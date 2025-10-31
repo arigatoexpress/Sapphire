@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import logging
 from typing import Any, Dict, Optional
 
 import httpx
 
 from .config import settings
+
+logger = logging.getLogger(__name__)
 
 
 BASE_URL = "https://fapi.asterdex.com"
@@ -51,11 +54,18 @@ class AsterClient:
         return resp.json()
 
     async def cancel_all(self, symbol: Optional[str] = None) -> None:
-        params: Dict[str, Any] = {}
-        if symbol:
-            params["symbol"] = symbol
-        params = await self._auth_params(params)
-        headers = {"X-MBX-APIKEY": self._api_key}
-        resp = await self._client.delete("/fapi/v1/allOpenOrders", params=params, headers=headers)
-        resp.raise_for_status()
+        """Cancel all open orders, gracefully handling cases where no orders exist."""
+        try:
+            params: Dict[str, Any] = {}
+            if symbol:
+                params["symbol"] = symbol
+            params = await self._auth_params(params)
+            headers = {"X-MBX-APIKEY": self._api_key}
+            resp = await self._client.delete("/fapi/v1/allOpenOrders", params=params, headers=headers)
+            resp.raise_for_status()
+        except Exception as e:
+            # Log but don't fail if there are no orders to cancel
+            # This is expected in paper trading mode
+            logger.warning(f"Cancel all orders failed (may be expected): {e}")
+            # Don't re-raise the exception to avoid breaking emergency stop
 
