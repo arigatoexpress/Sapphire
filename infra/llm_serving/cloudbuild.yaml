@@ -1,0 +1,50 @@
+steps:
+  # Build the container
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/llm/deepseek-trader:latest'
+      - '-f'
+      - 'infra/llm_serving/Dockerfile.vllm'
+      - '.'
+
+  # Push to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/llm/deepseek-trader:latest'
+
+  # Deploy to Cloud Run with TPU
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'deepseek-trader'
+      - '--image'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/llm/deepseek-trader:latest'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--set-env-vars'
+      - 'REDIS_URL=redis://10.161.118.219:6379,ORCHESTRATOR_URL=https://wallet-orchestrator-880429861698.us-central1.run.app'
+      - '--cpu'
+      - '4'
+      - '--memory'
+      - '16Gi'
+      - '--max-instances'
+      - '1'
+      - '--concurrency'
+      - '10'
+      - '--timeout'
+      - '3600'
+      - '--vpc-connector'
+      - 'projects/$PROJECT_ID/locations/us-central1/connectors/aster-vpc-connector'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'
+
+timeout: '3600s'

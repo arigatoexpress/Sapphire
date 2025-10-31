@@ -316,6 +316,53 @@ class TradingService:
         return self._health
 
     async def accept_inference_decision(self, request: InferenceRequest) -> None:
+        """Process LLM-generated trading decisions and execute orders"""
+        try:
+            decision = request.decision
+            confidence = request.confidence or 0.5
+            symbol = request.context.symbol
+
+            # Only execute high-confidence decisions
+            min_confidence = getattr(self._settings, 'min_llm_confidence', 0.7)
+            if confidence < min_confidence:
+                logger.info(f"🤖 LLM decision confidence {confidence:.2f} below threshold {min_confidence}, skipping")
+                decision.action = "HOLD"  # Override to hold
+
+            # Convert LLM decision to executable order
+            if decision.action in ["BUY", "SELL"] and confidence >= min_confidence:
+                # Calculate position size based on Kelly criterion and risk limits
+                position_size = self._calculate_position_size(decision, request.context, confidence)
+
+                if position_size > 0:
+                    order_intent = OrderIntent(
+                        symbol=symbol,
+                        side=decision.action,
+                        quantity=position_size,
+                        type="MARKET",
+                        client_order_id=generate_order_tag(request.bot_id, "llm"),
+                    )
+
+                    # Execute through orchestrator
+                    if self._orchestrator:
+                        await self._orchestrator.submit_order(request.bot_id, order_intent)
+                        logger.info(f"✅ LLM trade executed: {decision.action} {position_size} {symbol} (confidence: {confidence:.2f})")
+                    else:
+                        logger.warning("No orchestrator configured, cannot execute LLM order")
+                else:
+                    logger.info(f"LLM decision {decision.action} blocked by risk management (size: {position_size})")
+
+            elif decision.action == "CLOSE" and request.context.current_position:
+                # Close existing position
+                await self._close_position(request.bot_id, symbol)
+                logger.info(f"✅ Position closed via LLM decision for {symbol}")
+
+            else:
+                logger.info(f"🤖 LLM decision: {decision.action} {symbol} (confidence: {confidence:.2f})")
+
+        except Exception as exc:
+            logger.error(f"Failed to process LLM inference decision: {exc}")
+
+        # Always publish decision for telemetry
         decision_payload = {
             "bot_id": request.bot_id,
             "symbol": request.context.symbol,
@@ -342,6 +389,70 @@ class TradingService:
                     "timestamp": request.timestamp.isoformat(),
                 }
             )
+
+    def _calculate_position_size(self, decision: Any, context: Any, confidence: float) -> float:
+        """Calculate position size using Kelly criterion with risk limits"""
+        try:
+            # Get portfolio information
+            portfolio_value = self._portfolio.balance + self._portfolio.total_exposure
+            max_position_pct = getattr(self._settings, 'max_position_pct', 0.02)  # 2% default
+
+            # Kelly fraction (simplified)
+            kelly_fraction = min(confidence * 0.5, 0.25)  # Cap at 25% Kelly
+
+            # Calculate base position size
+            base_size = portfolio_value * max_position_pct * kelly_fraction
+
+            # Adjust for volatility and leverage
+            volatility_factor = 1.0  # Could be calculated from price data
+            leverage = context.get('leverage', 1)
+
+            position_size = base_size * volatility_factor / leverage
+
+            # Apply risk limits
+            max_size = portfolio_value * max_position_pct
+            position_size = min(position_size, max_size)
+
+            # Ensure minimum viable position
+            min_size = getattr(self._settings, 'min_position_size', 0.001)
+            position_size = max(position_size, min_size)
+
+            return position_size
+
+        except Exception as exc:
+            logger.warning(f"Failed to calculate position size: {exc}")
+            return 0.0
+
+    async def _close_position(self, bot_id: str, symbol: str) -> None:
+        """Close existing position for a symbol"""
+        try:
+            # Get current position
+            position = self._portfolio.positions.get(symbol)
+            if not position or position.notional == 0:
+                logger.info(f"No position to close for {symbol}")
+                return
+
+            # Create closing order (opposite side)
+            close_side = "SELL" if position.notional > 0 else "BUY"
+            close_quantity = abs(position.notional)
+
+            order_intent = OrderIntent(
+                symbol=symbol,
+                side=close_side,
+                quantity=close_quantity,
+                type="MARKET",
+                client_order_id=generate_order_tag(bot_id, "close"),
+            )
+
+            # Execute through orchestrator
+            if self._orchestrator:
+                await self._orchestrator.submit_order(bot_id, order_intent)
+                logger.info(f"Position closed: {close_side} {close_quantity} {symbol}")
+            else:
+                logger.warning("No orchestrator configured, cannot close position")
+
+        except Exception as exc:
+            logger.error(f"Failed to close position for {symbol}: {exc}")
 
     async def _publish_portfolio_state(self) -> None:
         positions = {symbol: position.notional for symbol, position in self._portfolio.positions.items()}
