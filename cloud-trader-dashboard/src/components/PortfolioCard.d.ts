@@ -1,3 +1,6 @@
 import React from 'react';
-declare const PortfolioCard: React.FC;
+interface PortfolioCardProps {
+    portfolio?: any;
+}
+declare const PortfolioCard: React.FC<PortfolioCardProps>;
 export default PortfolioCard;

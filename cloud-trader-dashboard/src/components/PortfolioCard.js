@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useState, useEffect } from 'react';
 import { fetchPortfolio } from '../api/client';
-const PortfolioCard = () => {
+const PortfolioCard = ({ portfolio: initialPortfolio }) => {
     const [portfolio, setPortfolio] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);

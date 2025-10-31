@@ -6,7 +6,12 @@ interface PerformanceData {
   pnl: number;
 }
 
-const PerformanceChart: React.FC = () => {
+interface PerformanceChartProps {
+  data?: any[];
+  detailed?: boolean;
+}
+
+const PerformanceChart: React.FC<PerformanceChartProps> = ({ data: initialData, detailed = false }) => {
   const [performanceData, setPerformanceData] = useState<PerformanceData[]>([]);
   const [loading, setLoading] = useState(true);
 

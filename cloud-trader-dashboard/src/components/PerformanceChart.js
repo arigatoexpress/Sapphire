@@ -1,6 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useState, useEffect } from 'react';
-const PerformanceChart = () => {
+const PerformanceChart = ({ data: initialData, detailed = false }) => {
     const [performanceData, setPerformanceData] = useState([]);
     const [loading, setLoading] = useState(true);
     // Mock performance data - in real implementation, this would come from your backend

@@ -1,3 +1,7 @@
 import React from 'react';
-declare const PerformanceChart: React.FC;
+interface PerformanceChartProps {
+    data?: any[];
+    detailed?: boolean;
+}
+declare const PerformanceChart: React.FC<PerformanceChartProps>;
 export default PerformanceChart;

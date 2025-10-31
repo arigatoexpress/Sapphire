@@ -1,4 +1,5 @@
 const API_URL = import.meta.env.VITE_API_URL || 'https://cloud-trader-880429861698.us-central1.run.app';
+const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL || 'https://trading-dashboard-880429861698.us-central1.run.app';
 
 export interface HealthResponse {
   running: boolean;
@@ -76,5 +77,9 @@ export const postStop = async (): Promise<ActionResponse> => {
 export const emergencyStop = async (): Promise<ActionResponse> => {
   const ORCHESTRATOR_URL = 'https://wallet-orchestrator-880429861698.us-central1.run.app';
   return (await fetchWithTimeout(`${ORCHESTRATOR_URL}/emergency_stop`, { method: 'POST' })) as ActionResponse;
+};
+
+export const fetchDashboard = async (): Promise<any> => {
+  return (await fetchWithTimeout(`${DASHBOARD_URL}/dashboard`)) as any;
 };
 

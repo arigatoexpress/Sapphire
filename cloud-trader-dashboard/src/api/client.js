@@ -1,4 +1,5 @@
 const API_URL = import.meta.env.VITE_API_URL || 'https://cloud-trader-880429861698.us-central1.run.app';
+const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL || 'https://trading-dashboard-880429861698.us-central1.run.app';
 const fetchWithTimeout = async (url, options = {}, timeout = 10_000) => {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
@@ -43,4 +44,7 @@ export const postStop = async () => {
 export const emergencyStop = async () => {
     const ORCHESTRATOR_URL = 'https://wallet-orchestrator-880429861698.us-central1.run.app';
     return (await fetchWithTimeout(`${ORCHESTRATOR_URL}/emergency_stop`, { method: 'POST' }));
+};
+export const fetchDashboard = async () => {
+    return (await fetchWithTimeout(`${DASHBOARD_URL}/dashboard`));
 };

@@ -25,4 +25,5 @@ export declare const fetchPortfolio: () => Promise<PortfolioResponse>;
 export declare const postStart: () => Promise<ActionResponse>;
 export declare const postStop: () => Promise<ActionResponse>;
 export declare const emergencyStop: () => Promise<ActionResponse>;
+export declare const fetchDashboard: () => Promise<any>;
 export {};

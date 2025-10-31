@@ -371,6 +371,10 @@ class TradingService:
             action=request.decision.action
         ).inc()
 
+        # Log which model was used
+        model_used = getattr(request, 'model_used', 'unknown')
+        logger.info(f"🤖 LLM Decision from {model_used}: {request.decision.action} {request.context.symbol} (confidence: {request.confidence:.2f})")
+
         # Always publish decision for telemetry
         decision_payload = {
             "bot_id": request.bot_id,

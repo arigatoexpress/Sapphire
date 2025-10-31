@@ -5,12 +5,32 @@ import StatusCard from './components/StatusCard';
 import PortfolioCard from './components/PortfolioCard';
 import PerformanceChart from './components/PerformanceChart';
 import RiskMetrics from './components/RiskMetrics';
+import ModelPerformance from './components/ModelPerformance';
+import ModelReasoning from './components/ModelReasoning';
+import LivePositions from './components/LivePositions';
+import SystemStatus from './components/SystemStatus';
+import TargetsAndAlerts from './components/TargetsAndAlerts';
+import PerformanceTrends from './components/PerformanceTrends';
+import NotificationCenter from './components/NotificationCenter';
 import { useTraderService } from './hooks/useTraderService';
+import { fetchDashboard } from './api/client';
+
+interface DashboardData {
+  portfolio: any;
+  positions: any[];
+  recent_trades: any[];
+  model_performance: any[];
+  model_reasoning: any[];
+  system_status: any;
+  targets: any;
+}
 
 const App: React.FC = () => {
   const { health, loading, error, logs, startTrader, stopTrader, refresh } = useTraderService();
   const [isMobile, setIsMobile] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'portfolio' | 'performance' | 'logs'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'models' | 'positions' | 'performance' | 'system'>('overview');
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -22,11 +42,31 @@ const App: React.FC = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Fetch comprehensive dashboard data
+  const fetchDashboardData = async () => {
+    try {
+      const data = await fetchDashboard();
+      setDashboardData(data);
+    } catch (err) {
+      console.error('Failed to fetch dashboard data:', err);
+    } finally {
+      setDashboardLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+    // Poll for updates every 5 seconds
+    const interval = setInterval(fetchDashboardData, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   const tabs = [
     { id: 'overview', label: 'Overview', icon: '📊' },
-    { id: 'portfolio', label: 'Portfolio', icon: '💼' },
-    { id: 'performance', label: 'Performance', icon: '📈' },
-    { id: 'logs', label: 'Activity', icon: '📝' },
+    { id: 'models', label: 'AI Models', icon: '🤖' },
+    { id: 'positions', label: 'Positions', icon: '📈' },
+    { id: 'performance', label: 'Performance', icon: '💰' },
+    { id: 'system', label: 'System', icon: '⚙️' },
   ] as const;
 
   return (
@@ -44,11 +84,26 @@ const App: React.FC = () => {
                 <p className="text-sm text-slate-500">Autonomous Trading System</p>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <div className={`w-2 h-2 rounded-full ${health?.running ? 'bg-green-500' : 'bg-red-500'}`}></div>
-              <span className="text-sm font-medium text-slate-600">
-                {health?.running ? 'Live' : 'Stopped'}
-              </span>
+            <div className="flex items-center space-x-4">
+              <div className="text-right">
+                <div className="text-sm text-slate-600">Total P&L</div>
+                <div className={`text-lg font-bold ${dashboardData?.portfolio?.total_pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  ${dashboardData?.portfolio?.total_pnl?.toFixed(2) || '0.00'}
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className={`w-2 h-2 rounded-full ${health?.running ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                <span className="text-sm font-medium text-slate-600">
+                  {health?.running ? 'Live' : 'Stopped'}
+                </span>
+              </div>
+              <NotificationCenter alerts={dashboardData?.targets?.alerts || []} />
+              <button
+                onClick={fetchDashboardData}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm transition-colors"
+              >
+                🔄 Refresh
+              </button>
             </div>
           </div>
         </div>
@@ -94,73 +149,72 @@ const App: React.FC = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Content */}
-          <div className={`${isMobile ? 'col-span-1' : 'lg:col-span-2'} space-y-6`}>
+        {/* Tab Content */}
+        {dashboardLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <span className="ml-3 text-slate-600">Loading dashboard data...</span>
+          </div>
+        ) : (
+          <div className="space-y-6">
             {/* Overview Tab */}
-            {(activeTab === 'overview' || !isMobile) && (
+            {activeTab === 'overview' && (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <StatusCard health={health} loading={loading} />
-                  <ControlsPanel
-                    health={health}
-                    loading={loading}
-                    onStart={startTrader}
-                    onStop={stopTrader}
-                    onRefresh={refresh}
-                  />
+                  <PortfolioCard portfolio={dashboardData?.portfolio} />
                 </div>
-
-                {!isMobile && (
-                  <>
-                    <PortfolioCard />
-                    <PerformanceChart />
-                  </>
-                )}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <PerformanceChart data={dashboardData?.recent_trades || []} />
+                  <RiskMetrics positions={dashboardData?.positions || []} />
+                </div>
+                <TargetsAndAlerts targets={dashboardData?.targets} />
+                <ActivityLog logs={logs} />
               </>
             )}
 
-            {/* Portfolio Tab */}
-            {activeTab === 'portfolio' && isMobile && <PortfolioCard />}
+            {/* Models Tab */}
+            {activeTab === 'models' && (
+              <div className="space-y-6">
+                <ModelPerformance models={dashboardData?.model_performance || []} />
+                <ModelReasoning reasoning={dashboardData?.model_reasoning || []} />
+              </div>
+            )}
+
+            {/* Positions Tab */}
+            {activeTab === 'positions' && (
+              <div className="space-y-6">
+                <LivePositions positions={dashboardData?.positions || []} />
+              </div>
+            )}
 
             {/* Performance Tab */}
-            {activeTab === 'performance' && isMobile && <PerformanceChart />}
-
-            {/* Activity Logs */}
-            {activeTab === 'logs' && <ActivityLog logs={logs} />}
-          </div>
-
-          {/* Sidebar */}
-          {!isMobile && (
-            <div className="space-y-6">
-              <RiskMetrics />
-              <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-                <h3 className="text-lg font-semibold text-slate-900 mb-4">Quick Actions</h3>
-                <div className="space-y-3">
-                  <button
-                    onClick={refresh}
-                    disabled={loading}
-                    className="w-full flex items-center justify-center px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors disabled:opacity-50"
-                  >
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Refresh Data
-                  </button>
-                  <button
-                    onClick={() => window.location.reload()}
-                    className="w-full flex items-center justify-center px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"
-                  >
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    Reload Dashboard
-                  </button>
+            {activeTab === 'performance' && (
+              <div className="space-y-6">
+                <PerformanceTrends trades={dashboardData?.recent_trades || []} />
+                <PerformanceChart data={dashboardData?.recent_trades || []} detailed />
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <RiskMetrics positions={dashboardData?.positions || []} />
+                  <TargetsAndAlerts targets={dashboardData?.targets} />
                 </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+
+            {/* System Tab */}
+            {activeTab === 'system' && (
+              <div className="space-y-6">
+                <SystemStatus status={dashboardData?.system_status} />
+                <ControlsPanel
+                  health={health}
+                  loading={loading}
+                  onStart={startTrader}
+                  onStop={stopTrader}
+                  onRefresh={refresh}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

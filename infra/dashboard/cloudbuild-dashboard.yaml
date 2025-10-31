@@ -1,0 +1,54 @@
+steps:
+  # Build the dashboard service container
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-f'
+      - 'infra/dashboard/Dockerfile.dashboard'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/trading-dashboard:latest'
+      - '--build-arg'
+      - 'BUILDKIT_INLINE_CACHE=1'
+      - '.'
+
+  # Push the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/trading-dashboard:latest'
+
+  # Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'trading-dashboard'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/trading-dashboard:latest'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--port'
+      - '8080'
+      - '--memory'
+      - '512Mi'
+      - '--cpu'
+      - '1'
+      - '--max-instances'
+      - '5'
+      - '--concurrency'
+      - '50'
+      - '--timeout'
+      - '300'
+      - '--set-env-vars'
+      - 'ORCHESTRATOR_URL=https://wallet-orchestrator-880429861698.us-central1.run.app'
+      - '--set-env-vars'
+      - 'CLOUD_TRADER_URL=https://cloud-trader-880429861698.us-central1.run.app'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: '1800s'

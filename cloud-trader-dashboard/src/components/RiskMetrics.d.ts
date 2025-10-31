@@ -1,3 +1,6 @@
 import React from 'react';
-declare const RiskMetrics: React.FC;
+interface RiskMetricsProps {
+    positions?: any[];
+}
+declare const RiskMetrics: React.FC<RiskMetricsProps>;
 export default RiskMetrics;

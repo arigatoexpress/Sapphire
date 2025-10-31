@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { fetchPortfolio, PortfolioResponse } from '../api/client';
 
-const PortfolioCard: React.FC = () => {
+interface PortfolioCardProps {
+  portfolio?: any;
+}
+
+const PortfolioCard: React.FC<PortfolioCardProps> = ({ portfolio: initialPortfolio }) => {
   const [portfolio, setPortfolio] = useState<PortfolioResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

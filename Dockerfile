@@ -20,6 +20,9 @@ COPY cloud_trader ./cloud_trader
 COPY run_live_trader.py ./
 COPY pyproject.toml README.md ./
 
+# Copy frontend build files
+COPY cloud-trader-dashboard/dist ./static/
+
 # Create non-root user
 RUN useradd --create-home --shell /bin/bash trader \
     && chown -R trader:trader /app

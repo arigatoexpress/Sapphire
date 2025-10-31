@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { fetchPortfolio, PortfolioResponse, emergencyStop } from '../api/client';
 
-const RiskMetrics: React.FC = () => {
+interface RiskMetricsProps {
+  positions?: any[];
+}
+
+const RiskMetrics: React.FC<RiskMetricsProps> = ({ positions: initialPositions }) => {
   const [portfolio, setPortfolio] = useState<PortfolioResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [emergencyLoading, setEmergencyLoading] = useState(false);

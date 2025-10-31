@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { useState, useEffect } from 'react';
 import { fetchPortfolio, emergencyStop } from '../api/client';
-const RiskMetrics = () => {
+const RiskMetrics = ({ positions: initialPositions }) => {
     const [portfolio, setPortfolio] = useState(null);
     const [loading, setLoading] = useState(true);
     const [emergencyLoading, setEmergencyLoading] = useState(false);
