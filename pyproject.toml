@@ -21,6 +21,19 @@ dependencies = [
     "pydantic>=2.5.0",
     "pydantic-settings>=2.1.0",
     "google-cloud-secret-manager>=2.16.0",
+    "redis>=5.0.3",
+    "httpx>=0.26.0",
+    "orjson>=3.10.7",
+    "prometheus-fastapi-instrumentator>=6.0.0",
+]
+
+[project.optional-dependencies]
+analytics = [
+    "feast>=0.44.1",
+    "sentence-transformers>=2.6.1",
+    "optuna>=3.6.1",
+    "panel>=1.4.4",
+    "plotly>=5.22.0",
 ]
 
 [project.urls]

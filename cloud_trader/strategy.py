@@ -14,17 +14,15 @@ class MarketSnapshot:
 
 
 class MomentumStrategy:
-    """Very small heuristic for demonstration purposes."""
+    """Momentum heuristic with configurable aggressiveness."""
 
-    def __init__(self, threshold: float = 2.5) -> None:
+    def __init__(self, threshold: float = 2.5, notional_fraction: float = 0.05) -> None:
         self.threshold = threshold
+        self.notional_fraction = notional_fraction
 
     def should_enter(self, symbol: str, market: MarketSnapshot) -> Optional[str]:
-        """Return order side ('BUY'/'SELL') or None."""
-
         if market.volume <= 0 or market.price <= 0:
             return None
-
         if market.change_24h >= self.threshold:
             return "BUY"
         if market.change_24h <= -self.threshold:
@@ -32,7 +30,7 @@ class MomentumStrategy:
         return None
 
     def allocate_notional(self, portfolio_balance: float) -> float:
-        return portfolio_balance * 0.05  # deploy 5% per signal
+        return portfolio_balance * max(min(self.notional_fraction, 0.5), 0.001)
 
 
 def parse_market_payload(payload: Dict[str, float]) -> MarketSnapshot:

@@ -1,0 +1,31 @@
+FROM ubuntu:22.04 AS build
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    python3 && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+RUN git clone https://github.com/ggerganov/llama.cpp.git
+WORKDIR /workspace/llama.cpp
+RUN cmake -S . -B build -DLLAMA_CUBLAS=OFF && \
+    cmake --build build --config Release --target server
+
+FROM ubuntu:22.04
+
+RUN apt-get update && apt-get install -y \
+    libgomp1 \
+    python3 && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --from=build /workspace/llama.cpp/build/bin/server ./server
+
+VOLUME ["/models"]
+
+EXPOSE 8081
+
+ENTRYPOINT ["./server"]
+

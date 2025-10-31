@@ -1,0 +1,30 @@
+version: "3.9"
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: trader-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:10.4.3
+    container_name: trader-grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana.json:/var/lib/grafana/dashboards/trader.json:ro
+      - ./grafana-provisioning.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+    ports:
+      - "3000:3000"
+
+volumes:
+  grafana-data:
+

@@ -6,7 +6,7 @@ import asyncio
 import hashlib
 import hmac
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import aiohttp
 
@@ -54,14 +54,23 @@ class AsterClient:
     async def ticker(self, symbol: str) -> Dict[str, Any]:
         return await self._get("/fapi/v1/ticker/24hr", params={"symbol": symbol}, signed=False) or {}
 
-    async def account_balance(self) -> Dict[str, Any]:
-        return await self._get("/fapi/v2/balance", signed=True) or {}
+    async def account_balance(self) -> List[Dict[str, Any]]:
+        payload = await self._get("/fapi/v2/balance", signed=True)
+        if isinstance(payload, list):
+            return payload
+        return []
 
     async def place_order(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         return await self._post("/fapi/v1/order", data=payload, signed=True) or {}
 
     async def cancel_all_orders(self, symbol: str) -> Dict[str, Any]:
         return await self._delete("/fapi/v1/allOpenOrders", params={"symbol": symbol}, signed=True) or {}
+
+    async def position_risk(self) -> List[Dict[str, Any]]:
+        payload = await self._get("/fapi/v2/positionRisk", signed=True)
+        if isinstance(payload, list):
+            return payload
+        return []
 
     # ------------------------------------------------------------------
     # Internal helpers
