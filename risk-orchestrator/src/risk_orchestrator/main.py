@@ -88,6 +88,13 @@ async def emergency_stop() -> dict:
     logger.critical("Emergency stop triggered. All open orders cancelled.")
     return {"status": "stopped"}
 
+@app.get("/portfolio")
+async def get_portfolio() -> dict:
+    if not aster_client:
+        raise HTTPException(status_code=503, detail="Service not ready")
+    account = await aster_client.get_account()
+    return account
+
 
 async def route_to_aster(order: dict, bot_id: str, order_id: str) -> None:
     if not aster_client or not redis_client:
