@@ -22,6 +22,10 @@ def build_app(service: TradingService | None = None) -> FastAPI:
         "reasoning": trading_service.settings.reasoning_stream,
     }
 
+    @app.get("/")
+    async def root() -> Dict[str, str]:
+        return {"status": "ok", "service": "cloud-trader"}
+
     @app.get("/healthz")
     async def healthz() -> Dict[str, object]:
         status = trading_service.health()
