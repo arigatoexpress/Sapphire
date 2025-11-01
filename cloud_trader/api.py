@@ -11,6 +11,7 @@ import httpx
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from .service import TradingService
@@ -34,6 +35,15 @@ RISK_LIMITS_BREACHED = Counter('trading_risk_limits_breached', 'Risk limit breac
 def build_app(service: TradingService | None = None) -> FastAPI:
     trading_service = service or TradingService()
     app = FastAPI(title="Cloud Trader", version="1.0")
+
+    # Add CORS middleware
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],  # Allow all origins for development
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     # Add Prometheus instrumentation
     Instrumentator().instrument(app).expose(app, endpoint="/metrics")
