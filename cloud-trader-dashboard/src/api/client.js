@@ -1,4 +1,16 @@
-const API_URL = import.meta.env.VITE_API_URL || 'https://cloud-trader-880429861698.us-central1.run.app';
+// Get API URL with fallback to current origin for development
+const getApiUrl = () => {
+    const envUrl = import.meta.env.VITE_API_URL;
+    if (envUrl)
+        return envUrl;
+    // In production, use the same origin as the frontend
+    if (typeof window !== 'undefined') {
+        return window.location.origin;
+    }
+    // Fallback for SSR/development
+    return 'http://localhost:8000';
+};
+const API_URL = getApiUrl();
 const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL || API_URL;
 const fetchWithTimeout = async (url, options = {}, timeout = 10_000) => {
     const controller = new AbortController();

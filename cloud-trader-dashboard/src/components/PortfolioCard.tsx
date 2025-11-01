@@ -41,7 +41,7 @@ const PortfolioCard: React.FC<PortfolioCardProps> = ({ portfolio }) => {
   const exposure = portfolio.total_exposure ?? 0;
   const available = Math.max(balance - exposure, 0);
 
-  return (
+    return (
     <div className="relative overflow-hidden rounded-2xl border border-surface-200/40 bg-surface-100/80 p-6 shadow-glass">
       <div className="absolute inset-0 bg-gradient-to-br from-primary-500/5 via-transparent to-transparent" />
       <div className="relative flex items-center justify-between">
@@ -83,7 +83,7 @@ const PortfolioCard: React.FC<PortfolioCardProps> = ({ portfolio }) => {
                 key={position.symbol}
                 className="flex items-center justify-between rounded-xl border border-surface-200/40 bg-surface-50/30 px-4 py-3 text-sm text-slate-200"
               >
-                <div>
+                  <div>
                   <p className="font-medium text-white">{position.symbol}</p>
                   <p className="text-xs text-slate-400">Gross notional</p>
                 </div>

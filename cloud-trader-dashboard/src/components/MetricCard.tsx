@@ -19,25 +19,26 @@ const MetricCard: React.FC<MetricCardProps> = ({ label, value, delta, icon, acce
     };
 
     return (
-        <div className={`relative overflow-hidden rounded-2xl border ${accentMap[accent]} bg-surface-100/60 p-6 shadow-glass`}>
+        <div className={`group relative overflow-hidden rounded-2xl border ${accentMap[accent]} bg-surface-100/60 p-6 shadow-glass transition-all duration-200 hover:shadow-glass-lg hover:scale-[1.02] hover:bg-surface-100/70`}>
             <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
             <div className="relative flex items-start justify-between">
-                <div>
-                    <p className="text-xs uppercase tracking-[0.35em] text-slate-400">{label}</p>
-                    <div className="mt-2 text-3xl font-semibold text-white">{value}</div>
+                <div className="transition-transform duration-200 group-hover:translate-y-[-1px]">
+                    <p className="text-xs uppercase tracking-[0.35em] text-slate-400 transition-colors duration-200 group-hover:text-slate-300">{label}</p>
+                    <div className="mt-2 text-3xl font-semibold text-white transition-transform duration-200 group-hover:scale-105">{value}</div>
                     {delta && (
                         <div className="mt-2 flex items-center gap-2 text-xs font-medium text-slate-300">
-                            <span className={deltaColor}>
+                            <span className={`${deltaColor} transition-all duration-200 group-hover:scale-110`}>
                                 {delta.value >= 0 ? '+' : ''}
                                 {delta.value.toFixed(2)}%
                             </span>
-                            <span>{delta.label ?? 'vs previous'}</span>
+                            <span className="transition-colors duration-200 group-hover:text-slate-400">{delta.label ?? 'vs previous'}</span>
                         </div>
                     )}
                 </div>
-                {icon && <span className="text-3xl">{icon}</span>}
+                {icon && <span className="text-3xl transition-transform duration-200 group-hover:scale-110 group-hover:rotate-3">{icon}</span>}
             </div>
-            {footer && <div className="relative mt-4 text-xs text-slate-400">{footer}</div>}
+            {footer && <div className="relative mt-4 text-xs text-slate-400 transition-colors duration-200 group-hover:text-slate-300">{footer}</div>}
         </div>
     );
 };

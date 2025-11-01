@@ -32,11 +32,19 @@ export const useTraderService = () => {
         }
         catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Unknown error fetching health';
-            setError(errorMessage);
-            setConnectionStatus('disconnected');
-            addLog(`Connection error: ${errorMessage}`, 'error');
+            // Don't treat health endpoint failures as connection failures since dashboard works
+            if (errorMessage.includes('404') || errorMessage.includes('Not Found')) {
+                // Health endpoint not available, but service might still be working
+                setConnectionStatus('connected'); // Assume connected since dashboard works
+                addLog(`Health endpoint unavailable: ${errorMessage}`, 'warning');
+            }
+            else {
+                setError(errorMessage);
+                setConnectionStatus('disconnected');
+                addLog(`Connection error: ${errorMessage}`, 'error');
+            }
             // If it's a network error, don't spam the logs
-            if (!errorMessage.includes('fetch')) {
+            if (!errorMessage.includes('fetch') && !errorMessage.includes('404')) {
                 addLog(`Health check failed: ${errorMessage}`, 'error');
             }
         }

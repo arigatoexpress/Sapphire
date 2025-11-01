@@ -126,6 +126,6 @@ run_cmd gcloud run deploy "${SERVICE_NAME}" \
 if $DRY_RUN; then
   echo "✅ Dry run complete"
 else
-  echo "✅ Deployment complete"
+echo "✅ Deployment complete"
 fi
 

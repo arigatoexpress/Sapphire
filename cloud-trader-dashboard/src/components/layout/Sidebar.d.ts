@@ -7,6 +7,8 @@ interface SidebarProps {
     }>;
     activeTab: string;
     onSelect: (id: string) => void;
+    mobileMenuOpen?: boolean;
+    setMobileMenuOpen?: (open: boolean) => void;
 }
 declare const Sidebar: React.FC<SidebarProps>;
 export default Sidebar;

@@ -27,7 +27,7 @@ const PerformanceChart = ({ data: initialData, detailed = false }) => {
     const formatCurrency = (value) => {
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
-            currency: 'USDT',
+            currency: 'USD',
             minimumFractionDigits: 0,
             maximumFractionDigits: 0,
         }).format(value);

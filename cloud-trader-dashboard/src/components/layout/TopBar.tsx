@@ -4,9 +4,11 @@ interface TopBarProps {
     onRefresh: () => void;
     lastUpdated?: string;
     healthRunning?: boolean;
+    mobileMenuOpen?: boolean;
+    setMobileMenuOpen?: (open: boolean) => void;
 }
 
-const TopBar: React.FC<TopBarProps> = ({ onRefresh, lastUpdated, healthRunning }) => {
+const TopBar: React.FC<TopBarProps> = ({ onRefresh, lastUpdated, healthRunning, mobileMenuOpen, setMobileMenuOpen }) => {
     const statusLabel = healthRunning ? 'Live' : 'Paused';
     const statusColor = healthRunning ? 'bg-emerald-400/80' : 'bg-amber-400/80';
 
@@ -37,12 +39,26 @@ const TopBar: React.FC<TopBarProps> = ({ onRefresh, lastUpdated, healthRunning }
                     <button
                         type="button"
                         onClick={onRefresh}
-                        className="group relative overflow-hidden rounded-full bg-primary-500/80 px-4 py-2 text-sm font-medium text-white shadow-glass transition hover:bg-primary-500"
+                        className="group relative overflow-hidden rounded-full bg-primary-500/80 px-4 py-2 text-sm font-medium text-white shadow-glass transition-all duration-200 hover:bg-primary-500 hover:scale-105 active:scale-95"
                     >
-                        <span className="mr-2">🔄</span>
+                        <span className="mr-2 transition-transform duration-200 group-hover:rotate-180">🔄</span>
                         Refresh
-                        <span className="absolute inset-0 -z-10 bg-gradient-to-r from-accent-teal/40 to-transparent opacity-0 transition group-hover:opacity-100" />
+                        <span className="absolute inset-0 -z-10 bg-gradient-to-r from-accent-teal/40 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
+                        <span className="absolute inset-0 rounded-full bg-white/10 opacity-0 group-active:opacity-100 transition-opacity duration-100" />
                     </button>
+
+                    {/* Mobile menu button */}
+                    {setMobileMenuOpen && (
+                        <button
+                            type="button"
+                            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                            className="lg:hidden p-2 rounded-lg text-slate-400 hover:text-white hover:bg-surface-200/60 transition-colors duration-200"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={mobileMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} />
+                            </svg>
+                        </button>
+                    )}
                 </div>
             </div>
         </header>
