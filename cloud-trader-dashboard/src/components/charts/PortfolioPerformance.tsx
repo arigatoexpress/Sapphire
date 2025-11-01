@@ -74,24 +74,9 @@ const PortfolioPerformance: React.FC<PortfolioPerformanceProps> = ({ balanceSeri
 
         chartRef.current = chart;
 
-        const areaSeries = chart.addAreaSeries({
-            lineColor: 'rgba(76, 99, 255, 1)',
-            topColor: 'rgba(76, 99, 255, 0.25)',
-            bottomColor: 'rgba(76, 99, 255, 0.02)',
-            priceFormat: {
-                type: 'custom',
-                formatter: (price: number) => `$${price.toFixed(2)}`,
-            },
-        });
-
-        const lineSeries = chart.addLineSeries({
-            color: 'rgba(34, 211, 238, 0.9)',
-            lineWidth: 2,
-            priceFormat: {
-                type: 'custom',
-                formatter: (price: number) => `$${price.toFixed(2)}`,
-            },
-        });
+        // Temporarily disable chart creation to prevent crash
+        const areaSeries = null;
+        const lineSeries = null;
 
         areaSeriesRef.current = areaSeries;
         lineSeriesRef.current = lineSeries;
@@ -117,15 +102,16 @@ const PortfolioPerformance: React.FC<PortfolioPerformanceProps> = ({ balanceSeri
     }, []);
 
     useEffect(() => {
-        if (areaSeriesRef.current && balanceData.length > 0) {
-            areaSeriesRef.current.setData(balanceData);
-        }
-        if (lineSeriesRef.current && priceData.length > 0) {
-            lineSeriesRef.current.setData(priceData);
-        }
-        if (chartRef.current) {
-            chartRef.current.timeScale().fitContent();
-        }
+        // Temporarily disabled to prevent crash
+        // if (areaSeriesRef.current && balanceData.length > 0) {
+        //     areaSeriesRef.current.setData(balanceData);
+        // }
+        // if (lineSeriesRef.current && priceData.length > 0) {
+        //     lineSeriesRef.current.setData(priceData);
+        // }
+        // if (chartRef.current) {
+        //     chartRef.current.timeScale().fitContent();
+        // }
     }, [balanceData, priceData]);
 
     return <div ref={containerRef} className="h-64 w-full" />;
