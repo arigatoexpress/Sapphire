@@ -70,11 +70,11 @@ const PortfolioPerformance: React.FC<PortfolioPerformanceProps> = ({ balanceSeri
                 timeVisible: true,
                 secondsVisible: false,
             },
-        }) as any;
+        });
 
         chartRef.current = chart;
 
-        // Temporarily disable chart creation to prevent crash
+        // Temporarily disable chart series creation due to API issues
         const areaSeries = null;
         const lineSeries = null;
 
@@ -102,7 +102,7 @@ const PortfolioPerformance: React.FC<PortfolioPerformanceProps> = ({ balanceSeri
     }, []);
 
     useEffect(() => {
-        // Temporarily disabled to prevent crash
+        // Temporarily disabled due to chart API issues
         // if (areaSeriesRef.current && balanceData.length > 0) {
         //     areaSeriesRef.current.setData(balanceData);
         // }
