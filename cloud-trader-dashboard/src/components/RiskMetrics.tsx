@@ -82,7 +82,7 @@ const RiskMetrics: React.FC<RiskMetricsProps> = ({ portfolio }) => {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USDT',
+      currency: 'USD',
       minimumFractionDigits: 2,
     }).format(value);
   };
@@ -121,7 +121,7 @@ const RiskMetrics: React.FC<RiskMetricsProps> = ({ portfolio }) => {
         {riskMetrics && (
           <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="rounded-xl border border-surface-200/40 bg-surface-50/40 p-4">
-              <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-slate-300">Leverage Ratio</p>
                 <span className={`rounded-full px-2 py-1 text-xs font-semibold ${riskMetrics.leverageRisk.bg} ${riskMetrics.leverageRisk.color}`}>
                   {riskMetrics.leverageRisk.level.toUpperCase()}
@@ -132,7 +132,7 @@ const RiskMetrics: React.FC<RiskMetricsProps> = ({ portfolio }) => {
             </div>
 
             <div className="rounded-xl border border-surface-200/40 bg-surface-50/40 p-4">
-              <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-slate-300">Concentration Risk</p>
                 <span className={`rounded-full px-2 py-1 text-xs font-semibold ${riskMetrics.concentrationRiskLevel.bg} ${riskMetrics.concentrationRiskLevel.color}`}>
                   {riskMetrics.concentrationRiskLevel.level.toUpperCase()}
@@ -147,13 +147,13 @@ const RiskMetrics: React.FC<RiskMetricsProps> = ({ portfolio }) => {
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-400">Margin Utilisation</span>
                   <span className="font-medium text-white">
-                    {formatCurrency(riskMetrics.marginUsed)} / {formatCurrency(riskMetrics.totalBalance)}
-                  </span>
-                </div>
+                  {formatCurrency(riskMetrics.marginUsed)} / {formatCurrency(riskMetrics.totalBalance)}
+                </span>
+              </div>
                 <div className="mt-3 h-2 rounded-full bg-slate-700/60">
-                  <div
+                <div
                     className="h-full rounded-full bg-gradient-to-r from-primary-500 via-accent-teal to-accent-emerald"
-                    style={{ width: `${Math.min((riskMetrics.marginUsed / riskMetrics.totalBalance) * 100, 100)}%` }}
+                  style={{ width: `${Math.min((riskMetrics.marginUsed / riskMetrics.totalBalance) * 100, 100)}%` }}
                   />
                 </div>
               </div>
