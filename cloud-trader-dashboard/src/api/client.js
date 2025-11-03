@@ -1,17 +1,33 @@
+const DEFAULT_API_URL = 'https://cloud-trader-cfxefrvooa-uc.a.run.app';
+const DEFAULT_DASHBOARD_URL = 'https://wallet-orchestrator-cfxefrvooa-uc.a.run.app';
 // Get API URL with fallback to current origin for development
 const getApiUrl = () => {
     const envUrl = import.meta.env.VITE_API_URL;
     if (envUrl)
         return envUrl;
-    // In production, use the same origin as the frontend
     if (typeof window !== 'undefined') {
-        return window.location.origin;
+        const origin = window.location.origin;
+        const hostname = window.location.hostname;
+        if (hostname === '127.0.0.1' || hostname === 'localhost') {
+            return DEFAULT_API_URL;
+        }
+        return origin;
     }
     // Fallback for SSR/development
-    return 'http://localhost:8000';
+    return DEFAULT_API_URL;
 };
 const API_URL = getApiUrl();
-const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL || API_URL;
+const DASHBOARD_URL = (() => {
+    if (import.meta.env.VITE_DASHBOARD_URL)
+        return import.meta.env.VITE_DASHBOARD_URL;
+    if (typeof window !== 'undefined') {
+        const hostname = window.location.hostname;
+        if (hostname === '127.0.0.1' || hostname === 'localhost') {
+            return DEFAULT_DASHBOARD_URL;
+        }
+    }
+    return `${DEFAULT_DASHBOARD_URL}`;
+})();
 const fetchWithTimeout = async (url, options = {}, timeout = 15_000) => {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
