@@ -20,7 +20,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Service endpoints
-ORCHESTRATOR_URL = os.getenv("ORCHESTRATOR_URL", "https://wallet-orchestrator-880429861698.us-central1.run.app")
+ORCHESTRATOR_URL = os.getenv("ORCHESTRATOR_URL", "https://api.sapphiretrade.xyz/orchestrator")
 CLOUD_TRADER_URL = os.getenv("CLOUD_TRADER_URL", "https://cloud-trader-880429861698.us-central1.run.app")
 
 class ModelPerformance(BaseModel):

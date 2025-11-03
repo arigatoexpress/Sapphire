@@ -21,7 +21,7 @@ scrape_configs:
 
   - job_name: 'wallet-orchestrator'
     static_configs:
-      - targets: ['wallet-orchestrator-880429861698.us-central1.run.app']
+      - targets: ['api.sapphiretrade.xyz']
     scrape_interval: 10s
     metrics_path: '/metrics'
     params:

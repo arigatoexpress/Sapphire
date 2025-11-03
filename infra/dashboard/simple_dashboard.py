@@ -28,7 +28,7 @@ static_path = "/app/static"
 if os.path.exists(static_path):
     app.mount("/static", StaticFiles(directory=static_path), name="static")
 
-ORCHESTRATOR_URL = os.getenv("ORCHESTRATOR_URL", "https://wallet-orchestrator-880429861698.us-central1.run.app")
+ORCHESTRATOR_URL = os.getenv("ORCHESTRATOR_URL", "https://api.sapphiretrade.xyz/orchestrator")
 CLOUD_TRADER_URL = os.getenv("CLOUD_TRADER_URL", "https://cloud-trader-880429861698.us-central1.run.app")
 
 @app.get("/")

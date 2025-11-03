@@ -4,7 +4,7 @@ import asyncio
 import contextlib
 from typing import Optional
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import APIRouter, BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 from loguru import logger
@@ -32,6 +32,7 @@ from .utils import generate_order_id
 
 
 app = FastAPI(title="Risk Orchestrator", version="0.1.0")
+prefixed_router = APIRouter(prefix="/orchestrator")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -230,15 +231,43 @@ async def get_portfolio() -> dict:
 
     # Fetch fresh data
     try:
-    account = await aster_client.get_account()
+        account = await aster_client.get_account()
         await redis_client.set_portfolio(account)
-    return account
+        return account
     except httpx.HTTPStatusError as exc:
         status_code = exc.response.status_code if exc.response else None
         if status_code == 429 and cached:
             logger.warning("Rate limited fetching portfolio; returning cached snapshot")
             return cached
         raise HTTPException(status_code=503, detail="Failed to fetch live portfolio")
+
+
+@prefixed_router.get("/")
+async def prefixed_root() -> dict:
+    return await root()
+
+
+@prefixed_router.get("/healthz")
+async def prefixed_healthz() -> dict:
+    return await healthz()
+
+
+@prefixed_router.post("/order/{bot_id}")
+async def prefixed_submit_order(bot_id: str, intent: OrderIntent, background: BackgroundTasks) -> RiskCheckResponse:
+    return await submit_order(bot_id, intent, background)
+
+
+@prefixed_router.post("/emergency_stop")
+async def prefixed_emergency_stop() -> dict:
+    return await emergency_stop()
+
+
+@prefixed_router.get("/portfolio")
+async def prefixed_portfolio() -> dict:
+    return await get_portfolio()
+
+
+app.include_router(prefixed_router)
 
 
 async def route_to_aster(order: dict, bot_id: str, order_id: str) -> None:

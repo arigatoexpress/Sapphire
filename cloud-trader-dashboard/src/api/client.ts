@@ -160,7 +160,7 @@ export const postStop = async (): Promise<ActionResponse> => {
 };
 
 export const emergencyStop = async (): Promise<ActionResponse> => {
-  const ORCHESTRATOR_URL = 'https://wallet-orchestrator-880429861698.us-central1.run.app';
+  const ORCHESTRATOR_URL = 'https://api.sapphiretrade.xyz/orchestrator';
   return (await fetchWithTimeout(`${ORCHESTRATOR_URL}/emergency_stop`, { method: 'POST' })) as ActionResponse;
 };
 

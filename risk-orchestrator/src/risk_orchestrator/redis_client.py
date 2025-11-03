@@ -4,7 +4,7 @@ import json
 from typing import Any, Dict, Optional
 
 try:  # pragma: no cover - optional dependency
-import redis.asyncio as redis
+    import redis.asyncio as redis
 except Exception:  # pragma: no cover
     redis = None  # type: ignore
 
@@ -17,6 +17,7 @@ class RedisClient:
         self._portfolio_cache: Dict[str, Any] = {}
         self._pending_orders: Dict[str, float] = {}
         self._events: list[Dict[str, Any]] = []
+        self._portfolio_timestamp: Optional[float] = None
 
     @staticmethod
     def _build_redis_client(url: Optional[str]):
@@ -29,10 +30,11 @@ class RedisClient:
 
     async def close(self) -> None:
         if self._redis:
-        await self._redis.close()
+            await self._redis.close()
 
     async def set_portfolio(self, data: Dict[str, Any]) -> None:
         import time
+
         self._portfolio_cache = data
         self._portfolio_timestamp = time.time()
         if self._redis:
@@ -45,7 +47,7 @@ class RedisClient:
     async def get_portfolio(self) -> Dict[str, Any]:
         if self._redis:
             try:
-        payload = await self._redis.get("portfolio:current")
+                payload = await self._redis.get("portfolio:current")
                 if payload:
                     self._portfolio_cache = json.loads(payload)
             except Exception:
@@ -55,6 +57,7 @@ class RedisClient:
     async def get_portfolio_age(self) -> Optional[float]:
         """Return age of portfolio cache in seconds, or None if no cache."""
         import time
+
         if self._redis:
             try:
                 timestamp_str = await self._redis.get("portfolio:timestamp")
@@ -62,15 +65,15 @@ class RedisClient:
                     return time.time() - float(timestamp_str)
             except Exception:
                 pass
-        if hasattr(self, '_portfolio_timestamp'):
+        if self._portfolio_timestamp is not None:
             return time.time() - self._portfolio_timestamp
         return None
 
     async def add_pending_order(self, order_id: str) -> None:
         if self._redis:
             try:
-        await self._redis.sadd("orders:pending", order_id)
-        await self._redis.expire("orders:pending", 3600)
+                await self._redis.sadd("orders:pending", order_id)
+                await self._redis.expire("orders:pending", 3600)
                 return
             except Exception:
                 pass
@@ -79,19 +82,32 @@ class RedisClient:
     async def is_duplicate(self, order_id: str) -> bool:
         if self._redis:
             try:
-        return bool(await self._redis.sismember("orders:pending", order_id))
+                exists = await self._redis.sismember("orders:pending", order_id)
+                if exists:
+                    return True
             except Exception:
                 pass
         return order_id in self._pending_orders
 
-    async def log_event(self, event: Dict[str, Any]) -> None:
+    async def remove_pending_order(self, order_id: str) -> None:
         if self._redis:
             try:
-        await self._redis.xadd("events:log", event)
+                await self._redis.srem("orders:pending", order_id)
                 return
             except Exception:
                 pass
-        self._events.append(event)
+        self._pending_orders.pop(order_id, None)
+
+    async def log_event(self, event: Dict[str, Any]) -> None:
+        if self._redis:
+            try:
+                await self._redis.lpush("events:recent", json.dumps(event))
+                await self._redis.ltrim("events:recent", 0, 99)
+                return
+            except Exception:
+                pass
+        self._events.insert(0, event)
+        self._events = self._events[:100]
 
     def has_redis(self) -> bool:
         return self._redis is not None

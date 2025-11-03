@@ -59,7 +59,7 @@ export const postStop = async () => {
     return (await fetchWithTimeout(`${API_URL}/stop`, { method: 'POST' }));
 };
 export const emergencyStop = async () => {
-    const ORCHESTRATOR_URL = 'https://wallet-orchestrator-880429861698.us-central1.run.app';
+    const ORCHESTRATOR_URL = 'https://api.sapphiretrade.xyz/orchestrator';
     return (await fetchWithTimeout(`${ORCHESTRATOR_URL}/emergency_stop`, { method: 'POST' }));
 };
 export const fetchDashboard = async () => {

@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 # Redis configuration
 REDIS_URL = os.getenv("REDIS_URL", "redis://10.161.118.219:6379")
-ORCHESTRATOR_URL = os.getenv("ORCHESTRATOR_URL", "https://wallet-orchestrator-880429861698.us-central1.run.app")
+ORCHESTRATOR_URL = os.getenv("ORCHESTRATOR_URL", "https://api.sapphiretrade.xyz/orchestrator")
 
 # Model configuration for DeepSeek
 MODEL_CONFIG = {
