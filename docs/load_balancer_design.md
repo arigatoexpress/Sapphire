@@ -25,7 +25,7 @@ Public Client → │ Global HTTPS LB       │ → Serverless NEG → Cloud Run
   - `/api/*` and `/metrics` → `cloud-trader` NEG
   - `/orchestrator/*` → `wallet-orchestrator` NEG
   - `/` (default) → `cloud-trader` NEG for the dashboard UI.
-- **Target HTTPS proxy + SSL certificate** (managed cert for `trader.aia.studio` TBD).
+- **Target HTTPS proxy + SSL certificate** (managed cert for `sapphiretrade.xyz` + subdomains).
 - **Forwarding Rule** binding the static IP to ports 80/443.
 - Optional **Cloud Armor** policy for WAF/rate-limiting, and **Cloud Logging** sink to BigQuery.
 
@@ -70,17 +70,17 @@ Public Client → │ Global HTTPS LB       │ → Serverless NEG → Cloud Run
      --backend-service-path-rules="/orchestrator/*=orchestrator-backend"
 
    gcloud compute url-maps add-host-rule aster-url-map \
-     --hosts=trader.aia.studio \
+     --hosts=sapphiretrade.xyz,www.sapphiretrade.xyz,trader.sapphiretrade.xyz,api.sapphiretrade.xyz \
      --path-matcher-name=aster-matcher
    ```
 
 5. **HTTPS Proxy + Certificates**
    ```bash
-   gcloud compute ssl-certificates create aster-cert \
-     --domains=trader.aia.studio,api.trader.aia.studio
+   gcloud compute ssl-certificates create sapphiretrade-cert \
+     --domains=sapphiretrade.xyz,www.sapphiretrade.xyz,trader.sapphiretrade.xyz,api.sapphiretrade.xyz
 
    gcloud compute target-https-proxies create aster-https-proxy \
-     --ssl-certificates=aster-cert --url-map=aster-url-map
+     --ssl-certificates=sapphiretrade-cert --url-map=aster-url-map
    ```
 
 6. **Forwarding Rule**
@@ -99,11 +99,11 @@ Public Client → │ Global HTTPS LB       │ → Serverless NEG → Cloud Run
 > Replace `target-http-proxy` portion with HTTPS-only if we redirect HTTP to HTTPS via URL map.
 
 ## Monitoring & Ops
-- Enable Cloud Monitoring uptime checks hitting `https://trader.aia.studio/healthz`.
+- Enable Cloud Monitoring uptime checks hitting `https://trader.sapphiretrade.xyz/healthz`.
 - Export LB logs to Cloud Logging for latency analysis; add BigQuery sink for long-term storage.
 - Use Prometheus metrics (`aster_api_requests_total`, etc.) to correlate load balancer traffic with Aster rate limits.
 - Document static IP in Secret Manager (`ASTER_STATIC_IP`) for infra reproducibility.
-- Track managed certificate status via `gcloud compute ssl-certificates describe aster-cert`. A status of `FAILED_NOT_VISIBLE` indicates DNS is not yet pointing at the LB static IP—create the A/AAAA records for `trader.aia.studio` and `api.trader.aia.studio` → `34.117.165.111`, then re-check in ~15 minutes.
+- Track managed certificate status via `gcloud compute ssl-certificates describe sapphiretrade-cert`. A status of `FAILED_NOT_VISIBLE` indicates DNS is not yet pointing at the LB static IP—create the A/AAAA records for `sapphiretrade.xyz`, `trader.sapphiretrade.xyz`, and `api.sapphiretrade.xyz` → `34.117.165.111`, then re-check in ~15 minutes.
 
 ## Security Considerations
 - Restrict Cloud Run ingress to `internal-and-cloud-load-balancing` once LB is active.
@@ -112,8 +112,7 @@ Public Client → │ Global HTTPS LB       │ → Serverless NEG → Cloud Run
 - Update Cloud Run services to `--ingress=internal-and-cloud-load-balancing` once the load balancer is verified to enforce LB-only access.
 
 ## Next Steps
-- Request DNS update: `trader.aia.studio` → static IP.
-- Update Aster API whitelist with the static IP once provisioned.
-- Run load/perf tests to validate latency and failover behaviour.
-
-
+- ✅ DNS delegated to Cloud DNS (`ns-cloud-e*.googledomains.com`) with A/CNAME records for `sapphiretrade.xyz`, `trader`, `api`, and `www` pointing at `34.117.165.111`.
+- ✅ Managed certificate `sapphiretrade-cert` now `ACTIVE`; Cloud Run ingress restricted to `internal-and-cloud-load-balancing`.
+- ➡️ Update Aster API whitelist with static IP `34.117.165.111` and rerun rate-limit soak tests.
+- ➡️ Enable Cloud Monitoring HTTPS uptime checks and synthetic latency probes.
