@@ -1,5 +1,5 @@
 const DEFAULT_API_URL = 'https://cloud-trader-cfxefrvooa-uc.a.run.app';
-const DEFAULT_DASHBOARD_URL = 'https://wallet-orchestrator-cfxefrvooa-uc.a.run.app';
+const DEFAULT_DASHBOARD_URL = DEFAULT_API_URL;
 
 // Get API URL with fallback to current origin for development
 const getApiUrl = () => {
