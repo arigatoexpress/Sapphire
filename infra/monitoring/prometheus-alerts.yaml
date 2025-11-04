@@ -1,0 +1,108 @@
+groups:
+  - name: sapphire_trading_alerts
+    interval: 30s
+    rules:
+      # Circuit breaker alerts
+      - alert: CircuitBreakerOpen
+        expr: circuit_breaker_state{service=~"aster|telegram"} == 1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Circuit breaker is OPEN for {{ $labels.service }}"
+          description: "Circuit breaker for {{ $labels.service }} has been open for more than 2 minutes"
+
+      # High error rate alert
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m])) by (endpoint)
+          /
+          sum(rate(http_requests_total[5m])) by (endpoint)
+          > 0.01
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate on {{ $labels.endpoint }}"
+          description: "Error rate is {{ $value | humanizePercentage }} on {{ $labels.endpoint }}"
+
+      # Market feed failures
+      - alert: MarketFeedFailure
+        expr: rate(market_feed_errors_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Market feed errors detected"
+          description: "Market feed error rate is {{ $value }} errors/second"
+
+      # Trading loop stopped
+      - alert: TradingLoopStopped
+        expr: trading_portfolio_balance_usd == 0 or absent(trading_portfolio_balance_usd)
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Trading loop appears to be stopped"
+          description: "No portfolio balance updates detected for 5 minutes"
+
+      # High leverage alert
+      - alert: HighLeverage
+        expr: trading_portfolio_leverage_ratio > 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High portfolio leverage detected"
+          description: "Portfolio leverage is {{ $value }}x"
+
+      # Circuit breaker failures
+      - alert: CircuitBreakerFailures
+        expr: rate(circuit_breaker_failures_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High circuit breaker failure rate"
+          description: "Circuit breaker failures: {{ $value }} failures/second for {{ $labels.service }}"
+
+      # API latency alerts
+      - alert: HighAPILatency
+        expr: histogram_quantile(0.95, rate(aster_api_request_duration_seconds_bucket[5m])) > 2.0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Aster API latency"
+          description: "95th percentile latency is {{ $value }}s for {{ $labels.endpoint }}"
+
+      # Position verification failures
+      - alert: PositionVerificationFailures
+        expr: rate(position_verification_duration_seconds_count{status="failed"}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Position verification failures detected"
+          description: "Position verification failure rate: {{ $value }} failures/second"
+
+      # Risk limits breached
+      - alert: RiskLimitsBreached
+        expr: rate(trading_risk_limits_breached_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: info
+        annotations:
+          summary: "Risk limits being breached frequently"
+          description: "Risk limits breached {{ $value }} times/second for {{ $labels.limit_type }}"
+
+      # MCP consensus issues
+      - alert: MCPConsensusIssues
+        expr: rate(consensus_reached_total[5m]) == 0 and rate(mcp_messages_total{message_type="proposal"}[5m]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MCP consensus not being reached"
+          description: "Proposals are being made but consensus is not being reached"
+

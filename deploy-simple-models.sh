@@ -42,7 +42,7 @@ for model in "${models[@]}"; do
         --max-instances 3 \
         --concurrency 10 \
         --timeout 300 \
-        --set-env-vars "REDIS_URL=redis://10.161.118.219:6379,ORCHESTRATOR_URL=https://wallet-orchestrator-880429861698.us-central1.run.app" \
+        --set-env-vars "REDIS_URL=redis://10.161.118.219:6379,ORCHESTRATOR_URL=https://api.sapphiretrade.xyz/orchestrator" \
         --project=$PROJECT_ID \
         --quiet
 
@@ -63,7 +63,7 @@ gcloud run deploy "model-router" \
     --max-instances 3 \
     --concurrency 10 \
     --timeout 300 \
-    --set-env-vars "REDIS_URL=redis://10.161.118.219:6379,ORCHESTRATOR_URL=https://wallet-orchestrator-880429861698.us-central1.run.app" \
+    --set-env-vars "REDIS_URL=redis://10.161.118.219:6379,ORCHESTRATOR_URL=https://api.sapphiretrade.xyz/orchestrator" \
     --project=$PROJECT_ID \
     --quiet
 

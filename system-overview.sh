@@ -32,7 +32,7 @@ echo "----------------------"
 
 # Check main services
 check_service "Cloud Trader" "https://cloud-trader-880429861698.us-central1.run.app/" "cloud-trader"
-check_service "Risk Orchestrator" "https://wallet-orchestrator-880429861698.us-central1.run.app/" "risk-orchestrator"
+check_service "Risk Orchestrator" "https://api.sapphiretrade.xyz/orchestrator/" "risk-orchestrator"
 check_service "Frontend Dashboard" "https://storage.googleapis.com/cloud-trader-dashboard/index.html" "Cloud Trader"
 
 echo ""
@@ -52,7 +52,7 @@ echo "----------------"
 
 # Check portfolio
 echo -n "💰 Portfolio Balance: "
-balance=$(curl -s "https://wallet-orchestrator-880429861698.us-central1.run.app/portfolio" | grep -o '"totalWalletBalance":"[^"]*"' | cut -d'"' -f4)
+balance=$(curl -s "https://api.sapphiretrade.xyz/orchestrator/portfolio" | grep -o '"totalWalletBalance":"[^\"]*"' | cut -d'"' -f4)
 if [ ! -z "$balance" ]; then
     echo -e "${GREEN}\$$balance USDT${NC}"
 else

@@ -11,7 +11,11 @@ from .config import Settings
 
 
 class RedisStreamsClient:
-    """Wrapper around Redis Streams for lean telemetry."""
+    """Wrapper around Redis Streams for lean telemetry with connection pooling."""
+
+    # Shared connection pool for all instances
+    _pool: Optional[redis.ConnectionPool] = None
+    _pool_url: Optional[str] = None
 
     def __init__(self, settings: Settings) -> None:
         self._url = settings.redis_url
@@ -22,9 +26,20 @@ class RedisStreamsClient:
         self._client: Optional[redis.Redis] = None
 
     async def connect(self) -> None:
+        """Connect to Redis using connection pooling."""
         if self._client is None and self._url:
             try:
-                client = redis.from_url(self._url, decode_responses=True)
+                # Create or reuse connection pool
+                if RedisStreamsClient._pool is None or RedisStreamsClient._pool_url != self._url:
+                    RedisStreamsClient._pool = redis.ConnectionPool.from_url(
+                        self._url,
+                        decode_responses=True,
+                        max_connections=100,
+                        retry_on_timeout=True,
+                    )
+                    RedisStreamsClient._pool_url = self._url
+                
+                client = redis.Redis(connection_pool=RedisStreamsClient._pool)
                 await client.ping()
             except Exception:
                 self._client = None

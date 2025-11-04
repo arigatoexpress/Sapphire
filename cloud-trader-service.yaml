@@ -1,0 +1,84 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  annotations:
+    run.googleapis.com/build-enable-automatic-updates: 'false'
+    run.googleapis.com/build-id: 6ffdc810-0f54-42cd-88fd-1d7e6a6e590d
+    run.googleapis.com/build-image-uri: us-central1-docker.pkg.dev/quant-ai-trader-credits/cloud-run-source-deploy/cloud-trader
+    run.googleapis.com/build-name: projects/880429861698/locations/us-central1/builds/6ffdc810-0f54-42cd-88fd-1d7e6a6e590d
+    run.googleapis.com/build-source-location: gs://run-sources-quant-ai-trader-credits-us-central1/services/cloud-trader/1762205909.989097-bf5c3f4283474e638997daae0d829075.zip#1762205955976003
+    run.googleapis.com/ingress: internal-and-cloud-load-balancing
+    run.googleapis.com/ingress-status: internal-and-cloud-load-balancing
+    run.googleapis.com/urls: '["https://cloud-trader-880429861698.us-central1.run.app","https://cloud-trader-cfxefrvooa-uc.a.run.app"]'
+  labels:
+    cloud.googleapis.com/location: us-central1
+  name: cloud-trader
+  namespace: '880429861698'
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/maxScale: '10'
+        autoscaling.knative.dev/minScale: '1'
+        run.googleapis.com/client-name: gcloud
+        run.googleapis.com/client-version: 533.0.0
+        run.googleapis.com/cpu-throttling: 'false'
+        run.googleapis.com/startup-cpu-boost: 'true'
+        run.googleapis.com/vpc-access-connector: projects/quant-ai-trader-credits/locations/us-central1/connectors/aster-vpc-connector
+        run.googleapis.com/vpc-access-egress: all-traffic
+      labels:
+        client.knative.dev/nonce: sjfnshqeex
+        run.googleapis.com/startupProbeType: Default
+    spec:
+      containerConcurrency: 80
+      containers:
+      - args:
+        - run_live_trader.py
+        - --host
+        - 0.0.0.0
+        - --port
+        - '8080'
+        command:
+        - python
+        env:
+        - name: ENABLE_PAPER_TRADING
+          value: 'false'
+        - name: ASTER_API_KEY
+          valueFrom:
+            secretKeyRef:
+              key: latest
+              name: ASTER_API_KEY
+        - name: ASTER_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              key: latest
+              name: ASTER_SECRET_KEY
+        - name: TELEGRAM_BOT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: latest
+              name: TELEGRAM_BOT_TOKEN
+        - name: TELEGRAM_CHAT_ID
+          valueFrom:
+            secretKeyRef:
+              key: latest
+              name: TELEGRAM_CHAT_ID
+        image: gcr.io/quant-ai-trader-credits/cloud-trader:latest
+        ports:
+        - containerPort: 8080
+          name: http1
+        resources:
+          limits:
+            cpu: '1'
+            memory: 1Gi
+        startupProbe:
+          failureThreshold: 1
+          periodSeconds: 240
+          tcpSocket:
+            port: 8080
+          timeoutSeconds: 240
+      serviceAccountName: 880429861698-compute@developer.gserviceaccount.com
+      timeoutSeconds: 300
+  traffic:
+  - percent: 100
+    revisionName: cloud-trader-00088-5rd

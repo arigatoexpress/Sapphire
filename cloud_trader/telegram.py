@@ -6,7 +6,29 @@ from typing import Any, Dict, Optional
 
 import httpx
 
+from .circuit_breaker import AsyncCircuitBreaker, CircuitBreakerError
+from .metrics import CIRCUIT_BREAKER_STATE, CIRCUIT_BREAKER_FAILURES
+
 logger = logging.getLogger(__name__)
+
+# Circuit breaker state mapping
+_STATE_MAP = {"closed": 0, "open": 1, "half_open": 2}
+
+
+def _update_circuit_breaker_metrics(breaker: AsyncCircuitBreaker, service_name: str) -> None:
+    """Update Prometheus metrics for circuit breaker state."""
+    state_name = breaker.current_state
+    state_value = _STATE_MAP.get(state_name, 0)
+    CIRCUIT_BREAKER_STATE.labels(service=service_name).set(state_value)
+
+
+# Circuit breaker for Telegram API calls
+# Fails open after 5 failures, resets after 60 seconds
+_telegram_circuit_breaker = AsyncCircuitBreaker(
+    fail_max=5,
+    reset_timeout=60,
+    name="TelegramAPI",
+)
 
 
 class TelegramService:
@@ -34,7 +56,7 @@ class TelegramService:
         Returns:
             bool: True if message sent successfully
         """
-        try:
+        async def _execute_send():
             url = f"{self.base_url}/sendMessage"
             payload = {
                 "chat_id": self.chat_id,
@@ -51,11 +73,33 @@ class TelegramService:
                 logger.info(f"✅ Telegram message sent successfully")
                 return True
             else:
-                logger.error(f"❌ Telegram API error: {result.get('description')}")
+                error_msg = result.get('description', 'Unknown error')
+                logger.error(f"❌ Telegram API error: {error_msg}")
+                raise RuntimeError(f"Telegram API error: {error_msg}")
+
+        try:
+            # Update metrics before checking state
+            _update_circuit_breaker_metrics(_telegram_circuit_breaker, "telegram")
+
+            # Check circuit breaker state
+            if _telegram_circuit_breaker.current_state == "open":
+                logger.warning("Telegram API circuit breaker is OPEN, failing fast")
                 return False
 
+            # Call through circuit breaker
+            result = await _telegram_circuit_breaker.call(_execute_send)
+            # Update metrics after call
+            _update_circuit_breaker_metrics(_telegram_circuit_breaker, "telegram")
+            return result
+        except CircuitBreakerError as e:
+            logger.error(f"Telegram circuit breaker error: {e}")
+            _update_circuit_breaker_metrics(_telegram_circuit_breaker, "telegram")
+            CIRCUIT_BREAKER_FAILURES.labels(service="telegram").inc()
+            return False
         except Exception as exc:
             logger.error(f"❌ Failed to send Telegram message: {exc}")
+            _update_circuit_breaker_metrics(_telegram_circuit_breaker, "telegram")
+            CIRCUIT_BREAKER_FAILURES.labels(service="telegram").inc()
             return False
 
     async def send_trade_notification(
@@ -241,6 +285,329 @@ class TelegramService:
 
         except Exception as exc:
             logger.error(f"❌ Failed to send alert: {exc}")
+            return False
+
+    async def send_mcp_notification(
+        self,
+        session_id: str,
+        sender_id: str,
+        message_type: str,
+        content: str,
+        context: Optional[str] = None
+    ) -> bool:
+        """Send MCP (Multi-Agent Collaboration Protocol) notifications.
+
+        Args:
+            session_id: MCP session identifier
+            sender_id: Agent that sent the message
+            message_type: Type of MCP message (proposal, critique, consensus, etc.)
+            content: Message content
+            context: Additional context information
+
+        Returns:
+            bool: True if notification sent successfully
+        """
+        try:
+            # Format message type with emoji
+            type_emoji = {
+                "proposal": "💡",
+                "critique": "🔍",
+                "consensus": "🤝",
+                "query": "❓",
+                "response": "💬",
+                "execution": "⚡",
+                "observation": "👁️",
+                "heartbeat": "💓"
+            }.get(message_type.lower(), "🤖")
+
+            formatted_message = f"""
+{type_emoji} <b>MCP {message_type.upper()}</b> {type_emoji}
+
+<b>Agent:</b> {sender_id}
+<b>Session:</b> {session_id[:8]}...
+
+{content}
+"""
+
+            if context:
+                formatted_message += f"\n📋 <b>Context:</b> {context}"
+
+            # Add timestamp
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
+            formatted_message += f"\n⏰ <i>{timestamp}</i>"
+
+            return await self.send_message(formatted_message.strip())
+
+        except Exception as exc:
+            logger.error(f"❌ Failed to send MCP notification: {exc}")
+            return False
+
+    async def send_agent_status_update(
+        self,
+        agent_id: str,
+        status: str,
+        model: str,
+        active_positions: int,
+        total_pnl: float,
+        win_rate: Optional[float] = None,
+        last_trade_time: Optional[str] = None
+    ) -> bool:
+        """Send agent status update notifications.
+
+        Args:
+            agent_id: Agent identifier
+            status: Current status (active, idle, error, etc.)
+            model: AI model being used
+            active_positions: Number of active positions
+            total_pnl: Total profit/loss
+            win_rate: Win rate percentage
+            last_trade_time: When the last trade occurred
+
+        Returns:
+            bool: True if notification sent successfully
+        """
+        try:
+            # Format status with emoji
+            status_emoji = {
+                "active": "🟢",
+                "idle": "⚪",
+                "monitoring": "🟡",
+                "error": "🔴",
+                "stopped": "⚫"
+            }.get(status.lower(), "⚪")
+
+            pnl_emoji = "📈" if total_pnl >= 0 else "📉"
+            pnl_fmt = f"${total_pnl:+,.2f}"
+
+            formatted_message = f"""
+{status_emoji} <b>AGENT STATUS UPDATE</b>
+
+<b>Agent:</b> {agent_id}
+<b>Model:</b> {model}
+<b>Status:</b> {status.upper()}
+<b>Active Positions:</b> {active_positions}
+<b>Total P&L:</b> {pnl_emoji} {pnl_fmt}
+"""
+
+            if win_rate is not None:
+                formatted_message += f"<b>Win Rate:</b> {win_rate:.1%}\n"
+
+            if last_trade_time:
+                formatted_message += f"<b>Last Trade:</b> {last_trade_time}\n"
+
+            # Add timestamp
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
+            formatted_message += f"\n⏰ <i>Updated at: {timestamp}</i>"
+
+            return await self.send_message(formatted_message.strip())
+
+        except Exception as exc:
+            logger.error(f"❌ Failed to send agent status update: {exc}")
+            return False
+
+    async def send_system_status_report(
+        self,
+        uptime_seconds: int,
+        total_trades: int,
+        active_agents: int,
+        total_portfolio_value: float,
+        daily_pnl: Optional[float] = None,
+        system_health: str = "healthy"
+    ) -> bool:
+        """Send comprehensive system status report.
+
+        Args:
+            uptime_seconds: System uptime in seconds
+            total_trades: Total number of trades executed
+            active_agents: Number of active AI agents
+            total_portfolio_value: Current portfolio value
+            daily_pnl: Daily profit/loss
+            system_health: Overall system health status
+
+        Returns:
+            bool: True if notification sent successfully
+        """
+        try:
+            # Format uptime
+            hours = uptime_seconds // 3600
+            minutes = (uptime_seconds % 3600) // 60
+            uptime_fmt = f"{hours}h {minutes}m"
+
+            # Format portfolio value
+            portfolio_fmt = f"${total_portfolio_value:,.2f}"
+
+            # Format daily P&L
+            if daily_pnl is not None:
+                pnl_emoji = "📈" if daily_pnl >= 0 else "📉"
+                daily_pnl_fmt = f"${daily_pnl:+,.2f}"
+            else:
+                pnl_emoji = "🤷"
+                daily_pnl_fmt = "N/A"
+
+            # Format system health
+            health_emoji = {
+                "healthy": "🟢",
+                "warning": "🟡",
+                "critical": "🔴",
+                "offline": "⚫"
+            }.get(system_health.lower(), "⚪")
+
+            formatted_message = f"""
+{health_emoji} <b>SYSTEM STATUS REPORT</b> {health_emoji}
+
+<b>Uptime:</b> {uptime_fmt}
+<b>Total Trades:</b> {total_trades:,}
+<b>Active Agents:</b> {active_agents}
+<b>Portfolio Value:</b> {portfolio_fmt}
+<b>Daily P&L:</b> {pnl_emoji} {daily_pnl_fmt}
+<b>System Health:</b> {system_health.upper()}
+"""
+
+            # Add performance metrics
+            if total_trades > 0:
+                avg_trade_size = total_portfolio_value / max(total_trades, 1)
+                formatted_message += f"<b>Avg Trade Size:</b> ${avg_trade_size:.2f}\n"
+
+            # Add timestamp
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
+            formatted_message += f"\n⏰ <i>Report generated at: {timestamp}</i>"
+
+            return await self.send_message(formatted_message.strip())
+
+        except Exception as exc:
+            logger.error(f"❌ Failed to send system status report: {exc}")
+            return False
+
+    async def send_market_alert(
+        self,
+        symbol: str,
+        alert_type: str,
+        message: str,
+        current_price: Optional[float] = None,
+        price_change_24h: Optional[float] = None,
+        volume_24h: Optional[float] = None
+    ) -> bool:
+        """Send market-related alerts and opportunities.
+
+        Args:
+            symbol: Trading pair symbol
+            alert_type: Type of market alert (breakout, dip, high_volume, etc.)
+            message: Alert description
+            current_price: Current market price
+            price_change_24h: 24h price change percentage
+            volume_24h: 24h trading volume
+
+        Returns:
+            bool: True if notification sent successfully
+        """
+        try:
+            # Format alert type with emoji
+            alert_emoji = {
+                "breakout": "🚀",
+                "dip": "📉",
+                "high_volume": "📊",
+                "volatility": "⚡",
+                "opportunity": "💎",
+                "warning": "⚠️"
+            }.get(alert_type.lower(), "📢")
+
+            formatted_message = f"""
+{alert_emoji} <b>MARKET ALERT: {alert_type.upper()}</b>
+
+<b>Symbol:</b> {symbol}
+
+{message}
+"""
+
+            if current_price is not None:
+                formatted_message += f"<b>Current Price:</b> ${current_price:,.4f}\n"
+
+            if price_change_24h is not None:
+                change_emoji = "📈" if price_change_24h >= 0 else "📉"
+                change_fmt = f"{price_change_24h:+.2f}%"
+                formatted_message += f"<b>24h Change:</b> {change_emoji} {change_fmt}\n"
+
+            if volume_24h is not None:
+                volume_fmt = f"${volume_24h:,.0f}"
+                formatted_message += f"<b>24h Volume:</b> {volume_fmt}\n"
+
+            # Add timestamp
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
+            formatted_message += f"\n⏰ <i>Alert at: {timestamp}</i>"
+
+            return await self.send_message(formatted_message.strip())
+
+        except Exception as exc:
+            logger.error(f"❌ Failed to send market alert: {exc}")
+            return False
+
+    async def send_risk_alert(
+        self,
+        risk_type: str,
+        severity: str,
+        message: str,
+        current_exposure: Optional[float] = None,
+        max_exposure: Optional[float] = None,
+        portfolio_value: Optional[float] = None,
+        recommendations: Optional[list] = None
+    ) -> bool:
+        """Send risk management alerts.
+
+        Args:
+            risk_type: Type of risk (exposure, drawdown, concentration, etc.)
+            severity: Risk severity (low, medium, high, critical)
+            message: Risk description
+            current_exposure: Current exposure amount
+            max_exposure: Maximum allowed exposure
+            portfolio_value: Current portfolio value
+            recommendations: List of risk mitigation recommendations
+
+        Returns:
+            bool: True if notification sent successfully
+        """
+        try:
+            # Format severity with emoji and color
+            severity_config = {
+                "low": {"emoji": "🟢", "level": "LOW"},
+                "medium": {"emoji": "🟡", "level": "MEDIUM"},
+                "high": {"emoji": "🟠", "level": "HIGH"},
+                "critical": {"emoji": "🔴", "level": "CRITICAL"}
+            }.get(severity.lower(), {"emoji": "⚪", "level": severity.upper()})
+
+            formatted_message = f"""
+{severity_config['emoji']} <b>RISK ALERT: {risk_type.upper()}</b>
+
+<b>Severity:</b> {severity_config['level']}
+
+{message}
+"""
+
+            if current_exposure is not None and max_exposure is not None:
+                exposure_pct = (current_exposure / max_exposure) * 100
+                formatted_message += f"<b>Current Exposure:</b> ${current_exposure:,.2f} ({exposure_pct:.1f}% of limit)\n"
+                formatted_message += f"<b>Max Exposure:</b> ${max_exposure:,.2f}\n"
+
+            if portfolio_value is not None:
+                formatted_message += f"<b>Portfolio Value:</b> ${portfolio_value:,.2f}\n"
+
+            if recommendations:
+                formatted_message += "\n<b>Recommendations:</b>\n"
+                for rec in recommendations[:3]:  # Limit to 3 recommendations
+                    formatted_message += f"• {rec}\n"
+
+            # Add timestamp
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
+            formatted_message += f"\n⏰ <i>Risk alert at: {timestamp}</i>"
+
+            return await self.send_message(formatted_message.strip())
+
+        except Exception as exc:
+            logger.error(f"❌ Failed to send risk alert: {exc}")
             return False
 
 

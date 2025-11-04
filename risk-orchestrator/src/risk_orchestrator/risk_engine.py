@@ -23,6 +23,10 @@ AGENT_ALLOCATIONS = {
     "qwen-7b-alt": 125.0,
 }
 
+# Default allocation applied when an agent is not explicitly listed above
+DEFAULT_AGENT_ALLOCATION = 125.0
+
+
 class RiskEngine:
     def __init__(self, portfolio: dict, bot_id: str = None):
         self.portfolio = portfolio
@@ -31,8 +35,10 @@ class RiskEngine:
         self.balance = _to_float(portfolio.get("availableBalance")) or _to_float(portfolio.get("totalWalletBalance"))
         self.unrealized_pnl = _to_float(portfolio.get("totalUnrealizedPnL"))
         self.peak_balance = _to_float(portfolio.get("maxWalletBalance"), self.balance)
-        # Use agent-specific allocation if available, otherwise use global balance
-        self.agent_allocation = AGENT_ALLOCATIONS.get(bot_id, self.balance)
+        # Use agent-specific allocation if available; otherwise fall back to default cap.
+        # Always ensure we don't allocate more than the actual available balance.
+        allocation_cap = AGENT_ALLOCATIONS.get(bot_id, DEFAULT_AGENT_ALLOCATION)
+        self.agent_allocation = min(self.balance, allocation_cap)
 
     def check_drawdown(self) -> Tuple[bool, str]:
         peak = max(self.peak_balance, self.balance)

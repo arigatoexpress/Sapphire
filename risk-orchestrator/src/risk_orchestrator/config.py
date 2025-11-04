@@ -18,4 +18,3 @@ class Settings(BaseSettings):
     PORTFOLIO_REFRESH_SECONDS: float = 300.0
 
 settings = Settings()
-

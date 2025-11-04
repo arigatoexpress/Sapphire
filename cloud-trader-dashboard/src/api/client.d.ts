@@ -5,9 +5,6 @@ export interface HealthResponse {
     status?: string;
     service?: string;
 }
-interface ActionResponse {
-    status: string;
-}
 export interface DashboardPosition {
     symbol: string;
     notional?: number;
@@ -84,8 +81,4 @@ export interface DashboardResponse {
     targets: DashboardTargets;
 }
 export declare const fetchHealth: () => Promise<HealthResponse>;
-export declare const postStart: () => Promise<ActionResponse>;
-export declare const postStop: () => Promise<ActionResponse>;
-export declare const emergencyStop: () => Promise<ActionResponse>;
 export declare const fetchDashboard: () => Promise<DashboardResponse>;
-export {};

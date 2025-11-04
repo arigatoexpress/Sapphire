@@ -1,31 +1,52 @@
-FROM python:3.11-slim
+# Multi-stage build for backend-only service
+# Stage 1: Builder stage for dependencies
+FROM python:3.11-slim AS builder
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
 WORKDIR /app
 
-# Install only the essentials
+# Install build dependencies required for compiling optional wheels
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        build-essential \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
+# Copy and install Python dependencies
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --user -r requirements.txt
 
-# Copy source
+# Stage 2: Runtime stage
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH=/home/trader/.local/bin:$PATH
+
+WORKDIR /app
+
+# Install only runtime essentials
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        ca-certificates \
+        wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy installed packages from builder
+COPY --from=builder /root/.local /home/trader/.local
+
+# Copy source code
 COPY cloud_trader ./cloud_trader
 COPY run_live_trader.py ./
 COPY pyproject.toml README.md ./
 
-# Copy frontend build files
-COPY cloud-trader-dashboard/dist ./static/
-
-# Create non-root user
+# Create non-root user and set ownership
 RUN useradd --create-home --shell /bin/bash trader \
-    && chown -R trader:trader /app
+    && chown -R trader:trader /app \
+    && chown -R trader:trader /home/trader/.local
+
 USER trader
 
 EXPOSE 8080

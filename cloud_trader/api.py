@@ -68,12 +68,16 @@ def build_app(service: TradingService | None = None) -> FastAPI:
         allow_origins=[
             "https://cloud-trader-880429861698.us-central1.run.app",
             "https://cloud-trader-cfxefrvooa-uc.a.run.app",
+            "https://sapphiretrade.xyz",
+            "https://www.sapphiretrade.xyz",
+            "https://api.sapphiretrade.xyz",
+            "https://trader.sapphiretrade.xyz",
             "http://localhost:3000",
             "http://localhost:5173",
         ],  # Explicitly allow known origins
         allow_credentials=True,
-        allow_methods=["GET", "POST"],  # Limit to necessary methods
-        allow_headers=["Content-Type", "Authorization"],  # Limit headers
+        allow_methods=["GET", "POST", "OPTIONS"],  # Include OPTIONS for CORS preflight
+        allow_headers=["Content-Type", "Authorization", "Accept", "Origin"],  # Include CORS headers
     )
 
     # Add Prometheus instrumentation
@@ -191,7 +195,12 @@ def build_app(service: TradingService | None = None) -> FastAPI:
     async def dashboard() -> Dict[str, object]:
         """Get comprehensive dashboard data"""
         try:
-            return await trading_service.dashboard_snapshot()
+            import asyncio
+            # Add timeout to prevent hanging
+            return await asyncio.wait_for(trading_service.dashboard_snapshot(), timeout=10.0)
+        except asyncio.TimeoutError:
+            logger.error("Dashboard snapshot timed out after 10 seconds")
+            raise HTTPException(status_code=504, detail="Dashboard snapshot request timed out")
         except Exception as exc:  # pragma: no cover - defensive logging
             logger.exception("Failed to build dashboard snapshot: %s", exc)
             raise HTTPException(status_code=500, detail="Failed to build dashboard snapshot")

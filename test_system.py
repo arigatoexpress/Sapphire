@@ -3,8 +3,9 @@
 
 import sys
 import asyncio
-import os
+
 sys.path.append('.')
+
 
 async def test_system():
     print("🚀 Testing Autonomous Trading System Components")
@@ -14,7 +15,7 @@ async def test_system():
     print("\n📦 Testing Imports...")
     try:
         from cloud_trader.config import get_settings
-        from cloud_trader.service import TradingService
+        # from cloud_trader.service import TradingService  # Unused import
         from cloud_trader.orchestrator.schemas import OrderIntent
         from cloud_trader.orchestrator.client import RiskOrchestratorClient
         print("✅ All imports successful")

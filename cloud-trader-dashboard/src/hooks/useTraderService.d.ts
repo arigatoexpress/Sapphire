@@ -21,8 +21,6 @@ export declare const useTraderService: () => {
     connectionStatus: "connecting" | "connected" | "disconnected";
     mcpMessages: MCPMessage[];
     mcpStatus: "connecting" | "connected" | "disconnected";
-    startTrader: () => Promise<void>;
-    stopTrader: () => Promise<void>;
     refresh: () => Promise<void>;
     addLog: (message: string, type?: LogEntry["type"]) => void;
 };

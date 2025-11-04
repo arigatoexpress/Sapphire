@@ -22,12 +22,59 @@ interface CommunityFeedbackProps {
 
 const CommunityFeedback: React.FC<CommunityFeedbackProps> = ({ comments, onSubmit, user, loading, onSignIn, onSignOut, authEnabled, authError }) => {
   const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  // Input validation and sanitization
+  const sanitizeInput = (input: string): string => {
+    // Remove HTML tags and potentially dangerous characters
+    return input
+      .replace(/<[^>]*>/g, '') // Remove HTML tags
+      .replace(/javascript:/gi, '') // Remove javascript: URLs
+      .replace(/on\w+\s*=/gi, '') // Remove event handlers
+      .replace(/[<>'"&]/g, (match) => {
+        const entityMap: { [key: string]: string } = {
+          '<': '&lt;',
+          '>': '&gt;',
+          "'": '&#39;',
+          '"': '&quot;',
+          '&': '&amp;'
+        };
+        return entityMap[match];
+      })
+      .trim();
+  };
+
+  const validateMessage = (msg: string): string => {
+    const sanitized = sanitizeInput(msg);
+    if (sanitized.length === 0) return 'Message cannot be empty';
+    if (sanitized.length > 1000) return 'Message too long (max 1000 characters)';
+    if (sanitized !== msg) return 'Invalid characters detected';
+    return '';
+  };
+
+  const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    if (value.length <= 1000) {
+      setMessage(value);
+      setError('');
+    } else {
+      setError('Message too long (max 1000 characters)');
+    }
+  };
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
+    const validationError = validateMessage(message);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
     if (!message.trim()) return;
-    onSubmit(message.trim());
+
+    const sanitizedMessage = sanitizeInput(message);
+    onSubmit(sanitizedMessage);
     setMessage('');
+    setError('');
   };
 
   return (
@@ -74,15 +121,24 @@ const CommunityFeedback: React.FC<CommunityFeedbackProps> = ({ comments, onSubmi
         <form onSubmit={handleSubmit} className="rounded-3xl border border-white/10 bg-white/5 px-5 py-4 shadow-glass">
           <textarea
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            onChange={handleMessageChange}
             placeholder={user ? 'Leave your message for the council…' : authEnabled ? 'Authenticate to send your message…' : 'Community feedback offline in this preview…'}
             className="h-24 w-full resize-none rounded-2xl border border-white/10 bg-black/20 p-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent-ai/50"
             disabled={!user}
+            maxLength={1000}
           />
+          <div className="mt-2 flex items-center justify-between">
+            <div className="text-xs text-red-400">
+              {error && <span>{error}</span>}
+            </div>
+            <div className="text-xs text-slate-400">
+              {message.length}/1000
+            </div>
+          </div>
           <div className="mt-3 flex justify-end">
             <button
               type="submit"
-              disabled={!user || !message.trim()}
+              disabled={!user || !message.trim() || !!error}
               className="rounded-full bg-gradient-to-r from-accent-ai via-accent-emerald to-accent-aurora px-5 py-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-900 disabled:opacity-40"
             >
               Submit Feedback

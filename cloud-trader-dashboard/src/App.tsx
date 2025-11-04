@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
-import ControlsPanel from './components/ControlsPanel';
 import ActivityLog from './components/ActivityLog';
 import StatusCard from './components/StatusCard';
 import PortfolioCard from './components/PortfolioCard';
@@ -49,7 +48,7 @@ const TPU_FLEET_DESCRIPTION = 'LLM serving pods (DeepSeek, Qwen, Phi-3) TPU-read
 
 const App: React.FC = () => {
   const { user, loading: authLoading, signIn, signOut, enabled: authEnabled, error: authError } = useAuth();
-  const { health, dashboardData, loading, error, logs, connectionStatus, mcpMessages, mcpStatus, startTrader, stopTrader, refresh } = useTraderService();
+  const { health, dashboardData, loading, error, logs, connectionStatus, mcpMessages, mcpStatus, refresh } = useTraderService();
   const [crowdSentiment, castCrowdVote, resetCrowd] = useCrowdSentiment();
   const [communityComments, addCommunityComment] = useCommunityComments(user);
   const [activeTab, setActiveTab] = useState<'overview' | 'positions' | 'performance' | 'activity' | 'system'>('overview');
@@ -425,8 +424,8 @@ const App: React.FC = () => {
                             <div key={j} className="h-3 bg-slate-600/40 rounded"></div>
                           ))}
                         </div>
-                      </div>
-                    </div>
+              </div>
+            </div>
                   ))}
                 </div>
               </div>
@@ -1031,7 +1030,7 @@ const App: React.FC = () => {
                             </span>
                             <span className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.28em] ${systemSummary.redisConnected ? 'bg-emerald-400/20 text-emerald-200' : 'bg-rose-400/20 text-rose-200'}`}>
                               Redis {systemSummary.redisConnected ? 'Synchronized' : 'Offline'}
-                            </span>
+                </span>
                           </div>
                         </div>
                         <div className="grid gap-4 text-sm text-slate-200 sm:grid-cols-2">
@@ -1066,13 +1065,6 @@ const App: React.FC = () => {
                         <SystemStatus status={dashboardData?.system_status} />
                       </div>
                       <div className="overflow-hidden rounded-4xl border border-white/10 bg-surface-75/70 p-6 shadow-glass">
-                        <ControlsPanel
-                          health={health}
-                          loading={loading}
-                          onStart={startTrader}
-                          onStop={stopTrader}
-                          onRefresh={refresh}
-                        />
                       </div>
                     </div>
                   </div>
@@ -1115,7 +1107,7 @@ const App: React.FC = () => {
                   <p className="text-[0.65rem] uppercase tracking-[0.3em] text-slate-500">{metric.label}</p>
                   <p className="mt-1 text-base font-semibold text-white">{metric.value}</p>
                   <p className="text-xs text-slate-400 mt-1">{metric.detail}</p>
-                </div>
+              </div>
               ))}
             </div>
           </div>
@@ -1229,15 +1221,90 @@ const App: React.FC = () => {
           </div>
           <PortfolioPerformance balanceSeries={performanceSeries.balance} priceSeries={performanceSeries.price} />
         </div>
-        <div className="space-y-6">
-          <StatusCard health={health} loading={loading} />
+          <div className="space-y-6">
+                  <StatusCard health={health} loading={loading} />
           <TargetsAndAlerts targets={dashboardData?.targets} />
         </div>
       </div>
 
       {/* Additional System Info */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-1">
-        <PortfolioCard portfolio={dashboardData?.portfolio} />
+                  <PortfolioCard portfolio={dashboardData?.portfolio} />
+                </div>
+
+      {/* About Section */}
+      <div className="mt-12 rounded-4xl border border-accent-ai/30 bg-surface-75/70 p-8 shadow-glass-xl">
+        <AuroraField className="-left-40 -top-40 h-[400px] w-[400px]" variant="sapphire" intensity="soft" />
+        <AuroraField className="right-[-8rem] bottom-[-6rem] h-[400px] w-[400px]" variant="emerald" />
+        <div className="relative">
+          <div className="text-center mb-8">
+            <h2 className="text-4xl font-bold text-white mb-4">Sapphire AI Trading</h2>
+            <p className="text-xl text-accent-ai font-medium">Intelligent Multi-Agent Trading Protocol</p>
+                </div>
+
+          <div className="grid gap-8 lg:grid-cols-2 mb-8">
+              <div className="space-y-6">
+              <div>
+                <h3 className="text-2xl font-semibold text-white mb-3">What We Built</h3>
+                <p className="text-slate-300 leading-relaxed">
+                  A revolutionary AI-powered trading system featuring four specialized agents (DeepSeek, Qwen, Phi-3, FinGPT)
+                  collaborating through our Multi-Agent Collaboration Protocol (MCP). Each agent specializes in different
+                  market conditions and trading strategies, working together to optimize portfolio performance.
+                </p>
+              </div>
+
+              <div>
+                <h3 className="text-2xl font-semibold text-white mb-3">What Makes It Special</h3>
+                <ul className="text-slate-300 space-y-2 leading-relaxed">
+                  <li>• <strong>Multi-Agent Intelligence:</strong> Four AI models collaborate in real-time</li>
+                  <li>• <strong>Radar-Style Monitoring:</strong> Live token tracking with military-grade visualization</li>
+                  <li>• <strong>Community Intelligence:</strong> Crowd-sourced sentiment analysis</li>
+                  <li>• <strong>Academic Science Experiment:</strong> Open-source decentralized AI trading research</li>
+                  <li>• <strong>Enterprise Security:</strong> Built with cybersecurity best practices</li>
+                  <li>• <strong>Real-Time MCP Communication:</strong> Agents discuss strategies and consensus</li>
+                </ul>
+              </div>
+            </div>
+
+              <div className="space-y-6">
+              <div>
+                <h3 className="text-2xl font-semibold text-white mb-3">Our Vision</h3>
+                <p className="text-slate-300 leading-relaxed mb-4">
+                  We're pioneering the future of decentralized AI trading through open scientific research.
+                  This platform demonstrates how multiple AI agents can collaborate, learn, and evolve together
+                  in live market conditions.
+                </p>
+                <p className="text-slate-300 leading-relaxed">
+                  Our mission is to democratize access to institutional-grade trading intelligence while
+                  advancing the field of multi-agent AI systems. Every trade, every decision, every
+                  collaboration is part of an ongoing experiment in collective artificial intelligence.
+                </p>
+              </div>
+
+              <div className="bg-surface-50/60 rounded-2xl p-6 border border-white/10">
+                <h4 className="text-lg font-semibold text-white mb-3">Follow Our Journey</h4>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 text-accent-ai">
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z" />
+                    </svg>
+                    <span className="font-medium">@rari_sui</span>
+                  </div>
+                  <span className="text-slate-400">•</span>
+                  <span className="text-slate-400">Live trading updates & AI research</span>
+                </div>
+              </div>
+            </div>
+              </div>
+
+          <div className="text-center border-t border-white/10 pt-8">
+            <p className="text-slate-400 text-sm">
+              Built with ❤️ using React, TypeScript, FastAPI, and cutting-edge AI models.
+              <br />
+              This is an open-source experiment in multi-agent AI trading systems.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -1,0 +1,41 @@
+creationTimestamp: '2025-11-02T22:45:00.476-08:00'
+defaultService: https://www.googleapis.com/compute/v1/projects/quant-ai-trader-credits/global/backendServices/cloud-trader-dashboard-backend
+fingerprint: kMI4CDofyv8=
+hostRules:
+# Main domain - serves frontend
+- hosts:
+  - sapphiretrade.xyz
+  - www.sapphiretrade.xyz
+  pathMatcher: frontend-matcher
+# Trading subdomain - serves frontend  
+- hosts:
+  - trader.sapphiretrade.xyz
+  pathMatcher: frontend-matcher
+# API subdomain - serves backend APIs
+- hosts:
+  - api.sapphiretrade.xyz
+  pathMatcher: api-matcher
+# Catch all - serves frontend
+- hosts:
+  - '*'
+  pathMatcher: frontend-matcher
+id: 7095268250743075204
+kind: compute#urlMap
+name: aster-url-map
+pathMatchers:
+# Frontend matcher - dashboard by default
+- name: frontend-matcher
+  defaultService: https://www.googleapis.com/compute/v1/projects/quant-ai-trader-credits/global/backendServices/cloud-trader-dashboard-backend
+# API matcher - wallet orchestrator by default
+- name: api-matcher
+  defaultService: https://www.googleapis.com/compute/v1/projects/quant-ai-trader-credits/global/backendServices/orchestrator-backend
+  pathRules:
+  - paths:
+    - /healthz
+    - /api
+    - /api/*
+    - /trading/*
+    - /streams/*
+    - /inference/*
+    service: https://www.googleapis.com/compute/v1/projects/quant-ai-trader-credits/global/backendServices/trader-backend
+selfLink: https://www.googleapis.com/compute/v1/projects/quant-ai-trader-credits/global/urlMaps/aster-url-map

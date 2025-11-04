@@ -1,0 +1,345 @@
+# ASTER AI Trading System Critical Issues Resolution
+
+## Current Status:
+- Frontend (sapphiretrade.xyz): ✅ WORKING - React dashboard loads correctly
+- Backend API (/healthz, /dashboard, /api/*): ❌ BROKEN - All return 404 or "no healthy upstream"
+- Load Balancer: ❌ BROKEN - All NEGs have size = 0, preventing routing
+- Cloud Run Services: Multiple services exist but NEGs can't discover them
+
+## Key Problems Identified:
+
+### Problem 1: Simplified Test App Deployed Instead of Full Trading Service
+**File**: `cloud_trader/api.py` (lines 61-79)
+**Current Code**:
+```python
+def build_app(service: TradingService | None = None) -> FastAPI:
+    logger.info("Creating simple test app...")
+    # Return a simple test app for debugging
+    app = FastAPI(title="Cloud Trader", version="1.0")
+
+    @app.get("/")
+    async def root():
+        return {"status": "ok", "message": "Simple test app working"}
+
+    @app.get("/test")
+    async def test():
+        return {"status": "ok", "message": "Test endpoint working"}
+
+    @app.get("/healthz")
+    async def healthz():
+        return {"status": "healthy", "message": "Health check working"}
+
+    logger.info("Simple test app created")
+    return app
+```
+
+**Root Cause**: During debugging, the full TradingService integration was removed and replaced with a minimal test app. The original implementation (from git commit HEAD~5) had:
+- Full TradingService initialization
+- CORS middleware configuration
+- Prometheus metrics instrumentation
+- All trading endpoints (/start, /stop, /inference/*, /dashboard, /streams/*)
+- Proper health check integration with TradingService.health()
+
+**Expected Original Code** (from git history):
+```python
+def build_app(service: TradingService | None = None) -> FastAPI:
+    trading_service = service or TradingService()
+    app = FastAPI(title="Cloud Trader", version="1.0")
+
+    # Add CORS middleware
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[...],
+        allow_credentials=True,
+        allow_methods=["GET", "POST"],
+        allow_headers=["Content-Type", "Authorization"],
+    )
+
+    # Add Prometheus instrumentation
+    Instrumentator().instrument(app).expose(app, endpoint="/metrics")
+
+    @app.get("/healthz")
+    async def healthz() -> Dict[str, object]:
+        try:
+            status = trading_service.health()
+            return {
+                "running": status.running,
+                "paper_trading": status.paper_trading,
+                "last_error": status.last_error,
+            }
+        except Exception as e:
+            return {
+                "running": False,
+                "paper_trading": True,
+                "last_error": str(e),
+            }
+
+    @app.get("/dashboard")
+    async def dashboard() -> Dict[str, object]:
+        try:
+            return await trading_service.dashboard_snapshot()
+        except Exception as exc:
+            logger.exception("Failed to build dashboard snapshot: %s", exc)
+            raise HTTPException(status_code=500, detail="Failed to build dashboard snapshot")
+
+    # ... additional routes for /start, /stop, /inference/*, /streams/*
+    
+    return app
+```
+
+### Problem 2: Network Endpoint Groups (NEGs) All Have Size = 0
+**Current NEG Status**:
+```
+NAME                        SIZE  ENDPOINT_TYPE  CLOUD_RUN_SERVICE
+cloud-trader-dashboard-neg  0     SERVERLESS    cloud-trader-dashboard
+orchestrator-neg            0     SERVERLESS    (not specified)
+trader-frontend-neg         0     SERVERLESS    cloud-trader
+trader-neg                  0     SERVERLESS    (not specified)
+```
+
+**Root Cause**: Serverless NEGs for Cloud Run should automatically discover endpoints when:
+1. Cloud Run service exists and is healthy
+2. NEG is properly configured with `--cloud-run-service` flag
+3. Cloud Run service has traffic allocated to at least one revision
+
+**Current Configuration**:
+- `trader-frontend-neg` points to `cloud-trader` service ✅
+- `cloud-trader-dashboard-neg` points to `cloud-trader-dashboard` service ✅
+- But size = 0 indicates NEGs can't discover Cloud Run endpoints
+
+**Possible Causes**:
+1. Cloud Run services don't have traffic allocated to any revision
+2. Cloud Run services are unhealthy or not ready
+3. NEG configuration is missing required fields
+4. Permissions/IAM issues preventing NEG from discovering Cloud Run
+
+### Problem 3: Load Balancer Routing Broken
+**URL Map Configuration** (`aster-url-map`):
+```yaml
+pathMatchers:
+- name: frontend-matcher
+  defaultService: cloud-trader-dashboard-backend
+- name: api-matcher
+  defaultService: orchestrator-backend
+  pathRules:
+  - paths: [/healthz, /api, /api/*, /trading/*, /streams/*, /inference/*]
+    service: trader-backend
+```
+
+**Backend Service Configuration**:
+- `trader-backend` has `trader-frontend-neg` attached ✅
+- `cloud-trader-dashboard-backend` has `cloud-trader-dashboard-neg` attached ✅
+- But NEG size = 0 means no healthy endpoints available
+
+**Symptom**: Load balancer returns "no healthy upstream" or 404 because backend services have no healthy endpoints (NEG size = 0).
+
+### Problem 4: Service Architecture Complexity
+**Multiple Cloud Run Services**:
+- `cloud-trader` (revision cloud-trader-00122-xcz) - ✅ Ready
+- `cloud-trader-dashboard` (revision cloud-trader-dashboard-00012-sh2) - ✅ Ready
+- `wallet-orchestrator` (revision wallet-orchestrator-00030-cb8) - ✅ Ready
+- Additional services: `cloud-trader-staging`, `deepseek-trader`, `qwen-trader`, `trading-dashboard`
+
+**Issue**: Multiple services with overlapping functionality may cause routing confusion.
+
+## Required Solutions:
+
+### Phase 1: Restore Full TradingService Implementation
+**Action**: Restore the original `build_app()` function in `cloud_trader/api.py`
+
+**Steps**:
+1. Replace the simplified test app (lines 61-79) with the full TradingService implementation
+2. Ensure TradingService is properly initialized: `trading_service = service or TradingService()`
+3. Add back all routes:
+   - `/healthz` - calls `trading_service.health()`
+   - `/dashboard` - calls `await trading_service.dashboard_snapshot()`
+   - `/start` - starts trading service
+   - `/stop` - stops trading service
+   - `/inference/decisions` - accepts inference decisions
+   - `/inference/chat` - proxies chat completions
+   - `/streams/{stream_name}` - gets stream snapshots
+   - `/metrics` - Prometheus metrics
+4. Add CORS middleware with proper origins
+5. Add Prometheus instrumentation
+6. Test locally first, then rebuild and deploy Docker image
+
+**Verification**:
+```bash
+# After deployment, test endpoints
+curl https://cloud-trader-880429861698.us-central1.run.app/healthz
+curl https://cloud-trader-880429861698.us-central1.run.app/dashboard
+```
+
+### Phase 2: Fix NEG Size = 0 Issue
+**Action**: Ensure NEGs can discover Cloud Run endpoints
+
+**Steps**:
+1. **Verify Cloud Run traffic allocation**:
+   ```bash
+   gcloud run services describe cloud-trader --region=us-central1 --project=quant-ai-trader-credits --format="yaml(traffic)"
+   ```
+   Ensure at least one revision has 100% traffic allocated.
+
+2. **Recreate NEGs with explicit Cloud Run service**:
+   ```bash
+   # Delete and recreate trader-frontend-neg
+   gcloud compute network-endpoint-groups delete trader-frontend-neg \
+     --region=us-central1 --project=quant-ai-trader-credits --quiet
+   
+   gcloud compute network-endpoint-groups create trader-frontend-neg \
+     --region=us-central1 \
+     --project=quant-ai-trader-credits \
+     --network-endpoint-type=serverless \
+     --cloud-run-service=cloud-trader
+   
+   # Wait 30-60 seconds, then check size
+   gcloud compute network-endpoint-groups describe trader-frontend-neg \
+     --region=us-central1 --project=quant-ai-trader-credits --format="value(size)"
+   ```
+
+3. **Verify NEG discovery**:
+   - NEG size should be > 0 within 1-2 minutes after Cloud Run service is ready
+   - If size remains 0, check Cloud Run service health and IAM permissions
+
+4. **Repeat for cloud-trader-dashboard-neg**:
+   ```bash
+   gcloud compute network-endpoint-groups delete cloud-trader-dashboard-neg \
+     --region=us-central1 --project=quant-ai-trader-credits --quiet
+   
+   gcloud compute network-endpoint-groups create cloud-trader-dashboard-neg \
+     --region=us-central1 \
+     --project=quant-ai-trader-credits \
+     --network-endpoint-type=serverless \
+     --cloud-run-service=cloud-trader-dashboard
+   ```
+
+**Verification**:
+```bash
+# Check NEG sizes
+gcloud compute network-endpoint-groups list \
+  --filter="region:us-central1" \
+  --project=quant-ai-trader-credits \
+  --format="table(name,size,cloudRunService)"
+
+# Should show size > 0 for both NEGs
+```
+
+### Phase 3: Verify Load Balancer Routing
+**Action**: Test end-to-end routing through load balancer
+
+**Steps**:
+1. **Verify backend services have NEGs attached**:
+   ```bash
+   gcloud compute backend-services describe trader-backend \
+     --global --project=quant-ai-trader-credits \
+     --format="yaml(backends)"
+   
+   gcloud compute backend-services describe cloud-trader-dashboard-backend \
+     --global --project=quant-ai-trader-credits \
+     --format="yaml(backends)"
+   ```
+
+2. **Test routing**:
+   ```bash
+   # Test frontend (should return React app)
+   curl -I https://sapphiretrade.xyz
+   
+   # Test API health (should return JSON from cloud-trader)
+   curl https://api.sapphiretrade.xyz/healthz
+   
+   # Test dashboard (should return JSON from cloud-trader)
+   curl https://api.sapphiretrade.xyz/dashboard
+   ```
+
+3. **Check load balancer logs**:
+   ```bash
+   gcloud logging read \
+     'resource.type=http_load_balancer AND resource.labels.url_map_name=aster-url-map' \
+     --limit=50 --project=quant-ai-trader-credits \
+     --format="table(timestamp,httpRequest.status,httpRequest.requestUrl)"
+   ```
+
+### Phase 4: Clean Up Duplicate/Unused Services
+**Action**: Remove or consolidate duplicate Cloud Run services and NEGs
+
+**Steps**:
+1. **Identify unused NEGs**:
+   ```bash
+   # List all NEGs and check which backend services reference them
+   gcloud compute network-endpoint-groups list --project=quant-ai-trader-credits
+   ```
+
+2. **Delete unused NEGs**:
+   ```bash
+   # Remove NEGs not attached to any backend service
+   gcloud compute network-endpoint-groups delete trader-api-neg \
+     --region=us-central1 --project=quant-ai-trader-credits --quiet
+   
+   gcloud compute network-endpoint-groups delete orchestrator-neg-new \
+     --region=us-central1 --project=quant-ai-trader-credits --quiet
+   
+   # Keep only: trader-frontend-neg, cloud-trader-dashboard-neg, orchestrator-neg
+   ```
+
+3. **Verify backend service references are correct**:
+   - `trader-backend` → `trader-frontend-neg` ✅
+   - `cloud-trader-dashboard-backend` → `cloud-trader-dashboard-neg` ✅
+   - `orchestrator-backend` → `orchestrator-neg` (verify this exists and points to wallet-orchestrator)
+
+## Files to Examine and Fix:
+
+1. **`cloud_trader/api.py`** (lines 61-79)
+   - Restore full TradingService implementation
+   - Add all routes and middleware
+
+2. **`run_live_trader.py`**
+   - Verify uvicorn startup is correct (already correct)
+   - Ensure app is passed correctly to uvicorn.run()
+
+3. **GCP Infrastructure**:
+   - NEG configurations (fix size = 0)
+   - Backend service → NEG attachments
+   - URL map routing rules
+   - Cloud Run service traffic allocation
+
+## Expected Outcome After Fixes:
+
+1. ✅ `/healthz` endpoint returns JSON: `{"running": bool, "paper_trading": bool, "last_error": str|null}`
+2. ✅ `/dashboard` endpoint returns full trading dashboard data
+3. ✅ Load balancer routes correctly: `sapphiretrade.xyz` → frontend, `api.sapphiretrade.xyz/healthz` → backend
+4. ✅ NEG sizes > 0, indicating healthy endpoints discovered
+5. ✅ Trading service can be started/stopped via API
+6. ✅ Frontend can successfully call `/dashboard` API endpoint
+
+## Critical GCP Commands for Verification:
+
+```bash
+# Check Cloud Run service status
+gcloud run services list --region=us-central1 --project=quant-ai-trader-credits
+
+# Check NEG sizes (should be > 0)
+gcloud compute network-endpoint-groups list \
+  --filter="region:us-central1" \
+  --project=quant-ai-trader-credits \
+  --format="table(name,size,cloudRunService)"
+
+# Check backend service health
+gcloud compute backend-services get-health trader-backend \
+  --global --project=quant-ai-trader-credits
+
+# Test direct Cloud Run endpoint (bypass load balancer)
+curl https://cloud-trader-880429861698.us-central1.run.app/healthz
+
+# Test through load balancer
+curl https://api.sapphiretrade.xyz/healthz
+```
+
+## Priority Order:
+
+1. **FIRST**: Restore full `build_app()` in `cloud_trader/api.py` and redeploy
+2. **SECOND**: Fix NEG size = 0 by ensuring Cloud Run traffic allocation and recreating NEGs
+3. **THIRD**: Verify load balancer routing works end-to-end
+4. **FOURTH**: Clean up duplicate/unused services
+
+Please analyze the current codebase and infrastructure, identify any additional issues, and provide specific fixes with exact commands for each phase. Focus on getting the NEG size > 0 first, as this is blocking all load balancer routing.
+

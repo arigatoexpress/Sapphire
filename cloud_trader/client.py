@@ -5,12 +5,39 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import hmac
+import logging
 import time
 from typing import Any, Dict, List, Optional
 
 import aiohttp
 
+from .circuit_breaker import AsyncCircuitBreaker, CircuitBreakerError
 from .config import Settings
+from .metrics import CIRCUIT_BREAKER_STATE, CIRCUIT_BREAKER_FAILURES
+
+logger = logging.getLogger(__name__)
+
+# Circuit breaker state mapping
+_STATE_MAP = {"closed": 0, "open": 1, "half_open": 2}
+
+
+def _update_circuit_breaker_metrics(breaker: AsyncCircuitBreaker, service_name: str) -> None:
+    """Update Prometheus metrics for circuit breaker state."""
+    state_name = breaker.current_state
+    state_value = _STATE_MAP.get(state_name, 0)
+    CIRCUIT_BREAKER_STATE.labels(service=service_name).set(state_value)
+
+
+# Circuit breaker for Aster API calls
+# Fails open after 5 failures, resets after 60 seconds
+_aster_circuit_breaker = AsyncCircuitBreaker(
+    fail_max=5,
+    reset_timeout=60,
+    name="AsterAPI",
+)
+
+# Note: Circuit breaker metrics are updated on each request
+# Listener API doesn't work well with async, so we track manually
 
 
 class AsterClient:
@@ -111,6 +138,7 @@ class AsterClient:
         *,
         signed: bool,
     ) -> Optional[Dict[str, Any]]:
+        """Execute request with circuit breaker protection."""
         await self.ensure_session()
         assert self._session is not None
 
@@ -127,15 +155,31 @@ class AsterClient:
         else:
             params = params or {}
 
-        async with self._lock:
-            async with self._session.request(method, url, params=params, json=data, headers=headers) as resp:
-                if resp.status == 200:
-                    try:
-                        return await resp.json()
-                    except Exception:
-                        return None
-                text = await resp.text()
-                raise RuntimeError(f"Aster API error {resp.status}: {text[:200]}")
+        async def _execute_request():
+            async with self._lock:
+                async with self._session.request(method, url, params=params, json=data, headers=headers) as resp:
+                    if resp.status == 200:
+                        try:
+                            return await resp.json()
+                        except Exception:
+                            return None
+                    text = await resp.text()
+                    raise RuntimeError(f"Aster API error {resp.status}: {text[:200]}")
+
+        try:
+            _update_circuit_breaker_metrics(_aster_circuit_breaker, "aster")
+            result = await _aster_circuit_breaker.call(_execute_request)
+            _update_circuit_breaker_metrics(_aster_circuit_breaker, "aster")
+            return result
+        except CircuitBreakerError as e:
+            logger.error(f"Aster API circuit breaker error: {e}")
+            _update_circuit_breaker_metrics(_aster_circuit_breaker, "aster")
+            CIRCUIT_BREAKER_FAILURES.labels(service="aster").inc()
+            raise RuntimeError(f"Aster API circuit breaker error: {e}")
+        except Exception as e:
+            logger.error(f"Aster API request failed: {e}")
+            _update_circuit_breaker_metrics(_aster_circuit_breaker, "aster")
+            raise
 
     def _sign_payload(self, method: str, path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         payload = payload.copy()

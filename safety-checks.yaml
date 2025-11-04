@@ -1,0 +1,55 @@
+# Trading Safety Configuration
+# Critical limits and circuit breakers
+
+risk_limits:
+  max_position_size: 0.05  # 5% of portfolio per position
+  max_portfolio_leverage: 2.0  # Maximum 2x leverage
+  max_daily_loss: 0.10  # 10% daily loss limit
+  max_consecutive_losses: 5  # Stop after 5 consecutive losses
+
+circuit_breakers:
+  api_failure_threshold: 5  # Open circuit after 5 API failures
+  reset_timeout: 60  # Reset after 60 seconds
+  
+monitoring_alerts:
+  - name: "High Error Rate"
+    condition: "error_rate > 0.01"  # Alert if > 1% errors
+    action: "notify_telegram"
+    
+  - name: "Service Down"
+    condition: "uptime_check_failure"
+    action: "page_oncall"
+    
+  - name: "Risk Limit Breach"
+    condition: "portfolio_leverage > 1.8"  # Alert at 90% of limit
+    action: "reduce_positions"
+    
+  - name: "API Latency"
+    condition: "p95_latency > 500ms"
+    action: "notify_telegram"
+
+emergency_procedures:
+  stop_loss:
+    - "Cancel all open orders"
+    - "Close all positions at market"
+    - "Disable trading"
+    - "Alert team"
+    
+  api_failure:
+    - "Switch to read-only mode"
+    - "Preserve position state"
+    - "Alert team"
+    - "Log detailed diagnostics"
+
+validation_checks:
+  pre_trade:
+    - "Verify API connectivity"
+    - "Check account balance"
+    - "Validate risk limits"
+    - "Confirm market hours"
+    
+  post_trade:
+    - "Verify order execution"
+    - "Update position tracking"
+    - "Check P&L impact"
+    - "Log trade details"

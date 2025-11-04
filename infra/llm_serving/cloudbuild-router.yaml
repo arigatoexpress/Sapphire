@@ -29,7 +29,7 @@ steps:
       - 'managed'
       - '--allow-unauthenticated'
       - '--set-env-vars'
-      - 'REDIS_URL=redis://10.161.118.219:6379,ORCHESTRATOR_URL=https://wallet-orchestrator-880429861698.us-central1.run.app,DEEPSEEK_ENDPOINT=https://deepseek-trader-880429861698.us-central1.run.app,QWEN_ENDPOINT=https://qwen-trader-880429861698.us-central1.run.app,FINGPT_ENDPOINT=https://fingpt-trader-880429861698.us-central1.run.app,PHI3_ENDPOINT=https://phi3-trader-880429861698.us-central1.run.app'
+      - 'REDIS_URL=redis://10.161.118.219:6379,ORCHESTRATOR_URL=https://api.sapphiretrade.xyz/orchestrator,DEEPSEEK_ENDPOINT=https://deepseek-trader-880429861698.us-central1.run.app,QWEN_ENDPOINT=https://qwen-trader-880429861698.us-central1.run.app,FINGPT_ENDPOINT=https://fingpt-trader-880429861698.us-central1.run.app,PHI3_ENDPOINT=https://phi3-trader-880429861698.us-central1.run.app'
       - '--cpu'
       - '1'
       - '--memory'

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { fetchDashboard, postStart, postStop, HealthResponse, DashboardResponse } from '../api/client';
+import { fetchDashboard, HealthResponse, DashboardResponse } from '../api/client';
 
 interface LogEntry {
   timestamp: string;
@@ -125,43 +125,6 @@ export const useTraderService = () => {
     setTimeout(() => setPollInterval(10000), 15000); // Reset after 15 seconds
   }, []);
 
-  const startTrader = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    addLog('🚀 Starting trading system...', 'info');
-
-    try {
-      const response = await postStart();
-      addLog('✅ Trading system started successfully', 'success');
-      temporaryPoll();
-      await refresh();
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown start error';
-      setError(errorMessage);
-      addLog(`❌ Failed to start trading system: ${errorMessage}`, 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [addLog, temporaryPoll, refresh]);
-
-  const stopTrader = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    addLog('🛑 Stopping trading system...', 'warning');
-
-    try {
-      const response = await postStop();
-      addLog('✅ Trading system stopped successfully', 'success');
-      temporaryPoll();
-      await refresh();
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown stop error';
-      setError(errorMessage);
-      addLog(`❌ Failed to stop trading system: ${errorMessage}`, 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [addLog, temporaryPoll, refresh]);
 
   // Connection status indicator
   useEffect(() => {
@@ -246,8 +209,6 @@ export const useTraderService = () => {
     connectionStatus,
     mcpMessages,
     mcpStatus,
-    startTrader,
-    stopTrader,
     refresh,
     addLog
   };

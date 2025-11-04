@@ -81,7 +81,7 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, onClick }) => {
                   {sentiment.label}
                 </span>
               </div>
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-400">{agent.model}</p>
+              {/* Removed redundant model label under radar */}
             </div>
           </div>
           <span

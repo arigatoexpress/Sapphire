@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from datetime import datetime
 from collections import deque
 from dataclasses import dataclass, field
@@ -24,7 +25,13 @@ from .secrets import load_credentials
 from .schemas import InferenceRequest
 from .strategy import MarketSnapshot, MomentumStrategy, parse_market_payload
 from .telegram import TelegramService, create_telegram_service
-from .mcp import MCPClient, MCPMessageType, MCPProposalPayload, MCPResponsePayload
+from .telegram_commands import TelegramCommandHandler
+# Temporarily disable MCP to fix deployment
+# from .mcp import MCPClient, MCPMessageType, MCPProposalPayload, MCPResponsePayload
+MCPClient = None
+MCPMessageType = None
+MCPProposalPayload = None
+MCPResponsePayload = None
 from .metrics import (
     ASTER_API_REQUESTS,
     LLM_CONFIDENCE,
@@ -36,6 +43,11 @@ from .metrics import (
     RISK_LIMITS_BREACHED,
     TRADING_DECISIONS,
     REDIS_STREAM_FAILURES,
+    MARKET_FEED_LATENCY,
+    MARKET_FEED_ERRORS,
+    POSITION_VERIFICATION_TIME,
+    TRADE_EXECUTION_TIME,
+    MCP_MESSAGES_TOTAL,
 )
 
 
@@ -136,11 +148,14 @@ class TradingService:
         if self._settings.orchestrator_url:
             self._orchestrator = RiskOrchestratorClient(self._settings.orchestrator_url)
         self._mcp: Optional[MCPClient] = None
-        if self._settings.mcp_url:
-            self._mcp = MCPClient(self._settings.mcp_url, self._settings.mcp_session_id)
+        # Temporarily disable MCP to get trading working ASAP
+        # if self._settings.mcp_url:
+        #     self._mcp = MCPClient(self._settings.mcp_url, self._settings.mcp_session_id)
+        self._mcp = None
 
         # Initialize Telegram service for notifications
         self._telegram: Optional[TelegramService] = None
+        self._telegram_commands: Optional[TelegramCommandHandler] = None
 
         # Agent tracking for live-only dashboards
         self._agent_states: Dict[str, AgentState] = {}
@@ -160,14 +175,30 @@ class TradingService:
             for symbol in state.symbols:
                 self._symbol_to_agent[symbol] = agent_id
 
+        # Market data cache with timestamps for validation
+        self._market_cache: Dict[str, Tuple[MarketSnapshot, float]] = {}
+        self._market_cache_ttl = 60.0  # 60 seconds max age
+
         self._recent_trades: Deque[Dict[str, Any]] = deque(maxlen=200)
         self._latest_portfolio_raw: Dict[str, Any] = {}
         self._latest_portfolio_frontend: Dict[str, Any] = {}
         self._price_cache: Dict[str, float] = {}
 
     async def _init_telegram(self) -> None:
-        """Initialize Telegram notification service."""
+        """Initialize Telegram notification service and command handler."""
         self._telegram = await create_telegram_service(self._settings)
+        
+        # Initialize command handler if credentials are available
+        if self._settings.telegram_bot_token and self._settings.telegram_chat_id:
+            try:
+                self._telegram_commands = TelegramCommandHandler(
+                    bot_token=self._settings.telegram_bot_token,
+                    chat_id=self._settings.telegram_chat_id,
+                    trading_service=self,
+                )
+                await self._telegram_commands.start()
+            except Exception as exc:
+                logger.warning(f"Failed to start Telegram command handler: {exc}")
 
     async def dashboard_snapshot(self) -> Dict[str, Any]:
         """Aggregate a lightweight view for the dashboard endpoint."""
@@ -262,6 +293,11 @@ class TradingService:
         await self._init_telegram()
         if self._orchestrator:
             await self._sync_portfolio()
+        if self._mcp:
+            try:
+                await self._mcp.ensure_session()
+            except Exception as exc:
+                logger.warning("Failed to ensure MCP session at startup: %s", exc)
         self._task = asyncio.create_task(self._run_loop())
 
     async def stop(self) -> None:
@@ -290,144 +326,198 @@ class TradingService:
             await self._publish_portfolio_state()
 
     async def _tick(self) -> None:
-        market = await self._fetch_market()
+        """Execute trading tick with enhanced error handling per symbol."""
+        try:
+            market = await self._fetch_market()
+            
+            if not market:
+                logger.warning("No market data available, skipping tick")
+                return
+        except Exception as exc:
+            logger.exception("Failed to fetch market data in tick: %s", exc)
+            self._health.last_error = str(exc)[:200]
+            return
 
+        # Process each symbol independently to continue on failures
         for symbol, snapshot in market.items():
-            decision = self._strategy.should_enter(symbol, snapshot)
-            if decision == "HOLD":
+            try:
+                decision = self._strategy.should_enter(symbol, snapshot)
+                if decision == "HOLD":
+                    await self._streams.publish_reasoning(
+                        {
+                            "bot_id": self._settings.bot_id,
+                            "symbol": symbol,
+                            "strategy": "momentum",
+                            "message": "hold_position",
+                            "context": json.dumps(
+                                {
+                                    "change_24h": round(snapshot.change_24h, 4),
+                                    "volume": round(snapshot.volume, 2),
+                                }
+                            ),
+                            "timestamp": timestamp(),
+                        }
+                    )
+                    continue
+                if not decision:
+                    continue
+
+                if self._mcp:
+                    # Calculate notional for proposal
+                    proposal_notional = self._strategy.allocate_notional(
+                        portfolio_balance=self._portfolio.balance,
+                        expected_return=self._settings.expected_win_rate,
+                        volatility=0.15,
+                    )
+                    proposal = MCPProposalPayload(
+                        symbol=symbol,
+                        side=decision,
+                        notional=proposal_notional,
+                        confidence=0.5,
+                        rationale="momentum_threshold_crossed",
+                    )
+                    await self._mcp.publish(
+                        {
+                            "session_id": self._settings.mcp_session_id or "",
+                            "sender_id": self._settings.bot_id,
+                            "sender_role": "agent",
+                            "message_type": MCPMessageType.PROPOSAL.value,
+                            "payload": proposal.model_dump(),
+                        }
+                    )
+                    MCP_MESSAGES_TOTAL.labels(message_type="proposal", direction="outbound").inc()
+
+                # Send MCP proposal notification via Telegram
+                if self._telegram:
+                    await self._telegram.send_mcp_notification(
+                        session_id=self._settings.mcp_session_id or "default",
+                        sender_id=self._settings.bot_id,
+                        message_type="proposal",
+                        content=f"Proposing {decision.upper()} trade on {symbol} with ${proposal_notional:.2f} notional",
+                        context=f"Momentum strategy triggered at {snapshot.price:.4f}"
+                    )
+
+                if not self._bandit.allow(symbol):
+                    await self._streams.publish_reasoning(
+                        {
+                            "bot_id": self._settings.bot_id,
+                            "symbol": symbol,
+                            "strategy": "bandit",
+                            "message": "bandit_suppressed_trade",
+                            "timestamp": timestamp(),
+                        }
+                    )
+                    continue
+
+                # Use Kelly Criterion for position sizing if enabled
+                notional = self._strategy.allocate_notional(
+                    portfolio_balance=self._portfolio.balance,
+                    expected_return=self._settings.expected_win_rate,
+                    volatility=0.15,  # Default volatility, can be calculated from price history
+                )
+                notional = await self._auto_delever(symbol, snapshot, notional)
+                if notional <= 0:
+                    continue
+                if not self._risk.can_open_position(self._portfolio, notional):
+                    logger.info("Risk limits prevent new %s position", symbol)
+                    RISK_LIMITS_BREACHED.labels(limit_type="position_size").inc()
+                    await self._streams.publish_reasoning(
+                        {
+                            "bot_id": self._settings.bot_id,
+                            "symbol": symbol,
+                            "strategy": "risk",
+                            "message": "risk_limit_block",
+                            "timestamp": timestamp(),
+                        }
+                    )
+                    continue
+
+                TRADING_DECISIONS.labels(
+                    bot_id=self._settings.bot_id,
+                    symbol=symbol,
+                    action=decision,
+                ).inc()
+
+                order_tag = generate_order_tag(self._settings.bot_id, symbol)
+                buffer = self._settings.trailing_stop_buffer
+                trail_step = self._settings.trailing_step
+                
+                # Use ATR-based stop loss if available, otherwise fallback to buffer
+                if snapshot.atr and snapshot.atr > 0:
+                    stop_loss = self._strategy.calculate_stop_loss(
+                        entry_price=snapshot.price,
+                        atr=snapshot.atr,
+                        is_long=(decision == "BUY"),
+                    )
+                else:
+                    # Fallback to buffer-based stop loss
+                    if decision == "BUY":
+                        stop_loss = snapshot.price * (1 - buffer)
+                    else:
+                        stop_loss = snapshot.price * (1 + buffer)
+                
+                # Calculate take profit
+                if decision == "BUY":
+                    take_profit = snapshot.price * (1 + buffer)
+                else:
+                    take_profit = snapshot.price * (1 - buffer)
+                decision_event = {
+                    "bot_id": self._settings.bot_id,
+                    "symbol": symbol,
+                    "side": decision,
+                    "notional": f"{notional:.2f}",
+                    "paper": str(self.paper_trading).lower(),
+                    "strategy": "momentum",
+                    "price": f"{snapshot.price:.2f}",
+                    "order_id": order_tag,
+                    "take_profit": f"{take_profit:.4f}",
+                    "stop_loss": f"{stop_loss:.4f}",
+                    "trail_step": f"{trail_step:.4f}",
+                    "timestamp": timestamp(),
+                }
+                await self._streams.publish_decision(decision_event)
                 await self._streams.publish_reasoning(
                     {
                         "bot_id": self._settings.bot_id,
                         "symbol": symbol,
                         "strategy": "momentum",
-                        "message": "hold_position",
+                        "message": "24h_change_crossed_threshold",
                         "context": json.dumps(
                             {
                                 "change_24h": round(snapshot.change_24h, 4),
-                                "volume": round(snapshot.volume, 2),
+                                "take_profit": round(take_profit, 4),
+                                "stop_loss": round(stop_loss, 4),
+                                "trail_step": trail_step,
                             }
                         ),
-                        "timestamp": timestamp(),
-                    }
-                )
-                continue
-            if not decision:
-                continue
-
-            if self._mcp:
-                proposal = MCPProposalPayload(
-                    symbol=symbol,
-                    side=decision,
-                    notional=self._strategy.allocate_notional(self._portfolio.balance),
-                    confidence=0.5,
-                    rationale="momentum_threshold_crossed",
-                )
-                await self._mcp.publish(
-                    {
-                        "session_id": self._settings.mcp_session_id or "",
-                        "sender_id": self._settings.bot_id,
-                        "sender_role": "agent",
-                        "message_type": MCPMessageType.PROPOSAL.value,
-                        "payload": proposal.model_dump(),
+                        "timestamp": decision_event["timestamp"],
                     }
                 )
 
-            if not self._bandit.allow(symbol):
-                await self._streams.publish_reasoning(
-                    {
-                        "bot_id": self._settings.bot_id,
-                        "symbol": symbol,
-                        "strategy": "bandit",
-                        "message": "bandit_suppressed_trade",
-                        "timestamp": timestamp(),
-                    }
+                if self.paper_trading:
+                    logger.info("[PAPER] %s %s @ %.2f", decision, symbol, snapshot.price)
+                    self._portfolio = self._risk.register_fill(self._portfolio, symbol, notional)
+                    await self._publish_portfolio_state()
+                    self._bandit.update(symbol, _reward_for(decision, snapshot.change_24h))
+                    continue
+
+                await self._execute_order(
+                    symbol,
+                    decision,
+                    snapshot.price,
+                    notional,
+                    order_tag,
+                    take_profit,
+                    stop_loss,
+                    trail_step,
                 )
-                continue
-
-            notional = self._strategy.allocate_notional(self._portfolio.balance)
-            notional = await self._auto_delever(symbol, snapshot, notional)
-            if notional <= 0:
-                continue
-            if not self._risk.can_open_position(self._portfolio, notional):
-                logger.info("Risk limits prevent new %s position", symbol)
-                RISK_LIMITS_BREACHED.labels(limit_type="position_size").inc()
-                await self._streams.publish_reasoning(
-                    {
-                        "bot_id": self._settings.bot_id,
-                        "symbol": symbol,
-                        "strategy": "risk",
-                        "message": "risk_limit_block",
-                        "timestamp": timestamp(),
-                    }
-                )
-                continue
-
-            TRADING_DECISIONS.labels(
-                bot_id=self._settings.bot_id,
-                symbol=symbol,
-                action=decision,
-            ).inc()
-
-            order_tag = generate_order_tag(self._settings.bot_id, symbol)
-            buffer = self._settings.trailing_stop_buffer
-            trail_step = self._settings.trailing_step
-            if decision == "BUY":
-                take_profit = snapshot.price * (1 + buffer)
-                stop_loss = snapshot.price * (1 - buffer)
-            else:
-                take_profit = snapshot.price * (1 - buffer)
-                stop_loss = snapshot.price * (1 + buffer)
-            decision_event = {
-                "bot_id": self._settings.bot_id,
-                "symbol": symbol,
-                "side": decision,
-                "notional": f"{notional:.2f}",
-                "paper": str(self.paper_trading).lower(),
-                "strategy": "momentum",
-                "price": f"{snapshot.price:.2f}",
-                "order_id": order_tag,
-                "take_profit": f"{take_profit:.4f}",
-                "stop_loss": f"{stop_loss:.4f}",
-                "trail_step": f"{trail_step:.4f}",
-                "timestamp": timestamp(),
-            }
-            await self._streams.publish_decision(decision_event)
-            await self._streams.publish_reasoning(
-                {
-                    "bot_id": self._settings.bot_id,
-                    "symbol": symbol,
-                    "strategy": "momentum",
-                    "message": "24h_change_crossed_threshold",
-                    "context": json.dumps(
-                        {
-                            "change_24h": round(snapshot.change_24h, 4),
-                            "take_profit": round(take_profit, 4),
-                            "stop_loss": round(stop_loss, 4),
-                            "trail_step": trail_step,
-                        }
-                    ),
-                    "timestamp": decision_event["timestamp"],
-                }
-            )
-
-            if self.paper_trading:
-                logger.info("[PAPER] %s %s @ %.2f", decision, symbol, snapshot.price)
-                self._portfolio = self._risk.register_fill(self._portfolio, symbol, notional)
-                await self._publish_portfolio_state()
                 self._bandit.update(symbol, _reward_for(decision, snapshot.change_24h))
+            except Exception as exc:
+                # Log error but continue processing other symbols
+                logger.exception("Error processing symbol %s in tick: %s", symbol, exc)
+                self._health.last_error = f"{symbol}: {str(exc)[:100]}"
+                # Continue to next symbol
                 continue
-
-            await self._execute_order(
-                symbol,
-                decision,
-                snapshot.price,
-                notional,
-                order_tag,
-                take_profit,
-                stop_loss,
-                trail_step,
-            )
-            self._bandit.update(symbol, _reward_for(decision, snapshot.change_24h))
 
     async def _execute_order(
         self,
@@ -471,6 +561,16 @@ class TradingService:
                 if response.get("status") not in {"submitted", "approved"}:
                     reason = response.get("reason", "unknown_error")
                     raise RuntimeError(f"orchestrator rejected order: {reason}")
+                
+                # Verify position via orchestrator (it handles positionRisk)
+                # For orchestrator route, we rely on it to verify, but we can still check
+                position_verified = True
+                if self._client:
+                    # Try to verify via direct Aster API if client available
+                    position_verified = await self._verify_position_execution(
+                        symbol, side, order_tag, timeout=30.0
+                    )
+                
                 await self._sync_portfolio()
 
                 self._register_trade_event(
@@ -479,7 +579,10 @@ class TradingService:
                     price=price,
                     notional=notional,
                     quantity=quantity,
-                    metadata={"status": response.get("status")},
+                    metadata={
+                        "status": response.get("status"),
+                        "position_verified": position_verified,
+                    },
                 )
 
                 # Send Telegram notification for successful trade
@@ -498,6 +601,16 @@ class TradingService:
                         portfolio_balance=self._portfolio.balance,
                         risk_percentage=(notional / self._portfolio.balance) * 100,
                     )
+
+                    # Also send MCP execution notification
+                    if self._mcp:
+                        await self._telegram.send_mcp_notification(
+                            session_id=self._settings.mcp_session_id or "default",
+                            sender_id=self._settings.bot_id,
+                            message_type="execution",
+                            content=f"Executed {side.upper()} trade on {symbol} for ${notional:.2f} at ${price:.4f}",
+                            context=f"Trade completed via orchestrator with {agent_model}"
+                        )
             except Exception as exc:
                 logger.error("Orchestrator route failed for %s: %s", symbol, exc)
                 self._health.last_error = str(exc)
@@ -524,15 +637,41 @@ class TradingService:
         try:
             await self._client.place_order(order_payload)
             logger.info("Placed %s order for %s (notional %.2f)", side, symbol, notional)
-            self._portfolio = self._risk.register_fill(self._portfolio, symbol, notional)
-            await self._publish_portfolio_state()
-            self._register_trade_event(
-                symbol=symbol,
-                side=side,
-                price=price,
-                notional=notional,
-                quantity=quantity,
-            )
+            
+            # Track execution time
+            execution_start = time.time()
+            
+            # Verify position was created with timeout
+            position_verified = await self._verify_position_execution(symbol, side, order_tag, timeout=30.0)
+            
+            execution_duration = time.time() - execution_start
+            TRADE_EXECUTION_TIME.labels(symbol=symbol, side=side).observe(execution_duration)
+            
+            if position_verified:
+                self._portfolio = self._risk.register_fill(self._portfolio, symbol, notional)
+                await self._publish_portfolio_state()
+                self._register_trade_event(
+                    symbol=symbol,
+                    side=side,
+                    price=price,
+                    notional=notional,
+                    quantity=quantity,
+                )
+            else:
+                logger.warning(
+                    "Position verification failed or timed out for %s %s order %s. "
+                    "Portfolio state not updated.",
+                    side, symbol, order_tag
+                )
+                # Still register the trade event but mark as unverified
+                self._register_trade_event(
+                    symbol=symbol,
+                    side=side,
+                    price=price,
+                    notional=notional,
+                    quantity=quantity,
+                    metadata={"position_verified": False},
+                )
             if self._mcp:
                 response_payload = MCPResponsePayload(
                     reference_id=order_tag,
@@ -567,25 +706,203 @@ class TradingService:
                 }
             )
 
+    async def _verify_position_execution(
+        self,
+        symbol: str,
+        side: str,
+        order_id: str,
+        timeout: float = 30.0,
+    ) -> bool:
+        """Verify that a position was actually created after order execution.
+        
+        Args:
+            symbol: Trading symbol (e.g., "BTCUSDT")
+            side: "BUY" or "SELL"
+            order_id: Client order ID to track
+            timeout: Maximum time to wait for verification (seconds)
+        
+        Returns:
+            True if position verified, False if timeout or verification failed
+        """
+        if not self._client:
+            logger.warning("No client available for position verification")
+            return False
+        
+        start_time = time.time()
+        max_polls = 10
+        poll_interval = timeout / max_polls
+        
+        logger.info("Verifying position execution for %s %s (order: %s)", side, symbol, order_id)
+        
+        verification_start = time.time()
+        
+        for attempt in range(max_polls):
+            try:
+                # Poll positionRisk endpoint
+                positions = await self._client.position_risk()
+                
+                # Look for matching position
+                symbol_upper = symbol.upper()
+                for position in positions:
+                    pos_symbol = position.get("symbol", "")
+                    pos_size = float(position.get("positionAmt", 0.0))
+                    
+                    if pos_symbol.upper() == symbol_upper and abs(pos_size) > 1e-8:
+                        # Position exists, verify direction matches
+                        verification_duration = time.time() - verification_start
+                        if side == "BUY" and pos_size > 0:
+                            logger.info(
+                                "Position verified: %s %s (size: %.6f) for order %s",
+                                side, symbol, pos_size, order_id
+                            )
+                            POSITION_VERIFICATION_TIME.labels(symbol=symbol, status="success").observe(verification_duration)
+                            return True
+                        elif side == "SELL" and pos_size < 0:
+                            logger.info(
+                                "Position verified: %s %s (size: %.6f) for order %s",
+                                side, symbol, pos_size, order_id
+                            )
+                            POSITION_VERIFICATION_TIME.labels(symbol=symbol, status="success").observe(verification_duration)
+                            return True
+                        else:
+                            logger.warning(
+                                "Position direction mismatch: expected %s, got size %.6f for %s",
+                                side, pos_size, symbol
+                            )
+                
+                # Position not found yet, wait and retry
+                elapsed = time.time() - start_time
+                if elapsed >= timeout:
+                    logger.warning(
+                        "Position verification timeout for %s %s (order: %s) after %.1fs",
+                        side, symbol, order_id, elapsed
+                    )
+                    return False
+                
+                await asyncio.sleep(poll_interval)
+                
+            except Exception as exc:
+                logger.error(
+                    "Error verifying position for %s %s (order: %s, attempt %d/%d): %s",
+                    side, symbol, order_id, attempt + 1, max_polls, exc
+                )
+                # Continue retrying unless we've exceeded timeout
+                elapsed = time.time() - start_time
+                if elapsed >= timeout:
+                    return False
+                await asyncio.sleep(poll_interval)
+        
+        verification_duration = time.time() - verification_start
+        POSITION_VERIFICATION_TIME.labels(symbol=symbol, status="failed").observe(verification_duration)
+        logger.warning(
+            "Position verification failed after %d attempts for %s %s (order: %s)",
+            max_polls, side, symbol, order_id
+        )
+        return False
+
     async def _fetch_market(self) -> Dict[str, MarketSnapshot]:
+        """Fetch market data with validation, retry logic, and caching."""
         if self.paper_trading:
             return self._generate_fake_market()
 
         assert self._client is not None
         result: Dict[str, MarketSnapshot] = {}
-        try:
-            for symbol in self._settings.symbols:
-                payload = await self._client.ticker(symbol)
-                result[symbol] = parse_market_payload(
-                    {
-                        "price": payload.get("lastPrice", 0.0),
-                        "volume": payload.get("volume", 0.0),
-                        "change_24h": payload.get("priceChangePercent", 0.0),
-                    }
-                )
-        except Exception as exc:
-            logger.error("Failed to fetch market data: %s", exc)
-            self._health.last_error = str(exc)
+        current_time = time.time()
+        
+        # Fetch data for each symbol with retry logic
+        for symbol in self._settings.symbols:
+            max_retries = 3
+            retry_delay = 1.0
+            fetch_start = time.time()
+            
+            for attempt in range(max_retries):
+                try:
+                    # Fetch ticker data
+                    payload = await self._client.ticker(symbol)
+                    fetch_duration = time.time() - fetch_start
+                    MARKET_FEED_LATENCY.labels(symbol=symbol).observe(fetch_duration)
+                    
+                    # Validate required fields
+                    price = _safe_float(payload.get("lastPrice"), 0.0)
+                    volume = _safe_float(payload.get("volume"), 0.0)
+                    change_24h = _safe_float(payload.get("priceChangePercent"), 0.0)
+                    
+                    # Check for missing or invalid data
+                    if not price or price <= 0:
+                        logger.warning(f"Invalid price for {symbol}: {price}, attempting retry {attempt + 1}/{max_retries}")
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(retry_delay * (attempt + 1))
+                            continue
+                        # Use cached data if available
+                        if symbol in self._market_cache:
+                            cached_snapshot, cached_time = self._market_cache[symbol]
+                            age = current_time - cached_time
+                            if age <= self._market_cache_ttl:
+                                logger.warning(f"Using cached market data for {symbol} (age: {age:.1f}s)")
+                                result[symbol] = cached_snapshot
+                                continue
+                        logger.error(f"Failed to fetch valid price for {symbol} after {max_retries} attempts")
+                        continue
+                    
+                    # Create market snapshot
+                    snapshot = parse_market_payload({
+                        "price": price,
+                        "volume": volume,
+                        "change_24h": change_24h,
+                    })
+                    
+                    # Validate snapshot data
+                    if snapshot.price <= 0 or snapshot.volume < 0:
+                        logger.warning(f"Invalid snapshot data for {symbol}: price={snapshot.price}, volume={snapshot.volume}")
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(retry_delay * (attempt + 1))
+                            continue
+                        # Use cached data if available
+                        if symbol in self._market_cache:
+                            cached_snapshot, cached_time = self._market_cache[symbol]
+                            age = current_time - cached_time
+                            if age <= self._market_cache_ttl:
+                                logger.warning(f"Using cached market data for {symbol} (age: {age:.1f}s)")
+                                result[symbol] = cached_snapshot
+                                continue
+                        continue
+                    
+                    # Store in cache with timestamp
+                    self._market_cache[symbol] = (snapshot, current_time)
+                    result[symbol] = snapshot
+                    break  # Success, exit retry loop
+                    
+                except Exception as exc:
+                    MARKET_FEED_ERRORS.labels(symbol=symbol, error_type=type(exc).__name__).inc()
+                    logger.exception(
+                        "Failed to fetch market data",
+                        symbol=symbol,
+                        attempt=attempt + 1,
+                        max_retries=max_retries,
+                        error=str(exc),
+                    )
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(retry_delay * (attempt + 1))
+                    else:
+                        # Last attempt failed, try cached data
+                        if symbol in self._market_cache:
+                            cached_snapshot, cached_time = self._market_cache[symbol]
+                            age = current_time - cached_time
+                            if age <= self._market_cache_ttl:
+                                logger.warning(f"Using cached market data for {symbol} after fetch failure (age: {age:.1f}s)")
+                                result[symbol] = cached_snapshot
+                            else:
+                                logger.error(f"Cached data for {symbol} is too old ({age:.1f}s > {self._market_cache_ttl}s)")
+                        else:
+                            logger.error(f"No cached data available for {symbol}")
+                        self._health.last_error = f"Failed to fetch {symbol}: {str(exc)[:100]}"
+        
+        # Log feed health metrics
+        if result:
+            logger.info(f"Market feed: {len(result)}/{len(self._settings.symbols)} symbols fetched successfully")
+        else:
+            logger.warning("No market data available after retries and cache lookup")
+        
         return result
 
     def _generate_fake_market(self) -> Dict[str, MarketSnapshot]:
@@ -1070,7 +1387,6 @@ class TradingService:
             logger.error(f"Failed to process LLM inference decision: {exc}")
 
         # Update Prometheus metrics
-        from .api import TRADING_DECISIONS, LLM_CONFIDENCE, LLM_INFERENCE_TIME
         if request.confidence is not None:
             LLM_CONFIDENCE.observe(request.confidence)
         TRADING_DECISIONS.labels(
@@ -1315,7 +1631,6 @@ class TradingService:
         self._update_agent_snapshots(derived_portfolio)
 
         # Update Prometheus metrics
-        from .api import PORTFOLIO_BALANCE, PORTFOLIO_LEVERAGE, POSITION_SIZE
         PORTFOLIO_BALANCE.set(balance)
         leverage_ratio = (total_exposure / balance) if balance > 0 else 0
         PORTFOLIO_LEVERAGE.set(leverage_ratio)
@@ -1325,3 +1640,20 @@ class TradingService:
             POSITION_SIZE.labels(symbol=symbol).set(position.notional)
 
         await self._publish_portfolio_state()
+
+
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    raw_value = value
+    if value is None:
+        return default
+    if isinstance(value, str):
+        cleaned = value.strip()
+        if not cleaned:
+            return default
+        cleaned = cleaned.replace('%', '').replace(',', '')
+        value = cleaned
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        logger.warning("Unable to parse numeric value", raw_value=raw_value, default=default)
+        return default

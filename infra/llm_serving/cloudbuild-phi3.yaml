@@ -29,7 +29,7 @@ steps:
       - 'managed'
       - '--allow-unauthenticated'
       - '--set-env-vars'
-      - 'REDIS_URL=redis://10.161.118.219:6379,ORCHESTRATOR_URL=https://wallet-orchestrator-880429861698.us-central1.run.app'
+      - 'REDIS_URL=redis://10.161.118.219:6379,ORCHESTRATOR_URL=https://api.sapphiretrade.xyz/orchestrator'
       - '--cpu'
       - '2'
       - '--memory'

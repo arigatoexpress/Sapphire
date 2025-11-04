@@ -19,6 +19,30 @@ from models.common.mcp_adapter import MCPAdapter
 
 app = FastAPI(title="AI Model Service", version="1.0.0")
 
+# Model-specific behaviors
+MODEL_CONFIGS = {
+    "deepseek": {
+        "name": "DeepSeek-Coder-V2",
+        "strengths": ["mathematical reasoning", "technical analysis", "market regime detection"],
+        "personality": "analytical and methodical"
+    },
+    "qwen": {
+        "name": "Qwen2.5-Coder",
+        "strengths": ["algorithmic trading", "code generation", "pattern recognition"],
+        "personality": "precise and systematic"
+    },
+    "fingpt": {
+        "name": "FinGPT",
+        "strengths": ["financial sentiment", "market psychology", "news analysis"],
+        "personality": "market-savvy and contextual"
+    },
+    "phi3": {
+        "name": "Phi-3",
+        "strengths": ["fast decision making", "risk assessment", "trend following"],
+        "personality": "agile and responsive"
+    }
+}
+
 # MCP configuration
 MCP_URL = os.getenv("MCP_URL")
 MCP_SESSION_ID = os.getenv("MCP_SESSION_ID")
@@ -47,30 +71,6 @@ class InferenceResponse(BaseModel):
     confidence: float
     reasoning: str
     model_used: str
-
-# Model-specific behaviors
-MODEL_CONFIGS = {
-    "deepseek": {
-        "name": "DeepSeek-Coder-V2",
-        "strengths": ["mathematical reasoning", "technical analysis", "market regime detection"],
-        "personality": "analytical and methodical"
-    },
-    "qwen": {
-        "name": "Qwen2.5-Coder",
-        "strengths": ["algorithmic trading", "code generation", "pattern recognition"],
-        "personality": "precise and systematic"
-    },
-    "fingpt": {
-        "name": "FinGPT",
-        "strengths": ["financial sentiment", "market psychology", "news analysis"],
-        "personality": "market-savvy and contextual"
-    },
-    "phi3": {
-        "name": "Phi-3",
-        "strengths": ["fast decision making", "risk assessment", "trend following"],
-        "personality": "agile and responsive"
-    }
-}
 
 def get_model_from_path(path: str) -> str:
     """Extract model name from URL path"""

@@ -1,13 +1,11 @@
-import React, { useState, useMemo } from 'react';
-import { DashboardPortfolio, emergencyStop } from '../api/client';
+import React, { useMemo } from 'react';
+import { DashboardPortfolio } from '../api/client';
 
 interface RiskMetricsProps {
   portfolio?: DashboardPortfolio;
 }
 
 const RiskMetrics: React.FC<RiskMetricsProps> = ({ portfolio }) => {
-  const [emergencyLoading, setEmergencyLoading] = useState(false);
-
   const derived = useMemo(() => {
     if (!portfolio) {
       return {
@@ -29,21 +27,6 @@ const RiskMetrics: React.FC<RiskMetricsProps> = ({ portfolio }) => {
     return { balance, exposure, positions };
   }, [portfolio]);
 
-  const handleEmergencyStop = async () => {
-    if (!confirm('Are you sure you want to trigger an emergency stop? This will cancel all open orders and close positions.')) {
-      return;
-    }
-
-    try {
-      setEmergencyLoading(true);
-      await emergencyStop();
-      alert('Emergency stop triggered successfully');
-    } catch (err) {
-      alert(`Emergency stop failed: ${(err as Error).message}`);
-    } finally {
-      setEmergencyLoading(false);
-    }
-  };
 
   const calculateRiskMetrics = () => {
     const { balance, exposure, positions } = derived;
@@ -162,37 +145,6 @@ const RiskMetrics: React.FC<RiskMetricsProps> = ({ portfolio }) => {
         )}
       </div>
 
-      <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-6 text-red-100 shadow-glass">
-        <h3 className="text-lg font-semibold text-red-100">Emergency Controls</h3>
-        <p className="mt-1 text-sm text-red-200/80">
-          Use only to halt trading and flatten exposure. Accessibility restricted to operators with elevated permissions.
-        </p>
-
-        <button
-          onClick={handleEmergencyStop}
-          disabled={emergencyLoading}
-          className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-red-500/80 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:bg-red-500/40"
-        >
-          {emergencyLoading ? (
-            <>
-              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-              Triggering Emergency Stop…
-            </>
-          ) : (
-            <>
-              <span>🛑</span>
-              Emergency Stop
-            </>
-          )}
-        </button>
-
-        <p className="mt-3 text-xs text-red-200/70">
-          Action will cancel open orders and send liquidation-intent to orchestrator routing layer.
-        </p>
-      </div>
     </div>
   );
 };

@@ -63,6 +63,27 @@ REDIS_STREAM_FAILURES = Counter(
     labelnames=["stream"],
 )
 
+# --- Circuit breaker metrics ----------------------------------------------------
+
+CIRCUIT_BREAKER_STATE = Gauge(
+    "circuit_breaker_state",
+    "Current state of circuit breaker (0=closed, 1=open, 2=half-open)",
+    labelnames=["service"],
+)
+
+CIRCUIT_BREAKER_FAILURES = Counter(
+    "circuit_breaker_failures_total",
+    "Total number of failures that triggered circuit breaker",
+    labelnames=["service"],
+)
+
+CIRCUIT_BREAKER_OPEN_DURATION = Histogram(
+    "circuit_breaker_open_duration_seconds",
+    "Duration circuit breaker remains open",
+    labelnames=["service"],
+    buckets=(10, 30, 60, 120, 300, 600),
+)
+
 
 # --- LLM related telemetry -------------------------------------------------------
 
@@ -76,6 +97,66 @@ LLM_INFERENCE_TIME = Histogram(
     "trading_llm_inference_duration_seconds",
     "Duration for external LLM inference calls",
     buckets=(0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0),
+)
+
+# --- Enhanced instrumentation metrics -----------------------------------------
+
+HTTP_REQUEST_DURATION = Histogram(
+    "http_request_duration_seconds",
+    "HTTP request duration",
+    labelnames=["method", "endpoint", "status"],
+    buckets=(0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0),
+)
+
+HTTP_REQUESTS_TOTAL = Counter(
+    "http_requests_total",
+    "Total HTTP requests",
+    labelnames=["method", "endpoint", "status"],
+)
+
+MARKET_FEED_LATENCY = Histogram(
+    "market_feed_latency_seconds",
+    "Market data feed fetch latency",
+    labelnames=["symbol"],
+    buckets=(0.01, 0.05, 0.1, 0.5, 1.0, 2.0),
+)
+
+MARKET_FEED_ERRORS = Counter(
+    "market_feed_errors_total",
+    "Market data feed errors",
+    labelnames=["symbol", "error_type"],
+)
+
+POSITION_VERIFICATION_TIME = Histogram(
+    "position_verification_duration_seconds",
+    "Time taken to verify position after execution",
+    labelnames=["symbol", "status"],
+    buckets=(1.0, 2.0, 5.0, 10.0, 30.0),
+)
+
+TRADE_EXECUTION_TIME = Histogram(
+    "trade_execution_duration_seconds",
+    "Time from decision to verified execution",
+    labelnames=["symbol", "side"],
+    buckets=(0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0),
+)
+
+MCP_MESSAGES_TOTAL = Counter(
+    "mcp_messages_total",
+    "Total MCP messages sent/received",
+    labelnames=["message_type", "direction"],
+)
+
+CONSENSUS_VOTES_TOTAL = Counter(
+    "consensus_votes_total",
+    "Total consensus votes cast",
+    labelnames=["proposal_id", "approved"],
+)
+
+CONSENSUS_REACHED = Counter(
+    "consensus_reached_total",
+    "Number of times consensus reached",
+    labelnames=["approved"],
 )
 
 
