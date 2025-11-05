@@ -26,71 +26,76 @@ const ModelReasoning: React.FC<ModelReasoningProps> = ({ reasoning }) => {
   };
 
   const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 0.8) return 'bg-green-100 text-green-800';
-    if (confidence >= 0.6) return 'bg-yellow-100 text-yellow-800';
-    return 'bg-red-100 text-red-800';
+    if (confidence >= 0.8) return 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/40';
+    if (confidence >= 0.6) return 'bg-amber-500/20 text-amber-200 border border-amber-400/40';
+    return 'bg-rose-500/20 text-rose-200 border border-rose-400/40';
   };
 
   const getDecisionColor = (decision: string) => {
     switch (decision.toLowerCase()) {
       case 'buy':
-        return 'bg-green-100 text-green-800';
+        return 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/40';
       case 'sell':
-        return 'bg-red-100 text-red-800';
+        return 'bg-rose-500/20 text-rose-200 border border-rose-400/40';
       case 'hold':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-slate-500/20 text-slate-200 border border-slate-400/40';
       default:
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-sky-500/20 text-sky-200 border border-sky-400/40';
     }
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold text-slate-900">AI Model Reasoning</h2>
-        <div className="text-sm text-slate-500">
+    <section className="relative overflow-hidden rounded-4xl border border-white/12 bg-surface-75/80 p-6 shadow-glass">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,_rgba(168,85,247,0.18),_transparent_70%)]" />
+      <div className="relative flex items-center justify-between mb-6">
+        <div>
+          <p className="text-xs uppercase tracking-[0.3em] text-purple-200/80">Reasoning trace</p>
+          <h2 className="text-2xl font-semibold text-white">AI Model Reasoning</h2>
+        </div>
+        <div className="text-sm font-medium text-slate-200/80">
           {reasoning.length} recent decisions
         </div>
       </div>
 
-      <div className="space-y-4 max-h-96 overflow-y-auto">
+      <div className="relative space-y-4 max-h-[28rem] overflow-y-auto pr-1">
         {reasoning.map((entry, index) => (
-          <div key={index} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex items-center space-x-3">
-                <span className="text-xl">{getModelIcon(entry.model_name)}</span>
+          <div key={index} className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.14),_transparent_70%)]" />
+            <div className="relative flex items-start justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <span className="text-xl drop-shadow">{getModelIcon(entry.model_name)}</span>
                 <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="font-medium text-slate-900">{entry.model_name}</span>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getDecisionColor(entry.decision)}`}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-white">{entry.model_name}</span>
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[0.65rem] uppercase tracking-[0.2em] ${getDecisionColor(entry.decision)}`}>
                       {entry.decision.toUpperCase()}
                     </span>
                   </div>
-                  <p className="text-sm text-slate-500">
+                  <p className="text-xs text-slate-300/80">
                     {entry.symbol} • {new Date(entry.timestamp).toLocaleString()}
                   </p>
                 </div>
               </div>
-              <div className={`px-3 py-1 rounded-full text-xs font-medium ${getConfidenceColor(entry.confidence)}`}>
-                {(entry.confidence * 100).toFixed(1)}% confidence
+              <div className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[0.65rem] font-medium uppercase tracking-[0.2em] ${getConfidenceColor(entry.confidence)}`}>
+                {(entry.confidence * 100).toFixed(1)}% Conf.
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="relative space-y-3 text-sm">
               <div>
-                <span className="text-sm font-medium text-slate-700">Reasoning:</span>
-                <p className="text-sm text-slate-600 mt-1">{entry.reasoning}</p>
+                <span className="text-xs uppercase tracking-[0.28em] text-slate-400">Reasoning</span>
+                <p className="mt-2 text-slate-200 leading-relaxed">{entry.reasoning}</p>
               </div>
 
               {entry.context && Object.keys(entry.context).length > 0 && (
-                <div className="mt-3 pt-3 border-t border-slate-100">
-                  <span className="text-sm font-medium text-slate-700">Context:</span>
-                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                <div className="relative mt-3 pt-3 border-t border-white/10">
+                  <span className="text-xs uppercase tracking-[0.28em] text-slate-400">Context</span>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-200">
                     {Object.entries(entry.context).slice(0, 4).map(([key, value]) => (
-                      <div key={key} className="bg-slate-50 px-2 py-1 rounded">
-                        <span className="font-medium text-slate-600">{key}:</span>
-                        <span className="ml-1 text-slate-800">
-                          {typeof value === 'number' ? value.toFixed(4) : String(value).slice(0, 20)}
+                      <div key={key} className="rounded-lg border border-white/10 bg-white/5 px-2 py-1">
+                        <span className="font-semibold text-slate-100">{key}:</span>
+                        <span className="ml-1 text-slate-200/90">
+                          {typeof value === 'number' ? value.toFixed(4) : String(value).slice(0, 24)}
                         </span>
                       </div>
                     ))}
@@ -103,13 +108,12 @@ const ModelReasoning: React.FC<ModelReasoningProps> = ({ reasoning }) => {
       </div>
 
       {reasoning.length === 0 && (
-        <div className="text-center py-12 text-slate-500">
+        <div className="relative text-center py-12 text-slate-300">
           <span className="text-4xl mb-2 block">💭</span>
-          <p>No reasoning data available yet</p>
-          <p className="text-sm">Model reasoning will appear here as decisions are made</p>
+          <p className="text-sm">Reasoning transcripts will appear after the next model decision.</p>
         </div>
       )}
-    </div>
+    </section>
   );
 };
 

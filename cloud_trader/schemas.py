@@ -18,6 +18,27 @@ class MarketContext(BaseModel):
     current_position: Optional[Dict[str, Any]] = None
 
 
+class TradingDecision(BaseModel):
+    side: Optional[str] = Field(None, description="BUY, SELL, HOLD, or CLOSE")
+
+class TradingContext(BaseModel):
+    symbol: str
+    price: float
+    current_position: Optional[dict] = None
+
+class ReasoningSlice(BaseModel):
+    source: str
+    rationale: str
+
+class InferenceRequest(BaseModel):
+    bot_id: str
+    decision: TradingDecision
+    context: TradingContext
+    confidence: Optional[float] = None
+    reasoning: Optional[List[ReasoningSlice]] = None
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+
 class DecisionEnvelope(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 

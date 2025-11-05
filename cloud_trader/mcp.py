@@ -69,22 +69,23 @@ class MCPClient:
             if self._session_id and not force_refresh:
                 exists = await self._session_exists(self._session_id)
                 if exists:
-                return self._session_id
+                    return self._session_id
                 logger.warning(
                     "Configured MCP session '%s' missing; obtaining a new session",
                     self._session_id,
                 )
                 self._session_id = None
 
-            resp = await self._client.post(f"{self._base_url}/sessions")
-            resp.raise_for_status()
-            data = resp.json()
-            new_session = data.get("session_id")
-            if not new_session:
-                raise RuntimeError("MCP session creation did not return a session_id")
-            self._session_id = new_session
-            logger.info("Acquired MCP session %s", self._session_id)
-            return self._session_id
+        logger.info("Obtaining new MCP session")
+        resp = await self._client.post(f"{self._base_url}/sessions", json={})
+        resp.raise_for_status()
+        data = resp.json()
+        new_session = data.get("session_id")
+        if not new_session:
+            raise RuntimeError("MCP session creation did not return a session_id")
+        self._session_id = new_session
+        logger.info("Acquired MCP session %s", self._session_id)
+        return self._session_id
 
     async def publish(self, message: Dict[str, Any]) -> None:
         """Publish MCP message and track metrics."""

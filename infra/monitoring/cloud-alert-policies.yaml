@@ -1,0 +1,84 @@
+"""
+Alerting policies for Sapphire Trade managed by Cloud Monitoring.
+
+Assumes Prometheus metrics are exported through Managed Service for Prometheus
+with the following metric type prefixes:
+  prometheus.googleapis.com/<metric_name>/<metric_kind>
+
+Update the notification channel IDs before applying:
+  gcloud alpha monitoring policies create --policy-from-file cloud-alert-policies.yaml
+"""
+
+# 1. Trade execution failure burst
+combiner: OR
+displayName: "Sapphire Trade – Execution Failure Spike"
+documentation:
+  content: |
+    Fires when the bot records 3 or more execution failures in a rolling 5 minute window.
+    Check the `trade_execution_failure_total` metric broken down by `reason` and symbol.
+  mimeType: text/markdown
+conditions:
+  - displayName: "Execution failures >= 3 (5m)"
+    conditionThreshold:
+      comparison: COMPARISON_GT
+      duration: 0s
+      filter: |
+        metric.type="prometheus.googleapis.com/trade_execution_failure_total/counter"
+        resource.type="prometheus_target"
+      aggregations:
+        - alignmentPeriod: 60s
+          perSeriesAligner: ALIGN_RATE
+        - alignmentPeriod: 300s
+          groupByFields: ["metric.symbol", "metric.reason"]
+          perSeriesAligner: ALIGN_SUM
+      thresholdValue: 3
+notificationChannels: []  # TODO: fill with channel IDs
+
+---
+
+# 2. Pub/Sub publish errors detected
+combiner: OR
+displayName: "Sapphire Trade – Pub/Sub Publish Failures"
+documentation:
+  content: |
+    Alerts when any Pub/Sub topic reports publish failures. Investigate Cloud Logging
+    for the trading service to identify connectivity or IAM issues.
+  mimeType: text/markdown
+conditions:
+  - displayName: "Pub/Sub publish failures > 0"
+    conditionThreshold:
+      comparison: COMPARISON_GT
+      duration: 0s
+      filter: |
+        metric.type="prometheus.googleapis.com/pubsub_publish_failures_total/counter"
+        resource.type="prometheus_target"
+      aggregations:
+        - alignmentPeriod: 60s
+          perSeriesAligner: ALIGN_RATE
+      thresholdValue: 0
+notificationChannels: []
+
+---
+
+# 3. Dashboard latency SLO breach
+combiner: OR
+displayName: "Sapphire Trade – Dashboard Snapshot Latency"
+documentation:
+  content: |
+    Dashboard snapshot generation is taking longer than expected. Investigate upstream
+    services (orchestrator, exchange, telemetry bus) for slow responses.
+  mimeType: text/markdown
+conditions:
+  - displayName: "Snapshot P95 > 5s"
+    conditionThreshold:
+      comparison: COMPARISON_GT
+      duration: 0s
+      filter: |
+        metric.type="prometheus.googleapis.com/dashboard_snapshot_duration_seconds/histogram"
+        resource.type="prometheus_target"
+      aggregations:
+        - alignmentPeriod: 60s
+          perSeriesAligner: ALIGN_PERCENTILE_99
+      thresholdValue: 5
+notificationChannels: []
+

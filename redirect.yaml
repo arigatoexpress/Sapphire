@@ -1,0 +1,4 @@
+name: sapphire-http-redirect-map
+defaultUrlRedirect:
+  httpsRedirect: True
+  stripQuery: False

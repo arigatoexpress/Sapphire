@@ -5,13 +5,14 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import secrets
 from typing import Dict
 
 import asyncio
 import time
 from collections import defaultdict
 import httpx
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -83,12 +84,6 @@ def build_app(service: TradingService | None = None) -> FastAPI:
     # Add Prometheus instrumentation
     Instrumentator().instrument(app).expose(app, endpoint="/metrics")
 
-    stream_names = {
-        "decisions": trading_service.settings.decisions_stream,
-        "positions": trading_service.settings.positions_stream,
-        "reasoning": trading_service.settings.reasoning_stream,
-    }
-
     # Serve static files if they exist
     static_path = "/app/static"
     if os.path.exists(static_path):
@@ -119,17 +114,41 @@ def build_app(service: TradingService | None = None) -> FastAPI:
                 "last_error": str(e),
             }
 
+    admin_token = trading_service.settings.admin_api_token
+    admin_guard_disabled = admin_token is None
+
+    def require_admin(request: Request) -> None:
+        nonlocal admin_guard_disabled
+        if admin_guard_disabled:
+            if not hasattr(require_admin, "_warned"):
+                logger.warning("ADMIN_API_TOKEN not configured; allowing admin endpoint access")
+                setattr(require_admin, "_warned", True)
+            return
+
+        header_token = None
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.lower().startswith("bearer "):
+            header_token = auth_header[7:].strip()
+        if not header_token:
+            header_token = request.headers.get("X-Admin-Token")
+
+        if not header_token:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing admin token")
+
+        if not secrets.compare_digest(header_token, admin_token or ""):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid admin token")
+
     @app.post("/start")
-    async def start(request: Request) -> Dict[str, str]:
+    async def start(request: Request, _: None = Depends(require_admin)) -> Dict[str, str]:
         client_ip = request.client.host if request.client else "unknown"
         if not rate_limiter.is_allowed(f"start_{client_ip}"):
             raise HTTPException(status_code=429, detail="Too many requests")
 
-        asyncio.create_task(trading_service.start())
-        return {"status": "starting"}
+        await trading_service.start()
+        return {"status": "started"}
 
     @app.post("/stop")
-    async def stop(request: Request) -> Dict[str, str]:
+    async def stop(request: Request, _: None = Depends(require_admin)) -> Dict[str, str]:
         client_ip = request.client.host if request.client else "unknown"
         if not rate_limiter.is_allowed(f"stop_{client_ip}"):
             raise HTTPException(status_code=429, detail="Too many requests")
@@ -139,8 +158,17 @@ def build_app(service: TradingService | None = None) -> FastAPI:
         asyncio.create_task(trading_service.stop())
         return {"status": "stopping"}
 
+    @app.post("/test-telegram")
+    async def test_telegram(request: Request, _: None = Depends(require_admin)) -> Dict[str, str]:
+        client_ip = request.client.host if request.client else "unknown"
+        if not rate_limiter.is_allowed(f"test_telegram_{client_ip}"):
+            raise HTTPException(status_code=429, detail="Too many requests")
+
+        await trading_service.send_test_telegram_message()
+        return {"status": "test message sent"}
+
     @app.post("/inference/decisions")
-    async def accept_decision(request: Request, inference_request: InferenceRequest) -> Dict[str, str]:
+    async def accept_decision(request: Request, inference_request: InferenceRequest, _: None = Depends(require_admin)) -> Dict[str, str]:
         client_ip = request.client.host if request.client else "unknown"
         if not rate_limiter.is_allowed(f"inference_{client_ip}"):
             raise HTTPException(status_code=429, detail="Too many requests")
@@ -155,7 +183,7 @@ def build_app(service: TradingService | None = None) -> FastAPI:
         return {"status": "queued"}
 
     @app.post("/inference/chat")
-    async def proxy_chat(request: Request, chat_request: ChatCompletionRequest) -> Dict[str, object]:
+    async def proxy_chat(request: Request, chat_request: ChatCompletionRequest, _: None = Depends(require_admin)) -> Dict[str, object]:
         client_ip = request.client.host if request.client else "unknown"
         if not rate_limiter.is_allowed(f"chat_{client_ip}"):
             raise HTTPException(status_code=429, detail="Too many requests")
@@ -182,14 +210,6 @@ def build_app(service: TradingService | None = None) -> FastAPI:
         except httpx.HTTPStatusError as exc:  # pragma: no cover - network defensive
             raise HTTPException(status_code=exc.response.status_code, detail=exc.response.text)
         return {"endpoint": endpoint, "response": response.json()}
-
-    @app.get("/streams/{stream_name}")
-    async def stream_snapshot(stream_name: str, limit: int = Query(default=50, ge=1, le=200)) -> Dict[str, object]:
-        target = stream_names.get(stream_name)
-        if not target:
-            raise HTTPException(status_code=404, detail="Unknown stream")
-        entries = await trading_service.stream_events(target, limit)
-        return {"stream": stream_name, "entries": entries}
 
     @app.get("/dashboard")
     async def dashboard() -> Dict[str, object]:

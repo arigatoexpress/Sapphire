@@ -1,17 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { Suspense, lazy, useState, useEffect, useMemo } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
-import ActivityLog from './components/ActivityLog';
 import StatusCard from './components/StatusCard';
 import PortfolioCard from './components/PortfolioCard';
 import RiskMetrics from './components/RiskMetrics';
-import ModelPerformance from './components/ModelPerformance';
-import ModelReasoning from './components/ModelReasoning';
-import LivePositions from './components/LivePositions';
-import SystemStatus from './components/SystemStatus';
-import TargetsAndAlerts from './components/TargetsAndAlerts';
-import PerformanceTrends from './components/PerformanceTrends';
-import MCPCouncil from './components/MCPCouncil';
-import NotificationCenter from './components/NotificationCenter';
 import Sidebar from './components/layout/Sidebar';
 import TopBar from './components/layout/TopBar';
 import MetricCard from './components/MetricCard';
@@ -26,6 +17,17 @@ import CommunityFeedback from './components/CommunityFeedback';
 import useCrowdSentiment from './hooks/useCrowdSentiment';
 import useCommunityComments from './hooks/useCommunityComments';
 import useAuth from './hooks/useAuth';
+import ArchitectureInfo from './components/ArchitectureInfo';
+
+const ActivityLog = lazy(() => import('./components/ActivityLog'));
+const ModelPerformance = lazy(() => import('./components/ModelPerformance'));
+const ModelReasoning = lazy(() => import('./components/ModelReasoning'));
+const LivePositions = lazy(() => import('./components/LivePositions'));
+const SystemStatus = lazy(() => import('./components/SystemStatus'));
+const TargetsAndAlerts = lazy(() => import('./components/TargetsAndAlerts'));
+const PerformanceTrends = lazy(() => import('./components/PerformanceTrends'));
+const MCPCouncil = lazy(() => import('./components/MCPCouncil'));
+const NotificationCenter = lazy(() => import('./components/NotificationCenter'));
 
 type RecentTrade = (DashboardResponse['recent_trades'] extends (infer T)[] ? T : never) & { pnl?: number };
 
@@ -41,6 +43,35 @@ const formatNumber = (value: number) =>
   new Intl.NumberFormat('en-US', {
     maximumFractionDigits: 0,
   }).format(value);
+
+const formatMaskedPortfolioValue = (_value: number) => '%s';
+
+const SectionSkeleton: React.FC<{ title?: string; className?: string }> = ({ title, className }) => (
+  <div className={`rounded-3xl border border-white/10 bg-white/[0.03] p-6 shadow-glass animate-pulse ${className ?? ''}`}>
+    {title && <div className="mb-5 h-3 w-40 rounded-full bg-white/20" />}
+    <div className="space-y-4">
+      <div className="h-4 w-full rounded-full bg-white/10" />
+      <div className="h-4 w-5/6 rounded-full bg-white/10" />
+      <div className="h-4 w-4/6 rounded-full bg-white/10" />
+    </div>
+  </div>
+);
+
+const DashboardSkeleton: React.FC = () => (
+  <div className="space-y-8">
+    <SectionSkeleton title="Calibrating control nexus" />
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <SectionSkeleton className="h-40" />
+      <SectionSkeleton className="h-40" />
+      <SectionSkeleton className="h-40" />
+    </div>
+    <SectionSkeleton title="Streaming live trade telemetry" className="h-80" />
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <SectionSkeleton className="h-72" />
+      <SectionSkeleton className="h-72" />
+    </div>
+  </div>
+);
 
 const CLOUD_RUN_REGION = 'us-central1';
 const LOAD_BALANCER_IP = '34.117.165.111';
@@ -336,101 +367,31 @@ const App: React.FC = () => {
   const sidebarTabs = tabs.map((tab) => ({ id: tab.id, label: tab.label, icon: tab.icon }));
 
   return (
-    <div className="min-h-screen bg-surface-50 text-slate-200">
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          style: {
-            background: 'rgba(15, 23, 42, 0.95)',
-            color: '#cbd5f5',
-            border: '1px solid rgba(148, 163, 184, 0.3)',
-            backdropFilter: 'blur(10px)',
-          },
-        }}
+    <div className="min-h-screen bg-gray-900 text-white flex">
+      <Sidebar
+        tabs={sidebarTabs}
+        activeTab={activeTab}
+        onSelect={(id) => setActiveTab(id as typeof activeTab)}
+        mobileMenuOpen={mobileMenuOpen}
+        setMobileMenuOpen={setMobileMenuOpen}
       />
-      <div className="flex min-h-screen bg-gradient-to-br from-surface-100 via-surface-50 to-surface-50">
-        <Sidebar
-          tabs={sidebarTabs}
-          activeTab={activeTab}
-          onSelect={(id) => setActiveTab(id as typeof activeTab)}
+      <div className="flex-1 flex flex-col">
+        <TopBar
+          onRefresh={refresh}
+          lastUpdated={dashboardData?.system_status?.timestamp}
+          healthRunning={health?.running}
           mobileMenuOpen={mobileMenuOpen}
           setMobileMenuOpen={setMobileMenuOpen}
         />
-
-        <div className="flex flex-1 flex-col">
-          <TopBar
-            onRefresh={refresh}
-            lastUpdated={dashboardData?.system_status?.timestamp}
-            healthRunning={health?.running}
-            mobileMenuOpen={mobileMenuOpen}
-            setMobileMenuOpen={setMobileMenuOpen}
-          />
-
-          <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-10">
-            <div className="flex justify-end">
-              <NotificationCenter alerts={derived.alerts} />
-            </div>
-
-            {error && (
-              <div className="mb-6 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-100">
-                <p className="font-semibold">Connection Error</p>
-                <p className="mt-1 text-red-200/80">{error}</p>
-              </div>
-            )}
-
+        <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto">
+          <ArchitectureInfo />
+          <div className="space-y-8">
             {loading ? (
-              <div className="space-y-8">
-                {/* Skeleton loading state */}
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="relative overflow-hidden rounded-2xl border border-surface-200/40 bg-surface-100/60 p-6 shadow-glass">
-                      <div className="animate-pulse">
-                        <div className="h-3 bg-slate-600/40 rounded mb-2"></div>
-                        <div className="h-8 bg-slate-600/40 rounded mb-4"></div>
-                        <div className="h-3 bg-slate-600/40 rounded w-2/3"></div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-                  <div className="xl:col-span-2 relative overflow-hidden rounded-2xl border border-surface-200/40 bg-surface-100/60 p-6 shadow-glass">
-                    <div className="animate-pulse">
-                      <div className="h-4 bg-slate-600/40 rounded mb-2 w-1/3"></div>
-                      <div className="h-6 bg-slate-600/40 rounded mb-4 w-1/2"></div>
-                      <div className="h-64 bg-slate-600/40 rounded"></div>
-                    </div>
-                  </div>
-                  <div className="relative overflow-hidden rounded-2xl border border-surface-200/40 bg-surface-100/60 p-6 shadow-glass">
-                    <div className="animate-pulse">
-                      <div className="h-4 bg-slate-600/40 rounded mb-2"></div>
-                      <div className="space-y-3">
-                        {[1, 2, 3].map((i) => (
-                          <div key={i} className="h-3 bg-slate-600/40 rounded"></div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                  {[1, 2].map((i) => (
-                    <div key={i} className="relative overflow-hidden rounded-2xl border border-surface-200/40 bg-surface-100/60 p-6 shadow-glass">
-                      <div className="animate-pulse">
-                        <div className="h-4 bg-slate-600/40 rounded mb-2 w-1/3"></div>
-                        <div className="h-6 bg-slate-600/40 rounded mb-4 w-1/2"></div>
-                        <div className="space-y-3">
-                          {[1, 2, 3, 4].map((j) => (
-                            <div key={j} className="h-3 bg-slate-600/40 rounded"></div>
-                          ))}
-                        </div>
-              </div>
-            </div>
-                  ))}
-                </div>
-              </div>
+              <DashboardSkeleton />
+            ) : error ? (
+              <div className="text-red-500">{error}</div>
             ) : (
-              <div className="space-y-8">
+              <>
                 {activeTab === 'overview' && (
                   <div className="space-y-8">
                     {/* Welcome Hero Section */}
@@ -488,7 +449,7 @@ const App: React.FC = () => {
                           <div className="relative space-y-6">
                             <div>
                               <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Portfolio Balance</p>
-                              <p className="mt-2 text-3xl font-bold text-white">{formatCurrency(derived.balance)}</p>
+                              <p className="mt-2 text-3xl font-bold text-white">{formatMaskedPortfolioValue(derived.balance)}</p>
                             </div>
                             <div className="grid grid-cols-2 gap-4 text-sm text-slate-200/80">
                               <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
@@ -727,7 +688,7 @@ const App: React.FC = () => {
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
                       <MetricCard
                         label="Portfolio Balance"
-                        value={formatCurrency(derived.balance)}
+                        value={formatMaskedPortfolioValue(derived.balance)}
                         accent="emerald"
                         footer={<span>Live account equity</span>}
                       />
@@ -873,7 +834,9 @@ const App: React.FC = () => {
                       </div>
                     )}
 
-                    <LivePositions positions={derived.positions} />
+                    <Suspense fallback={<SectionSkeleton title="Live Positions" className="h-72" />}>
+                      <LivePositions positions={derived.positions} />
+                    </Suspense>
                   </div>
                 )}
 
@@ -941,7 +904,9 @@ const App: React.FC = () => {
                         </div>
                       </div>
                       <div className="overflow-hidden rounded-4xl border border-white/10 bg-surface-75/70 p-6 shadow-glass">
-                        <PerformanceTrends trades={dashboardData?.recent_trades || []} />
+                        <Suspense fallback={<SectionSkeleton title="Trade Trends" className="h-72" />}>
+                          <PerformanceTrends trades={dashboardData?.recent_trades || []} />
+                        </Suspense>
                       </div>
                     </div>
 
@@ -950,8 +915,19 @@ const App: React.FC = () => {
                         <RiskMetrics portfolio={dashboardData?.portfolio} />
                       </div>
                       <div className="overflow-hidden rounded-4xl border border-white/10 bg-surface-75/70 p-6 shadow-glass">
-                        <TargetsAndAlerts targets={dashboardData?.targets} />
+                        <Suspense fallback={<SectionSkeleton title="Targets & Alerts" className="h-72" />}>
+                          <TargetsAndAlerts targets={dashboardData?.targets} />
+                        </Suspense>
                       </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                      <Suspense fallback={<SectionSkeleton title="Model Performance" className="h-[28rem]" />}>
+                        <ModelPerformance models={dashboardData?.model_performance ?? []} />
+                      </Suspense>
+                      <Suspense fallback={<SectionSkeleton title="Model Reasoning" className="h-[28rem]" />}>
+                        <ModelReasoning reasoning={dashboardData?.model_reasoning ?? []} />
+                      </Suspense>
                     </div>
                   </div>
                 )}
@@ -1006,7 +982,24 @@ const App: React.FC = () => {
                     </section>
 
                     <div className="overflow-hidden rounded-4xl border border-white/10 bg-surface-75/70 p-6 shadow-glass">
-                      <ActivityLog logs={logs} />
+                      <Suspense fallback={<SectionSkeleton title="Activity Log" className="h-[28rem]" />}>
+                        <ActivityLog logs={logs} />
+                      </Suspense>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                      <Suspense fallback={<SectionSkeleton title="MCP Council" className="h-[24rem]" />}>
+                        <MCPCouncil messages={mcpMessages ?? []} status={mcpStatus ?? connectionStatus} />
+                      </Suspense>
+                      <div className="overflow-hidden rounded-4xl border border-white/10 bg-surface-75/70 p-6 shadow-glass">
+                        <CrowdSentimentWidget
+                          totalVotes={crowdSentiment.totalVotes}
+                          bullishVotes={crowdSentiment.bullishVotes}
+                          bearishVotes={crowdSentiment.bearishVotes}
+                          onVote={castCrowdVote}
+                          onReset={resetCrowd}
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1030,7 +1023,7 @@ const App: React.FC = () => {
                             </span>
                             <span className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.28em] ${systemSummary.redisConnected ? 'bg-emerald-400/20 text-emerald-200' : 'bg-rose-400/20 text-rose-200'}`}>
                               Redis {systemSummary.redisConnected ? 'Synchronized' : 'Offline'}
-                </span>
+                            </span>
                           </div>
                         </div>
                         <div className="grid gap-4 text-sm text-slate-200 sm:grid-cols-2">
@@ -1062,249 +1055,20 @@ const App: React.FC = () => {
 
                     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
                       <div className="overflow-hidden rounded-4xl border border-white/10 bg-surface-75/70 p-6 shadow-glass">
-                        <SystemStatus status={dashboardData?.system_status} />
+                        <Suspense fallback={<SectionSkeleton title="System Status" className="h-[24rem]" />}>
+                          <SystemStatus status={dashboardData?.system_status} />
+                        </Suspense>
                       </div>
                       <div className="overflow-hidden rounded-4xl border border-white/10 bg-surface-75/70 p-6 shadow-glass">
+                        <StatusCard health={health ?? null} loading={loading} />
                       </div>
                     </div>
                   </div>
                 )}
-              </div>
+              </>
             )}
-          </main>
-        </div>
-      </div>
-
-      {/* Telemetry & Systems Dashboard */}
-      <div className="grid gap-6 xl:grid-cols-3">
-        <div className="relative overflow-hidden rounded-3xl border border-security-shield/40 bg-surface-75/65 p-6 shadow-glass">
-          <div className="absolute inset-0 bg-gradient-to-br from-security-shield/15 via-transparent to-surface-50/30" />
-          <div className="relative">
-            <p className="text-xs uppercase tracking-ultra text-security-shield">Infrastructure</p>
-            <h3 className="mt-2 text-xl font-semibold text-white">Operational Telemetry</h3>
-            <div className="mt-4 space-y-3 text-sm text-slate-300">
-              {infrastructureMetrics.map((metric) => (
-                <div key={metric.label} className="flex items-start justify-between gap-3 rounded-2xl border border-surface-100/40 bg-surface-50/60 px-4 py-3">
-                  <div>
-                    <p className="text-[0.65rem] uppercase tracking-[0.3em] text-slate-500">{metric.label}</p>
-                    <p className={`mt-1 text-base font-semibold text-white ${metric.tone ?? ''}`}>{metric.value}</p>
-                  </div>
-                  <p className="text-right text-xs text-slate-400 leading-snug max-w-[12rem]">{metric.detail}</p>
-                </div>
-              ))}
-            </div>
           </div>
-        </div>
-
-        <div className="relative overflow-hidden rounded-3xl border border-accent-ai/40 bg-surface-75/60 p-6 shadow-glass">
-          <div className="absolute inset-0 bg-gradient-to-br from-accent-ai/15 via-transparent to-accent-aurora/10" />
-          <div className="relative">
-            <p className="text-xs uppercase tracking-ultra text-accent-ai">Trading Stack</p>
-            <h3 className="mt-2 text-xl font-semibold text-white">Momentum Intelligence</h3>
-            <div className="mt-4 space-y-3 text-sm text-slate-300">
-              {tradingMetrics.map((metric) => (
-                <div key={metric.label} className="rounded-2xl border border-surface-100/40 bg-surface-50/60 px-4 py-3">
-                  <p className="text-[0.65rem] uppercase tracking-[0.3em] text-slate-500">{metric.label}</p>
-                  <p className="mt-1 text-base font-semibold text-white">{metric.value}</p>
-                  <p className="text-xs text-slate-400 mt-1">{metric.detail}</p>
-              </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="relative overflow-hidden rounded-3xl border border-accent-aurora/40 bg-surface-75/60 p-6 shadow-glass">
-          <div className="absolute inset-0 bg-gradient-to-br from-accent-aurora/15 via-transparent to-accent-ai/10" />
-          <div className="relative h-full">
-            <p className="text-xs uppercase tracking-ultra text-accent-aurora">Model Ops</p>
-            <h3 className="mt-2 text-xl font-semibold text-white">AI Orchestration</h3>
-            <div className="mt-4 space-y-3 text-sm text-slate-300">
-              {modelOpsMetrics.map((metric) => (
-                <div key={metric.label} className="rounded-2xl border border-surface-100/40 bg-surface-50/60 px-4 py-3">
-                  <p className="text-[0.65rem] uppercase tracking-[0.3em] text-slate-500">{metric.label}</p>
-                  <p className="mt-1 text-base font-semibold text-white">{metric.value}</p>
-                  <p className="text-xs text-slate-400 mt-1 leading-snug">{metric.detail}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <MCPCouncil messages={mcpMessages} status={mcpStatus} />
-
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,0.55fr)_minmax(0,0.45fr)]">
-        <CrowdSentimentWidget
-          totalVotes={crowdSentiment.totalVotes}
-          bullishVotes={crowdSentiment.bullishVotes}
-          bearishVotes={crowdSentiment.bearishVotes}
-          onVote={castCrowdVote}
-          onReset={crowdSentiment.totalVotes ? resetCrowd : undefined}
-        />
-        <CommunityFeedback
-          comments={communityComments}
-          onSubmit={addCommunityComment}
-          user={user}
-          loading={authLoading}
-          onSignIn={signIn}
-          onSignOut={signOut}
-          authEnabled={authEnabled}
-          authError={authError}
-        />
-      </div>
-
-      {/* Summary Metrics */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <MetricCard
-          label="Portfolio Balance"
-          value={formatCurrency(derived.balance)}
-          accent="emerald"
-          footer={<span>Live account equity</span>}
-        />
-        <MetricCard
-          label="Live Agent P&L"
-          value={formatCurrency(derived.totalAgentPnL)}
-          accent="teal"
-          footer={<span>Combined unrealized result</span>}
-        />
-        <MetricCard
-          label="Available Margin"
-          value={formatCurrency(derived.availableBalance)}
-          accent="slate"
-          footer={<span>Deployable capital</span>}
-        />
-        <MetricCard
-          label="Active Positions"
-          value={derived.positions.length}
-          accent="amber"
-          footer={<span>Across all agents</span>}
-        />
-      </div>
-
-      {/* 4-Pane Agent Dashboard */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {derived.agents.length > 0 ? (
-          derived.agents.map((agent) => (
-            <AgentCard
-              key={agent.id}
-              agent={agent}
-              onClick={() => {
-                toast.success(`${agent.name} metrics refreshed`, {
-                  duration: 2000,
-                  style: {
-                    background: 'rgba(15, 23, 42, 0.95)',
-                    color: '#cbd5f5',
-                    border: '1px solid rgba(59, 130, 246, 0.35)',
-                  },
-                });
-              }}
-            />
-          ))
-        ) : (
-          <div className="rounded-2xl border border-surface-200/40 bg-surface-100/60 p-8 text-center text-slate-400 shadow-glass">
-            <p className="text-lg font-semibold text-white">Awaiting live trades</p>
-            <p className="mt-2 text-sm text-slate-400">
-              Start the traders to stream real positions and model performance here.
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* System Overview */}
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <div className="xl:col-span-2 rounded-2xl border border-surface-200/40 bg-surface-100/80 p-6 shadow-glass">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Aggregate Performance</p>
-              <h3 className="mt-2 text-xl font-semibold text-white">Portfolio Overview</h3>
-            </div>
-          </div>
-          <PortfolioPerformance balanceSeries={performanceSeries.balance} priceSeries={performanceSeries.price} />
-        </div>
-          <div className="space-y-6">
-                  <StatusCard health={health} loading={loading} />
-          <TargetsAndAlerts targets={dashboardData?.targets} />
-        </div>
-      </div>
-
-      {/* Additional System Info */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-1">
-                  <PortfolioCard portfolio={dashboardData?.portfolio} />
-                </div>
-
-      {/* About Section */}
-      <div className="mt-12 rounded-4xl border border-accent-ai/30 bg-surface-75/70 p-8 shadow-glass-xl">
-        <AuroraField className="-left-40 -top-40 h-[400px] w-[400px]" variant="sapphire" intensity="soft" />
-        <AuroraField className="right-[-8rem] bottom-[-6rem] h-[400px] w-[400px]" variant="emerald" />
-        <div className="relative">
-          <div className="text-center mb-8">
-            <h2 className="text-4xl font-bold text-white mb-4">Sapphire AI Trading</h2>
-            <p className="text-xl text-accent-ai font-medium">Intelligent Multi-Agent Trading Protocol</p>
-                </div>
-
-          <div className="grid gap-8 lg:grid-cols-2 mb-8">
-              <div className="space-y-6">
-              <div>
-                <h3 className="text-2xl font-semibold text-white mb-3">What We Built</h3>
-                <p className="text-slate-300 leading-relaxed">
-                  A revolutionary AI-powered trading system featuring four specialized agents (DeepSeek, Qwen, Phi-3, FinGPT)
-                  collaborating through our Multi-Agent Collaboration Protocol (MCP). Each agent specializes in different
-                  market conditions and trading strategies, working together to optimize portfolio performance.
-                </p>
-              </div>
-
-              <div>
-                <h3 className="text-2xl font-semibold text-white mb-3">What Makes It Special</h3>
-                <ul className="text-slate-300 space-y-2 leading-relaxed">
-                  <li>• <strong>Multi-Agent Intelligence:</strong> Four AI models collaborate in real-time</li>
-                  <li>• <strong>Radar-Style Monitoring:</strong> Live token tracking with military-grade visualization</li>
-                  <li>• <strong>Community Intelligence:</strong> Crowd-sourced sentiment analysis</li>
-                  <li>• <strong>Academic Science Experiment:</strong> Open-source decentralized AI trading research</li>
-                  <li>• <strong>Enterprise Security:</strong> Built with cybersecurity best practices</li>
-                  <li>• <strong>Real-Time MCP Communication:</strong> Agents discuss strategies and consensus</li>
-                </ul>
-              </div>
-            </div>
-
-              <div className="space-y-6">
-              <div>
-                <h3 className="text-2xl font-semibold text-white mb-3">Our Vision</h3>
-                <p className="text-slate-300 leading-relaxed mb-4">
-                  We're pioneering the future of decentralized AI trading through open scientific research.
-                  This platform demonstrates how multiple AI agents can collaborate, learn, and evolve together
-                  in live market conditions.
-                </p>
-                <p className="text-slate-300 leading-relaxed">
-                  Our mission is to democratize access to institutional-grade trading intelligence while
-                  advancing the field of multi-agent AI systems. Every trade, every decision, every
-                  collaboration is part of an ongoing experiment in collective artificial intelligence.
-                </p>
-              </div>
-
-              <div className="bg-surface-50/60 rounded-2xl p-6 border border-white/10">
-                <h4 className="text-lg font-semibold text-white mb-3">Follow Our Journey</h4>
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 text-accent-ai">
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z" />
-                    </svg>
-                    <span className="font-medium">@rari_sui</span>
-                  </div>
-                  <span className="text-slate-400">•</span>
-                  <span className="text-slate-400">Live trading updates & AI research</span>
-                </div>
-              </div>
-            </div>
-              </div>
-
-          <div className="text-center border-t border-white/10 pt-8">
-            <p className="text-slate-400 text-sm">
-              Built with ❤️ using React, TypeScript, FastAPI, and cutting-edge AI models.
-              <br />
-              This is an open-source experiment in multi-agent AI trading systems.
-            </p>
-          </div>
-        </div>
+        </main>
       </div>
     </div>
   );

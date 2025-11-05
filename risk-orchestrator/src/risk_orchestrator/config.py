@@ -9,7 +9,10 @@ class Settings(BaseSettings):
 
     ASTER_API_KEY: str = Field(validation_alias=AliasChoices("ASTER_API_KEY"))
     ASTER_API_SECRET: str = Field(validation_alias=AliasChoices("ASTER_API_SECRET", "ASTER_SECRET_KEY"))
-    REDIS_URL: str | None = Field(default=None, validation_alias=AliasChoices("REDIS_URL"))
+    GCP_PROJECT_ID: str | None = Field(default=None, validation_alias=AliasChoices("GCP_PROJECT_ID"))
+    DECISIONS_TOPIC: str = Field(default="decisions", validation_alias=AliasChoices("DECISIONS_TOPIC"))
+    POSITIONS_TOPIC: str = Field(default="positions", validation_alias=AliasChoices("POSITIONS_TOPIC"))
+    REASONING_TOPIC: str = Field(default="reasoning", validation_alias=AliasChoices("REASONING_TOPIC"))
     ENVIRONMENT: Literal["dev", "prod"] = "dev"
     MAX_DRAWDOWN_PCT: float = 10.0
     MAX_PER_TRADE_PCT: float = 4.0

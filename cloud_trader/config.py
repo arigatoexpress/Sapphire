@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     telegram_bot_token: str | None = Field(default=None, validation_alias="TELEGRAM_BOT_TOKEN")
     telegram_chat_id: str | None = Field(default=None, validation_alias="TELEGRAM_CHAT_ID")
 
+    # Administrative API security
+    admin_api_token: str | None = Field(default=None, validation_alias="ADMIN_API_TOKEN")
+
     # API endpoints
     rest_base_url: str = Field(default="https://fapi.asterdex.com", validation_alias="ASTER_REST_URL")
     ws_base_url: str = Field(default="wss://fstream.asterdex.com", validation_alias="ASTER_WS_URL")
@@ -57,20 +60,25 @@ class Settings(BaseSettings):
     health_check_path: str = Field(default="/healthz")
     model_endpoint: str = Field(default="http://localhost:8000", validation_alias="MODEL_ENDPOINT")
     bot_id: str = Field(default="cloud_trader", validation_alias="BOT_ID")
-    redis_url: str | None = Field(default=None, validation_alias="REDIS_URL")
+    gcp_project_id: str | None = Field(default=None, validation_alias="GCP_PROJECT_ID")
     orchestrator_url: str | None = Field(default=None, validation_alias="ORCHESTRATOR_URL")
     mcp_url: str | None = Field(default=None, validation_alias="MCP_URL")
     mcp_session_id: str | None = Field(default=None, validation_alias="MCP_SESSION_ID")
-    decisions_stream: str = Field(default="trader:decisions")
-    positions_stream: str = Field(default="trader:positions")
-    reasoning_stream: str = Field(default="trader:reasoning")
-    redis_stream_maxlen: int = Field(default=2000, ge=100)
-    pending_order_set: str = Field(default="trader:pending_orders")
+    decisions_topic: str = Field(default="decisions")
+    positions_topic: str = Field(default="positions")
+    reasoning_topic: str = Field(default="reasoning")
     portfolio_poll_interval_seconds: int = Field(default=2, ge=1, le=60)
     kelly_fraction_cap: float = Field(default=0.5, gt=0, le=1)
     max_portfolio_leverage: float = Field(default=2.0, gt=0)
     expected_win_rate: float = Field(default=0.55, ge=0, le=1)
     reward_to_risk: float = Field(default=2.0, gt=0)
+    max_slippage_bps: float = Field(
+        default=25.0,
+        ge=0,
+        le=2000,
+        description="Maximum tolerated slippage in basis points before skipping an order",
+        validation_alias="MAX_SLIPPAGE_BPS",
+    )
 
     # LLM Configuration
     enable_llm_trading: bool = Field(default=False, validation_alias="ENABLE_LLM_TRADING")

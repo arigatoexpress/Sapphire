@@ -1,0 +1,27 @@
+name: aster-url-map
+defaultService: projects/quant-ai-trader-credits/global/backendServices/cloud-trader-dashboard-backend
+hostRules:
+  - hosts:
+      - "api.sapphiretrade.xyz"
+    pathMatcher: api-matcher
+  - hosts:
+      - "sapphiretrade.xyz"
+      - "www.sapphiretrade.xyz"
+    pathMatcher: frontend-matcher
+pathMatchers:
+  - name: frontend-matcher
+    defaultService: projects/quant-ai-trader-credits/global/backendServices/cloud-trader-dashboard-backend
+  - name: api-matcher
+    defaultService: projects/quant-ai-trader-credits/global/backendServices/trader-backend
+    pathRules:
+      - paths:
+          - "/healthz"
+          - "/healthz/"
+          - "/dashboard"
+          - "/dashboard/"
+          - "/start"
+          - "/start/"
+          - "/stop"
+          - "/stop/"
+          - "/inference/*"
+        service: projects/quant-ai-trader-credits/global/backendServices/trader-backend

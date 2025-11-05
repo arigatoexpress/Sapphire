@@ -1,193 +1,56 @@
-"""Minimal asynchronous client for interacting with the Aster DEX API."""
-
+"""Aster exchange client."""
 from __future__ import annotations
 
 import asyncio
 import hashlib
 import hmac
-import logging
 import time
 from typing import Any, Dict, List, Optional
 
-import aiohttp
-
-from .circuit_breaker import AsyncCircuitBreaker, CircuitBreakerError
+import httpx
 from .config import Settings
-from .metrics import CIRCUIT_BREAKER_STATE, CIRCUIT_BREAKER_FAILURES
-
-logger = logging.getLogger(__name__)
-
-# Circuit breaker state mapping
-_STATE_MAP = {"closed": 0, "open": 1, "half_open": 2}
-
-
-def _update_circuit_breaker_metrics(breaker: AsyncCircuitBreaker, service_name: str) -> None:
-    """Update Prometheus metrics for circuit breaker state."""
-    state_name = breaker.current_state
-    state_value = _STATE_MAP.get(state_name, 0)
-    CIRCUIT_BREAKER_STATE.labels(service=service_name).set(state_value)
-
-
-# Circuit breaker for Aster API calls
-# Fails open after 5 failures, resets after 60 seconds
-_aster_circuit_breaker = AsyncCircuitBreaker(
-    fail_max=5,
-    reset_timeout=60,
-    name="AsterAPI",
-)
-
-# Note: Circuit breaker metrics are updated on each request
-# Listener API doesn't work well with async, so we track manually
+from .credentials import Credentials
 
 
 class AsterClient:
-    """Tiny REST client tailored to the needs of the live trading service."""
-
     def __init__(self, settings: Settings, api_key: str, api_secret: str) -> None:
         self._settings = settings
         self._api_key = api_key
         self._api_secret = api_secret
-        self._session: Optional[aiohttp.ClientSession] = None
-        self._lock = asyncio.Lock()
-
-    async def __aenter__(self) -> "AsterClient":
-        await self.ensure_session()
-        return self
-
-    async def __aexit__(self, *_exc: object) -> None:
-        await self.close()
+        self._client = httpx.AsyncClient(base_url=self._settings.aster_api_base_url, timeout=10)
 
     async def ensure_session(self) -> None:
-        if self._session is None:
-            timeout = aiohttp.ClientTimeout(total=15)
-            self._session = aiohttp.ClientSession(timeout=timeout)
+        # Placeholder if session management is needed in the future
+        pass
 
     async def close(self) -> None:
-        if self._session is not None:
-            await self._session.close()
-            self._session = None
+        await self._client.aclose()
 
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-    async def ping(self) -> bool:
-        response = await self._get("/fapi/v1/ping", signed=False)
-        return response is not None
+    def _sign(self, params: Dict[str, Any]) -> str:
+        query_string = "&".join(f"{k}={v}" for k, v in sorted(params.items()))
+        return hmac.new(self._api_secret.encode("utf-8"), query_string.encode("utf-8"), hashlib.sha256).hexdigest()
 
-    async def server_time(self) -> int:
-        payload = await self._get("/fapi/v1/time", signed=False)
-        return int(payload.get("serverTime", 0))
-
-    async def ticker(self, symbol: str) -> Dict[str, Any]:
-        return await self._get("/fapi/v1/ticker/24hr", params={"symbol": symbol}, signed=False) or {}
-
-    async def account_balance(self) -> List[Dict[str, Any]]:
-        payload = await self._get("/fapi/v2/balance", signed=True)
-        if isinstance(payload, list):
-            return payload
-        return []
-
-    async def place_order(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        return await self._post("/fapi/v1/order", data=payload, signed=True) or {}
-
-    async def cancel_all_orders(self, symbol: str) -> Dict[str, Any]:
-        return await self._delete("/fapi/v1/allOpenOrders", params={"symbol": symbol}, signed=True) or {}
-
-    async def position_risk(self) -> List[Dict[str, Any]]:
-        payload = await self._get("/fapi/v2/positionRisk", signed=True)
-        if isinstance(payload, list):
-            return payload
-        return []
-
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
-    async def _get(
-        self,
-        path: str,
-        params: Optional[Dict[str, Any]] = None,
-        *,
-        signed: bool,
-    ) -> Optional[Dict[str, Any]]:
-        return await self._request("GET", path, params=params, signed=signed)
-
-    async def _post(
-        self,
-        path: str,
-        data: Optional[Dict[str, Any]] = None,
-        *,
-        signed: bool,
-    ) -> Optional[Dict[str, Any]]:
-        return await self._request("POST", path, data=data, signed=signed)
-
-    async def _delete(
-        self,
-        path: str,
-        params: Optional[Dict[str, Any]] = None,
-        *,
-        signed: bool,
-    ) -> Optional[Dict[str, Any]]:
-        return await self._request("DELETE", path, params=params, signed=signed)
-
-    async def _request(
-        self,
-        method: str,
-        path: str,
-        params: Optional[Dict[str, Any]] = None,
-        data: Optional[Dict[str, Any]] = None,
-        *,
-        signed: bool,
-    ) -> Optional[Dict[str, Any]]:
-        """Execute request with circuit breaker protection."""
-        await self.ensure_session()
-        assert self._session is not None
-
-        url = f"{self._settings.rest_base_url}{path}"
-        headers: Dict[str, str] = {"Content-Type": "application/json"}
-
+    async def _request(self, method: str, path: str, params: Optional[Dict[str, Any]] = None, signed: bool = False) -> Any:
+        params = params or {}
+        headers = {"X-MBX-APIKEY": self._api_key}
         if signed:
-            payload = params.copy() if params else {}
-            if data:
-                payload.update({k: v for k, v in data.items() if v is not None})
-            signed_params = self._sign_payload(method, path, payload)
-            params = signed_params if params is None else signed_params
-            headers["X-MBX-APIKEY"] = self._api_key
-        else:
-            params = params or {}
-
-        async def _execute_request():
-            async with self._lock:
-                async with self._session.request(method, url, params=params, json=data, headers=headers) as resp:
-                    if resp.status == 200:
-                        try:
-                            return await resp.json()
-                        except Exception:
-                            return None
-                    text = await resp.text()
-                    raise RuntimeError(f"Aster API error {resp.status}: {text[:200]}")
-
+            params["timestamp"] = int(time.time() * 1000)
+            params["signature"] = self._sign(params)
+        
         try:
-            _update_circuit_breaker_metrics(_aster_circuit_breaker, "aster")
-            result = await _aster_circuit_breaker.call(_execute_request)
-            _update_circuit_breaker_metrics(_aster_circuit_breaker, "aster")
-            return result
-        except CircuitBreakerError as e:
-            logger.error(f"Aster API circuit breaker error: {e}")
-            _update_circuit_breaker_metrics(_aster_circuit_breaker, "aster")
-            CIRCUIT_BREAKER_FAILURES.labels(service="aster").inc()
-            raise RuntimeError(f"Aster API circuit breaker error: {e}")
-        except Exception as e:
-            logger.error(f"Aster API request failed: {e}")
-            _update_circuit_breaker_metrics(_aster_circuit_breaker, "aster")
+            resp = await self._client.request(method, path, params=params, headers=headers)
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            # Add more context to error messages
+            print(f"HTTP Error: {e.response.status_code} - {e.response.text}")
             raise
 
-    def _sign_payload(self, method: str, path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-        payload = payload.copy()
-        payload.setdefault("timestamp", int(time.time() * 1000))
-        payload.setdefault("recvWindow", 5000)
+    async def ticker(self, symbol: str) -> Dict[str, Any]:
+        return await self._request("GET", "/api/v3/ticker/24hr", {"symbol": symbol})
 
-        query = "&".join(f"{key}={payload[key]}" for key in sorted(payload))
-        message = f"{method}{path}{query}".encode()
-        signature = hmac.new(self._api_secret.encode(), message, hashlib.sha256).hexdigest()
-        payload["signature"] = signature
-        return payload
+    async def place_order(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        return await self._request("POST", "/api/v3/order", payload, signed=True)
+
+    async def position_risk(self) -> List[Dict[str, Any]]:
+        return await self._request("GET", "/fapi/v2/positionRisk", signed=True)

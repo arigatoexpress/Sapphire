@@ -1,8 +1,8 @@
-"""Simple risk guardrails for live trading."""
+"""Risk management service for live trading."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict
 
 from .config import Settings
@@ -18,44 +18,24 @@ class Position:
 class PortfolioState:
     balance: float
     total_exposure: float
-    positions: Dict[str, Position]
+    positions: Dict[str, Position] = field(default_factory=dict)
 
 
 class RiskManager:
-    """Validate trades against conservative risk limits."""
+    def __init__(self, settings: Settings):
+        self._max_drawdown = settings.max_drawdown
+        self._max_leverage = settings.max_portfolio_leverage
 
-    def __init__(self, settings: Settings) -> None:
-        self._settings = settings
-
-    def can_open_position(self, portfolio: PortfolioState, order_notional: float) -> bool:
-        if portfolio.balance <= 0:
+    def can_open_position(self, portfolio: PortfolioState, notional: float) -> bool:
+        if (portfolio.total_exposure + notional) / portfolio.balance > self._max_leverage:
             return False
-
-        new_exposure = portfolio.total_exposure + order_notional
-        if new_exposure > portfolio.balance * (1 + self._settings.max_drawdown):
-            return False
-
-        if order_notional > portfolio.balance * self._settings.max_position_risk:
-            return False
-
-        if len(portfolio.positions) >= self._settings.max_concurrent_positions:
-            return False
-
         return True
 
     def register_fill(self, portfolio: PortfolioState, symbol: str, notional: float) -> PortfolioState:
-        new_positions = dict(portfolio.positions)
-        new_positions[symbol] = Position(symbol=symbol, notional=notional)
-        return PortfolioState(
-            balance=portfolio.balance,
-            total_exposure=portfolio.total_exposure + notional,
-            positions=new_positions,
-        )
-
-    def close_position(self, portfolio: PortfolioState, symbol: str) -> PortfolioState:
-        new_positions = dict(portfolio.positions)
-        position = new_positions.pop(symbol, None)
-        total_exposure = portfolio.total_exposure
-        if position:
-            total_exposure -= position.notional
-        return PortfolioState(balance=portfolio.balance, total_exposure=total_exposure, positions=new_positions)
+        if symbol not in portfolio.positions:
+            portfolio.positions[symbol] = Position(symbol=symbol, notional=0.0)
+        
+        portfolio.positions[symbol].notional += notional
+        portfolio.total_exposure = sum(pos.notional for pos in portfolio.positions.values())
+        
+        return portfolio

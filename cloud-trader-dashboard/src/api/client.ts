@@ -7,11 +7,12 @@ const getApiUrl = () => {
   if (envUrl) return envUrl;
 
   if (typeof window !== 'undefined') {
+    const origin = window.location.origin;
     const hostname = window.location.hostname;
     if (hostname === '127.0.0.1' || hostname === 'localhost') {
       return DEFAULT_API_URL;
     }
-    // Use api subdomain for production
+    // Use the direct service URL for production
     if (hostname === 'sapphiretrade.xyz' || hostname === 'www.sapphiretrade.xyz') {
       return 'https://api.sapphiretrade.xyz';
     }
@@ -30,7 +31,7 @@ const DASHBOARD_URL = (() => {
     if (hostname === '127.0.0.1' || hostname === 'localhost') {
       return DEFAULT_DASHBOARD_URL;
     }
-    // Use api subdomain for production dashboard endpoint
+    // Use the direct service URL for production dashboard endpoint
     if (hostname === 'sapphiretrade.xyz' || hostname === 'www.sapphiretrade.xyz') {
       return 'https://api.sapphiretrade.xyz';
     }
@@ -177,12 +178,18 @@ const fetchWithTimeout = async (
         ...options.headers,
       },
     });
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
-    }
-    return (await response.json()) as unknown;
-  } finally {
     clearTimeout(id);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+    }
+    return await response.json();
+  } catch (error: any) {
+    clearTimeout(id);
+    if (error.name === 'AbortError') {
+      throw new Error('Connection timeout or error');
+    }
+    throw new Error(`Connection Error: ${error.message}`);
   }
 };
 
@@ -190,9 +197,14 @@ export const fetchHealth = async (): Promise<HealthResponse> => {
   return (await fetchWithTimeout(`${API_URL}/healthz`)) as HealthResponse;
 };
 
-
-
 export const fetchDashboard = async (): Promise<DashboardResponse> => {
   return (await fetchWithTimeout(`${DASHBOARD_URL}/dashboard`)) as DashboardResponse;
 };
 
+export const startTrader = async (): Promise<ActionResponse> => {
+  return (await fetchWithTimeout(`${API_URL}/start`, { method: 'POST' })) as ActionResponse;
+};
+
+export const stopTrader = async (): Promise<ActionResponse> => {
+  return (await fetchWithTimeout(`${API_URL}/stop`, { method: 'POST' })) as ActionResponse;
+};

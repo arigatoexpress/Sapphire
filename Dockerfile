@@ -21,9 +21,12 @@ RUN pip install --no-cache-dir --user -r requirements.txt
 # Stage 2: Runtime stage
 FROM python:3.11-slim
 
+RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf
+
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PATH=/home/trader/.local/bin:$PATH
+    PATH=/home/trader/.local/bin:$PATH \
+    PYTHONPATH=/app
 
 WORKDIR /app
 
@@ -39,7 +42,6 @@ COPY --from=builder /root/.local /home/trader/.local
 
 # Copy source code
 COPY cloud_trader ./cloud_trader
-COPY run_live_trader.py ./
 COPY pyproject.toml README.md ./
 
 # Create non-root user and set ownership
@@ -54,4 +56,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD wget -qO- http://127.0.0.1:8080/healthz || exit 1
 
-CMD ["python", "run_live_trader.py", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "cloud_trader.api:build_app", "--host", "0.0.0.0", "--port", "8080", "--factory"]

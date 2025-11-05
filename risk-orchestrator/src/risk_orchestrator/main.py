@@ -26,7 +26,7 @@ from .mcp import (
 )
 from .mcp.consensus import get_consensus_engine
 from .models import OrderIntent, RiskCheckResponse
-from .redis_client import RedisClient
+from .pubsub_client import PubSubClient
 from .risk_engine import RiskEngine
 from .utils import generate_order_id
 
@@ -41,7 +41,7 @@ app.add_middleware(
 Instrumentator().instrument(app).expose(app)
 
 aster_client: Optional[AsterClient] = None
-redis_client: Optional[RedisClient] = None
+pubsub_client: Optional[PubSubClient] = None
 mcp_manager: MCPManager = MCPManagerSingleton.manager
 _portfolio_task: Optional[asyncio.Task] = None
 
@@ -167,10 +167,11 @@ async def _broadcast_execution(order_id: str, status: str, error: str | None = N
 
 @app.on_event("startup")
 async def startup() -> None:
-    global aster_client, redis_client, _portfolio_task
+    global aster_client, pubsub_client, _portfolio_task
     logger.info("Starting Risk Orchestrator (%s)", settings.ENVIRONMENT)
     aster_client = AsterClient()
-    redis_client = RedisClient()
+    pubsub_client = PubSubClient()
+    pubsub_client.connect()
     _portfolio_task = asyncio.create_task(portfolio_watcher())
     session_id = await mcp_manager.create_session()
     MCPManagerSingleton.default_session_id = session_id
@@ -182,8 +183,8 @@ async def shutdown() -> None:
         _portfolio_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await _portfolio_task
-    if redis_client:
-        await redis_client.close()
+    if pubsub_client:
+        pubsub_client.close()
     if aster_client:
         await aster_client.close()
 
@@ -197,18 +198,12 @@ async def healthz() -> dict:
 
 @app.post("/order/{bot_id}", response_model=RiskCheckResponse)
 async def submit_order(bot_id: str, intent: OrderIntent, background: BackgroundTasks) -> RiskCheckResponse:
-    if not redis_client or not aster_client:
+    if not aster_client:
         raise HTTPException(status_code=503, detail="Service not ready")
 
     order_id = generate_order_id(bot_id, intent.symbol)
-    if await redis_client.is_duplicate(order_id):
-        await _broadcast_consensus(None, False, [bot_id], notes="duplicate order")
-        return RiskCheckResponse(approved=False, reason="duplicate")
-
-    portfolio = await redis_client.get_portfolio()
-    if not portfolio:
-        portfolio = await aster_client.get_account()
-        await redis_client.set_portfolio(portfolio)
+    
+    portfolio = await aster_client.get_account()
     if not portfolio:
         raise HTTPException(status_code=503, detail="Portfolio not ready")
 
@@ -219,7 +214,6 @@ async def submit_order(bot_id: str, intent: OrderIntent, background: BackgroundT
     if not result.approved:
         return result
 
-    await redis_client.add_pending_order(order_id)
     order_payload = intent.dict(exclude_none=True)
     order_payload["clientOrderId"] = order_id
     background.add_task(route_to_aster, order_payload, bot_id, order_id)
@@ -227,26 +221,14 @@ async def submit_order(bot_id: str, intent: OrderIntent, background: BackgroundT
 
 @app.get("/portfolio")
 async def get_portfolio() -> dict:
-    if not aster_client or not redis_client:
+    if not aster_client:
         raise HTTPException(status_code=503, detail="Service not ready")
 
-    # Check cache first - if we have recent data (within 60 seconds), use it
-    cached = await redis_client.get_portfolio()
-    if cached:
-        cache_age = await redis_client.get_portfolio_age()
-        if cache_age and cache_age < 60:  # Use cache if less than 60 seconds old
-            return cached
-
-    # Fetch fresh data
+    # Fetch fresh data directly
     try:
         account = await aster_client.get_account()
-        await redis_client.set_portfolio(account)
         return account
     except httpx.HTTPStatusError as exc:
-        status_code = exc.response.status_code if exc.response else None
-        if status_code == 429 and cached:
-            logger.warning("Rate limited fetching portfolio; returning cached snapshot")
-            return cached
         raise HTTPException(status_code=503, detail="Failed to fetch live portfolio")
 
 @prefixed_router.get("/")
@@ -341,12 +323,12 @@ async def diagnostics_aster_debug() -> dict:
 app.include_router(prefixed_router)
 
 async def route_to_aster(order: dict, bot_id: str, order_id: str) -> None:
-    if not aster_client or not redis_client:
+    if not aster_client or not pubsub_client:
         logger.error("Route attempted before startup initialisation")
         return
     try:
         await aster_client.place_order(order)
-        await redis_client.log_event(
+        await pubsub_client.log_event(
             {
                 "bot_id": bot_id,
                 "event": "order_placed",
@@ -358,18 +340,18 @@ async def route_to_aster(order: dict, bot_id: str, order_id: str) -> None:
         await _broadcast_execution(order_id, "submitted")
     except Exception as exc:  # pragma: no cover - defensive logging
         logger.exception("Order placement failed [%s]: %s", bot_id, exc)
-        await redis_client.log_event(
+        await pubsub_client.log_event(
             {"bot_id": bot_id, "event": "order_failed", "order_id": order_id, "error": str(exc)}
         )
         await _broadcast_execution(order_id, "failed", error=str(exc))
 
 async def portfolio_watcher() -> None:
-    assert aster_client and redis_client
+    assert aster_client
     base_interval = max(0.5, settings.PORTFOLIO_REFRESH_SECONDS)
     while True:
         try:
             account = await aster_client.get_account()
-            await redis_client.set_portfolio(account)
+            # We don't need to set the portfolio in a cache anymore
             await _broadcast_observation(account)
             await asyncio.sleep(base_interval)
             continue

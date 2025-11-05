@@ -1,162 +1,139 @@
-"""Prometheus metrics used across the Cloud Trader service."""
-
-from __future__ import annotations
-
+"""Prometheus metrics definitions."""
 from prometheus_client import Counter, Gauge, Histogram
 
-
-# --- Trading loop level metrics -------------------------------------------------
-
-TRADING_DECISIONS = Counter(
-    "trading_decisions_total",
-    "Total trading decisions emitted by the trading loop",
-    labelnames=["bot_id", "symbol", "action"],
-)
-
-PORTFOLIO_BALANCE = Gauge(
-    "trading_portfolio_balance_usd",
-    "Current portfolio balance reported by the trading service",
-)
-
-PORTFOLIO_LEVERAGE = Gauge(
-    "trading_portfolio_leverage_ratio",
-    "Current portfolio leverage based on total exposure / balance",
-)
-
-POSITION_SIZE = Gauge(
-    "trading_open_position_notional",
-    "Latest notional exposure per symbol",
-    labelnames=["symbol"],
-)
-
-RISK_LIMITS_BREACHED = Counter(
-    "trading_risk_limits_breached_total",
-    "Count of events where risk checks prevented an action",
-    labelnames=["limit_type"],
-)
-
-RATE_LIMIT_EVENTS = Counter(
-    "aster_rate_limit_events_total",
-    "Occurrences of 429 responses from the Aster API",
-    labelnames=["component", "endpoint"],
-)
-
-
-# --- External integration metrics ------------------------------------------------
-
+# General API metrics
 ASTER_API_REQUESTS = Counter(
     "aster_api_requests_total",
-    "Number of requests performed against the Aster REST API",
-    labelnames=["component", "method", "endpoint", "status"],
+    "Total requests to the Aster API",
+    ["endpoint", "method"],
 )
 
 ASTER_API_LATENCY = Histogram(
-    "aster_api_request_duration_seconds",
-    "Latency distribution for Aster REST API calls",
-    labelnames=["component", "method", "endpoint"],
-    buckets=(0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0),
+    "aster_api_latency_seconds",
+    "Latency of requests to the Aster API",
+    ["endpoint", "method"],
+    buckets=[0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0],
+)
+
+# Trading decision metrics
+TRADING_DECISIONS = Counter(
+    "trading_decisions_total",
+    "Total trading decisions made by the bot",
+    ["bot_id", "symbol", "action"],
+)
+
+# LLM-specific metrics
+LLM_INFERENCE_TIME = Histogram(
+    "llm_inference_time_seconds",
+    "Time taken for LLM inference",
+    buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0],
+)
+LLM_CONFIDENCE = Histogram(
+    "llm_confidence",
+    "Confidence score of LLM decisions",
+    buckets=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+)
+
+# Portfolio and risk metrics
+PORTFOLIO_BALANCE = Gauge("portfolio_balance_usd", "Current portfolio balance in USD")
+PORTFOLIO_LEVERAGE = Gauge("portfolio_leverage_ratio", "Current portfolio leverage ratio")
+POSITION_SIZE = Gauge("position_size_usd", "Current position size in USD", ["symbol"])
+RISK_LIMITS_BREACHED = Counter(
+    "risk_limits_breached_total",
+    "Total number of times risk limits were breached",
+    ["limit_type"],
+)
+
+TRADE_EXECUTION_SUCCESS = Counter(
+    "trade_execution_success_total",
+    "Successful trade executions routed to the venue",
+    ["symbol", "mode", "source"],
+)
+
+TRADE_EXECUTION_FAILURE = Counter(
+    "trade_execution_failure_total",
+    "Failed trade executions and their reasons",
+    ["symbol", "reason"],
+)
+
+# Snapshot and telemetry metrics
+DASHBOARD_SNAPSHOT_TIME = Histogram(
+    "dashboard_snapshot_duration_seconds",
+    "Time taken to assemble the dashboard payload",
+    buckets=[0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0],
+)
+
+PUBSUB_PUBLISH_FAILURES = Counter(
+    "pubsub_publish_failures_total",
+    "Number of Pub/Sub publish attempts that resulted in an error",
+    ["topic"],
+)
+
+TELEGRAM_NOTIFICATIONS_SENT = Counter(
+    "telegram_notifications_total",
+    "Count of Telegram notifications attempted",
+    ["category", "status"],
+)
+
+SLIPPAGE_VIOLATIONS = Counter(
+    "slippage_violations_total",
+    "Orders skipped because live prices exceeded the configured slippage tolerance",
+    ["symbol"],
+)
+
+LAST_TRADE_UNREALIZED_PNL = Gauge(
+    "last_trade_unrealized_pnl_usd",
+    "Unrealized PnL of the most recently verified position",
+    ["symbol"],
+)
+
+# System health metrics
+RATE_LIMIT_EVENTS = Counter(
+    "rate_limit_events_total",
+    "Total number of rate limit events encountered",
+    ["service"],
 )
 
 REDIS_STREAM_FAILURES = Counter(
     "redis_stream_failures_total",
-    "Telemetry publish attempts that failed due to Redis errors",
-    labelnames=["stream"],
-)
-
-# --- Circuit breaker metrics ----------------------------------------------------
-
-CIRCUIT_BREAKER_STATE = Gauge(
-    "circuit_breaker_state",
-    "Current state of circuit breaker (0=closed, 1=open, 2=half-open)",
-    labelnames=["service"],
-)
-
-CIRCUIT_BREAKER_FAILURES = Counter(
-    "circuit_breaker_failures_total",
-    "Total number of failures that triggered circuit breaker",
-    labelnames=["service"],
-)
-
-CIRCUIT_BREAKER_OPEN_DURATION = Histogram(
-    "circuit_breaker_open_duration_seconds",
-    "Duration circuit breaker remains open",
-    labelnames=["service"],
-    buckets=(10, 30, 60, 120, 300, 600),
-)
-
-
-# --- LLM related telemetry -------------------------------------------------------
-
-LLM_CONFIDENCE = Histogram(
-    "trading_llm_confidence",
-    "Confidence distribution for LLM generated decisions",
-    buckets=(0.1, 0.3, 0.5, 0.7, 0.9, 1.0),
-)
-
-LLM_INFERENCE_TIME = Histogram(
-    "trading_llm_inference_duration_seconds",
-    "Duration for external LLM inference calls",
-    buckets=(0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0),
-)
-
-# --- Enhanced instrumentation metrics -----------------------------------------
-
-HTTP_REQUEST_DURATION = Histogram(
-    "http_request_duration_seconds",
-    "HTTP request duration",
-    labelnames=["method", "endpoint", "status"],
-    buckets=(0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0),
-)
-
-HTTP_REQUESTS_TOTAL = Counter(
-    "http_requests_total",
-    "Total HTTP requests",
-    labelnames=["method", "endpoint", "status"],
+    "Total failures to publish to Redis streams",
+    ["stream_name"],
 )
 
 MARKET_FEED_LATENCY = Histogram(
     "market_feed_latency_seconds",
-    "Market data feed fetch latency",
-    labelnames=["symbol"],
-    buckets=(0.01, 0.05, 0.1, 0.5, 1.0, 2.0),
+    "Latency of the market data feed",
+    ["symbol"],
+    buckets=[0.05, 0.1, 0.25, 0.5, 1.0, 2.5],
 )
 
 MARKET_FEED_ERRORS = Counter(
     "market_feed_errors_total",
-    "Market data feed errors",
-    labelnames=["symbol", "error_type"],
+    "Total errors from the market data feed",
+    ["symbol", "error_type"],
 )
 
+# Order execution metrics
 POSITION_VERIFICATION_TIME = Histogram(
-    "position_verification_duration_seconds",
-    "Time taken to verify position after execution",
-    labelnames=["symbol", "status"],
-    buckets=(1.0, 2.0, 5.0, 10.0, 30.0),
+    "position_verification_time_seconds",
+    "Time taken to verify position execution",
+    ["symbol", "status"],
+    buckets=[1.0, 2.5, 5.0, 10.0, 20.0, 30.0],
 )
 
 TRADE_EXECUTION_TIME = Histogram(
-    "trade_execution_duration_seconds",
-    "Time from decision to verified execution",
-    labelnames=["symbol", "side"],
-    buckets=(0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0),
+    "trade_execution_time_seconds",
+    "Time taken from order placement to confirmation",
+    ["symbol", "side"],
+    buckets=[0.1, 0.25, 0.5, 1.0, 2.5, 5.0],
 )
 
+
+# MCP metrics
 MCP_MESSAGES_TOTAL = Counter(
     "mcp_messages_total",
-    "Total MCP messages sent/received",
-    labelnames=["message_type", "direction"],
-)
-
-CONSENSUS_VOTES_TOTAL = Counter(
-    "consensus_votes_total",
-    "Total consensus votes cast",
-    labelnames=["proposal_id", "approved"],
-)
-
-CONSENSUS_REACHED = Counter(
-    "consensus_reached_total",
-    "Number of times consensus reached",
-    labelnames=["approved"],
+    "Total number of MCP messages sent or received",
+    ["message_type", "direction"],
 )
 
 

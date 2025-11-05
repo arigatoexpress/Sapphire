@@ -1,5 +1,5 @@
-const DEFAULT_API_URL = 'https://api.sapphiretrade.xyz/orchestrator';
-const DEFAULT_DASHBOARD_URL = 'https://trader.sapphiretrade.xyz';
+const DEFAULT_API_URL = 'https://api.sapphiretrade.xyz';
+const DEFAULT_DASHBOARD_URL = 'https://api.sapphiretrade.xyz';
 // Get API URL with fallback to current origin for development
 const getApiUrl = () => {
     const envUrl = import.meta.env.VITE_API_URL;
@@ -10,6 +10,10 @@ const getApiUrl = () => {
         const hostname = window.location.hostname;
         if (hostname === '127.0.0.1' || hostname === 'localhost') {
             return DEFAULT_API_URL;
+        }
+        // Use the direct service URL for production
+        if (hostname === 'sapphiretrade.xyz' || hostname === 'www.sapphiretrade.xyz') {
+            return 'https://api.sapphiretrade.xyz';
         }
         return origin;
     }
@@ -25,8 +29,12 @@ const DASHBOARD_URL = (() => {
         if (hostname === '127.0.0.1' || hostname === 'localhost') {
             return DEFAULT_DASHBOARD_URL;
         }
+        // Use the direct service URL for production dashboard endpoint
+        if (hostname === 'sapphiretrade.xyz' || hostname === 'www.sapphiretrade.xyz') {
+            return 'https://api.sapphiretrade.xyz';
+        }
     }
-    return `${DEFAULT_DASHBOARD_URL}`;
+    return DEFAULT_DASHBOARD_URL;
 })();
 // Rate limiting for API calls
 const rateLimiter = {
@@ -66,13 +74,19 @@ const fetchWithTimeout = async (url, options = {}, timeout = 15_000) => {
                 ...options.headers,
             },
         });
-        if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        return (await response.json());
-    }
-    finally {
         clearTimeout(id);
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+        }
+        return await response.json();
+    }
+    catch (error) {
+        clearTimeout(id);
+        if (error.name === 'AbortError') {
+            throw new Error('Connection timeout or error');
+        }
+        throw new Error(`Connection Error: ${error.message}`);
     }
 };
 export const fetchHealth = async () => {
@@ -80,4 +94,10 @@ export const fetchHealth = async () => {
 };
 export const fetchDashboard = async () => {
     return (await fetchWithTimeout(`${DASHBOARD_URL}/dashboard`));
+};
+export const startTrader = async () => {
+    return (await fetchWithTimeout(`${API_URL}/start`, { method: 'POST' }));
+};
+export const stopTrader = async () => {
+    return (await fetchWithTimeout(`${API_URL}/stop`, { method: 'POST' }));
 };

@@ -5,29 +5,31 @@ module.exports = {
     extend: {
       colors: {
         primary: {
-          50: '#f5f7ff',
-          100: '#e6ebff',
-          200: '#c3ccff',
-          300: '#9fafff',
-          400: '#7387ff',
-          500: '#4c63ff',
-          600: '#3246e6',
-          700: '#2434b4',
-          800: '#1d2a8c',
-          900: '#18236d',
+          50: '#eff6ff',
+          100: '#dbeafe',
+          200: '#bfdbfe',
+          300: '#93c5fd',
+          400: '#60a5fa',
+          500: '#3b82f6',
+          600: '#2563eb',
+          700: '#1d4ed8',
+          800: '#1e40af',
+          900: '#1e3a8a',
         },
         surface: {
-          50: '#0f172a',
-          100: '#111c33',
-          200: '#13213d',
-          300: '#16274b',
-          400: '#1a315f',
+          50: '#020617',    // Deep navy, almost black
+          75: '#081023',    // Slightly lighter for nested cards
+          100: '#0f172a',   // Dark blue-slate (was surface-50)
+          200: '#1e293b',   // Slate gray for borders
+          300: '#334155',   // Lighter slate for interactive elements
         },
         accent: {
-          teal: '#22d3ee',
-          emerald: '#34d399',
-          amber: '#f59e0b',
+          ai: '#818cf8',        // Lavender for AI/model elements
+          emerald: '#34d399',   // Keep vibrant emerald for P/L
+          sapphire: '#38bdf8',  // Bright blue for key metrics
+          aurora: '#f472b6',    // Pink/magenta for highlights
         },
+        'security-shield': '#f59e0b', // Amber for security/warning elements
         success: '#10B981',
         warning: '#F59E0B',
         error: '#EF4444',
