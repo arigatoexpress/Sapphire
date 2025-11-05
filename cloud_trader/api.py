@@ -75,6 +75,7 @@ def build_app(service: TradingService | None = None) -> FastAPI:
             "https://trader.sapphiretrade.xyz",
             "http://localhost:3000",
             "http://localhost:5173",
+            "*",  # Allow all origins temporarily for debugging
         ],  # Explicitly allow known origins
         allow_credentials=True,
         allow_methods=["GET", "POST", "OPTIONS"],  # Include OPTIONS for CORS preflight

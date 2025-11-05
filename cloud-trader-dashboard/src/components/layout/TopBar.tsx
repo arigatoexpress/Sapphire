@@ -6,9 +6,10 @@ interface TopBarProps {
     healthRunning?: boolean;
     mobileMenuOpen?: boolean;
     setMobileMenuOpen?: (open: boolean) => void;
+    onBackToHome?: () => void;
 }
 
-const TopBar: React.FC<TopBarProps> = ({ onRefresh, lastUpdated, healthRunning, mobileMenuOpen, setMobileMenuOpen }) => {
+const TopBar: React.FC<TopBarProps> = ({ onRefresh, lastUpdated, healthRunning, mobileMenuOpen, setMobileMenuOpen, onBackToHome }) => {
     const statusLabel = healthRunning ? 'Live' : 'Paused';
     const statusColor = healthRunning ? 'bg-emerald-400/80' : 'bg-amber-400/80';
 
@@ -35,6 +36,18 @@ const TopBar: React.FC<TopBarProps> = ({ onRefresh, lastUpdated, healthRunning, 
                         <span className="h-2 w-2 rounded-full bg-slate-900" />
                         {statusLabel}
                     </span>
+
+                    {onBackToHome && (
+                        <button
+                            type="button"
+                            onClick={onBackToHome}
+                            className="group relative overflow-hidden rounded-full border border-white/20 bg-white/5 px-4 py-2 text-sm font-medium text-white shadow-glass transition-all duration-200 hover:bg-white/10 hover:scale-105 active:scale-95"
+                        >
+                            <span className="mr-2">🏠</span>
+                            Home
+                            <span className="absolute inset-0 rounded-full bg-accent-ai/10 opacity-0 group-active:opacity-100 transition-opacity duration-100" />
+                        </button>
+                    )}
 
                     <button
                         type="button"

@@ -18,6 +18,7 @@ import useCrowdSentiment from './hooks/useCrowdSentiment';
 import useCommunityComments from './hooks/useCommunityComments';
 import useAuth from './hooks/useAuth';
 import ArchitectureInfo from './components/ArchitectureInfo';
+import LandingPage from './components/LandingPage';
 
 const ActivityLog = lazy(() => import('./components/ActivityLog'));
 const ModelPerformance = lazy(() => import('./components/ModelPerformance'));
@@ -84,6 +85,11 @@ const App: React.FC = () => {
   const [communityComments, addCommunityComment] = useCommunityComments(user);
   const [activeTab, setActiveTab] = useState<'overview' | 'positions' | 'performance' | 'activity' | 'system'>('overview');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showLandingPage, setShowLandingPage] = useState(true);
+
+  const handleEnterApp = () => {
+    setShowLandingPage(false);
+  };
 
   const derived = useMemo(() => {
     if (!dashboardData) {
@@ -366,6 +372,26 @@ const App: React.FC = () => {
 
   const sidebarTabs = tabs.map((tab) => ({ id: tab.id, label: tab.label, icon: tab.icon }));
 
+  // Show landing page first
+  if (showLandingPage) {
+    return (
+      <>
+        <LandingPage onEnterApp={handleEnterApp} />
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            duration: 4000,
+            style: {
+              background: 'rgba(15, 23, 42, 0.95)',
+              color: '#cbd5f5',
+              border: '1px solid rgba(59, 130, 246, 0.35)',
+            },
+          }}
+        />
+      </>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-900 text-white flex">
       <Sidebar
@@ -382,6 +408,7 @@ const App: React.FC = () => {
           healthRunning={health?.running}
           mobileMenuOpen={mobileMenuOpen}
           setMobileMenuOpen={setMobileMenuOpen}
+          onBackToHome={() => setShowLandingPage(true)}
         />
         <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto">
           <ArchitectureInfo />

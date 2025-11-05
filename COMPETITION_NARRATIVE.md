@@ -73,6 +73,7 @@ This entire platform—from the low-latency trading bots to the GCP control plan
 3. **Scalable Architecture**: Can handle institutional volumes while maintaining millisecond latency
 4. **Solo-Built Narrative**: Proves that individual brilliance can compete with team efforts
 5. **Complete Package**: End-to-end solution from signal generation to execution and reporting
+6. **Responsible Development**: No rushed token launches—any future token will be community-led with careful consideration for real utility
 
 ### The Roadmap Ahead
 
@@ -91,6 +92,21 @@ This entire platform—from the low-latency trading bots to the GCP control plan
 **Q3 Multi-Chain Expansion**
 - Deploy Sapphire bots to Solana and Base
 - Cross-chain liquidity capture
+
+### Responsible Token Development
+
+**No Rushed Launches**: Unlike many projects that rush token launches for hype, Sapphire AI focuses first on building a working, profitable trading platform. Any future token will be introduced only after proving sustainable value.
+
+**Community-Led Approach**: Future token utilities will be designed and implemented based on community feedback and real user needs, not speculative promises.
+
+**Potential Token Utilities** (When Community-Ready):
+- **Launch Your Own AI Agents**: Deploy custom trading strategies with community governance
+- **Bet on Agent Performance**: Stake tokens on agent predictions with profit sharing
+- **Profit Sharing Pools**: Earn rewards from Sapphire's trading performance
+- **Governance Rights**: Community voting on platform upgrades and feature development
+- **Exclusive Access**: Premium features and early beta access for token holders
+
+**Why This Matters**: This responsible approach ensures any token has real utility and long-term value, rather than short-term hype that often leads to failed projects.
 
 ### Technical Excellence That Speaks for Itself
 
