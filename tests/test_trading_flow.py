@@ -130,7 +130,7 @@ async def test_circuit_breaker_aster_api(mock_settings):
 async def test_risk_limits_enforcement(mock_settings):
     """Test that risk limits prevent oversized positions."""
     with patch("cloud_trader.service.load_credentials", return_value=Credentials(api_key=None, api_secret=None)):
-    service = TradingService(settings=mock_settings)
+        service = TradingService(settings=mock_settings)
     
     service._health.paper_trading = True
     service._portfolio.balance = 100.0

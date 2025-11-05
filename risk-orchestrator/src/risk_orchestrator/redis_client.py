@@ -16,6 +16,7 @@ class RedisClient:
     _pool: Optional[redis.ConnectionPool] = None
     _pool_url: Optional[str] = None
 
+
     def __init__(self) -> None:
         self._redis = self._build_redis_client(settings.REDIS_URL)
         self._portfolio_cache: Dict[str, Any] = {}
@@ -24,6 +25,8 @@ class RedisClient:
         self._portfolio_timestamp: Optional[float] = None
 
     @classmethod
+
+
     def _build_redis_client(cls, url: Optional[str]):
         """Build Redis client with connection pooling."""
         if not url or redis is None:
@@ -124,6 +127,6 @@ class RedisClient:
         self._events.insert(0, event)
         self._events = self._events[:100]
 
+
     def has_redis(self) -> bool:
         return self._redis is not None
-

@@ -202,12 +202,23 @@ class TradingService:
 
     async def dashboard_snapshot(self) -> Dict[str, Any]:
         """Aggregate a lightweight view for the dashboard endpoint."""
+        logger.info("Dashboard snapshot requested")
 
-        raw_portfolio, orchestrator_status = await self._resolve_portfolio()
+        try:
+            raw_portfolio, orchestrator_status = await self._resolve_portfolio()
+            logger.info("Dashboard: portfolio resolved")
+        except Exception as exc:
+            logger.exception("Dashboard: failed to resolve portfolio")
+            raise
 
         # Transform portfolio data for frontend
-        portfolio = self._transform_portfolio_for_frontend(raw_portfolio)
-        self._latest_portfolio_frontend = portfolio
+        try:
+            portfolio = self._transform_portfolio_for_frontend(raw_portfolio)
+            self._latest_portfolio_frontend = portfolio
+            logger.info("Dashboard: portfolio transformed")
+        except Exception as exc:
+            logger.exception("Dashboard: failed to transform portfolio")
+            raise
 
         portfolio_positions = portfolio.get("positions", {}) if isinstance(portfolio, dict) else {}
         positions: List[Dict[str, Any]] = []
@@ -220,13 +231,23 @@ class TradingService:
                     positions.append(enriched)
 
         # Update agent snapshots using live portfolio data
-        self._update_agent_snapshots(portfolio)
-        agents = self._serialize_agents()
+        try:
+            self._update_agent_snapshots(portfolio)
+            agents = self._serialize_agents()
+            logger.info("Dashboard: agent snapshots updated")
+        except Exception as exc:
+            logger.exception("Dashboard: failed to update agent snapshots")
+            raise
 
-        recent_trades = list(self._recent_trades)
-        if not recent_trades:
-            recent_trades = await self._safe_read_stream(self._settings.decisions_stream, count=20)
-        model_reasoning = await self._safe_read_stream(self._settings.reasoning_stream, count=10)
+        try:
+            recent_trades = list(self._recent_trades)
+            if not recent_trades:
+                recent_trades = await self._safe_read_stream(self._settings.decisions_stream, count=20)
+            model_reasoning = await self._safe_read_stream(self._settings.reasoning_stream, count=10)
+            logger.info("Dashboard: streams read")
+        except Exception as exc:
+            logger.exception("Dashboard: failed to read streams")
+            raise
 
         system_status = {
             "services": {
@@ -259,6 +280,8 @@ class TradingService:
             system_status["models"] = {
                 agent["model"].lower(): agent["status"] for agent in agents
             }
+
+        logger.info("Dashboard snapshot complete")
 
         return {
             "portfolio": portfolio,
@@ -922,9 +945,14 @@ class TradingService:
     async def _resolve_portfolio(self) -> Tuple[Dict[str, Any], str]:
         if self._orchestrator:
             try:
+                logger.info("Resolving portfolio from orchestrator")
                 portfolio = await self._orchestrator.portfolio()
                 portfolio.setdefault("source", "orchestrator")
-                await self._refresh_asset_prices(portfolio)
+                
+                # Temporarily disable asset price refresh to isolate timeout
+                # await self._refresh_asset_prices(portfolio)
+                logger.info("Portfolio successfully resolved from orchestrator")
+                
                 return portfolio, "healthy"
             except Exception as exc:
                 logger.warning("Failed to fetch orchestrator portfolio: %s", exc)

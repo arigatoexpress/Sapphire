@@ -7,7 +7,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Dict, Optional
 
-from .schemas import MCPConsensusPayload
+from .schemas import MCPConsensusPayload, MCPProposalPayload
 
 
 @dataclass
@@ -36,6 +36,7 @@ class ProposalState:
 
 class ConsensusEngine:
     """Engine for managing consensus voting on MCP proposals."""
+
 
     def __init__(self):
         self._proposals: Dict[str, ProposalState] = {}
@@ -154,4 +155,3 @@ _consensus_engine = ConsensusEngine()
 async def get_consensus_engine() -> ConsensusEngine:
     """Get the global consensus engine instance."""
     return _consensus_engine
-

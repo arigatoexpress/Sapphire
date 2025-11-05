@@ -25,6 +25,8 @@ from risk_orchestrator.risk_engine import RiskEngine
         }
     ],
 )
+
+
 def test_drawdown_rejection(portfolio):
     engine = RiskEngine(portfolio)
     intent = OrderIntent(symbol="BTCUSDT", side="BUY", type="MARKET", quantity=0.01)
@@ -32,4 +34,3 @@ def test_drawdown_rejection(portfolio):
     assert not result.approved
     assert result.reason is not None
     assert "Drawdown" in result.reason
-
