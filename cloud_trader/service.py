@@ -433,6 +433,11 @@ class TradingService:
             
             logger.info("Creating _run_loop task...")
             self._task = asyncio.create_task(self._run_loop())
+
+            # Start periodic market observation task (every 2 hours)
+            self._observation_task = asyncio.create_task(self._periodic_market_observations())
+            logger.info("Market observation task started.")
+
             logger.warning("--- EXITING start() ---")
         except Exception as exc:
             logger.exception("Exception during service start: %s", exc)
@@ -444,6 +449,12 @@ class TradingService:
         self._stop_event.set()
         if self._task:
             await self._task
+        if hasattr(self, '_observation_task') and self._observation_task:
+            self._observation_task.cancel()
+            try:
+                await self._observation_task
+            except asyncio.CancelledError:
+                pass
         if self._exchange:
             await self._exchange.close()
         await self._streams.close()
@@ -703,6 +714,121 @@ class TradingService:
                 # Continue to next symbol
                 continue
 
+    def _generate_trade_thesis(self, symbol: str, side: str, price: float, market_context: dict) -> str:
+        """Generate an intelligent trading thesis based on market conditions."""
+        change_24h = market_context.get('change_24h', 0)
+        volume = market_context.get('volume', 0)
+        atr = market_context.get('atr')
+
+        # Analyze market conditions
+        trend_strength = abs(change_24h)
+        volume_level = "high" if volume > 1000000 else "moderate" if volume > 100000 else "low"
+        volatility = "high" if atr and atr > price * 0.02 else "moderate" if atr and atr > price * 0.01 else "low"
+
+        # Generate thesis based on conditions
+        if side == "BUY":
+            if trend_strength > 5:
+                thesis = f"Strong bullish momentum with {change_24h:.1f}% 24h gain. "
+            elif trend_strength > 2:
+                thesis = f"Moderate bullish trend with {change_24h:.1f}% 24h gain. "
+            else:
+                thesis = f"Early bullish signal despite {change_24h:.1f}% 24h change. "
+
+            if volume_level == "high":
+                thesis += f"High volume confirms buying pressure. "
+            elif volume_level == "moderate":
+                thesis += f"Moderate volume supports the bullish case. "
+
+            if volatility == "high":
+                thesis += f"High volatility suggests potential for quick moves. "
+            elif volatility == "low":
+                thesis += f"Low volatility environment favors steady accumulation. "
+
+            thesis += f"Targeting ${take_profit:.2f} take-profit with calculated risk management."
+
+        else:  # SELL
+            if trend_strength > 5:
+                thesis = f"Strong bearish momentum with {change_24h:.1f}% 24h decline. "
+            elif trend_strength > 2:
+                thesis = f"Moderate bearish trend with {change_24h:.1f}% 24h decline. "
+            else:
+                thesis = f"Early bearish signal despite {change_24h:.1f}% 24h change. "
+
+            if volume_level == "high":
+                thesis += f"High volume confirms selling pressure. "
+            elif volume_level == "moderate":
+                thesis += f"Moderate volume supports the bearish case. "
+
+            if volatility == "high":
+                thesis += f"High volatility suggests potential for quick downside moves. "
+            elif volatility == "low":
+                thesis += f"Low volatility environment favors steady position reduction. "
+
+            thesis += f"Targeting ${take_profit:.2f} take-profit with disciplined risk controls."
+
+        return thesis
+
+    async def _periodic_market_observations(self) -> None:
+        """Send periodic market observations and portfolio updates via Telegram."""
+        observation_interval = 7200  # 2 hours in seconds
+
+        while not self._stop_event.is_set():
+            try:
+                await asyncio.sleep(observation_interval)
+
+                if not self._telegram:
+                    continue
+
+                # Collect market summary
+                market_summary = {}
+                for symbol, data in self._market_cache.items():
+                    if isinstance(data, dict):
+                        market_summary[symbol] = {
+                            'change_24h': data.get('change_24h', 0),
+                            'volume': data.get('volume', 0)
+                        }
+
+                # Collect active positions
+                active_positions = []
+                for symbol, position in self._portfolio.positions.items():
+                    if position.size != 0:
+                        current_price = self._market_cache.get(symbol.upper(), {}).get('price', position.entry_price)
+                        pnl = (current_price - position.entry_price) * position.size if position.side.upper() == 'BUY' else (position.entry_price - current_price) * position.size
+
+                        active_positions.append({
+                            'symbol': symbol,
+                            'side': position.side,
+                            'notional': abs(position.notional),
+                            'pnl': pnl
+                        })
+
+                # Calculate trading activity (simplified for now)
+                # In a full implementation, you'd track this over time
+                trading_activity = {
+                    'trades_today': 0,  # Would be calculated from recent trades
+                    'win_rate': self._settings.expected_win_rate * 100,
+                    'avg_return': 0.0  # Would be calculated from trade history
+                }
+
+                # Send market observation
+                try:
+                    await self._telegram.send_market_observation(
+                        portfolio_balance=self._portfolio.balance,
+                        active_positions=active_positions,
+                        total_pnl=sum(pos['pnl'] for pos in active_positions),
+                        market_summary=market_summary,
+                        trading_activity=trading_activity
+                    )
+                    logger.info("Sent periodic market observation via Telegram")
+                except Exception as exc:
+                    logger.warning("Failed to send market observation: %s", exc)
+
+            except asyncio.CancelledError:
+                break
+            except Exception as exc:
+                logger.error("Error in periodic market observations: %s", exc)
+                await asyncio.sleep(60)  # Wait a minute before retrying
+
     async def _execute_order(
         self,
         symbol: str,
@@ -845,6 +971,25 @@ class TradingService:
  
             if self._telegram:
                 risk_pct = (notional / self._portfolio.balance) * 100 if self._portfolio.balance else 0.0
+
+                # Get market context for the trade
+                market_context = {}
+                if symbol.upper() in self._market_cache:
+                    cached = self._market_cache[symbol.upper()]
+                    market_context = {
+                        'change_24h': cached.get('change_24h', 0),
+                        'volume': cached.get('volume', 0),
+                        'atr': cached.get('atr')
+                    }
+
+                # Generate trading thesis based on market conditions
+                trade_thesis = self._generate_trade_thesis(symbol, side, execution_price, market_context)
+
+                # Calculate risk/reward ratio
+                risk_amount = abs(execution_price - stop_loss) if stop_loss > 0 else 0
+                reward_amount = abs(take_profit - execution_price) if take_profit > 0 else 0
+                risk_reward_ratio = reward_amount / risk_amount if risk_amount > 0 else 0
+
                 try:
                     await self._telegram.send_trade_notification(
                         symbol=symbol,
@@ -852,13 +997,16 @@ class TradingService:
                         price=execution_price,
                         quantity=quantity,
                         notional=notional,
-                        decision_reason="AI momentum strategy decision",
+                        decision_reason=f"Advanced momentum analysis with {confidence:.1%} confidence",
                         model_used=agent_model,
                         confidence=self._settings.expected_win_rate,
                         take_profit=take_profit,
                         stop_loss=stop_loss,
                         portfolio_balance=self._portfolio.balance,
                         risk_percentage=risk_pct,
+                        market_context=market_context,
+                        trade_thesis=trade_thesis,
+                        risk_reward_ratio=risk_reward_ratio,
                     )
                     TELEGRAM_NOTIFICATIONS_SENT.labels(category="trade", status="success").inc()
                 except Exception as exc:

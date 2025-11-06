@@ -441,298 +441,8 @@ const App: React.FC = () => {
             ) : (
               <>
                 {activeTab === 'overview' && (
-                  <div className="space-y-8">
-                    {/* Welcome Hero Section */}
-                    <div className="relative overflow-hidden rounded-4xl border border-sapphire-700/40 bg-surface-75/85 p-10 shadow-glass-xl">
-                      <AuroraField className="-left-72 top-[-14rem] h-[620px] w-[620px]" variant="sapphire" intensity="bold" />
-                      <AuroraField className="right-[-12rem] bottom-[-10rem] h-[540px] w-[540px]" variant="emerald" intensity="soft" />
-                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.22),_transparent_65%)]" />
-                      <div className="absolute -left-48 top-1/2 h-96 w-96 -translate-y-1/2 rounded-full bg-emerald-500/15 blur-3xl" />
-                      <div className="absolute right-[-8rem] top-[-6rem] h-80 w-80 rounded-full bg-accent-aurora/25 blur-2xl" />
-                      <div className="relative grid gap-10 lg:grid-cols-[minmax(0,1fr)_420px]">
-                        <div className="space-y-6">
-                          <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-slate-100">
-                            Aster Labs Command Desk
-                          </span>
-                          <h1 className="text-4xl sm:text-6xl font-black leading-tight text-white">
-                            Sapphire AI <span className="text-accent-ai">Control Nexus</span>
-                          </h1>
-                          <p className="max-w-2xl text-base sm:text-lg leading-relaxed text-slate-300/90">
-                            Multi-agent automation fused with institutional risk choreography. Sapphire AI interprets microstructure in real time, negotiates strategy peer-to-peer, and executes with millisecond discipline across the Aster DEX perimeter.
-                          </p>
-                          <div className="flex flex-wrap gap-3">
-                            <div className="flex items-center gap-2 rounded-full border border-emerald-400/40 bg-emerald-500/20 px-4 py-2 text-sm font-semibold text-emerald-100">
-                              <span className={`h-2 w-2 rounded-full ${health?.running ? 'bg-emerald-300 animate-pulse' : 'bg-amber-300'}`} />
-                              {health?.running ? 'Execution Armed' : 'Execution Standby'}
-                            </div>
-                            <div className="flex items-center gap-2 rounded-full border border-sky-400/40 bg-sky-500/15 px-4 py-2 text-sm font-semibold text-sky-100">
-                              <span className="text-xs uppercase tracking-[0.3em]">Agents</span>
-                              {derived.activeAgents} / {configuredAgents}
-                            </div>
-                            <div className="flex items-center gap-2 rounded-full border border-purple-400/40 bg-purple-500/20 px-4 py-2 text-sm font-semibold text-purple-100">
-                              <span className="text-xs uppercase tracking-[0.3em]">Margin</span>
-                              {formatCurrency(derived.availableBalance)} free
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                            <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-4 backdrop-blur-sm">
-                              <p className="text-[0.7rem] uppercase tracking-[0.35em] text-slate-400">Consensus</p>
-                              <p className="mt-2 text-xl font-semibold text-white">{traderStatus === 'running' ? 'Live Negotiation' : 'Awaiting Pulse'}</p>
-                              <p className="mt-1 text-xs text-slate-400">MCP agents vet strategy proposals before routing</p>
-                            </div>
-                            <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-4 backdrop-blur-sm">
-                              <p className="text-[0.7rem] uppercase tracking-[0.35em] text-slate-400">Redis Spine</p>
-                              <p className={`mt-2 text-xl font-semibold ${redisOnline ? 'text-emerald-300' : 'text-amber-300'}`}>{redisOnline ? 'Streaming' : 'Offline'}</p>
-                              <p className="mt-1 text-xs text-slate-400">Telemetry bus for decisions, reasoning, and portfolio snapshots</p>
-                            </div>
-                            <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-4 backdrop-blur-sm">
-                              <p className="text-[0.7rem] uppercase tracking-[0.35em] text-slate-400">Last Signal</p>
-                              <p className="mt-2 text-xl font-semibold text-white">{latestLog ? latestLog.message : 'Idle'}</p>
-                              <p className="mt-1 text-xs text-slate-400">{latestLog ? new Date(latestLog.timestamp).toLocaleString() : 'Standing by for consensus feedback'}</p>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="relative overflow-hidden rounded-3xl border border-surface-200/40 bg-surface-50/10 p-6 shadow-glass backdrop-blur-2xl">
-                          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(129,140,248,0.35),_transparent_70%)]" />
-                          <div className="relative space-y-6">
-                            <div>
-                              <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Portfolio Balance</p>
-                              <p className="mt-2 text-3xl font-bold text-white">{formatMaskedPortfolioValue(derived.balance)}</p>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 text-sm text-slate-200/80">
-                              <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
-                                <p className="text-[0.65rem] uppercase tracking-[0.3em] text-slate-400">Live Agent P&L</p>
-                                <p className={`mt-2 text-xl font-semibold ${derived.totalAgentPnL >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{formatCurrency(derived.totalAgentPnL)}</p>
-                              </div>
-                              <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
-                                <p className="text-[0.65rem] uppercase tracking-[0.3em] text-slate-400">Open Positions</p>
-                                <p className="mt-2 text-xl font-semibold text-white">{derived.positions.length}</p>
-                              </div>
-                              <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
-                                <p className="text-[0.65rem] uppercase tracking-[0.3em] text-slate-400">Exposure</p>
-                                <p className="mt-2 text-xl font-semibold text-white">{formatCurrency(derived.exposure)}</p>
-                              </div>
-                              <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
-                                <p className="text-[0.65rem] uppercase tracking-[0.3em] text-slate-400">Heartbeat</p>
-                                <p className="mt-2 text-xl font-semibold text-white">{lastHeartbeat}</p>
-                              </div>
-                            </div>
-                            <div className="rounded-2xl border border-accent-ai/30 bg-accent-ai/10 px-4 py-3 text-xs text-accent-ai">
-                              MCP mesh live. Agents share critiques in real time before orchestrator approval.
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* How It Works Section */}
-                    <div className="relative overflow-hidden rounded-4xl border border-white/12 bg-surface-75/70 p-8 shadow-glass">
-                      <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(45,212,191,0.12),transparent_55%)]" />
-                      <div className="absolute inset-y-0 right-[-10rem] w-80 rounded-full bg-accent-ai/15 blur-3xl" />
-                      <div className="relative grid gap-10 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
-                        <div className="space-y-4">
-                          <p className="text-xs uppercase tracking-[0.35em] text-emerald-200/80">Protocol Spine</p>
-                          <h2 className="text-3xl font-bold text-white">How Sapphire Synthesizes Intent</h2>
-                          <p className="text-sm leading-relaxed text-slate-300">
-                            A coordinated dance across data streams, agent dialogue, and risk controls. Each stage surfaces intelligence, interrogates conviction, and only then releases capital onto the book.
-                          </p>
-                        </div>
-                        <ol className="grid gap-6 text-sm text-slate-200">
-                          <li className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 px-5 py-4">
-                            <span className="mr-4 inline-flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/20 text-sm font-bold text-emerald-200">01</span>
-                            <div>
-                              <h3 className="text-base font-semibold text-white">Signal Harvest</h3>
-                              <p className="mt-1 text-slate-300/90">Market data, funding curves, and on-chain sentiment funnel into the MCP coordinator as observations.</p>
-                            </div>
-                          </li>
-                          <li className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 px-5 py-4">
-                            <span className="mr-4 inline-flex h-9 w-9 items-center justify-center rounded-full bg-accent-ai/20 text-sm font-bold text-accent-ai">02</span>
-                            <div>
-                              <h3 className="text-base font-semibold text-white">Peer Deliberation</h3>
-                              <p className="mt-1 text-slate-300/90">DeepSeek, Qwen, Phi-3, and guardians question each other&apos;s proposals, sharing critiques and counter-trades before consensus.</p>
-                            </div>
-                          </li>
-                          <li className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 px-5 py-4">
-                            <span className="mr-4 inline-flex h-9 w-9 items-center justify-center rounded-full bg-purple-500/20 text-sm font-bold text-purple-200">03</span>
-                            <div>
-                              <h3 className="text-base font-semibold text-white">Risk Arbitration</h3>
-                              <p className="mt-1 text-slate-300/90">The orchestrator validates margin, leverage, and drawdown envelopes; only approved intent is allowed to touch the exchange.</p>
-                            </div>
-                          </li>
-                          <li className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 px-5 py-4">
-                            <span className="mr-4 inline-flex h-9 w-9 items-center justify-center rounded-full bg-amber-500/20 text-sm font-bold text-amber-200">04</span>
-                            <div>
-                              <h3 className="text-base font-semibold text-white">Telemetry & Recall</h3>
-                              <p className="mt-1 text-slate-300/90">Executions, reasoning, and PnL streams are written back to Redis + MCP so future cycles learn and adapt rapidly.</p>
-                            </div>
-                          </li>
-                        </ol>
-                      </div>
-                    </div>
-
-                    {/* Features & Technology Section */}
-                    <div className="relative overflow-hidden rounded-4xl border border-white/10 bg-surface-75/70 p-8 shadow-glass">
-                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(168,85,247,0.16),_transparent_70%)]" />
-                      <div className="relative grid gap-5 md:grid-cols-2">
-                        <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-                          <div className="flex items-center gap-3">
-                            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-accent-ai/25 text-lg">⚡</span>
-                            <h3 className="text-lg font-semibold text-white">AI Fusion Core</h3>
-                          </div>
-                          <p className="mt-3 text-sm leading-relaxed text-slate-300">
-                            DeepSeek momentum scouts, Qwen flow interpreters, Phi-3 hedging tacticians, and guardian sentinels negotiate every order under MCP governance.
-                          </p>
-                          <div className="mt-4 grid grid-cols-2 gap-3 text-[0.7rem] uppercase tracking-[0.28em] text-slate-400">
-                            <span className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-white/70">LLM mesh</span>
-                            <span className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-white/70">Prompt consensus</span>
-                            <span className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-white/70">Live reinforcement</span>
-                            <span className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-white/70">Microstructure aware</span>
-                          </div>
-                        </div>
-
-                        <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-                          <div className="flex items-center gap-3">
-                            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/25 text-lg">🛡️</span>
-                            <h3 className="text-lg font-semibold text-white">Risk Envelope</h3>
-                          </div>
-                          <p className="mt-3 text-sm leading-relaxed text-slate-300">
-                            Institutional guardrails monitor leverage, drawdown, and latency. The orchestrator can overrule any proposal if exposure breaches our Sapphire covenant.
-                          </p>
-                          <div className="mt-4 grid gap-3 text-[0.7rem] uppercase tracking-[0.28em] text-slate-400 sm:grid-cols-2">
-                            <span className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-white/70">Kelly-guided size</span>
-                            <span className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-white/70">Emergency flatten</span>
-                            <span className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-white/70">Stateful recalls</span>
-                            <span className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-white/70">Cloud Armor ready</span>
-                          </div>
-                        </div>
-
-                        <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-                          <div className="flex items-center gap-3">
-                            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-sapphire-500/25 text-lg">📡</span>
-                            <h3 className="text-lg font-semibold text-white">Telemetry Fabric</h3>
-                          </div>
-                          <p className="mt-3 text-sm leading-relaxed text-slate-300">
-                            Prometheus, Redis streams, and MPC transcripts provide real-time introspection. Every decision is archived for forensic replay.
-                          </p>
-                          <div className="mt-4 grid grid-cols-2 gap-3 text-[0.7rem] uppercase tracking-[0.28em] text-slate-400">
-                            <span className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-white/70">Decision bus</span>
-                            <span className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-white/70">Consensus log</span>
-                            <span className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-white/70">Prom metrics</span>
-                            <span className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-white/70">Replay ready</span>
-                          </div>
-                        </div>
-
-                        <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-                          <div className="flex items-center gap-3">
-                            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/25 text-lg">🎛️</span>
-                            <h3 className="text-lg font-semibold text-white">Mission Control</h3>
-                          </div>
-                          <p className="mt-3 text-sm leading-relaxed text-slate-300">
-                            A bespoke interface crafted for clarity: lattice dashboards, live consensus feed, and upcoming community prediction markets for vibe traders.
-                          </p>
-                          <div className="mt-4 grid gap-3 text-[0.7rem] uppercase tracking-[0.28em] text-slate-400 sm:grid-cols-2">
-                            <span className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-white/70">Radar dashboards</span>
-                            <span className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-white/70">Agent council</span>
-                            <span className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-white/70">Prediction layer</span>
-                            <span className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-white/70">Creator studio</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Coming Soon: Community & Creator Tools */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <div className="relative overflow-hidden rounded-3xl border border-security-shield/40 bg-surface-75/70 p-6 shadow-glass group">
-                        <div className="absolute inset-0 bg-gradient-to-br from-security-shield/15 via-transparent to-sapphire-700/20" />
-                        <div className="relative flex h-full flex-col gap-4">
-                          <span className="inline-flex items-center gap-2 self-start rounded-full border border-security-shield/40 bg-security-shield/10 px-3 py-1 text-xs font-semibold uppercase tracking-mega text-security-shield">
-                            Coming Soon
-                          </span>
-                          <h3 className="text-2xl font-semibold text-white">Bet on the Bots</h3>
-                          <p className="text-sm text-slate-300 leading-relaxed">
-                            A on-chain prediction market that lets the community back their favorite Sapphire agents. Witness real-time odds, risk-adjusted spreads, and transparent treasury flows secured by our load balanced infrastructure.
-                          </p>
-                          <div className="mt-auto flex flex-wrap gap-2 text-xs text-neutral">
-                            <span className="rounded-full border border-neutral/30 bg-surface-100/60 px-3 py-1 capitalize">Live P&amp;L odds</span>
-                            <span className="rounded-full border border-neutral/30 bg-surface-100/60 px-3 py-1 capitalize">Trustless settlement</span>
-                            <span className="rounded-full border border-neutral/30 bg-surface-100/60 px-3 py-1 capitalize">Security-first escrow</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="relative overflow-hidden rounded-3xl border border-accent-ai/40 bg-surface-75/60 p-6 shadow-glass group">
-                        <div className="absolute inset-0 bg-gradient-to-br from-accent-aurora/20 via-transparent to-accent-ai/10" />
-                        <div className="relative flex h-full flex-col gap-4">
-                          <span className="inline-flex items-center gap-2 self-start rounded-full border border-accent-ai/40 bg-accent-ai/10 px-3 py-1 text-xs font-semibold uppercase tracking-mega text-accent-ai">
-                            Creator Preview
-                          </span>
-                          <h3 className="text-2xl font-semibold text-white">Deploy Your Own Vibe Trader</h3>
-                          <p className="text-sm text-slate-300 leading-relaxed">
-                            A guided deployment studio that packages your strategies, prompts, and security policies into certified Sapphire bots. Ship to our load balancer, register credentials, and get real-time observability dashboards out of the box.
-                          </p>
-                          <div className="mt-auto flex flex-wrap gap-2 text-xs text-neutral">
-                            <span className="rounded-full border border-neutral/30 bg-surface-100/60 px-3 py-1 capitalize">TPU / GPU ready pipelines</span>
-                            <span className="rounded-full border border-neutral/30 bg-surface-100/60 px-3 py-1 capitalize">One-click security scaffold</span>
-                            <span className="rounded-full border border-neutral/30 bg-surface-100/60 px-3 py-1 capitalize">Branded observability</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Roadmap & Vision */}
-                    <div className="relative overflow-hidden rounded-4xl border border-surface-200/40 bg-surface-50/65 p-8 shadow-glass-xl">
-                      <div className="absolute inset-0 bg-gradient-to-br from-sapphire-500/10 via-accent-aurora/10 to-surface-75/40" />
-                      <div className="relative grid gap-8 lg:grid-cols-3 text-slate-100">
-                        <div className="lg:col-span-1 space-y-4">
-                          <span className="inline-flex items-center gap-2 self-start rounded-full border border-accent-aurora/40 bg-accent-aurora/10 px-3 py-1 text-xs font-semibold uppercase tracking-ultra text-accent-aurora">
-                            Roadmap
-                          </span>
-                          <h3 className="text-3xl font-semibold text-white">Open Science Vibe Protocol</h3>
-                          <p className="text-sm text-slate-300 leading-relaxed">
-                            Sapphire AI is a decentralized science experiment pushed to production—open-source agents, transparent telemetry, and a security-first infrastructure anyone can replicate. With every milestone, we invite the community to audit, extend, and co-create the future of AI trading.
-                          </p>
-                          <div className="space-y-2 text-xs text-neutral">
-                            <div className="flex items-center gap-2">
-                              <span className="h-2 w-2 rounded-full bg-accent-ai animate-pulse" />
-                              <span>Live: Multi-agent momentum, risk orchestrator, and battle-tested observability.</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="h-2 w-2 rounded-full bg-accent-emerald animate-pulse" />
-                              <span>Coming soon: Community prediction markets, creator deployment studio, and governance primitives.</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="lg:col-span-2 grid gap-6 sm:grid-cols-2">
-                          <div className="rounded-3xl border border-security-shield/40 bg-surface-75/70 p-5 shadow-glass">
-                            <h4 className="text-lg font-semibold text-white">Phase I — Sapphire Genesis</h4>
-                            <ul className="mt-3 space-y-2 text-sm text-slate-300">
-                              <li>• Publicly battle-tested trading loop & risk orchestration</li>
-                              <li>• Aster static IP + load-balanced security perimeter</li>
-                              <li>• Prometheus, structured logging, and incident playbooks</li>
-                            </ul>
-                          </div>
-                          <div className="rounded-3xl border border-accent-ai/40 bg-surface-75/60 p-5 shadow-glass">
-                            <h4 className="text-lg font-semibold text-white">Phase II — Vibe Dynamics</h4>
-                            <ul className="mt-3 space-y-2 text-sm text-slate-300">
-                              <li>• Community "Bet on the Bots" prediction layers</li>
-                              <li>• Creator portal for one-click agent deployment</li>
-                              <li>• On-chain telemetry feeds & verifiable AI proofs</li>
-                            </ul>
-                          </div>
-                          <div className="rounded-3xl border border-accent-aurora/40 bg-surface-75/60 p-5 shadow-glass sm:col-span-2">
-                            <h4 className="text-lg font-semibold text-white">Phase III — Open Science Coalition</h4>
-                            <ul className="mt-3 space-y-2 text-sm text-slate-300">
-                              <li>• DAO-inspired research guild curating new agent archetypes</li>
-                              <li>• Federated TPU/GPU labs to benchmark open models in real time</li>
-                              <li>• Community-driven risk parameters, audits, and protocol stewardship</li>
-                            </ul>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Summary Metrics */}
+                  <div className="space-y-6">
+                    {/* Key Metrics Dashboard */}
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
                       <MetricCard
                         label="Portfolio Balance"
@@ -760,7 +470,43 @@ const App: React.FC = () => {
                       />
                     </div>
 
-                    {/* 4-Pane Agent Dashboard */}
+                    {/* System Status Overview */}
+                    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                      <StatusCard health={health} loading={loading} />
+                      <div className="rounded-2xl border border-surface-200/40 bg-surface-100/80 p-6 shadow-glass">
+                        <div className="mb-4">
+                          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Trading Status</p>
+                          <h3 className="mt-2 text-lg font-semibold text-white">System Health</h3>
+                        </div>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-slate-300">Trader Service</span>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              traderStatus === 'running' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
+                            }`}>
+                              {traderStatus}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-slate-300">Redis Connection</span>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              redisOnline ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'
+                            }`}>
+                              {redisOnline ? 'Online' : 'Offline'}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-slate-300">Active Agents</span>
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300">
+                              {derived.activeAgents}/{configuredAgents}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <TargetsAndAlerts targets={dashboardData?.targets} />
+                    </div>
+
+                    {/* Agent Performance Overview */}
                     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                       {derived.agents.length > 0 ? (
                         derived.agents.map((agent) => (
@@ -789,26 +535,15 @@ const App: React.FC = () => {
                       )}
                     </div>
 
-                    {/* System Overview */}
-                    <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-                      <div className="xl:col-span-2 rounded-2xl border border-surface-200/40 bg-surface-100/80 p-6 shadow-glass">
-                        <div className="mb-4 flex items-center justify-between">
-                          <div>
-                            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Aggregate Performance</p>
-                            <h3 className="mt-2 text-xl font-semibold text-white">Portfolio Overview</h3>
-                          </div>
+                    {/* Portfolio Performance Chart */}
+                    <div className="rounded-2xl border border-surface-200/40 bg-surface-100/80 p-6 shadow-glass">
+                      <div className="mb-4 flex items-center justify-between">
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Portfolio Performance</p>
+                          <h3 className="mt-2 text-xl font-semibold text-white">Balance & Price Trends</h3>
                         </div>
-                        <PortfolioPerformance balanceSeries={performanceSeries.balance} priceSeries={performanceSeries.price} />
                       </div>
-                      <div className="space-y-6">
-                        <StatusCard health={health} loading={loading} />
-                        <TargetsAndAlerts targets={dashboardData?.targets} />
-                      </div>
-                    </div>
-
-                    {/* Additional System Info */}
-                    <div className="grid grid-cols-1 gap-6 lg:grid-cols-1">
-                      <PortfolioCard portfolio={dashboardData?.portfolio} />
+                      <PortfolioPerformance balanceSeries={performanceSeries.balance} priceSeries={performanceSeries.price} />
                     </div>
                   </div>
                 )}

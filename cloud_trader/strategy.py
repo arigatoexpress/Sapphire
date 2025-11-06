@@ -22,26 +22,37 @@ class MomentumStrategy:
     def __init__(self, threshold: float, notional_fraction: float):
         self._threshold = threshold
         self._notional_fraction = notional_fraction
+        # 10% of portfolio allocated for asymmetric bets
+        self._asymmetric_bet_fraction = 0.10
 
     def should_enter(self, symbol: str, snapshot: MarketSnapshot) -> Literal["BUY", "SELL", "HOLD"]:
-        if snapshot.change_24h > self._threshold:
+        # Lower threshold for more frequent trading (was self._threshold)
+        aggressive_threshold = self._threshold * 0.7  # 30% more sensitive
+
+        if snapshot.change_24h > aggressive_threshold:
             return "BUY"
-        if snapshot.change_24h < -self._threshold:
+        if snapshot.change_24h < -aggressive_threshold:
             return "SELL"
         return "HOLD"
-    
+
     def allocate_notional(self, portfolio_balance: float, expected_return: float, volatility: float) -> float:
-        # Simple Kelly Criterion for now, can be expanded
+        """Allocate 10% of portfolio for asymmetric bets with higher frequency trading."""
         if volatility <= 0:
             return 0.0
-        
-        kelly_fraction = (expected_return) / (volatility**2)
-        capped_fraction = min(kelly_fraction, 1.0) # Cap at 100% of portfolio
-        
-        # Apply risk management cap (e.g., max 2% of portfolio per trade)
-        risk_managed_fraction = min(capped_fraction, self._notional_fraction)
-        
-        return portfolio_balance * risk_managed_fraction
+
+        # Use asymmetric Kelly Criterion for more aggressive allocation
+        # Higher edge assumption for asymmetric bets
+        asymmetric_edge = expected_return * 1.5  # 50% more aggressive
+        kelly_fraction = (asymmetric_edge) / (volatility**2)
+
+        # Cap at 10% of portfolio for asymmetric bets (more aggressive than before)
+        capped_fraction = min(kelly_fraction, self._asymmetric_bet_fraction)
+
+        # Minimum bet size to ensure frequent trading
+        min_bet = portfolio_balance * 0.005  # Minimum 0.5% per trade
+        allocated_amount = portfolio_balance * capped_fraction
+
+        return max(allocated_amount, min_bet)
 
     def calculate_stop_loss(self, entry_price: float, atr: float, is_long: bool) -> float:
         # ATR-based stop loss calculation
