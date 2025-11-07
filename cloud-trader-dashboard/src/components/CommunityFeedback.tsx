@@ -25,17 +25,17 @@ const sanitizeInput = (input: string): string =>
     .replace(/<[^>]*>/g, '')
     .replace(/javascript:/gi, '')
     .replace(/on\w+\s*=/gi, '')
-    .replace(/[<>'"&]/g, (match) => {
+      .replace(/[<>'"&]/g, (match) => {
       const entityMap: Record<string, string> = {
-        '<': '&lt;',
-        '>': '&gt;',
-        "'": '&#39;',
-        '"': '&quot;',
+          '<': '&lt;',
+          '>': '&gt;',
+          "'": '&#39;',
+          '"': '&quot;',
         '&': '&amp;',
-      };
-      return entityMap[match];
-    })
-    .trim();
+        };
+        return entityMap[match];
+      })
+      .trim();
 
 const CommunityFeedback: React.FC<CommunityFeedbackProps> = ({
   comments,
@@ -88,9 +88,9 @@ const CommunityFeedback: React.FC<CommunityFeedbackProps> = ({
     }
 
     try {
-      const sanitizedMessage = sanitizeInput(message);
+    const sanitizedMessage = sanitizeInput(message);
       await onSubmit(sanitizedMessage);
-      setMessage('');
+    setMessage('');
       setInputError('');
       setSubmitError(null);
     } catch (error) {
@@ -165,13 +165,13 @@ const CommunityFeedback: React.FC<CommunityFeedbackProps> = ({
                   >
                     Apple
                   </button>
-                  <button
-                    disabled={loading || !authEnabled}
+              <button
+                disabled={loading || !authEnabled}
                     onClick={() => onSocialSignIn('facebook')}
                     className="rounded-full border border-white/15 bg-white/5 px-3 py-2 uppercase tracking-[0.3em] text-white/70 transition hover:bg-white/10 disabled:opacity-40"
-                  >
+              >
                     Facebook
-                  </button>
+              </button>
                 </div>
                 <p className="text-[0.65rem] text-brand-ice/50">
                   Authenticate to keep your identity safe while we collect high-signal crowd insight.
@@ -316,7 +316,7 @@ const CommunityFeedback: React.FC<CommunityFeedbackProps> = ({
                     <p className="mt-2 text-sm text-brand-ice/90 leading-relaxed">{comment.message}</p>
                     {comment.mentionedTickers.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-2 text-xs text-brand-accent-blue">
-                        {comment.mentionedTickers.map((ticker) => (
+                        {comment.mentionedTickers.map((ticker: string) => (
                           <span key={`${comment.id}-${ticker}`} className="rounded-full border border-brand-accent-blue/40 bg-brand-accent-blue/10 px-2 py-1">
                             ${ticker}
                           </span>

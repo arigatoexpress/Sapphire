@@ -20,14 +20,14 @@ const FALLBACK_KEY = 'sapphire-crowd-sentiment-fallback';
 const todayKey = (): string => new Date().toISOString().slice(0, 10);
 
 const readFallbackState = (): CrowdSentimentState => {
-  try {
+    try {
     const raw = localStorage.getItem(FALLBACK_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as CrowdSentimentState;
+      if (raw) {
+        const parsed = JSON.parse(raw) as CrowdSentimentState;
       if (parsed.dateKey === todayKey()) {
         return parsed;
       }
-    }
+      }
   } catch (error) {
     console.warn('Crowd sentiment fallback read failed', error);
   }
@@ -48,11 +48,11 @@ export const useCrowdSentiment = (
     setLoading(true);
     const unsubscribe = subscribeSentiment(user, (snapshot: SentimentSnapshot) => {
       setState({
-        totalVotes: snapshot.total,
+        totalVotes: snapshot.total ?? 0,
         bullishVotes: snapshot.bullish,
         bearishVotes: snapshot.bearish,
-        hasVoted: snapshot.hasVoted,
-        dateKey: snapshot.dateKey,
+        hasVoted: snapshot.hasVoted ?? false,
+        dateKey: snapshot.dateKey ?? todayKey(),
       });
       setLoading(false);
     });
@@ -62,7 +62,7 @@ export const useCrowdSentiment = (
 
   useEffect(() => {
     if (!isRealtimeCommunityEnabled()) {
-      try {
+    try {
         localStorage.setItem(FALLBACK_KEY, JSON.stringify(state));
       } catch (error) {
         console.warn('Crowd sentiment fallback write failed', error);
@@ -80,9 +80,9 @@ export const useCrowdSentiment = (
           return prev;
         }
         const next = {
-          totalVotes: prev.totalVotes + 1,
-          bullishVotes: vote === 'bullish' ? prev.bullishVotes + 1 : prev.bullishVotes,
-          bearishVotes: vote === 'bearish' ? prev.bearishVotes + 1 : prev.bearishVotes,
+      totalVotes: prev.totalVotes + 1,
+      bullishVotes: vote === 'bullish' ? prev.bullishVotes + 1 : prev.bullishVotes,
+      bearishVotes: vote === 'bearish' ? prev.bearishVotes + 1 : prev.bearishVotes,
           hasVoted: true,
           dateKey: todayKey(),
         } satisfies CrowdSentimentState;

@@ -9,8 +9,9 @@ import PortfolioPerformance from './components/charts/PortfolioPerformance';
 import AuroraField from './components/visuals/AuroraField';
 import { resolveTokenMeta } from './utils/tokenMeta';
 import { useTraderService } from './hooks/useTraderService';
-import { DashboardResponse, DashboardPosition } from './api/client';
+import { DashboardResponse, DashboardPosition, DashboardAgent } from './api/client';
 import AgentCard from './components/AgentCard';
+import HistoricalPerformance from './components/HistoricalPerformance';
 import CrowdSentimentWidget from './components/CrowdSentimentWidget';
 import useCrowdSentiment from './hooks/useCrowdSentiment';
 import LandingPage from './components/LandingPage';
@@ -27,7 +28,6 @@ const ModelPerformance = lazy(() => import('./components/ModelPerformance'));
 const ModelReasoning = lazy(() => import('./components/ModelReasoning'));
 const LivePositions = lazy(() => import('./components/LivePositions'));
 const SystemStatus = lazy(() => import('./components/SystemStatus'));
-const TargetsAndAlerts = lazy(() => import('./components/TargetsAndAlerts'));
 const PerformanceTrends = lazy(() => import('./components/PerformanceTrends'));
 const MCPCouncil = lazy(() => import('./components/MCPCouncil'));
 
@@ -59,7 +59,7 @@ const SectionSkeleton: React.FC<{ title?: string; className?: string }> = ({ tit
 
 const DashboardSkeleton: React.FC = () => (
   <div className="space-y-8">
-    <SectionSkeleton title="Calibrating control nexus" />
+    <SectionSkeleton title="Initializing trading system" />
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
       <SectionSkeleton className="h-40" />
       <SectionSkeleton className="h-40" />
@@ -73,10 +73,34 @@ const DashboardSkeleton: React.FC = () => (
   </div>
 );
 
+const MaintenancePage: React.FC = () => (
+  <div className="min-h-screen bg-brand-midnight text-brand-ice relative overflow-hidden flex items-center justify-center p-6">
+    <div className="pointer-events-none absolute inset-0 bg-sapphire-mesh opacity-60" />
+    <div className="pointer-events-none absolute inset-0 bg-sapphire-strata opacity-50" />
+    <div className="relative max-w-3xl rounded-4xl border border-brand-border/70 bg-brand-abyss/80 p-10 text-center shadow-sapphire">
+      <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-accent-blue/20 text-3xl">
+        ⏳
+      </div>
+      <h1 className="text-3xl font-bold tracking-wide text-brand-ice">Sapphire is calibrating for launch</h1>
+      <p className="mt-4 text-brand-ice/80 leading-relaxed">
+        We&apos;re applying final production upgrades to the live trading stack and refreshing all community data.
+        The dashboard will reopen by <span className="text-brand-accent-blue font-semibold">10:30 PM Central Time</span>
+        with the full Sapphire experience.
+      </p>
+      <div className="mt-8 space-y-2 text-sm text-brand-ice/60">
+        <p>• Live traders remain on risk-managed standby during this upgrade window.</p>
+        <p>• Telegram alerts will resume automatically once trading restarts.</p>
+        <p>• Follow updates on Twitter/X: <span className="text-brand-accent-blue">@rari_sui</span></p>
+      </div>
+    </div>
+  </div>
+);
+
 // This is the new, self-contained Dashboard component.
 // All hooks and data logic now live here, ensuring they are always called in the same order.
 const Dashboard: React.FC<{ onBackToHome: () => void }> = ({ onBackToHome }) => {
   const { health, dashboardData, loading, error, logs, connectionStatus, mcpMessages, mcpStatus, refresh } = useTraderService();
+  const [selectedAgentForHistory, setSelectedAgentForHistory] = React.useState<DashboardAgent | null>(null);
   const {
     user,
     loading: authLoading,
@@ -98,7 +122,7 @@ const Dashboard: React.FC<{ onBackToHome: () => void }> = ({ onBackToHome }) => 
 
   React.useEffect(() => {
     if (user && realtimeCommunity) {
-      recordCheckIn(user).catch((err) => {
+      recordCheckIn(user).catch((err: unknown) => {
         if (import.meta.env.DEV) {
           console.warn('[community] failed to record daily check-in', err);
         }
@@ -524,9 +548,6 @@ const Dashboard: React.FC<{ onBackToHome: () => void }> = ({ onBackToHome }) => 
                             <span className="inline-flex items-center gap-2 rounded-full bg-brand-abyss/80 px-4 py-2 text-xs font-semibold uppercase tracking-[0.4em] text-accent-sapphire">
                               ∞ Sapphire Command Loop
                             </span>
-                            <span className="inline-flex items-center gap-2 rounded-full border border-accent-aurora/40 bg-accent-aurora/15 px-4 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-accent-aurora">
-                              Competition Entry · Built pre-announcement and formally submitted to the Aster Vibe Coding Challenge
-                            </span>
                             <h2 className="text-3xl font-bold text-brand-ice">World-class AI trading, distilled for you</h2>
                             <p className="text-sm leading-relaxed text-brand-muted">
                               This dashboard streams live output from our GCP-native multi-agent stack. Sapphire’s traders listen to market structure, coordinate via MCP consensus, and execute with disciplined risk overlays. Every panel here explains what the bots are doing now, how capital is positioned, and how you can interact in real time.
@@ -566,10 +587,10 @@ const Dashboard: React.FC<{ onBackToHome: () => void }> = ({ onBackToHome }) => 
                           <header className="flex flex-col gap-3 text-brand-ice/80 md:flex-row md:items-center md:justify-between">
                             <div>
                               <p className="text-xs uppercase tracking-[0.35em] text-brand-ice/70">Open-source intelligence core</p>
-                              <h3 className="text-2xl font-semibold text-brand-ice">FinGPT + Lag-LLaMA, tuned for Sapphire</h3>
+                              <h3 className="text-2xl font-semibold text-brand-ice">Multi-Agent AI Stack: FinGPT + Lag-LLaMA</h3>
                             </div>
                             <p className="text-sm md:max-w-xl">
-                              We blend two open-source research agents to keep Sapphire transparent, privacy-respecting, and community-auditable. Signals never leave our secure Vertex/GCP boundary, and every prompt is scrubbed of user identifiers before inference.
+                              Sapphire queries multiple AI agents in parallel for AVAX and ARB symbols, synthesizing their perspectives for enhanced accuracy. Both agents collaborate simultaneously, with intelligent thesis selection based on confidence and risk scores. All signals stay within our secure Vertex/GCP boundary, with privacy-preserving inference and community-auditable reasoning.
                             </p>
                           </header>
                           <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -580,12 +601,14 @@ const Dashboard: React.FC<{ onBackToHome: () => void }> = ({ onBackToHome }) => 
                                   🧠 FinGPT Alpha
                                 </div>
                                 <p className="text-sm text-brand-ice/80">
-                                  Baseline thesis generator for AVAX markets. Outputs structured reasoning, risk scoring, and confidence so risk managers can throttle exposure instantly. Hallucination guardrails ensure only assets Sapphire actually trades make it to execution.
+                                  Primary thesis generator for AVAX markets with parallel collaboration with Lag-Llama. Outputs structured reasoning, risk scoring, and confidence. Queries happen simultaneously with Lag-Llama for multi-perspective analysis. Hallucination guardrails and risk threshold enforcement ensure only high-quality theses reach execution.
                                 </p>
                                 <ul className="space-y-2 text-xs text-brand-ice/70">
-                                  <li>• Custom rate limiter prevents endpoint saturation.</li>
-                                  <li>• Responses validated against symbol allowlist & risk thresholds.</li>
-                                  <li>• Commentary piped into dashboard + Telegram with markdown-safe formatting.</li>
+                                  <li>• Parallel queries with Lag-Llama for AVAX symbols.</li>
+                                  <li>• Response caching (10s TTL) reduces redundant API calls by 50-70%.</li>
+                                  <li>• Retry logic with exponential backoff for reliability.</li>
+                                  <li>• Risk threshold enforcement (default 0.7) filters low-quality theses.</li>
+                                  <li>• Enhanced prompts with DeFi context and volatility regime detection.</li>
                                 </ul>
                               </div>
                             </article>
@@ -596,12 +619,14 @@ const Dashboard: React.FC<{ onBackToHome: () => void }> = ({ onBackToHome }) => 
                                   🦙 Lag-LLaMA Visionary
                                 </div>
                                 <p className="text-sm text-brand-ice/80">
-                                  Forecasts ARB/USD order flow with probabilistic confidence bands. Trades are gated when confidence intervals widen beyond tolerance, keeping execution disciplined during volatility spikes.
+                                  Primary time-series forecaster for ARB markets with parallel collaboration with FinGPT. Generates probabilistic forecasts with confidence bands and anomaly detection. Queries happen simultaneously with FinGPT for sentiment + time-series synthesis. CI span validation (over 20% rejected) keeps execution disciplined.
                                 </p>
                                 <ul className="space-y-2 text-xs text-brand-ice/70">
-                                  <li>• Forecast + anomaly scores merged into trading thesis.</li>
-                                  <li>• Confidence intervals surfaced in dashboard tooltips.</li>
-                                  <li>• Community sentiment optional: considered but never overweighted.</li>
+                                  <li>• Parallel queries with FinGPT for ARB symbols.</li>
+                                  <li>• Forecast validation rejects predictions over 50% away from current price.</li>
+                                  <li>• CI span validation (max 20%) prevents overconfident trades.</li>
+                                  <li>• Anomaly detection integration for regime shift identification.</li>
+                                  <li>• Time-series enrichment with on-chain volume data.</li>
                                 </ul>
                               </div>
                             </article>
@@ -667,9 +692,6 @@ const Dashboard: React.FC<{ onBackToHome: () => void }> = ({ onBackToHome }) => 
                               </div>
                             </div>
                           </div>
-                          <div className="sapphire-panel p-6">
-                            <TargetsAndAlerts targets={dashboardData?.targets} />
-                          </div>
                         </div>
 
                         {/* Agent Performance Overview */}
@@ -689,6 +711,7 @@ const Dashboard: React.FC<{ onBackToHome: () => void }> = ({ onBackToHome }) => 
                                     },
                                   });
                                 }}
+                                onViewHistory={(agent) => setSelectedAgentForHistory(agent)}
                               />
                             ))
                           ) : (
@@ -857,14 +880,9 @@ const Dashboard: React.FC<{ onBackToHome: () => void }> = ({ onBackToHome }) => 
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-6">
                           <div className="sapphire-panel p-6">
                             <RiskMetrics portfolio={dashboardData?.portfolio} />
-                          </div>
-                          <div className="sapphire-panel p-6">
-                            <Suspense fallback={<SectionSkeleton title="Targets & Alerts" className="h-72" />}>
-                              <TargetsAndAlerts targets={dashboardData?.targets} />
-                            </Suspense>
                           </div>
                         </div>
 
@@ -1120,12 +1138,25 @@ const Dashboard: React.FC<{ onBackToHome: () => void }> = ({ onBackToHome }) => 
           </div>
         </div>
       </div>
+      
+      {/* Historical Performance Modal */}
+      {selectedAgentForHistory && (
+        <HistoricalPerformance
+          agent={selectedAgentForHistory}
+          onClose={() => setSelectedAgentForHistory(null)}
+        />
+      )}
     </>
   );
 };
 
 const App: React.FC = () => {
-  const [view, setView] = useState<'landing' | 'dashboard'>('dashboard');
+  const maintenanceMode = import.meta.env.VITE_MAINTENANCE_MODE === 'true';
+  const [view, setView] = useState<'landing' | 'dashboard'>('landing');
+
+  if (maintenanceMode) {
+    return <MaintenancePage />;
+  }
 
   if (view === 'landing') {
     return (

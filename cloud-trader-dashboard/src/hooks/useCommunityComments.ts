@@ -33,7 +33,7 @@ const useCommunityComments = (
     }
 
     setLoading(true);
-    const unsubscribe = subscribeCommunityComments((next) => {
+    const unsubscribe = subscribeCommunityComments((next: CommunityComment[]) => {
       setComments(next);
       setLoading(false);
     });
@@ -43,7 +43,7 @@ const useCommunityComments = (
 
   useEffect(() => {
     if (!isRealtimeCommunityEnabled()) {
-      try {
+    try {
         localStorage.setItem(FALLBACK_STORAGE_KEY, JSON.stringify(comments.slice(0, 50)));
       } catch (error) {
         console.warn('Community comments fallback write failed', error);
@@ -61,15 +61,15 @@ const useCommunityComments = (
     } else {
       const fallbackComment: CommunityComment = {
         id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-          ? crypto.randomUUID()
+      ? crypto.randomUUID()
           : `${Date.now()}-${Math.random()}`,
         publicId: 'local-preview',
         displayName: user.displayName || user.email || 'Anonymous',
-        message,
+      message,
         createdAt: new Date().toISOString(),
         avatarUrl: user.photoURL || undefined,
         mentionedTickers: [],
-      };
+    };
       setComments((prev) => [fallbackComment, ...prev].slice(0, 50));
     }
   };

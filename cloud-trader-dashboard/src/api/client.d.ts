@@ -84,6 +84,14 @@ export interface DashboardResponse {
     targets: DashboardTargets;
 }
 export declare const fetchHealth: () => Promise<HealthResponse>;
+export declare const fetchTradeHistory: (agentId?: string, symbol?: string, startDate?: string, endDate?: string, limit?: number) => Promise<{
+    trades: any[];
+    count: number;
+}>;
+export declare const fetchAgentPerformance: (agentId: string, startDate?: string, endDate?: string, limit?: number) => Promise<{
+    performance: any[];
+    count: number;
+}>;
 export declare const fetchDashboard: () => Promise<DashboardResponse>;
 export declare const startTrader: () => Promise<ActionResponse>;
 export declare const stopTrader: () => Promise<ActionResponse>;

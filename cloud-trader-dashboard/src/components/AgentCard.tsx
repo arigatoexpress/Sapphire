@@ -7,20 +7,23 @@ import { resolveTokenMeta } from '../utils/tokenMeta';
 interface AgentCardProps {
   agent: DashboardAgent;
   onClick?: () => void;
+  onViewHistory?: (agent: DashboardAgent) => void;
 }
 
-const modelPalette: Record<string, { label: string; subtitle: string; accent: string; icon: string }> = {
+const modelPalette: Record<string, { label: string; subtitle: string; accent: string; icon: string; multiAgent?: boolean }> = {
   'fingpt-alpha': {
     label: 'FinGPT Alpha',
-    subtitle: 'Open-source thesis engine \u2022 privacy-first',
+    subtitle: 'Open-source thesis engine \u2022 privacy-first \u2022 Parallel queries enabled',
     accent: 'from-brand-accent-blue/30 via-brand-accent-purple/20 to-brand-accent-green/30',
     icon: '🧠',
+    multiAgent: true,
   },
   'lagllama-visionary': {
     label: 'Lag-LLaMA Visionary',
-    subtitle: 'Probabilistic forecasts with anomaly guardrails',
+    subtitle: 'Probabilistic forecasts with anomaly guardrails \u2022 Parallel queries enabled',
     accent: 'from-brand-accent-purple/30 via-brand-accent-teal/20 to-brand-accent-blue/30',
     icon: '🦙',
+    multiAgent: true,
   },
 };
 
@@ -31,7 +34,7 @@ const statusTone: Record<string, string> = {
   error: 'bg-red-400/80 text-brand-midnight',
 };
 
-const AgentCard: React.FC<AgentCardProps> = ({ agent, onClick }) => {
+const AgentCard: React.FC<AgentCardProps> = ({ agent, onClick, onViewHistory }) => {
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -134,10 +137,25 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, onClick }) => {
                 <p className="text-xs text-brand-ice/60">Open-source, privacy-preserving AI inference routed via Sapphire</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 text-xs text-brand-ice/60">
+            <div className="flex flex-wrap items-center gap-3 text-xs text-brand-ice/60">
+              {palette.multiAgent && (
+                <>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-brand-accent-green/20 px-2 py-1 text-brand-accent-green">
+                    <span>⚡</span>
+                    <span>Parallel Multi-Agent</span>
+                  </span>
+                  <span className="text-brand-border">•</span>
+                </>
+              )}
               <span>Community-safe reasoning logs</span>
               <span className="text-brand-border">•</span>
               <span>Edge-weighted with real-market data</span>
+              {palette.multiAgent && (
+                <>
+                  <span className="text-brand-border">•</span>
+                  <span>Risk threshold enforced</span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -179,6 +197,19 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, onClick }) => {
             <p className="mt-1 text-2xl font-semibold text-brand-ice">{Number.isFinite(agent.win_rate) ? `${agent.win_rate.toFixed(1)}%` : '--'}</p>
           </div>
         </div>
+
+        {/* View History Button */}
+        {onViewHistory && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onViewHistory(agent);
+            }}
+            className="w-full px-4 py-2 text-sm font-medium text-brand-ice bg-brand-accent-blue/20 hover:bg-brand-accent-blue/30 rounded-lg transition-colors border border-brand-accent-blue/30"
+          >
+            View Historical Performance →
+          </button>
+        )}
 
         {/* Positions */}
         <div className="space-y-3">

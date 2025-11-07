@@ -37,9 +37,9 @@ const TopBar: React.FC<TopBarProps> = ({
         <header className="sticky top-0 z-40 border-b border-brand-border/70 bg-brand-abyss/80 backdrop-blur-lg">
             <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-10">
                 <div>
-                    <p className="text-xs uppercase tracking-[0.35em] text-accent-sapphire/80">Sapphire Command Verse</p>
-                    <h2 className="mt-1 text-3xl font-semibold text-brand-ice">Hyperdrive Trading Nexus</h2>
-                    <p className="mt-0.5 text-sm text-brand-muted/80">Solo-built control tower orchestrating GCP-native agents, live capital, and community intelligence.</p>
+                    <p className="text-xs uppercase tracking-[0.35em] text-accent-sapphire/80">Sapphire AI Trading System</p>
+                    <h2 className="mt-1 text-3xl font-semibold text-brand-ice">Multi-Agent Trading Platform</h2>
+                    <p className="mt-0.5 text-sm text-brand-muted/80">Real-time algorithmic trading system using reinforcement learning, statistical arbitrage, and multi-agent decision making on Aster DEX.</p>
                 </div>
 
                 <div className="flex items-center gap-4">

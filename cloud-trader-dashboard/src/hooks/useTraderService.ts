@@ -40,17 +40,31 @@ export const useTraderService = () => {
     }, ...prev.slice(0, 99)]); // Keep last 100 logs
   }, []);
 
+  // Use refs to track state without causing re-renders
+  const loadingRef = useRef(false);
+  const healthRef = useRef<HealthResponse | null>(null);
+  const retryCountRef = useRef(0);
+
   const refresh = useCallback(async () => {
-    const wasLoading = loading;
-    if (!wasLoading) setLoading(true);
+    const wasLoading = loadingRef.current;
+    if (!wasLoading) {
+      loadingRef.current = true;
+      setLoading(true);
+    }
     setError(null);
 
     try {
       // Fetch dashboard data - this is our single source of truth
       const data = await fetchDashboard();
 
-      // Update dashboard data
-      setDashboardData(data);
+      // Only update state if data actually changed to prevent flickering
+      setDashboardData((prevData) => {
+        // Simple comparison - only update if timestamp changed or it's first load
+        if (!prevData || prevData.system_status?.timestamp !== data.system_status?.timestamp) {
+          return data;
+        }
+        return prevData; // Return previous data to prevent re-render
+      });
 
       // Extract health info from dashboard data
       const healthData = {
@@ -59,43 +73,52 @@ export const useTraderService = () => {
         last_error: null
       };
 
+      const prevHealth = healthRef.current;
+      
+      // Only update health if it actually changed
+      if (!prevHealth || prevHealth.running !== healthData.running || prevHealth.paper_trading !== healthData.paper_trading) {
+        healthRef.current = healthData;
       setHealth(healthData);
+      }
+      
       setConnectionStatus('connected');
       setError(null);
-      setRetryCount(0); // Reset retry count on successful connection
+      retryCountRef.current = 0; // Reset retry count on successful connection
 
       // Only log health checks occasionally to avoid spam
-      if (wasLoading || !health || health.running !== healthData.running) {
+      if (wasLoading || !prevHealth || prevHealth.running !== healthData.running) {
         addLog(`System ${healthData.running ? 'running' : 'stopped'} ${healthData.paper_trading ? '(Paper Trading)' : '(Live Trading)'}`, 'info');
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error fetching health';
+      const currentRetryCount = retryCountRef.current;
 
       // Be more forgiving on initial loads and network errors
-      const isNetworkError = errorMessage.includes('CORS') || errorMessage.includes('fetch') || errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError');
+      const isNetworkError = errorMessage.includes('CORS') || errorMessage.includes('fetch') || errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError') || errorMessage.includes('timeout');
 
-      if (isNetworkError && retryCount < 3) {
+      if (isNetworkError && currentRetryCount < 3) {
         // Network errors on initial attempts - these might be temporary
         setConnectionStatus('connecting');
-        setRetryCount(prev => prev + 1);
-        addLog(`Network connectivity issue (attempt ${retryCount + 1}/3): ${errorMessage}`, 'warning');
+        retryCountRef.current = currentRetryCount + 1;
+        addLog(`Network connectivity issue (attempt ${currentRetryCount + 1}/3): ${errorMessage}`, 'warning');
         // Don't show error state yet, let it retry
         setError(null);
       } else if (isNetworkError) {
         // After 3 failed attempts, show a user-friendly error
         setError('Unable to connect to trading service. Please check your internet connection and try again.');
         setConnectionStatus('disconnected');
-        addLog(`Connection failed after ${retryCount} attempts: ${errorMessage}`, 'error');
+        addLog(`Connection failed after ${currentRetryCount} attempts: ${errorMessage}`, 'error');
       } else {
         // Other types of errors (parsing, server errors, etc.)
-        setError(errorMessage);
-        setConnectionStatus('disconnected');
-        addLog(`Connection error: ${errorMessage}`, 'error');
+      setError(errorMessage);
+      setConnectionStatus('disconnected');
+      addLog(`Connection error: ${errorMessage}`, 'error');
       }
     } finally {
+      loadingRef.current = false;
       setLoading(false);
     }
-  }, [addLog, retryCount, loading, health]);
+  }, [addLog]);
 
   // Use refs to avoid stale closures in polling
   const pollIntervalRef = React.useRef(pollInterval);
@@ -106,35 +129,56 @@ export const useTraderService = () => {
     connectionStatusRef.current = connectionStatus;
   }, [connectionStatus]);
 
+  // Store refresh in a ref to avoid dependency issues
+  const refreshRef = useRef(refresh);
   useEffect(() => {
+    refreshRef.current = refresh;
+  }, [refresh]);
+
+  useEffect(() => {
+    let isMounted = true;
+    let intervalId: ReturnType<typeof setTimeout> | undefined;
+
     // Initial load
-    refresh();
+    if (isMounted) {
+      refreshRef.current();
+    }
 
     // Set up polling with exponential backoff on errors
-    let intervalId: ReturnType<typeof setTimeout> | undefined;
-    let currentInterval = pollIntervalRef.current;
+    const scheduleNextPoll = (useInterval?: number) => {
+      if (!isMounted) return;
+      
+      const currentInterval = useInterval ?? pollIntervalRef.current;
 
-    const scheduleNextPoll = () => {
       intervalId = setTimeout(async () => {
-        await refresh();
+        if (!isMounted) return;
+        
+        await refreshRef.current();
 
         // Adjust polling interval based on connection status
-        if (connectionStatusRef.current === 'disconnected') {
-          currentInterval = Math.min(currentInterval * 1.5, 60000); // Max 60s on errors
-        } else {
-          currentInterval = pollIntervalRef.current; // Reset to normal
-        }
+        const currentStatus = connectionStatusRef.current;
+        const baseInterval = pollIntervalRef.current;
+        const nextInterval = currentStatus === 'disconnected' 
+          ? Math.min(baseInterval * 1.5, 60000) // Max 60s on errors
+          : baseInterval; // Reset to normal
 
-        scheduleNextPoll();
+        scheduleNextPoll(nextInterval);
       }, currentInterval);
     };
 
+    // Start polling after initial load
+    const initialDelay = setTimeout(() => {
+      if (isMounted) {
     scheduleNextPoll();
+      }
+    }, pollIntervalRef.current);
 
     return () => {
+      isMounted = false;
       if (intervalId !== undefined) clearTimeout(intervalId);
+      clearTimeout(initialDelay);
     };
-  }, [refresh]); // Only depend on refresh to prevent excessive re-runs
+  }, []); // Empty deps - using refs to avoid re-runs
 
   // Connection status indicator
   useEffect(() => {

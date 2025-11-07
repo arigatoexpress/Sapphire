@@ -17,7 +17,7 @@ const useCommunityLeaderboard = (limit = 10): [LeaderboardEntry[], boolean] => {
     }
 
     setLoading(true);
-    const unsubscribe = subscribeLeaderboard((leaderboard) => {
+    const unsubscribe = subscribeLeaderboard((leaderboard: LeaderboardEntry[]) => {
       setEntries(leaderboard);
       setLoading(false);
     }, limit);

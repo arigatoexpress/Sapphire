@@ -39,11 +39,9 @@ const AgentRadar: React.FC<AgentRadarProps> = ({ agent }) => {
 
   return (
     <div className="relative flex flex-col items-center gap-3">
-      {/* Agent Name Title - Moved Outside Radar */}
+      {/* Status and Targets - Name removed (shown in AgentCard header) */}
       <div className="text-center">
-        <h3 className="text-sm font-semibold text-white">{agent.name}</h3>
-        <div className="flex items-center justify-center gap-2 mt-1">
-          <span className={`text-[0.65rem] uppercase tracking-[0.4em] text-slate-400 ${statusColor}`}>Radar</span>
+        <div className="flex items-center justify-center gap-2">
           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-[0.28em] ${
             agent.status === 'active' ? 'bg-emerald-400/20 text-emerald-200' :
             agent.status === 'monitoring' ? 'bg-sky-400/20 text-sky-200' :
@@ -52,8 +50,8 @@ const AgentRadar: React.FC<AgentRadarProps> = ({ agent }) => {
             {agent.status}
           </span>
         </div>
-        <p className="text-[0.6rem] text-slate-400 mt-1">
-          Targets: {tokens.join(' · ') || '—'}
+        <p className="text-[0.65rem] text-slate-400 mt-2">
+          {tokens.length > 0 ? tokens.slice(0, 4).join(' · ') + (tokens.length > 4 ? ` +${tokens.length - 4}` : '') : 'Monitoring'}
         </p>
       </div>
 

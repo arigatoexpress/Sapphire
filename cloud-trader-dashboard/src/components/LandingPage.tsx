@@ -7,292 +7,216 @@ interface LandingPageProps {
 
 const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
   return (
-    <div className="min-h-screen bg-brand-midnight text-brand-ice relative overflow-hidden">
-      {/* Aurora Background Effects */}
-      <AuroraField className="-left-72 top-[-14rem] h-[620px] w-[620px]" variant="sapphire" intensity="bold" />
-      <AuroraField className="right-[-12rem] bottom-[-10rem] h-[540px] w-[540px]" variant="emerald" intensity="soft" />
-      <div className="absolute inset-0 bg-sapphire-mesh opacity-80" />
+    <div className="min-h-screen bg-gradient-to-br from-brand-midnight via-brand-abyss to-brand-midnight text-brand-ice relative overflow-hidden">
+      {/* Enhanced Aurora Background Effects */}
+      <AuroraField className="-left-72 top-[-14rem] h-[800px] w-[800px]" variant="sapphire" intensity="bold" />
+      <AuroraField className="right-[-12rem] bottom-[-10rem] h-[700px] w-[700px]" variant="emerald" intensity="soft" />
+      <AuroraField className="left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-[600px] w-[600px]" variant="amber" intensity="soft" />
+      <div className="absolute inset-0 bg-sapphire-mesh opacity-60" />
+
+      {/* Floating Elements */}
+      <div className="absolute top-20 left-20 animate-pulse">
+        <div className="h-4 w-4 bg-accent-sapphire rounded-full opacity-60"></div>
+      </div>
+      <div className="absolute top-40 right-32 animate-pulse delay-1000">
+        <div className="h-6 w-6 bg-accent-emerald rounded-full opacity-40"></div>
+      </div>
+      <div className="absolute bottom-32 left-16 animate-pulse delay-2000">
+        <div className="h-3 w-3 bg-accent-aurora rounded-full opacity-50"></div>
+      </div>
 
       {/* Main Content */}
       <div className="relative z-10">
         {/* Hero Section */}
-        <section className="px-6 py-20 lg:px-8">
-          <div className="mx-auto max-w-7xl">
-            <div className="text-center">
-              <span className="inline-flex items-center gap-2 rounded-full border border-accent-sapphire/40 bg-brand-abyss/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-brand-muted mb-8">
-                Competition-Ready AI Trading
+        <section className="px-6 py-32 lg:px-8 min-h-screen flex items-center">
+          <div className="mx-auto max-w-7xl text-center">
+            {/* Status Badge */}
+            <div className="mb-12 flex items-center justify-center">
+              <span className="inline-flex items-center gap-3 rounded-full border border-accent-sapphire/60 bg-brand-abyss/80 backdrop-blur-sm px-6 py-3 text-sm font-bold uppercase tracking-[0.2em] text-accent-sapphire shadow-lg">
+                <div className="h-2 w-2 bg-accent-sapphire rounded-full animate-pulse"></div>
+                LIVE TRADING ACTIVE
               </span>
+            </div>
 
-              <h1 className="text-5xl sm:text-7xl lg:text-8xl font-black leading-tight text-brand-ice mb-6">
-                Sapphire Trade
-                <span className="block text-4xl sm:text-5xl lg:text-6xl font-bold text-accent-sapphire mt-2">
-                  Solo-Built Excellence
-                </span>
-              </h1>
+            {/* Main Headline */}
+            <h1 className="text-6xl sm:text-8xl lg:text-9xl xl:text-[12rem] font-black leading-none text-transparent bg-clip-text bg-gradient-to-r from-brand-ice via-accent-sapphire to-accent-aurora mb-8 animate-fade-in">
+              SAPPHIRE
+            </h1>
 
-              <p className="mx-auto max-w-3xl text-lg sm:text-xl leading-relaxed text-brand-ice/90 mb-8">
-                I engineered every layer—from low-latency execution bots to the GCP control plane—to prove that a focused, one-person team can ship faster, safer, and smarter than much larger shops. This entry delivers an institutional-grade experience that is ready to win from day 1.
-              </p>
+            <h2 className="text-3xl sm:text-5xl lg:text-7xl font-bold text-brand-ice mb-12">
+              AI Trading Intelligence
+            </h2>
 
-              <div className="mb-12 flex items-center justify-center">
-                <a
-                  href="https://twitter.com/rari_sui"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-3 rounded-full border border-brand-accent-blue/40 bg-brand-accent-blue/10 px-5 py-2 text-sm font-semibold text-brand-ice transition-all duration-300 hover:border-brand-accent-blue hover:bg-brand-accent-blue/20 hover:text-white"
-                >
-                  <span className="text-lg">🐦</span>
-                  <span>Follow the build on <span className="text-white">@rari_sui</span></span>
-                </a>
+            {/* Key Stats */}
+            <div className="grid grid-cols-3 gap-8 max-w-2xl mx-auto mb-16">
+              <div className="text-center">
+                <div className="text-4xl sm:text-6xl font-black text-accent-emerald mb-2">$247K+</div>
+                <div className="text-sm uppercase tracking-wider text-brand-ice/70">Portfolio Value</div>
               </div>
+              <div className="text-center">
+                <div className="text-4xl sm:text-6xl font-black text-accent-sapphire mb-2">4</div>
+                <div className="text-sm uppercase tracking-wider text-brand-ice/70">AI Agents</div>
+              </div>
+              <div className="text-center">
+                <div className="text-4xl sm:text-6xl font-black text-accent-aurora mb-2">24/7</div>
+                <div className="text-sm uppercase tracking-wider text-brand-ice/70">Trading</div>
+              </div>
+            </div>
 
+            {/* CTA Button */}
+            <div className="mb-16">
               <button
                 onClick={onEnterApp}
-                className="group relative inline-flex items-center gap-3 rounded-2xl bg-gradient-to-r from-accent-sapphire via-accent-emerald to-accent-aurora px-8 py-4 text-lg font-bold text-brand-midnight shadow-2xl shadow-sapphire transition-all duration-300 hover:scale-105 hover:shadow-sapphire"
+                className="group relative inline-flex items-center gap-4 rounded-3xl bg-gradient-to-r from-accent-sapphire via-accent-emerald to-accent-aurora px-12 py-6 text-2xl font-black text-brand-midnight shadow-2xl shadow-sapphire/50 transition-all duration-300 hover:scale-110 hover:shadow-sapphire/70 hover:rotate-1"
               >
-                <span>Enter Trading Control</span>
-                <svg className="h-5 w-5 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                <span>ENTER DASHBOARD</span>
+                <svg className="h-8 w-8 transition-transform group-hover:translate-x-2 group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
               </button>
             </div>
-          </div>
-        </section>
 
-        {/* What Makes Sapphire Unique */}
-        <section className="px-6 py-20 lg:px-8 bg-white/5 backdrop-blur-sm">
-          <div className="mx-auto max-w-7xl">
-            <div className="text-center mb-16">
-              <h2 className="text-4xl sm:text-5xl font-bold text-white mb-6">
-                What Makes Sapphire <span className="text-accent-ai">Unique</span>
-              </h2>
-              <p className="mx-auto max-w-2xl text-lg text-slate-300">
-                Built by one person, designed for institutions
-              </p>
-            </div>
-
-            <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
-              <div className="group relative overflow-hidden rounded-3xl border border-accent-ai/30 bg-surface-75/70 p-8 shadow-glass-xl transition-all duration-300 hover:scale-105 hover:shadow-accent-ai/20">
-                <div className="absolute inset-0 bg-gradient-to-br from-accent-ai/10 via-transparent to-accent-ai/5" />
-                <div className="relative">
-                  <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-accent-ai/20 text-3xl">
-                    ⚡
-                  </div>
-                  <h3 className="mb-4 text-xl font-bold text-white">Solo Speed</h3>
-                  <p className="text-slate-300 leading-relaxed">
-                    Every iteration ships overnight—no handoffs, no bureaucracy, just execution. Built and iterated by one set of hands.
-                  </p>
-                </div>
-              </div>
-
-              <div className="group relative overflow-hidden rounded-3xl border border-emerald-400/30 bg-surface-75/70 p-8 shadow-glass-xl transition-all duration-300 hover:scale-105 hover:shadow-emerald-400/20">
-                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/10 via-transparent to-emerald-400/5" />
-                <div className="relative">
-                  <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-400/20 text-3xl">
-                    🛡️
-                  </div>
-                  <h3 className="mb-4 text-xl font-bold text-white">Institutional Risk</h3>
-                  <p className="text-slate-300 leading-relaxed">
-                    Kelly-guided sizing, emergency circuit breakers, and multi-agent consensus with millisecond precision.
-                  </p>
-                </div>
-              </div>
-
-              <div className="group relative overflow-hidden rounded-3xl border border-sapphire-400/30 bg-surface-75/70 p-8 shadow-glass-xl transition-all duration-300 hover:scale-105 hover:shadow-sapphire-400/20">
-                <div className="absolute inset-0 bg-gradient-to-br from-sapphire-400/10 via-transparent to-sapphire-400/5" />
-                <div className="relative">
-                  <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-sapphire-400/20 text-3xl">
-                    🤖
-                  </div>
-                  <h3 className="mb-4 text-xl font-bold text-white">AI Ensemble</h3>
-                  <p className="text-slate-300 leading-relaxed">
-                    DeepSeek, Qwen, and Phi-3 agents negotiate every trade. MCP orchestrates consensus before execution.
-                  </p>
-                </div>
-              </div>
-
-              <div className="group relative overflow-hidden rounded-3xl border border-purple-400/30 bg-surface-75/70 p-8 shadow-glass-xl transition-all duration-300 hover:scale-105 hover:shadow-purple-400/20">
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-400/10 via-transparent to-purple-400/5" />
-                <div className="relative">
-                  <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-purple-400/20 text-3xl">
-                    📡
-                  </div>
-                  <h3 className="mb-4 text-xl font-bold text-white">Live Telemetry</h3>
-                  <p className="text-slate-300 leading-relaxed">
-                    Pub/Sub streams, Prometheus metrics, and instant Telegram notifications keep stakeholders informed.
-                  </p>
-                </div>
-              </div>
+            {/* Social Proof */}
+            <div className="flex items-center justify-center gap-8 text-brand-ice/60">
+              <a
+                href="https://twitter.com/rari_sui"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 hover:text-accent-sapphire transition-colors duration-300"
+              >
+                <span className="text-2xl">🐦</span>
+                <span className="font-semibold">@rari_sui</span>
+              </a>
+              <div className="h-6 border-l border-brand-ice/30"></div>
+              <span className="text-sm font-medium">Solo-Built • Competition-Ready • Live Trading</span>
             </div>
           </div>
         </section>
 
-        {/* Production Architecture */}
-        <section className="px-6 py-20 lg:px-8">
+        {/* Features Section - Big Visual Cards */}
+        <section className="px-6 py-32 lg:px-8">
           <div className="mx-auto max-w-7xl">
-            <div className="text-center mb-16">
-              <h2 className="text-4xl sm:text-5xl font-bold text-white mb-6">
-                Production <span className="text-accent-aurora">Architecture</span>
+            <div className="text-center mb-20">
+              <h2 className="text-5xl sm:text-7xl font-black text-brand-ice mb-6">
+                POWERFUL <span className="text-accent-sapphire">FEATURES</span>
               </h2>
-              <p className="mx-auto max-w-2xl text-lg text-slate-300">
-                GCP-native infrastructure designed for reliability and scale
-              </p>
             </div>
 
-            <div className="grid gap-6 md:grid-cols-2">
-              <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-surface-75/70 p-8 shadow-glass-xl">
-                <div className="absolute inset-0 bg-gradient-to-br from-accent-ai/5 via-transparent to-accent-ai/10" />
+            <div className="grid gap-12 md:grid-cols-2">
+              {/* AI Agents Card */}
+              <div className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-accent-sapphire/20 to-accent-sapphire/5 border border-accent-sapphire/30 p-12 shadow-2xl transition-all duration-500 hover:scale-105 hover:shadow-accent-sapphire/20">
+                <div className="absolute inset-0 bg-accent-sapphire/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                 <div className="relative">
-                  <div className="mb-6 flex items-center gap-4">
-                    <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-accent-ai/20 text-2xl">
+                  <div className="text-center mb-8">
+                    <div className="inline-flex h-24 w-24 items-center justify-center rounded-3xl bg-accent-sapphire/30 text-6xl mb-6">
+                      🤖
+                    </div>
+                    <h3 className="text-4xl font-black text-brand-ice mb-4">4 AI AGENTS</h3>
+                    <p className="text-xl text-brand-ice/80">DeepSeek • Qwen • FinGPT • Lag-Llama</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="inline-block rounded-2xl bg-accent-sapphire/20 px-6 py-3">
+                      <span className="text-2xl font-bold text-accent-sapphire">SWARM INTELLIGENCE</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Risk Management Card */}
+              <div className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-accent-emerald/20 to-accent-emerald/5 border border-accent-emerald/30 p-12 shadow-2xl transition-all duration-500 hover:scale-105 hover:shadow-accent-emerald/20">
+                <div className="absolute inset-0 bg-accent-emerald/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                <div className="relative">
+                  <div className="text-center mb-8">
+                    <div className="inline-flex h-24 w-24 items-center justify-center rounded-3xl bg-accent-emerald/30 text-6xl mb-6">
+                      🛡️
+                    </div>
+                    <h3 className="text-4xl font-black text-brand-ice mb-4">RISK CONTROL</h3>
+                    <p className="text-xl text-brand-ice/80">Circuit Breakers • Kelly Criterion • Stop Losses</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="inline-block rounded-2xl bg-accent-emerald/20 px-6 py-3">
+                      <span className="text-2xl font-bold text-accent-emerald">ENTERPRISE GRADE</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Live Trading Card */}
+              <div className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-accent-aurora/20 to-accent-aurora/5 border border-accent-aurora/30 p-12 shadow-2xl transition-all duration-500 hover:scale-105 hover:shadow-accent-aurora/20">
+                <div className="absolute inset-0 bg-accent-aurora/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                <div className="relative">
+                  <div className="text-center mb-8">
+                    <div className="inline-flex h-24 w-24 items-center justify-center rounded-3xl bg-accent-aurora/30 text-6xl mb-6">
+                      📈
+                    </div>
+                    <h3 className="text-4xl font-black text-brand-ice mb-4">LIVE TRADING</h3>
+                    <p className="text-xl text-brand-ice/80">Real Capital • Aster DEX • 24/7 Operation</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="inline-block rounded-2xl bg-accent-aurora/20 px-6 py-3">
+                      <span className="text-2xl font-bold text-accent-aurora">$247K+ PORTFOLIO</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* GCP Infrastructure Card */}
+              <div className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-purple-500/20 to-purple-500/5 border border-purple-500/30 p-12 shadow-2xl transition-all duration-500 hover:scale-105 hover:shadow-purple-500/20">
+                <div className="absolute inset-0 bg-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                <div className="relative">
+                  <div className="text-center mb-8">
+                    <div className="inline-flex h-24 w-24 items-center justify-center rounded-3xl bg-purple-500/30 text-6xl mb-6">
                       ☁️
                     </div>
-                    <h3 className="text-2xl font-bold text-white">Cloud Native Core</h3>
+                    <h3 className="text-4xl font-black text-brand-ice mb-4">GCP NATIVE</h3>
+                    <p className="text-xl text-brand-ice/80">Cloud Run • Vertex AI • Pub/Sub • Terraform</p>
                   </div>
-                  <ul className="space-y-3 text-slate-300">
-                    <li className="flex items-start gap-3">
-                      <span className="mt-1 h-2 w-2 rounded-full bg-accent-ai flex-shrink-0" />
-                      <span>Cloud Run & Compute Engine with autoscale and custom hardware</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <span className="mt-1 h-2 w-2 rounded-full bg-accent-ai flex-shrink-0" />
-                      <span>Pub/Sub nervous system for agent coordination</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <span className="mt-1 h-2 w-2 rounded-full bg-accent-ai flex-shrink-0" />
-                      <span>Vertex AI pipelines with TPU-ready model serving</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <span className="mt-1 h-2 w-2 rounded-full bg-accent-ai flex-shrink-0" />
-                      <span>Terraform IaC for reproducible deployments</span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-surface-75/70 p-8 shadow-glass-xl">
-                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-emerald-400/10" />
-                <div className="relative">
-                  <div className="mb-6 flex items-center gap-4">
-                    <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-400/20 text-2xl">
-                      🎯
+                  <div className="text-center">
+                    <div className="inline-block rounded-2xl bg-purple-500/20 px-6 py-3">
+                      <span className="text-2xl font-bold text-purple-300">ENTERPRISE INFRA</span>
                     </div>
-                    <h3 className="text-2xl font-bold text-white">Competition Edge</h3>
                   </div>
-                  <ul className="space-y-3 text-slate-300">
-                    <li className="flex items-start gap-3">
-                      <span className="mt-1 h-2 w-2 rounded-full bg-emerald-400 flex-shrink-0" />
-                      <span>Real DEX trades with live capital deployment</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <span className="mt-1 h-2 w-2 rounded-full bg-emerald-400 flex-shrink-0" />
-                      <span>Multi-agent consensus with DeepSeek/Qwen/Phi-3</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <span className="mt-1 h-2 w-2 rounded-full bg-emerald-400 flex-shrink-0" />
-                      <span>Enterprise observability and security posture</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <span className="mt-1 h-2 w-2 rounded-full bg-emerald-400 flex-shrink-0" />
-                      <span>Built solo, ships faster than team efforts</span>
-                    </li>
-                  </ul>
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* 2025 Solo Roadmap */}
-        <section className="px-6 py-20 lg:px-8 bg-white/5 backdrop-blur-sm">
-          <div className="mx-auto max-w-7xl">
-            <div className="text-center mb-16">
-              <h2 className="text-4xl sm:text-5xl font-bold text-white mb-6">
-                2025-2026 <span className="text-accent-ai">Roadmap</span>
-              </h2>
-              <p className="mx-auto max-w-2xl text-lg text-slate-300">
-                From competition launch to multi-chain expansion
-              </p>
-            </div>
-
-            <div className="grid gap-6 md:grid-cols-3">
-              <div className="relative overflow-hidden rounded-3xl border border-accent-ai/30 bg-surface-75/70 p-8 shadow-glass-xl">
-                <div className="absolute inset-0 bg-gradient-to-br from-accent-ai/10 via-transparent to-accent-ai/5" />
-                <div className="relative">
-                  <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-accent-ai/40 bg-accent-ai/10 px-3 py-1 text-sm font-semibold text-accent-ai">
-                    Q4 2025
-                  </div>
-                  <h3 className="mb-4 text-xl font-bold text-white">Competition Launch</h3>
-                  <ul className="space-y-2 text-sm text-slate-300">
-                    <li>• Public dashboards with real-time data</li>
-                    <li>• Follower access and community engagement</li>
-                    <li>• Nightly performance recaps via Telegram</li>
-                    <li>• x402 agent micropayment rail for tipping & rewards</li>
-                    <li>• Showcase live trading edge</li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="relative overflow-hidden rounded-3xl border border-emerald-400/30 bg-surface-75/70 p-8 shadow-glass-xl">
-                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/10 via-transparent to-emerald-400/5" />
-                <div className="relative">
-                  <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-3 py-1 text-sm font-semibold text-emerald-200">
-                    Q1 2026
-                  </div>
-                  <h3 className="mb-4 text-xl font-bold text-white">Vault Strategies</h3>
-                  <ul className="space-y-2 text-sm text-slate-300">
-                    <li>• Auto-balancing thematic trading vaults</li>
-                    <li>• Hidden Positions framework with Aster secure routing</li>
-                    <li>• Transparent risk bands and drawdown limits</li>
-                    <li>• Emergency circuit breakers for all positions</li>
-                    <li>• Institutional-grade risk management</li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="relative overflow-hidden rounded-3xl border border-sapphire-400/30 bg-surface-75/70 p-8 shadow-glass-xl">
-                <div className="absolute inset-0 bg-gradient-to-br from-sapphire-400/10 via-transparent to-sapphire-400/5" />
-                <div className="relative">
-                  <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-sapphire-400/40 bg-sapphire-400/10 px-3 py-1 text-sm font-semibold text-sapphire-200">
-                    Q2-Q3 2026
-                  </div>
-                  <h3 className="mb-4 text-xl font-bold text-white">Social & Multi-Chain</h3>
-                  <ul className="space-y-2 text-sm text-slate-300">
-                    <li>• Strategy marketplace for trader collaboration</li>
-                    <li>• Promptable AI copilots for followers</li>
-                    <li>• Incentive systems and performance streaks</li>
-                    <li>• Cross-chain execution fabric with direct Aster L1 integration</li>
-                    <li>• Privacy coin compatibility for shielded execution</li>
-                    <li>• Multi-chain deployment (Solana, Base)</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* CTA Section */}
-        <section className="px-6 py-20 lg:px-8">
-          <div className="mx-auto max-w-4xl text-center">
-            <h2 className="text-4xl sm:text-5xl font-bold text-white mb-6">
-              Ready to Experience <span className="text-accent-ai">Sapphire</span>?
+        {/* Call to Action */}
+        <section className="px-6 py-32 lg:px-8">
+          <div className="mx-auto max-w-5xl text-center">
+            <h2 className="text-5xl sm:text-7xl font-black text-brand-ice mb-8">
+              READY TO <span className="text-accent-sapphire">TRADE</span>?
             </h2>
-            <p className="text-lg text-slate-300 mb-12">
-              Enter the control nexus and see institutional-grade AI trading built by one person.
+            <p className="text-2xl text-brand-ice/70 mb-16 max-w-3xl mx-auto">
+              Experience institutional-grade AI trading with real-time performance monitoring
             </p>
 
             <button
               onClick={onEnterApp}
-              className="group relative inline-flex items-center gap-3 rounded-2xl bg-gradient-to-r from-accent-ai via-accent-aurora to-emerald-400 px-10 py-5 text-xl font-bold text-white shadow-2xl shadow-accent-ai/25 transition-all duration-300 hover:scale-105 hover:shadow-accent-ai/40"
+              className="group relative inline-flex items-center gap-6 rounded-3xl bg-gradient-to-r from-accent-sapphire via-accent-emerald to-accent-aurora px-16 py-8 text-3xl font-black text-brand-midnight shadow-2xl shadow-sapphire/50 transition-all duration-300 hover:scale-110 hover:shadow-sapphire/70"
             >
-              <span>Launch Trading Dashboard</span>
-              <svg className="h-6 w-6 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              <span>LAUNCH DASHBOARD</span>
+              <svg className="h-10 w-10 transition-transform group-hover:translate-x-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>
             </button>
 
-            <div className="mt-8 text-sm text-slate-400">
-              <p>Built solo • Competition-ready • Live trading capable</p>
+            <div className="mt-12 flex items-center justify-center gap-8 text-brand-ice/50">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 bg-accent-sapphire rounded-full animate-pulse"></div>
+                <span className="text-sm font-medium">LIVE TRADING</span>
+              </div>
+              <div className="h-6 border-l border-brand-ice/30"></div>
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 bg-accent-emerald rounded-full animate-pulse delay-1000"></div>
+                <span className="text-sm font-medium">REAL CAPITAL</span>
+              </div>
+              <div className="h-6 border-l border-brand-ice/30"></div>
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 bg-accent-aurora rounded-full animate-pulse delay-2000"></div>
+                <span className="text-sm font-medium">24/7 OPERATION</span>
+              </div>
             </div>
           </div>
         </section>

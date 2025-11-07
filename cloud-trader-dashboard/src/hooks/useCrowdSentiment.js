@@ -27,11 +27,11 @@ export const useCrowdSentiment = (user) => {
         setLoading(true);
         const unsubscribe = subscribeSentiment(user, (snapshot) => {
             setState({
-                totalVotes: snapshot.total,
+                totalVotes: snapshot.total ?? 0,
                 bullishVotes: snapshot.bullish,
                 bearishVotes: snapshot.bearish,
-                hasVoted: snapshot.hasVoted,
-                dateKey: snapshot.dateKey,
+                hasVoted: snapshot.hasVoted ?? false,
+                dateKey: snapshot.dateKey ?? todayKey(),
             });
             setLoading(false);
         });

@@ -56,7 +56,7 @@ const CommunityLeaderboard: React.FC<CommunityLeaderboardProps> = ({ entries, lo
                           <p className="text-xs text-brand-ice/60">{entry.publicId}</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-lg font-semibold text-brand-accent-green">{entry.points.toLocaleString()} pts</p>
+                          <p className="text-lg font-semibold text-brand-accent-green">{(entry.points ?? entry.score).toLocaleString()} pts</p>
                           {entry.lastActive && (
                             <p className="text-xs text-brand-ice/60">Active {new Date(entry.lastActive).toLocaleDateString()}</p>
                           )}

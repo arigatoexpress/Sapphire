@@ -89,27 +89,27 @@ const CrowdSentimentWidget: React.FC<CrowdSentimentWidgetProps> = ({
           <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Community Breakdown</p>
           {hasVoted ? (
             <>
-              <div className="mt-3 flex flex-col gap-3 text-sm text-slate-200">
-                <div className="flex items-center justify-between">
-                  <span>Participants</span>
-                  <span className="text-white font-semibold">{totalVotes}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-300" />Bullish</span>
-                  <span className="text-white font-semibold">{bullishPercentage}%</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-red-300" />Bearish</span>
-                  <span className="text-white font-semibold">{bearishPercentage}%</span>
-                </div>
-              </div>
+          <div className="mt-3 flex flex-col gap-3 text-sm text-slate-200">
+            <div className="flex items-center justify-between">
+              <span>Participants</span>
+              <span className="text-white font-semibold">{totalVotes}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-300" />Bullish</span>
+              <span className="text-white font-semibold">{bullishPercentage}%</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-red-300" />Bearish</span>
+              <span className="text-white font-semibold">{bearishPercentage}%</span>
+            </div>
+          </div>
 
-              <div className="mt-4 h-2 w-full rounded-full bg-white/10">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400"
-                  style={{ width: `${bullishPercentage}%` }}
-                />
-              </div>
+          <div className="mt-4 h-2 w-full rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400"
+              style={{ width: `${bullishPercentage}%` }}
+            />
+          </div>
             </>
           ) : (
             <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300">

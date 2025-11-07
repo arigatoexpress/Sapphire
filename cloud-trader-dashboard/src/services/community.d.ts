@@ -1,35 +1,50 @@
-import { type User } from 'firebase/auth';
 export interface LeaderboardEntry {
-    publicId: string;
-    displayName: string;
-    avatarUrl?: string;
-    points: number;
+    id: string;
+    username: string;
+    displayName?: string;
+    publicId?: string;
+    score: number;
+    points?: number;
     lastActive?: string;
     checkIns?: number;
-    comments?: number;
     votes?: number;
-}
-export interface SentimentSnapshot {
-    dateKey: string;
-    bullish: number;
-    bearish: number;
-    total: number;
-    hasVoted: boolean;
+    comments?: number;
 }
 export interface CommunityComment {
     id: string;
-    publicId: string;
-    displayName: string;
+    publicId?: string;
     message: string;
+    username?: string;
+    displayName?: string;
     createdAt: string;
     avatarUrl?: string;
     mentionedTickers: string[];
 }
-export declare const ensureMemberProfile: (user: User) => Promise<string>;
-export declare const recordCheckIn: (user: User) => Promise<void>;
-export declare const subscribeSentiment: (user: User | null, callback: (snapshot: SentimentSnapshot) => void) => import("@firebase/firestore").Unsubscribe;
-export declare const castVote: (user: User, vote: "bullish" | "bearish") => Promise<void>;
-export declare const subscribeLeaderboard: (callback: (entries: LeaderboardEntry[]) => void, limitSize?: number) => import("@firebase/firestore").Unsubscribe;
-export declare const subscribeCommunityComments: (callback: (comments: CommunityComment[]) => void, limitSize?: number) => import("@firebase/firestore").Unsubscribe;
-export declare const addCommunityComment: (user: User, message: string) => Promise<void>;
+export declare const recordCheckIn: (user: {
+    uid?: string;
+    email?: string | null;
+}) => Promise<void>;
+export declare const addCommunityComment: (user: {
+    uid?: string;
+    email?: string | null;
+    displayName?: string | null;
+    photoURL?: string | null;
+}, message: string) => Promise<void>;
+export interface SentimentSnapshot {
+    symbol: string;
+    bullish: number;
+    bearish: number;
+    neutral: number;
+    total?: number;
+    hasVoted?: boolean;
+    dateKey?: string;
+}
+export declare const castVote: (user: {
+    uid?: string;
+}, sentiment: "bullish" | "bearish" | "neutral") => Promise<void>;
+export declare const subscribeSentiment: (user: {
+    uid?: string;
+} | null, callback: (snapshot: SentimentSnapshot) => void) => () => void;
 export declare const isRealtimeCommunityEnabled: () => boolean;
+export declare const subscribeCommunityComments: (callback: (comments: CommunityComment[]) => void) => () => void;
+export declare const subscribeLeaderboard: (callback: (leaderboard: LeaderboardEntry[]) => void, limit?: number) => () => void;

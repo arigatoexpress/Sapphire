@@ -241,3 +241,41 @@
     opacity: 0.3;
   }
 }
+
+/* Aurora Field Variants */
+.aurora-variant-sapphire .aurora-layer-primary {
+  background: radial-gradient(ellipse at center, rgba(0, 123, 255, 0.15) 0%, transparent 70%);
+}
+
+.aurora-variant-sapphire .aurora-layer-secondary {
+  background: radial-gradient(ellipse at center, rgba(0, 191, 255, 0.1) 0%, transparent 70%);
+}
+
+.aurora-variant-emerald .aurora-layer-primary {
+  background: radial-gradient(ellipse at center, rgba(16, 185, 129, 0.15) 0%, transparent 70%);
+}
+
+.aurora-variant-emerald .aurora-layer-secondary {
+  background: radial-gradient(ellipse at center, rgba(5, 150, 105, 0.1) 0%, transparent 70%);
+}
+
+.aurora-variant-amber .aurora-layer-primary {
+  background: radial-gradient(ellipse at center, rgba(245, 158, 11, 0.15) 0%, transparent 70%);
+}
+
+.aurora-variant-amber .aurora-layer-secondary {
+  background: radial-gradient(ellipse at center, rgba(217, 119, 6, 0.1) 0%, transparent 70%);
+}
+
+/* Aurora Intensity Levels */
+.aurora-intensity-soft .aurora-layer {
+  opacity: 0.4;
+}
+
+.aurora-intensity-bold .aurora-layer {
+  opacity: 0.7;
+}
+
+.aurora-intensity-medium .aurora-layer {
+  opacity: 0.55;
+}

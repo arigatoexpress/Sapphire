@@ -63,19 +63,19 @@ const ArchitectureInfo: React.FC = () => {
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-black/40 p-6 backdrop-blur-sm">
-          <h3 className="text-xl font-semibold text-purple-200">2025 Solo Roadmap</h3>
+          <h3 className="text-xl font-semibold text-purple-200">2025-2026 Solo Roadmap</h3>
           <ul className="mt-4 space-y-3 text-sm text-slate-200">
             <li>
-              <span className="font-semibold text-purple-300">Q4 · Competition Launch:</span> public dashboards, follower access, and nightly recaps that showcase the live edge.
+              <span className="font-semibold text-purple-300">Q4 · Competition Launch:</span> ✅ live trading, public dashboard, community features, Telegram notifications, token utility roadmap.
             </li>
             <li>
-              <span className="font-semibold text-purple-300">Q1 · Vault Strategies:</span> auto-balancing thematic vaults with transparent risk bands and emergency circuit breakers.
+              <span className="font-semibold text-purple-300">Q1 · Vault Strategies:</span> auto-balancing thematic trading vaults with hidden positions and emergency circuit breakers.
             </li>
             <li>
-              <span className="font-semibold text-purple-300">Q2 · Social Execution Layer:</span> curated strategy marketplace, incentive streaks, and promptable copilots for followers.
+              <span className="font-semibold text-purple-300">Q2 · Social & Multi-Chain:</span> strategy marketplace, promptable AI copilots, x402 micropayments, cross-chain execution.
             </li>
             <li>
-              <span className="font-semibold text-purple-300">Q3 · Multi-Chain Expansion:</span> deploy Sapphire bots to Solana and Base for continuous liquidity capture across ecosystems.
+              <span className="font-semibold text-purple-300">Q3 · Privacy Coin Integration:</span> shielded execution, Sui ecosystem hooks, community-led token development.
             </li>
           </ul>
         </div>

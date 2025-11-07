@@ -1,9 +1,3 @@
-declare global {
-    interface Window {
-        dataLayer?: unknown[];
-        gtag?: (...args: unknown[]) => void;
-        __sapphireAnalyticsLoaded?: boolean;
-    }
-}
-declare const AnalyticsManager: () => import("react/jsx-runtime").JSX.Element | null;
+import React from 'react';
+declare const AnalyticsManager: React.FC;
 export default AnalyticsManager;
