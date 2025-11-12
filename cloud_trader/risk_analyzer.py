@@ -473,6 +473,41 @@ class RiskAnalyzer:
 
         return recommendations
 
+    def calculate_agent_tp_sl(
+        self,
+        agent_config: Dict[str, Any],
+        market_conditions: Dict[str, Any],
+        current_price: float,
+        conviction_score: float
+    ) -> Dict[str, float]:
+        """Calculate take profit and stop loss levels based on agent personality and market conditions."""
+        # Extract agent personality traits
+        risk_tolerance = agent_config.get('risk_tolerance', 0.02)  # 2% default
+        profit_target = agent_config.get('profit_target', 0.05)   # 5% default
+        stop_loss_limit = agent_config.get('stop_loss_limit', 0.03)  # 3% default
+
+        # Adjust based on conviction score (0-1 scale)
+        conviction_multiplier = 0.5 + (conviction_score * 0.5)  # 0.5 to 1.0
+
+        # Calculate TP/SL levels
+        take_profit_price = current_price * (1 + profit_target * conviction_multiplier)
+        stop_loss_price = current_price * (1 - stop_loss_limit * conviction_multiplier)
+
+        # Adjust based on market volatility
+        volatility = market_conditions.get('volatility', 0.02)
+        if volatility > 0.05:  # High volatility
+            # Widen stops in high volatility
+            stop_loss_price = current_price * (1 - stop_loss_limit * conviction_multiplier * 1.5)
+        elif volatility < 0.01:  # Low volatility
+            # Tighten stops in low volatility
+            stop_loss_price = current_price * (1 - stop_loss_limit * conviction_multiplier * 0.7)
+
+        return {
+            'take_profit': take_profit_price,
+            'stop_loss': stop_loss_price,
+            'conviction_multiplier': conviction_multiplier
+        }
+
     def _calculate_portfolio_var(
         self,
         positions: List[Dict[str, Any]],

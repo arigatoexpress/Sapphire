@@ -148,9 +148,8 @@ class EnhancedTelegramService:
             first=5
         )
 
-        await self.application.initialize()
-        await self.application.start()
-        await self.application.updater.start_polling()
+        # Start the bot with polling
+        await self.application.run_polling()
 
         # Send startup notification
         await self.send_startup_notification()
