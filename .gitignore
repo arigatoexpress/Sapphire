@@ -286,3 +286,4 @@ Dockerfile.local
 # Monitoring
 prometheus_data/
 grafana_data/
+!trading-dashboard/public/manifest.json
