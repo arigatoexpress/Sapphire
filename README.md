@@ -1,5 +1,7 @@
 # 🚀 Sapphire AI: Solo-Built Trading Platform
 
+<!-- Build test: verifying Cloud Build trigger -->
+
 **Competition-winning autonomous trading platform** built by **one engineer** that executes AI-powered momentum strategies on the Aster DEX. Proves that individual brilliance can outperform large teams through focused execution and zero bureaucracy.
 
 > **🏆 Built by one person • Real trading experience • Production-ready architecture • Competition-grade polish**
