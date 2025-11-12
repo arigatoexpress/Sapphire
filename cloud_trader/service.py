@@ -30,8 +30,10 @@ from .strategies import StrategySelector, StrategySignal
 from .arbitrage import ArbitrageEngine
 from .cache import get_cache, close_cache, BaseCache
 from .safeguards import TradingSafeguards, handle_kill_switch_command
-from .telegram import TelegramService, create_telegram_service
-from .telegram_commands import TelegramCommandHandler
+from .enhanced_telegram import EnhancedTelegramService, create_enhanced_telegram_service
+from .ai_analyzer import AITradingAnalyzer
+from .market_sentiment import MarketSentimentAnalyzer
+from .risk_analyzer import RiskAnalyzer
 from .storage import get_storage, close_storage, TradingStorage
 from .bigquery_streaming import get_bigquery_streamer, close_bigquery_streamer, BigQueryStreamer
 from .feature_store import get_feature_store, TradingFeatureStore
@@ -317,8 +319,10 @@ class TradingService:
             logger.info("Vertex AI client disabled by settings.")
 
         # Initialize Telegram service for notifications
-        self._telegram: Optional[TelegramService] = None
-        self._telegram_commands: Optional[TelegramCommandHandler] = None
+        self._telegram: Optional[EnhancedTelegramService] = None
+        self._ai_analyzer: Optional[AITradingAnalyzer] = None
+        self._sentiment_analyzer: Optional[MarketSentimentAnalyzer] = None
+        self._risk_analyzer: Optional[RiskAnalyzer] = None
 
         # Fetch all available symbols from Aster DEX
         self._available_symbols: List[str] = []
@@ -759,20 +763,27 @@ class TradingService:
         return True, market_price
 
     async def _init_telegram(self) -> None:
-        """Initialize Telegram notification service and command handler."""
-        self._telegram = await create_telegram_service(self._settings)
-        
-        # Initialize command handler if credentials are available
-        if self._settings.telegram_bot_token and self._settings.telegram_chat_id:
+        """Initialize enhanced Telegram notification service and AI components."""
+        # Initialize AI analyzers
+        self._ai_analyzer = AITradingAnalyzer()
+        self._sentiment_analyzer = MarketSentimentAnalyzer()
+        self._risk_analyzer = RiskAnalyzer()
+
+        # Initialize enhanced Telegram service
+        self._telegram = await create_enhanced_telegram_service(
+            self._settings,
+            ai_analyzer=self._ai_analyzer,
+            sentiment_analyzer=self._sentiment_analyzer,
+            risk_analyzer=self._risk_analyzer
+        )
+
+        # Start the enhanced Telegram bot if initialized
+        if self._telegram:
             try:
-                self._telegram_commands = TelegramCommandHandler(
-                    bot_token=self._settings.telegram_bot_token,
-                    chat_id=self._settings.telegram_chat_id,
-                    trading_service=self,
-                )
-                await self._telegram_commands.start()
+                await self._telegram.start()
+                logger.info("Enhanced Telegram AI bot started successfully")
             except Exception as exc:
-                logger.warning(f"Failed to start Telegram command handler: {exc}")
+                logger.warning(f"Failed to start enhanced Telegram bot: {exc}")
 
     async def dashboard_snapshot(self) -> Dict[str, Any]:
         """Aggregate a lightweight view for the dashboard endpoint."""
@@ -1440,19 +1451,39 @@ class TradingService:
                     paper_quantity = notional / snapshot.price if snapshot.price else 0.0
                     if self._telegram:
                         try:
-                            await self._telegram.send_trade_notification(
+                            # Generate AI analysis for the trade
+                            ai_analysis = None
+                            if self._ai_analyzer:
+                                analysis_result = await self._ai_analyzer.analyze_trade(
+                                    symbol=symbol,
+                                    side=decision,
+                                    price=snapshot.price,
+                                    volume=paper_quantity,
+                                    market_data={
+                                        'volatility': snapshot.volatility,
+                                        'volume': snapshot.volume_24h,
+                                        'trend': 'bullish' if snapshot.price > snapshot.sma_20 else 'bearish'
+                                    }
+                                )
+                                ai_analysis = analysis_result.get('rationale', '')
+
+                            # Create enhanced trade notification
+                            from .enhanced_telegram import TradeNotification, NotificationPriority
+                            trade_notification = TradeNotification(
                                 symbol=symbol,
                                 side=decision,
                                 price=snapshot.price,
                                 quantity=paper_quantity,
                                 notional=notional,
-                                decision_reason="AI momentum strategy (Paper Trading)",
-                                model_used=agent_model_for_symbol,
-                                confidence=self._settings.expected_win_rate,
                                 take_profit=take_profit,
                                 stop_loss=stop_loss,
-                                portfolio_balance=self._portfolio.balance,
-                                risk_percentage=(notional / self._portfolio.balance) * 100 if self._portfolio.balance > 0 else 0,
+                                confidence=self._settings.expected_win_rate,
+                                ai_analysis=ai_analysis
+                            )
+
+                            await self._telegram.send_trade_notification(
+                                trade_notification,
+                                priority=NotificationPriority.MEDIUM
                             )
                             TELEGRAM_NOTIFICATIONS_SENT.labels(category="trade", status="success").inc()
                         except Exception as exc:
@@ -2031,22 +2062,39 @@ class TradingService:
                 risk_reward_ratio = reward_amount / risk_amount if risk_amount > 0 else 0
 
                 try:
-                    await self._telegram.send_trade_notification(
+                    # Generate AI analysis for the trade
+                    ai_analysis = None
+                    if self._ai_analyzer:
+                        analysis_result = await self._ai_analyzer.analyze_trade(
+                            symbol=symbol,
+                            side=side,
+                            price=execution_price,
+                            volume=quantity,
+                            market_data={
+                                'volatility': market_context.get('atr', 0.02),
+                                'volume': market_context.get('volume', 0),
+                                'trend': 'bullish' if market_context.get('change_24h', 0) > 0 else 'bearish'
+                            }
+                        )
+                        ai_analysis = f"{analysis_result.get('rationale', '')}\n\nTrade Thesis: {trade_thesis}"
+
+                    # Create enhanced trade notification
+                    from .enhanced_telegram import TradeNotification, NotificationPriority
+                    trade_notification = TradeNotification(
                         symbol=symbol,
                         side=side,
                         price=execution_price,
                         quantity=quantity,
                         notional=notional,
-                        decision_reason=f"Advanced momentum analysis with {self._settings.expected_win_rate:.1%} confidence",
-                        model_used=agent_model,
-                        confidence=self._settings.expected_win_rate,
                         take_profit=take_profit,
                         stop_loss=stop_loss,
-                        portfolio_balance=self._portfolio.balance,
-                        risk_percentage=risk_pct,
-                        market_context=market_context,
-                        trade_thesis=trade_thesis,
-                        risk_reward_ratio=risk_reward_ratio,
+                        confidence=self._settings.expected_win_rate,
+                        ai_analysis=ai_analysis
+                    )
+
+                    await self._telegram.send_trade_notification(
+                        trade_notification,
+                        priority=NotificationPriority.HIGH if notional > 1000 else NotificationPriority.MEDIUM
                     )
                     TELEGRAM_NOTIFICATIONS_SENT.labels(category="trade", status="success").inc()
                 except Exception as exc:
