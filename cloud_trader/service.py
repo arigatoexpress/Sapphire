@@ -210,6 +210,28 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         "time_horizon": "adaptive",
         "market_regime_preference": "adaptive",
     },
+    # NEW: Kimi agent for news and sentiment analysis
+    {
+        "id": "kimi-chat",
+        "name": "Kimi Chat",
+        "model": "kimi-chat-v1",
+        "emoji": "🦉",
+        "symbols": [],
+        "description": "News-driven sentiment analysis and event-based trading using the Kimi model.",
+        "personality": "Analytical, news-focused, and event-driven",
+        "baseline_win_rate": 0.65,
+        "risk_multiplier": 1.1,
+        "profit_target": 0.016,
+        "margin_allocation": 150000.0,
+        "specialization": "sentiment_analysis",
+        "dynamic_position_sizing": True,
+        "adaptive_leverage": True,
+        "intelligence_tp_sl": True,
+        "max_leverage_limit": 4.0,
+        "risk_tolerance": "medium",
+        "time_horizon": "medium",
+        "market_regime_preference": "neutral",
+    },
 ]
 
 
@@ -282,16 +304,17 @@ class TradingService:
             logger.info("MCP URL not configured, MCP disabled")
             self._mcp = None
 
-        # Initialize Vertex AI client (disabled for now to ensure service starts)
+        # Initialize Vertex AI client
         self._vertex_client: Optional[Any] = None
-        # Temporarily disable Vertex AI to get service running
-        # if self._settings.enable_vertex_ai:
-        #     try:
-        #         self._vertex_client = get_vertex_client()
-        #         logger.info("Vertex AI client initialized")
-        #     except Exception as exc:
-        #         logger.warning(f"Failed to initialize Vertex AI client: {exc}")
-        logger.info("Vertex AI client initialization skipped for service stability")
+        if self._settings.enable_vertex_ai:
+            try:
+                from .vertex_ai_client import get_vertex_client
+                self._vertex_client = get_vertex_client()
+                logger.info("Vertex AI client initialized")
+            except Exception as exc:
+                logger.warning(f"Failed to initialize Vertex AI client: {exc}")
+        else:
+            logger.info("Vertex AI client disabled by settings.")
 
         # Initialize Telegram service for notifications
         self._telegram: Optional[TelegramService] = None

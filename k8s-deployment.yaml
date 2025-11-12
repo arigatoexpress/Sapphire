@@ -15,8 +15,28 @@ spec:
       labels:
         app: cloud-trader
       annotations:
-        # Simplified networking for MVP'
+        # Simplified networking for MVP
     spec:
+      containers:
+      - name: cloud-trader
+        image: us-central1-docker.pkg.dev/sapphireinfinite/cloud-run-source-deploy/cloud-trader:latest
+        command: ["uvicorn", "cloud_trader.api:build_app", "--host", "0.0.0.0", "--port", "8080"]
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: ENABLE_PAPER_TRADING
+          value: "true"
+        - name: GCP_PROJECT_ID
+          value: "sapphireinfinite"
+        - name: LOG_LEVEL
+          value: "WARNING"
+        - name: MCP_ENABLED
+          value: "true"
+      tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"
       containers:
       - name: cloud-trader
         image: us-central1-docker.pkg.dev/sapphireinfinite/cloud-run-source-deploy/cloud-trader:latest
@@ -36,10 +56,7 @@ spec:
         envFrom:
         - secretRef:
             name: cloud-trader-secrets
-        resources:
-          limits:
-            cpu: "500m"
-            memory: "512Mi"
+        # No resource limits for MVP
         livenessProbe:
           httpGet:
             path: /healthz

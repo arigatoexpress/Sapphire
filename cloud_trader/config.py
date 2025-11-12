@@ -105,7 +105,7 @@ class Settings(BaseSettings):
 
     # Agent configuration
     enabled_agents: List[str] = Field(
-        default_factory=lambda: ["deepseek-v3", "qwen-7b", "fingpt-alpha", "lagllama-degen", "profit-maximizer"],
+        default_factory=lambda: ["deepseek-v3", "qwen-7b", "fingpt-alpha", "lagllama-degen", "profit-maximizer", "kimi-chat"],
         validation_alias="ENABLED_AGENTS",
         description="List of agent IDs to enable for autonomous trading"
     )
