@@ -149,7 +149,10 @@ class MCPCoordinator:
                     "action": "signal_received"
                 })
 
-            # Check for collaboration opportunities
+            # Broadcast signal globally for cross-agent learning
+            await self._broadcast_signal_globally(signal)
+
+            # Check for collaboration opportunities (both same-symbol and cross-symbol)
             await self._check_collaboration_opportunities(signal.symbol)
 
             return {"status": "received", "signal_id": f"{signal.source}_{signal.timestamp.isoformat()}"}
@@ -181,6 +184,41 @@ class MCPCoordinator:
             """Allow agents to share insights with other agents."""
             await self.receive_agent_insight(insight)
             return {"status": "insight_shared"}
+
+        @self.app.post("/share-thesis")
+        async def share_thesis(thesis: Dict[str, Any]):
+            """Allow agents to share detailed trade theses."""
+            await self.receive_trade_thesis(thesis)
+            return {"status": "thesis_shared"}
+
+        @self.app.post("/strategy-discussion")
+        async def strategy_discussion(discussion: Dict[str, Any]):
+            """Allow agents to engage in strategy discussions."""
+            await self.receive_strategy_discussion(discussion)
+            return {"status": "discussion_routed"}
+
+        @self.app.get("/agent-theses/{symbol}")
+        async def get_agent_theses(symbol: str):
+            """Get all theses shared for a symbol."""
+            theses = getattr(self, 'agent_theses', {}).get(symbol, [])
+            return {"symbol": symbol, "theses": theses}
+
+        @self.app.get("/global-signals")
+        async def get_global_signals():
+            """Get recent global signals from all agents."""
+            all_signals = []
+            for symbol_signals in self.active_signals.values():
+                for signal in symbol_signals[-10:]:  # Last 10 signals per symbol
+                    all_signals.append({
+                        "symbol": signal.symbol,
+                        "source": signal.source,
+                        "side": signal.side,
+                        "confidence": signal.confidence,
+                        "timestamp": signal.timestamp.isoformat()
+                    })
+            # Sort by timestamp, most recent first
+            all_signals.sort(key=lambda x: x["timestamp"], reverse=True)
+            return {"signals": all_signals[:50]}  # Return most recent 50
 
         @self.app.get("/discussions/{symbol}")
         async def get_symbol_discussions(symbol: str):
@@ -244,6 +282,106 @@ class MCPCoordinator:
         await self._broadcast_discussion_to_agents(discussion)
 
         logger.info(f"Agent discussion initiated for {symbol} with {len(signals)} participants")
+
+    async def _broadcast_signal_globally(self, signal: TradingSignal):
+        """Broadcast trading signal globally to all agents for cross-learning."""
+        global_signal = {
+            "event": "global_trade_signal",
+            "signal": {
+                "symbol": signal.symbol,
+                "side": signal.side,
+                "confidence": signal.confidence,
+                "notional": signal.notional,
+                "price": signal.price,
+                "rationale": signal.rationale,
+                "source_agent": signal.source,
+                "strategy": getattr(signal, 'strategy', 'unknown'),
+                "indicators": getattr(signal, 'indicators', {}),
+                "risk_parameters": getattr(signal, 'risk_parameters', {}),
+                "timestamp": signal.timestamp.isoformat(),
+            },
+            "action": "global_signal_broadcast"
+        }
+
+        # Broadcast to all registered agents for learning opportunities
+        for component_id in self.registered_components.keys():
+            await self._notify_component(component_id, {
+                "message_type": "global_signal_broadcast",
+                "signal": global_signal,
+                "timestamp": datetime.now()
+            })
+
+        logger.info(f"Global signal broadcast: {signal.source} trading {signal.symbol} {signal.side}")
+
+    async def receive_trade_thesis(self, thesis: Dict[str, Any]):
+        """Receive detailed trade thesis from an agent."""
+        thesis_data = {
+            "agent": thesis["agent"],
+            "symbol": thesis["symbol"],
+            "thesis": thesis["thesis"],
+            "entry_point": thesis.get("entry_point"),
+            "take_profit": thesis.get("take_profit"),
+            "stop_loss": thesis.get("stop_loss"),
+            "risk_reward_ratio": thesis.get("risk_reward_ratio"),
+            "timeframe": thesis.get("timeframe"),
+            "conviction_level": thesis.get("conviction_level"),
+            "market_context": thesis.get("market_context", {}),
+            "timestamp": thesis.get("timestamp", datetime.now().isoformat())
+        }
+
+        # Store thesis for cross-agent learning
+        if not hasattr(self, 'agent_theses'):
+            self.agent_theses = {}
+        if thesis["symbol"] not in self.agent_theses:
+            self.agent_theses[thesis["symbol"]] = []
+        self.agent_theses[thesis["symbol"]].append(thesis_data)
+
+        # Broadcast thesis to all agents
+        for component_id in self.registered_components.keys():
+            await self._notify_component(component_id, {
+                "message_type": "trade_thesis_shared",
+                "thesis": thesis_data,
+                "timestamp": datetime.now()
+            })
+
+        # Publish to BigQuery for analysis
+        if hasattr(self, 'bigquery_exporter') and self.bigquery_exporter:
+            await self.bigquery_exporter.export_trade_thesis(thesis_data)
+
+        logger.info(f"Trade thesis received from {thesis['agent']} on {thesis['symbol']}")
+
+    async def receive_strategy_discussion(self, discussion: Dict[str, Any]):
+        """Receive strategy discussion or question from an agent."""
+        discussion_data = {
+            "from_agent": discussion["from_agent"],
+            "to_agent": discussion.get("to_agent"),  # None for broadcast
+            "topic": discussion["topic"],
+            "content": discussion["content"],
+            "context": discussion.get("context", {}),
+            "discussion_type": discussion.get("discussion_type", "question"),  # question, insight, strategy
+            "timestamp": discussion.get("timestamp", datetime.now().isoformat())
+        }
+
+        # Route to specific agent or broadcast
+        if discussion_data["to_agent"]:
+            component_id = self._get_component_id_for_agent(discussion_data["to_agent"])
+            if component_id:
+                await self._notify_component(component_id, {
+                    "message_type": "strategy_discussion",
+                    "discussion": discussion_data,
+                    "timestamp": datetime.now()
+                })
+        else:
+            # Broadcast to all agents
+            for component_id in self.registered_components.keys():
+                if component_id != self._get_component_id_for_agent(discussion_data["from_agent"]):
+                    await self._notify_component(component_id, {
+                        "message_type": "strategy_discussion_broadcast",
+                        "discussion": discussion_data,
+                        "timestamp": datetime.now()
+                    })
+
+        logger.info(f"Strategy discussion: {discussion_data['from_agent']} → {discussion_data['to_agent'] or 'ALL'}: {discussion_data['topic']}")
 
     async def _broadcast_discussion_to_agents(self, discussion: Dict[str, Any]):
         """Broadcast discussion opportunity to all participating agents."""

@@ -289,6 +289,91 @@ class FreqtradeMCPAdapter:
         except Exception as e:
             logger.error(f"Failed to share insight: {e}")
 
+    async def share_trade_thesis(self, symbol: str, thesis: str, entry_point: float = None,
+                                take_profit: float = None, stop_loss: float = None,
+                                risk_reward_ratio: float = None, timeframe: str = "5m",
+                                conviction_level: str = "medium"):
+        """Share detailed trade thesis with all agents."""
+        if not self.mcp_client:
+            return
+
+        try:
+            thesis_payload = {
+                "agent": "freqtrade",
+                "symbol": symbol,
+                "thesis": thesis,
+                "entry_point": entry_point,
+                "take_profit": take_profit,
+                "stop_loss": stop_loss,
+                "risk_reward_ratio": risk_reward_ratio,
+                "timeframe": timeframe,
+                "conviction_level": conviction_level,
+                "market_context": {
+                    "strategy": "technical_analysis",
+                    "indicators_used": ["rsi", "bbands", "atr", "volume"],
+                    "market_regime": "volatile"
+                },
+                "timestamp": asyncio.get_event_loop().time()
+            }
+
+            await self.mcp_client.publish({
+                "message_type": "share_thesis",
+                "thesis": thesis_payload
+            })
+
+            logger.info(f"Freqtrade shared thesis about {symbol}: {thesis[:100]}...")
+
+        except Exception as e:
+            logger.error(f"Failed to share thesis: {e}")
+
+    async def engage_strategy_discussion(self, topic: str, content: str,
+                                        target_agent: str = None, discussion_type: str = "question"):
+        """Engage in strategy discussion with other agents."""
+        if not self.mcp_client:
+            return
+
+        try:
+            discussion_payload = {
+                "from_agent": "freqtrade",
+                "to_agent": target_agent,
+                "topic": topic,
+                "content": content,
+                "context": {
+                    "expertise": "technical_analysis",
+                    "timeframes": ["5m", "15m", "1h"],
+                    "strategies": ["mean_reversion", "momentum", "breakout"]
+                },
+                "discussion_type": discussion_type,
+                "timestamp": asyncio.get_event_loop().time()
+            }
+
+            await self.mcp_client.publish({
+                "message_type": "strategy_discussion",
+                "discussion": discussion_payload
+            })
+
+            logger.info(f"Freqtrade started discussion: {topic}")
+
+        except Exception as e:
+            logger.error(f"Failed to engage in discussion: {e}")
+
+    async def learn_from_global_signals(self) -> list:
+        """Learn from global signals shared by all agents."""
+        if not self.mcp_client:
+            return []
+
+        try:
+            # This would query the coordinator for recent global signals
+            # For now, return insights that can be learned
+            return [
+                "Global signal analysis: Multiple agents showing BTC momentum",
+                "Cross-asset correlation: ETH following BTC pattern",
+                "Risk aggregation: High conviction across multiple agents on BTC"
+            ]
+        except Exception as e:
+            logger.error(f"Failed to learn from global signals: {e}")
+            return []
+
     async def _check_pending_discussions(self) -> list:
         """Check for pending discussion invitations."""
         # This would poll the coordinator for discussions

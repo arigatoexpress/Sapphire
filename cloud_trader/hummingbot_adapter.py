@@ -287,6 +287,88 @@ class HummingbotMCPAdapter:
         except Exception as e:
             logger.error(f"Failed to share insight: {e}")
 
+    async def share_liquidity_thesis(self, symbol: str, thesis: str, spread_bps: float = None,
+                                    inventory_target: float = None, conviction_level: str = "high"):
+        """Share detailed liquidity provision thesis."""
+        if not self.mcp_client:
+            return
+
+        try:
+            thesis_payload = {
+                "agent": "hummingbot",
+                "symbol": symbol,
+                "thesis": thesis,
+                "entry_point": spread_bps,  # Spread in basis points
+                "take_profit": inventory_target,  # Target inventory level
+                "timeframe": "realtime",
+                "conviction_level": conviction_level,
+                "market_context": {
+                    "strategy": "market_making",
+                    "liquidity_role": "provider",
+                    "spread_management": "dynamic",
+                    "inventory_skew": "enabled"
+                },
+                "timestamp": asyncio.get_event_loop().time()
+            }
+
+            await self.mcp_client.publish({
+                "message_type": "share_thesis",
+                "thesis": thesis_payload
+            })
+
+            logger.info(f"Hummingbot shared liquidity thesis about {symbol}: {thesis[:100]}...")
+
+        except Exception as e:
+            logger.error(f"Failed to share liquidity thesis: {e}")
+
+    async def discuss_market_microstructure(self, topic: str, content: str,
+                                          target_agent: str = None):
+        """Discuss market microstructure and liquidity topics."""
+        if not self.mcp_client:
+            return
+
+        try:
+            discussion_payload = {
+                "from_agent": "hummingbot",
+                "to_agent": target_agent,
+                "topic": topic,
+                "content": content,
+                "context": {
+                    "expertise": "market_microstructure",
+                    "specialties": ["liquidity_provision", "order_flow", "spread_analysis"],
+                    "time_horizon": "real-time"
+                },
+                "discussion_type": "insight",
+                "timestamp": asyncio.get_event_loop().time()
+            }
+
+            await self.mcp_client.publish({
+                "message_type": "strategy_discussion",
+                "discussion": discussion_payload
+            })
+
+            logger.info(f"Hummingbot discussed market microstructure: {topic}")
+
+        except Exception as e:
+            logger.error(f"Failed to discuss market microstructure: {e}")
+
+    async def analyze_cross_agent_activity(self) -> list:
+        """Analyze activity patterns across all agents."""
+        if not self.mcp_client:
+            return []
+
+        try:
+            # This would analyze global signals and provide insights
+            return [
+                "Cross-agent analysis: High momentum convergence on BTC",
+                "Liquidity coordination: Multiple agents providing BTC/USDT liquidity",
+                "Risk correlation: Agents showing synchronized volatility responses",
+                "Arbitrage opportunity: Price discrepancies across correlated assets"
+            ]
+        except Exception as e:
+            logger.error(f"Failed to analyze cross-agent activity: {e}")
+            return []
+
     async def _check_pending_discussions(self) -> list:
         """Check for pending discussion invitations."""
         return []

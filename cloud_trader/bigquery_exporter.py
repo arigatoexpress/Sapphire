@@ -142,6 +142,34 @@ class BigQueryExporter:
         except Exception as e:
             logger.error(f"Failed to insert row into {table_name}: {e}")
 
+    async def export_trade_thesis(self, thesis: Dict[str, Any]):
+        """Export trade thesis to BigQuery."""
+        await self._insert_row("trade_theses", {
+            "timestamp": thesis.get("timestamp", datetime.utcnow().isoformat()),
+            "agent": thesis.get("agent"),
+            "symbol": thesis.get("symbol"),
+            "thesis": thesis.get("thesis"),
+            "entry_point": thesis.get("entry_point"),
+            "take_profit": thesis.get("take_profit"),
+            "stop_loss": thesis.get("stop_loss"),
+            "risk_reward_ratio": thesis.get("risk_reward_ratio"),
+            "timeframe": thesis.get("timeframe"),
+            "conviction_level": thesis.get("conviction_level"),
+            "market_context": json.dumps(thesis.get("market_context", {})),
+        })
+
+    async def export_strategy_discussion(self, discussion: Dict[str, Any]):
+        """Export strategy discussion to BigQuery."""
+        await self._insert_row("strategy_discussions", {
+            "timestamp": discussion.get("timestamp", datetime.utcnow().isoformat()),
+            "from_agent": discussion.get("from_agent"),
+            "to_agent": discussion.get("to_agent"),
+            "topic": discussion.get("topic"),
+            "content": discussion.get("content"),
+            "context": json.dumps(discussion.get("context", {})),
+            "discussion_type": discussion.get("discussion_type", "question"),
+        })
+
     def create_tables_if_not_exist(self):
         """Create BigQuery tables if they don't exist."""
         if not self.client:
@@ -205,6 +233,28 @@ class BigQueryExporter:
                 bid_price:FLOAT64,
                 ask_price:FLOAT64,
                 source:STRING
+            """),
+            ("trade_theses", """
+                timestamp:TIMESTAMP,
+                agent:STRING,
+                symbol:STRING,
+                thesis:STRING,
+                entry_point:FLOAT64,
+                take_profit:FLOAT64,
+                stop_loss:FLOAT64,
+                risk_reward_ratio:FLOAT64,
+                timeframe:STRING,
+                conviction_level:STRING,
+                market_context:STRING
+            """),
+            ("strategy_discussions", """
+                timestamp:TIMESTAMP,
+                from_agent:STRING,
+                to_agent:STRING,
+                topic:STRING,
+                content:STRING,
+                context:STRING,
+                discussion_type:STRING
             """),
         ]
 
