@@ -23,11 +23,16 @@ steps:
       - '--all-tags'
       - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader'
 
-  # Skip Cloud Run deployment - deploy manually to GKE
-  - name: 'alpine'
+  # Deploy to GKE cluster
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: bash
     args:
-      - 'echo'
-      - 'Build completed successfully. Deploy manually to GKE with: kubectl set image deployment/cloud-trader cloud-trader=us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:latest -n trading'
+      - -c
+      - |
+        gcloud container clusters get-credentials hft-trading-cluster --zone=us-central1-a --project=${PROJECT_ID}
+        kubectl -n trading set image deployment/cloud-trader \
+          cloud-trader=us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:${BUILD_ID}
+        kubectl -n trading rollout status deployment/cloud-trader
 
 images:
   - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:latest'

@@ -17,11 +17,11 @@ spec:
       annotations:
         # Enable VPC access similar to Cloud Run
         networking.gke.io/default-interface: "eth0"
-        networking.gke.io/interfaces: '[{"name": "eth0", "network": "projects/quant-ai-trader-credits/global/networks/default", "subnetwork": "projects/quant-ai-trader-credits/regions/us-central1/subnetworks/default"}]'
+        networking.gke.io/interfaces: '[{"name": "eth0", "network": "projects/sapphireinfinite/global/networks/default", "subnetwork": "projects/sapphireinfinite/regions/us-central1/subnetworks/default"}]'
     spec:
       containers:
       - name: cloud-trader
-        image: us-central1-docker.pkg.dev/quant-ai-trader-credits/cloud-run-source-deploy/cloud-trader@sha256:52a203b004c045baabbbe93ce1f875db706bb086333490fa9e3afe7a53a00c87
+        image: us-central1-docker.pkg.dev/sapphireinfinite/cloud-run-source-deploy/cloud-trader:latest
         command: ["uvicorn", "cloud_trader.api:build_app", "--host", "0.0.0.0", "--port", "8080"]
         ports:
         - containerPort: 8080
@@ -30,7 +30,7 @@ spec:
         - name: ENABLE_PAPER_TRADING
           value: "true"
         - name: GCP_PROJECT_ID
-          value: "quant-ai-trader-credits"
+          value: "sapphireinfinite"
         - name: LOG_LEVEL
           value: "WARNING"
         - name: MCP_ENABLED
