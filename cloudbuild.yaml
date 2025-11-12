@@ -16,33 +16,22 @@ steps:
       - 'DOCKER_BUILDKIT=1'
       - 'BUILDKIT_PROGRESS=plain'
 
-  # Push cloud-trader container image (parallel with next step)
+  # Push cloud-trader container image
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
       - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:latest'
-    waitFor: ['-']  # Allow parallel execution
 
-  # Prepare GKE credentials in parallel
+  # Deploy to GKE cluster
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: bash
     args:
       - -c
       - |
-        echo "🔐 Preparing GKE credentials..."
+        echo "🔐 Getting GKE credentials..."
         gcloud container clusters get-credentials hft-trading-cluster --zone=us-central1-a --project=${PROJECT_ID}
-        echo "✅ GKE credentials ready"
-    waitFor: ['-']  # Allow parallel execution
 
-  # Deploy to GKE cluster (wait for push and credentials)
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: bash
-    args:
-      - -c
-      - |
         echo "🚀 Starting GKE deployment..."
-
-        # Deploy cloud-trader with rolling update
         kubectl -n trading set image deployment/cloud-trader \
           cloud-trader=us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:${BUILD_ID}
 
@@ -53,27 +42,25 @@ steps:
 
         # Quick health check
         echo "🏥 Running post-deployment health check..."
-        kubectl -n trading get pods -l app=cloud-trader
-        kubectl -n trading get ingress
+        kubectl -n trading get pods -l app=cloud-trader --no-headers | head -3
+        kubectl -n trading get ingress --no-headers | head -2
 
 images:
   - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:latest'
   - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:${BUILD_ID}'
 
 options:
-  # Maximum performance configuration for fastest builds
-  diskSizeGb: 1000  # Increased for better I/O performance
-  machineType: 'E2_HIGHCPU_32'  # Maximum CPU cores for parallel processing
-  # Advanced build optimizations
+  # Balanced performance configuration
+  diskSizeGb: 500  # Good balance of speed and cost
+  machineType: 'E2_HIGHCPU_32'  # High CPU for faster builds
+  # Stable build settings
   dynamicSubstitutions: true
   substitutionOption: 'ALLOW_LOOSE'
   logging: CLOUD_LOGGING_ONLY
-  # Maximum buildkit performance settings
+  # Reliable buildkit settings
   env:
     - 'DOCKER_BUILDKIT=1'
     - 'BUILDKIT_PROGRESS=plain'
-    - 'BUILDKIT_INLINE_CACHE=1'  # Enable inline caching
-    - 'COMPOSE_DOCKER_CLI_BUILD=1'  # Use docker CLI for better performance
 
-# Optimized timeout for high-performance builds
-timeout: '1200s'  # Extended slightly for larger disk operations
+# Conservative timeout for reliability
+timeout: '1800s'  # 30 minutes should be sufficient
