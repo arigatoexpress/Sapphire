@@ -15,9 +15,7 @@ spec:
       labels:
         app: cloud-trader
       annotations:
-        # Enable VPC access similar to Cloud Run
-        networking.gke.io/default-interface: "eth0"
-        networking.gke.io/interfaces: '[{"name": "eth0", "network": "projects/sapphireinfinite/global/networks/default", "subnetwork": "projects/sapphireinfinite/regions/us-central1/subnetworks/default"}]'
+        # Simplified networking for MVP'
     spec:
       containers:
       - name: cloud-trader
@@ -39,12 +37,9 @@ spec:
         - secretRef:
             name: cloud-trader-secrets
         resources:
-          requests:
+          limits:
             cpu: "500m"
             memory: "512Mi"
-          limits:
-            cpu: "1"
-            memory: "1Gi"
         livenessProbe:
           httpGet:
             path: /healthz

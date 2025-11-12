@@ -174,7 +174,7 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         "profit_target": 0.025,
         "margin_allocation": 300000.0,
         "specialization": "volatility",
-        # Dynamic configuration parameters
+        # Dynamic configuration parameters - MAXIMUM PROFIT MODE
         "dynamic_position_sizing": True,
         "adaptive_leverage": True,
         "intelligence_tp_sl": True,
@@ -184,6 +184,31 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         "risk_tolerance": "extreme",
         "time_horizon": "short",
         "market_regime_preference": "volatile",
+    },
+    # NEW: Ultra-aggressive profit maximizer
+    {
+        "id": "profit-maximizer",
+        "name": "Profit Maximizer",
+        "model": "Multi-Model Ensemble",
+        "emoji": "💰",
+        "symbols": [],
+        "description": "AI-powered profit maximization using all available strategies autonomously.",
+        "personality": "Pure profit-seeking algorithm with adaptive risk management",
+        "baseline_win_rate": 0.60,
+        "risk_multiplier": 1.8,
+        "profit_target": 0.02,
+        "margin_allocation": 400000.0,
+        "specialization": "profit_maximization",
+        # Dynamic configuration parameters - AUTONOMOUS PROFIT MODE
+        "dynamic_position_sizing": True,
+        "adaptive_leverage": True,
+        "intelligence_tp_sl": True,
+        "max_leverage_limit": 8.0,
+        "min_position_size_pct": 0.01,
+        "max_position_size_pct": 0.20,
+        "risk_tolerance": "high",
+        "time_horizon": "adaptive",
+        "market_regime_preference": "adaptive",
     },
 ]
 
@@ -422,7 +447,11 @@ class TradingService:
         if not coverage_universe:
             coverage_universe = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "SUIUSDT", "AVAXUSDT", "ARBUSDT"]
 
+        enabled_agent_ids = set(self._settings.enabled_agents)
         for i, agent_def in enumerate(AGENT_DEFINITIONS):
+            if agent_def["id"] not in enabled_agent_ids:
+                logger.info(f"Skipping disabled agent: {agent_def['id']}")
+                continue
             agent_id = agent_def["id"]
 
             # All agents now have access to ALL symbols - no token-specific restrictions
@@ -1836,7 +1865,7 @@ class TradingService:
                 order_payload = {
                     "symbol": symbol,
                     "side": side.upper(),
-                    "order_type": "MARKET",
+                    "order_type": OrderType.MARKET,
                     "quantity": quantity_str,
                     "new_client_order_id": order_tag,
                 }
@@ -3104,14 +3133,14 @@ class TradingService:
             order_params = {
                 "symbol": symbol,
                 "side": close_side,
-                "type": "MARKET",
+                "order_type": OrderType.MARKET,
                 "quantity": round(close_quantity, 8),
             }
             
             logger.info(f"Partial closing {symbol}: {reason}")
-            
+
             # Execute the order
-            result = await self._exchange.place_order(order_params)
+            result = await self._exchange.place_order(**order_params)
             
             if result:
                 # Update position with remaining quantity
@@ -3145,14 +3174,14 @@ class TradingService:
             order_params = {
                 "symbol": symbol,
                 "side": close_side,
-                "type": "MARKET",
+                "order_type": OrderType.MARKET,
                 "quantity": close_quantity,
             }
-            
+
             logger.info(f"Closing {symbol} position: {reason}")
-            
+
             # Execute the order
-            result = await self._exchange.place_order(order_params)
+            result = await self._exchange.place_order(**order_params)
             
             if result:
                 # Update strategy performance
@@ -3488,6 +3517,37 @@ class TradingService:
         except Exception as exc:
             TELEGRAM_NOTIFICATIONS_SENT.labels(category="test", status="error").inc()
             logger.warning("Failed to dispatch test Telegram message: %s", exc)
+
+    # Agent Management Methods
+    async def enable_agent(self, agent_id: str) -> bool:
+        """Enable a specific agent for autonomous trading."""
+        if agent_id in [agent["id"] for agent in AGENT_DEFINITIONS]:
+            if agent_id not in self._settings.enabled_agents:
+                self._settings.enabled_agents.append(agent_id)
+                # Reinitialize agents to include the newly enabled one
+                await self._initialize_agents()
+                logger.info(f"Enabled agent: {agent_id}")
+                return True
+        return False
+
+    async def disable_agent(self, agent_id: str) -> bool:
+        """Disable a specific agent from autonomous trading."""
+        if agent_id in self._settings.enabled_agents:
+            self._settings.enabled_agents.remove(agent_id)
+            # Remove from active agents
+            if agent_id in self._agent_states:
+                del self._agent_states[agent_id]
+            logger.info(f"Disabled agent: {agent_id}")
+            return True
+        return False
+
+    def get_enabled_agents(self) -> List[str]:
+        """Get list of currently enabled agent IDs."""
+        return self._settings.enabled_agents.copy()
+
+    def get_available_agents(self) -> List[Dict[str, Any]]:
+        """Get list of all available agents with their configurations."""
+        return AGENT_DEFINITIONS.copy()
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
