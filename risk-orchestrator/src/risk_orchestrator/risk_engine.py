@@ -28,6 +28,8 @@ DEFAULT_AGENT_ALLOCATION = 125.0
 
 
 class RiskEngine:
+
+
     def __init__(self, portfolio: dict, bot_id: str = None):
         self.portfolio = portfolio
         self.bot_id = bot_id
@@ -40,6 +42,7 @@ class RiskEngine:
         allocation_cap = AGENT_ALLOCATIONS.get(bot_id, DEFAULT_AGENT_ALLOCATION)
         self.agent_allocation = min(self.balance, allocation_cap)
 
+
     def check_drawdown(self) -> Tuple[bool, str]:
         peak = max(self.peak_balance, self.balance)
         if peak <= 0:
@@ -50,12 +53,14 @@ class RiskEngine:
             return False, f"Drawdown {drawdown_pct:.1f}% > {settings.MAX_DRAWDOWN_PCT}%"
         return True, ""
 
+
     def check_margin_buffer(self) -> Tuple[bool, str]:
         if self.balance < settings.MIN_MARGIN_BUFFER_USDT:
             return False, (
                 f"Balance {self.balance:.2f} < buffer {settings.MIN_MARGIN_BUFFER_USDT:.2f}"
             )
         return True, ""
+
 
     def check_per_trade_exposure(self, intent: OrderIntent) -> Tuple[bool, str]:
         reference_price = intent.price or _to_float(
@@ -69,6 +74,7 @@ class RiskEngine:
                 f"Trade size {notional:.2f} > {settings.MAX_PER_TRADE_PCT}% of agent allocation (${self.agent_allocation:.0f})"
             )
         return True, ""
+
 
     def evaluate(self, intent: OrderIntent, bot_id: str, order_id: str) -> RiskCheckResponse:
         checks = [
@@ -86,4 +92,3 @@ class RiskEngine:
             "Order approved [%s]: %s %s qty=%.4f", bot_id, intent.symbol, intent.side, intent.quantity
         )
         return RiskCheckResponse(approved=True, order_id=order_id)
-

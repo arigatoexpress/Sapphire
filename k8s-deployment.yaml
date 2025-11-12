@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloud-trader
+  namespace: trading
+  labels:
+    app: cloud-trader
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cloud-trader
+  template:
+    metadata:
+      labels:
+        app: cloud-trader
+      annotations:
+        # Enable VPC access similar to Cloud Run
+        networking.gke.io/default-interface: "eth0"
+        networking.gke.io/interfaces: '[{"name": "eth0", "network": "projects/quant-ai-trader-credits/global/networks/default", "subnetwork": "projects/quant-ai-trader-credits/regions/us-central1/subnetworks/default"}]'
+    spec:
+      containers:
+      - name: cloud-trader
+        image: us-central1-docker.pkg.dev/quant-ai-trader-credits/cloud-run-source-deploy/cloud-trader@sha256:52a203b004c045baabbbe93ce1f875db706bb086333490fa9e3afe7a53a00c87
+        command: ["uvicorn", "cloud_trader.api:build_app", "--host", "0.0.0.0", "--port", "8080"]
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: ENABLE_PAPER_TRADING
+          value: "true"
+        - name: GCP_PROJECT_ID
+          value: "quant-ai-trader-credits"
+        - name: LOG_LEVEL
+          value: "WARNING"
+        - name: MCP_ENABLED
+          value: "true"
+        envFrom:
+        - secretRef:
+            name: cloud-trader-secrets
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "512Mi"
+          limits:
+            cpu: "1"
+            memory: "1Gi"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        startupProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 10

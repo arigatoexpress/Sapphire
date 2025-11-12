@@ -1,4 +1,8 @@
 import React from 'react';
+interface CacheStatus {
+    backend: string;
+    connected: boolean;
+}
 interface SystemStatusData {
     services: {
         [key: string]: string;
@@ -6,7 +10,11 @@ interface SystemStatusData {
     models: {
         [key: string]: string;
     };
-    redis_connected: boolean;
+    cache: CacheStatus;
+    storage_ready: boolean;
+    pubsub_connected: boolean;
+    feature_store_ready: boolean;
+    bigquery_ready: boolean;
     timestamp: string;
 }
 interface SystemStatusProps {

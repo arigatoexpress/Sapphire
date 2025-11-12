@@ -14,7 +14,7 @@ const NotificationCenter = ({ alerts = [] }) => {
             title: alert.includes('⚠️') ? 'Risk Alert' :
                 alert.includes('🎯') ? 'Target Achieved' :
                     alert.includes('❌') ? 'Error' : 'System Info',
-            message: alert.replace(/^[⚠️🎯ℹ️❌]\s*/, ''),
+            message: alert.replace(/^[^A-Za-z0-9]*\s*/, ''),
             timestamp: new Date(),
             read: false
         }));
@@ -59,14 +59,6 @@ const NotificationCenter = ({ alerts = [] }) => {
     };
     const markAllAsRead = () => {
         setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    };
-    const getTypeColor = (type) => {
-        switch (type) {
-            case 'success': return 'text-green-600 bg-green-50 border-green-200';
-            case 'warning': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-            case 'error': return 'text-red-600 bg-red-50 border-red-200';
-            case 'info': return 'text-blue-600 bg-blue-50 border-blue-200';
-        }
     };
     const getTypeIcon = (type) => {
         switch (type) {

@@ -6,7 +6,7 @@ Simple Trading Dashboard Service
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 import httpx
 import os
 from datetime import datetime
@@ -23,10 +23,31 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Custom static file handler with cache headers
+class CachedStaticFiles(StaticFiles):
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        # Add cache headers based on file type
+        if path.endswith(('.js', '.css')) and any(hash_pattern in path for hash_pattern in ['-', '.']):
+            # Hashed assets can be cached forever
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        elif path.endswith('.html'):
+            # HTML files should always be fresh
+            response.headers["Cache-Control"] = "public, max-age=0, must-revalidate"
+        else:
+            # Other assets get moderate caching
+            response.headers["Cache-Control"] = "public, max-age=3600"
+        return response
+
 # Mount static files if they exist
 static_path = "/app/static"
 if os.path.exists(static_path):
-    app.mount("/static", StaticFiles(directory=static_path), name="static")
+    # Mount assets directory at /assets to match React build output
+    assets_path = os.path.join(static_path, "assets")
+    if os.path.exists(assets_path):
+        app.mount("/assets", CachedStaticFiles(directory=assets_path), name="assets")
+    # Also mount static root for other files
+    app.mount("/static", CachedStaticFiles(directory=static_path), name="static")
 
 ORCHESTRATOR_URL = os.getenv("ORCHESTRATOR_URL", "https://api.sapphiretrade.xyz/orchestrator")
 CLOUD_TRADER_URL = os.getenv("CLOUD_TRADER_URL", "https://cloud-trader-880429861698.us-central1.run.app")
@@ -36,7 +57,15 @@ async def root():
     # Try to serve the React app's index.html if it exists
     index_path = "/app/static/index.html"
     if os.path.exists(index_path):
-        return FileResponse(index_path, media_type="text/html")
+        # No caching for HTML to ensure fresh content
+        return FileResponse(
+            index_path, 
+            media_type="text/html",
+            headers={
+                "Cache-Control": "public, max-age=0, must-revalidate",
+                "ETag": f'"{datetime.utcnow().timestamp()}"'
+            }
+        )
     return {"status": "running", "service": "trading-dashboard"}
 
 @app.get("/health")

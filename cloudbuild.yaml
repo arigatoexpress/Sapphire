@@ -1,0 +1,51 @@
+steps:
+  # Build optimized multi-stage container image (no cache to ensure latest code)
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--build-arg'
+      - 'CACHE_BUST=${BUILD_ID}'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:${BUILD_ID}'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:latest'
+      - '--progress=plain'
+      - '--target=runtime'
+      - '.'
+    env:
+      - 'DOCKER_BUILDKIT=1'
+      - 'BUILDKIT_PROGRESS=plain'
+
+  # Push container image with both tags (skip testing to avoid timeouts)
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '--all-tags'
+      - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader'
+
+  # Skip Cloud Run deployment - deploy manually to GKE
+  - name: 'alpine'
+    args:
+      - 'echo'
+      - 'Build completed successfully. Deploy manually to GKE with: kubectl set image deployment/cloud-trader cloud-trader=us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:latest -n trading'
+
+images:
+  - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:latest'
+  - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:${BUILD_ID}'
+
+options:
+  # Increase disk size for better I/O
+  diskSizeGb: 500
+  # Upgrade to high-CPU machine for faster builds
+  machineType: 'E2_HIGHCPU_32'
+  # Enable build caching and parallel processing
+  dynamicSubstitutions: true
+  substitutionOption: 'ALLOW_LOOSE'
+  logging: CLOUD_LOGGING_ONLY
+  # Enable buildkit for faster layer caching
+  env:
+    - 'DOCKER_BUILDKIT=1'
+    - 'BUILDKIT_PROGRESS=plain'
+
+# Build timeout - reduced since builds should be faster now
+timeout: '900s'

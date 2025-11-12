@@ -5,16 +5,18 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from typing import Dict
+import secrets
+from typing import Dict, Optional
 
 import asyncio
 import time
 from collections import defaultdict
+from contextlib import asynccontextmanager
 import httpx
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, status, WebSocket
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
+# from fastapi.middleware.cors import CORSMiddleware  # CORS handled manually
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from .service import TradingService
@@ -60,34 +62,34 @@ rate_limiter = RateLimiter(requests_per_minute=60)  # 60 requests per minute per
 
 def build_app(service: TradingService | None = None) -> FastAPI:
     trading_service = service or TradingService()
-    app = FastAPI(title="Cloud Trader", version="1.0")
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        """Handle application startup and shutdown."""
+        print("🚀 STARTUP: Starting trading service...")
+        logger.info("🚀 STARTUP: Starting trading service...")
+        try:
+            await trading_service.start()
+            print("✅ STARTUP: Trading service started successfully")
+            logger.info("✅ STARTUP: Trading service started successfully")
+        except Exception as exc:
+            print(f"❌ STARTUP: Failed to start trading service: {exc}")
+            logger.exception("❌ STARTUP: Failed to start trading service: %s", exc)
 
-    # Add CORS middleware with production-safe configuration
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=[
-            "https://cloud-trader-880429861698.us-central1.run.app",
-            "https://cloud-trader-cfxefrvooa-uc.a.run.app",
-            "https://sapphiretrade.xyz",
-            "https://www.sapphiretrade.xyz",
-            "https://api.sapphiretrade.xyz",
-            "https://trader.sapphiretrade.xyz",
-            "http://localhost:3000",
-            "http://localhost:5173",
-        ],  # Explicitly allow known origins
-        allow_credentials=True,
-        allow_methods=["GET", "POST", "OPTIONS"],  # Include OPTIONS for CORS preflight
-        allow_headers=["Content-Type", "Authorization", "Accept", "Origin"],  # Include CORS headers
-    )
+        yield
+
+        logger.info("🛑 SHUTDOWN: Stopping trading service...")
+        try:
+            await trading_service.stop()
+            logger.info("✅ SHUTDOWN: Trading service stopped successfully")
+        except Exception as exc:
+            logger.exception("❌ SHUTDOWN: Failed to stop trading service: %s", exc)
+
+    app = FastAPI(title="Cloud Trader", version="1.0", lifespan=lifespan)
+
+    # CORS headers will be handled manually in OPTIONS handlers
 
     # Add Prometheus instrumentation
     Instrumentator().instrument(app).expose(app, endpoint="/metrics")
-
-    stream_names = {
-        "decisions": trading_service.settings.decisions_stream,
-        "positions": trading_service.settings.positions_stream,
-        "reasoning": trading_service.settings.reasoning_stream,
-    }
 
     # Serve static files if they exist
     static_path = "/app/static"
@@ -104,32 +106,66 @@ def build_app(service: TradingService | None = None) -> FastAPI:
 
     @app.get("/healthz")
     async def healthz() -> Dict[str, object]:
+        from fastapi.responses import JSONResponse
         try:
             status = trading_service.health()
-            return {
+            data = {
                 "running": status.running,
                 "paper_trading": status.paper_trading,
                 "last_error": status.last_error,
             }
         except Exception as e:
             # Return a basic response if health check fails
-            return {
+            data = {
                 "running": False,
                 "paper_trading": True,
                 "last_error": str(e),
             }
+        response = JSONResponse(content=data)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        return response
+
+    @app.get("/health")
+    async def health() -> Dict[str, object]:
+        """Alias for /healthz for compatibility"""
+        return await healthz()
+
+    admin_token = trading_service.settings.admin_api_token
+    admin_guard_disabled = admin_token is None
+
+    def require_admin(request: Request) -> None:
+        nonlocal admin_guard_disabled
+        if admin_guard_disabled:
+            if not hasattr(require_admin, "_warned"):
+                logger.warning("ADMIN_API_TOKEN not configured; allowing admin endpoint access")
+                setattr(require_admin, "_warned", True)
+            return
+
+        header_token = None
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.lower().startswith("bearer "):
+            header_token = auth_header[7:].strip()
+        if not header_token:
+            header_token = request.headers.get("X-Admin-Token")
+
+        if not header_token:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing admin token")
+
+        if not secrets.compare_digest(header_token, admin_token or ""):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid admin token")
 
     @app.post("/start")
-    async def start(request: Request) -> Dict[str, str]:
+    async def start(request: Request, _: None = Depends(require_admin)) -> Dict[str, str]:
         client_ip = request.client.host if request.client else "unknown"
         if not rate_limiter.is_allowed(f"start_{client_ip}"):
             raise HTTPException(status_code=429, detail="Too many requests")
 
-        asyncio.create_task(trading_service.start())
-        return {"status": "starting"}
+        await trading_service.start()
+        return {"status": "started"}
 
     @app.post("/stop")
-    async def stop(request: Request) -> Dict[str, str]:
+    async def stop(request: Request, _: None = Depends(require_admin)) -> Dict[str, str]:
         client_ip = request.client.host if request.client else "unknown"
         if not rate_limiter.is_allowed(f"stop_{client_ip}"):
             raise HTTPException(status_code=429, detail="Too many requests")
@@ -139,8 +175,17 @@ def build_app(service: TradingService | None = None) -> FastAPI:
         asyncio.create_task(trading_service.stop())
         return {"status": "stopping"}
 
+    @app.post("/test-telegram")
+    async def test_telegram(request: Request, _: None = Depends(require_admin)) -> Dict[str, str]:
+        client_ip = request.client.host if request.client else "unknown"
+        if not rate_limiter.is_allowed(f"test_telegram_{client_ip}"):
+            raise HTTPException(status_code=429, detail="Too many requests")
+
+        await trading_service.send_test_telegram_message()
+        return {"status": "test message sent"}
+
     @app.post("/inference/decisions")
-    async def accept_decision(request: Request, inference_request: InferenceRequest) -> Dict[str, str]:
+    async def accept_decision(request: Request, inference_request: InferenceRequest, _: None = Depends(require_admin)) -> Dict[str, str]:
         client_ip = request.client.host if request.client else "unknown"
         if not rate_limiter.is_allowed(f"inference_{client_ip}"):
             raise HTTPException(status_code=429, detail="Too many requests")
@@ -155,7 +200,7 @@ def build_app(service: TradingService | None = None) -> FastAPI:
         return {"status": "queued"}
 
     @app.post("/inference/chat")
-    async def proxy_chat(request: Request, chat_request: ChatCompletionRequest) -> Dict[str, object]:
+    async def proxy_chat(request: Request, chat_request: ChatCompletionRequest, _: None = Depends(require_admin)) -> Dict[str, object]:
         client_ip = request.client.host if request.client else "unknown"
         if not rate_limiter.is_allowed(f"chat_{client_ip}"):
             raise HTTPException(status_code=429, detail="Too many requests")
@@ -183,26 +228,324 @@ def build_app(service: TradingService | None = None) -> FastAPI:
             raise HTTPException(status_code=exc.response.status_code, detail=exc.response.text)
         return {"endpoint": endpoint, "response": response.json()}
 
-    @app.get("/streams/{stream_name}")
-    async def stream_snapshot(stream_name: str, limit: int = Query(default=50, ge=1, le=200)) -> Dict[str, object]:
-        target = stream_names.get(stream_name)
-        if not target:
-            raise HTTPException(status_code=404, detail="Unknown stream")
-        entries = await trading_service.stream_events(target, limit)
-        return {"stream": stream_name, "entries": entries}
+    @app.options("/dashboard")
+    async def dashboard_options():
+        from fastapi.responses import Response
+        response = Response()
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, Accept, Origin, X-Requested-With"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        return response
+
+    @app.options("/healthz")
+    async def healthz_options():
+        from fastapi.responses import Response
+        response = Response()
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, Accept, Origin, X-Requested-With"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        return response
+
+    @app.options("/start")
+    async def start_options():
+        from fastapi.responses import Response
+        response = Response()
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, Accept, Origin, X-Requested-With"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        return response
+
+    @app.options("/stop")
+    async def stop_options():
+        from fastapi.responses import Response
+        response = Response()
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, Accept, Origin, X-Requested-With"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        return response
 
     @app.get("/dashboard")
     async def dashboard() -> Dict[str, object]:
         """Get comprehensive dashboard data"""
+        from fastapi.responses import JSONResponse
         try:
             import asyncio
             # Add timeout to prevent hanging
-            return await asyncio.wait_for(trading_service.dashboard_snapshot(), timeout=10.0)
+            data = await asyncio.wait_for(trading_service.dashboard_snapshot(), timeout=10.0)
+            response = JSONResponse(content=data)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
         except asyncio.TimeoutError:
             logger.error("Dashboard snapshot timed out after 10 seconds")
-            raise HTTPException(status_code=504, detail="Dashboard snapshot request timed out")
+            response = JSONResponse(content={"error": "Dashboard snapshot request timed out"}, status_code=504)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
         except Exception as exc:  # pragma: no cover - defensive logging
             logger.exception("Failed to build dashboard snapshot: %s", exc)
-            raise HTTPException(status_code=500, detail="Failed to build dashboard snapshot")
+            response = JSONResponse(content={"error": "Failed to build dashboard snapshot"}, status_code=500)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+    
+    @app.get("/api/trades/history")
+    async def get_trade_history(
+        agent_id: Optional[str] = None,
+        symbol: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        limit: int = 1000,
+    ) -> Dict[str, object]:
+        """Get historical trades with filters"""
+        from fastapi.responses import JSONResponse
+        from datetime import datetime
+        try:
+            if not trading_service._storage:
+                return JSONResponse(content={"error": "Storage not available"}, status_code=503)
+            
+            start = datetime.fromisoformat(start_date) if start_date else None
+            end = datetime.fromisoformat(end_date) if end_date else None
+            
+            trades = await trading_service._storage.get_trades(
+                agent_id=agent_id,
+                symbol=symbol,
+                start_date=start,
+                end_date=end,
+                limit=limit,
+            )
+            
+            response = JSONResponse(content={"trades": trades, "count": len(trades)})
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+        except Exception as exc:
+            logger.exception("Failed to get trade history: %s", exc)
+            response = JSONResponse(content={"error": str(exc)}, status_code=500)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+    
+    @app.get("/api/agents/performance")
+    async def get_agent_performance(
+        agent_id: str,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        limit: int = 1000,
+    ) -> Dict[str, object]:
+        """Get agent performance history"""
+        from fastapi.responses import JSONResponse
+        from datetime import datetime
+        try:
+            if not trading_service._storage:
+                return JSONResponse(content={"error": "Storage not available"}, status_code=503)
+            
+            start = datetime.fromisoformat(start_date) if start_date else None
+            end = datetime.fromisoformat(end_date) if end_date else None
+            
+            performance = await trading_service._storage.get_agent_performance(
+                agent_id=agent_id,
+                start_date=start,
+                end_date=end,
+                limit=limit,
+            )
+            
+            response = JSONResponse(content={"performance": performance, "count": len(performance)})
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+        except Exception as exc:
+            logger.exception("Failed to get agent performance: %s", exc)
+            response = JSONResponse(content={"error": str(exc)}, status_code=500)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+    
+    @app.get("/api/analytics/attribution")
+    async def get_performance_attribution(
+        agent_id: str,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+    ) -> Dict[str, object]:
+        """Get performance attribution by strategy, symbol, and period"""
+        from fastapi.responses import JSONResponse
+        from datetime import datetime
+        from .analytics import get_analytics
+        try:
+            if not trading_service._storage:
+                return JSONResponse(content={"error": "Storage not available"}, status_code=503)
+            
+            start = datetime.fromisoformat(start_date) if start_date else None
+            end = datetime.fromisoformat(end_date) if end_date else None
+            
+            analytics = get_analytics(trading_service._storage)
+            attribution = await analytics.performance_attribution(agent_id, start, end)
+            
+            response = JSONResponse(content=attribution)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+        except Exception as exc:
+            logger.exception("Failed to get performance attribution: %s", exc)
+            response = JSONResponse(content={"error": str(exc)}, status_code=500)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+    
+    @app.get("/api/analytics/risk-metrics")
+    async def get_risk_metrics(
+        agent_id: str,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+    ) -> Dict[str, object]:
+        """Get risk-adjusted performance metrics"""
+        from fastapi.responses import JSONResponse
+        from datetime import datetime
+        from .analytics import get_analytics
+        try:
+            if not trading_service._storage:
+                return JSONResponse(content={"error": "Storage not available"}, status_code=503)
+            
+            start = datetime.fromisoformat(start_date) if start_date else None
+            end = datetime.fromisoformat(end_date) if end_date else None
+            
+            analytics = get_analytics(trading_service._storage)
+            metrics = await analytics.risk_adjusted_metrics(agent_id, start, end)
+            
+            response = JSONResponse(content=metrics)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+        except Exception as exc:
+            logger.exception("Failed to get risk metrics: %s", exc)
+            response = JSONResponse(content={"error": str(exc)}, status_code=500)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+    
+    @app.get("/api/analytics/daily-report")
+    async def get_daily_report(
+        agent_id: Optional[str] = None,
+        date: Optional[str] = None,
+    ) -> Dict[str, object]:
+        """Get daily performance report"""
+        from fastapi.responses import JSONResponse
+        from datetime import datetime
+        from .analytics import get_analytics
+        try:
+            if not trading_service._storage:
+                return JSONResponse(content={"error": "Storage not available"}, status_code=503)
+            
+            report_date = datetime.fromisoformat(date) if date else None
+            
+            analytics = get_analytics(trading_service._storage)
+            report = await analytics.generate_daily_report(agent_id, report_date)
+            
+            response = JSONResponse(content=report)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+        except Exception as exc:
+            logger.exception("Failed to get daily report: %s", exc)
+            response = JSONResponse(content={"error": str(exc)}, status_code=500)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+
+    # Vertex AI endpoints temporarily disabled for service stability
+    # @app.get("/api/models/health")
+    # async def get_models_health() -> Dict[str, object]:
+    #     """Get health status of all Vertex AI models."""
+    #     try:
+    #         if not trading_service._vertex_client:
+    #             return {"status": "Vertex AI not configured", "models": {}}
+    #
+    #         models_health = await trading_service._vertex_client.list_all_models()
+    #         return {
+    #             "status": "success",
+    #             "models": models_health,
+    #             "timestamp": time.time()
+    #         }
+    #     except Exception as exc:
+    #         logger.exception("Failed to get models health: %s", exc)
+    #         return {"status": "error", "error": str(exc)}
+
+    # @app.get("/api/models/{agent_id}")
+    # async def get_model_info(agent_id: str) -> Dict[str, object]:
+    #     """Get detailed information about a specific Vertex AI model."""
+    #     return {"status": "Vertex AI temporarily disabled", "agent_id": agent_id}
+
+    # @app.post("/api/models/{agent_id}/test")
+    # async def test_model_inference(agent_id: str, _: None = Depends(require_admin)) -> Dict[str, object]:
+    #     """Test inference with a specific Vertex AI model."""
+    #     return {"status": "Vertex AI temporarily disabled", "agent_id": agent_id}
+
+    # @app.get("/api/models/status")
+    # async def get_models_status() -> Dict[str, object]:
+    #     """Get overall Vertex AI system status."""
+    #     return {"status": "Vertex AI temporarily disabled"}
+
+    # @app.get("/api/models/circuit-breakers")
+    # async def get_circuit_breakers() -> Dict[str, object]:
+    #     """Get circuit breaker status for all agents."""
+    #     return {"status": "Vertex AI temporarily disabled", "circuit_breakers": {}}
+
+    # @app.get("/api/models/performance")
+    # async def get_models_performance() -> Dict[str, object]:
+    #     """Get performance metrics for all agents."""
+    #     return {"status": "Vertex AI temporarily disabled", "performance": {}}
+
+    # @app.post("/api/models/{agent_id}/reset-circuit")
+    # async def reset_agent_circuit_breaker(agent_id: str, _: None = Depends(require_admin)) -> Dict[str, object]:
+    #     """Reset circuit breaker for a specific agent."""
+    #     return {"status": "Vertex AI temporarily disabled", "agent_id": agent_id}
+
+    # @app.get("/api/models/health-detailed")
+    # async def get_detailed_health() -> Dict[str, object]:
+    #     """Get comprehensive health status including circuit breakers and performance."""
+    #     return {"status": "Vertex AI temporarily disabled"}
+
+    # MCP endpoints for agent council
+    @app.get("/api/mcp/messages")
+    async def get_mcp_messages(limit: int = 50) -> Dict[str, object]:
+        """Get recent MCP messages for agent council display."""
+        try:
+            if not trading_service._mcp:
+                return {"messages": [], "status": "mcp_disabled"}
+
+            messages = await trading_service._mcp.get_recent_messages(limit)
+            return {
+                "messages": messages,
+                "status": "connected",
+                "count": len(messages)
+            }
+        except Exception as exc:
+            logger.exception("Failed to get MCP messages: %s", exc)
+            return {"messages": [], "status": "error", "error": str(exc)}
+
+    @app.websocket("/ws/mcp")
+    async def mcp_websocket(websocket: WebSocket) -> None:
+        """WebSocket endpoint for real-time MCP messages."""
+        await websocket.accept()
+        logger.info("MCP WebSocket connection established")
+
+        try:
+            while True:
+                # Send heartbeat every 30 seconds
+                await asyncio.sleep(30)
+                await websocket.send_json({
+                    "type": "heartbeat",
+                    "timestamp": time.time(),
+                    "message": "MCP connection active"
+                })
+        except Exception as exc:
+            logger.exception("MCP WebSocket error: %s", exc)
+        finally:
+            logger.info("MCP WebSocket connection closed")
+
 
     return app

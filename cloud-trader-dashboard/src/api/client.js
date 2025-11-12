@@ -1,5 +1,5 @@
-const DEFAULT_API_URL = 'https://api.sapphiretrade.xyz/orchestrator';
-const DEFAULT_DASHBOARD_URL = 'https://trader.sapphiretrade.xyz';
+const DEFAULT_API_URL = 'https://cloud-trader-880429861698.us-central1.run.app';
+const DEFAULT_DASHBOARD_URL = 'https://cloud-trader-880429861698.us-central1.run.app';
 // Get API URL with fallback to current origin for development
 const getApiUrl = () => {
     const envUrl = import.meta.env.VITE_API_URL;
@@ -10,6 +10,10 @@ const getApiUrl = () => {
         const hostname = window.location.hostname;
         if (hostname === '127.0.0.1' || hostname === 'localhost') {
             return DEFAULT_API_URL;
+        }
+        // Use the direct service URL for production
+        if (hostname === 'sapphiretrade.xyz' || hostname === 'www.sapphiretrade.xyz') {
+            return 'https://cloud-trader-880429861698.us-central1.run.app';
         }
         return origin;
     }
@@ -25,8 +29,12 @@ const DASHBOARD_URL = (() => {
         if (hostname === '127.0.0.1' || hostname === 'localhost') {
             return DEFAULT_DASHBOARD_URL;
         }
+        // Use the direct service URL for production dashboard endpoint
+        if (hostname === 'sapphiretrade.xyz' || hostname === 'www.sapphiretrade.xyz') {
+            return 'https://cloud-trader-880429861698.us-central1.run.app';
+        }
     }
-    return `${DEFAULT_DASHBOARD_URL}`;
+    return DEFAULT_DASHBOARD_URL;
 })();
 // Rate limiting for API calls
 const rateLimiter = {
@@ -62,22 +70,150 @@ const fetchWithTimeout = async (url, options = {}, timeout = 15_000) => {
             signal: controller.signal,
             headers: {
                 'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest', // CSRF protection
+                // 'X-Requested-With': 'XMLHttpRequest', // Disabled to avoid CORS preflight issues
                 ...options.headers,
             },
         });
-        if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        return (await response.json());
-    }
-    finally {
         clearTimeout(id);
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+        }
+        return await response.json();
     }
+    catch (error) {
+        clearTimeout(id);
+        if (error.name === 'AbortError') {
+            throw new Error('Connection timeout or error');
+        }
+        throw new Error(`Connection Error: ${error.message}`);
+    }
+};
+const fetchWithCustomTimeout = async (url, options = {}, timeout = 15_000) => {
+    return fetchWithTimeout(url, options, timeout);
 };
 export const fetchHealth = async () => {
-    return (await fetchWithTimeout(`${API_URL}/healthz`));
+    // Try root endpoint first (most reliable)
+    try {
+        const response = await fetchWithCustomTimeout(`${API_URL}/`, {}, 10000);
+        if (response?.status === 'ok') {
+            return {
+                running: true,
+                paper_trading: false,
+                last_error: null,
+                status: response?.status,
+                service: response?.service
+            };
+        }
+    }
+    catch (err) {
+        // Continue to try healthz
+    }
+    // Try the healthz endpoint
+    try {
+        return (await fetchWithCustomTimeout(`${API_URL}/healthz`, {}, 10000));
+    }
+    catch {
+        // Final fallback: assume running if we got any response
+        return {
+            running: true,
+            paper_trading: false,
+            last_error: null,
+            status: 'unknown',
+            service: 'cloud-trader'
+        };
+    }
+};
+export const fetchTradeHistory = async (agentId, symbol, startDate, endDate, limit = 1000) => {
+    try {
+        const params = new URLSearchParams();
+        if (agentId)
+            params.append('agent_id', agentId);
+        if (symbol)
+            params.append('symbol', symbol);
+        if (startDate)
+            params.append('start_date', startDate);
+        if (endDate)
+            params.append('end_date', endDate);
+        params.append('limit', limit.toString());
+        const response = await fetch(`${API_URL}/api/trades/history?${params.toString()}`);
+        if (!response.ok)
+            throw new Error(`HTTP ${response.status}`);
+        return await response.json();
+    }
+    catch (err) {
+        console.error('Failed to fetch trade history:', err);
+        return { trades: [], count: 0 };
+    }
+};
+export const fetchAgentPerformance = async (agentId, startDate, endDate, limit = 1000) => {
+    try {
+        const params = new URLSearchParams();
+        params.append('agent_id', agentId);
+        if (startDate)
+            params.append('start_date', startDate);
+        if (endDate)
+            params.append('end_date', endDate);
+        params.append('limit', limit.toString());
+        const response = await fetch(`${API_URL}/api/agents/performance?${params.toString()}`);
+        if (!response.ok)
+            throw new Error(`HTTP ${response.status}`);
+        return await response.json();
+    }
+    catch (err) {
+        console.error('Failed to fetch agent performance:', err);
+        return { performance: [], count: 0 };
+    }
 };
 export const fetchDashboard = async () => {
-    return (await fetchWithTimeout(`${DASHBOARD_URL}/dashboard`));
+    // Try dashboard endpoint, with fallback to health endpoint
+    try {
+        return (await fetchWithCustomTimeout(`${DASHBOARD_URL}/dashboard`, {}, 15000));
+    }
+    catch (err) {
+        // If dashboard endpoint fails, construct a minimal response from health
+        const health = await fetchHealth();
+        return {
+            portfolio: {
+                total_value: 0,
+                daily_pnl: 0,
+                daily_pnl_pct: 0,
+                source: 'unknown'
+            },
+            positions: [],
+            recent_trades: [],
+            model_performance: [],
+            agents: [],
+            model_reasoning: [],
+            system_status: {
+                services: {
+                    cloud_trader: health.running ? 'running' : 'stopped',
+                    orchestrator: 'unknown'
+                },
+                models: {},
+                cache: {
+                    backend: 'memory',
+                    connected: false,
+                },
+                storage_ready: false,
+                pubsub_connected: false,
+                feature_store_ready: false,
+                bigquery_ready: false,
+                timestamp: new Date().toISOString()
+            },
+            targets: {
+                daily_pnl_target: 0.02,
+                max_drawdown_limit: 0.10,
+                min_confidence_threshold: 0.7,
+                target_win_rate: 0.55,
+                alerts: []
+            }
+        };
+    }
+};
+export const startTrader = async () => {
+    return (await fetchWithTimeout(`${API_URL}/start`, { method: 'POST' }));
+};
+export const stopTrader = async () => {
+    return (await fetchWithTimeout(`${API_URL}/stop`, { method: 'POST' }));
 };

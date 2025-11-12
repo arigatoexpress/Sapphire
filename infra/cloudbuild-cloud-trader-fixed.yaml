@@ -49,6 +49,8 @@ steps:
       - 'ASTER_API_KEY=ASTER_API_KEY:latest,ASTER_SECRET_KEY=ASTER_SECRET_KEY:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest'
 
 options:
+  machineType: E2_HIGHCPU_32
+  diskSizeGb: 200
   logging: CLOUD_LOGGING_ONLY
 
 timeout: '1800s'

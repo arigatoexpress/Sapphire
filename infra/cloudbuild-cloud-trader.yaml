@@ -58,6 +58,8 @@ steps:
       - 'readinessProbe=httpGet={path=/healthz,port=8080},timeoutSeconds=10,periodSeconds=10,failureThreshold=3,initialDelaySeconds=5'
 
 options:
+  machineType: E2_HIGHCPU_32
+  diskSizeGb: 200
   logging: CLOUD_LOGGING_ONLY
 
 timeout: '1800s'

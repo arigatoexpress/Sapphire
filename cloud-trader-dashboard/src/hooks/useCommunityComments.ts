@@ -1,55 +1,80 @@
 import { useEffect, useState } from 'react';
-import { User } from 'firebase/auth';
+import { type User } from 'firebase/auth';
+import {
+  addCommunityComment,
+  subscribeCommunityComments,
+  type CommunityComment,
+  isRealtimeCommunityEnabled,
+} from '../services/community';
 
-interface CommunityComment {
-  id: string;
-  author: string;
-  message: string;
-  timestamp: string;
-  avatar?: string;
-}
+const FALLBACK_STORAGE_KEY = 'sapphire-community-comments-fallback';
 
-const STORAGE_KEY = 'sapphire-community-comments';
+const readFallbackComments = (): CommunityComment[] => {
+  try {
+    const raw = localStorage.getItem(FALLBACK_STORAGE_KEY);
+    if (raw) {
+      return JSON.parse(raw) as CommunityComment[];
+    }
+  } catch (error) {
+    console.warn('Community comments fallback read failed', error);
+  }
+  return [];
+};
 
-const useCommunityComments = (user: User | null): [CommunityComment[], (message: string) => void] => {
-  const [comments, setComments] = useState<CommunityComment[]>([]);
+const useCommunityComments = (
+  user: User | null,
+): [CommunityComment[], (message: string) => Promise<void>, boolean] => {
+  const [comments, setComments] = useState<CommunityComment[]>(() => readFallbackComments());
+  const [loading, setLoading] = useState<boolean>(isRealtimeCommunityEnabled());
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as CommunityComment[];
-        setComments(parsed);
-      }
-    } catch (err) {
-      console.error('Failed to load community comments', err);
+    if (!isRealtimeCommunityEnabled()) {
+      return;
     }
+
+    setLoading(true);
+    const unsubscribe = subscribeCommunityComments((next: CommunityComment[]) => {
+      setComments(next);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
+    if (!isRealtimeCommunityEnabled()) {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(comments));
-    } catch (err) {
-      console.error('Failed to persist community comments', err);
+        localStorage.setItem(FALLBACK_STORAGE_KEY, JSON.stringify(comments.slice(0, 50)));
+      } catch (error) {
+        console.warn('Community comments fallback write failed', error);
+      }
     }
   }, [comments]);
 
-  const addComment = (message: string) => {
-    if (!user) return;
-    const id = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+  const submitComment = async (message: string) => {
+    if (!user) {
+      throw new Error('Authentication required to leave a comment');
+    }
+
+    if (isRealtimeCommunityEnabled()) {
+      await addCommunityComment(user, message);
+    } else {
+      const fallbackComment: CommunityComment = {
+        id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
       ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random()}`;
-    const newComment: CommunityComment = {
-      id,
-      author: user.displayName || user.email || 'Anonymous',
+          : `${Date.now()}-${Math.random()}`,
+        publicId: 'local-preview',
+        displayName: user.displayName || user.email || 'Anonymous',
       message,
-      timestamp: new Date().toISOString(),
-      avatar: user.photoURL || undefined,
+        createdAt: new Date().toISOString(),
+        avatarUrl: user.photoURL || undefined,
+        mentionedTickers: [],
     };
-    setComments((prev) => [newComment, ...prev].slice(0, 100));
+      setComments((prev) => [fallbackComment, ...prev].slice(0, 50));
+    }
   };
 
-  return [comments, addComment];
+  return [comments, submitComment, loading];
 };
 
 export type { CommunityComment };

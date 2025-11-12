@@ -1,5 +1,13 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, type Auth } from 'firebase/auth';
+import {
+  getAuth,
+  GoogleAuthProvider,
+  FacebookAuthProvider,
+  OAuthProvider,
+  EmailAuthProvider,
+  type Auth,
+} from 'firebase/auth';
+import { getFirestore, type Firestore } from 'firebase/firestore';
 
 type FirebaseConfig = {
   apiKey?: string;
@@ -24,13 +32,30 @@ const isConfigValid = Object.values(firebaseConfig).every((value) => typeof valu
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let googleProvider: GoogleAuthProvider | null = null;
+let facebookProvider: FacebookAuthProvider | null = null;
+let appleProvider: OAuthProvider | null = null;
+let emailProvider: EmailAuthProvider | null = null;
 let firebaseError: string | null = null;
+let firestore: Firestore | null = null;
 
 if (isConfigValid) {
   try {
     app = initializeApp(firebaseConfig as Required<FirebaseConfig>);
     auth = getAuth(app);
+    auth.useDeviceLanguage();
+
     googleProvider = new GoogleAuthProvider();
+    facebookProvider = new FacebookAuthProvider();
+    facebookProvider.addScope('public_profile');
+    facebookProvider.addScope('email');
+
+    appleProvider = new OAuthProvider('apple.com');
+    appleProvider.addScope('email');
+    appleProvider.addScope('name');
+
+    emailProvider = new EmailAuthProvider();
+
+    firestore = getFirestore(app);
   } catch (error) {
     firebaseError = 'Failed to initialise Firebase';
     if (import.meta.env.DEV) {
@@ -44,10 +69,13 @@ if (isConfigValid) {
   }
 }
 
-export const firebaseEnabled = Boolean(app && auth && googleProvider);
+const authReady = Boolean(app && auth && googleProvider);
+
+export const firebaseEnabled = authReady;
+export const firestoreEnabled = Boolean(firestore);
 export const firebaseInitError = firebaseError;
 
-export { auth, googleProvider };
+export { auth, googleProvider, facebookProvider, appleProvider, emailProvider, firestore };
 
 export default app;
 

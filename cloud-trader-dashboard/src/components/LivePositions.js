@@ -25,23 +25,11 @@ const LivePositions = ({ positions }) => {
             timestamp: pos.timestamp ?? new Date().toISOString(),
         };
     });
-    const getModelIcon = (modelName) => {
-        const icons = {
-            'DeepSeek-Coder-V2': '🧠',
-            'Qwen2.5-Coder': '🧮',
-            'FinGPT': '💰',
-            'Phi-3': '🔬'
-        };
-        return icons[modelName] || '🤖';
-    };
     const getPositionColor = (side) => {
         return side.toLowerCase() === 'long' ? 'text-green-600' : 'text-red-600';
     };
     const getPnLColor = (pnl) => {
         return pnl >= 0 ? 'text-green-600' : 'text-red-600';
-    };
-    const getPnLBgColor = (pnl) => {
-        return pnl >= 0 ? 'bg-green-50' : 'bg-red-50';
     };
     // Filter and sort positions
     const filteredPositions = normalizedPositions.filter(pos => filterModel === 'all' || pos.model_used === filterModel);

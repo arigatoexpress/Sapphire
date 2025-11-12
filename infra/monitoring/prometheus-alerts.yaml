@@ -96,6 +96,26 @@ groups:
           summary: "Risk limits being breached frequently"
           description: "Risk limits breached {{ $value }} times/second for {{ $labels.limit_type }}"
 
+      # Agent margin nearly exhausted
+      - alert: AgentMarginCritical
+        expr: max_over_time(agent_margin_utilization_ratio[3m]) > 0.95
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Agent margin nearly exhausted for {{ $labels.agent_id }}"
+          description: "Margin utilization is {{ $value | humanizePercentage }} for {{ $labels.agent_id }}"
+
+      # Portfolio drawdown exceeds tolerance
+      - alert: PortfolioDeepDrawdown
+        expr: portfolio_drawdown_pct > 0.25
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Portfolio drawdown above 25%"
+          description: "Portfolio drawdown currently {{ $value | humanizePercentage }}"
+
       # MCP consensus issues
       - alert: MCPConsensusIssues
         expr: rate(consensus_reached_total[5m]) == 0 and rate(mcp_messages_total{message_type="proposal"}[5m]) > 0.1

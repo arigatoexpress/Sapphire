@@ -1,0 +1,77 @@
+# Optimized Cloud Build configuration for HFT trading system
+steps:
+  # Build optimized multi-stage container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:${BUILD_ID}'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:latest'
+      - '--cache-from'
+      - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:latest'
+      - '--build-arg'
+      - 'BUILDKIT_INLINE_CACHE=1'
+      - '--progress=plain'
+      - '--target=runtime'
+      - '.'
+    env:
+      - 'DOCKER_BUILDKIT=1'
+      - 'BUILDKIT_PROGRESS=plain'
+      
+  # Push container image with both tags
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '--all-tags'
+      - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader'
+      
+  # Deploy to Cloud Run with HFT optimizations
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'cloud-trader'
+      - '--image'
+      - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:latest'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--port'
+      - '8080'
+      - '--memory'
+      - '2Gi'
+      - '--cpu'
+      - '2'
+      - '--cpu-boost'
+      - '--concurrency'
+      - '100'
+      - '--max-instances'
+      - '20'
+      - '--min-instances'
+      - '0'
+      - '--timeout'
+      - '900'
+      - '--set-secrets'
+      - 'ASTER_API_KEY=ASTER_API_KEY:latest,ASTER_SECRET_KEY=ASTER_SECRET_KEY:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest,GROK4_API_KEY=grok4-api-key:latest,REDIS_URL=redis-url:latest'
+      - '--set-env-vars'
+      - 'ENABLE_PAPER_TRADING=false,GCP_PROJECT_ID=${PROJECT_ID},LOG_LEVEL=WARNING,MCP_ENABLED=true'
+      
+images:
+  - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:latest'
+  - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:${BUILD_ID}'
+
+options:
+  machineType: 'N2_HIGHCPU_32'
+  diskSizeGb: 500
+  dynamicSubstitutions: true
+  substitutionOption: 'ALLOW_LOOSE'
+  logging: CLOUD_LOGGING_ONLY
+  env:
+    - 'DOCKER_BUILDKIT=1'
+    - 'BUILDKIT_PROGRESS=plain'
+    
+timeout: '900s'

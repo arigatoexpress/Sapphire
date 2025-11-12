@@ -17,4 +17,3 @@ class RiskCheckResponse(BaseModel):
     approved: bool
     reason: Optional[str] = None
     order_id: Optional[str] = None
-

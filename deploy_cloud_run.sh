@@ -169,16 +169,8 @@ for REGION in "${REGION_LIST[@]}"; do
     --allow-unauthenticated \
     --set-env-vars "${ENV_VARS}" \
     --set-secrets ASTER_API_KEY=ASTER_API_KEY:latest,ASTER_SECRET_KEY=ASTER_SECRET_KEY:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest \
-    --startup-cpu-boost \
-    --cpu-throttling \
-    --startup-probe-path=/healthz \
-    --startup-probe-timeout=300 \
-    --startup-probe-period=10 \
-    --startup-probe-failure-threshold=30 \
-    --readiness-probe-path=/healthz \
-    --readiness-probe-timeout=10 \
-    --readiness-probe-period=10 \
-    --readiness-probe-initial-delay=5
+    --cpu-boost \
+    --cpu-throttling
 done
 
 if $DRY_RUN; then

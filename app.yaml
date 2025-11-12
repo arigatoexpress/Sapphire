@@ -1,0 +1,18 @@
+runtime: python311
+service: default
+
+env_variables:
+  PYTHONPATH: .
+  GCP_PROJECT_ID: "sapphire-477307"
+  ENABLE_PAPER_TRADING: "false"
+  BOT_ID: "cloud_trader"
+
+automatic_scaling:
+  min_instances: 1
+  max_instances: 10
+
+entrypoint: uvicorn cloud_trader.api:build_app --host 0.0.0.0 --port $PORT --factory
+
+handlers:
+- url: /.*
+  script: auto

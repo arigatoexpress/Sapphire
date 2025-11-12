@@ -43,15 +43,6 @@ const LivePositions: React.FC<LivePositionsProps> = ({ positions }) => {
       timestamp: pos.timestamp ?? new Date().toISOString(),
     };
   });
-  const getModelIcon = (modelName: string) => {
-    const icons: { [key: string]: string } = {
-      'DeepSeek-Coder-V2': '🧠',
-      'Qwen2.5-Coder': '🧮',
-      'FinGPT': '💰',
-      'Phi-3': '🔬'
-    };
-    return icons[modelName] || '🤖';
-  };
 
   const getPositionColor = (side: string) => {
     return side.toLowerCase() === 'long' ? 'text-green-600' : 'text-red-600';
@@ -59,10 +50,6 @@ const LivePositions: React.FC<LivePositionsProps> = ({ positions }) => {
 
   const getPnLColor = (pnl: number) => {
     return pnl >= 0 ? 'text-green-600' : 'text-red-600';
-  };
-
-  const getPnLBgColor = (pnl: number) => {
-    return pnl >= 0 ? 'bg-green-50' : 'bg-red-50';
   };
 
   // Filter and sort positions

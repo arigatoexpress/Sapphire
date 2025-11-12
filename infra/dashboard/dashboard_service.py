@@ -224,7 +224,7 @@ class DashboardService:
             ModelReasoning(
                 model_name=random.choice(["DeepSeek-Coder-V2", "Qwen2.5-Coder", "FinGPT", "Phi-3"]),
                 decision=random.choice(["BUY", "SELL", "HOLD"]),
-                reasoning=f"Analysis of market conditions shows {random.choice(['bullish', 'bearish', 'neutral']} momentum",
+                reasoning=f"Analysis of market conditions shows {random.choice(['bullish', 'bearish', 'neutral'])} momentum",
                 confidence=random.uniform(0.7, 0.95),
                 context={"rsi": random.uniform(30, 70), "volume": random.uniform(1000, 5000)},
                 timestamp=datetime.utcnow(),

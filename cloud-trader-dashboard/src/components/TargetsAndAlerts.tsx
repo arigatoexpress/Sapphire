@@ -111,7 +111,7 @@ const TargetsAndAlerts: React.FC<TargetsAndAlertsProps> = ({ targets }) => {
                   <div className="flex items-start space-x-3">
                     <span className="text-lg flex-shrink-0">{getAlertIcon(alert)}</span>
                     <div className="flex-1">
-                      <p className="font-medium">{alert.replace(/^[⚠️🎯ℹ️]\s*/, '')}</p>
+                      <p className="font-medium">{alert.replace(/^[^A-Za-z0-9]*\s*/, '')}</p>
                     </div>
                   </div>
                 </div>

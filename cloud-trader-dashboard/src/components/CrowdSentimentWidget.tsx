@@ -4,16 +4,24 @@ interface CrowdSentimentWidgetProps {
   totalVotes: number;
   bullishVotes: number;
   bearishVotes: number;
+  hasVoted: boolean;
   onVote: (vote: 'bullish' | 'bearish') => void;
+  onAuthenticate: () => void;
+  isAuthenticated: boolean;
   onReset?: () => void;
+  loading?: boolean;
 }
 
 const CrowdSentimentWidget: React.FC<CrowdSentimentWidgetProps> = ({
   totalVotes,
   bullishVotes,
   bearishVotes,
+  hasVoted,
   onVote,
+  onAuthenticate,
+  isAuthenticated,
   onReset,
+  loading = false,
 }) => {
   const bullishPercentage = useMemo(() => {
     if (totalVotes === 0) return 0;
@@ -49,8 +57,9 @@ const CrowdSentimentWidget: React.FC<CrowdSentimentWidgetProps> = ({
 
         <div className="grid gap-4 md:grid-cols-2">
           <button
-            onClick={() => onVote('bullish')}
-            className="group rounded-3xl border border-emerald-400/40 bg-emerald-500/15 px-5 py-4 text-left shadow-glass transition-transform hover:-translate-y-1"
+            onClick={() => (isAuthenticated ? onVote('bullish') : onAuthenticate())}
+            disabled={loading || (!isAuthenticated && hasVoted)}
+            className="group rounded-3xl border border-emerald-400/40 bg-emerald-500/15 px-5 py-4 text-left shadow-glass transition-transform hover:-translate-y-1 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <div className="flex items-center gap-3">
               <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-400/30 text-lg">🟢</span>
@@ -62,8 +71,9 @@ const CrowdSentimentWidget: React.FC<CrowdSentimentWidgetProps> = ({
           </button>
 
           <button
-            onClick={() => onVote('bearish')}
-            className="group rounded-3xl border border-red-400/40 bg-red-500/15 px-5 py-4 text-left shadow-glass transition-transform hover:-translate-y-1"
+            onClick={() => (isAuthenticated ? onVote('bearish') : onAuthenticate())}
+            disabled={loading || (!isAuthenticated && hasVoted)}
+            className="group rounded-3xl border border-red-400/40 bg-red-500/15 px-5 py-4 text-left shadow-glass transition-transform hover:-translate-y-1 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <div className="flex items-center gap-3">
               <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-red-400/30 text-lg">🔴</span>
@@ -77,6 +87,8 @@ const CrowdSentimentWidget: React.FC<CrowdSentimentWidgetProps> = ({
 
         <div className="rounded-3xl border border-white/10 bg-black/20 px-5 py-4">
           <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Community Breakdown</p>
+          {hasVoted ? (
+            <>
           <div className="mt-3 flex flex-col gap-3 text-sm text-slate-200">
             <div className="flex items-center justify-between">
               <span>Participants</span>
@@ -98,6 +110,23 @@ const CrowdSentimentWidget: React.FC<CrowdSentimentWidgetProps> = ({
               style={{ width: `${bullishPercentage}%` }}
             />
           </div>
+            </>
+          ) : (
+            <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300">
+              <p className="font-medium text-white">Vote to unlock community consensus.</p>
+              <p className="mt-1 text-xs text-slate-300/80">
+                We protect privacy by sharing only anonymized aggregates. Cast your signal to see how the crowd is leaning.
+              </p>
+              {!isAuthenticated && (
+                <button
+                  onClick={onAuthenticate}
+                  className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.28em] text-white transition hover:bg-white/20"
+                >
+                  Authenticate & Vote
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </section>

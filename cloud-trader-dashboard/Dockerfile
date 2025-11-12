@@ -3,8 +3,14 @@ FROM node:20-alpine AS build
 
 WORKDIR /app
 
-# Set environment to force rollup to use JS instead of native binaries
-ENV ROLLUP_SKIP_NODEJS_NATIVE_DEPS=true
+# Set environment defaults for build-time flags
+ARG VITE_MAINTENANCE_MODE=false
+ARG VITE_API_URL
+ARG VITE_DASHBOARD_URL
+ENV VITE_MAINTENANCE_MODE=$VITE_MAINTENANCE_MODE \
+    VITE_API_URL=$VITE_API_URL \
+    VITE_DASHBOARD_URL=$VITE_DASHBOARD_URL \
+    ROLLUP_SKIP_NODEJS_NATIVE_DEPS=true
 
 # Copy package files
 COPY package*.json ./

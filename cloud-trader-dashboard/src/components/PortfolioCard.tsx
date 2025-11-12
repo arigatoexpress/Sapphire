@@ -23,6 +23,11 @@ const PortfolioCard: React.FC<PortfolioCardProps> = ({ portfolio }) => {
     }).format(value);
   };
 
+  const formatMaskedCurrency = (value: number) => {
+    void value;
+    return '%s';
+  };
+
   if (!portfolio) {
     return (
       <div className="rounded-2xl border border-surface-200/40 bg-surface-100/60 p-6 shadow-glass">
@@ -48,7 +53,7 @@ const PortfolioCard: React.FC<PortfolioCardProps> = ({ portfolio }) => {
       <div className="relative flex items-center justify-between">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Portfolio Overview</p>
-          <h3 className="mt-2 text-2xl font-semibold text-white">{formatCurrency(balance)}</h3>
+          <h3 className="mt-2 text-2xl font-semibold text-white">{formatMaskedCurrency(balance)}</h3>
           <p className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-500">
             Source · {portfolio.source ?? 'local cache'}
           </p>
@@ -63,7 +68,7 @@ const PortfolioCard: React.FC<PortfolioCardProps> = ({ portfolio }) => {
       <div className="relative mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-surface-200/40 bg-surface-50/40 p-4">
           <p className="text-[0.65rem] uppercase tracking-[0.3em] text-slate-500">Balance</p>
-          <p className="mt-2 text-xl font-semibold text-white">{formatCurrency(balance)}</p>
+          <p className="mt-2 text-xl font-semibold text-white">{formatMaskedCurrency(balance)}</p>
         </div>
         <div className="rounded-xl border border-surface-200/40 bg-surface-50/40 p-4">
           <p className="text-[0.65rem] uppercase tracking-[0.3em] text-slate-500">Exposure</p>

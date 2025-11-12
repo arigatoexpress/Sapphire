@@ -1,25 +1,49 @@
-# This file controls which files are uploaded to Cloud Build.
-# Keep it intentionally lean so required build artifacts are available.
+# Default gcloudignore file. Copy of .gitignore rules plus additional heavy directories.
 
-# Exclude VCS and local-only directories
 .git/
-.gitignore
 .gcloudignore
-.vscode/
-.idea/
-
-# Python virtual environments and caches
-.venv/
-__pycache__/
-
-# Node dependency directories
+**/__pycache__/
+**/.pytest_cache/
+venv/
+venv311/
+env/
 node_modules/
 cloud-trader-dashboard/node_modules/
-
-# OS junk
-.DS_Store
-
-# Include the compiled frontend bundle explicitly so Cloud Build ships it
-!cloud-trader-dashboard/dist/
-!cloud-trader-dashboard/dist/**
-
+cloud-trader-dashboard/dist/
+*.log
+*.zip
+*.tar
+*.tar.gz
+**/.DS_Store
+# Additional exclusions for faster builds
+.ipynb_checkpoints/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+.cache/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.tox/
+.venv/
+*.egg-info/
+dist/
+build/
+# Documentation and non-essential files
+docs/
+notebooks/
+*.md
+!README.md
+# Test files (keep only essential ones)
+tests/
+!tests/test_trading_flow.py
+# Remove large model directories that aren't needed
+models/deepseek/
+models/fingpt/
+models/lagllama/
+models/phi3/
+models/qwen/
+models/router/
+# Keep only the model files we actually use
+!models/common/

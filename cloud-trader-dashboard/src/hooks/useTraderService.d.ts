@@ -18,9 +18,9 @@ export declare const useTraderService: () => {
     loading: boolean;
     error: string | null;
     logs: LogEntry[];
-    connectionStatus: "connecting" | "connected" | "disconnected";
+    connectionStatus: "connected" | "disconnected" | "connecting";
     mcpMessages: MCPMessage[];
-    mcpStatus: "connecting" | "connected" | "disconnected";
+    mcpStatus: "connected" | "disconnected" | "connecting";
     refresh: () => Promise<void>;
     addLog: (message: string, type?: LogEntry["type"]) => void;
 };

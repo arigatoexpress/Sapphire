@@ -5,17 +5,23 @@ const PerformanceChart = ({ data: initialData, detailed = false }) => {
     const [loading, setLoading] = useState(true);
     // Mock performance data - in real implementation, this would come from your backend
     useEffect(() => {
+        if (initialData && initialData.length) {
+            setPerformanceData(initialData);
+            setLoading(false);
+            return;
+        }
         const generateMockData = () => {
+            const hours = detailed ? 36 : 24;
             const data = [];
             const now = Date.now();
             let balance = 1000;
-            for (let i = 23; i >= 0; i--) {
-                const timestamp = now - (i * 60 * 60 * 1000); // Hourly data for last 24 hours
-                const pnlChange = (Math.random() - 0.5) * 20; // Random P&L change
+            for (let i = hours - 1; i >= 0; i--) {
+                const timestamp = now - i * 60 * 60 * 1000; // Hourly data
+                const pnlChange = (Math.random() - 0.5) * (detailed ? 15 : 20);
                 balance += pnlChange;
                 data.push({
                     timestamp,
-                    balance: Math.max(950, balance), // Ensure balance doesn't go too low
+                    balance: Math.max(950, balance),
                     pnl: pnlChange,
                 });
             }
@@ -23,7 +29,7 @@ const PerformanceChart = ({ data: initialData, detailed = false }) => {
             setLoading(false);
         };
         generateMockData();
-    }, []);
+    }, [initialData, detailed]);
     const formatCurrency = (value) => {
         return new Intl.NumberFormat('en-US', {
             style: 'currency',

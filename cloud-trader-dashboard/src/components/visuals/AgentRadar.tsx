@@ -13,8 +13,21 @@ const statusColorMap: Record<string, string> = {
 };
 
 const AgentRadar: React.FC<AgentRadarProps> = ({ agent }) => {
-  const tokens = useMemo(() => agent.symbols ?? [], [agent.symbols]);
   const activeSymbols = useMemo(() => new Set((agent.positions ?? []).map((p) => (p.symbol || '').toUpperCase())), [agent.positions]);
+
+  // Show only active positions + up to 8 example symbols for visual variety
+  const tokens = useMemo(() => {
+    const allSymbols = agent.symbols ?? [];
+    if (allSymbols.length === 0) return [];
+
+    const activePositions = Array.from(activeSymbols);
+    const availableSymbols = allSymbols.filter(s => !activeSymbols.has(s.toUpperCase()));
+
+    // Prioritize active positions, then add some examples for visual effect
+    const displaySymbols = [...activePositions, ...availableSymbols.slice(0, Math.max(0, 12 - activePositions.length))];
+
+    return displaySymbols;
+  }, [agent.symbols, activeSymbols]);
 
   const radarTargets = useMemo(() => {
     if (tokens.length === 0) {
@@ -39,11 +52,9 @@ const AgentRadar: React.FC<AgentRadarProps> = ({ agent }) => {
 
   return (
     <div className="relative flex flex-col items-center gap-3">
-      {/* Agent Name Title - Moved Outside Radar */}
+      {/* Status and Targets - Name removed (shown in AgentCard header) */}
       <div className="text-center">
-        <h3 className="text-sm font-semibold text-white">{agent.name}</h3>
-        <div className="flex items-center justify-center gap-2 mt-1">
-          <span className={`text-[0.65rem] uppercase tracking-[0.4em] text-slate-400 ${statusColor}`}>Radar</span>
+        <div className="flex items-center justify-center gap-2">
           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-[0.28em] ${
             agent.status === 'active' ? 'bg-emerald-400/20 text-emerald-200' :
             agent.status === 'monitoring' ? 'bg-sky-400/20 text-sky-200' :
@@ -52,8 +63,8 @@ const AgentRadar: React.FC<AgentRadarProps> = ({ agent }) => {
             {agent.status}
           </span>
         </div>
-        <p className="text-[0.6rem] text-slate-400 mt-1">
-          Targets: {tokens.join(' · ') || '—'}
+        <p className="text-[0.65rem] text-slate-400 mt-2">
+          {agent.symbols?.length ? `${agent.symbols.length} symbols available` : 'Monitoring'}
         </p>
       </div>
 

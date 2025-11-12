@@ -1,35 +1,49 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+const badgeTone = (value) => {
+    const normalized = typeof value === 'string' ? value.toLowerCase() : value;
+    if (normalized === true || normalized === 'online' || normalized === 'healthy' || normalized === 'connected') {
+        return 'bg-emerald-100/60 text-emerald-600';
+    }
+    if (normalized === false || normalized === 'offline' || normalized === 'unhealthy' || normalized === 'disconnected') {
+        return 'bg-rose-100/60 text-rose-600';
+    }
+    return 'bg-slate-200/60 text-slate-600';
+};
+const badgeIcon = (value) => {
+    const normalized = typeof value === 'string' ? value.toLowerCase() : value;
+    if (normalized === true || normalized === 'online' || normalized === 'healthy' || normalized === 'connected') {
+        return '🟢';
+    }
+    if (normalized === false || normalized === 'offline' || normalized === 'unhealthy' || normalized === 'disconnected') {
+        return '🔴';
+    }
+    return '🟡';
+};
 const SystemStatus = ({ status }) => {
-    const getStatusColor = (status) => {
-        switch (status.toLowerCase()) {
-            case 'healthy':
-            case 'online':
-                return 'bg-green-100 text-green-800';
-            case 'unhealthy':
-            case 'offline':
-                return 'bg-red-100 text-red-800';
-            case 'unreachable':
-                return 'bg-gray-100 text-gray-800';
-            default:
-                return 'bg-yellow-100 text-yellow-800';
-        }
-    };
-    const getStatusIcon = (status) => {
-        switch (status.toLowerCase()) {
-            case 'healthy':
-            case 'online':
-                return '🟢';
-            case 'unhealthy':
-            case 'offline':
-                return '🔴';
-            case 'unreachable':
-                return '⚫';
-            default:
-                return '🟡';
-        }
-    };
-    const services = status?.services || {};
-    const models = status?.models || {};
-    return (_jsxs("div", { className: "bg-white rounded-lg shadow-sm border border-slate-200 p-6", children: [_jsxs("div", { className: "flex items-center justify-between mb-6", children: [_jsx("h2", { className: "text-xl font-semibold text-slate-900", children: "System Status" }), _jsxs("div", { className: "flex items-center space-x-2 text-sm text-slate-500", children: [_jsxs("span", { children: ["Last updated: ", status?.timestamp ? new Date(status.timestamp).toLocaleTimeString() : 'Never'] }), _jsx("div", { className: `w-2 h-2 rounded-full ${status?.redis_connected ? 'bg-green-500' : 'bg-red-500'}` })] })] }), _jsxs("div", { className: "grid grid-cols-1 lg:grid-cols-2 gap-8", children: [_jsxs("div", { children: [_jsxs("h3", { className: "text-lg font-medium text-slate-900 mb-4 flex items-center", children: [_jsx("span", { className: "mr-2", children: "\uD83D\uDD27" }), "Core Services"] }), _jsxs("div", { className: "space-y-3", children: [Object.entries(services).map(([service, status]) => (_jsxs("div", { className: "flex items-center justify-between p-3 bg-slate-50 rounded-lg", children: [_jsxs("div", { className: "flex items-center space-x-3", children: [_jsx("span", { className: "text-lg", children: getStatusIcon(status) }), _jsx("span", { className: "font-medium text-slate-900 capitalize", children: service.replace('_', ' ') })] }), _jsx("span", { className: `px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(status)}`, children: status })] }, service))), Object.keys(services).length === 0 && (_jsx("div", { className: "text-center py-4 text-slate-500", children: _jsx("p", { children: "No service data available" }) }))] })] }), _jsxs("div", { children: [_jsxs("h3", { className: "text-lg font-medium text-slate-900 mb-4 flex items-center", children: [_jsx("span", { className: "mr-2", children: "\uD83E\uDD16" }), "AI Models"] }), _jsxs("div", { className: "space-y-3", children: [Object.entries(models).map(([model, status]) => (_jsxs("div", { className: "flex items-center justify-between p-3 bg-slate-50 rounded-lg", children: [_jsxs("div", { className: "flex items-center space-x-3", children: [_jsx("span", { className: "text-lg", children: getStatusIcon(status) }), _jsx("span", { className: "font-medium text-slate-900", children: model })] }), _jsx("span", { className: `px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(status)}`, children: status })] }, model))), Object.keys(models).length === 0 && (_jsx("div", { className: "text-center py-4 text-slate-500", children: _jsx("p", { children: "No model data available" }) }))] })] })] }), _jsx("div", { className: "mt-6 pt-6 border-t border-slate-200", children: _jsxs("div", { className: "flex items-center justify-between", children: [_jsxs("div", { className: "flex items-center space-x-3", children: [_jsx("span", { className: "text-lg", children: status?.redis_connected ? '🟢' : '🔴' }), _jsxs("div", { children: [_jsx("span", { className: "font-medium text-slate-900", children: "Redis Connection" }), _jsx("p", { className: "text-sm text-slate-500", children: "Data streaming and caching" })] })] }), _jsx("span", { className: `px-3 py-1 rounded-full text-sm font-medium ${status?.redis_connected ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`, children: status?.redis_connected ? 'Connected' : 'Disconnected' })] }) }), _jsxs("div", { className: "mt-6 grid grid-cols-1 md:grid-cols-3 gap-4", children: [_jsxs("div", { className: "bg-slate-50 rounded-lg p-4 text-center", children: [_jsxs("div", { className: "text-2xl font-bold text-slate-900", children: [Object.values(services).filter(s => s === 'healthy').length, "/", Object.keys(services).length] }), _jsx("div", { className: "text-sm text-slate-600", children: "Services Healthy" })] }), _jsxs("div", { className: "bg-slate-50 rounded-lg p-4 text-center", children: [_jsxs("div", { className: "text-2xl font-bold text-slate-900", children: [Object.values(models).filter(s => s === 'healthy').length, "/", Object.keys(models).length] }), _jsx("div", { className: "text-sm text-slate-600", children: "Models Healthy" })] }), _jsxs("div", { className: "bg-slate-50 rounded-lg p-4 text-center", children: [_jsx("div", { className: `text-2xl font-bold ${status?.redis_connected ? 'text-green-600' : 'text-red-600'}`, children: status?.redis_connected ? '✓' : '✗' }), _jsx("div", { className: "text-sm text-slate-600", children: "Data Pipeline" })] })] })] }));
+    const services = status?.services ?? {};
+    const models = status?.models ?? {};
+    const infrastructureChecks = [
+        {
+            label: `Cache (${status?.cache?.backend ?? 'memory'})`,
+            value: status?.cache?.connected ?? false,
+        },
+        {
+            label: 'Storage',
+            value: status?.storage_ready ?? false,
+        },
+        {
+            label: 'Pub/Sub',
+            value: status?.pubsub_connected ?? false,
+        },
+        {
+            label: 'Feature Store',
+            value: status?.feature_store_ready ?? false,
+        },
+        {
+            label: 'BigQuery',
+            value: status?.bigquery_ready ?? false,
+        },
+    ];
+    return (_jsxs("div", { className: "sapphire-panel border border-brand-border/50 bg-brand-abyss/70 p-6", children: [_jsxs("div", { className: "flex flex-col gap-4 md:flex-row md:items-center md:justify-between", children: [_jsxs("div", { children: [_jsx("p", { className: "text-xs uppercase tracking-[0.32em] text-brand-muted/80", children: "System Status" }), _jsx("h2", { className: "text-xl font-semibold text-brand-ice", children: "Runtime Snapshot" })] }), _jsxs("div", { className: "flex items-center gap-2 text-xs text-brand-muted/70", children: [_jsx("span", { children: "Last updated:" }), _jsx("span", { className: "rounded-full bg-brand-border/60 px-2 py-1 text-brand-ice", children: status?.timestamp ? new Date(status.timestamp).toLocaleTimeString() : 'Never' })] })] }), _jsxs("div", { className: "mt-6 grid gap-6 lg:grid-cols-[2fr,1fr]", children: [_jsxs("div", { className: "space-y-4", children: [_jsxs("section", { children: [_jsx("h3", { className: "mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-brand-muted/70", children: "Core Services" }), _jsxs("div", { className: "grid gap-2 sm:grid-cols-2", children: [Object.entries(services).map(([service, svcStatus]) => (_jsxs("div", { className: "flex items-center justify-between rounded-lg bg-brand-midnight/70 px-3 py-2", children: [_jsxs("div", { className: "flex items-center gap-2 text-brand-ice", children: [_jsx("span", { children: badgeIcon(svcStatus) }), _jsx("span", { className: "capitalize tracking-wide", children: service.replace('_', ' ') })] }), _jsx("span", { className: `rounded-full px-2 py-0.5 text-xs font-medium ${badgeTone(svcStatus)}`, children: svcStatus })] }, service))), Object.keys(services).length === 0 && (_jsx("div", { className: "rounded-lg bg-brand-midnight/60 px-3 py-6 text-center text-sm text-brand-muted", children: "No service telemetry available" }))] })] }), _jsxs("section", { children: [_jsx("h3", { className: "mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-brand-muted/70", children: "AI Models" }), _jsxs("div", { className: "grid gap-2 sm:grid-cols-2", children: [Object.entries(models).map(([model, mdlStatus]) => (_jsxs("div", { className: "flex items-center justify-between rounded-lg bg-brand-midnight/70 px-3 py-2", children: [_jsxs("div", { className: "flex items-center gap-2 text-brand-ice", children: [_jsx("span", { children: badgeIcon(mdlStatus) }), _jsx("span", { className: "tracking-wide", children: model })] }), _jsx("span", { className: `rounded-full px-2 py-0.5 text-xs font-medium ${badgeTone(mdlStatus)}`, children: mdlStatus })] }, model))), Object.keys(models).length === 0 && (_jsx("div", { className: "rounded-lg bg-brand-midnight/60 px-3 py-6 text-center text-sm text-brand-muted", children: "No model telemetry available" }))] })] })] }), _jsxs("aside", { className: "rounded-xl border border-brand-border/60 bg-brand-midnight/70 p-4", children: [_jsx("h3", { className: "mb-4 text-sm font-semibold uppercase tracking-[0.2em] text-brand-muted/70", children: "Data Backbone" }), _jsx("div", { className: "space-y-3", children: infrastructureChecks.map(({ label, value }) => (_jsxs("div", { className: "flex items-center justify-between", children: [_jsx("span", { className: "text-sm text-brand-muted", children: label }), _jsx("span", { className: `rounded-full px-2 py-0.5 text-xs font-medium ${badgeTone(value)}`, children: value ? 'Connected' : 'Offline' })] }, label))) })] })] })] }));
 };
 export default SystemStatus;

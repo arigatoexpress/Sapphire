@@ -23,12 +23,12 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ alerts = [] }) 
     const newNotifications: Notification[] = alerts.map((alert, index) => ({
       id: `alert-${Date.now()}-${index}`,
       type: alert.includes('⚠️') ? 'warning' :
-            alert.includes('🎯') ? 'success' :
-            alert.includes('❌') ? 'error' : 'info',
+        alert.includes('🎯') ? 'success' :
+          alert.includes('❌') ? 'error' : 'info',
       title: alert.includes('⚠️') ? 'Risk Alert' :
-             alert.includes('🎯') ? 'Target Achieved' :
-             alert.includes('❌') ? 'Error' : 'System Info',
-      message: alert.replace(/^[⚠️🎯ℹ️❌]\s*/, ''),
+        alert.includes('🎯') ? 'Target Achieved' :
+          alert.includes('❌') ? 'Error' : 'System Info',
+      message: alert.replace(/^[^A-Za-z0-9]*\s*/, ''),
       timestamp: new Date(),
       read: false
     }));
@@ -84,15 +84,6 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ alerts = [] }) 
 
   const markAllAsRead = () => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-  };
-
-  const getTypeColor = (type: Notification['type']) => {
-    switch (type) {
-      case 'success': return 'text-green-600 bg-green-50 border-green-200';
-      case 'warning': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-      case 'error': return 'text-red-600 bg-red-50 border-red-200';
-      case 'info': return 'text-blue-600 bg-blue-50 border-blue-200';
-    }
   };
 
   const getTypeIcon = (type: Notification['type']) => {
@@ -159,9 +150,8 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ alerts = [] }) 
               filteredNotifications.map((notification) => (
                 <div
                   key={notification.id}
-                  className={`p-4 border-b border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors ${
-                    !notification.read ? 'bg-blue-50' : ''
-                  }`}
+                  className={`p-4 border-b border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors ${!notification.read ? 'bg-blue-50' : ''
+                    }`}
                   onClick={() => markAsRead(notification.id)}
                 >
                   <div className="flex items-start space-x-3">
