@@ -330,7 +330,7 @@ const AgentActivityGrid: React.FC = () => {
       <Box display="flex" alignItems="center" gap={2} mb={3}>
         <Psychology sx={{ fontSize: 28, color: 'primary.main' }} />
         <Typography variant="h5" sx={{ fontWeight: 600 }}>
-          Agent Activity Grid
+          AI Agent Status
         </Typography>
       </Box>
 

@@ -40,30 +40,55 @@ const Dashboard: React.FC = () => {
         </Alert>
       )}
 
-      {/* Enhanced Metrics Cards */}
+      {/* System Overview */}
+      <Typography variant="h4" sx={{ mb: 1, fontWeight: 700 }}>
+        Trading Operations Center
+      </Typography>
+      <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
+        Enterprise-grade autonomous trading system with real-time monitoring and AI-driven decision making.
+      </Typography>
+
+      {/* Key Performance Indicators */}
       <EnhancedMetrics />
 
-      {/* Portfolio Performance Chart */}
+      {/* Portfolio Performance */}
       <PortfolioChart />
 
-      {/* Agent Activity Grid */}
+      {/* AI Agent Activity */}
       <AgentActivityGrid />
 
-      {/* System Status Footer */}
+      {/* System Status */}
       <Box
         sx={{
           mt: 4,
-          p: 2,
+          p: 3,
           borderRadius: 2,
           bgcolor: 'background.paper',
           border: '1px solid',
           borderColor: 'divider',
-          textAlign: 'center',
         }}
       >
-        <Typography variant="body2" color="text.secondary">
-          💎 Sapphire Trading AI - System Online | Last Updated: {new Date().toLocaleTimeString()}
+        <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+          System Status
         </Typography>
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 2 }}>
+          <Box>
+            <Typography variant="body2" color="text.secondary">Architecture</Typography>
+            <Typography variant="body1" sx={{ fontWeight: 600 }}>Kubernetes + GCP</Typography>
+          </Box>
+          <Box>
+            <Typography variant="body2" color="text.secondary">Uptime Target</Typography>
+            <Typography variant="body1" sx={{ fontWeight: 600 }}>99.9%</Typography>
+          </Box>
+          <Box>
+            <Typography variant="body2" color="text.secondary">AI Agents</Typography>
+            <Typography variant="body1" sx={{ fontWeight: 600 }}>6 Active</Typography>
+          </Box>
+          <Box>
+            <Typography variant="body2" color="text.secondary">Last Updated</Typography>
+            <Typography variant="body1" sx={{ fontWeight: 600 }}>{new Date().toLocaleTimeString()}</Typography>
+          </Box>
+        </Box>
       </Box>
     </Container>
   );

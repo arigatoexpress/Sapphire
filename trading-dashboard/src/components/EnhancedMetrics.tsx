@@ -204,7 +204,7 @@ const EnhancedMetrics: React.FC = () => {
     <Box sx={{ mb: 4 }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h5" sx={{ fontWeight: 600, color: 'text.primary' }}>
-          System Overview
+          Key Metrics
         </Typography>
         <Tooltip title="Refresh data" arrow>
           <IconButton
@@ -229,13 +229,13 @@ const EnhancedMetrics: React.FC = () => {
           <MetricCard
             title="Portfolio Value"
             value={portfolio?.portfolio_value || 0}
-            subtitle="Total account balance"
+            subtitle="Account balance"
             icon={<AccountBalance />}
             color="#00d4aa"
             trend={portfolioChange.trend}
             trendValue={portfolioChange.value}
             loading={loading}
-            tooltip="Current total portfolio value across all positions"
+            tooltip="Total value of all trading positions"
           />
         </Grid>
 
@@ -243,11 +243,11 @@ const EnhancedMetrics: React.FC = () => {
           <MetricCard
             title="Active Agents"
             value={agentActivities.length}
-            subtitle={`${agentActivities.filter(a => a.activity_score > 5).length} highly active`}
+            subtitle={`${agentActivities.filter(a => a.activity_score > 5).length} high activity`}
             icon={<Psychology />}
             color="#ff6b35"
             loading={loading}
-            tooltip="Number of currently active trading agents"
+            tooltip="AI agents currently engaged in trading"
           />
         </Grid>
 
@@ -255,11 +255,11 @@ const EnhancedMetrics: React.FC = () => {
           <MetricCard
             title="Trading Signals"
             value={recentSignals.length}
-            subtitle="Last 24 hours"
+            subtitle="Recent activity"
             icon={<Analytics />}
             color="#4ecdc4"
             loading={loading}
-            tooltip="Number of trading signals generated recently"
+            tooltip="Trading decisions made in last 24 hours"
           />
         </Grid>
 
@@ -267,11 +267,11 @@ const EnhancedMetrics: React.FC = () => {
           <MetricCard
             title="Risk Level"
             value={portfolio ? `${(portfolio.risk_limit * 100).toFixed(1)}%` : '15.0%'}
-            subtitle={portfolio?.portfolio_value ? 'Within limits' : 'Monitoring'}
+            subtitle="Max drawdown limit"
             icon={<Warning />}
             color={portfolio?.portfolio_value ? '#00d4aa' : '#ffaa00'}
             loading={loading}
-            tooltip="Current risk exposure as percentage of portfolio"
+            tooltip="Maximum allowed portfolio drawdown"
           />
         </Grid>
       </Grid>
@@ -289,7 +289,7 @@ const EnhancedMetrics: React.FC = () => {
           icon={<div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#00d4aa', marginLeft: 8 }} />}
         />
         <Chip
-          label="Auto-Trading Active"
+          label="Automated Trading"
           sx={{
             bgcolor: '#ff6b3520',
             color: '#ff6b35',
@@ -297,19 +297,11 @@ const EnhancedMetrics: React.FC = () => {
           }}
         />
         <Chip
-          label="Risk Management: Enabled"
+          label="Risk Controls Active"
           sx={{
             bgcolor: '#4ecdc420',
             color: '#4ecdc4',
             border: '1px solid #4ecdc440',
-          }}
-        />
-        <Chip
-          label={`Agents: ${agentActivities.length} Connected`}
-          sx={{
-            bgcolor: '#ffe66d20',
-            color: '#ffe66d',
-            border: '1px solid #ffe66d40',
           }}
         />
       </Box>

@@ -200,9 +200,9 @@ const PortfolioChart: React.FC = () => {
           <Box>
             <Box display="flex" alignItems="center" gap={2} mb={1}>
               <Timeline sx={{ fontSize: 28, color: 'primary.main' }} />
-              <Typography variant="h5" sx={{ fontWeight: 600 }}>
-                Portfolio Performance
-              </Typography>
+      <Typography variant="h5" sx={{ fontWeight: 600 }}>
+        Portfolio Value
+      </Typography>
             </Box>
             <Box display="flex" alignItems="center" gap={2}>
               <Typography variant="h3" sx={{ fontWeight: 700, color: 'primary.main' }}>
