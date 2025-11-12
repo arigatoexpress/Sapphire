@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-coordinator
+  namespace: trading
+  labels:
+    app: mcp-coordinator
+    component: messaging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mcp-coordinator
+      component: messaging
+  template:
+    metadata:
+      labels:
+        app: mcp-coordinator
+        component: messaging
+    spec:
+      containers:
+      - name: mcp-coordinator
+        image: us-central1-docker.pkg.dev/sapphireinfinite/cloud-run-source-deploy/cloud-trader:latest
+        command: ["python", "-m", "cloud_trader.mcp_coordinator"]
+        ports:
+        - containerPort: 8081
+          name: http
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "1Gi"
+        env:
+        - name: GCP_PROJECT_ID
+          value: "sapphireinfinite"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: MCP_ENABLED
+          value: "true"
+        envFrom:
+        - secretRef:
+            name: cloud-trader-secrets
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/sapphire-icon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Sapphire Trading - Real-time Autonomous AI Trading Dashboard" />
+    <meta name="theme-color" content="#00d4aa" />
+
+    <!-- Preconnect to Firebase -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <title>💎 Sapphire Trading - Autonomous AI Dashboard</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+
+    <!-- Performance monitoring -->
+    <script>
+      // Basic performance monitoring
+      window.addEventListener('load', () => {
+        if ('performance' in window && 'getEntriesByType' in performance) {
+          const navigation = performance.getEntriesByType('navigation')[0];
+          if (navigation) {
+            console.log(`Page loaded in ${navigation.loadEventEnd - navigation.loadEventStart}ms`);
+          }
+        }
+      });
+
+      // Error boundary for production
+      window.addEventListener('error', (event) => {
+        console.error('Application Error:', event.error);
+        // Could send to error reporting service
+      });
+
+      window.addEventListener('unhandledrejection', (event) => {
+        console.error('Unhandled Promise Rejection:', event.reason);
+        // Could send to error reporting service
+      });
+    </script>
+  </body>
+</html>

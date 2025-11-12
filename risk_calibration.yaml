@@ -1,0 +1,95 @@
+# Risk Calibration Configuration for HFT Trading System
+# Ensures no-liquidation policies and 15% max drawdown limits
+
+# Portfolio Risk Limits
+portfolio_limits:
+  max_drawdown_pct: 0.15  # 15% maximum drawdown
+  max_daily_loss_pct: 0.05  # 5% maximum daily loss
+  max_leverage: 10.0  # Maximum portfolio leverage
+  min_liquidity_ratio: 2.0  # Minimum liquidity to debt ratio
+
+# Position Risk Limits
+position_limits:
+  max_position_size_pct: 0.02  # 2% of portfolio per position
+  max_correlation_threshold: 0.7  # Maximum correlation between positions
+  min_position_size_usd: 10.0  # Minimum position size
+  max_positions_per_symbol: 3  # Maximum concurrent positions per symbol
+
+# Leverage Calibration
+leverage_settings:
+  freqtrade_momentum:
+    base_leverage: 5.0
+    max_leverage: 8.0
+    deleveraging_threshold: 0.03  # Delever at 3% loss
+    re_leveraging_threshold: 0.01  # Re-lever at 1% profit
+
+  hummingbot_market_making:
+    base_leverage: 2.0
+    max_leverage: 3.0
+    inventory_skew_max: 0.15  # Max 15% inventory skew
+
+  llm_agents:
+    deepseek_momentum: 5.0
+    qwen_adaptive: 3.0
+    fingpt_alpha: 4.0
+    lagllama_degenerate: 10.0
+
+# Stop Loss Configuration
+stop_loss:
+  atr_multiplier: 1.5  # ATR-based stops
+  trailing_stop_activation: 0.01  # 1% profit to activate trailing
+  trailing_stop_step: 0.005  # 0.5% trailing step
+  emergency_stop_pct: 0.10  # Emergency stop at 10% loss
+
+# Risk Monitoring
+monitoring:
+  health_check_interval_seconds: 30
+  risk_update_interval_seconds: 60
+  alert_thresholds:
+    drawdown_warning: 0.05  # 5% drawdown warning
+    drawdown_critical: 0.10  # 10% drawdown critical
+    leverage_warning: 7.0  # Leverage warning
+    correlation_warning: 0.8  # High correlation warning
+
+# Circuit Breakers
+circuit_breakers:
+  max_consecutive_losses: 5
+  pause_after_loss_pct: 0.02  # Pause trading after 2% loss
+  resume_after_profit_pct: 0.005  # Resume after 0.5% profit
+  max_trades_per_hour: 100  # Rate limiting
+  max_trades_per_day: 1000
+
+# Compliance Settings
+compliance:
+  human_oversight_required: true
+  max_autonomous_trade_size_usd: 500.0
+  reportable_trade_threshold_usd: 1000.0
+  audit_log_retention_days: 90
+
+# Aster DEX Specific
+aster_dex:
+  max_taker_volume_pct: 0.10  # Max 10% of daily volume
+  reward_optimization: true
+  holding_time_target_minutes: 30  # Target for 10x Rh multiplier
+  asset_preference: ["asBNB", "USDF"]  # Preferred margin assets
+
+# Performance Targets
+targets:
+  daily_pnl_minimum: 360.0  # $360 daily minimum
+  sharpe_ratio_target: 3.0  # Sharpe ratio target
+  win_rate_target: 0.55  # 55% win rate target
+  max_daily_volatility: 0.03  # 3% max daily volatility
+
+# Adaptive Risk (Beta)
+adaptive_risk:
+  enabled: false  # Set to true after validation
+  volatility_adjustment: true
+  market_regime_detection: true
+  dynamic_position_sizing: true
+
+# Emergency Protocols
+emergency:
+  kill_switch_enabled: true
+  auto_reduce_positions: true
+  notify_on_emergency: true
+  emergency_contacts: ["admin@trading-system.com"]

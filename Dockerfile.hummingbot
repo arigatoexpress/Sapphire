@@ -1,0 +1,47 @@
+# Hummingbot Gateway for DEX Market Making on Aster
+FROM python:3.11-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    git \
+    curl \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /hummingbot
+
+# Install Hummingbot
+RUN pip install --upgrade pip
+RUN pip install hummingbot
+
+# Install additional dependencies for Aster DEX integration
+RUN pip install web3
+RUN pip install eth-account
+RUN pip install requests
+
+# Create directories
+RUN mkdir -p /hummingbot/conf
+RUN mkdir -p /hummingbot/scripts
+RUN mkdir -p /hummingbot/data
+RUN mkdir -p /hummingbot/logs
+
+# Copy configuration and scripts
+COPY config/hummingbot_conf_global.yml /hummingbot/conf/global.yml
+COPY scripts/aster_market_maker.py /hummingbot/scripts/
+
+# Set permissions
+RUN chmod +x /hummingbot/scripts/*.py
+
+# Create non-root user
+RUN useradd -m hummingbot
+RUN chown -R hummingbot:hummingbot /hummingbot
+USER hummingbot
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:1902/api/v1/status || exit 1
+
+# Default command
+CMD ["hummingbot", "start", "--config", "/hummingbot/conf/global.yml", "--script", "/hummingbot/scripts/aster_market_maker.py"]

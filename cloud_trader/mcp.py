@@ -20,6 +20,12 @@ class MCPMessageType(str, Enum):
     CONSENSUS = "consensus"
     EXECUTION = "execution"
     HEARTBEAT = "heartbeat"
+    # HFT-specific message types
+    HFT_SIGNAL = "hft_signal"
+    MARKET_DATA = "market_data"
+    ORDER_EXECUTION = "order_execution"
+    RISK_UPDATE = "risk_update"
+    STRATEGY_ADJUSTMENT = "strategy_adjustment"
 
 
 class MCPProposalPayload(BaseModel):
@@ -36,6 +42,65 @@ class MCPResponsePayload(BaseModel):
     answer: str
     confidence: float
     supplementary: Optional[Dict[str, Any]] = None
+
+
+class MCPHFTSignalPayload(BaseModel):
+    """HFT trading signal from Freqtrade or Hummingbot."""
+    symbol: str
+    side: str  # "buy", "sell", "hold"
+    confidence: float
+    notional: float
+    price: Optional[float] = None
+    rationale: str
+    source: str  # "freqtrade", "hummingbot"
+    strategy: str
+    indicators: Optional[Dict[str, Any]] = None
+
+
+class MCPMarketDataPayload(BaseModel):
+    """Real-time market data updates."""
+    symbol: str
+    price: float
+    volume: float
+    bid_price: Optional[float] = None
+    ask_price: Optional[float] = None
+    timestamp: str
+    source: str
+
+
+class MCPOrderExecutionPayload(BaseModel):
+    """Order execution notifications."""
+    symbol: str
+    side: str
+    quantity: float
+    price: float
+    order_id: str
+    timestamp: str
+    status: str  # "filled", "partial", "cancelled"
+    source: str  # "freqtrade", "hummingbot"
+    fees: Optional[float] = None
+
+
+class MCRiskUpdatePayload(BaseModel):
+    """Risk management updates."""
+    symbol: Optional[str] = None
+    portfolio_risk: float
+    position_risk: Optional[Dict[str, float]] = None
+    drawdown: float
+    leverage: float
+    alerts: Optional[List[str]] = None
+    timestamp: str
+
+
+class MCPStrategyAdjustmentPayload(BaseModel):
+    """Strategy parameter adjustments."""
+    strategy_name: str
+    parameter: str
+    old_value: Any
+    new_value: Any
+    reason: str
+    source: str  # "freqtrade", "hummingbot", "coordinator"
+    timestamp: str
 
 
 logger = logging.getLogger(__name__)
@@ -373,5 +438,10 @@ __all__ = [
     "MCPMessageType",
     "MCPProposalPayload",
     "MCPResponsePayload",
+    "MCPHFTSignalPayload",
+    "MCPMarketDataPayload",
+    "MCPOrderExecutionPayload",
+    "MCRiskUpdatePayload",
+    "MCPStrategyAdjustmentPayload",
 ]
 

@@ -3,6 +3,30 @@
 ## Overview
 This document summarizes all enhancements implemented based on the Grok research recommendations to improve deployment reliability, trading activation, performance, and features.
 
+## Phase 0: Aster API Verification & Compliance ✅
+
+### 0.1 API Testing & Capability Enumeration
+- **Test Results**: Comprehensive testing of Aster API endpoints
+- **Connectivity**: ✅ Full API access to `https://fapi.asterdex.com`
+- **Trading Symbols**: ✅ 231 symbols available for trading
+- **Market Data**: ✅ All endpoints functional (tickers, order book, trades, klines)
+
+### 0.2 Verified Order Types
+**Supported via API (7 types):**
+```json
+["LIMIT", "MARKET", "STOP", "STOP_MARKET", "TAKE_PROFIT", "TAKE_PROFIT_MARKET", "TRAILING_STOP_MARKET"]
+```
+
+**UI-Only Features (Not Available via API):**
+- ❌ Hidden Orders (available in Aster Pro UI but not REST API)
+- ❌ Iceberg Orders (available in Aster Pro UI but not REST API)
+
+### 0.3 API Compliance Cleanup
+- **Removed**: All speculative code for unsupported hidden/iceberg orders
+- **Updated**: Order type enums to match verified API capabilities
+- **Verified**: All trading logic uses only documented API features
+- **Documentation**: Updated code comments to reflect actual API limitations
+
 ## Phase 1: Deployment & Infrastructure Fixes ✅
 
 ### 1.1 Multi-Stage Dockerfile

@@ -103,6 +103,16 @@ class Settings(BaseSettings):
         validation_alias="MAX_SLIPPAGE_BPS",
     )
 
+    # Agent configuration
+    enabled_agents: List[str] = Field(
+        default_factory=lambda: ["deepseek-v3", "qwen-7b", "fingpt-alpha", "lagllama-degen", "profit-maximizer", "kimi-chat"],
+        validation_alias="ENABLED_AGENTS",
+        description="List of agent IDs to enable for autonomous trading"
+    )
+    max_symbols_per_agent: int = Field(default=10, ge=1, le=50)
+    agent_parallel_execution: bool = Field(default=True, validation_alias="AGENT_PARALLEL_EXECUTION")
+    enable_profit_maximization: bool = Field(default=True, validation_alias="ENABLE_PROFIT_MAXIMIZATION")
+
     # Vertex AI Configuration
     enable_vertex_ai: bool = Field(default=True, validation_alias="ENABLE_VERTEX_AI")
     vertex_ai_region: str = Field(default="us-central1", validation_alias="VERTEX_AI_REGION")

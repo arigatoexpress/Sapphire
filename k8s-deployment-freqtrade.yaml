@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: freqtrade-hft-bot
+  namespace: trading
+  labels:
+    app: freqtrade-hft
+    component: hft-framework
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: freqtrade-hft
+      component: hft-framework
+  template:
+    metadata:
+      labels:
+        app: freqtrade-hft
+        component: hft-framework
+    spec:
+      containers:
+      - name: freqtrade
+        image: us-central1-docker.pkg.dev/sapphireinfinite/cloud-run-source-deploy/freqtrade:latest
+        command: ["freqtrade", "trade", "--config", "/config/config.json", "--strategy", "AsterHFTStrategy"]
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
+          limits:
+            cpu: "2000m"
+            memory: "4Gi"
+        env:
+        - name: ENABLE_PAPER_TRADING
+          value: "true"
+        - name: GCP_PROJECT_ID
+          value: "sapphireinfinite"
+        - name: FREQTRADE__EXCHANGE__NAME
+          value: "asterdex"
+        - name: FREQTRADE__EXCHANGE__KEY
+          valueFrom:
+            secretKeyRef:
+              name: cloud-trader-secrets
+              key: aster_api_key
+        - name: FREQTRADE__EXCHANGE__SECRET
+          valueFrom:
+            secretKeyRef:
+              name: cloud-trader-secrets
+              key: aster_secret_key
+        - name: FREQTRADE__TELEGRAM__ENABLED
+          value: "true"
+        - name: FREQTRADE__TELEGRAM__TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: cloud-trader-secrets
+              key: telegram_bot_token
+        - name: FREQTRADE__TELEGRAM__CHAT_ID
+          valueFrom:
+            secretKeyRef:
+              name: cloud-trader-secrets
+              key: telegram_chat_id
+        volumeMounts:
+        - name: config-volume
+          mountPath: /config
+        - name: strategies-volume
+          mountPath: /freqtrade/user_data/strategies
+      volumes:
+      - name: config-volume
+        configMap:
+          name: freqtrade-config
+      - name: strategies-volume
+        configMap:
+          name: freqtrade-strategies
+      livenessProbe:
+        httpGet:
+          path: /api/v1/status
+          port: 8080
+        initialDelaySeconds: 30
+        periodSeconds: 30
+      readinessProbe:
+        httpGet:
+          path: /api/v1/status
+          port: 8080
+        initialDelaySeconds: 5
+        periodSeconds: 10

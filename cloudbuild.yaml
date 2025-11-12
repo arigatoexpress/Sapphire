@@ -1,5 +1,5 @@
 steps:
-  # Build optimized multi-stage container image (no cache to ensure latest code)
+  # Build optimized multi-stage container image for cloud-trader (no cache to ensure latest code)
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
@@ -16,22 +16,88 @@ steps:
       - 'DOCKER_BUILDKIT=1'
       - 'BUILDKIT_PROGRESS=plain'
 
-  # Push container image with both tags (skip testing to avoid timeouts)
+  # Build Freqtrade container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-f'
+      - 'Dockerfile.freqtrade'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/freqtrade:${BUILD_ID}'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/freqtrade:latest'
+      - '.'
+    env:
+      - 'DOCKER_BUILDKIT=1'
+
+  # Build Hummingbot container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-f'
+      - 'Dockerfile.hummingbot'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/hummingbot:${BUILD_ID}'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/hummingbot:latest'
+      - '.'
+    env:
+      - 'DOCKER_BUILDKIT=1'
+
+  # Push all container images
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
       - '--all-tags'
       - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader'
 
-  # Skip Cloud Run deployment - deploy manually to GKE
-  - name: 'alpine'
+  - name: 'gcr.io/cloud-builders/docker'
     args:
-      - 'echo'
-      - 'Build completed successfully. Deploy manually to GKE with: kubectl set image deployment/cloud-trader cloud-trader=us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:latest -n trading'
+      - 'push'
+      - '--all-tags'
+      - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/freqtrade'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '--all-tags'
+      - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/hummingbot'
+
+  # Deploy to GKE cluster
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        gcloud container clusters get-credentials hft-trading-cluster --zone=us-central1-a --project=${PROJECT_ID}
+
+        # Deploy cloud-trader
+        kubectl -n trading set image deployment/cloud-trader \
+          cloud-trader=us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:${BUILD_ID}
+        kubectl -n trading rollout status deployment/cloud-trader
+
+        # Deploy Freqtrade
+        kubectl -n trading set image deployment/freqtrade-hft-bot \
+          freqtrade=us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/freqtrade:${BUILD_ID}
+        kubectl -n trading rollout status deployment/freqtrade-hft-bot
+
+        # Deploy Hummingbot
+        kubectl -n trading set image deployment/hummingbot-market-maker \
+          hummingbot=us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/hummingbot:${BUILD_ID}
+        kubectl -n trading rollout status deployment/hummingbot-market-maker
+
+        # Deploy MCP Coordinator
+        kubectl -n trading set image deployment/mcp-coordinator \
+          mcp-coordinator=us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:${BUILD_ID}
+        kubectl -n trading rollout status deployment/mcp-coordinator
 
 images:
   - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:latest'
   - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:${BUILD_ID}'
+  - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/freqtrade:latest'
+  - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/freqtrade:${BUILD_ID}'
+  - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/hummingbot:latest'
+  - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/hummingbot:${BUILD_ID}'
 
 options:
   # Increase disk size for better I/O

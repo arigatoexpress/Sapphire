@@ -1,21 +1,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: cloud-trader
+  name: deepseek-momentum-bot
   namespace: trading
   labels:
     app: cloud-trader
+    agent: deepseek-v3
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: cloud-trader
+      agent: deepseek-v3
   template:
     metadata:
       labels:
         app: cloud-trader
-      annotations:
-        # Simplified networking for MVP
+        agent: deepseek-v3
     spec:
       containers:
       - name: cloud-trader
@@ -31,12 +32,19 @@ spec:
           value: "sapphireinfinite"
         - name: LOG_LEVEL
           value: "WARNING"
+        - name: ENABLED_AGENTS
+          value: '["deepseek-v3"]'
+        - name: ENABLE_VERTEX_AI
+          value: "true"
         - name: MCP_ENABLED
           value: "true"
+        - name: MCP_COORDINATOR_URL
+          value: "http://mcp-coordinator.trading.svc.cluster.local:8081"
+        - name: DEEPSEEK_VERTEX_ENDPOINT
+          value: "https://us-central1-aiplatform.googleapis.com/v1/projects/sapphireinfinite/locations/us-central1/endpoints/deepseek-momentum-endpoint"
         envFrom:
         - secretRef:
             name: cloud-trader-secrets
-        # No resource limits for MVP
         livenessProbe:
           httpGet:
             path: /healthz
@@ -49,15 +57,3 @@ spec:
             port: 8080
           initialDelaySeconds: 5
           periodSeconds: 5
-        startupProbe:
-          httpGet:
-            path: /healthz
-            port: 8080
-          initialDelaySeconds: 60
-          periodSeconds: 30
-          timeoutSeconds: 10
-          failureThreshold: 10
-      tolerations:
-      - key: "nvidia.com/gpu"
-        operator: "Exists"
-        effect: "NoSchedule"

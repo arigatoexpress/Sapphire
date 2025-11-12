@@ -6,7 +6,7 @@ import asyncio
 import logging
 import os
 import secrets
-from typing import Dict, Optional
+from typing import Dict, Optional, List, Any
 
 import asyncio
 import time
@@ -439,18 +439,473 @@ def build_app(service: TradingService | None = None) -> FastAPI:
         try:
             if not trading_service._storage:
                 return JSONResponse(content={"error": "Storage not available"}, status_code=503)
-            
+
             report_date = datetime.fromisoformat(date) if date else None
-            
+
             analytics = get_analytics(trading_service._storage)
             report = await analytics.generate_daily_report(agent_id, report_date)
-            
+
             response = JSONResponse(content=report)
             response.headers["Access-Control-Allow-Origin"] = "*"
             response.headers["Access-Control-Allow-Credentials"] = "true"
             return response
         except Exception as exc:
             logger.exception("Failed to get daily report: %s", exc)
+            response = JSONResponse(content={"error": str(exc)}, status_code=500)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+
+    # Enhanced Aster API endpoints
+    @app.post("/api/exchange/position-mode")
+    async def change_position_mode(dual_side_position: bool, request: Request, _: None = Depends(require_admin)) -> Dict[str, object]:
+        """Change position mode (Hedge Mode or One-way Mode)"""
+        from fastapi.responses import JSONResponse
+        try:
+            if not trading_service._exchange_client:
+                return JSONResponse(content={"error": "Exchange client not available"}, status_code=503)
+
+            result = await trading_service._exchange_client.change_position_mode(dual_side_position)
+            response = JSONResponse(content=result)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+        except Exception as exc:
+            logger.exception("Failed to change position mode: %s", exc)
+            response = JSONResponse(content={"error": str(exc)}, status_code=500)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+
+    @app.get("/api/exchange/position-mode")
+    async def get_position_mode(request: Request, _: None = Depends(require_admin)) -> Dict[str, object]:
+        """Get current position mode"""
+        from fastapi.responses import JSONResponse
+        try:
+            if not trading_service._exchange_client:
+                return JSONResponse(content={"error": "Exchange client not available"}, status_code=503)
+
+            result = await trading_service._exchange_client.get_position_mode()
+            response = JSONResponse(content=result)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+        except Exception as exc:
+            logger.exception("Failed to get position mode: %s", exc)
+            response = JSONResponse(content={"error": str(exc)}, status_code=500)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+
+    @app.post("/api/exchange/multi-assets-mode")
+    async def change_multi_assets_mode(multi_assets_margin: bool, request: Request, _: None = Depends(require_admin)) -> Dict[str, object]:
+        """Change Multi-Asset Mode"""
+        from fastapi.responses import JSONResponse
+        try:
+            if not trading_service._exchange_client:
+                return JSONResponse(content={"error": "Exchange client not available"}, status_code=503)
+
+            result = await trading_service._exchange_client.change_multi_assets_mode(multi_assets_margin)
+            response = JSONResponse(content=result)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+        except Exception as exc:
+            logger.exception("Failed to change multi-assets mode: %s", exc)
+            response = JSONResponse(content={"error": str(exc)}, status_code=500)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+
+    @app.post("/api/exchange/leverage")
+    async def change_leverage(symbol: str, leverage: int, request: Request, _: None = Depends(require_admin)) -> Dict[str, object]:
+        """Change leverage for a symbol"""
+        from fastapi.responses import JSONResponse
+        try:
+            if not trading_service._exchange_client:
+                return JSONResponse(content={"error": "Exchange client not available"}, status_code=503)
+
+            result = await trading_service._exchange_client.change_leverage(symbol, leverage)
+            response = JSONResponse(content=result)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+        except Exception as exc:
+            logger.exception("Failed to change leverage: %s", exc)
+            response = JSONResponse(content={"error": str(exc)}, status_code=500)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+
+    @app.post("/api/exchange/margin-type")
+    async def change_margin_type(symbol: str, margin_type: str, request: Request, _: None = Depends(require_admin)) -> Dict[str, object]:
+        """Change margin type for a symbol"""
+        from fastapi.responses import JSONResponse
+        from .enums import MarginType
+        try:
+            if not trading_service._exchange_client:
+                return JSONResponse(content={"error": "Exchange client not available"}, status_code=503)
+
+            margin_type_enum = MarginType(margin_type.upper())
+            result = await trading_service._exchange_client.change_margin_type(symbol, margin_type_enum)
+            response = JSONResponse(content=result)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+        except Exception as exc:
+            logger.exception("Failed to change margin type: %s", exc)
+            response = JSONResponse(content={"error": str(exc)}, status_code=500)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+
+    @app.post("/api/exchange/position-margin")
+    async def modify_position_margin(
+        symbol: str, amount: float, type_: int, request: Request,
+        position_side: Optional[str] = None, _: None = Depends(require_admin)
+    ) -> Dict[str, object]:
+        """Modify position margin"""
+        from fastapi.responses import JSONResponse
+        from .enums import PositionSide
+        try:
+            if not trading_service._exchange_client:
+                return JSONResponse(content={"error": "Exchange client not available"}, status_code=503)
+
+            position_side_enum = PositionSide(position_side.upper()) if position_side else None
+            result = await trading_service._exchange_client.modify_position_margin(symbol, amount, type_, position_side_enum)
+            response = JSONResponse(content=result)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+        except Exception as exc:
+            logger.exception("Failed to modify position margin: %s", exc)
+            response = JSONResponse(content={"error": str(exc)}, status_code=500)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+
+    @app.get("/api/exchange/mark-price")
+    async def get_mark_price(symbol: Optional[str] = None) -> Dict[str, object]:
+        """Get mark price and funding rate"""
+        from fastapi.responses import JSONResponse
+        try:
+            if not trading_service._exchange_client:
+                return JSONResponse(content={"error": "Exchange client not available"}, status_code=503)
+
+            result = await trading_service._exchange_client.get_mark_price(symbol)
+            response = JSONResponse(content=result)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+        except Exception as exc:
+            logger.exception("Failed to get mark price: %s", exc)
+            response = JSONResponse(content={"error": str(exc)}, status_code=500)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+
+    @app.get("/api/exchange/funding-rate")
+    async def get_funding_rate_history(
+        symbol: Optional[str] = None, start_time: Optional[int] = None,
+        end_time: Optional[int] = None, limit: int = 100
+    ) -> Dict[str, object]:
+        """Get funding rate history"""
+        from fastapi.responses import JSONResponse
+        try:
+            if not trading_service._exchange_client:
+                return JSONResponse(content={"error": "Exchange client not available"}, status_code=503)
+
+            result = await trading_service._exchange_client.get_funding_rate_history(symbol, start_time, end_time, limit)
+            response = JSONResponse(content=result)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+        except Exception as exc:
+            logger.exception("Failed to get funding rate history: %s", exc)
+            response = JSONResponse(content={"error": str(exc)}, status_code=500)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+
+    @app.get("/api/exchange/leverage-brackets")
+    async def get_leverage_brackets(symbol: Optional[str] = None, _: None = Depends(require_admin)) -> Dict[str, object]:
+        """Get leverage brackets"""
+        from fastapi.responses import JSONResponse
+        try:
+            if not trading_service._exchange_client:
+                return JSONResponse(content={"error": "Exchange client not available"}, status_code=503)
+
+            result = await trading_service._exchange_client.get_leverage_brackets(symbol)
+            response = JSONResponse(content=result)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+        except Exception as exc:
+            logger.exception("Failed to get leverage brackets: %s", exc)
+            response = JSONResponse(content={"error": str(exc)}, status_code=500)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+
+    @app.get("/api/exchange/adl-quantile")
+    async def get_adl_quantile(symbol: Optional[str] = None, _: None = Depends(require_admin)) -> Dict[str, object]:
+        """Get ADL quantile estimation"""
+        from fastapi.responses import JSONResponse
+        try:
+            if not trading_service._exchange_client:
+                return JSONResponse(content={"error": "Exchange client not available"}, status_code=503)
+
+            result = await trading_service._exchange_client.get_adl_quantile(symbol)
+            response = JSONResponse(content=result)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+        except Exception as exc:
+            logger.exception("Failed to get ADL quantile: %s", exc)
+            response = JSONResponse(content={"error": str(exc)}, status_code=500)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+
+    @app.get("/api/exchange/force-orders")
+    async def get_force_orders(
+        symbol: Optional[str] = None, auto_close_type: Optional[str] = None,
+        start_time: Optional[int] = None, end_time: Optional[int] = None,
+        limit: int = 50, _: None = Depends(require_admin)
+    ) -> Dict[str, object]:
+        """Get user's force orders (liquidations)"""
+        from fastapi.responses import JSONResponse
+        try:
+            if not trading_service._exchange_client:
+                return JSONResponse(content={"error": "Exchange client not available"}, status_code=503)
+
+            result = await trading_service._exchange_client.get_force_orders(
+                symbol, auto_close_type, start_time, end_time, limit
+            )
+            response = JSONResponse(content=result)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+        except Exception as exc:
+            logger.exception("Failed to get force orders: %s", exc)
+            response = JSONResponse(content={"error": str(exc)}, status_code=500)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+
+    @app.post("/api/exchange/auto-cancel")
+    async def auto_cancel_orders(symbol: str, countdown_time: int, request: Request, _: None = Depends(require_admin)) -> Dict[str, object]:
+        """Auto-cancel all open orders after countdown"""
+        from fastapi.responses import JSONResponse
+        try:
+            if not trading_service._exchange_client:
+                return JSONResponse(content={"error": "Exchange client not available"}, status_code=503)
+
+            result = await trading_service._exchange_client.auto_cancel_orders(symbol, countdown_time)
+            response = JSONResponse(content=result)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+        except Exception as exc:
+            logger.exception("Failed to set auto-cancel: %s", exc)
+            response = JSONResponse(content={"error": str(exc)}, status_code=500)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+
+    @app.post("/api/exchange/batch-orders")
+    async def place_batch_orders(batch_orders: List[Dict[str, Any]], request: Request, _: None = Depends(require_admin)) -> Dict[str, object]:
+        """Place multiple orders in batch"""
+        from fastapi.responses import JSONResponse
+        try:
+            if not trading_service._exchange_client:
+                return JSONResponse(content={"error": "Exchange client not available"}, status_code=503)
+
+            result = await trading_service._exchange_client.place_batch_orders(batch_orders)
+            response = JSONResponse(content=result)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+        except Exception as exc:
+            logger.exception("Failed to place batch orders: %s", exc)
+            response = JSONResponse(content={"error": str(exc)}, status_code=500)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+
+    @app.delete("/api/exchange/batch-orders")
+    async def cancel_batch_orders(
+        symbol: str, request: Request,
+        order_id_list: Optional[List[int]] = None,
+        orig_client_order_id_list: Optional[List[str]] = None,
+        _: None = Depends(require_admin)
+    ) -> Dict[str, object]:
+        """Cancel multiple orders"""
+        from fastapi.responses import JSONResponse
+        try:
+            if not trading_service._exchange_client:
+                return JSONResponse(content={"error": "Exchange client not available"}, status_code=503)
+
+            result = await trading_service._exchange_client.cancel_batch_orders(
+                symbol, order_id_list, orig_client_order_id_list
+            )
+            response = JSONResponse(content=result)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+        except Exception as exc:
+            logger.exception("Failed to cancel batch orders: %s", exc)
+            response = JSONResponse(content={"error": str(exc)}, status_code=500)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+
+    @app.get("/api/exchange/account/v4")
+    async def get_account_info_v4(request: Request, _: None = Depends(require_admin)) -> Dict[str, object]:
+        """Get enhanced account information V4"""
+        from fastapi.responses import JSONResponse
+        try:
+            if not trading_service._exchange_client:
+                return JSONResponse(content={"error": "Exchange client not available"}, status_code=503)
+
+            result = await trading_service._exchange_client.get_account_info_v4()
+            response = JSONResponse(content=result)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+        except Exception as exc:
+            logger.exception("Failed to get account info V4: %s", exc)
+            response = JSONResponse(content={"error": str(exc)}, status_code=500)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+
+    @app.get("/api/exchange/trades")
+    async def get_account_trades(
+        symbol: str, start_time: Optional[int] = None, end_time: Optional[int] = None,
+        from_id: Optional[int] = None, limit: int = 500, _: None = Depends(require_admin)
+    ) -> Dict[str, object]:
+        """Get account trade list"""
+        from fastapi.responses import JSONResponse
+        try:
+            if not trading_service._exchange_client:
+                return JSONResponse(content={"error": "Exchange client not available"}, status_code=503)
+
+            result = await trading_service._exchange_client.get_account_trades(
+                symbol, start_time, end_time, from_id, limit
+            )
+            response = JSONResponse(content=result)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+        except Exception as exc:
+            logger.exception("Failed to get account trades: %s", exc)
+            response = JSONResponse(content={"error": str(exc)}, status_code=500)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+
+    @app.get("/api/exchange/income")
+    async def get_income_history(
+        symbol: Optional[str] = None, income_type: Optional[str] = None,
+        start_time: Optional[int] = None, end_time: Optional[int] = None,
+        limit: int = 100, _: None = Depends(require_admin)
+    ) -> Dict[str, object]:
+        """Get income history"""
+        from fastapi.responses import JSONResponse
+        try:
+            if not trading_service._exchange_client:
+                return JSONResponse(content={"error": "Exchange client not available"}, status_code=503)
+
+            result = await trading_service._exchange_client.get_income_history(
+                symbol, income_type, start_time, end_time, limit
+            )
+            response = JSONResponse(content=result)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+        except Exception as exc:
+            logger.exception("Failed to get income history: %s", exc)
+            response = JSONResponse(content={"error": str(exc)}, status_code=500)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+
+    # Agent Management Endpoints
+    @app.get("/api/agents")
+    async def get_agents(request: Request, _: None = Depends(require_admin)) -> Dict[str, object]:
+        """Get all available and enabled agents."""
+        from fastapi.responses import JSONResponse
+        try:
+            available = trading_service.get_available_agents()
+            enabled = trading_service.get_enabled_agents()
+            response = JSONResponse(content={
+                "available": available,
+                "enabled": enabled,
+                "total_available": len(available),
+                "total_enabled": len(enabled)
+            })
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+        except Exception as exc:
+            logger.exception("Failed to get agents: %s", exc)
+            response = JSONResponse(content={"error": str(exc)}, status_code=500)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+
+    @app.post("/api/agents/{agent_id}/enable")
+    async def enable_agent(agent_id: str, request: Request, _: None = Depends(require_admin)) -> Dict[str, object]:
+        """Enable a specific agent for autonomous trading."""
+        from fastapi.responses import JSONResponse
+        try:
+            success = await trading_service.enable_agent(agent_id)
+            if success:
+                response = JSONResponse(content={
+                    "status": "enabled",
+                    "agent_id": agent_id,
+                    "message": f"Agent {agent_id} has been enabled for autonomous trading"
+                })
+            else:
+                response = JSONResponse(content={
+                    "status": "error",
+                    "agent_id": agent_id,
+                    "message": f"Agent {agent_id} not found or already enabled"
+                }, status_code=400)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+        except Exception as exc:
+            logger.exception("Failed to enable agent: %s", exc)
+            response = JSONResponse(content={"error": str(exc)}, status_code=500)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+
+    @app.post("/api/agents/{agent_id}/disable")
+    async def disable_agent(agent_id: str, request: Request, _: None = Depends(require_admin)) -> Dict[str, object]:
+        """Disable a specific agent from autonomous trading."""
+        from fastapi.responses import JSONResponse
+        try:
+            success = await trading_service.disable_agent(agent_id)
+            if success:
+                response = JSONResponse(content={
+                    "status": "disabled",
+                    "agent_id": agent_id,
+                    "message": f"Agent {agent_id} has been disabled from autonomous trading"
+                })
+            else:
+                response = JSONResponse(content={
+                    "status": "error",
+                    "agent_id": agent_id,
+                    "message": f"Agent {agent_id} not found or already disabled"
+                }, status_code=400)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+        except Exception as exc:
+            logger.exception("Failed to disable agent: %s", exc)
             response = JSONResponse(content={"error": str(exc)}, status_code=500)
             response.headers["Access-Control-Allow-Origin"] = "*"
             response.headers["Access-Control-Allow-Credentials"] = "true"

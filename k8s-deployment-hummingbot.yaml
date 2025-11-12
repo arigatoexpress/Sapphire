@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hummingbot-market-maker
+  namespace: trading
+  labels:
+    app: hummingbot-mm
+    component: hft-framework
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hummingbot-mm
+      component: hft-framework
+  template:
+    metadata:
+      labels:
+        app: hummingbot-mm
+        component: hft-framework
+    spec:
+      containers:
+      - name: hummingbot
+        image: us-central1-docker.pkg.dev/sapphireinfinite/cloud-run-source-deploy/hummingbot:latest
+        command: ["hummingbot", "start", "--config", "/config/conf_global.yml", "--script", "/scripts/aster_market_maker.py"]
+        ports:
+        - containerPort: 1902
+          name: hummingbot-web
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "512Mi"
+          limits:
+            cpu: "1000m"
+            memory: "2Gi"
+        env:
+        - name: ENABLE_PAPER_TRADING
+          value: "true"
+        - name: GCP_PROJECT_ID
+          value: "sapphireinfinite"
+        - name: HUMMINGBOT__EXCHANGES__ASTERDEX__API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: cloud-trader-secrets
+              key: aster_api_key
+        - name: HUMMINGBOT__EXCHANGES__ASTERDEX__API_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: cloud-trader-secrets
+              key: aster_secret_key
+        - name: HUMMINGBOT__TELEGRAM__ENABLED
+          value: "true"
+        - name: HUMMINGBOT__TELEGRAM__TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: cloud-trader-secrets
+              key: telegram_bot_token
+        - name: HUMMINGBOT__TELEGRAM__CHAT_ID
+          valueFrom:
+            secretKeyRef:
+              name: cloud-trader-secrets
+              key: telegram_chat_id
+        volumeMounts:
+        - name: config-volume
+          mountPath: /config
+        - name: scripts-volume
+          mountPath: /scripts
+        - name: data-volume
+          mountPath: /data
+      volumes:
+      - name: config-volume
+        configMap:
+          name: hummingbot-config
+      - name: scripts-volume
+        configMap:
+          name: hummingbot-scripts
+      - name: data-volume
+        emptyDir: {}
+      livenessProbe:
+        httpGet:
+          path: /api/v1/status
+          port: 1902
+        initialDelaySeconds: 60
+        periodSeconds: 30
+      readinessProbe:
+        httpGet:
+          path: /api/v1/status
+          port: 1902
+        initialDelaySeconds: 30
+        periodSeconds: 15

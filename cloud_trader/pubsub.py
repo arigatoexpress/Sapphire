@@ -79,6 +79,26 @@ class PubSubClient:
     async def publish_reasoning(self, payload: Dict[str, Any]) -> None:
         await self._publish(self._reasoning_topic, payload)
 
+    async def publish_hft_signal(self, payload: Dict[str, Any]) -> None:
+        """Publish HFT trading signal."""
+        await self._publish(self._decisions_topic, payload)
+
+    async def publish_market_data(self, payload: Dict[str, Any]) -> None:
+        """Publish market data update."""
+        await self._publish(self._reasoning_topic, payload)
+
+    async def publish_order_execution(self, payload: Dict[str, Any]) -> None:
+        """Publish order execution notification."""
+        await self._publish(self._positions_topic, payload)
+
+    async def publish_risk_update(self, payload: Dict[str, Any]) -> None:
+        """Publish risk management update."""
+        await self._publish(self._positions_topic, payload)
+
+    async def publish_strategy_adjustment(self, payload: Dict[str, Any]) -> None:
+        """Publish strategy parameter adjustment."""
+        await self._publish(self._reasoning_topic, payload)
+
     # The stream_events functionality is not directly replicable with Pub/Sub in the same way.
     # Pub/Sub is a message bus, not a persistent log like Redis Streams.
     # To get recent events, we would need a subscriber that saves them to a database.

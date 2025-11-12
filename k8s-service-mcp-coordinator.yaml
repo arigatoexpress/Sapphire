@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-coordinator-service
+  namespace: trading
+  labels:
+    app: mcp-coordinator
+    component: messaging
+spec:
+  selector:
+    app: mcp-coordinator
+    component: messaging
+  ports:
+  - name: http
+    port: 8081
+    targetPort: 8081
+    protocol: TCP
+  type: ClusterIP
