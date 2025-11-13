@@ -4,12 +4,30 @@ global:
   projectId: sapphireinfinite
   imagePullPolicy: Always
 
-# TPU configuration - enables TPU acceleration for AI agents (cost-effective alternative to GPUs)
-# NOTE: TPU quota required - more affordable than GPUs for AI workloads
+# Vertex AI and TPU configuration - Full Google AI optimization
+vertexAI:
+  enabled: true
+  project: "sapphireinfinite"
+  location: "us-central1"
+  orchestrator:
+    enabled: true
+    endpoint: "https://us-central1-aiplatform.googleapis.com/v1/projects/sapphireinfinite/locations/us-central1/endpoints/mcp-orchestrator-endpoint"
+    model: "gemini-1.5-pro"  # Advanced orchestrator for MCP coordination
+  mlops:
+    enabled: true
+    experimentTracking: true
+    modelMonitoring: true
+    performanceMetrics: true
+    driftDetection: true
+
 tpu:
   enabled: false  # Set to true after TPU quota approval
   type: "v5e-lite-podslice"  # Most cost-effective TPU for inference
   machineType: "ct5lp-hightpu-1t"  # TPU v5e instance
+  optimization:
+    bfloat16: true  # Enable mixed precision for TPU efficiency
+    xlaCompilation: true  # Enable XLA compilation for TPU
+    dynamicPadding: false  # Static shapes for TPU optimization
   # TPU v5e pricing: ~$1.20/hour vs L4 GPU ~$1.50/hour
   # Performance: 197 TFLOPS optimized for transformer inference
 
@@ -79,7 +97,7 @@ cloudTrader:
     - name: TELEGRAM_CHAT_ID
       value: ""  # Will be overridden by secret
 
-# MCP Coordinator Service
+# MCP Coordinator Service - Vertex AI Orchestrator
 mcpCoordinator:
   enabled: true
   replicaCount: 1
@@ -89,13 +107,26 @@ mcpCoordinator:
   service:
     type: ClusterIP
     port: 8081
+  # Vertex AI Orchestration for Advanced MCP Coordination
+  vertexAI:
+    model: "gemini-1.5-pro"  # Advanced orchestrator for multi-agent coordination
+    optimization:
+      quantization: "int8"  # Efficient for orchestration tasks
+      batchSize: 1  # Single orchestration decisions
+      temperature: 0.1  # High precision for coordination
+      maxTokens: 2048  # Complex coordination analysis
+    roleContext: "mcp-orchestrator"
+    monitoring:
+      latencyThreshold: 300  # 300ms target for orchestration decisions
+      accuracyMetric: "coordination_success_rate"
+      driftThreshold: 0.04
   resources:
     requests:
-      cpu: 200m  # Optimized for message routing
-      memory: 512Mi  # Increased for message buffering
+      cpu: 1000m  # Increased for Vertex AI orchestration
+      memory: 2Gi  # Increased for complex coordination state
     limits:
-      cpu: 1000m  # Higher CPU for concurrent processing
-      memory: 2Gi
+      cpu: 2000m  # Higher CPU for concurrent AI coordination
+      memory: 4Gi  # Increased memory for orchestration state
   env:
     - name: LOG_LEVEL
       value: "INFO"
@@ -116,7 +147,7 @@ mcpCoordinator:
 agents:
   enabled: true
 
-  # DeepSeek Agent
+  # DeepSeek Agent - Momentum Analysis Specialist (Vertex AI Optimized)
   deepseek:
     enabled: true
     replicaCount: 1
@@ -130,6 +161,19 @@ agents:
       limits:
         cpu: 3000m
         memory: 12Gi
+    # Vertex AI Optimization for Momentum Analysis
+    vertexAI:
+      model: "gemini-1.5-flash"  # Fast inference for real-time momentum
+      optimization:
+        quantization: "int8"  # Efficient for momentum calculations
+        batchSize: 8
+        temperature: 0.1  # Low creativity, high precision
+        maxTokens: 512  # Concise momentum analysis
+      roleContext: "momentum-analysis"
+      monitoring:
+        latencyThreshold: 200  # 200ms target for momentum signals
+        accuracyMetric: "momentum_prediction_accuracy"
+        driftThreshold: 0.05
     env:
       - name: ENABLE_PAPER_TRADING
         value: "true"
@@ -139,18 +183,41 @@ agents:
         value: "true"
       - name: MCP_ENABLED
         value: "true"
-      - name: DEEPSEEK_VERTEX_ENDPOINT
-        value: "https://us-central1-aiplatform.googleapis.com/v1/projects/sapphireinfinite/locations/us-central1/endpoints/deepseek-momentum-endpoint"
-      - name: MODEL_QUANTIZATION
-        value: "4bit"  # Enable 4-bit quantization
-      - name: GPU_MEMORY_FRACTION
-        value: "0.7"  # Use 70% of GPU memory
-      - name: INFERENCE_BATCH_SIZE
-        value: "8"  # Batch processing for efficiency
-      - name: CUDA_LAUNCH_BLOCKING
-        value: "0"  # Async CUDA operations
+      - name: AGENT_ROLE
+        value: "momentum-analysis"
+      - name: VERTEX_MODEL
+        value: "gemini-1.5-flash"
+      - name: MODEL_TEMPERATURE
+        value: "0.1"
+      - name: MAX_OUTPUT_TOKENS
+        value: "512"
+      - name: QUANTIZATION_LEVEL
+        value: "int8"
+      - name: MONITORING_ENABLED
+        value: "true"
+    env:
+      - name: ENABLE_PAPER_TRADING
+        value: "true"
+      - name: ENABLED_AGENTS
+        value: '["deepseek-v3"]'
+      - name: ENABLE_VERTEX_AI
+        value: "true"
+      - name: MCP_ENABLED
+        value: "true"
+      - name: AGENT_ROLE
+        value: "momentum-analysis"
+      - name: VERTEX_MODEL
+        value: "gemini-1.5-flash"
+      - name: MODEL_TEMPERATURE
+        value: "0.1"
+      - name: MAX_OUTPUT_TOKENS
+        value: "512"
+      - name: QUANTIZATION_LEVEL
+        value: "int8"
+      - name: MONITORING_ENABLED
+        value: "true"
 
-  # Qwen Agent
+  # Qwen Agent - Strategy Optimization Specialist (Vertex AI Optimized)
   qwen:
     enabled: true
     replicaCount: 1
@@ -159,13 +226,24 @@ agents:
       tag: "latest"
     resources:
       requests:
-        cpu: 500m
-        memory: 2Gi  # Optimized for quantized models
-        nvidia.com/gpu: 1
+        cpu: 1000m
+        memory: 4Gi
       limits:
-        cpu: 2000m
-        memory: 8Gi  # Reduced with quantization
-        nvidia.com/gpu: 1
+        cpu: 3000m
+        memory: 12Gi
+    # Vertex AI Optimization for Strategy Optimization
+    vertexAI:
+      model: "gemini-1.5-pro"  # Advanced reasoning for strategy optimization
+      optimization:
+        quantization: "int8"  # Balanced precision/performance
+        batchSize: 4  # Smaller batches for complex reasoning
+        temperature: 0.3  # Moderate creativity for strategy innovation
+        maxTokens: 1024  # Detailed strategy analysis
+      roleContext: "strategy-optimization"
+      monitoring:
+        latencyThreshold: 500  # 500ms acceptable for strategy decisions
+        accuracyMetric: "strategy_success_rate"
+        driftThreshold: 0.08
     env:
       - name: ENABLE_PAPER_TRADING
         value: "true"
@@ -175,24 +253,20 @@ agents:
         value: "true"
       - name: MCP_ENABLED
         value: "true"
-      - name: QWEN_VERTEX_ENDPOINT
-        value: "https://us-central1-aiplatform.googleapis.com/v1/projects/sapphireinfinite/locations/us-central1/endpoints/qwen-adaptive-endpoint"
-      - name: MODEL_QUANTIZATION
-        value: "4bit"
-      - name: GPU_MEMORY_FRACTION
-        value: "0.8"  # Increased for L4 GPUs
-      - name: INFERENCE_BATCH_SIZE
-        value: "16"   # Optimized for L4 parallel processing
-      - name: CUDA_LAUNCH_BLOCKING
-        value: "0"
-      - name: TORCH_USE_CUDA_DSA
-        value: "1"    # Enable CUDA device-side assertions
-      - name: CUDA_VISIBLE_DEVICES
-        value: "0"    # Use first GPU
-      - name: PYTORCH_CUDA_ALLOC_CONF
-        value: "max_split_size_mb:512"  # Optimize memory allocation
+      - name: AGENT_ROLE
+        value: "strategy-optimization"
+      - name: VERTEX_MODEL
+        value: "gemini-1.5-pro"
+      - name: MODEL_TEMPERATURE
+        value: "0.3"
+      - name: MAX_OUTPUT_TOKENS
+        value: "1024"
+      - name: QUANTIZATION_LEVEL
+        value: "int8"
+      - name: MONITORING_ENABLED
+        value: "true"
 
-  # FinGPT Agent
+  # FinGPT Agent - Financial Sentiment Analysis Specialist (Vertex AI Optimized)
   fingpt:
     enabled: true
     replicaCount: 1
@@ -206,6 +280,19 @@ agents:
       limits:
         cpu: 3000m
         memory: 12Gi
+    # Vertex AI Optimization for Sentiment Analysis
+    vertexAI:
+      model: "gemini-1.5-flash"  # Fast inference for real-time sentiment
+      optimization:
+        quantization: "int8"  # Efficient for text analysis
+        batchSize: 16  # Higher batches for sentiment processing
+        temperature: 0.2  # Low creativity for consistent sentiment
+        maxTokens: 256  # Concise sentiment scores
+      roleContext: "sentiment-analysis"
+      monitoring:
+        latencyThreshold: 150  # 150ms target for sentiment signals
+        accuracyMetric: "sentiment_accuracy"
+        driftThreshold: 0.03
     env:
       - name: ENABLE_PAPER_TRADING
         value: "true"
@@ -215,25 +302,20 @@ agents:
         value: "true"
       - name: MCP_ENABLED
         value: "true"
-      - name: FINGPT_VERTEX_ENDPOINT
-        value: "https://us-central1-aiplatform.googleapis.com/v1/projects/sapphireinfinite/locations/us-central1/endpoints/fingpt-alpha-endpoint"
+      - name: AGENT_ROLE
+        value: "sentiment-analysis"
+      - name: VERTEX_MODEL
+        value: "gemini-1.5-flash"
+      - name: MODEL_TEMPERATURE
+        value: "0.2"
+      - name: MAX_OUTPUT_TOKENS
+        value: "256"
+      - name: QUANTIZATION_LEVEL
+        value: "int8"
+      - name: MONITORING_ENABLED
         value: "true"
-      - name: MODEL_QUANTIZATION
-        value: "4bit"
-      - name: GPU_MEMORY_FRACTION
-        value: "0.8"  # Increased for L4 GPUs
-      - name: INFERENCE_BATCH_SIZE
-        value: "16"   # Optimized for L4 parallel processing
-      - name: CUDA_LAUNCH_BLOCKING
-        value: "0"
-      - name: TORCH_USE_CUDA_DSA
-        value: "1"    # Enable CUDA device-side assertions
-      - name: CUDA_VISIBLE_DEVICES
-        value: "0"    # Use first GPU
-      - name: PYTORCH_CUDA_ALLOC_CONF
-        value: "max_split_size_mb:512"  # Optimize memory allocation
 
-  # Lag-LLaMA Agent
+  # Lag-LLaMA Agent - DeFi Market Prediction Specialist (Vertex AI Optimized)
   lagllama:
     enabled: true
     replicaCount: 1
@@ -247,6 +329,19 @@ agents:
       limits:
         cpu: 3000m
         memory: 12Gi
+    # Vertex AI Optimization for DeFi Prediction
+    vertexAI:
+      model: "gemini-1.5-pro"  # Advanced reasoning for market prediction
+      optimization:
+        quantization: "int8"  # Balanced for complex DeFi analysis
+        batchSize: 6  # Medium batches for prediction models
+        temperature: 0.4  # Moderate creativity for market scenarios
+        maxTokens: 768  # Detailed prediction analysis
+      roleContext: "defi-prediction"
+      monitoring:
+        latencyThreshold: 400  # 400ms acceptable for prediction analysis
+        accuracyMetric: "prediction_accuracy"
+        driftThreshold: 0.06
     env:
       - name: ENABLE_PAPER_TRADING
         value: "true"
@@ -256,23 +351,18 @@ agents:
         value: "true"
       - name: MCP_ENABLED
         value: "true"
-      - name: LAGLLAMA_VERTEX_ENDPOINT
-        value: "https://us-central1-aiplatform.googleapis.com/v1/projects/sapphireinfinite/locations/us-central1/endpoints/lagllama-degen-endpoint"
+      - name: AGENT_ROLE
+        value: "defi-prediction"
+      - name: VERTEX_MODEL
+        value: "gemini-1.5-pro"
+      - name: MODEL_TEMPERATURE
+        value: "0.4"
+      - name: MAX_OUTPUT_TOKENS
+        value: "768"
+      - name: QUANTIZATION_LEVEL
+        value: "int8"
+      - name: MONITORING_ENABLED
         value: "true"
-      - name: MODEL_QUANTIZATION
-        value: "4bit"
-      - name: GPU_MEMORY_FRACTION
-        value: "0.8"  # Increased for L4 GPUs
-      - name: INFERENCE_BATCH_SIZE
-        value: "16"   # Optimized for L4 parallel processing
-      - name: CUDA_LAUNCH_BLOCKING
-        value: "0"
-      - name: TORCH_USE_CUDA_DSA
-        value: "1"    # Enable CUDA device-side assertions
-      - name: CUDA_VISIBLE_DEVICES
-        value: "0"    # Use first GPU
-      - name: PYTORCH_CUDA_ALLOC_CONF
-        value: "max_split_size_mb:512"  # Optimize memory allocation
 
   # VPIN Agent (TPU-accelerated with elastic scaling and fallback - cost-optimized)
   vpin:
@@ -436,6 +526,47 @@ hpa:
     maxReplicas: 2
     targetCPUUtilizationPercentage: 70
     targetMemoryUtilizationPercentage: 80
+
+# Monitoring and Observability
+monitoring:
+  enabled: true
+  prometheus:
+    enabled: true
+    scrapeInterval: 15s
+    evaluationInterval: 15s
+    retention: 30d
+  grafana:
+    enabled: true
+    adminPassword: "sapphire-trading-2024"  # Change in production
+    dashboards:
+      enabled: true
+      default: true
+  alertmanager:
+    enabled: true
+    slackWebhookUrl: ""  # Configure for production alerts
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  format: "json"
+  fluentd:
+    enabled: true
+    match: "kube.*"
+  elasticsearch:
+    enabled: false  # Enable if needed for log aggregation
+
+# Security and Compliance
+security:
+  networkPolicies:
+    enabled: true
+  podSecurityStandards:
+    enabled: true
+    level: "restricted"
+  secrets:
+    encryption: true
+  audit:
+    enabled: true
+    logRetention: 90d
 
 # Service Account for GCP access
 serviceAccount:

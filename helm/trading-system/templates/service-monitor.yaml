@@ -1,0 +1,77 @@
+{{- if and .Values.monitoring.enabled .Values.monitoring.prometheus.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "trading-system.fullname" . }}-service-monitor
+  namespace: trading
+  labels:
+    {{- include "trading-system.labels" . | nindent 4 }}
+    app: trading-system
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: trading-system
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 15s
+    scrapeTimeout: 10s
+  - port: http
+    path: /healthz
+    interval: 30s
+    scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+    - trading
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "trading-system.fullname" . }}-prometheus-rules
+  namespace: trading
+  labels:
+    {{- include "trading-system.labels" . | nindent 4 }}
+spec:
+  groups:
+  - name: trading-system
+    rules:
+    # Agent health checks
+    - alert: TradingAgentDown
+      expr: up{job="trading-system"} == 0
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Trading agent {{ $labels.pod }} is down"
+        description: "Trading agent {{ $labels.pod }} has been down for more than 5 minutes."
+
+    # Performance alerts
+    - alert: HighLatency
+      expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="trading-system"}[5m])) > 2
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High latency detected"
+        description: "95th percentile latency is {{ $value }}s for the last 5 minutes."
+
+    # TPU/GPU utilization alerts
+    - alert: LowTPUUtilization
+      expr: rate(tpu_utilization{job="trading-system"}[5m]) < 0.5
+      for: 10m
+      labels:
+        severity: info
+      annotations:
+        summary: "Low TPU utilization"
+        description: "TPU utilization is below 50% for the last 10 minutes."
+
+    # API throttling alerts
+    - alert: HighThrottleRate
+      expr: rate(api_throttle_count{job="trading-system"}[5m]) > 10
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High API throttling detected"
+        description: "API throttling rate exceeds 10 requests per minute."
+{{- end }}

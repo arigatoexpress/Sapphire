@@ -1,0 +1,93 @@
+{{- if and .Values.monitoring.enabled .Values.monitoring.grafana.enabled .Values.monitoring.grafana.dashboards.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "trading-system.fullname" . }}-grafana-dashboards
+  namespace: trading
+  labels:
+    {{- include "trading-system.labels" . | nindent 4 }}
+    grafana_dashboard: "1"
+data:
+  trading-system-overview.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Sapphire Trading System Overview",
+        "tags": ["trading", "ai", "vertex-ai"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Agent Health Status",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "up{job=\"trading-system\"}",
+                "legendFormat": "{{ pod }}"
+              }
+            ]
+          },
+          {
+            "id": 2,
+            "title": "Response Latency",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"trading-system\"}[5m]))",
+                "legendFormat": "95th percentile"
+              }
+            ]
+          },
+          {
+            "id": 3,
+            "title": "TPU Utilization",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "tpu_utilization{job=\"trading-system\"}",
+                "legendFormat": "{{ pod }}"
+              }
+            ]
+          },
+          {
+            "id": 4,
+            "title": "Trading Signals Generated",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(trading_signals_total{job=\"trading-system\"}[5m])",
+                "legendFormat": "{{ agent }}"
+              }
+            ]
+          },
+          {
+            "id": 5,
+            "title": "API Throttling Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(api_throttle_count{job=\"trading-system\"}[5m])",
+                "legendFormat": "Throttle rate"
+              }
+            ]
+          },
+          {
+            "id": 6,
+            "title": "MCP Coordination Efficiency",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "rate(mcp_messages_processed_total{job=\"trading-system\"}[5m]) / rate(mcp_messages_received_total{job=\"trading-system\"}[5m]) * 100",
+                "legendFormat": "Coordination efficiency %"
+              }
+            ]
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "30s"
+      }
+    }
+{{- end }}

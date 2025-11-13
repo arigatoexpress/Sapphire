@@ -106,7 +106,7 @@ class TPUQuotaRequester:
 ## Technical Requirements
 **System:** {request_details['technical_details']['system']}
 **Purpose:** {request_details['technical_details']['purpose']}
-**GPU Configuration:** {request_details['technical_details']['gpu_type']}
+**TPU Configuration:** {request_details['technical_details']['tpu_type']}
 **AI Setup:** {request_details['technical_details']['configuration']}
 
 **Performance Impact:**
