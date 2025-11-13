@@ -7,7 +7,9 @@ global:
 # GPU configuration - enables GPU acceleration for AI agents
 # NOTE: GPU quota required - set to true after requesting GPU quota from GCP
 gpu:
-  enabled: false
+  enabled: false  # Set to true after GPU quota approval
+  type: "nvidia-l4"  # GCP AI-optimized L4 GPUs
+  machineType: "g2-standard-8"  # 8 vCPUs, 32GB RAM, 1 L4 GPU - optimal for AI trading
 
 # Redis configuration
 redis:
@@ -121,11 +123,11 @@ agents:
       tag: "latest"
     resources:
       requests:
-        cpu: 500m
-        memory: 2Gi
+        cpu: 1000m
+        memory: 4Gi
       limits:
-        cpu: 2000m
-        memory: 8Gi
+        cpu: 3000m
+        memory: 12Gi
     env:
       - name: ENABLE_PAPER_TRADING
         value: "true"
@@ -176,11 +178,17 @@ agents:
       - name: MODEL_QUANTIZATION
         value: "4bit"
       - name: GPU_MEMORY_FRACTION
-        value: "0.7"
+        value: "0.8"  # Increased for L4 GPUs
       - name: INFERENCE_BATCH_SIZE
-        value: "8"
+        value: "16"   # Optimized for L4 parallel processing
       - name: CUDA_LAUNCH_BLOCKING
         value: "0"
+      - name: TORCH_USE_CUDA_DSA
+        value: "1"    # Enable CUDA device-side assertions
+      - name: CUDA_VISIBLE_DEVICES
+        value: "0"    # Use first GPU
+      - name: PYTORCH_CUDA_ALLOC_CONF
+        value: "max_split_size_mb:512"  # Optimize memory allocation
 
   # FinGPT Agent
   fingpt:
@@ -191,11 +199,11 @@ agents:
       tag: "latest"
     resources:
       requests:
-        cpu: 500m
-        memory: 2Gi
+        cpu: 1000m
+        memory: 4Gi
       limits:
-        cpu: 2000m
-        memory: 8Gi
+        cpu: 3000m
+        memory: 12Gi
     env:
       - name: ENABLE_PAPER_TRADING
         value: "true"
@@ -211,11 +219,17 @@ agents:
       - name: MODEL_QUANTIZATION
         value: "4bit"
       - name: GPU_MEMORY_FRACTION
-        value: "0.7"
+        value: "0.8"  # Increased for L4 GPUs
       - name: INFERENCE_BATCH_SIZE
-        value: "8"
+        value: "16"   # Optimized for L4 parallel processing
       - name: CUDA_LAUNCH_BLOCKING
         value: "0"
+      - name: TORCH_USE_CUDA_DSA
+        value: "1"    # Enable CUDA device-side assertions
+      - name: CUDA_VISIBLE_DEVICES
+        value: "0"    # Use first GPU
+      - name: PYTORCH_CUDA_ALLOC_CONF
+        value: "max_split_size_mb:512"  # Optimize memory allocation
 
   # Lag-LLaMA Agent
   lagllama:
@@ -226,11 +240,11 @@ agents:
       tag: "latest"
     resources:
       requests:
-        cpu: 500m
-        memory: 2Gi
+        cpu: 1000m
+        memory: 4Gi
       limits:
-        cpu: 2000m
-        memory: 8Gi
+        cpu: 3000m
+        memory: 12Gi
     env:
       - name: ENABLE_PAPER_TRADING
         value: "true"
@@ -246,11 +260,17 @@ agents:
       - name: MODEL_QUANTIZATION
         value: "4bit"
       - name: GPU_MEMORY_FRACTION
-        value: "0.7"
+        value: "0.8"  # Increased for L4 GPUs
       - name: INFERENCE_BATCH_SIZE
-        value: "8"
+        value: "16"   # Optimized for L4 parallel processing
       - name: CUDA_LAUNCH_BLOCKING
         value: "0"
+      - name: TORCH_USE_CUDA_DSA
+        value: "1"    # Enable CUDA device-side assertions
+      - name: CUDA_VISIBLE_DEVICES
+        value: "0"    # Use first GPU
+      - name: PYTORCH_CUDA_ALLOC_CONF
+        value: "max_split_size_mb:512"  # Optimize memory allocation
 
   # VPIN Agent
   vpin:
@@ -261,11 +281,11 @@ agents:
       tag: "latest"
     resources:
       requests:
-        cpu: 500m
-        memory: 2Gi
+        cpu: 1000m
+        memory: 4Gi
       limits:
-        cpu: 2000m
-        memory: 8Gi
+        cpu: 3000m
+        memory: 12Gi
     env:
       - name: ENABLE_PAPER_TRADING
         value: "true"
@@ -281,11 +301,17 @@ agents:
       - name: MODEL_QUANTIZATION
         value: "4bit"
       - name: GPU_MEMORY_FRACTION
-        value: "0.7"
+        value: "0.8"  # Increased for L4 GPUs
       - name: INFERENCE_BATCH_SIZE
-        value: "8"
+        value: "16"   # Optimized for L4 parallel processing
       - name: CUDA_LAUNCH_BLOCKING
         value: "0"
+      - name: TORCH_USE_CUDA_DSA
+        value: "1"    # Enable CUDA device-side assertions
+      - name: CUDA_VISIBLE_DEVICES
+        value: "0"    # Use first GPU
+      - name: PYTORCH_CUDA_ALLOC_CONF
+        value: "max_split_size_mb:512"  # Optimize memory allocation
 
 # Trading Framework Services
 frameworks:
@@ -385,7 +411,8 @@ securityContext:
 # Node Selector for GPU nodes (only used when gpu.enabled=true)
 {{- if .Values.gpu.enabled }}
 nodeSelector:
-  accelerator: nvidia-l4
+  accelerator: {{ .Values.gpu.type }}
+  instance-type: {{ .Values.gpu.machineType }}
 
 # Tolerations for GPU workloads (only used when gpu.enabled=true)
 tolerations:
