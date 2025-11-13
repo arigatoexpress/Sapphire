@@ -502,7 +502,7 @@ hpa:
 monitoring:
   enabled: true
   prometheus:
-    enabled: true
+    enabled: false  # Disabled until Prometheus Operator CRDs are installed
     scrapeInterval: 15s
     evaluationInterval: 15s
     retention: 30d
