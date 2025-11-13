@@ -110,7 +110,7 @@ steps:
         # Install gcloud
         echo "📦 Installing gcloud..."
         curl -sSL https://sdk.cloud.google.com | bash > /dev/null 2>&1
-        export PATH=$PATH:/root/google-cloud-sdk/bin
+        export PATH=/root/google-cloud-sdk/bin:/usr/local/bin:/usr/bin:/bin
 
         # Install Helm
         echo "📦 Installing Helm..."
