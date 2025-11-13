@@ -4,6 +4,10 @@ global:
   projectId: sapphireinfinite
   imagePullPolicy: Always
 
+# GPU configuration - set to false for CPU-only operation
+gpu:
+  enabled: false
+
 # Redis configuration
 redis:
   enabled: true
@@ -117,12 +121,10 @@ agents:
     resources:
       requests:
         cpu: 500m
-        memory: 2Gi  # Optimized for quantized models
-        nvidia.com/gpu: 1
+        memory: 2Gi
       limits:
         cpu: 2000m
-        memory: 8Gi  # Reduced from 4Gi with quantization
-        nvidia.com/gpu: 1
+        memory: 8Gi
     env:
       - name: ENABLE_PAPER_TRADING
         value: "true"
@@ -385,15 +387,17 @@ securityContext:
   runAsUser: 1000
   fsGroup: 2000
 
-# Node Selector for GPU nodes
+# Node Selector for GPU nodes (only used when gpu.enabled=true)
+{{- if .Values.gpu.enabled }}
 nodeSelector:
   accelerator: nvidia-tesla-l4
 
-# Tolerations for GPU workloads
+# Tolerations for GPU workloads (only used when gpu.enabled=true)
 tolerations:
   - key: "nvidia.com/gpu"
     operator: "Exists"
     effect: "NoSchedule"
+{{- end }}
 
 # Affinity rules
 affinity:
