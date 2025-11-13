@@ -1,0 +1,41 @@
+name: Deploy to Firebase Hosting on merge
+
+on:
+  push:
+    branches:
+      - main
+      - feature/lean-cloud-trader
+    paths:
+      - 'trading-dashboard/**'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: trading-dashboard/package-lock.json
+
+      - name: Install Dependencies
+        working-directory: trading-dashboard
+        run: npm ci
+
+      - name: Build Application
+        working-directory: trading-dashboard
+        run: npm run build
+        env:
+          CI: false
+
+      - name: Deploy to Firebase
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: '${{ secrets.GITHUB_TOKEN }}'
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_SAPPHIREINFINITE }}'
+          channelId: live
+          projectId: sapphireinfinite
