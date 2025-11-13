@@ -53,7 +53,7 @@ class RiskManager:
         self._max_loss = 1250.0
         # Anti-liquidation safeguards
         self._maintenance_margin_ratio = 0.05  # 5% maintenance margin
-        self._liquidation_buffer = 0.15  # 15% buffer before liquidation
+        self._liquidation_buffer = 0.25  # 25% buffer before liquidation for live trading
         self._max_position_size_pct = 0.08  # Max 8% of portfolio per position
         self._volatility_multiplier = 1.5  # Reduce size in high volatility
 
@@ -173,8 +173,8 @@ class RiskManager:
         confidence_multiplier = 1.0 + (confidence - 0.5) * 0.5
 
         # Stop loss based on volatility and confidence
-        base_sl_pct = volatility * 0.02  # 2% of volatility as base
-        stop_loss_pct = base_sl_pct * confidence_multiplier * 1.5  # More conservative
+        base_sl_pct = volatility * 0.03  # 3% of volatility as base for live trading
+        stop_loss_pct = base_sl_pct * confidence_multiplier * 2.0  # More conservative for live trading
 
         # Take profit based on risk-reward and confidence
         take_profit_pct = stop_loss_pct * risk_reward_ratio / confidence_multiplier

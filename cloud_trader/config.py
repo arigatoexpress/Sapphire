@@ -105,9 +105,9 @@ class Settings(BaseSettings):
 
     # Agent configuration
     enabled_agents: List[str] = Field(
-        default_factory=lambda: ["deepseek-v3", "fingpt-alpha", "lagllama-degen", "profit-maximizer"],
+        default_factory=lambda: ["deepseek-v3", "qwen-adaptive", "fingpt-alpha", "lagllama-degen", "vpin-hft", "freqtrade", "hummingbot"],
         validation_alias="ENABLED_AGENTS",
-        description="List of 4 core PvP agent IDs for autonomous trading"
+        description="List of 7 advanced AI agents for autonomous trading"
     )
     max_symbols_per_agent: int = Field(default=10, ge=1, le=50)
     agent_parallel_execution: bool = Field(default=True, validation_alias="AGENT_PARALLEL_EXECUTION")

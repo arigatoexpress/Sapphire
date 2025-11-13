@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "sapphireinfinite"
+  },
+  "targets": {
+    "sapphireinfinite": {
+      "hosting": {
+        "sapphire-prod": [
+          "sapphire-trading"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

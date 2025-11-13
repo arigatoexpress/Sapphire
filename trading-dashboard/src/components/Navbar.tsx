@@ -97,7 +97,7 @@ const Navbar: React.FC = () => {
                 WebkitTextFillColor: 'transparent',
               }}
             >
-              💎 Sapphire Trading ✨
+              💎 Sapphire Trade ✨
             </Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, alignItems: 'flex-start' }}>
               <Chip

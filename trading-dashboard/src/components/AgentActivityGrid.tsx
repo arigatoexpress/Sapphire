@@ -21,35 +21,56 @@ import {
   Info,
 } from '@mui/icons-material';
 import { useTrading } from '../contexts/TradingContext';
+import { useTheme } from '@mui/material/styles';
 import { XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 
 interface AgentCardProps {
   agent: {
     agent_id: string;
+    agent_type: 'deepseek' | 'qwen' | 'fingpt' | 'lagllama' | 'vpin' | 'freqtrade' | 'hummingbot';
+    agent_name: string;
     activity_score: number;
     communication_count: number;
     trading_count: number;
     last_activity: string;
     participation_threshold: number;
+    specialization: string;
+    color: string;
+    status: 'active' | 'idle' | 'analyzing' | 'trading';
+    gpu_utilization?: number;
+    memory_usage?: number;
   };
 }
 
 const AgentCard: React.FC<AgentCardProps> = ({ agent }) => {
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const theme = useTheme();
 
-  const getActivityColor = (score: number) => {
-    if (score > 7) return '#00d4aa';
-    if (score > 4) return '#ffaa00';
-    return '#ff6b35';
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active': return theme.palette.success.main;
+      case 'trading': return theme.palette.info.main;
+      case 'analyzing': return theme.palette.warning.main;
+      case 'idle': return theme.palette.text.secondary;
+      default: return theme.palette.primary.main;
+    }
   };
 
-  const getActivityLevel = (score: number) => {
-    if (score > 7) return 'High';
-    if (score > 4) return 'Medium';
-    return 'Low';
+  const getAgentThemeColor = () => {
+    return theme.agent[agent.agent_type] || theme.palette.primary.main;
   };
 
-  // Mock activity data for the chart
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'active': return 'Active';
+      case 'trading': return 'Trading';
+      case 'analyzing': return 'Analyzing';
+      case 'idle': return 'Idle';
+      default: return 'Unknown';
+    }
+  };
+
+  // Enhanced activity data for the chart
   const activityData = [
     { time: '1h', activity: Math.random() * 10 },
     { time: '2h', activity: Math.random() * 10 },
@@ -59,15 +80,30 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent }) => {
     { time: '6h', activity: agent.activity_score },
   ];
 
-  const agentType = agent.agent_id.toLowerCase();
   const getAgentIcon = () => {
-    if (agentType.includes('deepseek')) return '🤖';
-    if (agentType.includes('qwen')) return '🧠';
-    if (agentType.includes('fingpt')) return '📊';
-    if (agentType.includes('lagllama')) return '📈';
-    if (agentType.includes('freqtrade')) return '⚡';
-    if (agentType.includes('hummingbot')) return '🤖';
-    return '🎯';
+    switch (agent.agent_type) {
+      case 'deepseek': return '🧠'; // Brain for AI analysis
+      case 'qwen': return '🎯'; // Target for precision risk management
+      case 'fingpt': return '📊'; // Chart for financial analysis
+      case 'lagllama': return '📈'; // Trending chart for time series
+      case 'vpin': return '🔍'; // Magnifying glass for VPIN detection
+      case 'freqtrade': return '⚡'; // Lightning for algorithmic execution
+      case 'hummingbot': return '🤖'; // Robot for market making
+      default: return '🎯';
+    }
+  };
+
+  const getAgentTypeLabel = (type: string) => {
+    switch (type) {
+      case 'deepseek': return 'DeepSeek AI';
+      case 'qwen': return 'Qwen AI';
+      case 'fingpt': return 'FinGPT AI';
+      case 'lagllama': return 'Lag-LLaMA';
+      case 'vpin': return 'VPIN Sentinel';
+      case 'freqtrade': return 'FreqTrade';
+      case 'hummingbot': return 'HummingBot';
+      default: return type.toUpperCase();
+    }
   };
 
   return (
@@ -92,28 +128,46 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent }) => {
             <Box display="flex" alignItems="center" gap={2}>
               <Avatar
                 sx={{
-                  bgcolor: `${getActivityColor(agent.activity_score)}20`,
+                  bgcolor: `${getAgentThemeColor()}20`,
+                  border: `2px solid ${getAgentThemeColor()}`,
                   width: 48,
                   height: 48,
                   fontSize: '1.5rem',
+                  boxShadow: `0 0 12px ${getAgentThemeColor()}40`,
                 }}
               >
                 {getAgentIcon()}
               </Avatar>
               <Box>
                 <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1.1rem' }}>
-                  {agent.agent_id.replace('-', ' ').toUpperCase()}
+                  {agent.agent_name}
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {getActivityLevel(agent.activity_score)} Activity
+                <Typography variant="body2" sx={{ color: getAgentThemeColor(), fontWeight: 500 }}>
+                  {getStatusLabel(agent.status)} • {getAgentTypeLabel(agent.agent_type)}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.2 }}>
+                  {agent.specialization}
                 </Typography>
               </Box>
             </Box>
-            <Tooltip title="View Details" arrow>
-              <IconButton size="small">
-                <Info sx={{ fontSize: 20 }} />
-              </IconButton>
-            </Tooltip>
+            <Box display="flex" flexDirection="column" alignItems="flex-end" gap={1}>
+              <Tooltip title="View Details" arrow>
+                <IconButton size="small">
+                  <Info sx={{ fontSize: 20 }} />
+                </IconButton>
+              </Tooltip>
+              <Chip
+                label={getStatusLabel(agent.status)}
+                size="small"
+                sx={{
+                  bgcolor: `${getStatusColor(agent.status)}20`,
+                  color: getStatusColor(agent.status),
+                  fontWeight: 600,
+                  fontSize: '0.7rem',
+                  height: 20,
+                }}
+              />
+            </Box>
           </Box>
 
           <Box sx={{ mb: 2 }}>
@@ -133,21 +187,22 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent }) => {
                 borderRadius: 4,
                 bgcolor: 'grey.200',
                 '& .MuiLinearProgress-bar': {
-                  bgcolor: getActivityColor(agent.activity_score),
+                  bgcolor: agent.color,
                   borderRadius: 4,
                 },
               }}
             />
           </Box>
 
-          <Box display="flex" gap={1} flexWrap="wrap">
+          <Box display="flex" gap={1} flexWrap="wrap" mb={1}>
             <Chip
               label={`${agent.trading_count} Trades`}
               size="small"
               sx={{
-                bgcolor: 'primary.main',
-                color: 'primary.contrastText',
+                bgcolor: getAgentThemeColor(),
+                color: 'white',
                 fontSize: '0.75rem',
+                fontWeight: 600,
               }}
             />
             <Chip
@@ -157,8 +212,33 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent }) => {
                 bgcolor: 'secondary.main',
                 color: 'secondary.contrastText',
                 fontSize: '0.75rem',
+                fontWeight: 600,
               }}
             />
+            {agent.gpu_utilization && (
+              <Chip
+                label={`GPU: ${agent.gpu_utilization.toFixed(0)}%`}
+                size="small"
+                sx={{
+                  bgcolor: 'warning.main',
+                  color: 'warning.contrastText',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                }}
+              />
+            )}
+            {agent.memory_usage && (
+              <Chip
+                label={`RAM: ${agent.memory_usage.toFixed(1)}GB`}
+                size="small"
+                sx={{
+                  bgcolor: 'info.main',
+                  color: 'info.contrastText',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                }}
+              />
+            )}
           </Box>
 
           <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
@@ -181,17 +261,40 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent }) => {
         }}
       >
         <DialogTitle sx={{ pb: 1 }}>
-          <Box display="flex" alignItems="center" gap={2}>
-            <Avatar sx={{ bgcolor: `${getActivityColor(agent.activity_score)}20`, width: 56, height: 56, fontSize: '2rem' }}>
+          <Box display="flex" alignItems="center" gap={3}>
+            <Avatar
+              sx={{
+                bgcolor: `${getAgentThemeColor()}20`,
+                border: `3px solid ${getAgentThemeColor()}`,
+                width: 64,
+                height: 64,
+                fontSize: '2.5rem',
+                boxShadow: `0 0 20px ${getAgentThemeColor()}60`,
+              }}
+            >
               {getAgentIcon()}
             </Avatar>
-            <Box>
-              <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                {agent.agent_id.replace('-', ' ').toUpperCase()}
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="h4" sx={{ fontWeight: 800, mb: 0.5, color: getAgentThemeColor() }}>
+                {agent.agent_name}
               </Typography>
-              <Typography variant="body1" color="text.secondary">
-                {getActivityLevel(agent.activity_score)} Activity Agent
+              <Typography variant="h6" sx={{ fontWeight: 600, color: 'text.primary', mb: 1 }}>
+                {getAgentTypeLabel(agent.agent_type)}
               </Typography>
+              <Box display="flex" alignItems="center" gap={2} mb={1}>
+                <Chip
+                  label={getStatusLabel(agent.status)}
+                  sx={{
+                    bgcolor: `${getStatusColor(agent.status)}20`,
+                    color: getStatusColor(agent.status),
+                    fontWeight: 600,
+                    fontSize: '0.8rem',
+                  }}
+                />
+                <Typography variant="body2" color="text.secondary">
+                  {agent.specialization}
+                </Typography>
+              </Box>
             </Box>
           </Box>
         </DialogTitle>
@@ -218,7 +321,7 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent }) => {
                         height: 8,
                         borderRadius: 4,
                         '& .MuiLinearProgress-bar': {
-                          bgcolor: getActivityColor(agent.activity_score),
+                          bgcolor: agent.color,
                         },
                       }}
                     />
@@ -227,7 +330,7 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent }) => {
                   <Grid container spacing={2}>
                     <Grid item xs={6}>
                       <Box textAlign="center">
-                        <Typography variant="h4" sx={{ color: 'primary.main', fontWeight: 700 }}>
+                        <Typography variant="h4" sx={{ color: agent.color, fontWeight: 700 }}>
                           {agent.trading_count}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
@@ -245,6 +348,30 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent }) => {
                         </Typography>
                       </Box>
                     </Grid>
+                    {agent.gpu_utilization && (
+                      <Grid item xs={6}>
+                        <Box textAlign="center">
+                          <Typography variant="h4" sx={{ color: 'warning.main', fontWeight: 700 }}>
+                            {agent.gpu_utilization.toFixed(0)}%
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            GPU Utilization
+                          </Typography>
+                        </Box>
+                      </Grid>
+                    )}
+                    {agent.memory_usage && (
+                      <Grid item xs={6}>
+                        <Box textAlign="center">
+                          <Typography variant="h4" sx={{ color: 'info.main', fontWeight: 700 }}>
+                            {agent.memory_usage.toFixed(1)}GB
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Memory Usage
+                          </Typography>
+                        </Box>
+                      </Grid>
+                    )}
                   </Grid>
                 </CardContent>
               </Card>
@@ -272,8 +399,8 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent }) => {
                         <Area
                           type="monotone"
                           dataKey="activity"
-                          stroke={getActivityColor(agent.activity_score)}
-                          fill={`${getActivityColor(agent.activity_score)}40`}
+                          stroke={getAgentThemeColor()}
+                          fill={`${getAgentThemeColor()}40`}
                           strokeWidth={2}
                         />
                       </AreaChart>

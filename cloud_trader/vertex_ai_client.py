@@ -55,6 +55,7 @@ class VertexAIClient:
         settings = self._settings
         self._endpoints = {
             "deepseek-v3": settings.deepseek_vertex_endpoint,
+            "qwen-adaptive": settings.qwen_vertex_endpoint,
             "fingpt-alpha": settings.fingpt_vertex_endpoint,
             "lagllama-degen": settings.lagllama_vertex_endpoint,
             "profit-maximizer": settings.profit_maximizer_vertex_endpoint,

@@ -158,8 +158,12 @@ class PortfolioOrchestrator:
         # For now, we'll define the standard agent set
         standard_agents = {
             "deepseek-v3": AgentRole.MOMENTUM_TRADER,
+            "qwen-adaptive": AgentRole.TECHNICAL_ANALYST,
             "fingpt-alpha": AgentRole.SENTIMENT_ANALYST,
             "lagllama-degen": AgentRole.VOLATILITY_SPECIALIST,
+            "vpin-hft": AgentRole.VOLATILITY_SPECIALIST,
+            "freqtrade": AgentRole.TECHNICAL_ANALYST,
+            "hummingbot": AgentRole.MARKET_MAKER,
             "profit-maximizer": AgentRole.PORTFOLIO_OPTIMIZER,
         }
 

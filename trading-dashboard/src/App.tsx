@@ -2,45 +2,84 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { CssBaseline, Box, Typography } from '@mui/material';
 import { TradingProvider } from './contexts/TradingContext';
-import Sidebar from './components/Sidebar';
+// import Sidebar from './components/Sidebar';
 import Navbar from './components/Navbar';
 import AnimatedBackground from './components/AnimatedBackground';
 import Dashboard from './pages/Dashboard';
 import Portfolio from './pages/Portfolio';
 import Agents from './pages/Agents';
 import Analytics from './pages/Analytics';
-import Settings from './pages/Settings';
 
-// 🎨 Premium Sapphire Theme - Artful & Sophisticated
+// Extend theme with custom agent colors
+declare module '@mui/material/styles' {
+  interface Theme {
+    agent: {
+      deepseek: string;
+      qwen: string;
+      fingpt: string;
+      lagllama: string;
+      vpin: string;
+      freqtrade: string;
+      hummingbot: string;
+    };
+  }
+  interface ThemeOptions {
+    agent?: {
+      deepseek: string;
+      qwen: string;
+      fingpt: string;
+      lagllama: string;
+      vpin: string;
+      freqtrade: string;
+      hummingbot: string;
+    };
+  }
+}
+
+// 🎨 Clean Sapphire Theme - Readable, Uniform & Beautiful
 const theme = createTheme({
   palette: {
     mode: 'dark',
     primary: {
-      main: '#00d4aa', // Sapphire green
-      light: '#00f5d4',
-      dark: '#009d80',
+      main: '#0ea5e9', // Clean sapphire blue
+      light: '#38bdf8',
+      dark: '#0284c7',
     },
     secondary: {
-      main: '#8a2be2', // Electric purple
-      light: '#a855f7',
-      dark: '#6b21a8',
+      main: '#06b6d4', // Cyan accent
+      light: '#22d3ee',
+      dark: '#0891b2',
     },
     background: {
-      default: 'transparent', // Let CSS handle background
-      paper: 'rgba(255, 255, 255, 0.08)',
+      default: '#0f172a', // Deep navy background
+      paper: 'rgba(30, 41, 59, 0.8)', // Semi-transparent slate
     },
     success: {
-      main: '#00d4aa',
+      main: '#10b981', // Emerald
     },
     error: {
-      main: '#ff4757',
+      main: '#ef4444', // Clean red
     },
     warning: {
-      main: '#ffa502',
+      main: '#f59e0b', // Amber
     },
     info: {
-      main: '#3742fa',
+      main: '#8b5cf6', // Violet
     },
+    text: {
+      primary: '#f1f5f9', // Off-white for readability
+      secondary: '#cbd5e1', // Light gray for secondary text
+    },
+  },
+  // Custom agent colors - clean and distinct
+  agent: {
+    deepseek: '#06b6d4', // Cyan - Market Analysis
+    qwen: '#8b5cf6', // Violet - Risk Management
+    fingpt: '#ef4444', // Red - Financial Analysis
+    lagllama: '#f59e0b', // Amber - Time Series
+    vpin: '#ec4899', // Pink - VPIN Analysis
+    freqtrade: '#3b82f6', // Blue - Algorithmic Execution
+    hummingbot: '#10b981', // Emerald - Market Making
   },
   typography: {
     fontFamily: '"Inter", "SF Pro Display", "Segoe UI", system-ui, sans-serif',
@@ -98,15 +137,16 @@ const theme = createTheme({
     MuiCard: {
       styleOverrides: {
         root: {
-          background: 'rgba(255, 255, 255, 0.08)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
+          backgroundColor: 'rgba(30, 41, 59, 0.6)',
+          backdropFilter: 'blur(16px)',
+          border: '1px solid rgba(148, 163, 184, 0.1)',
           borderRadius: '16px',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
-          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15)',
+          transition: 'all 0.3s ease',
           '&:hover': {
             transform: 'translateY(-2px)',
-            boxShadow: '0 12px 40px rgba(0, 0, 0, 0.4)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+            borderColor: 'rgba(14, 165, 233, 0.2)',
           },
         },
       },
@@ -117,26 +157,66 @@ const theme = createTheme({
           borderRadius: '12px',
           textTransform: 'none',
           fontWeight: 600,
-          letterSpacing: '0.02em',
-          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-        },
-        contained: {
-          background: 'linear-gradient(135deg, #00d4aa 0%, #00f5d4 100%)',
-          boxShadow: '0 4px 16px rgba(0, 212, 170, 0.3)',
+          fontSize: '0.95rem',
+          padding: '10px 24px',
+          transition: 'all 0.2s ease',
           '&:hover': {
-            background: 'linear-gradient(135deg, #00f5d4 0%, #00d4aa 100%)',
-            boxShadow: '0 6px 24px rgba(0, 212, 170, 0.4)',
             transform: 'translateY(-1px)',
           },
+        },
+        contained: {
+          backgroundColor: '#0ea5e9',
+          color: '#ffffff',
+          boxShadow: '0 2px 8px rgba(14, 165, 233, 0.3)',
+          '&:hover': {
+            backgroundColor: '#0284c7',
+            boxShadow: '0 4px 16px rgba(14, 165, 233, 0.4)',
+          },
+        },
+        outlined: {
+          borderColor: 'rgba(14, 165, 233, 0.5)',
+          color: '#0ea5e9',
+          '&:hover': {
+            borderColor: '#0ea5e9',
+            backgroundColor: 'rgba(14, 165, 233, 0.05)',
+          },
+        },
+      },
+    },
+    MuiChip: {
+      styleOverrides: {
+        root: {
+          borderRadius: '8px',
+          fontWeight: 500,
+          fontSize: '0.85rem',
+          height: '28px',
+        },
+        filled: {
+          backgroundColor: 'rgba(14, 165, 233, 0.1)',
+          color: '#0ea5e9',
+          border: '1px solid rgba(14, 165, 233, 0.2)',
         },
       },
     },
     MuiPaper: {
       styleOverrides: {
         root: {
-          backgroundImage: 'none',
-          background: 'rgba(255, 255, 255, 0.08)',
-          backdropFilter: 'blur(20px)',
+          backgroundColor: 'rgba(30, 41, 59, 0.4)',
+          backdropFilter: 'blur(12px)',
+          border: '1px solid rgba(148, 163, 184, 0.08)',
+        },
+      },
+    },
+    MuiLinearProgress: {
+      styleOverrides: {
+        root: {
+          borderRadius: '6px',
+          backgroundColor: 'rgba(148, 163, 184, 0.2)',
+          height: '8px',
+        },
+        bar: {
+          borderRadius: '6px',
+          backgroundColor: '#0ea5e9',
         },
       },
     },
@@ -149,7 +229,6 @@ function AppContent() {
     <Router>
       <AnimatedBackground />
       <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'transparent' }}>
-        <Sidebar />
         <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
           <Navbar />
           <Box
@@ -166,7 +245,6 @@ function AppContent() {
               <Route path="/portfolio" element={<Portfolio />} />
               <Route path="/agents" element={<Agents />} />
               <Route path="/analytics" element={<Analytics />} />
-              <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
 
@@ -219,7 +297,7 @@ function AppContent() {
                   mb: 1
                 }}
               >
-                🚀 <strong style={{ color: '#8a2be2', fontSize: '1.1em' }}>Sapphire Trading</strong> is proudly built on{' '}
+                🚀 <strong style={{ color: '#8a2be2', fontSize: '1.1em' }}>Sapphire Trade</strong> is proudly built on{' '}
                 <strong style={{ color: '#00d4aa', fontSize: '1.1em' }}>Aster DEX</strong>
               </Typography>
 

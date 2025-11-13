@@ -35,7 +35,7 @@ window.addEventListener('offline', () => {
   console.log('Application is offline');
   // Show offline notification
   if ('Notification' in window && Notification.permission === 'granted') {
-    new Notification('Sapphire Trading', {
+    new Notification('Sapphire Trade', {
       body: 'You are currently offline. Some features may be limited.',
       icon: '/sapphire-icon.svg'
     });

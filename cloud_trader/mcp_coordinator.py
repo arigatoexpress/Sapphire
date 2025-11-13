@@ -549,8 +549,12 @@ class MCPCoordinator:
         # Map signal sources to agent IDs
         source_mapping = {
             "deepseek": "deepseek-v3",
+            "qwen": "qwen-adaptive",
             "fingpt": "fingpt-alpha",
             "lagllama": "lagllama-degen",
+            "vpin": "vpin-hft",
+            "freqtrade": "freqtrade",
+            "hummingbot": "hummingbot",
             "profit-maximizer": "profit-maximizer",
         }
         return source_mapping.get(source.value, source.value)
