@@ -1,8 +1,9 @@
 import asyncio
+import logging
 import random
 from typing import Any, Dict, Optional
 
-from loguru import logger
+logger = logging.getLogger(__name__)
 
 class FallbackStrategySelector:
     """
