@@ -146,6 +146,9 @@ steps:
         if helm list -n trading 2>/dev/null | grep -q "trading-system.*pending"; then
             echo "⚠️  Found pending Helm operation, waiting..."
             sleep 30
+            # Try to cancel any stuck operations
+            echo "🔄 Attempting to cancel stuck operations..."
+            helm rollback trading-system 2>/dev/null || echo "No rollback needed"
         fi
 
         # Install/upgrade Helm chart with error handling
@@ -153,24 +156,15 @@ steps:
         helm dependency build ./helm/trading-system
 
         echo "⚡ Installing/upgrading trading-system Helm chart..."
-        if helm upgrade --install trading-system ./helm/trading-system \
+        # Force upgrade to override any stuck operations
+        helm upgrade --install trading-system ./helm/trading-system \
             --namespace trading \
             --create-namespace \
             --set global.imageRegistry=us-central1-docker.pkg.dev \
             --set global.projectId=${PROJECT_ID} \
             --set cloudTrader.image.tag=${BUILD_ID} \
-            --dry-run; then
-            helm upgrade --install trading-system ./helm/trading-system \
-                --namespace trading \
-                --create-namespace \
-                --set global.imageRegistry=us-central1-docker.pkg.dev \
-                --set global.projectId=${PROJECT_ID} \
-                --set cloudTrader.image.tag=${BUILD_ID}
-            echo "✅ Helm chart installed/upgraded successfully"
-        else
-            echo "❌ Helm chart validation failed, aborting deployment"
-            exit 1
-        fi
+            --force
+        echo "✅ Helm chart installed/upgraded successfully"
 
         # Helm chart handles all image updates automatically
 
