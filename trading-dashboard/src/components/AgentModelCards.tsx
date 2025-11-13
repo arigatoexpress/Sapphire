@@ -389,9 +389,10 @@ const AgentModelCards: React.FC = () => {
                 🤖 Neural Trading Matrix
               </Typography>
               <Typography variant="body1" sx={{ color: 'text.secondary', lineHeight: 1.6 }}>
-                Enterprise-grade AI ensemble with 5 specialized agents using Google Gemini models:
-                Trend Momentum Agent (Gemini 1.5 Flash), Strategy Optimization Agent (Gemini 1.5 Pro), Financial Sentiment Agent (Gemini 1.5 Flash),
-                Market Prediction Agent (Gemini 1.5 Flash), and Volume Microstructure Agent (Codey).
+                Enterprise-grade AI ensemble with 5 specialized agents using latest Google Gemini models:
+                Trend Momentum Agent (Gemini 2.0 Flash Experimental), Strategy Optimization Agent (Gemini Experimental 1206),
+                Financial Sentiment Agent (Gemini 2.0 Flash Experimental), Market Prediction Agent (Gemini Experimental 1206),
+                and Volume Microstructure Agent (Codey).
                 Advanced risk management, real-time coordination, and institutional-grade performance monitoring.
               </Typography>
             </Box>

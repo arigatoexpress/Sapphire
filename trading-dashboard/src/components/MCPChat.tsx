@@ -57,7 +57,7 @@ const MCPChat: React.FC = () => {
           agent: 'Trend Momentum Agent',
           agent_type: 'trend_momentum_agent',
           type: 'market_analysis',
-          message: '🔍 Detected strong momentum in BTC/USDT - RSI breaking above 70, volume spike 3x average using Gemini 1.5 Flash analysis',
+          message: '🔍 Detected strong momentum in BTC/USDT - RSI breaking above 70, volume spike 3x average using Gemini 2.0 Flash Exp analysis',
           confidence: 0.85
         },
         {
@@ -66,7 +66,7 @@ const MCPChat: React.FC = () => {
           agent: 'Strategy Optimization Agent',
           agent_type: 'strategy_optimization_agent',
           type: 'trade_idea',
-          message: '💡 Opportunity: Long position with 2:1 risk-reward, stop loss at 1.5% below entry - optimized via Gemini 1.5 Pro reasoning',
+          message: '💡 Opportunity: Long position with 2:1 risk-reward, stop loss at 1.5% below entry - optimized via Gemini Exp 1206 reasoning',
           confidence: 0.78
         },
         {
@@ -75,7 +75,7 @@ const MCPChat: React.FC = () => {
           agent: 'Financial Sentiment Agent',
           agent_type: 'financial_sentiment_agent',
           type: 'strategy_discussion',
-          message: '📊 Sentiment analysis shows 68% bullish news flow - confirming momentum signal using Gemini 1.5 Flash NLP processing',
+          message: '📊 Sentiment analysis shows 68% bullish news flow - confirming momentum signal using Gemini 2.0 Flash Exp NLP processing',
           confidence: 0.82
         },
         {
@@ -93,7 +93,7 @@ const MCPChat: React.FC = () => {
           agent: 'Market Prediction Agent',
           agent_type: 'market_prediction_agent',
           type: 'market_analysis',
-          message: '📈 Time series forecast: BTC/USDT showing 72% probability of upward continuation using Gemini 1.5 Flash predictive analytics',
+          message: '📈 Time series forecast: BTC/USDT showing 72% probability of upward continuation using Gemini Exp 1206 predictive analytics',
           confidence: 0.76
         },
         {
@@ -117,10 +117,10 @@ const MCPChat: React.FC = () => {
       const agents = ['trend_momentum_agent', 'strategy_optimization_agent', 'financial_sentiment_agent', 'market_prediction_agent', 'volume_microstructure_agent', 'freqtrade', 'hummingbot'] as const;
       const agent = agents[Math.floor(Math.random() * agents.length)];
       const agentNames = {
-        trend_momentum_agent: 'Trend Momentum Agent (Gemini 1.5 Flash)',
-        strategy_optimization_agent: 'Strategy Optimization Agent (Gemini 1.5 Pro)',
-        financial_sentiment_agent: 'Financial Sentiment Agent (Gemini 1.5 Flash)',
-        market_prediction_agent: 'Market Prediction Agent (Gemini 1.5 Flash)',
+        trend_momentum_agent: 'Trend Momentum Agent (Gemini 2.0 Flash Exp)',
+        strategy_optimization_agent: 'Strategy Optimization Agent (Gemini Exp 1206)',
+        financial_sentiment_agent: 'Financial Sentiment Agent (Gemini 2.0 Flash Exp)',
+        market_prediction_agent: 'Market Prediction Agent (Gemini Exp 1206)',
         volume_microstructure_agent: 'Volume Microstructure Agent (Codey)',
         freqtrade: 'FreqTrade Pro',
         hummingbot: 'HummingBot Plus'

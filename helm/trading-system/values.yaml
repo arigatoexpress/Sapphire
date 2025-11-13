@@ -147,8 +147,8 @@ mcpCoordinator:
 agents:
   enabled: true
 
-  # Momentum Analyzer - Real-time trend detection using PaLM 2 Chat
-  momentum_analyzer:
+  # Trend Momentum Agent - Real-time market momentum analysis using PaLM 2 Chat
+  trend_momentum_agent:
     enabled: true
     replicaCount: 1
     image:
@@ -163,7 +163,7 @@ agents:
         memory: 12Gi
     # Vertex AI Optimization for Momentum Analysis
     vertexAI:
-      model: "chat-bison-32k"  # PaLM 2 Chat - Fast conversational inference
+      model: "gemini-2.0-flash-exp"  # Gemini 2.0 Flash Experimental - Fastest for momentum
       optimization:
         quantization: "int8"  # Efficient for real-time analysis
         batchSize: 16  # Higher throughput for momentum signals
@@ -171,14 +171,14 @@ agents:
         maxTokens: 512  # Concise momentum analysis
       roleContext: "momentum-analysis"
       monitoring:
-        latencyThreshold: 200  # 200ms target for momentum signals
+        latencyThreshold: 150  # 150ms target for momentum signals (faster model)
         accuracyMetric: "momentum_prediction_accuracy"
         driftThreshold: 0.05
     env:
       - name: ENABLE_PAPER_TRADING
         value: "true"
       - name: ENABLED_AGENTS
-        value: '["momentum_analyzer"]'
+        value: '["trend_momentum_agent"]'
       - name: ENABLE_VERTEX_AI
         value: "true"
       - name: MCP_ENABLED
@@ -186,7 +186,7 @@ agents:
       - name: AGENT_ROLE
         value: "momentum-analysis"
       - name: VERTEX_MODEL
-        value: "chat-bison-32k"
+        value: "gemini-2.0-flash-exp"
       - name: MODEL_TEMPERATURE
         value: "0.1"
       - name: MAX_OUTPUT_TOKENS
@@ -196,8 +196,8 @@ agents:
       - name: MONITORING_ENABLED
         value: "true"
 
-  # Strategy Optimizer - Advanced reasoning using PaLM 2 Unicorn
-  strategy_optimizer:
+  # Strategy Optimization Agent - Advanced trading strategy optimization using PaLM 2 Unicorn
+  strategy_optimization_agent:
     enabled: true
     replicaCount: 1
     image:
@@ -212,7 +212,7 @@ agents:
         memory: 12Gi
     # Vertex AI Optimization for Strategy Optimization
     vertexAI:
-      model: "text-unicorn-001"  # PaLM 2 Unicorn - Advanced reasoning
+      model: "gemini-exp-1206"  # Latest Gemini Experimental - Advanced reasoning for strategy
       optimization:
         quantization: "int8"  # Balanced precision/performance
         batchSize: 4  # Smaller batches for complex reasoning
@@ -227,7 +227,7 @@ agents:
       - name: ENABLE_PAPER_TRADING
         value: "true"
       - name: ENABLED_AGENTS
-        value: '["strategy_optimizer"]'
+        value: '["strategy_optimization_agent"]'
       - name: ENABLE_VERTEX_AI
         value: "true"
       - name: MCP_ENABLED
@@ -235,7 +235,7 @@ agents:
       - name: AGENT_ROLE
         value: "strategy-optimization"
       - name: VERTEX_MODEL
-        value: "text-unicorn-001"
+        value: "gemini-exp-1206"
       - name: MODEL_TEMPERATURE
         value: "0.3"
       - name: MAX_OUTPUT_TOKENS
@@ -245,8 +245,8 @@ agents:
       - name: MONITORING_ENABLED
         value: "true"
 
-  # Sentiment Analyzer - NLP analysis using BERT
-  sentiment_analyzer:
+  # Financial Sentiment Agent - Financial news and market sentiment analysis using BERT
+  financial_sentiment_agent:
     enabled: true
     replicaCount: 1
     image:
@@ -261,7 +261,7 @@ agents:
         memory: 12Gi
     # Vertex AI Optimization for Sentiment Analysis
     vertexAI:
-      model: "bert-base-multilingual-cased"  # BERT - Expert NLP model
+      model: "gemini-2.0-flash-exp"  # Latest Gemini 2.0 Flash - Fast text processing
       optimization:
         quantization: "int8"  # Efficient for text analysis
         batchSize: 32  # Higher batches for sentiment processing
@@ -276,7 +276,7 @@ agents:
       - name: ENABLE_PAPER_TRADING
         value: "true"
       - name: ENABLED_AGENTS
-        value: '["sentiment_analyzer"]'
+        value: '["financial_sentiment_agent"]'
       - name: ENABLE_VERTEX_AI
         value: "true"
       - name: MCP_ENABLED
@@ -284,7 +284,7 @@ agents:
       - name: AGENT_ROLE
         value: "sentiment-analysis"
       - name: VERTEX_MODEL
-        value: "bert-base-multilingual-cased"
+        value: "gemini-2.0-flash-exp"
       - name: MODEL_TEMPERATURE
         value: "0.2"
       - name: MAX_OUTPUT_TOKENS
@@ -294,8 +294,8 @@ agents:
       - name: MONITORING_ENABLED
         value: "true"
 
-  # Market Predictor - Analytical reasoning using PaLM 2 Text
-  market_predictor:
+  # Market Prediction Agent - Time series forecasting and market prediction using PaLM 2 Text
+  market_prediction_agent:
     enabled: true
     replicaCount: 1
     image:
@@ -310,7 +310,7 @@ agents:
         memory: 12Gi
     # Vertex AI Optimization for Market Prediction
     vertexAI:
-      model: "text-bison-32k"  # PaLM 2 Text - Analytical reasoning
+      model: "gemini-exp-1206"  # Latest Gemini Experimental - Complex analytical reasoning
       optimization:
         quantization: "int8"  # Balanced for prediction analysis
         batchSize: 8  # Medium batches for prediction models
@@ -325,7 +325,7 @@ agents:
       - name: ENABLE_PAPER_TRADING
         value: "true"
       - name: ENABLED_AGENTS
-        value: '["market_predictor"]'
+        value: '["market_prediction_agent"]'
       - name: ENABLE_VERTEX_AI
         value: "true"
       - name: MCP_ENABLED
@@ -333,7 +333,7 @@ agents:
       - name: AGENT_ROLE
         value: "market-prediction"
       - name: VERTEX_MODEL
-        value: "text-bison-32k"
+        value: "gemini-exp-1206"
       - name: MODEL_TEMPERATURE
         value: "0.4"
       - name: MAX_OUTPUT_TOKENS
@@ -343,8 +343,8 @@ agents:
       - name: MONITORING_ENABLED
         value: "true"
 
-  # Volume Analyzer - Mathematical processing using Codey
-  volume_analyzer:
+  # Volume Microstructure Agent - Volume synchronized probability of informed trading using Codey
+  volume_microstructure_agent:
     enabled: true
     replicaCount: 1
     image:
@@ -374,7 +374,7 @@ agents:
       - name: ENABLE_PAPER_TRADING
         value: "true"
       - name: ENABLED_AGENTS
-        value: '["volume_analyzer"]'
+        value: '["volume_microstructure_agent"]'
       - name: ENABLE_VERTEX_AI
         value: "true"
       - name: MCP_ENABLED

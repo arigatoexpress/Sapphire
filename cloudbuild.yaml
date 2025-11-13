@@ -173,7 +173,7 @@ steps:
 
         echo "⏳ Waiting for optimized rollouts to complete..."
                 # Rollout with error handling - check all deployments from Helm chart
-                deployments="trading-system-cloud-trader trading-system-mcp-coordinator trading-system-deepseek-bot trading-system-qwen-bot trading-system-fingpt-bot trading-system-lagllama-bot trading-system-vpin-bot"
+                deployments="trading-system-cloud-trader trading-system-mcp-coordinator trading-system-trend-momentum-agent trading-system-strategy-optimization-agent trading-system-financial-sentiment-agent trading-system-market-prediction-agent trading-system-volume-microstructure-agent"
 
                 for deployment in $deployments; do
                   if ! kubectl -n trading rollout status deployment/$deployment --timeout=300s; then
