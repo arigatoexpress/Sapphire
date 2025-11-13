@@ -5,7 +5,7 @@ The Gemini model access is not configured for this project. Here are alternative
 
 ## Option 1: Google Cloud Console (Recommended)
 
-1. Go to [Vertex AI Studio](https://console.cloud.google.com/vertex-ai/generative/multimodal/create/text?project=quant-ai-trader-credits)
+1. Go to [Vertex AI Studio](https://console.cloud.google.com/vertex-ai/generative/multimodal/create/text?project=sapphireinfinite)
 2. Select "Gemini 1.5 Pro" model
 3. Copy the entire contents of `gemini-prompt-for-fixes.txt`
 4. Paste into the prompt field
@@ -19,7 +19,7 @@ If you want to use the command line, first enable the API:
 
 ```bash
 # Enable Generative AI API
-gcloud services enable generativelanguage.googleapis.com --project=quant-ai-trader-credits
+gcloud services enable generativelanguage.googleapis.com --project=sapphireinfinite
 
 # Then try the Python script again
 python3 gemini-fix-prompt-python.py

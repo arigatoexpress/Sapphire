@@ -143,7 +143,7 @@ class Settings(BaseSettings):
     # LLM Configuration (fallback)
     enable_llm_trading: bool = Field(default=False, validation_alias="ENABLE_LLM_TRADING")
     min_llm_confidence: float = Field(default=0.7, ge=0, le=1, description="Minimum confidence threshold for LLM decisions")
-    llm_endpoint: str = Field(default="https://deepseek-trader-880429861698.us-central1.run.app", validation_alias="LLM_ENDPOINT")
+    llm_endpoint: str = Field(default="https://api.sapphiretrade.xyz", validation_alias="LLM_ENDPOINT")
     llm_timeout_seconds: int = Field(default=30, ge=5, le=120)
 
     # Open-source analyst endpoints

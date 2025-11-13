@@ -33,6 +33,10 @@ spec:
           value: "WARNING"
         - name: MCP_ENABLED
           value: "true"
+        - name: CACHE_BACKEND
+          value: "redis"
+        - name: REDIS_URL
+          value: "redis://redis-service.trading.svc.cluster.local:6379"
         envFrom:
         - secretRef:
             name: cloud-trader-secrets

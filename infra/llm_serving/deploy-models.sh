@@ -85,7 +85,7 @@ log_info "Checking service status..."
 SERVICES=("deepseek-trader" "qwen-trader" "fingpt-trader" "phi3-trader" "model-router")
 
 for service in "${SERVICES[@]}"; do
-    if curl -s "https://$service-880429861698.us-central1.run.app/health" > /dev/null; then
+    if curl -s "https://$service-342943608894.us-central1.run.app/health" > /dev/null; then
         log_success "$service is healthy"
     else
         log_warning "$service may not be ready yet"

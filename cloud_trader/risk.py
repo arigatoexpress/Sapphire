@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Dict
 
 from .config import Settings
+from .pubsub import PubSubClient
 
 
 @dataclass
@@ -39,18 +40,52 @@ class Position:
 class PortfolioState:
     balance: float
     total_exposure: float
+    unrealized_pnl: float = 0.0
     positions: Dict[str, Position] = field(default_factory=dict)
 
 
 class RiskManager:
     def __init__(self, settings: Settings):
+        self._settings = settings
         self._max_drawdown = settings.max_drawdown
         self._max_leverage = settings.max_portfolio_leverage
+        self._total_capital = 5000.0
+        self._max_loss = 1250.0
         # Anti-liquidation safeguards
         self._maintenance_margin_ratio = 0.05  # 5% maintenance margin
         self._liquidation_buffer = 0.15  # 15% buffer before liquidation
         self._max_position_size_pct = 0.08  # Max 8% of portfolio per position
         self._volatility_multiplier = 1.5  # Reduce size in high volatility
+
+        # VPIN integration
+        self._pubsub_client = PubSubClient(self._settings)
+        self._vpin_positions: Dict[str, Any] = {}
+        self._vpin_subscription_task: Optional[asyncio.Task[None]] = None
+
+    async def start_vpin_listener(self):
+        """Starts the Pub/Sub listener for VPIN position updates."""
+        if not self._pubsub_client.is_connected():
+            await self._pubsub_client.connect()
+        
+        self._vpin_subscription_task = asyncio.create_task(
+            self._pubsub_client.subscribe("vpin_positions", self._handle_vpin_position_update)
+        )
+
+    async def stop_vpin_listener(self):
+        """Stops the VPIN position listener."""
+        if self._vpin_subscription_task:
+            self._vpin_subscription_task.cancel()
+            try:
+                await self._vpin_subscription_task
+            except asyncio.CancelledError:
+                pass
+        await self._pubsub_client.close()
+
+    async def _handle_vpin_position_update(self, message: Dict[str, Any]):
+        """Callback to handle VPIN position updates from Pub/Sub."""
+        symbol = message.get("symbol")
+        if symbol:
+            self._vpin_positions[symbol] = message
 
     def can_open_position(self, portfolio: PortfolioState, notional: float, volatility: float = 1.0) -> bool:
         """Enhanced position opening with liquidation prevention."""
@@ -325,6 +360,26 @@ class RiskManager:
             "trailing_stop_buffer": dynamic_config["trailing_stop_buffer"],
             "max_leverage": dynamic_config["max_leverage"],
         }
+
+    def update_portfolio_risk(self, portfolio: PortfolioState) -> tuple[bool, str]:
+        """
+        Updates and checks the overall portfolio risk, including VPIN positions.
+        """
+        vpin_exposure = sum(
+            pos.get('notional', 0) * pos.get('leverage', 30)
+            for pos in self._vpin_positions.values()
+        )
+        total_exposure = portfolio.total_exposure + vpin_exposure
+        
+        if self._total_capital > 0:
+            current_leverage = total_exposure / self._total_capital
+            if current_leverage > self._max_leverage:
+                return False, f"Portfolio leverage {current_leverage:.2f} exceeds max leverage {self._max_leverage}"
+
+        if portfolio.unrealized_pnl < -self._max_loss:
+            return False, f"Maximum loss limit of ${self._max_loss} exceeded. Current PnL: ${portfolio.unrealized_pnl:.2f}"
+
+        return True, ""
 
     def register_fill(self, portfolio: PortfolioState, symbol: str, notional: float) -> PortfolioState:
         if symbol not in portfolio.positions:

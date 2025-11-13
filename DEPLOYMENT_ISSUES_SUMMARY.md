@@ -19,7 +19,7 @@ Your frontend is being served from an **outdated GCS bucket** instead of your Cl
 
 ### 2. Duplicate Services Across Projects 🔄
 
-**quant-ai-trader-credits** (Currently Active):
+**sapphireinfinite** (Currently Active):
 - 10 Cloud Run services including duplicates
 - Both `cloud-trader-dashboard` (new) and `trading-dashboard` (old)
 - This IS your production environment
@@ -86,7 +86,7 @@ sapphiretrade.xyz → Load Balancer → aster-url-map → Cloud Run (NEW)
 
 2. **Remove Old Services:**
    ```bash
-   # In quant-ai-trader-credits
+   # In sapphireinfinite
    gcloud run services delete trading-dashboard --region=us-central1
    ```
 
@@ -96,7 +96,7 @@ sapphiretrade.xyz → Load Balancer → aster-url-map → Cloud Run (NEW)
    ```
 
 4. **Consolidate Projects:**
-   - Consider using only `quant-ai-trader-credits`
+   - Consider using only `sapphireinfinite`
    - Archive `sapphire-477307` project
 
 ## Position Closing Fix Details

@@ -5,15 +5,15 @@ metadata:
     run.googleapis.com/build-enable-automatic-updates: 'false'
     run.googleapis.com/build-id: 6ffdc810-0f54-42cd-88fd-1d7e6a6e590d
     run.googleapis.com/build-image-uri: us-central1-docker.pkg.dev/sapphireinfinite/cloud-run-source-deploy/cloud-trader
-    run.googleapis.com/build-name: projects/880429861698/locations/us-central1/builds/6ffdc810-0f54-42cd-88fd-1d7e6a6e590d
+    run.googleapis.com/build-name: projects/342943608894/locations/us-central1/builds/6ffdc810-0f54-42cd-88fd-1d7e6a6e590d
     run.googleapis.com/build-source-location: gs://run-sources-sapphireinfinite-us-central1/services/cloud-trader/1762205909.989097-bf5c3f4283474e638997daae0d829075.zip#1762205955976003
     run.googleapis.com/ingress: internal-and-cloud-load-balancing
     run.googleapis.com/ingress-status: internal-and-cloud-load-balancing
-    run.googleapis.com/urls: '["https://cloud-trader-880429861698.us-central1.run.app","https://cloud-trader-cfxefrvooa-uc.a.run.app"]'
+    run.googleapis.com/urls: '["https://cloud-trader-342943608894.us-central1.run.app","https://cloud-trader-cfxefrvooa-uc.a.run.app"]'
   labels:
     cloud.googleapis.com/location: us-central1
   name: cloud-trader
-  namespace: '880429861698'
+  namespace: '342943608894'
 spec:
   template:
     metadata:
@@ -77,7 +77,7 @@ spec:
           tcpSocket:
             port: 8080
           timeoutSeconds: 240
-      serviceAccountName: 880429861698-compute@developer.gserviceaccount.com
+      serviceAccountName: 342943608894-compute@developer.gserviceaccount.com
       timeoutSeconds: 300
   traffic:
   - percent: 100

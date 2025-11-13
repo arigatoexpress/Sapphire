@@ -51,7 +51,7 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=123456789
 VITE_FIREBASE_APP_ID=1:123456789:web:abcdef123456
 
 # Backend API (update with your deployed URL)
-VITE_API_BASE_URL=https://cloud-trader-880429861698.us-central1.run.app
+VITE_API_BASE_URL=https://cloud-trader-342943608894.us-central1.run.app
 ```
 
 ### **Development Server**
@@ -124,7 +124,7 @@ firebase hosting:channel:list
 ### **Backend Connection Test**
 ```bash
 # Test API connectivity
-curl https://cloud-trader-880429861698.us-central1.run.app/healthz
+curl https://cloud-trader-342943608894.us-central1.run.app/healthz
 
 # Test with dashboard
 curl https://your-firebase-hosting-url.com/api/portfolio-status

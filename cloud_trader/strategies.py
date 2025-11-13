@@ -15,6 +15,7 @@ from decimal import Decimal
 from .config import get_settings
 from .strategy import MarketSnapshot
 from .rl_strategies import RLStrategyManager
+from .cache import get_cache, BaseCache
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,12 @@ class TradingStrategy(ABC):
     def __init__(self, name: str):
         self.name = name
         self.settings = get_settings()
+        self._cache: Optional[BaseCache] = None
+        
+    async def get_cache(self) -> BaseCache:
+        if self._cache is None:
+            self._cache = await get_cache()
+        return self._cache
         
     @abstractmethod
     async def evaluate(self, symbol: str, market_data: MarketSnapshot, 
@@ -109,23 +116,34 @@ class MeanReversionStrategy(TradingStrategy):
     async def evaluate(self, symbol: str, market_data: MarketSnapshot, 
                       historical_data: Optional[pd.DataFrame] = None) -> StrategySignal:
         """Evaluate mean reversion signal using Bollinger Bands."""
-        if historical_data is None or len(historical_data) < self.bb_period:
-            return StrategySignal(
-                strategy_name=self.name,
-                symbol=symbol,
-                direction="HOLD",
-                confidence=0.0,
-                position_size=0.0,
-                reasoning="Insufficient historical data for BB calculation",
-                metadata={}
-            )
-        
-        # Calculate Bollinger Bands
-        closes = historical_data['close'].tail(self.bb_period)
-        sma = closes.mean()
-        std = closes.std()
-        upper_band = sma + (self.bb_std * std)
-        lower_band = sma - (self.bb_std * std)
+        cache = await self.get_cache()
+        cache_key = f"strategy:mean_reversion:bb:{symbol}"
+        cached_bands = await cache.get(cache_key)
+
+        if cached_bands:
+            upper_band = cached_bands['upper']
+            lower_band = cached_bands['lower']
+            sma = cached_bands['sma']
+        else:
+            if historical_data is None or len(historical_data) < self.bb_period:
+                return StrategySignal(
+                    strategy_name=self.name,
+                    symbol=symbol,
+                    direction="HOLD",
+                    confidence=0.0,
+                    position_size=0.0,
+                    reasoning="Insufficient historical data for BB calculation",
+                    metadata={}
+                )
+            
+            # Calculate Bollinger Bands
+            closes = historical_data['close'].tail(self.bb_period)
+            sma = closes.mean()
+            std = closes.std()
+            upper_band = sma + (self.bb_std * std)
+            lower_band = sma - (self.bb_std * std)
+            
+            await cache.set(cache_key, {"upper": upper_band, "lower": lower_band, "sma": sma}, ttl=60)
         
         current_price = market_data.price
         
@@ -243,19 +261,27 @@ class DQNStrategy(TradingStrategy):
     async def evaluate(self, symbol: str, market_data: MarketSnapshot, 
                       historical_data: Optional[pd.DataFrame] = None) -> StrategySignal:
         """Evaluate using DQN model (simulated for MVP)."""
-        if historical_data is None or len(historical_data) < self.state_size:
-            return StrategySignal(
-                strategy_name=self.name,
-                symbol=symbol,
-                direction="HOLD",
-                confidence=0.0,
-                position_size=0.0,
-                reasoning="Insufficient data for state construction",
-                metadata={}
-            )
-        
-        # Construct state features
-        state = self._construct_state(market_data, historical_data)
+        cache = await self.get_cache()
+        cache_key = f"strategy:dqn:state:{symbol}"
+        cached_state = await cache.get(cache_key)
+
+        if cached_state:
+            state = np.array(cached_state)
+        else:
+            if historical_data is None or len(historical_data) < self.state_size:
+                return StrategySignal(
+                    strategy_name=self.name,
+                    symbol=symbol,
+                    direction="HOLD",
+                    confidence=0.0,
+                    position_size=0.0,
+                    reasoning="Insufficient data for state construction",
+                    metadata={}
+                )
+            
+            # Construct state features
+            state = self._construct_state(market_data, historical_data)
+            await cache.set(cache_key, state.tolist(), ttl=60)
         
         # Simulate Q-values (in production, use neural network)
         q_values = self._get_q_values(state)
@@ -379,26 +405,51 @@ class PPOStrategy(TradingStrategy):
     async def evaluate(self, symbol: str, market_data: MarketSnapshot, 
                       historical_data: Optional[pd.DataFrame] = None) -> StrategySignal:
         """Evaluate using PPO model (simulated for MVP)."""
-        if historical_data is None or len(historical_data) < 20:
-            return StrategySignal(
-                strategy_name=self.name,
-                symbol=symbol,
-                direction="HOLD",
-                confidence=0.0,
-                position_size=0.0,
-                reasoning="Insufficient data for PPO evaluation",
-                metadata={}
-            )
-        
-        # Calculate market regime indicators
-        returns = historical_data['close'].pct_change().tail(20)
-        trend = np.polyfit(range(len(returns)), returns.fillna(0), 1)[0]
-        volatility = returns.std()
-        
+        cache = await self.get_cache()
+        cache_key = f"strategy:ppo:features:{symbol}"
+        cached_features = await cache.get(cache_key)
+
+        if cached_features:
+            trend = cached_features['trend']
+            volatility = cached_features['volatility']
+            returns_mean = cached_features['returns_mean']
+            returns_std = cached_features['returns_std']
+            latest_return = cached_features['latest_return']
+            ma_return = cached_features['ma_return']
+        else:
+            if historical_data is None or len(historical_data) < 20:
+                return StrategySignal(
+                    strategy_name=self.name,
+                    symbol=symbol,
+                    direction="HOLD",
+                    confidence=0.0,
+                    position_size=0.0,
+                    reasoning="Insufficient data for PPO evaluation",
+                    metadata={}
+                )
+            
+            # Calculate market regime indicators
+            returns = historical_data['close'].pct_change().tail(20)
+            trend = np.polyfit(range(len(returns)), returns.fillna(0), 1)[0]
+            volatility = returns.std()
+            returns_mean = returns.mean()
+            returns_std = returns.std()
+            latest_return = returns.iloc[-1]
+            ma_return = returns.iloc[-5:].mean()
+
+            await cache.set(cache_key, {
+                "trend": trend, 
+                "volatility": volatility,
+                "returns_mean": returns_mean,
+                "returns_std": returns_std,
+                "latest_return": latest_return,
+                "ma_return": ma_return,
+            }, ttl=60)
+
         # Use actual RL model if available
         if self.rl_manager:
-            state = np.array([trend, volatility, returns.mean(), returns.std(), 
-                            returns.iloc[-1], returns.iloc[-5:].mean(),
+            state = np.array([trend, volatility, returns_mean, returns_std, 
+                            latest_return, ma_return,
                             market_data.change_24h / 100, market_data.volume / 1e6,
                             0.5, 0.5])[:10]  # Ensure state size
             

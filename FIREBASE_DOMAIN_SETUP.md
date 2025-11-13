@@ -178,13 +178,13 @@ firebase deploy --only hosting
 ### Update API Base URL
 ```typescript
 // src/contexts/TradingContext.tsx
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://cloud-trader-880429861698.us-central1.run.app';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://cloud-trader-342943608894.us-central1.run.app';
 ```
 
 ### Update Environment Variables
 ```bash
 # .env.local
-VITE_API_BASE_URL=https://cloud-trader-880429861698.us-central1.run.app
+VITE_API_BASE_URL=https://cloud-trader-342943608894.us-central1.run.app
 VITE_FIREBASE_API_KEY=your_api_key_here
 VITE_FIREBASE_AUTH_DOMAIN=sapphire-trading-dashboard.firebaseapp.com
 VITE_FIREBASE_PROJECT_ID=sapphire-trading-dashboard

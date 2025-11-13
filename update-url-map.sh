@@ -7,24 +7,24 @@ echo "🔧 Fixing Dashboard Routing..."
 gcloud compute url-maps export aster-url-map \
   --destination=url-map-fixed.yaml \
   --global \
-  --project=quant-ai-trader-credits
+  --project=sapphireinfinite
 
 # Update the URL map to route dashboard correctly
 cat > url-map-patch.yaml << 'EOF'
 pathMatchers:
-- defaultService: https://www.googleapis.com/compute/v1/projects/quant-ai-trader-credits/global/backendServices/trader-backend
+- defaultService: https://www.googleapis.com/compute/v1/projects/sapphireinfinite/global/backendServices/trader-backend
   name: aster-matcher
   pathRules:
   - paths:
     - /dashboard
     - /dashboard/*
-    service: https://www.googleapis.com/compute/v1/projects/quant-ai-trader-credits/global/backendServices/cloud-trader-dashboard-backend
+    service: https://www.googleapis.com/compute/v1/projects/sapphireinfinite/global/backendServices/cloud-trader-dashboard-backend
   - paths:
     - /orchestrator/*
-    service: https://www.googleapis.com/compute/v1/projects/quant-ai-trader-credits/global/backendServices/orchestrator-backend
+    service: https://www.googleapis.com/compute/v1/projects/sapphireinfinite/global/backendServices/orchestrator-backend
   - paths:
     - /assets/*
-    service: https://www.googleapis.com/compute/v1/projects/quant-ai-trader-credits/global/backendServices/cloud-trader-dashboard-backend
+    service: https://www.googleapis.com/compute/v1/projects/sapphireinfinite/global/backendServices/cloud-trader-dashboard-backend
 EOF
 
 echo "📝 Current configuration exported to url-map-fixed.yaml"

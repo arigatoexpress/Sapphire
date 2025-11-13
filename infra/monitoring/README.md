@@ -82,7 +82,7 @@ cd infra/monitoring
 scrape_configs:
   - job_name: 'cloud-trader'
     static_configs:
-      - targets: ['cloud-trader-880429861698.us-central1.run.app']
+      - targets: ['cloud-trader-342943608894.us-central1.run.app']
     metrics_path: '/metrics'
 ```
 

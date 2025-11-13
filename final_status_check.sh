@@ -105,7 +105,7 @@ if [ "$BUILD_STATUS" = "SUCCESS" ] && [ "$READY_PODS" = "$TOTAL_PODS" ] && [ "$L
     echo "2. Update DNS: api.sapphiretrade.xyz → $LB_IP"
     echo "3. Enable live trading mode"
     echo "4. Monitor system performance"
-    echo "5. Delete old quant-ai-trader-credits project"
+    echo "5. Delete old sapphireinfinite project"
     echo ""
     echo "💎 SAPPHIRE TRADING IS LIVE! 🌟"
 else

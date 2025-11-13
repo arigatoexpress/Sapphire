@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vpin-hft-agent
+  labels:
+    app: vpin-hft-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vpin-hft-agent
+  template:
+    metadata:
+      labels:
+        app: vpin-hft-agent
+    spec:
+      nodeSelector:
+        cloud.google.com/gke-nodepool: hft-pool
+      tolerations:
+      - key: hft-workload
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+      containers:
+      - name: vpin-hft-agent
+        image: gcr.io/your-project-id/vpin-hft-agent:latest # Replace with your project ID and image
+        resources:
+          limits:
+            cpu: "4"
+            memory: "8Gi"
+          requests:
+            cpu: "2"
+            memory: "4Gi"
+        env:
+          - name: ASTRO_DEX_WEBSOCKET_URL
+            value: "wss://fstream.asterdex.com"
+          - name: PUBSUB_PROJECT_ID
+            value: "your-project-id" # Replace with your project ID
+          - name: PUBSUB_TOPIC_VPIN_POSITIONS
+            value: "vpin_position_updates"
+        securityContext:
+          sysctls:
+            - name: net.core.somaxconn
+              value: "65535"
+            - name: net.ipv4.tcp_tw_reuse
+              value: "1"
+            - name: net.ipv4.tcp_fin_timeout
+              value: "30"
+            - name: net.ipv4.tcp_keepalive_time
+              value: "600"
+        ports:
+          - containerPort: 8080 # Or whatever port your agent listens on
+        livenessProbe:
+          httpGet:
+            path: /healthz # Replace with your actual health check endpoint
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /readyz # Replace with your actual readiness check endpoint
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vpin-hft-agent-service
+spec:
+  selector:
+    app: vpin-hft-agent
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+  type: ClusterIP

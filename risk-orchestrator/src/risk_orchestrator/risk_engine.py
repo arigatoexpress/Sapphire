@@ -21,6 +21,7 @@ AGENT_ALLOCATIONS = {
     "fingpt-alpha": 1000.0,     # PvP Alpha
     "lagllama-degen": 1000.0,   # PvP Degen
     "profit-maximizer": 1000.0, # PvP Maximizer
+    "vpin-hft": 1000.0,         # New
 }
 
 # Default allocation applied when an agent is not explicitly listed above

@@ -1,12 +1,12 @@
 {
   "projects": {
-    "default": "sapphireinfinite"
+    "default": "sapphire-dash-05747193"
   },
   "targets": {
-    "sapphireinfinite": {
+    "sapphire-dash-05747193": {
       "hosting": {
         "sapphire-prod": [
-          "sapphireinfinite"
+          "sapphire-dash-05747193"
         ]
       }
     }

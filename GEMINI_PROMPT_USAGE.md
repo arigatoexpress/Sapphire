@@ -39,8 +39,7 @@ cd /Users/aribs/AIAster
 ```bash
 gcloud ai generate-content \
   --model=gemini-1.5-pro \
-  --project=quant-ai-trader-credits \
-  --prompt="$(cat gemini-prompt-for-fixes.txt)" \
+  --project=sapphireinfinite \
   --temperature=0.2 \
   --max-output-tokens=8192
 ```
@@ -52,7 +51,7 @@ gcloud ai generate-content \
 ```bash
 gcloud ai generate-content \
   --model=gemini-1.5-pro \
-  --project=quant-ai-trader-credits \
+  --project=sapphireinfinite \
   --prompt="<paste prompt here>"
 ```
 
@@ -79,11 +78,11 @@ After applying fixes, verify with:
 # Check NEG sizes (should be > 0)
 gcloud compute network-endpoint-groups list \
   --filter="region:us-central1" \
-  --project=quant-ai-trader-credits \
+  --project=sapphireinfinite \
   --format="table(name,size,cloudRunService)"
 
 # Test direct Cloud Run endpoint
-curl https://cloud-trader-880429861698.us-central1.run.app/healthz
+curl https://cloud-trader-342943608894.us-central1.run.app/healthz
 
 # Test through load balancer
 curl https://api.sapphiretrade.xyz/healthz

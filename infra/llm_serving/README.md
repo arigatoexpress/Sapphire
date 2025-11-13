@@ -9,28 +9,28 @@ Advanced autonomous trading system with 4 specialized open-source LLMs, intellig
 - **Strengths**: Complex pattern recognition, technical analysis, risk assessment
 - **Use Case**: General-purpose trading decisions requiring deep analysis
 - **Model**: `deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct`
-- **Endpoint**: `https://deepseek-trader-880429861698.us-central1.run.app`
+- **Endpoint**: `https://deepseek-trader-342943608894.us-central1.run.app`
 
 ### 2. **Qwen2.5-Coder** (7B parameters)
 - **Specialization**: Algorithmic and coding-focused analysis
 - **Strengths**: Quantitative strategies, momentum analysis, algorithmic trading
 - **Use Case**: High-frequency patterns, technical indicators, algorithmic execution
 - **Model**: `Qwen/Qwen2.5-Coder-7B-Instruct`
-- **Endpoint**: `https://qwen-trader-880429861698.us-central1.run.app`
+- **Endpoint**: `https://qwen-trader-342943608894.us-central1.run.app`
 
 ### 3. **FinGPT** (7B parameters, LLaMA-based)
 - **Specialization**: Financial market expertise
 - **Strengths**: Market sentiment, fundamental analysis, institutional-grade insights
 - **Use Case**: Complex market analysis, sentiment-driven decisions, fundamental factors
 - **Model**: `FinGPT/fingpt-mt_llama2-7b_lora`
-- **Endpoint**: `https://fingpt-trader-880429861698.us-central1.run.app`
+- **Endpoint**: `https://fingpt-trader-342943608894.us-central1.run.app`
 
 ### 4. **Phi-3** (3.8B parameters)
 - **Specialization**: Efficient, fast decision making
 - **Strengths**: Quick analysis, edge deployment, low-latency responses
 - **Use Case**: Rapid market reactions, simple strategies, high-frequency signals
 - **Model**: `microsoft/Phi-3-mini-128k-instruct`
-- **Endpoint**: `https://phi3-trader-880429861698.us-central1.run.app`
+- **Endpoint**: `https://phi3-trader-342943608894.us-central1.run.app`
 
 ## 🎯 Intelligent Model Router
 
@@ -107,7 +107,7 @@ gcloud builds submit . --config infra/llm_serving/cloudbuild-router.yaml
 ### **Cloud Trader Configuration**
 ```bash
 # Update LLM endpoint to use router
-export LLM_ENDPOINT="https://model-router-880429861698.us-central1.run.app"
+export LLM_ENDPOINT="https://model-router-342943608894.us-central1.run.app"
 
 # Enable LLM trading
 export ENABLE_LLM_TRADING=true
@@ -119,15 +119,14 @@ export MIN_LLM_CONFIDENCE=0.7
 import requests
 
 # Use router (automatic model selection)
-response = requests.post("https://model-router-880429861698.us-central1.run.app/decide", json={
-    "context": {"price": 45000, "volume": 1000000},
+response = requests.post("https://model-router-342943608894.us-central1.run.app/decide", json={
     "bot_id": "momentum_bot",
     "symbol": "BTCUSDT",
     "risk_limits": {"max_position_pct": 0.02}
 })
 
 # Force specific model
-response = requests.post("https://model-router-880429861698.us-central1.run.app/decide", json={
+response = requests.post("https://model-router-342943608894.us-central1.run.app/decide", json={
     "context": {...},
     "bot_id": "momentum_bot",
     "symbol": "BTCUSDT",
@@ -159,11 +158,10 @@ response = requests.post("https://model-router-880429861698.us-central1.run.app/
 
 ### **Model Performance Tracking**
 ```bash
-# Check model health
-curl https://model-router-880429861698.us-central1.run.app/status
+curl https://model-router-342943608894.us-central1.run.app/status
 
 # View decision distribution
-curl https://cloud-trader-880429861698.us-central1.run.app/metrics | grep trading_llm
+curl https://cloud-trader-342943608894.us-central1.run.app/metrics | grep trading_llm
 ```
 
 ### **Grafana Dashboards**
@@ -199,10 +197,10 @@ for model in ["deepseek", "qwen", "fingpt", "phi3"]:
 ### **Model Not Responding**
 ```bash
 # Check model health
-curl https://[model]-trader-880429861698.us-central1.run.app/health
+curl https://[model]-trader-342943608894.us-central1.run.app/health
 
 # Check router status
-curl https://model-router-880429861698.us-central1.run.app/status
+curl https://model-router-342943608894.us-central1.run.app/status
 ```
 
 ### **High Latency**

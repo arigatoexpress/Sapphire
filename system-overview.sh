@@ -31,7 +31,7 @@ echo "📊 CORE SERVICES STATUS"
 echo "----------------------"
 
 # Check main services
-check_service "Cloud Trader" "https://cloud-trader-880429861698.us-central1.run.app/" "cloud-trader"
+check_service "Cloud Trader" "https://cloud-trader-342943608894.us-central1.run.app/" "cloud-trader"
 check_service "Risk Orchestrator" "https://api.sapphiretrade.xyz/orchestrator/" "risk-orchestrator"
 check_service "Frontend Dashboard" "https://storage.googleapis.com/cloud-trader-dashboard/index.html" "Cloud Trader"
 
@@ -40,11 +40,11 @@ echo "🤖 LLM MODELS STATUS"
 echo "-------------------"
 
 # Check LLM services
-check_service "DeepSeek" "https://deepseek-trader-880429861698.us-central1.run.app/health" "running"
-check_service "Qwen2.5-Coder" "https://qwen-trader-880429861698.us-central1.run.app/health" "running"
-check_service "FinGPT" "https://fingpt-trader-880429861698.us-central1.run.app/health" "running"
-check_service "Phi-3" "https://phi3-trader-880429861698.us-central1.run.app/health" "running"
-check_service "Model Router" "https://model-router-880429861698.us-central1.run.app/health" "healthy"
+check_service "DeepSeek" "https://deepseek-trader-342943608894.us-central1.run.app/health" "running"
+check_service "Qwen2.5-Coder" "https://qwen-trader-342943608894.us-central1.run.app/health" "running"
+check_service "FinGPT" "https://fingpt-trader-342943608894.us-central1.run.app/health" "running"
+check_service "Phi-3" "https://phi3-trader-342943608894.us-central1.run.app/health" "running"
+check_service "Model Router" "https://model-router-342943608894.us-central1.run.app/health" "healthy"
 
 echo ""
 echo "💾 SYSTEM METRICS"
@@ -61,7 +61,7 @@ fi
 
 # Check trader status
 echo -n "🎯 Trading Status: "
-status=$(curl -s "https://cloud-trader-880429861698.us-central1.run.app/healthz" | grep -o '"running":[^,]*' | cut -d':' -f2)
+status=$(curl -s "https://cloud-trader-342943608894.us-central1.run.app/healthz" | grep -o '"running":[^,]*' | cut -d':' -f2)
 if [ "$status" = "true" ]; then
     echo -e "${GREEN}ACTIVE${NC}"
 else

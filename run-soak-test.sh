@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-SERVICE_URL=${1:-"https://cloud-trader-880429861698.us-central1.run.app"}
+SERVICE_URL=${1:-"https://cloud-trader-342943608894.us-central1.run.app"}
 DURATION=${2:-86400}  # 24 hours in seconds
 INTERVAL=60  # Check every minute
 

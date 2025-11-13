@@ -9,7 +9,7 @@ echo ""
 
 # Direct service URLs
 CLOUD_TRADER_URL="https://cloud-trader-cfxefrvooa-uc.a.run.app"
-DASHBOARD_URL="https://cloud-trader-dashboard-880429861698.us-central1.run.app"
+DASHBOARD_URL="https://cloud-trader-dashboard-342943608894.us-central1.run.app"
 
 echo "1️⃣ Testing Cloud Trader API directly:"
 echo "--------------------------------------"

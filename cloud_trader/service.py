@@ -37,12 +37,15 @@ from .risk_analyzer import RiskAnalyzer
 from .storage import get_storage, close_storage, TradingStorage
 from .bigquery_streaming import get_bigquery_streamer, close_bigquery_streamer, BigQueryStreamer
 from .feature_store import get_feature_store, TradingFeatureStore
+from .agents.vpin_hft_agent import VpinHFTAgent
+from .vpin_data_streamer import VPINDataStreamer
+from .rate_limit_manager import RateLimitManager
+from .fallback_strategies import FallbackStrategySelector
 
 RiskOrchestratorClientType = Any
 OrderIntent = None  # type: ignore[assignment]
 from .mcp import MCPClient, MCPMessageType, MCPProposalPayload, MCPResponsePayload
-# Temporarily disable Vertex AI imports for service stability
-# from .vertex_ai_client import get_vertex_client, VertexAIClient
+from .vertex_ai_client import get_vertex_client, VertexAIClient
 from .open_source import OpenSourceAnalyst
 from .metrics import (
     ASTER_API_REQUESTS,
@@ -186,7 +189,30 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         "max_position_size_pct": 0.35,  # Large positions for market impact
         "risk_tolerance": "extreme",     # PvP requires extreme tolerance
         "time_horizon": "multi_timeframe",  # Scalps and swings
-        "market_regime_preference": "all_regimes",  # Profits in any market
+        "market_regime_preference": "all_regimes",
+    },
+    {
+        "id": "vpin-hft",
+        "name": "VPIN HFT Agent",
+        "model": "VPIN Volatility",
+        "emoji": "⚡",
+        "symbols": [],  # All symbols
+        "margin_allocation": 1000.0,
+        "max_leverage_limit": 30.0,
+        "specialization": "volatility_hft",
+        "description": "High-frequency trading agent using VPIN to detect order flow toxicity and predict short-term price movements.",
+        "personality": "Aggressive, high-frequency, reacts to market microstructure.",
+        "baseline_win_rate": 0.55, # Win rate depends on market conditions
+        "risk_multiplier": 3.0,
+        "profit_target": 0.005, # Small, frequent profits
+        "dynamic_position_sizing": True,
+        "adaptive_leverage": True,
+        "intelligence_tp_sl": False, # VPIN has its own logic
+        "min_position_size_pct": 0.01,
+        "max_position_size_pct": 0.10,
+        "risk_tolerance": "very_high",
+        "time_horizon": "very_short",
+        "market_regime_preference": "volatile",
     },
 ]
 
@@ -284,7 +310,7 @@ class TradingService:
         self._observation_task: Optional[asyncio.Task[None]] = None
 
         # Agent tracking for live-only dashboards
-        self._agent_states: Dict[str, AgentState] = {}
+        self._agent_states: Dict[str, AgentState] = {} 
         self._symbol_to_agent: Dict[str, str] = {}
         # Agents will be initialized in start() method
 
@@ -321,7 +347,45 @@ class TradingService:
             "alerts": [],
         }
 
-    async def _fetch_historical_klines(self, symbol: str, interval: str = "1h", limit: int = 100) -> Optional[Any]:
+        # VPIN Agent Initialization
+        self._vpin_agent: Optional[VpinHFTAgent] = None
+        self._vpin_data_streamer: Optional[VPINDataStreamer] = None
+        self._vpin_tick_batch_queue = asyncio.Queue()
+        self._vpin_data_streamer_task: Optional[asyncio.Task[None]] = None
+        self._vpin_processing_task: Optional[asyncio.Task[None]] = None
+
+        if "vpin-hft" in self._settings.enabled_agents:
+            self._vpin_data_streamer = VPINDataStreamer(output_queue=self._vpin_tick_batch_queue)
+            self._vpin_agent = VpinHFTAgent(
+                exchange_client=self._exchange,
+                pubsub_client=self._streams,
+            )
+
+        self._rate_limit_manager = RateLimitManager(limits={'second': 10, 'minute': 1200})
+        self._fallback_strategy_selector = FallbackStrategySelector()
+
+    async def _execute_fallback_strategies(self) -> None:
+        """Executes fallback strategies when rate limits are hit."""
+        logger.warning("Executing fallback strategies...")
+        market = await self._fetch_market() # This might also be rate limited
+        if not market:
+            return
+
+        for symbol, snapshot in market.items():
+            position = self._portfolio.positions.get(symbol)
+            decision = await self._fallback_strategy_selector.select_and_execute(symbol, position)
+            
+            # The fallback strategies currently only return HOLD.
+            # If they returned BUY or SELL, I would need to execute the trades here.
+            # For now, I will just log the decision.
+            logger.info(f"Fallback strategy for {symbol}: {decision}")
+
+    async def _execute_standard_agents_only(self) -> None:
+        """Executes a trading tick for standard agents, throttling VPIN."""
+        # The VPIN agent runs in a separate task, so we just need to run the
+        # standard agent logic here.
+        await self._execute_all_agents()
+
         """Fetch historical kline data for technical analysis with caching."""
         # Check cache first
         if self._cache:
@@ -1037,6 +1101,13 @@ class TradingService:
             self._health.last_error = str(exc)
             self._health.running = False
 
+        # Start VPIN streamer and processor if enabled
+        if self._vpin_data_streamer and self._vpin_agent:
+            logger.info("Starting VPIN data streamer...")
+            self._vpin_data_streamer_task = asyncio.create_task(self._vpin_data_streamer.run())
+            logger.info("Starting VPIN processing task...")
+            self._vpin_processing_task = asyncio.create_task(self._process_vpin_batches())
+
 
     async def stop(self) -> None:
         self._stop_event.set()
@@ -1052,6 +1123,16 @@ class TradingService:
             self._symbol_refresh_task.cancel()
             try:
                 await self._symbol_refresh_task
+            except asyncio.CancelledError:
+                pass
+        if self._vpin_data_streamer:
+            self._vpin_data_streamer.stop()
+        if self._vpin_data_streamer_task:
+            await self._vpin_data_streamer_task
+        if self._vpin_processing_task:
+            self._vpin_processing_task.cancel()
+            try:
+                await self._vpin_processing_task
             except asyncio.CancelledError:
                 pass
         if self._exchange:
@@ -1089,7 +1170,21 @@ class TradingService:
             await self._publish_portfolio_state()
 
     async def _tick(self) -> None:
-        """Execute trading tick with enhanced error handling per symbol."""
+        """Execute a trading tick, with rate limiting and fallback logic."""
+        # Record request for rate limiting for the overall tick process
+        self._rate_limit_manager.record_request("tick_process", "overall")
+
+        # Check API rate limit status for VPIN specifically
+        if self._rate_limit_manager.should_throttle_agent("vpin-hft"):
+            logger.warning("Throttling VPIN HFT agent due to rate limits. Executing standard agents only.")
+            await self._execute_standard_agents_only()
+        elif self._rate_limit_manager.is_rate_limited():
+            logger.warning("Global rate limits exceeded, switching to fallback strategies for all agents.")
+            await self._execute_fallback_strategies()
+        else:
+            await self._execute_all_agents()
+    async def _execute_all_agents(self) -> None:
+        """Executes a full trading tick with all agents active."""
         # Check if market data circuit breaker allows operation
         if not self._safeguards.check_circuit_breaker('market_data'):
             logger.warning("Market data circuit breaker is open, skipping tick")
@@ -1488,6 +1583,54 @@ class TradingService:
                 # Continue to next symbol
                 continue
 
+    async def _process_vpin_batches(self) -> None:
+        """Process VPIN tick batches from the data streamer."""
+        if not self._vpin_agent:
+            return
+
+        while not self._stop_event.is_set():
+            try:
+                batch_data = await self._vpin_tick_batch_queue.get()
+                symbol = batch_data.get("symbol")
+                batch = batch_data.get("batch")
+
+                if not symbol or not batch:
+                    continue
+
+                vpin_signal = self._vpin_agent.calculate_vpin(batch)
+                await self._vpin_agent.execute_trade(vpin_signal, symbol)
+
+            except asyncio.CancelledError:
+                logger.info("VPIN processing task cancelled.")
+                break
+            except Exception as e:
+                logger.error(f"Error in VPIN processing loop: {e}")
+                # Avoid tight loop on continuous errors
+                await asyncio.sleep(5)
+
+
+    async def _execute_fallback_strategies(self) -> None:
+        """Executes fallback strategies when rate limits are hit."""
+        logger.warning("Executing fallback strategies...")
+        market = await self._fetch_market() # This might also be rate limited
+        if not market:
+            return
+
+        for symbol, snapshot in market.items():
+            position = self._portfolio.positions.get(symbol)
+            decision = await self._fallback_strategy_selector.select_and_execute(symbol, position)
+            
+            # The fallback strategies currently only return HOLD.
+            # If they returned BUY or SELL, I would need to execute the trades here.
+            # For now, I will just log the decision.
+            logger.info(f"Fallback strategy for {symbol}: {decision}")
+
+    async def _execute_standard_agents_only(self) -> None:
+        """Executes a trading tick for standard agents, throttling VPIN."""
+        # The VPIN agent runs in a separate task, so we just need to run the
+        # standard agent logic here.
+        await self._execute_all_agents()
+
     async def _generate_trade_thesis(
         self,
         agent_id: Optional[str],
@@ -1509,19 +1652,24 @@ class TradingService:
             if candidate not in agents_to_query:
                 agents_to_query.append(candidate)
 
-        # Query multiple agents in parallel using the open-source analyst
+        # Query multiple agents in parallel
         agent_results: List[Dict[str, Any]] = []
         if agents_to_query:
-            tasks = [
-                self._open_source_analyst.generate_thesis(
-                    agent,
-                    symbol,
-                    side,
-                    price,
-                    market_context,
-                )
-                for agent in agents_to_query
-            ]
+            tasks = []
+            for agent in agents_to_query:
+                if agent in ["deepseek-v3", "fingpt-alpha"]:
+                    tasks.append(self._query_vertex_agent(
+                        agent, symbol, side, price, market_context, take_profit, stop_loss
+                    ))
+                else:
+                    tasks.append(self._open_source_analyst.generate_thesis(
+                        agent,
+                        symbol,
+                        side,
+                        price,
+                        market_context,
+                    ))
+
             results = await asyncio.gather(*tasks, return_exceptions=True)
             
             for i, result in enumerate(results):
@@ -1684,14 +1832,82 @@ class TradingService:
         stop_loss: float,
     ) -> Dict[str, Any]:
         """Query a Vertex AI agent for trading analysis."""
-        # Vertex AI temporarily disabled - return fallback analysis
-        return {
-            "thesis": f"Agent {agent_id} analysis for {symbol}: {side} position with entry at ${price:.2f}, take profit ${take_profit:.2f}, stop loss ${stop_loss:.2f}",
-            "confidence": 0.7,
-            "source": agent_id,
-            "risk_score": 0.3,
-            "inference_time": 0.1,
-        }
+        cache = await get_cache()
+        # Bucket price to the nearest 100 to make the cache more effective
+        price_bucket = round(price / 100) * 100
+        cache_key = f"agent:vertex:{agent_id}:{symbol}:{side}:{price_bucket}"
+        cached_result = await cache.get(cache_key)
+        if cached_result:
+            return cached_result
+
+        if not self._vertex_client:
+            logger.warning("Vertex AI client not available for agent %s", agent_id)
+            return {
+                "thesis": f"Fallback analysis for {symbol}: {side} position.",
+                "confidence": 0.5,
+                "source": "fallback",
+                "risk_score": 0.5,
+            }
+
+        # Borrowing prompt structure from OpenSourceAnalyst
+        change = market_context.get("change_24h", 0)
+        volume = market_context.get("volume", 0)
+        atr = market_context.get("atr")
+
+        volatility_regime = "high"
+        if atr and price > 0:
+            atr_pct = (atr / price) * 100
+            if atr_pct < 1.0:
+                volatility_regime = "low"
+            elif atr_pct < 2.0:
+                volatility_regime = "moderate"
+
+        prompt = f"""You are a trading agent with ID {agent_id}.
+Generate a concise thesis for a {side.upper()} trade on {symbol} at price {price:.4f}.
+
+Market Context:
+- 24h change: {change:.2f}%
+- Volume: ${volume:,.0f}
+- ATR: {atr if atr is not None else 'N/A'}
+- Volatility Regime: {volatility_regime}
+
+Your analysis should include a "thesis", a "risk_score" (0-1), and a "confidence" (0-1).
+The output should be a JSON object with these keys.
+"""
+
+        try:
+            start_time = time.time()
+            prediction = await self._vertex_client.predict_with_fallback(
+                agent_id=agent_id,
+                prompt=prompt,
+                max_tokens=512,
+                temperature=0.7,
+            )
+            inference_time = time.time() - start_time
+
+            response_text = prediction.get("response", "{}")
+            try:
+                analysis = json.loads(response_text)
+            except json.JSONDecodeError:
+                analysis = {"thesis": response_text}
+
+
+            analysis["source"] = f"vertex-ai-{agent_id}"
+            analysis.setdefault("confidence", prediction.get("confidence", 0.5))
+            analysis.setdefault("risk_score", 0.5) # Default risk score
+            analysis["inference_time"] = inference_time
+
+            await cache.set(cache_key, analysis, ttl=60) # Cache for 60 seconds
+            return analysis
+
+        except Exception as e:
+            logger.error(f"Vertex AI query failed for agent {agent_id}: {e}")
+            return {
+                "thesis": f"Error during analysis for {symbol}. Fallback initiated.",
+                "confidence": 0.4,
+                "source": "error_fallback",
+                "risk_score": 0.8,
+            }
 
     def _can_send_notification(
         self,

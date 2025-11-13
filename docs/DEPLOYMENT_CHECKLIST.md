@@ -24,7 +24,7 @@ Expected: 200 with healthy payload.
 
 ### 2. Vertex AI Inference Images
 ```bash
-gcloud artifacts docker images list us-central1-docker.pkg.dev/quant-ai-trader-credits/vertex-ai
+gcloud artifacts docker images list us-central1-docker.pkg.dev/sapphireinfinite/vertex-ai
 ```
 Ensure latest tags exist for `deepseek-trader`, `qwen-trader`, `fingpt-trader`, `lagllama-trader`.
 
@@ -93,7 +93,7 @@ Confirm policies:
 | `risk_limits_breached_total{limit_type="agent_margin"}` | Count of margin rejections | Prometheus warning |
 
 ## 🚀 Next Steps
-- [ ] Populate training datasets in GCS (`gs://quant-ai-trader-credits/training/*.jsonl`)
+- [ ] Populate training datasets in GCS (`gs://sapphireinfinite/training/*.jsonl`)
 - [ ] Execute initial fine-tuning job for DeepSeek via Cloud Build
 - [ ] Populate Vertex AI endpoints once models trained
 - [ ] Extend Grafana dashboards with new gauges and alert panels
