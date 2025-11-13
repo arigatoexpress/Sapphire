@@ -33,7 +33,7 @@ tpu:
 
 # Redis configuration
 redis:
-  enabled: true
+  enabled: false  # Temporarily disabled for faster deployment
   architecture: standalone
   auth:
     enabled: false

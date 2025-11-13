@@ -149,8 +149,6 @@ steps:
         if helm upgrade --install trading-system ./helm/trading-system \
             --namespace trading \
             --create-namespace \
-            --wait \
-                    --timeout=600s \
             --set global.imageRegistry=us-central1-docker.pkg.dev \
             --set global.projectId=${PROJECT_ID} \
             --set cloudTrader.image.tag=${BUILD_ID} \
@@ -158,8 +156,6 @@ steps:
             helm upgrade --install trading-system ./helm/trading-system \
                 --namespace trading \
                 --create-namespace \
-                --wait \
-                    --timeout=600s \
                 --set global.imageRegistry=us-central1-docker.pkg.dev \
                 --set global.projectId=${PROJECT_ID} \
                 --set cloudTrader.image.tag=${BUILD_ID}
