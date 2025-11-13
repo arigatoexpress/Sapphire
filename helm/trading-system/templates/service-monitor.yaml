@@ -53,7 +53,7 @@ spec:
         severity: warning
       annotations:
         summary: "High latency detected"
-        description: "95th percentile latency is {{ $value }}s for the last 5 minutes."
+        description: "95th percentile latency exceeded threshold for the last 5 minutes."
 
     # TPU/GPU utilization alerts
     - alert: LowTPUUtilization
