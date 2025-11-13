@@ -23,7 +23,7 @@ class SuiWalrusClient:
         """Persist encrypted payloads while preserving user data ownership.
 
         TODO: Encrypt with user-controlled keys before upload and return a content
-        addressable identifier that FinGPT/Lag-LLaMA agents can reference without
+        addressable identifier that Google Cloud AI agents can reference without
         exposing raw inputs to third parties.
         """
 

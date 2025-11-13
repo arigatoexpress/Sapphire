@@ -27,6 +27,33 @@ import {
 } from '@mui/icons-material';
 import { useTrading } from '../contexts/TradingContext';
 
+// Advanced Agent Descriptions and Features
+const getAgentRoleDescription = (agentType: string): string => {
+  const descriptions: Record<string, string> = {
+    'trend_momentum_agent': '🎯 Momentum Analyzer - Gemini 2.0 Flash Exp',
+    'strategy_optimization_agent': '🧠 Strategy Optimizer - Gemini Exp-1206',
+    'financial_sentiment_agent': '💭 Sentiment Analyst - Gemini 2.0 Flash Exp',
+    'market_prediction_agent': '🔮 Market Predictor - Gemini Exp-1206',
+    'volume_microstructure_agent': '📊 Volume Analyst - Codey Model',
+    'freqtrade': '⚡ FreqTrade Bot - Traditional Algorithmic Trading',
+    'hummingbot': '🤖 HummingBot - Market Making & Arbitrage'
+  };
+  return descriptions[agentType] || 'Unknown Agent';
+};
+
+const getAgentAdvancedFeatures = (agentType: string): string => {
+  const features: Record<string, string> = {
+    'trend_momentum_agent': 'Fast momentum detection using TPU-optimized inference. Analyzes price action, volume, and technical indicators for short-term trading signals.',
+    'strategy_optimization_agent': 'Advanced reasoning for complex strategy optimization. Uses experimental Gemini models for portfolio rebalancing and risk-adjusted position sizing.',
+    'financial_sentiment_agent': 'Real-time NLP analysis of news, social media, and financial reports. Detects market psychology shifts and sentiment-driven opportunities.',
+    'market_prediction_agent': 'Time series forecasting with advanced ML models. Predicts price movements using historical patterns and macroeconomic indicators.',
+    'volume_microstructure_agent': 'High-frequency volume analysis using Codey for mathematical processing. Detects order book imbalances and institutional activity.',
+    'freqtrade': 'Traditional algorithmic trading framework. Implements proven technical analysis strategies with FreqAI machine learning integration.',
+    'hummingbot': 'Decentralized market making bot. Provides liquidity and executes arbitrage strategies across multiple exchanges.'
+  };
+  return features[agentType] || 'Advanced AI-powered trading agent with specialized market analysis capabilities.';
+};
+
 interface AgentModelCardProps {
   agent: {
     agent_id: string;
@@ -214,6 +241,16 @@ const AgentModelCard: React.FC<AgentModelCardProps> = ({ agent, onAgentClick }) 
               },
             }}
           />
+        </Box>
+
+        {/* Agent Role Description */}
+        <Box sx={{ mb: 2, p: 1, bgcolor: 'rgba(139, 92, 246, 0.05)', borderRadius: 1, border: '1px solid rgba(139, 92, 246, 0.1)' }}>
+          <Typography variant="caption" sx={{ fontSize: '0.7rem', fontWeight: 600, color: agent.color, mb: 0.5 }}>
+            {getAgentRoleDescription(agent.agent_type)}
+          </Typography>
+          <Typography variant="caption" sx={{ fontSize: '0.65rem', color: 'text.secondary', lineHeight: 1.3 }}>
+            {getAgentAdvancedFeatures(agent.agent_type)}
+          </Typography>
         </Box>
 
         {/* Stats Grid */}

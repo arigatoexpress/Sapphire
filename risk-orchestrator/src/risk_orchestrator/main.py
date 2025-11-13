@@ -7,7 +7,8 @@ from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
-from loguru import logger
+import logging
+logger = logging.getLogger(__name__)
 import httpx
 
 from .aster_client import AsterClient

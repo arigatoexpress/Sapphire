@@ -20,7 +20,7 @@ from .enums import OrderSide, OrderStatus
 from .exchange import AsterClient, Ticker, Trade, TrailingStop, Execution, Order
 from .mcp import MCPClient
 from .optimization.bandit import EpsilonGreedyBandit
-from .open_source import OpenSourceAnalyst
+# Open-source analyst removed - now using Google Cloud AI exclusively
 from .pubsub import PubSubClient
 from .order_tags import generate_order_tag, parse_order_tag
 from .risk import PortfolioState, RiskManager, Position
@@ -54,7 +54,7 @@ RiskOrchestratorClientType = Any
 OrderIntent = None  # type: ignore[assignment]
 from .mcp import MCPClient, MCPMessageType, MCPProposalPayload, MCPResponsePayload
 from .vertex_ai_client import get_vertex_client, VertexAIClient
-from .open_source import OpenSourceAnalyst
+# Open-source analyst removed - now using Google Cloud AI exclusively
 from .metrics import (
     ASTER_API_REQUESTS,
     LLM_CONFIDENCE,
@@ -103,124 +103,119 @@ class HealthStatus:
 
 AGENT_DEFINITIONS: List[Dict[str, Any]] = [
     {
-        "id": "deepseek-v3",
-        "name": "DeepSeek PvP Momentum",
-        "model": "DeepSeek-V3",
-        "emoji": "💎",
+        "id": "trend-momentum-agent",
+        "name": "Trend Momentum Agent",
+        "model": "gemini-2.0-flash-exp",
+        "emoji": "📈",
         "symbols": [],
-        "description": "Aggressive momentum PvP trader - beats market manipulators with superior timing and conviction.",
-        "personality": "Ruthless momentum predator, exploits weak hands and stops above/below key levels",
-        "baseline_win_rate": 0.68,
-        "risk_multiplier": 1.5,
-        "profit_target": 0.008,  # Frequent small wins to stack equity
-        "margin_allocation": 600.0,
-        "specialization": "momentum",
-        # Dynamic configuration parameters - PvP MODE
+        "description": "High-speed momentum analysis using Gemini 2.0 Flash Experimental for real-time trend detection and fast execution.",
+        "personality": "Aggressive momentum trader, identifies and exploits strong directional moves with lightning-fast execution.",
+        "baseline_win_rate": 0.65,
+        "risk_multiplier": 1.4,
+        "profit_target": 0.008,
+        "margin_allocation": 500.0,
+        "specialization": "momentum_trading",
         "dynamic_position_sizing": True,
         "adaptive_leverage": True,
         "intelligence_tp_sl": True,
-        "max_leverage_limit": 15.0,  # Aggressive leverage for PvP
+        "max_leverage_limit": 12.0,
         "min_position_size_pct": 0.02,
-        "max_position_size_pct": 0.30,  # Larger positions for impact
-        "risk_tolerance": "extreme",  # PvP requires extreme risk tolerance
-        "time_horizon": "ultra_short",   # Scalp trades
-        "market_regime_preference": "bull_volatile",  # Loves volatility
-    },
-    {
-        "id": "fingpt-alpha",
-        "name": "FinGPT PvP Alpha",
-        "model": "FinGPT-8B",
-        "emoji": "📊",
-        "symbols": [],
-        "description": "Fundamental PvP predator - exploits news, catalysts, and market psychology before retail catches on.",
-        "personality": "Elite fundamental arbitrageur, fades retail sentiment, exploits catalysts preemptively",
-        "baseline_win_rate": 0.63,
-        "risk_multiplier": 1.3,
-        "profit_target": 0.012,  # Quick catalyst profits
-        "margin_allocation": 600.0,
-        "specialization": "fundamental_sentiment",
-        # Dynamic configuration parameters - CATALYST PvP MODE
-        "dynamic_position_sizing": True,
-        "adaptive_leverage": True,
-        "intelligence_tp_sl": True,
-        "max_leverage_limit": 12.0,  # High leverage for catalyst plays
-        "min_position_size_pct": 0.015,
-        "max_position_size_pct": 0.25,  # Large positions on high-conviction setups
+        "max_position_size_pct": 0.25,
         "risk_tolerance": "high",
-        "time_horizon": "short_medium",  # Catalyst timeframe
-        "market_regime_preference": "bull_catalysts",  # Loves upcoming catalysts
+        "time_horizon": "very_short",
+        "market_regime_preference": "trending",
     },
     {
-        "id": "lagllama-degen",
-        "name": "Lag-Llama PvP Degen",
-        "model": "Lag-Llama",
-        "emoji": "🎰",
+        "id": "strategy-optimization-agent",
+        "name": "Strategy Optimization Agent",
+        "model": "gemini-exp-1206",
+        "emoji": "🧠",
         "symbols": [],
-        "description": "Ultimate volatility PvP predator - 50x leverage chaos agent that weaponizes market fear and manipulates stops.",
-        "personality": "Psychopathic volatility hunter, thrives in panic, exploits retail liquidation cascades",
-        "baseline_win_rate": 0.45,
-        "risk_multiplier": 4.0,  # Maximum risk for maximum reward
-        "profit_target": 0.05,   # Huge profit targets on volatility spikes
-        "margin_allocation": 600.0,
-        "specialization": "volatility",
-        # Dynamic configuration parameters - MAXIMUM DEGEN PvP MODE
+        "description": "Advanced strategy optimization using Gemini Experimental 1206 for complex analytical reasoning and portfolio optimization.",
+        "personality": "Analytical strategist, continuously optimizes trading approaches using advanced reasoning and market analysis.",
+        "baseline_win_rate": 0.62,
+        "risk_multiplier": 1.6,
+        "profit_target": 0.010,
+        "margin_allocation": 500.0,
+        "specialization": "strategy_optimization",
         "dynamic_position_sizing": True,
         "adaptive_leverage": True,
         "intelligence_tp_sl": True,
-        "max_leverage_limit": 50.0,  # 50x leverage as requested
-        "min_position_size_pct": 0.05,
-        "max_position_size_pct": 0.50,  # Massive positions during chaos
-        "risk_tolerance": "maximum",    # No fear of volatility
-        "time_horizon": "ultra_short",  # Instant volatility exploitation
-        "market_regime_preference": "maximum_chaos",  # Loves market crashes/rallies
-    },
-    # PvP PROFIT MAXIMIZER - ASTER AIRDROP STACKER
-    {
-        "id": "profit-maximizer",
-        "name": "Profit Maximizer PvP",
-        "model": "Multi-Model Ensemble",
-        "emoji": "💰",
-        "symbols": ["ASTERUSDT", "PENGUUSDT", "ZECUSDT", "SOLUSDT"],  # ASTER airdrop priority
-        "description": "Elite PvP profit maximizer - stacks ASTER airdrop points while crushing market manipulators with ensemble intelligence.",
-        "personality": "Ruthless profit predator, exploits every edge, stacks ASTER points while dominating retail traders",
-        "baseline_win_rate": 0.60,
-        "risk_multiplier": 2.2,  # Aggressive but calculated
-        "profit_target": 0.015,  # Frequent profits to compound
-        "margin_allocation": 600.0,
-        "specialization": "profit_maximization",
-        # Dynamic configuration parameters - PvP PROFIT MAXIMIZATION
-        "dynamic_position_sizing": True,
-        "adaptive_leverage": True,
-        "intelligence_tp_sl": True,
-        "max_leverage_limit": 20.0,  # High leverage for PvP dominance
-        "min_position_size_pct": 0.02,
-        "max_position_size_pct": 0.35,  # Large positions for market impact
-        "risk_tolerance": "extreme",     # PvP requires extreme tolerance
-        "time_horizon": "multi_timeframe",  # Scalps and swings
+        "max_leverage_limit": 10.0,
+        "min_position_size_pct": 0.015,
+        "max_position_size_pct": 0.22,
+        "risk_tolerance": "moderate",
+        "time_horizon": "short",
         "market_regime_preference": "all_regimes",
     },
     {
-        "id": "qwen-adaptive",
-        "name": "Qwen Adaptive Trader",
-        "model": "Qwen-2.5",
-        "emoji": "🎯",
+        "id": "financial-sentiment-agent",
+        "name": "Financial Sentiment Agent",
+        "model": "gemini-2.0-flash-exp",
+        "emoji": "💭",
         "symbols": [],
-        "description": "Adaptive AI trader using reinforcement learning to optimize strategies in real-time market conditions.",
-        "personality": "Analytical and adaptive, continuously learns from market feedback to improve performance.",
+        "description": "Real-time sentiment analysis using Gemini 2.0 Flash Experimental for fast processing of news and social media sentiment.",
+        "personality": "Sentiment-focused trader, analyzes market psychology and news impact to identify sentiment-driven opportunities.",
         "baseline_win_rate": 0.58,
         "risk_multiplier": 1.8,
-        "profit_target": 0.010,
-        "margin_allocation": 600.0,
-        "specialization": "adaptive_trading",
+        "profit_target": 0.012,
+        "margin_allocation": 500.0,
+        "specialization": "sentiment_analysis",
         "dynamic_position_sizing": True,
         "adaptive_leverage": True,
         "intelligence_tp_sl": True,
-        "max_leverage_limit": 18.0,
-        "min_position_size_pct": 0.02,
+        "max_leverage_limit": 14.0,
+        "min_position_size_pct": 0.018,
         "max_position_size_pct": 0.28,
         "risk_tolerance": "high",
         "time_horizon": "short_medium",
-        "market_regime_preference": "adaptive",
+        "market_regime_preference": "news_driven",
+    },
+    {
+        "id": "market-prediction-agent",
+        "name": "Market Prediction Agent",
+        "model": "gemini-exp-1206",
+        "emoji": "🔮",
+        "symbols": [],
+        "description": "Advanced market prediction using Gemini Experimental 1206 for time series forecasting and macroeconomic analysis.",
+        "personality": "Predictive analyst, uses advanced models to forecast market movements and identify high-probability setups.",
+        "baseline_win_rate": 0.60,
+        "risk_multiplier": 1.7,
+        "profit_target": 0.011,
+        "margin_allocation": 500.0,
+        "specialization": "market_prediction",
+        "dynamic_position_sizing": True,
+        "adaptive_leverage": True,
+        "intelligence_tp_sl": True,
+        "max_leverage_limit": 11.0,
+        "min_position_size_pct": 0.016,
+        "max_position_size_pct": 0.24,
+        "risk_tolerance": "moderate_high",
+        "time_horizon": "medium",
+        "market_regime_preference": "predictable",
+    },
+    {
+        "id": "volume-microstructure-agent",
+        "name": "Volume Microstructure Agent",
+        "model": "codey-001",
+        "emoji": "📊",
+        "symbols": [],
+        "description": "Mathematical volume analysis using Codey for precise order flow and microstructure analysis.",
+        "personality": "Quantitative analyst, focuses on order book dynamics and institutional activity patterns.",
+        "baseline_win_rate": 0.55,
+        "risk_multiplier": 2.0,
+        "profit_target": 0.006,
+        "margin_allocation": 500.0,
+        "specialization": "volume_analysis",
+        "dynamic_position_sizing": True,
+        "adaptive_leverage": True,
+        "intelligence_tp_sl": True,
+        "max_leverage_limit": 16.0,
+        "min_position_size_pct": 0.012,
+        "max_position_size_pct": 0.20,
+        "risk_tolerance": "high",
+        "time_horizon": "very_short",
+        "market_regime_preference": "liquid",
     },
     {
         "id": "freqtrade",
@@ -233,7 +228,7 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         "baseline_win_rate": 0.62,
         "risk_multiplier": 1.6,
         "profit_target": 0.008,
-        "margin_allocation": 600.0,
+        "margin_allocation": 500.0,
         "specialization": "algorithmic_trading",
         "dynamic_position_sizing": True,
         "adaptive_leverage": True,
@@ -256,7 +251,7 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         "baseline_win_rate": 0.70,
         "risk_multiplier": 1.2,
         "profit_target": 0.004,
-        "margin_allocation": 600.0,
+        "margin_allocation": 500.0,
         "specialization": "market_making",
         "dynamic_position_sizing": True,
         "adaptive_leverage": True,
@@ -274,7 +269,7 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         "model": "VPIN Volatility",
         "emoji": "⚡",
         "symbols": [],  # All symbols
-        "margin_allocation": 600.0,
+        "margin_allocation": 500.0,
         "max_leverage_limit": 30.0,
         "specialization": "volatility_hft",
         "description": "High-frequency trading agent using VPIN to detect order flow toxicity and predict short-term price movements.",
@@ -410,7 +405,7 @@ class TradingService:
         self._price_cache: Dict[str, float] = {}
         self._symbol_filters: Dict[str, Dict[str, Decimal]] = {}
         self._notification_windows: Dict[str, Dict[str, float]] = {}
-        self._open_source_analyst = OpenSourceAnalyst(self._settings)
+        # Open-source analyst removed - now using Google Cloud AI exclusively
         self._strategy_selector = StrategySelector(enable_rl=self._settings.enable_rl_strategies)
         self._arbitrage_engine = ArbitrageEngine(self._exchange, self._settings)
         self._cache: Optional[BaseCache] = None
@@ -448,7 +443,18 @@ class TradingService:
                 risk_manager_topic="sapphire-vpin-positions",
             )
 
-        self._rate_limit_manager = RateLimitManager(limits={'second': 10, 'minute': 1200})
+        # Check environment variable to disable rate limiter for emergency deployment
+        disable_rate_limiter = os.getenv('DISABLE_RATE_LIMITER', 'false').lower() == 'true'
+        if disable_rate_limiter:
+            logger.warning("Rate limiter disabled via environment variable")
+            self._rate_limit_manager = None
+        else:
+            try:
+                self._rate_limit_manager = RateLimitManager(default_rps=10, default_rpm=1200)
+            except Exception as e:
+                logger.error(f"Failed to initialize rate limiter: {e}")
+                logger.warning("Rate limiter disabled due to initialization error")
+                self._rate_limit_manager = None
         self._fallback_strategy_selector = FallbackStrategySelector()
 
     async def _execute_fallback_strategies(self) -> None:
@@ -1371,15 +1377,16 @@ class TradingService:
     async def _tick(self) -> None:
         """Execute a trading tick, with rate limiting and fallback logic."""
         # Record request for rate limiting for the overall tick process
-        self._rate_limit_manager.record_request("tick_process", "overall")
+        if self._rate_limit_manager:
+            self._rate_limit_manager.record_request("tick_process", "overall")
 
-        # Check API rate limit status for VPIN specifically
-        if self._rate_limit_manager.should_throttle_agent("vpin-hft"):
-            logger.warning("Throttling VPIN HFT agent due to rate limits. Executing standard agents only.")
-            await self._execute_standard_agents_only()
-        elif self._rate_limit_manager.is_rate_limited():
-            logger.warning("Global rate limits exceeded, switching to fallback strategies for all agents.")
-            await self._execute_fallback_strategies()
+            # Check API rate limit status for VPIN specifically
+            if self._rate_limit_manager.should_throttle_agent("vpin-hft"):
+                logger.warning("Throttling VPIN HFT agent due to rate limits. Executing standard agents only.")
+                await self._execute_standard_agents_only()
+            elif self._rate_limit_manager.is_rate_limited():
+                logger.warning("Global rate limits exceeded, switching to fallback strategies for all agents.")
+                await self._execute_fallback_strategies()
         else:
             await self._execute_all_agents()
     async def _execute_all_agents(self) -> None:
@@ -1791,7 +1798,7 @@ class TradingService:
         while not self._stop_event.is_set():
             try:
                 # Check rate limits before processing VPIN (highest priority throttling)
-                if self._rate_limit_manager.should_throttle_agent("vpin-hft"):
+                if self._rate_limit_manager and self._rate_limit_manager.should_throttle_agent("vpin-hft"):
                     logger.debug("VPIN agent throttled due to rate limits, skipping batch processing")
                     await asyncio.sleep(1)  # Brief pause before checking again
                     continue
@@ -1863,18 +1870,13 @@ class TradingService:
         if agents_to_query:
             tasks = []
             for agent in agents_to_query:
-                if agent in ["deepseek-v3", "fingpt-alpha"]:
+                # Agent-specific logic removed - all agents now use unified processing
                     tasks.append(self._query_vertex_agent(
                         agent, symbol, side, price, market_context, take_profit, stop_loss
                     ))
                 else:
-                    tasks.append(self._open_source_analyst.generate_thesis(
-                        agent,
-                        symbol,
-                        side,
-                        price,
-                        market_context,
-                    ))
+                    # Open-source analyst removed - now using Google Cloud AI exclusively
+                    pass  # All agents now use Vertex AI
 
             results = await asyncio.gather(*tasks, return_exceptions=True)
             
@@ -1908,14 +1910,8 @@ class TradingService:
         elif len(agent_results) == 1:
             analysis = agent_results[0]
         elif agent_id:
-            # Fallback to single agent query
-            analysis = await self._open_source_analyst.generate_thesis(
-                agent_id,
-                symbol,
-                side,
-                price,
-                market_context,
-            )
+            # Fallback removed - all agents now use Vertex AI exclusively
+            analysis = None
         else:
             analysis = None
 
@@ -1954,45 +1950,7 @@ class TradingService:
                     return thesis_text
 
             if not risk_rejected:
-                # For FinGPT-specific validation
-                if source == "FinGPT":
-                    if risk_score is None or risk_score >= self._settings.fingpt_min_risk_score:
-                        extras: list[str] = []
-                        if isinstance(risk_score, (int, float)):
-                            extras.append(f"risk {risk_score:.2f}")
-                        if isinstance(confidence, (int, float)):
-                            extras.append(f"confidence {confidence:.2f}")
-                        if extras:
-                            thesis_text = f"{thesis_text} [{' | '.join(extras)}]"
-                        return thesis_text
-                    logger.info(
-                        "FinGPT thesis for %s discarded (risk_score %.2f < %.2f)",
-                        symbol,
-                        risk_score,
-                        self._settings.fingpt_min_risk_score,
-                    )
-                # For Lag-Llama-specific validation
-                elif source == "Lag-LLaMA":
-                    ci_span = analysis.get("ci_span")
-                    if ci_span is not None and ci_span > self._settings.lagllama_max_ci_span:
-                        logger.info(
-                            "Lag-LLaMA thesis for %s discarded (CI span %.2f > %.2f)",
-                            symbol,
-                            ci_span,
-                            self._settings.lagllama_max_ci_span,
-                        )
-                    else:
-                        extras = []
-                        if isinstance(ci_span, (int, float)):
-                            extras.append(f"CI span {ci_span:.2%}")
-                        anomaly = analysis.get("anomaly_score")
-                        if isinstance(anomaly, (int, float)):
-                            extras.append(f"anomaly {anomaly:.2f}")
-                        if isinstance(confidence, (int, float)):
-                            extras.append(f"confidence {confidence:.2f}")
-                        if extras:
-                            thesis_text = f"{thesis_text} [{' | '.join(extras)}]"
-                        return thesis_text
+                # Agent-specific validation removed - all agents now use unified validation
 
         change_24h = market_context.get('change_24h', 0)
         volume = market_context.get('volume', 0)

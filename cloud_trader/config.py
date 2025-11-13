@@ -105,7 +105,7 @@ class Settings(BaseSettings):
 
     # Agent configuration
     enabled_agents: List[str] = Field(
-        default_factory=lambda: ["deepseek-v3", "qwen-adaptive", "fingpt-alpha", "lagllama-degen", "vpin-hft", "freqtrade", "hummingbot"],
+        default_factory=lambda: ["trend-momentum-agent", "strategy-optimization-agent", "financial-sentiment-agent", "market-prediction-agent", "volume-microstructure-agent", "freqtrade", "hummingbot", "vpin-hft"],
         validation_alias="ENABLED_AGENTS",
         description="List of 7 advanced AI agents for autonomous trading"
     )
@@ -118,27 +118,7 @@ class Settings(BaseSettings):
     vertex_ai_region: str = Field(default="us-central1", validation_alias="VERTEX_AI_REGION")
     vertex_ai_project: str | None = Field(default=None, validation_alias="VERTEX_AI_PROJECT")
 
-    # Agent-specific Vertex AI endpoints
-    deepseek_vertex_endpoint: str | None = Field(
-        default="https://us-central1-aiplatform.googleapis.com/v1/projects/sapphireinfinite/locations/us-central1/endpoints/deepseek-momentum-endpoint",
-        validation_alias="DEEPSEEK_VERTEX_ENDPOINT"
-    )
-    qwen_vertex_endpoint: str | None = Field(
-        default="https://us-central1-aiplatform.googleapis.com/v1/projects/sapphireinfinite/locations/us-central1/endpoints/qwen-adaptive-endpoint",
-        validation_alias="QWEN_VERTEX_ENDPOINT"
-    )
-    fingpt_vertex_endpoint: str | None = Field(
-        default="https://us-central1-aiplatform.googleapis.com/v1/projects/sapphireinfinite/locations/us-central1/endpoints/fingpt-alpha-endpoint",
-        validation_alias="FINGPT_VERTEX_ENDPOINT"
-    )
-    lagllama_vertex_endpoint: str | None = Field(
-        default="https://us-central1-aiplatform.googleapis.com/v1/projects/sapphireinfinite/locations/us-central1/endpoints/lagllama-degenerate-endpoint",
-        validation_alias="LAGLLAMA_VERTEX_ENDPOINT"
-    )
-    profit_maximizer_vertex_endpoint: str | None = Field(
-        default="https://us-central1-aiplatform.googleapis.com/v1/projects/sapphireinfinite/locations/us-central1/endpoints/profit-maximizer-endpoint",
-        validation_alias="PROFIT_MAXIMIZER_VERTEX_ENDPOINT"
-    )
+    # Agent-specific Vertex AI endpoints removed - now using unified Google Cloud AI
 
     # LLM Configuration (fallback)
     enable_llm_trading: bool = Field(default=False, validation_alias="ENABLE_LLM_TRADING")
@@ -146,13 +126,7 @@ class Settings(BaseSettings):
     llm_endpoint: str = Field(default="https://api.sapphiretrade.xyz", validation_alias="LLM_ENDPOINT")
     llm_timeout_seconds: int = Field(default=30, ge=5, le=120)
 
-    # Open-source analyst endpoints
-    fingpt_endpoint: str | None = Field(default=None, validation_alias="FINGPT_ENDPOINT")
-    fingpt_api_key: str | None = Field(default=None, validation_alias="FINGPT_API_KEY")
-    lagllama_endpoint: str | None = Field(default=None, validation_alias="LAGLLAMA_ENDPOINT")
-    lagllama_api_key: str | None = Field(default=None, validation_alias="LAGLLAMA_API_KEY")
-    fingpt_min_risk_score: float = Field(default=0.4, ge=0, le=1, validation_alias="FINGPT_MIN_RISK_SCORE")
-    lagllama_max_ci_span: float = Field(default=0.25, ge=0, validation_alias="LAGLLAMA_MAX_CI_SPAN")
+    # Open-source analyst endpoints removed - now using Google Cloud AI
     max_position_pct: float = Field(default=0.02, gt=0, le=0.1, description="Maximum position size as % of portfolio")
     min_position_size: float = Field(default=0.001, gt=0, description="Minimum viable position size")
 

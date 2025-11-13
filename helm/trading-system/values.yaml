@@ -4,6 +4,22 @@ global:
   projectId: sapphireinfinite
   imagePullPolicy: Always
 
+# Trading configuration
+trading:
+  enabled: true
+  capitalAllocation: 3500  # $3,500 total = $500 per agent
+  riskMultiplier: 0.02
+  maxLeverage: 10
+  disableRateLimiter: true  # Emergency bypass for deployment
+
+# Simplified trader for emergency deployment
+simplifiedTrader:
+  enabled: true
+  image:
+    repository: cloud-run-source-deploy/cloud-trader
+    tag: latest
+  replicas: 1
+
 # Vertex AI and TPU configuration - Full Google AI optimization
 vertexAI:
   enabled: true
@@ -21,7 +37,7 @@ vertexAI:
     driftDetection: true
 
 tpu:
-  enabled: false  # Set to true after TPU quota approval
+  enabled: true  # Set to true after TPU quota approval
   type: "v5e-lite-podslice"  # Most cost-effective TPU for inference
   machineType: "ct5lp-hightpu-1t"  # TPU v5e instance
   optimization:
@@ -33,10 +49,10 @@ tpu:
 
 # Redis configuration
 redis:
-  enabled: false  # Temporarily disabled for faster deployment
+  enabled: true  # Temporarily disabled for faster deployment
   architecture: standalone
   auth:
-    enabled: false
+    enabled: true
   master:
     resources:
       requests:
@@ -145,7 +161,7 @@ mcpCoordinator:
 
 # LLM Agent Services - Open Source Models on Vertex AI
 agents:
-  enabled: false  # Disabled for minimal deployment - enable after core services work
+  enabled: true  # Disabled for minimal deployment - enable after core services work
 
   # Trend Momentum Agent - Real-time market momentum analysis using PaLM 2 Chat
   trend-momentum-agent:
@@ -392,13 +408,109 @@ agents:
       - name: MONITORING_ENABLED
         value: "true"
 
+  # FreqTrade Framework Agent
+  freqtrade:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: cloud-run-source-deploy/freqtrade
+      tag: "latest"
+    resources:
+      requests:
+        cpu: 750m
+        memory: 1.5Gi
+      limits:
+        cpu: 3000m
+        memory: 6Gi
+    env:
+      - name: ENABLE_PAPER_TRADING
+        value: "true"
+      - name: ENABLED_AGENTS
+        value: '["freqtrade"]'
+      - name: AGENT_ROLE
+        value: "algorithmic-trading"
+      - name: MONITORING_ENABLED
+        value: "true"
+
+  # HummingBot Framework Agent
+  hummingbot:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: cloud-run-source-deploy/hummingbot
+      tag: "latest"
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+    env:
+      - name: ENABLE_PAPER_TRADING
+        value: "true"
+      - name: ENABLED_AGENTS
+        value: '["hummingbot"]'
+      - name: AGENT_ROLE
+        value: "market-making"
+      - name: MONITORING_ENABLED
+        value: "true"
+
+  # VPIN HFT Agent
+  vpin-hft:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: cloud-run-source-deploy/cloud-trader
+      tag: "latest"
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 4Gi
+      limits:
+        cpu: 3000m
+        memory: 12Gi
+    vertexAI:
+      model: "codey-001"
+      optimization:
+        quantization: "int8"
+        batchSize: 4
+        temperature: 0.1
+        maxTokens: 1024
+      roleContext: "volume-analysis"
+      monitoring:
+        latencyThreshold: 300
+        accuracyMetric: "volume_analysis_accuracy"
+        driftThreshold: 0.04
+    env:
+      - name: ENABLE_PAPER_TRADING
+        value: "true"
+      - name: ENABLED_AGENTS
+        value: '["vpin-hft"]'
+      - name: ENABLE_VERTEX_AI
+        value: "true"
+      - name: MCP_ENABLED
+        value: "true"
+      - name: AGENT_ROLE
+        value: "volume-analysis"
+      - name: VERTEX_MODEL
+        value: "codey-001"
+      - name: MODEL_TEMPERATURE
+        value: "0.1"
+      - name: MAX_OUTPUT_TOKENS
+        value: "1024"
+      - name: QUANTIZATION_LEVEL
+        value: "int8"
+      - name: MONITORING_ENABLED
+        value: "true"
+
 # Trading Framework Services
 frameworks:
   enabled: true
 
   # Freqtrade HFT
   freqtrade:
-    enabled: false  # Disabled for minimal deployment
+    enabled: true  # Disabled for minimal deployment
     replicaCount: 1
     image:
       repository: cloud-run-source-deploy/freqtrade
@@ -428,7 +540,7 @@ frameworks:
 
   # Hummingbot Market Maker
   hummingbot:
-    enabled: false  # Disabled for minimal deployment
+    enabled: true  # Disabled for minimal deployment
     replicaCount: 1
     image:
       repository: cloud-run-source-deploy/hummingbot
@@ -502,7 +614,7 @@ hpa:
 monitoring:
   enabled: true
   prometheus:
-    enabled: false  # Disabled until Prometheus Operator CRDs are installed
+    enabled: true  # Disabled until Prometheus Operator CRDs are installed
     scrapeInterval: 15s
     evaluationInterval: 15s
     retention: 30d
@@ -524,7 +636,7 @@ logging:
     enabled: true
     match: "kube.*"
   elasticsearch:
-    enabled: false  # Enable if needed for log aggregation
+    enabled: true  # Enable if needed for log aggregation
 
 # Security and Compliance
 security:
@@ -582,7 +694,7 @@ affinity:
 
 # System Initialization Job
 systemInitialization:
-  enabled: false  # Temporarily disabled to speed up deployment
+  enabled: true  # Temporarily disabled to speed up deployment
   image:
     repository: cloud-run-source-deploy/cloud-trader
     tag: "latest"

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Tuple
 
-from loguru import logger
+import logging
+logger = logging.getLogger(__name__)
 
 from .config import settings
 from .models import OrderIntent, RiskCheckResponse

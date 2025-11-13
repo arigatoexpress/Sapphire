@@ -157,14 +157,14 @@ class PortfolioOrchestrator:
         # This would be called when agents register with the system
         # For now, we'll define the standard agent set
         standard_agents = {
-            "deepseek-v3": AgentRole.MOMENTUM_TRADER,
-            "qwen-adaptive": AgentRole.TECHNICAL_ANALYST,
-            "fingpt-alpha": AgentRole.SENTIMENT_ANALYST,
-            "lagllama-degen": AgentRole.VOLATILITY_SPECIALIST,
+            "trend-momentum-agent": AgentRole.MOMENTUM_TRADER,
+            "strategy-optimization-agent": AgentRole.STRATEGY_OPTIMIZER,
+            "financial-sentiment-agent": AgentRole.SENTIMENT_ANALYST,
+            "market-prediction-agent": AgentRole.MARKET_PREDICTOR,
+            "volume-microstructure-agent": AgentRole.VOLUME_ANALYST,
             "vpin-hft": AgentRole.VOLATILITY_SPECIALIST,
             "freqtrade": AgentRole.TECHNICAL_ANALYST,
             "hummingbot": AgentRole.MARKET_MAKER,
-            "profit-maximizer": AgentRole.PORTFOLIO_OPTIMIZER,
         }
 
         for agent_id, role in standard_agents.items():

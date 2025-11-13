@@ -74,7 +74,7 @@ class ChatMessage(BaseModel):
 
 
 class ChatCompletionRequest(BaseModel):
-    model: str = "deepseek-coder"
+    model: str = "gemini-1.5-flash"  # Google Cloud AI default
     messages: List[ChatMessage]
     max_tokens: int = Field(default=256, ge=1, le=2048)
     temperature: float = Field(default=0.2, ge=0, le=2)

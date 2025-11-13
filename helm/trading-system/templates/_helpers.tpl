@@ -78,4 +78,6 @@ Common environment variables for all services
   value: "redis"
 - name: REDIS_URL
   value: "redis://{{ include "trading-system.fullname" . }}-redis-master.trading.svc.cluster.local:6379"
+- name: DISABLE_RATE_LIMITER
+  value: {{ .Values.trading.disableRateLimiter | default false | quote }}
 {{- end }}

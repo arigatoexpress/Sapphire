@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "trading-system.fullname" $ }}-simplified-trader
+  namespace: trading
+  labels:
+    {{- include "trading-system.labels" $ | nindent 4 }}
+    app: cloud-trader
+    component: simplified
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "trading-system.selectorLabels" $ | nindent 6 }}
+      app: cloud-trader
+      component: simplified
+  template:
+    metadata:
+      labels:
+        {{- include "trading-system.selectorLabels" $ | nindent 8 }}
+        app: cloud-trader
+        component: simplified
+    spec:
+      serviceAccountName: {{ include "trading-system.serviceAccountName" $ }}
+      containers:
+        - name: simplified-trader
+          image: {{ $.Values.global.imageRegistry }}/{{ $.Values.global.projectId }}/{{ $.Values.simplifiedTrader.image.repository }}:{{ $.Values.simplifiedTrader.image.tag }}
+          imagePullPolicy: {{ $.Values.global.imagePullPolicy }}
+          command: ["uvicorn", "cloud_trader.simplified_api:app", "--host", "0.0.0.0", "--port", "8080"]
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            {{- include "trading-system.commonEnv" $ | nindent 12 }}
+            - name: TOTAL_CAPITAL
+              value: {{ .Values.trading.capitalAllocation | quote }}
+            - name: SIMPLIFIED_MODE
+              value: "true"
+          envFrom:
+            - secretRef:
+                name: cloud-trader-secrets
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5

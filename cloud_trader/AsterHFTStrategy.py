@@ -69,7 +69,7 @@ class AsterHFTStrategy(IStrategy):
 
         # Competition awareness: detect potential market maker activity
         dataframe['spread_expansion'] = (
-            dataframe['high'] - dataframe['low'
+            dataframe['high'] - dataframe['low']
         ) / dataframe['close'] > 0.02  # >2% intrabar range
 
         return dataframe

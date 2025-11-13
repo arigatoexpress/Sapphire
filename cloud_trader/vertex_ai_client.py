@@ -53,13 +53,8 @@ class VertexAIClient:
     def _initialize_endpoints(self) -> None:
         """Initialize Vertex AI endpoint mappings for each agent."""
         settings = self._settings
-        self._endpoints = {
-            "deepseek-v3": settings.deepseek_vertex_endpoint,
-            "qwen-adaptive": settings.qwen_vertex_endpoint,
-            "fingpt-alpha": settings.fingpt_vertex_endpoint,
-            "lagllama-degen": settings.lagllama_vertex_endpoint,
-            "profit-maximizer": settings.profit_maximizer_vertex_endpoint,
-        }
+        # Vertex AI endpoints removed - now using unified Google Cloud AI models
+        self._endpoints = {}
 
         # Filter out None endpoints
         self._endpoints = {k: v for k, v in self._endpoints.items() if v is not None}

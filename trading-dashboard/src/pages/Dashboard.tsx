@@ -1,15 +1,15 @@
+import { Container, Box, Typography, Button, Grid, Alert } from "@mui/material";
 import React from 'react';
-import { Box, Alert, Button, Container, Typography, useTheme, Grid } from '@mui/material';
 import { useTrading } from '../contexts/TradingContext';
 import EnhancedMetrics from '../components/EnhancedMetrics';
 import PortfolioChart from '../components/PortfolioChart';
 import MCPChat from '../components/MCPChat';
 import AgentModelCards from '../components/AgentModelCards';
 import MarketAnalysis from '../components/MarketAnalysis';
-import AdvancedAnalytics from '../components/AdvancedAnalytics';
-import MarketMicrostructure from '../components/MarketMicrostructure';
-import SentimentAnalysis from '../components/SentimentAnalysis';
-import RiskManagement from '../components/RiskManagement';
+import { AdvancedAnalytics } from '../components/AdvancedAnalytics';
+import { MarketMicrostructure } from '../components/MarketMicrostructure';
+import { SentimentAnalysis } from '../components/SentimentAnalysis';
+import { RiskManagement } from '../components/RiskManagement';
 import SystemAchievements from '../components/SystemAchievements';
 
 const Dashboard: React.FC = () => {
