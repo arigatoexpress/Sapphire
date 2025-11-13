@@ -272,7 +272,7 @@ agents:
       - name: PYTORCH_CUDA_ALLOC_CONF
         value: "max_split_size_mb:512"  # Optimize memory allocation
 
-  # VPIN Agent (GPU-accelerated for real-time volume analysis)
+  # VPIN Agent (GPU-accelerated with elastic scaling and fallback)
   vpin:
     enabled: true
     replicaCount: 1
@@ -299,7 +299,6 @@ agents:
         value: "true"
       - name: VPIN_VERTEX_ENDPOINT
         value: "https://us-central1-aiplatform.googleapis.com/v1/projects/sapphireinfinite/locations/us-central1/endpoints/vpin-hft-endpoint"
-        value: "true"
       - name: MODEL_QUANTIZATION
         value: "4bit"
       - name: GPU_MEMORY_FRACTION
@@ -314,6 +313,21 @@ agents:
         value: "0"    # Use first GPU
       - name: PYTORCH_CUDA_ALLOC_CONF
         value: "max_split_size_mb:512"  # Optimize memory allocation
+      # Elastic scaling and fallback configuration
+      - name: ELASTIC_SCALING_ENABLED
+        value: "true"
+      - name: FALLBACK_MODELS
+        value: '["deepseek-v3", "qwen-adaptive", "fingpt-alpha"]'
+      - name: API_THROTTLE_DETECTION_ENABLED
+        value: "true"
+      - name: THROTTLE_THRESHOLD_REQUESTS
+        value: "10"  # Requests per minute threshold
+      - name: THROTTLE_BACKOFF_SECONDS
+        value: "300"  # 5 minutes backoff when throttled
+      - name: RESOURCE_CONSERVATION_MODE
+        value: "true"  # Scale down when throttled
+      - name: FALLBACK_ACCURACY_THRESHOLD
+        value: "0.85"  # Minimum acceptable accuracy for fallback models
 
 # Trading Framework Services
 frameworks:
@@ -381,6 +395,30 @@ frameworks:
 hpa:
   enabled: true
 
+  # VPIN HPA (Elastic scaling with intelligent resource management)
+  vpin:
+    enabled: true
+    minReplicas: 0  # Can scale to zero when throttled
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 60  # Lower threshold for GPU workloads
+    targetMemoryUtilizationPercentage: 75
+    # Custom metrics for intelligent scaling
+    customMetrics:
+      - type: Pods
+        pods:
+          metric:
+            name: api_requests_per_second
+          target:
+            type: AverageValue
+            averageValue: 5  # Scale up if >5 req/sec
+      - type: Pods
+        pods:
+          metric:
+            name: throttle_rate
+          target:
+            type: AverageValue
+            averageValue: 0.1  # Scale down if throttle rate >10%
+
   # Freqtrade HPA
   freqtrade:
     enabled: true
@@ -411,17 +449,15 @@ securityContext:
   fsGroup: 2000
 
 # Node Selector for GPU nodes (only used when gpu.enabled=true)
-{{- if .Values.gpu.enabled }}
 nodeSelector:
-  accelerator: {{ .Values.gpu.type }}
-  instance-type: {{ .Values.gpu.machineType }}
+  accelerator: nvidia-l4
+  instance-type: g2-standard-8
 
 # Tolerations for GPU workloads (only used when gpu.enabled=true)
 tolerations:
   - key: "nvidia.com/gpu"
     operator: "Exists"
     effect: "NoSchedule"
-{{- end }}
 
 # Affinity rules
 affinity:
