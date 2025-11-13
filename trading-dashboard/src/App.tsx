@@ -170,28 +170,68 @@ function AppContent() {
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
 
-            {/* Aster DEX Footer */}
+            {/* Competition & DEX Footer */}
             <Box
               component="footer"
               sx={{
                 mt: 'auto',
-                py: 2,
+                py: 3,
                 px: 3,
-                borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-                background: 'rgba(0, 0, 0, 0.3)',
-                backdropFilter: 'blur(10px)',
+                borderTop: '2px solid rgba(255, 215, 0, 0.3)',
+                background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.4) 0%, rgba(138, 43, 226, 0.1) 100%)',
+                backdropFilter: 'blur(15px)',
                 textAlign: 'center'
               }}
             >
+              <Box sx={{ mb: 2 }}>
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontWeight: 700,
+                    fontSize: '1.1rem',
+                    background: 'linear-gradient(45deg, #ffd700 0%, #ffed4e 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    mb: 1
+                  }}
+                >
+                  🏆 Vibe Coding Competition Entry 🏆
+                </Typography>
+                <Typography
+                  variant="body1"
+                  sx={{
+                    color: 'rgba(255, 255, 255, 0.8)',
+                    fontSize: '0.95rem',
+                    fontWeight: 600,
+                    mb: 2
+                  }}
+                >
+                  Advanced AI-Powered Trading System
+                </Typography>
+              </Box>
+
+              <Typography
+                variant="body1"
+                sx={{
+                  color: 'rgba(255, 255, 255, 0.9)',
+                  fontSize: '1rem',
+                  fontWeight: 500,
+                  mb: 1
+                }}
+              >
+                🚀 <strong style={{ color: '#8a2be2', fontSize: '1.1em' }}>Sapphire Trading</strong> is proudly built on{' '}
+                <strong style={{ color: '#00d4aa', fontSize: '1.1em' }}>Aster DEX</strong>
+              </Typography>
+
               <Typography
                 variant="body2"
                 sx={{
-                  color: 'rgba(255, 255, 255, 0.6)',
-                  fontSize: '0.875rem'
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  fontSize: '0.85rem',
+                  fontStyle: 'italic'
                 }}
               >
-                🚀 <strong style={{ color: '#8a2be2' }}>Sapphire Trading</strong> is proudly built on{' '}
-                <strong style={{ color: '#00d4aa' }}>Aster DEX</strong> - The premier decentralized futures exchange
+                The premier decentralized futures exchange for automated algorithmic trading
               </Typography>
             </Box>
           </Box>

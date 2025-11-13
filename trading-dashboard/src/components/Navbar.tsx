@@ -99,21 +99,38 @@ const Navbar: React.FC = () => {
             >
               💎 Sapphire Trading ✨
             </Typography>
-            <Chip
-              label="Powered by Aster DEX"
-              size="small"
-              sx={{
-                bgcolor: 'rgba(138, 43, 226, 0.2)',
-                color: '#8a2be2',
-                border: '1px solid #8a2be2',
-                fontWeight: 600,
-                fontSize: '0.7rem',
-                height: '20px',
-                '& .MuiChip-label': {
-                  px: 1,
-                },
-              }}
-            />
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, alignItems: 'flex-start' }}>
+              <Chip
+                label="🏆 Vibe Coding Competition Entry"
+                size="small"
+                sx={{
+                  bgcolor: 'rgba(255, 215, 0, 0.2)',
+                  color: '#ffd700',
+                  border: '1px solid #ffd700',
+                  fontWeight: 700,
+                  fontSize: '0.65rem',
+                  height: '18px',
+                  '& .MuiChip-label': {
+                    px: 1,
+                  },
+                }}
+              />
+              <Chip
+                label="🚀 Built on Aster DEX"
+                size="small"
+                sx={{
+                  bgcolor: 'rgba(138, 43, 226, 0.2)',
+                  color: '#8a2be2',
+                  border: '1px solid #8a2be2',
+                  fontWeight: 600,
+                  fontSize: '0.7rem',
+                  height: '20px',
+                  '& .MuiChip-label': {
+                    px: 1,
+                  },
+                }}
+              />
+            </Box>
           </Box>
 
           {/* Desktop Navigation */}

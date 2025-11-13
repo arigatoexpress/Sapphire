@@ -79,6 +79,61 @@ const Dashboard: React.FC = () => {
           featuring real-time monitoring, AI-driven decision making, and institutional-grade risk management.
         </Typography>
 
+        {/* Competition Entry Banner */}
+        <Box sx={{
+          mt: 3,
+          p: 3,
+          borderRadius: 3,
+          background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.15) 0%, rgba(255, 140, 0, 0.1) 100%)',
+          border: '2px solid rgba(255, 215, 0, 0.5)',
+          boxShadow: '0 4px 20px rgba(255, 215, 0, 0.2)',
+          textAlign: 'center',
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          <Box sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'radial-gradient(circle at 30% 30%, rgba(255, 215, 0, 0.1) 0%, transparent 50%)',
+            pointerEvents: 'none'
+          }} />
+          <Typography
+            variant="h5"
+            sx={{
+              fontWeight: 800,
+              background: 'linear-gradient(45deg, #ffd700 0%, #ff6b35 50%, #ffd700 100%)',
+              backgroundClip: 'text',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              mb: 1,
+              position: 'relative',
+              zIndex: 1,
+              textShadow: '0 2px 4px rgba(0,0,0,0.3)'
+            }}
+          >
+            🏆 Vibe Coding Competition Entry 🏆
+          </Typography>
+          <Typography variant="body1" sx={{
+            color: 'rgba(255, 255, 255, 0.9)',
+            fontWeight: 600,
+            mb: 1,
+            position: 'relative',
+            zIndex: 1
+          }}>
+            Advanced AI-Powered Autonomous Trading System
+          </Typography>
+          <Typography variant="body2" sx={{
+            color: 'rgba(255, 255, 255, 0.8)',
+            position: 'relative',
+            zIndex: 1
+          }}>
+            Built with cutting-edge AI agents, real-time market analysis, and institutional-grade risk management
+          </Typography>
+        </Box>
+
         {/* Aster DEX Branding Banner */}
         <Box sx={{
           mt: 3,
