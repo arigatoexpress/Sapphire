@@ -47,7 +47,7 @@ echo "Trading configuration:"
 gcloud run services describe cloud-trader \
   --region=us-central1 \
   --format="table(spec.template.spec.containers[0].env[name='ENABLE_PAPER_TRADING'].value)" \
-  --project=quant-ai-trader-credits | grep -v NAME | xargs echo "ENABLE_PAPER_TRADING:"
+  --project=sapphireinfinite | grep -v NAME | xargs echo "ENABLE_PAPER_TRADING:"
 
 echo ""
 echo "Recent trading activity:"
@@ -55,7 +55,7 @@ gcloud logging read \
   'resource.type="cloud_run_revision" AND resource.labels.service_name="cloud-trader" AND (textPayload:"order" OR textPayload:"trade" OR textPayload:"position")' \
   --limit=5 \
   --format="table(timestamp.date('%H:%M:%S'), textPayload)" \
-  --project=quant-ai-trader-credits 2>/dev/null | head -10
+  --project=sapphireinfinite 2>/dev/null | head -10
 
 echo ""
 echo "6️⃣ Load Balancer Configuration:"
@@ -64,7 +64,7 @@ echo "URL map host rules:"
 gcloud compute url-maps describe aster-url-map \
   --global \
   --format="table(hostRules[].hosts.flatten())" \
-  --project=quant-ai-trader-credits
+  --project=sapphireinfinite
 
 echo ""
 echo "✅ Test complete!"

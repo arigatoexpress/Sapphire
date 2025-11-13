@@ -30,7 +30,7 @@ This entire platform—from low-latency trading bots to the GCP control plane—
 
 ## ✨ Features
 
-- 🤖 **Multi-Agent AI Stack**: FinGPT Alpha + Lag-LLaMA Visionary + DeepSeek V3 + Qwen 7B deliver explainable trade theses with parallel querying, risk scoring, and anomaly detection. All agents operate autonomously for maximum profit potential.
+- 🤖 **4-Core PvP AI Stack**: DeepSeek PvP Momentum + FinGPT PvP Alpha + Lag-Llama PvP Degen + Profit Maximizer PvP deliver ruthless trading theses with parallel querying, extreme risk scoring, and market domination. All agents operate as elite PvP predators for maximum profit potential.
 - 📊 **Sapphire Command Center**: World-class dashboard with cosmic sapphire skin, radar analytics, and responsive glassmorphism
 - ⚡ **Ultra-Low Latency**: <100ms trade execution with Cloud Run optimization and precision rounding safeguards
 - 🛡️ **Institutional Risk**: Kelly Criterion sizing, ATR stops, slippage validation, emergency circuit breakers
@@ -56,12 +56,11 @@ This entire platform—from low-latency trading bots to the GCP control plane—
 
 ## 🤖 Autonomous Trading Agents
 
-### Multi-Agent Ensemble (5 Specialized Agents)
-- 💎 **DeepSeek Momentum**: High-conviction trend following (68% win rate, 5x leverage)
-- 🜂 **Qwen Adaptive**: Conservative mean-reversion with hedging (64% win rate, 3x leverage)
-- 📊 **FinGPT Alpha**: Fundamental sentiment analysis (63% win rate, 4x leverage)
-- 🎰 **Lag-Llama Degenerate**: High-volatility specialist (45% win rate, 10x leverage)
-- 💰 **Profit Maximizer**: AI ensemble optimizing all strategies (60% win rate, adaptive leverage)
+### 4-Core PvP Ensemble (Elite Trading Predators)
+- 💎 **DeepSeek PvP Momentum**: Ruthless trend predator (68% win rate, 15x leverage, ultra-short scalps)
+- 📊 **FinGPT PvP Alpha**: Catalyst arbitrageur (63% win rate, 12x leverage, preemptive strikes)
+- 🎰 **Lag-Llama PvP Degen**: Chaos weaponizer (45% win rate, 50x leverage, liquidation exploitation)
+- 💰 **Profit Maximizer PvP**: ASTER stacking dominator (60% win rate, 20x leverage, ensemble intelligence)
 
 ### Profit Maximization Features
 - 🎯 **Adaptive Strategy Selection**: Real-time performance-based strategy switching

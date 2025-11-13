@@ -341,7 +341,7 @@ class MCPClient:
                 {
                     "id": f"msg_{i}",
                     "type": "observation" if i % 4 == 0 else "proposal" if i % 4 == 1 else "critique" if i % 4 == 2 else "consensus",
-                    "sender": ["deepseek-v3", "qwen-7b", "fingpt-alpha", "lagllama-degen"][i % 4],
+                    "sender": ["deepseek-v3", "fingpt-alpha", "lagllama-degen", "profit-maximizer"][i % 4],
                     "timestamp": str(current_time - (i * 60)),  # One per minute
                     "content": f"Agent analysis for market conditions - confidence: {0.6 + (i % 4) * 0.1:.1f}",
                     "context": f"Market regime: {'bull' if i % 2 == 0 else 'bear'}"

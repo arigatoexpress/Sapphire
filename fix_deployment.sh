@@ -7,14 +7,14 @@ echo "=== Fixing Sapphire AI Trading Stack Deployment ==="
 echo "1. Switching main domain to use Cloud Run dashboard..."
 gcloud compute target-https-proxies update sapphire-https-proxy \
     --url-map=aster-url-map \
-    --project=quant-ai-trader-credits
+    --project=sapphireinfinite
 
 # Step 2: Clear CDN cache to force refresh
 echo "2. Invalidating CDN cache..."
 gcloud compute url-maps invalidate-cdn-cache aster-url-map \
     --path="/*" \
     --global \
-    --project=quant-ai-trader-credits
+    --project=sapphireinfinite
 
 # Step 3: Optionally disable CDN on the backend bucket (since we're not using it anymore)
 echo "3. Updating backend configuration..."
@@ -24,7 +24,7 @@ gcloud compute backend-services update cloud-trader-dashboard-backend \
     --cache-mode="FORCE_CACHE_ALL" \
     --default-ttl=10 \
     --max-ttl=60 \
-    --project=quant-ai-trader-credits
+    --project=sapphireinfinite
 
 # Step 4: Deploy latest backend with position closing fix
 echo "4. Deploying backend with position closing fix..."

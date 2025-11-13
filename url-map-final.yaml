@@ -1,5 +1,5 @@
 creationTimestamp: '2025-11-02T22:45:00.476-08:00'
-defaultService: https://www.googleapis.com/compute/v1/projects/quant-ai-trader-credits/global/backendServices/cloud-trader-dashboard-backend
+defaultService: https://www.googleapis.com/compute/v1/projects/sapphireinfinite/global/backendServices/cloud-trader-dashboard-backend
 fingerprint: kMI4CDofyv8=
 hostRules:
 # Main domain - serves frontend
@@ -25,10 +25,10 @@ name: aster-url-map
 pathMatchers:
 # Frontend matcher - dashboard by default
 - name: frontend-matcher
-  defaultService: https://www.googleapis.com/compute/v1/projects/quant-ai-trader-credits/global/backendServices/cloud-trader-dashboard-backend
+  defaultService: https://www.googleapis.com/compute/v1/projects/sapphireinfinite/global/backendServices/cloud-trader-dashboard-backend
 # API matcher - wallet orchestrator by default
 - name: api-matcher
-  defaultService: https://www.googleapis.com/compute/v1/projects/quant-ai-trader-credits/global/backendServices/orchestrator-backend
+  defaultService: https://www.googleapis.com/compute/v1/projects/sapphireinfinite/global/backendServices/orchestrator-backend
   pathRules:
   - paths:
     - /healthz
@@ -37,5 +37,5 @@ pathMatchers:
     - /trading/*
     - /streams/*
     - /inference/*
-    service: https://www.googleapis.com/compute/v1/projects/quant-ai-trader-credits/global/backendServices/trader-backend
-selfLink: https://www.googleapis.com/compute/v1/projects/quant-ai-trader-credits/global/urlMaps/aster-url-map
+    service: https://www.googleapis.com/compute/v1/projects/sapphireinfinite/global/backendServices/trader-backend
+selfLink: https://www.googleapis.com/compute/v1/projects/sapphireinfinite/global/urlMaps/aster-url-map

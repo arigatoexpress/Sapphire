@@ -65,11 +65,11 @@ class Settings(BaseSettings):
 
     # Trading configuration
     symbols: List[str] = Field(
-        default_factory=lambda: ["BTCUSDT", "ETHUSDT", "SOLUSDT", "SUIUSDT", "AVAXUSDT", "ARBUSDT"]
+        default_factory=list  # Load all available symbols from exchange by default
     )
-    decision_interval_seconds: int = Field(default=15, ge=5, le=300)
-    max_position_risk: float = Field(default=0.10, gt=0, le=0.5)
-    max_drawdown: float = Field(default=0.20, gt=0, le=0.8)
+    decision_interval_seconds: int = Field(default=10, ge=5, le=300)  # Faster decisions for PvP trading
+    max_position_risk: float = Field(default=0.15, gt=0, le=0.5)  # Higher risk per position for PvP
+    max_drawdown: float = Field(default=0.25, gt=0, le=0.8)     # Higher drawdown tolerance for aggressive trading
     volatility_delever_threshold: float = Field(default=4.0, ge=0)
     auto_delever_factor: float = Field(default=0.5, gt=0, le=1)
     bandit_epsilon: float = Field(default=0.1, ge=0, le=1)
@@ -105,9 +105,9 @@ class Settings(BaseSettings):
 
     # Agent configuration
     enabled_agents: List[str] = Field(
-        default_factory=lambda: ["deepseek-v3", "qwen-7b", "fingpt-alpha", "lagllama-degen", "profit-maximizer", "kimi-chat"],
+        default_factory=lambda: ["deepseek-v3", "fingpt-alpha", "lagllama-degen", "profit-maximizer"],
         validation_alias="ENABLED_AGENTS",
-        description="List of agent IDs to enable for autonomous trading"
+        description="List of 4 core PvP agent IDs for autonomous trading"
     )
     max_symbols_per_agent: int = Field(default=10, ge=1, le=50)
     agent_parallel_execution: bool = Field(default=True, validation_alias="AGENT_PARALLEL_EXECUTION")
@@ -120,20 +120,24 @@ class Settings(BaseSettings):
 
     # Agent-specific Vertex AI endpoints
     deepseek_vertex_endpoint: str | None = Field(
-        default="https://us-central1-aiplatform.googleapis.com/v1/projects/quant-ai-trader-credits/locations/us-central1/endpoints/deepseek-momentum-endpoint",
+        default="https://us-central1-aiplatform.googleapis.com/v1/projects/sapphireinfinite/locations/us-central1/endpoints/deepseek-momentum-endpoint",
         validation_alias="DEEPSEEK_VERTEX_ENDPOINT"
     )
     qwen_vertex_endpoint: str | None = Field(
-        default="https://us-central1-aiplatform.googleapis.com/v1/projects/quant-ai-trader-credits/locations/us-central1/endpoints/qwen-adaptive-endpoint",
+        default="https://us-central1-aiplatform.googleapis.com/v1/projects/sapphireinfinite/locations/us-central1/endpoints/qwen-adaptive-endpoint",
         validation_alias="QWEN_VERTEX_ENDPOINT"
     )
     fingpt_vertex_endpoint: str | None = Field(
-        default="https://us-central1-aiplatform.googleapis.com/v1/projects/quant-ai-trader-credits/locations/us-central1/endpoints/fingpt-alpha-endpoint",
+        default="https://us-central1-aiplatform.googleapis.com/v1/projects/sapphireinfinite/locations/us-central1/endpoints/fingpt-alpha-endpoint",
         validation_alias="FINGPT_VERTEX_ENDPOINT"
     )
     lagllama_vertex_endpoint: str | None = Field(
-        default="https://us-central1-aiplatform.googleapis.com/v1/projects/quant-ai-trader-credits/locations/us-central1/endpoints/lagllama-degenerate-endpoint",
+        default="https://us-central1-aiplatform.googleapis.com/v1/projects/sapphireinfinite/locations/us-central1/endpoints/lagllama-degenerate-endpoint",
         validation_alias="LAGLLAMA_VERTEX_ENDPOINT"
+    )
+    profit_maximizer_vertex_endpoint: str | None = Field(
+        default="https://us-central1-aiplatform.googleapis.com/v1/projects/sapphireinfinite/locations/us-central1/endpoints/profit-maximizer-endpoint",
+        validation_alias="PROFIT_MAXIMIZER_VERTEX_ENDPOINT"
     )
 
     # LLM Configuration (fallback)

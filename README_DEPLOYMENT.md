@@ -3,13 +3,13 @@
 ## Quick Start Commands
 ```bash
 # Build & deploy trading service
-gcloud builds submit --config=cloudbuild.yaml --project=quant-ai-trader-credits --async
+gcloud builds submit --config=cloudbuild.yaml --project=sapphireinfinite --async
 
 # Deploy dashboard
-gcloud builds submit --config=infra/dashboard/cloudbuild.yaml --project=quant-ai-trader-credits --async
+gcloud builds submit --config=infra/dashboard/cloudbuild.yaml --project=sapphireinfinite --async
 
 # List active Cloud Run revisions
-gcloud run services list --project=quant-ai-trader-credits --region=us-central1
+gcloud run services list --project=sapphireinfinite --region=us-central1
 ```
 
 ## Architecture Snapshot
@@ -36,8 +36,8 @@ Reusable scripts in `cloud_trader/training/` handle dataset loading (JSON or Big
 Launch a training job:
 ```bash
 gcloud builds submit --config=infra/training/cloudbuild-deepseek.yaml \
-  --substitutions=_DATA_PATH=gs://quant-ai-trader-credits/training/deepseek.jsonl \
-  --project=quant-ai-trader-credits --async
+  --substitutions=_DATA_PATH=gs://sapphireinfinite/training/deepseek.jsonl \
+  --project=sapphireinfinite --async
 ```
 The Cloud Build config builds `vertex-ai-training/deepseek-trainer` and immediately starts a Vertex AI custom job on `a2-highgpu-1g`. Mirror configs exist for Qwen/FinGPT/Lag-Llama.
 

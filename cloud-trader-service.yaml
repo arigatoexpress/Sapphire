@@ -4,9 +4,9 @@ metadata:
   annotations:
     run.googleapis.com/build-enable-automatic-updates: 'false'
     run.googleapis.com/build-id: 6ffdc810-0f54-42cd-88fd-1d7e6a6e590d
-    run.googleapis.com/build-image-uri: us-central1-docker.pkg.dev/quant-ai-trader-credits/cloud-run-source-deploy/cloud-trader
+    run.googleapis.com/build-image-uri: us-central1-docker.pkg.dev/sapphireinfinite/cloud-run-source-deploy/cloud-trader
     run.googleapis.com/build-name: projects/880429861698/locations/us-central1/builds/6ffdc810-0f54-42cd-88fd-1d7e6a6e590d
-    run.googleapis.com/build-source-location: gs://run-sources-quant-ai-trader-credits-us-central1/services/cloud-trader/1762205909.989097-bf5c3f4283474e638997daae0d829075.zip#1762205955976003
+    run.googleapis.com/build-source-location: gs://run-sources-sapphireinfinite-us-central1/services/cloud-trader/1762205909.989097-bf5c3f4283474e638997daae0d829075.zip#1762205955976003
     run.googleapis.com/ingress: internal-and-cloud-load-balancing
     run.googleapis.com/ingress-status: internal-and-cloud-load-balancing
     run.googleapis.com/urls: '["https://cloud-trader-880429861698.us-central1.run.app","https://cloud-trader-cfxefrvooa-uc.a.run.app"]'
@@ -24,7 +24,7 @@ spec:
         run.googleapis.com/client-version: 533.0.0
         run.googleapis.com/cpu-throttling: 'false'
         run.googleapis.com/startup-cpu-boost: 'true'
-        run.googleapis.com/vpc-access-connector: projects/quant-ai-trader-credits/locations/us-central1/connectors/aster-vpc-connector
+        run.googleapis.com/vpc-access-connector: projects/sapphireinfinite/locations/us-central1/connectors/aster-vpc-connector
         run.googleapis.com/vpc-access-egress: all-traffic
       labels:
         client.knative.dev/nonce: sjfnshqeex
@@ -63,7 +63,7 @@ spec:
             secretKeyRef:
               key: latest
               name: TELEGRAM_CHAT_ID
-        image: gcr.io/quant-ai-trader-credits/cloud-trader:latest
+        image: gcr.io/sapphireinfinite/cloud-trader:latest
         ports:
         - containerPort: 8080
           name: http1

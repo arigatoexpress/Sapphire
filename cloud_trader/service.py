@@ -93,146 +93,100 @@ class HealthStatus:
 AGENT_DEFINITIONS: List[Dict[str, Any]] = [
     {
         "id": "deepseek-v3",
-        "name": "DeepSeek Momentum",
+        "name": "DeepSeek PvP Momentum",
         "model": "DeepSeek-V3",
         "emoji": "💎",
         "symbols": [],
-        "description": "High-conviction momentum execution powered by DeepSeek-V3.",
-        "personality": "Aggressive trend follower, high conviction",
+        "description": "Aggressive momentum PvP trader - beats market manipulators with superior timing and conviction.",
+        "personality": "Ruthless momentum predator, exploits weak hands and stops above/below key levels",
         "baseline_win_rate": 0.68,
-        "risk_multiplier": 1.0,
-        "profit_target": 0.015,
-        "margin_allocation": 200000.0,
+        "risk_multiplier": 1.5,
+        "profit_target": 0.008,  # Frequent small wins to stack equity
+        "margin_allocation": 1000.0,
         "specialization": "momentum",
-        # Dynamic configuration parameters
+        # Dynamic configuration parameters - PvP MODE
         "dynamic_position_sizing": True,
         "adaptive_leverage": True,
         "intelligence_tp_sl": True,
-        "max_leverage_limit": 5.0,
-        "min_position_size_pct": 0.01,
-        "max_position_size_pct": 0.15,
-        "risk_tolerance": "high",  # high, medium, low
-        "time_horizon": "short",   # short, medium, long
-        "market_regime_preference": "bull",  # bull, bear, neutral
-    },
-    {
-        "id": "qwen-7b",
-        "name": "Qwen Adaptive",
-        "model": "Qwen2.5-7B",
-        "emoji": "🜂",
-        "symbols": [],
-        "description": "Adaptive mean-reversion routing using Qwen2.5-7B.",
-        "personality": "Conservative mean-reversion with disciplined hedging",
-        "baseline_win_rate": 0.64,
-        "risk_multiplier": 1.0,
-        "profit_target": 0.015,
-        "margin_allocation": 200000.0,
-        "specialization": "mean_reversion",
-        # Dynamic configuration parameters
-        "dynamic_position_sizing": True,
-        "adaptive_leverage": True,
-        "intelligence_tp_sl": True,
-        "max_leverage_limit": 3.0,
-        "min_position_size_pct": 0.005,
-        "max_position_size_pct": 0.08,
-        "risk_tolerance": "medium",
-        "time_horizon": "medium",
-        "market_regime_preference": "neutral",
+        "max_leverage_limit": 15.0,  # Aggressive leverage for PvP
+        "min_position_size_pct": 0.02,
+        "max_position_size_pct": 0.30,  # Larger positions for impact
+        "risk_tolerance": "extreme",  # PvP requires extreme risk tolerance
+        "time_horizon": "ultra_short",   # Scalp trades
+        "market_regime_preference": "bull_volatile",  # Loves volatility
     },
     {
         "id": "fingpt-alpha",
-        "name": "FinGPT Alpha",
+        "name": "FinGPT PvP Alpha",
         "model": "FinGPT-8B",
         "emoji": "📊",
         "symbols": [],
-        "description": "FinGPT open-source finance agent covering momentum regimes.",
-        "personality": "Fundamental-driven, sentiment analysis focused",
+        "description": "Fundamental PvP predator - exploits news, catalysts, and market psychology before retail catches on.",
+        "personality": "Elite fundamental arbitrageur, fades retail sentiment, exploits catalysts preemptively",
         "baseline_win_rate": 0.63,
-        "risk_multiplier": 1.0,
-        "profit_target": 0.015,
-        "margin_allocation": 200000.0,
+        "risk_multiplier": 1.3,
+        "profit_target": 0.012,  # Quick catalyst profits
+        "margin_allocation": 1000.0,
         "specialization": "fundamental_sentiment",
-        # Dynamic configuration parameters
+        # Dynamic configuration parameters - CATALYST PvP MODE
         "dynamic_position_sizing": True,
         "adaptive_leverage": True,
         "intelligence_tp_sl": True,
-        "max_leverage_limit": 4.0,
-        "min_position_size_pct": 0.008,
-        "max_position_size_pct": 0.12,
-        "risk_tolerance": "medium",
-        "time_horizon": "long",
-        "market_regime_preference": "bull",
+        "max_leverage_limit": 12.0,  # High leverage for catalyst plays
+        "min_position_size_pct": 0.015,
+        "max_position_size_pct": 0.25,  # Large positions on high-conviction setups
+        "risk_tolerance": "high",
+        "time_horizon": "short_medium",  # Catalyst timeframe
+        "market_regime_preference": "bull_catalysts",  # Loves upcoming catalysts
     },
     {
         "id": "lagllama-degen",
-        "name": "Lag-Llama Degenerate",
+        "name": "Lag-Llama PvP Degen",
         "model": "Lag-Llama",
         "emoji": "🎰",
         "symbols": [],
-        "description": "High-risk, high-reward Lag-Llama degenerate trader taking massive positions.",
-        "personality": "High-volatility specialist embracing fat-tail regimes",
+        "description": "Ultimate volatility PvP predator - 50x leverage chaos agent that weaponizes market fear and manipulates stops.",
+        "personality": "Psychopathic volatility hunter, thrives in panic, exploits retail liquidation cascades",
         "baseline_win_rate": 0.45,
-        "risk_multiplier": 2.5,
-        "profit_target": 0.025,
-        "margin_allocation": 300000.0,
+        "risk_multiplier": 4.0,  # Maximum risk for maximum reward
+        "profit_target": 0.05,   # Huge profit targets on volatility spikes
+        "margin_allocation": 1000.0,
         "specialization": "volatility",
-        # Dynamic configuration parameters - MAXIMUM PROFIT MODE
+        # Dynamic configuration parameters - MAXIMUM DEGEN PvP MODE
         "dynamic_position_sizing": True,
         "adaptive_leverage": True,
         "intelligence_tp_sl": True,
-        "max_leverage_limit": 10.0,
-        "min_position_size_pct": 0.02,
-        "max_position_size_pct": 0.25,
-        "risk_tolerance": "extreme",
-        "time_horizon": "short",
-        "market_regime_preference": "volatile",
+        "max_leverage_limit": 50.0,  # 50x leverage as requested
+        "min_position_size_pct": 0.05,
+        "max_position_size_pct": 0.50,  # Massive positions during chaos
+        "risk_tolerance": "maximum",    # No fear of volatility
+        "time_horizon": "ultra_short",  # Instant volatility exploitation
+        "market_regime_preference": "maximum_chaos",  # Loves market crashes/rallies
     },
-    # NEW: Ultra-aggressive profit maximizer
+    # PvP PROFIT MAXIMIZER - ASTER AIRDROP STACKER
     {
         "id": "profit-maximizer",
-        "name": "Profit Maximizer",
+        "name": "Profit Maximizer PvP",
         "model": "Multi-Model Ensemble",
         "emoji": "💰",
-        "symbols": [],
-        "description": "AI-powered profit maximization using all available strategies autonomously.",
-        "personality": "Pure profit-seeking algorithm with adaptive risk management",
+        "symbols": ["ASTERUSDT", "PENGUUSDT", "ZECUSDT", "SOLUSDT"],  # ASTER airdrop priority
+        "description": "Elite PvP profit maximizer - stacks ASTER airdrop points while crushing market manipulators with ensemble intelligence.",
+        "personality": "Ruthless profit predator, exploits every edge, stacks ASTER points while dominating retail traders",
         "baseline_win_rate": 0.60,
-        "risk_multiplier": 1.8,
-        "profit_target": 0.02,
-        "margin_allocation": 400000.0,
+        "risk_multiplier": 2.2,  # Aggressive but calculated
+        "profit_target": 0.015,  # Frequent profits to compound
+        "margin_allocation": 1000.0,
         "specialization": "profit_maximization",
-        # Dynamic configuration parameters - AUTONOMOUS PROFIT MODE
+        # Dynamic configuration parameters - PvP PROFIT MAXIMIZATION
         "dynamic_position_sizing": True,
         "adaptive_leverage": True,
         "intelligence_tp_sl": True,
-        "max_leverage_limit": 8.0,
-        "min_position_size_pct": 0.01,
-        "max_position_size_pct": 0.20,
-        "risk_tolerance": "high",
-        "time_horizon": "adaptive",
-        "market_regime_preference": "adaptive",
-    },
-    # NEW: Kimi agent for news and sentiment analysis
-    {
-        "id": "kimi-chat",
-        "name": "Kimi Chat",
-        "model": "kimi-chat-v1",
-        "emoji": "🦉",
-        "symbols": [],
-        "description": "News-driven sentiment analysis and event-based trading using the Kimi model.",
-        "personality": "Analytical, news-focused, and event-driven",
-        "baseline_win_rate": 0.65,
-        "risk_multiplier": 1.1,
-        "profit_target": 0.016,
-        "margin_allocation": 150000.0,
-        "specialization": "sentiment_analysis",
-        "dynamic_position_sizing": True,
-        "adaptive_leverage": True,
-        "intelligence_tp_sl": True,
-        "max_leverage_limit": 4.0,
-        "risk_tolerance": "medium",
-        "time_horizon": "medium",
-        "market_regime_preference": "neutral",
+        "max_leverage_limit": 20.0,  # High leverage for PvP dominance
+        "min_position_size_pct": 0.02,
+        "max_position_size_pct": 0.35,  # Large positions for market impact
+        "risk_tolerance": "extreme",     # PvP requires extreme tolerance
+        "time_horizon": "multi_timeframe",  # Scalps and swings
+        "market_regime_preference": "all_regimes",  # Profits in any market
     },
 ]
 
@@ -467,12 +421,13 @@ class TradingService:
             if self._settings.symbols:
                 self._available_symbols = self._settings.symbols
             else:
-                # Fallback to common symbols from agent definitions
-                self._available_symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "SUIUSDT", "AVAXUSDT", "ARBUSDT"]
+                # Fallback to empty list - will be populated by exchange symbols
+                self._available_symbols = []
 
         coverage_universe: List[str] = [str(symbol).upper() for symbol in self._available_symbols]
         if not coverage_universe:
-            coverage_universe = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "SUIUSDT", "AVAXUSDT", "ARBUSDT"]
+            # If no symbols loaded, agents will trade any symbols they encounter
+            coverage_universe = []
 
         enabled_agent_ids = set(self._settings.enabled_agents)
         for i, agent_def in enumerate(AGENT_DEFINITIONS):
@@ -764,26 +719,33 @@ class TradingService:
 
     async def _init_telegram(self) -> None:
         """Initialize enhanced Telegram notification service and AI components."""
-        # Initialize AI analyzers
-        self._ai_analyzer = AITradingAnalyzer()
-        self._sentiment_analyzer = MarketSentimentAnalyzer()
-        self._risk_analyzer = RiskAnalyzer()
+        # Skip Telegram initialization if not configured
+        if not (self._settings.telegram_bot_token and self._settings.telegram_chat_id):
+            logger.info("Telegram notifications disabled (token/chat_id not configured)")
+            self._telegram = None
+            return
 
-        # Initialize enhanced Telegram service
-        self._telegram = await create_enhanced_telegram_service(
-            self._settings,
-            ai_analyzer=self._ai_analyzer,
-            sentiment_analyzer=self._sentiment_analyzer,
-            risk_analyzer=self._risk_analyzer
-        )
+        try:
+            # Initialize AI analyzers
+            self._ai_analyzer = AITradingAnalyzer()
+            self._sentiment_analyzer = MarketSentimentAnalyzer()
+            self._risk_analyzer = RiskAnalyzer()
 
-        # Start the enhanced Telegram bot if initialized
-        if self._telegram:
-            try:
+            # Initialize enhanced Telegram service
+            self._telegram = await create_enhanced_telegram_service(
+                self._settings,
+                ai_analyzer=self._ai_analyzer,
+                sentiment_analyzer=self._sentiment_analyzer,
+                risk_analyzer=self._risk_analyzer
+            )
+
+            # Start the enhanced Telegram bot if initialized
+            if self._telegram:
                 await self._telegram.start()
                 logger.info("Enhanced Telegram AI bot started successfully")
-            except Exception as exc:
-                logger.warning(f"Failed to start enhanced Telegram bot: {exc}")
+        except Exception as exc:
+            logger.warning(f"Failed to initialize Telegram service: {exc}")
+            self._telegram = None
 
     async def dashboard_snapshot(self) -> Dict[str, Any]:
         """Aggregate a lightweight view for the dashboard endpoint."""

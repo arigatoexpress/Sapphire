@@ -85,7 +85,7 @@ def test_agent_definitions():
 
         # Check agent IDs match Vertex AI endpoints
         agent_ids = {agent['id'] for agent in AGENT_DEFINITIONS}
-        expected_ids = {'deepseek-v3', 'qwen-7b', 'fingpt-alpha', 'lagllama-degen'}
+        expected_ids = {'deepseek-v3', 'fingpt-alpha', 'lagllama-degen', 'profit-maximizer'}
         assert agent_ids == expected_ids, f"Agent IDs mismatch: {agent_ids} vs {expected_ids}"
 
         print(f"✅ Agent definitions validated ({len(AGENT_DEFINITIONS)} agents)")

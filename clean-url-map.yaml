@@ -1,5 +1,5 @@
 creationTimestamp: '2025-11-02T22:45:00.476-08:00'
-defaultService: https://www.googleapis.com/compute/v1/projects/quant-ai-trader-credits/global/backendServices/cloud-trader-dashboard-backend
+defaultService: https://www.googleapis.com/compute/v1/projects/sapphireinfinite/global/backendServices/cloud-trader-dashboard-backend
 fingerprint: kMI4CDofyv8=
 hostRules:
 # Main domain - serves frontend
@@ -25,22 +25,22 @@ name: aster-url-map
 pathMatchers:
 # Frontend matcher - dashboard by default, API calls routed to backend
 - name: frontend-matcher
-  defaultService: https://www.googleapis.com/compute/v1/projects/quant-ai-trader-credits/global/backendServices/cloud-trader-dashboard-backend
+  defaultService: https://www.googleapis.com/compute/v1/projects/sapphireinfinite/global/backendServices/cloud-trader-dashboard-backend
   pathRules:
   - paths:
     - /healthz
     - /api
     - /api/*
     - /metrics
-    service: https://www.googleapis.com/compute/v1/projects/quant-ai-trader-credits/global/backendServices/trader-backend
+    service: https://www.googleapis.com/compute/v1/projects/sapphireinfinite/global/backendServices/trader-backend
 # API matcher - backend by default, orchestrator for specific paths
 - name: api-matcher
-  defaultService: https://www.googleapis.com/compute/v1/projects/quant-ai-trader-credits/global/backendServices/trader-backend
+  defaultService: https://www.googleapis.com/compute/v1/projects/sapphireinfinite/global/backendServices/trader-backend
   pathRules:
   - paths:
     - /orchestrator
     - /orchestrator/*
     - /mcp
     - /mcp/*
-    service: https://www.googleapis.com/compute/v1/projects/quant-ai-trader-credits/global/backendServices/orchestrator-backend
-selfLink: https://www.googleapis.com/compute/v1/projects/quant-ai-trader-credits/global/urlMaps/aster-url-map
+    service: https://www.googleapis.com/compute/v1/projects/sapphireinfinite/global/backendServices/orchestrator-backend
+selfLink: https://www.googleapis.com/compute/v1/projects/sapphireinfinite/global/urlMaps/aster-url-map

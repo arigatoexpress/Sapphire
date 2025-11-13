@@ -15,12 +15,12 @@ def _to_float(value, default: float = 0.0) -> float:
         return default
 
 
-# Per-agent allocation limits (in USD)
+# Per-agent allocation limits (in USD) - PvP 4-core configuration
 AGENT_ALLOCATIONS = {
-    "deepseek-v3": 125.0,
-    "qwen-7b": 125.0,
-    "deepseek-v3-alt": 125.0,
-    "qwen-7b-alt": 125.0,
+    "deepseek-v3": 1000.0,      # PvP Momentum
+    "fingpt-alpha": 1000.0,     # PvP Alpha
+    "lagllama-degen": 1000.0,   # PvP Degen
+    "profit-maximizer": 1000.0, # PvP Maximizer
 }
 
 # Default allocation applied when an agent is not explicitly listed above

@@ -5,7 +5,7 @@ echo "📈 Trading Performance Dashboard"
 echo "==============================="
 echo ""
 
-PROJECT_ID="quant-ai-trader-credits"
+PROJECT_ID="sapphireinfinite"
 
 # Function to query logs
 query_logs() {

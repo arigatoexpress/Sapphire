@@ -21,7 +21,7 @@ gcloud logging read \
   'resource.type="cloud_run_revision" AND severity>=ERROR AND resource.labels.service_name="cloud-trader"' \
   --limit=5 \
   --format="table(timestamp.date('%H:%M:%S'), textPayload)" \
-  --project=quant-ai-trader-credits
+  --project=sapphireinfinite
 echo ""
 
 # Check circuit breaker metrics
@@ -30,7 +30,7 @@ gcloud logging read \
   'resource.type="cloud_run_revision" AND textPayload:"circuit breaker" AND resource.labels.service_name="cloud-trader"' \
   --limit=10 \
   --format="value(textPayload)" \
-  --project=quant-ai-trader-credits | grep -E "OPEN|CLOSED|half" | tail -5
+  --project=sapphireinfinite | grep -E "OPEN|CLOSED|half" | tail -5
 echo ""
 
 # Check trading positions
@@ -39,7 +39,7 @@ gcloud logging read \
   'resource.type="cloud_run_revision" AND textPayload:"position" AND resource.labels.service_name="cloud-trader"' \
   --limit=10 \
   --format="value(textPayload)" \
-  --project=quant-ai-trader-credits | grep -v "GET" | tail -5
+  --project=sapphireinfinite | grep -v "GET" | tail -5
 echo ""
 
 echo "✅ Health check complete!"

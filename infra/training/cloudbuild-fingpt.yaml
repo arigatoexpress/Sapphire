@@ -3,8 +3,8 @@ substitutions:
   _BASE_IMAGE: pytorch/pytorch:2.2.2-cuda12.1-cudnn8-runtime
   _REGION: us-central1
   _DISPLAY_NAME: fingpt-alpha-train
-  _DATA_PATH: gs://quant-ai-trader-credits/training/fingpt.jsonl
-  _SYMBOLS: BTCUSDT,ETHUSDT
+  _DATA_PATH: gs://sapphireinfinite/training/fingpt.jsonl
+  _SYMBOLS: ""  # Train on all available symbols
 
 steps:
   - name: 'gcr.io/cloud-builders/docker'
@@ -35,7 +35,7 @@ steps:
       - 'create'
       - "--region=${_REGION}"
       - "--display-name=${_DISPLAY_NAME}-$BUILD_ID"
-      - "--worker-pool-spec=machine-type=a2-highgpu-1g,replica-count=1,container-image=us-central1-docker.pkg.dev/$PROJECT_ID/vertex-ai-training/${_TRAIN_IMAGE}:$BUILD_ID,command=python,args=-m,args=cloud_trader.training.fingpt_train,args=--data-path,args=${_DATA_PATH},args=--symbols,args=${_SYMBOLS},args=--output-dir,args=/gcs/artifacts/fingpt"
+      - "--worker-pool-spec=machine-type=a2-highgpu-1g,replica-count=1,container-image=us-central1-docker.pkg.dev/$PROJECT_ID/vertex-ai-training/${_TRAIN_IMAGE}:$BUILD_ID,command=python,args=-m,args=cloud_trader.training.fingpt_train,args=--data-path,args=${_DATA_PATH},args=--output-dir,args=/gcs/artifacts/fingpt"
 
 options:
   logging: CLOUD_LOGGING_ONLY

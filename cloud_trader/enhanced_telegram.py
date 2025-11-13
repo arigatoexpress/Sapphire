@@ -754,18 +754,18 @@ class EnhancedTelegramService:
         }
         return sentiment_map.get(sentiment.lower(), '⚪')
 
-async def create_enhanced_telegram_service(settings: Settings) -> Optional[EnhancedTelegramService]:
+async def create_enhanced_telegram_service(
+    settings: Settings,
+    ai_analyzer: Optional[AITradingAnalyzer] = None,
+    sentiment_analyzer: Optional[MarketSentimentAnalyzer] = None,
+    risk_analyzer: Optional[RiskAnalyzer] = None
+) -> Optional[EnhancedTelegramService]:
     """Create enhanced Telegram service with AI capabilities."""
     if not (settings.telegram_bot_token and settings.telegram_chat_id):
         logger.warning("Telegram bot token or chat ID not configured")
         return None
 
     try:
-        # Initialize AI components (would create these classes)
-        ai_analyzer = None  # AITradingAnalyzer()
-        sentiment_analyzer = None  # MarketSentimentAnalyzer()
-        risk_analyzer = None  # RiskAnalyzer()
-
         service = EnhancedTelegramService(
             bot_token=settings.telegram_bot_token,
             chat_id=settings.telegram_chat_id,

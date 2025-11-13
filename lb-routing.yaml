@@ -1,5 +1,5 @@
 name: sapphire-url-map
-defaultService: projects/quant-ai-trader-credits/global/backendBuckets/sapphire-frontend-backend-bucket
+defaultService: projects/sapphireinfinite/global/backendBuckets/sapphire-frontend-backend-bucket
 hostRules:
 - hosts:
   - api.sapphiretrade.xyz
@@ -10,6 +10,6 @@ hostRules:
   pathMatcher: frontend-matcher
 pathMatchers:
 - name: frontend-matcher
-  defaultService: projects/quant-ai-trader-credits/global/backendBuckets/sapphire-frontend-backend-bucket
+  defaultService: projects/sapphireinfinite/global/backendBuckets/sapphire-frontend-backend-bucket
 - name: api-matcher
-  defaultService: projects/quant-ai-trader-credits/global/backendServices/sapphire-api-backend-service
+  defaultService: projects/sapphireinfinite/global/backendServices/sapphire-api-backend-service

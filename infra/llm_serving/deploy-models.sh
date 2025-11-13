@@ -5,7 +5,7 @@ set -e
 echo "🚀 Deploying Multi-Model LLM Trading System"
 echo "=========================================="
 
-PROJECT_ID="quant-ai-trader-credits"
+PROJECT_ID="sapphireinfinite"
 REGION="us-central1"
 
 # Colors for output
