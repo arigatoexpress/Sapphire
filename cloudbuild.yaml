@@ -99,22 +99,30 @@ steps:
   #     - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/hummingbot:latest'
 
   # Deploy to GKE cluster with optimizations
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:latest'
+  - name: 'gcr.io/cloud-builders/gcloud'
     entrypoint: sh
     args:
       - -c
       - |
         set -e  # Exit on any error
 
-        # Verify gcloud and kubectl are available
+        # Verify gcloud is available
         echo "🔍 Verifying gcloud installation..."
         gcloud --version
+
+        # Install kubectl if not available
+        if ! command -v kubectl &> /dev/null; then
+            echo "📦 Installing kubectl..."
+            curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+            chmod +x kubectl
+            mv kubectl /usr/local/bin/
+        fi
+
         echo "🔍 Verifying kubectl installation..."
         kubectl version --client
 
         # Install Helm
         echo "📦 Installing Helm..."
-        apk add --no-cache curl
         curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
         chmod 700 get_helm.sh
         ./get_helm.sh --version v3.12.1
