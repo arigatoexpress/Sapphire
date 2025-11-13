@@ -109,13 +109,13 @@ steps:
         # Install required tools
         apk add --no-cache curl bash openssl
 
-        # Install gcloud globally
+        # Install gcloud globally and set PATH for all subsequent commands
         echo "📦 Installing gcloud..."
         curl -sSL https://sdk.cloud.google.com | bash > /dev/null 2>&1
-        echo 'export PATH=/root/google-cloud-sdk/bin:$PATH' >> /root/.bashrc
-        export PATH=/root/google-cloud-sdk/bin:/usr/local/bin:/usr/bin:/bin
+        export PATH=/root/google-cloud-sdk/bin:/usr/local/bin:/usr/bin:/bin:$PATH
 
         # Verify gcloud installation
+        echo "🔍 Verifying gcloud installation..."
         which gcloud || (echo "❌ gcloud not found in PATH"; exit 1)
         gcloud --version
 
@@ -127,6 +127,7 @@ steps:
         rm get_helm.sh
 
         # Verify helm installation
+        echo "🔍 Verifying Helm installation..."
         which helm || (echo "❌ helm not found in PATH"; exit 1)
         helm version --short
 
