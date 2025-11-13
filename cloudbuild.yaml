@@ -99,11 +99,19 @@ steps:
   #     - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/hummingbot:latest'
 
   # Deploy to GKE cluster with optimizations
-  - name: 'gcr.io/cloud-builders/gcloud'
-    entrypoint: bash
+  - name: 'alpine/k8s:1.24.15'
+    entrypoint: sh
     args:
       - -c
       - |
+        # Install required tools
+        apk add --no-cache curl bash
+
+        # Install gcloud
+        echo "📦 Installing gcloud..."
+        curl -sSL https://sdk.cloud.google.com | bash > /dev/null 2>&1
+        export PATH=$PATH:/root/google-cloud-sdk/bin
+
         # Install Helm
         echo "📦 Installing Helm..."
         curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
