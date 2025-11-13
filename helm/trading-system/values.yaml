@@ -148,7 +148,7 @@ agents:
   enabled: true
 
   # Trend Momentum Agent - Real-time market momentum analysis using PaLM 2 Chat
-  trend_momentum_agent:
+  trend-momentum-agent:
     enabled: true
     replicaCount: 1
     image:
@@ -178,7 +178,7 @@ agents:
       - name: ENABLE_PAPER_TRADING
         value: "true"
       - name: ENABLED_AGENTS
-        value: '["trend_momentum_agent"]'
+        value: '["trend-momentum-agent"]'
       - name: ENABLE_VERTEX_AI
         value: "true"
       - name: MCP_ENABLED
@@ -197,7 +197,7 @@ agents:
         value: "true"
 
   # Strategy Optimization Agent - Advanced trading strategy optimization using PaLM 2 Unicorn
-  strategy_optimization_agent:
+  strategy-optimization-agent:
     enabled: true
     replicaCount: 1
     image:
@@ -227,7 +227,7 @@ agents:
       - name: ENABLE_PAPER_TRADING
         value: "true"
       - name: ENABLED_AGENTS
-        value: '["strategy_optimization_agent"]'
+        value: '["strategy-optimization-agent"]'
       - name: ENABLE_VERTEX_AI
         value: "true"
       - name: MCP_ENABLED
@@ -246,7 +246,7 @@ agents:
         value: "true"
 
   # Financial Sentiment Agent - Financial news and market sentiment analysis using BERT
-  financial_sentiment_agent:
+  financial-sentiment-agent:
     enabled: true
     replicaCount: 1
     image:
@@ -276,7 +276,7 @@ agents:
       - name: ENABLE_PAPER_TRADING
         value: "true"
       - name: ENABLED_AGENTS
-        value: '["financial_sentiment_agent"]'
+        value: '["financial-sentiment-agent"]'
       - name: ENABLE_VERTEX_AI
         value: "true"
       - name: MCP_ENABLED
@@ -295,7 +295,7 @@ agents:
         value: "true"
 
   # Market Prediction Agent - Time series forecasting and market prediction using PaLM 2 Text
-  market_prediction_agent:
+  market-prediction-agent:
     enabled: true
     replicaCount: 1
     image:
@@ -325,7 +325,7 @@ agents:
       - name: ENABLE_PAPER_TRADING
         value: "true"
       - name: ENABLED_AGENTS
-        value: '["market_prediction_agent"]'
+        value: '["market-prediction-agent"]'
       - name: ENABLE_VERTEX_AI
         value: "true"
       - name: MCP_ENABLED
@@ -344,7 +344,7 @@ agents:
         value: "true"
 
   # Volume Microstructure Agent - Volume synchronized probability of informed trading using Codey
-  volume_microstructure_agent:
+  volume-microstructure-agent:
     enabled: true
     replicaCount: 1
     image:
@@ -374,7 +374,7 @@ agents:
       - name: ENABLE_PAPER_TRADING
         value: "true"
       - name: ENABLED_AGENTS
-        value: '["volume_microstructure_agent"]'
+        value: '["volume-microstructure-agent"]'
       - name: ENABLE_VERTEX_AI
         value: "true"
       - name: MCP_ENABLED
