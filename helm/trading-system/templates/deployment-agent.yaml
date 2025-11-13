@@ -29,16 +29,16 @@ spec:
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if $.Values.gpu.enabled }}
-      {{- with $.Values.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with $.Values.tolerations }}
-      tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- end }}
+{{- if and $.Values.gpu.enabled (eq $agentName "vpin") }}
+{{- with $.Values.nodeSelector }}
+nodeSelector:
+  {{- toYaml . | nindent 8 }}
+{{- end }}
+{{- with $.Values.tolerations }}
+tolerations:
+  {{- toYaml . | nindent 8 }}
+{{- end }}
+{{- end }}
       serviceAccountName: {{ include "trading-system.serviceAccountName" $ }}
       containers:
         - name: cloud-trader
@@ -60,7 +60,11 @@ spec:
             - secretRef:
                 name: cloud-trader-secrets
           resources:
-            {{- toYaml $agentConfig.resources | nindent 12 }}
+            {{- $resources := $agentConfig.resources }}
+            {{- if and $.Values.gpu.enabled (ne $agentName "vpin") }}
+              {{- $resources = omit $resources "limits" "requests" | merge (dict "limits" (omit $agentConfig.resources.limits "nvidia.com/gpu") "requests" (omit $agentConfig.resources.requests "nvidia.com/gpu")) }}
+            {{- end }}
+            {{- toYaml $resources | nindent 12 }}
           livenessProbe:
             httpGet:
               path: /healthz

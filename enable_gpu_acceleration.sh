@@ -34,45 +34,26 @@ echo "✅ GPU quota verified: $GPU_QUOTA GPUs available"
 echo ""
 echo "🏗️  Phase 2: GPU Node Pool Provisioning"
 echo "--------------------------------------"
-echo "Creating optimized GPU node pools..."
+echo "Creating cost-optimized GPU node pool..."
 
-# Agent pool for individual AI agents
-echo "🤖 Creating gpu-agent-pool..."
-gcloud container node-pools create gpu-agent-pool \
+# Single GPU node pool for VPIN trader only (cost-effective approach)
+echo "🎯 Creating gpu-vpin-pool (1 node × 1 L4 GPU for VPIN trader only)..."
+gcloud container node-pools create gpu-vpin-pool \
   --cluster=$CLUSTER_NAME \
   --zone=$ZONE \
   --project=$PROJECT_ID \
   --machine-type=g2-standard-8 \
   --accelerator=type=nvidia-l4,count=1 \
-  --num-nodes=4 \
-  --min-nodes=2 \
-  --max-nodes=6 \
-  --enable-autoscaling \
-  --enable-autorepair \
-  --enable-autoupgrade \
-  --node-labels=pool=gpu-agents,workload=ai-trading,accelerator=nvidia-l4 \
-  --node-taints=workload=ai-trading:NoSchedule,accelerator=nvidia-l4:NoSchedule \
-  --disk-size=100GB \
-  --disk-type=pd-standard
-
-# Coordinator pool for heavy processing
-echo "🎯 Creating gpu-coordinator-pool..."
-gcloud container node-pools create gpu-coordinator-pool \
-  --cluster=$CLUSTER_NAME \
-  --zone=$ZONE \
-  --project=$PROJECT_ID \
-  --machine-type=g2-standard-16 \
-  --accelerator=type=nvidia-l4,count=1 \
   --num-nodes=1 \
-  --min-nodes=1 \
+  --min-nodes=0 \
   --max-nodes=2 \
   --enable-autoscaling \
   --enable-autorepair \
   --enable-autoupgrade \
-  --node-labels=pool=gpu-coordinator,workload=ai-coordinator,accelerator=nvidia-l4 \
-  --node-taints=workload=ai-coordinator:NoSchedule,accelerator=nvidia-l4:NoSchedule \
-  --disk-size=200GB \
-  --disk-type=pd-ssd
+  --node-labels=pool=gpu-vpin,workload=vpin-trader,accelerator=nvidia-l4 \
+  --node-taints=workload=vpin-trader:NoSchedule,accelerator=nvidia-l4:NoSchedule \
+  --disk-size=100GB \
+  --disk-type=pd-standard
 
 echo "⏳ Waiting for GPU node pools to initialize..."
 sleep 120
@@ -134,15 +115,15 @@ echo "   ✅ AI Agents: 7 agents with GPU acceleration"
 echo "   ✅ Performance: 4-bit quantized models at maximum speed"
 echo ""
 echo "💰 Cost Estimate:"
-echo "   📊 gpu-agent-pool: ~$6-8/hour (4 nodes)"
-echo "   📊 gpu-coordinator-pool: ~$3-4/hour (1 node)"
-echo "   💵 Total: ~$9-12/hour (~$6500/month if running 24/7)"
+echo "   📊 gpu-vpin-pool: ~$1.50-2.50/hour (1 node, autoscaling 0-2)"
+echo "   📊 CPU agents: ~$0.50-1.00/hour (4 standard nodes)"
+echo "   💵 Total: ~$2-3.50/hour (~$1,500-2,500/month if running 24/7)"
 echo ""
 echo "⚡ Performance Gains:"
-echo "   🚀 Inference Speed: 3-5x faster (sub-50ms responses)"
-echo "   🔄 Parallel Processing: 8x concurrent AI operations"
-echo "   🧠 Model Quality: Full precision maintained with quantization"
-echo "   📊 Real-time Analysis: Enhanced market microstructure processing"
+echo "   🚀 VPIN Inference: 3-5x faster GPU acceleration for volume analysis"
+echo "   🔄 CPU Agents: Efficient processing for momentum/sentiment analysis"
+echo "   🧠 Selective Precision: GPU precision where critical, CPU efficiency elsewhere"
+echo "   📊 Cost-Effective HFT: Competitive performance at 80% cost reduction"
 echo ""
 echo "🎪 Next Steps:"
 echo "1. Monitor system performance: kubectl top nodes"

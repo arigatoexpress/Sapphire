@@ -272,7 +272,7 @@ agents:
       - name: PYTORCH_CUDA_ALLOC_CONF
         value: "max_split_size_mb:512"  # Optimize memory allocation
 
-  # VPIN Agent
+  # VPIN Agent (GPU-accelerated for real-time volume analysis)
   vpin:
     enabled: true
     replicaCount: 1
@@ -283,9 +283,11 @@ agents:
       requests:
         cpu: 1000m
         memory: 4Gi
+        nvidia.com/gpu: 1
       limits:
         cpu: 3000m
         memory: 12Gi
+        nvidia.com/gpu: 1
     env:
       - name: ENABLE_PAPER_TRADING
         value: "true"
