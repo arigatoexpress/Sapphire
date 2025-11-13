@@ -42,8 +42,8 @@ spec:
       labels:
         severity: critical
       annotations:
-        summary: "Trading agent {{ $labels.pod }} is down"
-        description: "Trading agent {{ $labels.pod }} has been down for more than 5 minutes."
+        summary: "Trading agent is down"
+        description: "Trading agent has been down for more than 5 minutes."
 
     # Performance alerts
     - alert: HighLatency
