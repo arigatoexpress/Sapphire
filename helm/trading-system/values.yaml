@@ -143,12 +143,12 @@ mcpCoordinator:
     - name: MEMORY_CACHE_ENABLED
       value: "true"  # Enable in-memory caching
 
-# LLM Agent Services
+# LLM Agent Services - Open Source Models on Vertex AI
 agents:
   enabled: true
 
-  # DeepSeek Agent - Momentum Analysis Specialist (Vertex AI Optimized)
-  deepseek:
+  # Momentum Analyzer - Real-time trend detection using PaLM 2 Chat
+  momentum_analyzer:
     enabled: true
     replicaCount: 1
     image:
@@ -163,10 +163,10 @@ agents:
         memory: 12Gi
     # Vertex AI Optimization for Momentum Analysis
     vertexAI:
-      model: "gemini-1.5-flash"  # Fast inference for real-time momentum
+      model: "chat-bison-32k"  # PaLM 2 Chat - Fast conversational inference
       optimization:
-        quantization: "int8"  # Efficient for momentum calculations
-        batchSize: 8
+        quantization: "int8"  # Efficient for real-time analysis
+        batchSize: 16  # Higher throughput for momentum signals
         temperature: 0.1  # Low creativity, high precision
         maxTokens: 512  # Concise momentum analysis
       roleContext: "momentum-analysis"
@@ -178,7 +178,7 @@ agents:
       - name: ENABLE_PAPER_TRADING
         value: "true"
       - name: ENABLED_AGENTS
-        value: '["deepseek-v3"]'
+        value: '["momentum_analyzer"]'
       - name: ENABLE_VERTEX_AI
         value: "true"
       - name: MCP_ENABLED
@@ -186,28 +186,7 @@ agents:
       - name: AGENT_ROLE
         value: "momentum-analysis"
       - name: VERTEX_MODEL
-        value: "gemini-1.5-flash"
-      - name: MODEL_TEMPERATURE
-        value: "0.1"
-      - name: MAX_OUTPUT_TOKENS
-        value: "512"
-      - name: QUANTIZATION_LEVEL
-        value: "int8"
-      - name: MONITORING_ENABLED
-        value: "true"
-    env:
-      - name: ENABLE_PAPER_TRADING
-        value: "true"
-      - name: ENABLED_AGENTS
-        value: '["deepseek-v3"]'
-      - name: ENABLE_VERTEX_AI
-        value: "true"
-      - name: MCP_ENABLED
-        value: "true"
-      - name: AGENT_ROLE
-        value: "momentum-analysis"
-      - name: VERTEX_MODEL
-        value: "gemini-1.5-flash"
+        value: "chat-bison-32k"
       - name: MODEL_TEMPERATURE
         value: "0.1"
       - name: MAX_OUTPUT_TOKENS
@@ -217,8 +196,8 @@ agents:
       - name: MONITORING_ENABLED
         value: "true"
 
-  # Qwen Agent - Strategy Optimization Specialist (Vertex AI Optimized)
-  qwen:
+  # Strategy Optimizer - Advanced reasoning using PaLM 2 Unicorn
+  strategy_optimizer:
     enabled: true
     replicaCount: 1
     image:
@@ -233,7 +212,7 @@ agents:
         memory: 12Gi
     # Vertex AI Optimization for Strategy Optimization
     vertexAI:
-      model: "gemini-1.5-pro"  # Advanced reasoning for strategy optimization
+      model: "text-unicorn-001"  # PaLM 2 Unicorn - Advanced reasoning
       optimization:
         quantization: "int8"  # Balanced precision/performance
         batchSize: 4  # Smaller batches for complex reasoning
@@ -248,7 +227,7 @@ agents:
       - name: ENABLE_PAPER_TRADING
         value: "true"
       - name: ENABLED_AGENTS
-        value: '["qwen-adaptive"]'
+        value: '["strategy_optimizer"]'
       - name: ENABLE_VERTEX_AI
         value: "true"
       - name: MCP_ENABLED
@@ -256,7 +235,7 @@ agents:
       - name: AGENT_ROLE
         value: "strategy-optimization"
       - name: VERTEX_MODEL
-        value: "gemini-1.5-pro"
+        value: "text-unicorn-001"
       - name: MODEL_TEMPERATURE
         value: "0.3"
       - name: MAX_OUTPUT_TOKENS
@@ -266,8 +245,8 @@ agents:
       - name: MONITORING_ENABLED
         value: "true"
 
-  # FinGPT Agent - Financial Sentiment Analysis Specialist (Vertex AI Optimized)
-  fingpt:
+  # Sentiment Analyzer - NLP analysis using BERT
+  sentiment_analyzer:
     enabled: true
     replicaCount: 1
     image:
@@ -282,10 +261,10 @@ agents:
         memory: 12Gi
     # Vertex AI Optimization for Sentiment Analysis
     vertexAI:
-      model: "gemini-1.5-flash"  # Fast inference for real-time sentiment
+      model: "bert-base-multilingual-cased"  # BERT - Expert NLP model
       optimization:
         quantization: "int8"  # Efficient for text analysis
-        batchSize: 16  # Higher batches for sentiment processing
+        batchSize: 32  # Higher batches for sentiment processing
         temperature: 0.2  # Low creativity for consistent sentiment
         maxTokens: 256  # Concise sentiment scores
       roleContext: "sentiment-analysis"
@@ -297,7 +276,7 @@ agents:
       - name: ENABLE_PAPER_TRADING
         value: "true"
       - name: ENABLED_AGENTS
-        value: '["fingpt-alpha"]'
+        value: '["sentiment_analyzer"]'
       - name: ENABLE_VERTEX_AI
         value: "true"
       - name: MCP_ENABLED
@@ -305,7 +284,7 @@ agents:
       - name: AGENT_ROLE
         value: "sentiment-analysis"
       - name: VERTEX_MODEL
-        value: "gemini-1.5-flash"
+        value: "bert-base-multilingual-cased"
       - name: MODEL_TEMPERATURE
         value: "0.2"
       - name: MAX_OUTPUT_TOKENS
@@ -315,8 +294,8 @@ agents:
       - name: MONITORING_ENABLED
         value: "true"
 
-  # Lag-LLaMA Agent - DeFi Market Prediction Specialist (Vertex AI Optimized)
-  lagllama:
+  # Market Predictor - Analytical reasoning using PaLM 2 Text
+  market_predictor:
     enabled: true
     replicaCount: 1
     image:
@@ -329,15 +308,15 @@ agents:
       limits:
         cpu: 3000m
         memory: 12Gi
-    # Vertex AI Optimization for DeFi Prediction
+    # Vertex AI Optimization for Market Prediction
     vertexAI:
-      model: "gemini-1.5-pro"  # Advanced reasoning for market prediction
+      model: "text-bison-32k"  # PaLM 2 Text - Analytical reasoning
       optimization:
-        quantization: "int8"  # Balanced for complex DeFi analysis
-        batchSize: 6  # Medium batches for prediction models
+        quantization: "int8"  # Balanced for prediction analysis
+        batchSize: 8  # Medium batches for prediction models
         temperature: 0.4  # Moderate creativity for market scenarios
         maxTokens: 768  # Detailed prediction analysis
-      roleContext: "defi-prediction"
+      roleContext: "market-prediction"
       monitoring:
         latencyThreshold: 400  # 400ms acceptable for prediction analysis
         accuracyMetric: "prediction_accuracy"
@@ -346,15 +325,15 @@ agents:
       - name: ENABLE_PAPER_TRADING
         value: "true"
       - name: ENABLED_AGENTS
-        value: '["lagllama-degen"]'
+        value: '["market_predictor"]'
       - name: ENABLE_VERTEX_AI
         value: "true"
       - name: MCP_ENABLED
         value: "true"
       - name: AGENT_ROLE
-        value: "defi-prediction"
+        value: "market-prediction"
       - name: VERTEX_MODEL
-        value: "gemini-1.5-pro"
+        value: "text-bison-32k"
       - name: MODEL_TEMPERATURE
         value: "0.4"
       - name: MAX_OUTPUT_TOKENS
@@ -364,8 +343,8 @@ agents:
       - name: MONITORING_ENABLED
         value: "true"
 
-  # VPIN Agent (TPU-accelerated with elastic scaling and fallback - cost-optimized)
-  vpin:
+  # Volume Analyzer - Mathematical processing using Codey
+  volume_analyzer:
     enabled: true
     replicaCount: 1
     image:
@@ -375,51 +354,43 @@ agents:
       requests:
         cpu: 1000m
         memory: 4Gi
-        google.com/tpu: "1"  # TPU resource instead of GPU
       limits:
         cpu: 3000m
         memory: 12Gi
-        google.com/tpu: "1"  # TPU resource instead of GPU
+    # Vertex AI Optimization for Volume Analysis
+    vertexAI:
+      model: "codey-001"  # Codey - Mathematical and code processing
+      optimization:
+        quantization: "int8"  # Efficient for computational analysis
+        batchSize: 4  # Focused batches for complex calculations
+        temperature: 0.1  # High precision for volume calculations
+        maxTokens: 1024  # Detailed volume microstructure analysis
+      roleContext: "volume-analysis"
+      monitoring:
+        latencyThreshold: 300  # 300ms acceptable for volume analysis
+        accuracyMetric: "volume_analysis_accuracy"
+        driftThreshold: 0.04
     env:
       - name: ENABLE_PAPER_TRADING
         value: "true"
       - name: ENABLED_AGENTS
-        value: '["vpin-hft"]'
+        value: '["volume_analyzer"]'
       - name: ENABLE_VERTEX_AI
         value: "true"
       - name: MCP_ENABLED
         value: "true"
-      - name: VPIN_VERTEX_ENDPOINT
-        value: "https://us-central1-aiplatform.googleapis.com/v1/projects/sapphireinfinite/locations/us-central1/endpoints/vpin-hft-endpoint"
-      - name: MODEL_QUANTIZATION
-        value: "4bit"
-      - name: TPU_IP_ADDRESS
-        value: ""  # Will be set by TPU runtime
-      - name: TPU_NAME
-        value: "vpin-tpu"  # TPU instance name
-      - name: USE_TPU
-        value: "true"  # Enable TPU mode instead of GPU
-      - name: XRT_TPU_CONFIG
-        value: "localservice;0;localhost:51011"  # TPU runtime config
-      - name: INFERENCE_BATCH_SIZE
-        value: "32"   # TPU optimized batch size (larger than GPU)
-      - name: TPU_PROFILER_PORT
-        value: "8466"  # TPU profiling port
-      # Elastic scaling and fallback configuration
-      - name: ELASTIC_SCALING_ENABLED
+      - name: AGENT_ROLE
+        value: "volume-analysis"
+      - name: VERTEX_MODEL
+        value: "codey-001"
+      - name: MODEL_TEMPERATURE
+        value: "0.1"
+      - name: MAX_OUTPUT_TOKENS
+        value: "1024"
+      - name: QUANTIZATION_LEVEL
+        value: "int8"
+      - name: MONITORING_ENABLED
         value: "true"
-      - name: FALLBACK_MODELS
-        value: '["deepseek-v3", "qwen-adaptive", "fingpt-alpha"]'
-      - name: API_THROTTLE_DETECTION_ENABLED
-        value: "true"
-      - name: THROTTLE_THRESHOLD_REQUESTS
-        value: "10"  # Requests per minute threshold
-      - name: THROTTLE_BACKOFF_SECONDS
-        value: "300"  # 5 minutes backoff when throttled
-      - name: RESOURCE_CONSERVATION_MODE
-        value: "true"  # Scale down when throttled
-      - name: FALLBACK_ACCURACY_THRESHOLD
-        value: "0.85"  # Minimum acceptable accuracy for fallback models
 
 # Trading Framework Services
 frameworks:

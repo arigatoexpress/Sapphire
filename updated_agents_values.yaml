@@ -1,0 +1,3 @@
+# LLM Agent Services
+agents:
+  enabled: true
