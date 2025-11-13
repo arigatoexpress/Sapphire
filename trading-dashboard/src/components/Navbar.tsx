@@ -18,12 +18,10 @@ import {
   Psychology as AgentsIcon,
   Analytics as AnalyticsIcon,
   Settings as SettingsIcon,
-  Logout as LogoutIcon,
   AccountCircle,
   Menu as MenuIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
 import { useTrading } from '../contexts/TradingContext';
 
 const Navbar: React.FC = () => {
@@ -31,7 +29,6 @@ const Navbar: React.FC = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout, user } = useAuth();
   const { portfolio } = useTrading();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -44,15 +41,7 @@ const Navbar: React.FC = () => {
     setAnchorEl(null);
   };
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-      navigate('/login');
-    } catch (error) {
-      console.error('Error logging out:', error);
-    }
-    handleClose();
-  };
+  // No authentication needed - public access
 
   const navItems = [
     { path: '/', label: 'Dashboard', icon: <DashboardIcon />, description: 'System overview' },
@@ -206,12 +195,8 @@ const Navbar: React.FC = () => {
           >
             <MenuItem disabled sx={{ opacity: 0.7 }}>
               <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                {user?.email}
+                Public Access
               </Typography>
-            </MenuItem>
-            <MenuItem onClick={handleLogout} sx={{ color: 'error.main' }}>
-              <LogoutIcon sx={{ mr: 1 }} />
-              Logout
             </MenuItem>
           </Menu>
         </Toolbar>
