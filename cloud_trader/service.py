@@ -41,6 +41,14 @@ from .agents.vpin_hft_agent import VpinHFTAgent
 from .vpin_data_streamer import VPINDataStreamer
 from .rate_limit_manager import RateLimitManager
 from .fallback_strategies import FallbackStrategySelector
+from .circuit_breaker import (
+    get_circuit_breaker, VERTEX_AI_BREAKER, EXCHANGE_API_BREAKER,
+    REDIS_BREAKER, DATABASE_BREAKER, TELEGRAM_BREAKER,
+    CircuitBreakerOpenException, CircuitBreakerTimeoutException
+)
+from .retry_mechanism import retry_api, retry_database, retry_redis, retry_external_api
+from .self_healing import get_self_healing_manager, recover_database_connection, recover_redis_connection, recover_vertex_ai_connection
+from .graceful_degradation import get_graceful_degradation_manager, initialize_graceful_degradation, DegradationLevel
 
 RiskOrchestratorClientType = Any
 OrderIntent = None  # type: ignore[assignment]
@@ -379,7 +387,16 @@ class TradingService:
         self._observation_task: Optional[asyncio.Task[None]] = None
 
         # Agent tracking for live-only dashboards
-        self._agent_states: Dict[str, AgentState] = {} 
+        self._agent_states: Dict[str, AgentState] = {}
+
+        # Initialize self-healing system
+        self._healing_manager = get_self_healing_manager()
+        self._setup_self_healing_checks()
+
+        # Initialize graceful degradation system
+        initialize_graceful_degradation()
+        self._degradation_manager = get_graceful_degradation_manager()
+        self._setup_degradation_handlers() 
         self._symbol_to_agent: Dict[str, str] = {}
         # Agents will be initialized in start() method
 
@@ -459,7 +476,11 @@ class TradingService:
         """Fetch historical kline data for technical analysis with caching."""
         # Check cache first
         if self._cache:
-            cached_data = await self._cache.get_historical_data(symbol, interval, limit)
+            try:
+                cached_data = await REDIS_BREAKER.call(self._cache.get_historical_data, symbol, interval, limit)
+            except Exception:
+                logger.warning(f"Cache operation failed, proceeding without cache")
+                cached_data = None
             if cached_data is not None:
                 logger.debug(f"Using cached historical data for {symbol}")
                 import pandas as pd
@@ -1060,6 +1081,107 @@ class TradingService:
     def paper_trading(self) -> bool:
         return self._health.paper_trading
 
+    def _setup_self_healing_checks(self) -> None:
+        """Setup self-healing health checks for system resilience."""
+        from .self_healing import HealthCheck
+
+        # Database connectivity check
+        async def check_database():
+            try:
+                storage = await get_storage()
+                if storage:
+                    # Try a simple query
+                    await storage.health_check()
+                    return True
+                return False
+            except Exception:
+                return False
+
+        # Redis connectivity check
+        async def check_redis():
+            try:
+                cache = await get_cache()
+                if cache:
+                    # Try a simple ping
+                    await cache.ping()
+                    return True
+                return False
+            except Exception:
+                return False
+
+        # Vertex AI connectivity check
+        async def check_vertex_ai():
+            try:
+                if self._vertex_client:
+                    # Try a simple health check
+                    result = await self._vertex_client.health_check()
+                    return result
+                return True  # If not enabled, consider healthy
+            except Exception:
+                return False
+
+        # Exchange API connectivity check
+        async def check_exchange_api():
+            try:
+                # Try to get ticker data
+                ticker = await self._exchange.get_ticker("BTCUSDT")
+                return ticker is not None
+            except Exception:
+                return False
+
+        # Register health checks with recovery functions
+        self._healing_manager.register_health_check(HealthCheck(
+            name="database",
+            check_func=check_database,
+            recovery_func=recover_database_connection,
+            interval=60.0,  # Check every minute
+            max_failures=3
+        ))
+
+        self._healing_manager.register_health_check(HealthCheck(
+            name="redis",
+            check_func=check_redis,
+            recovery_func=recover_redis_connection,
+            interval=30.0,  # Check every 30 seconds
+            max_failures=3
+        ))
+
+        self._healing_manager.register_health_check(HealthCheck(
+            name="vertex_ai",
+            check_func=check_vertex_ai,
+            recovery_func=recover_vertex_ai_connection,
+            interval=120.0,  # Check every 2 minutes
+            max_failures=5
+        ))
+
+        self._healing_manager.register_health_check(HealthCheck(
+            name="exchange_api",
+            check_func=check_exchange_api,
+            recovery_func=None,  # No automatic recovery for exchange API
+            interval=30.0,  # Check every 30 seconds
+            max_failures=5
+        ))
+
+        # Start the healing manager
+        self._healing_manager.start_monitoring()
+
+    def _setup_degradation_handlers(self) -> None:
+        """Setup handlers for graceful degradation events."""
+        def handle_degradation(component: 'DegradedComponent'):
+            """Handle component degradation events."""
+            logger.warning(f"Component degradation detected: {component.name} - {component.description}")
+
+            # Log the impact and take appropriate actions
+            if component.degradation_level == DegradationLevel.CRITICAL:
+                logger.critical(f"Critical component {component.name} degraded: {component.impact}")
+                # Could trigger emergency stop here
+            elif component.degradation_level == DegradationLevel.SEVERE:
+                logger.error(f"Severe degradation in {component.name}: {component.impact}")
+            else:
+                logger.warning(f"Component {component.name} degraded: {component.impact}")
+
+        self._degradation_manager.add_degradation_listener(handle_degradation)
+
     async def start(self) -> None:
         """Start the trading service."""
         logger.warning("--- ENTERING start() ---")
@@ -1615,7 +1737,8 @@ class TradingService:
                                 ai_analysis=ai_analysis
                             )
 
-                            await self._telegram.send_trade_notification(
+                            await TELEGRAM_BREAKER.call(
+                                self._telegram.send_trade_notification,
                                 trade_notification,
                                 priority=NotificationPriority.MEDIUM
                             )
@@ -1960,7 +2083,9 @@ The output should be a JSON object with these keys.
 
         try:
             start_time = time.time()
-            prediction = await self._vertex_client.predict_with_fallback(
+            # Use circuit breaker for Vertex AI calls
+            prediction = await VERTEX_AI_BREAKER.call(
+                self._vertex_client.predict_with_fallback,
                 agent_id=agent_id,
                 prompt=prompt,
                 max_tokens=512,
@@ -2483,7 +2608,12 @@ The output should be a JSON object with these keys.
         
         try:
             fetch_start = time.time()
-            all_tickers = await self._exchange.get_all_tickers()
+            # Use circuit breaker for exchange API calls with graceful degradation
+            all_tickers = await self._degradation_manager.execute_with_fallback(
+                "exchange_api",
+                EXCHANGE_API_BREAKER.call,
+                self._exchange.get_all_tickers
+            )
             fetch_duration = time.time() - fetch_start
             logger.info("Fetched %d tickers in %.2fs", len(all_tickers), fetch_duration)
             MARKET_FEED_LATENCY.labels(symbol="ALL").observe(fetch_duration)
@@ -3085,7 +3215,7 @@ The output should be a JSON object with these keys.
         # Write to persistent storage
         if self._storage:
             try:
-                await self._storage.insert_trade(
+                await DATABASE_BREAKER.call(self._storage.insert_trade,
                     timestamp=timestamp_value,
                     symbol=symbol,
                     side=side,
