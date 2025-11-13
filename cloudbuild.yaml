@@ -112,10 +112,18 @@ steps:
         # Install gcloud globally and set PATH for all subsequent commands
         echo "📦 Installing gcloud..."
         curl -sSL https://sdk.cloud.google.com | bash > /dev/null 2>&1
-        export PATH=/root/google-cloud-sdk/bin:/usr/local/bin:/usr/bin:/bin:$PATH
+
+        # Find where gcloud was installed
+        GCLOUD_PATH=$(find /root -name "gcloud" -type f 2>/dev/null | head -1)
+        if [ -z "$GCLOUD_PATH" ]; then
+            echo "❌ gcloud binary not found after installation"
+            exit 1
+        fi
+        GCLOUD_DIR=$(dirname "$GCLOUD_PATH")
+        export PATH="$GCLOUD_DIR:/usr/local/bin:/usr/bin:/bin:$PATH"
 
         # Verify gcloud installation
-        echo "🔍 Verifying gcloud installation..."
+        echo "🔍 Verifying gcloud installation at: $GCLOUD_PATH"
         which gcloud || (echo "❌ gcloud not found in PATH"; exit 1)
         gcloud --version
 
