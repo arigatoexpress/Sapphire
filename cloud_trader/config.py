@@ -161,7 +161,7 @@ class Settings(BaseSettings):
     max_symbols_per_agent: int = Field(default=50, ge=1, le=200, validation_alias="MAX_SYMBOLS_PER_AGENT", description="Maximum symbols each agent can monitor")
 
     # Feature flags
-    enable_paper_trading: bool = Field(default=True, validation_alias="ENABLE_PAPER_TRADING")
+    enable_paper_trading: bool = Field(default=False, validation_alias="ENABLE_PAPER_TRADING")
     enable_arbitrage: bool = Field(default=True, validation_alias="ENABLE_ARBITRAGE", description="Enable arbitrage scanning and execution")
     enable_rl_strategies: bool = Field(default=True, validation_alias="ENABLE_RL_STRATEGIES", description="Enable reinforcement learning strategies")
     
