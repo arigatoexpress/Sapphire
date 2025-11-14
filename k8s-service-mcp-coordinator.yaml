@@ -1,8 +1,8 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: mcp-coordinator-service
-  namespace: trading
+  name: coordinator-service
+  namespace: trading-system-fresh
   labels:
     app: mcp-coordinator
     component: messaging

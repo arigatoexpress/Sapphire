@@ -17,8 +17,6 @@ spec:
         image: redis:6.2-alpine
         ports:
         - containerPort: 6379
-      nodeSelector:
-        cloud.google.com/gke-nodepool: standard-pool # Deploy on the standard pool
 ---
 apiVersion: v1
 kind: Service

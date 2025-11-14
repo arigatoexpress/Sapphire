@@ -45,11 +45,11 @@ class TradingLogger:
         cache_logger_on_first_use=True,
     )
 
-        # Configure standard logging
-        self._configure_standard_logging(log_level)
+    # Configure standard logging
+    self._configure_standard_logging(log_level)
 
-        # Create logger
-        self.logger = structlog.get_logger()
+    # Create logger
+    self.logger = structlog.get_logger()
 
     def _get_log_level(self, level_str: str) -> int:
         levels = {
