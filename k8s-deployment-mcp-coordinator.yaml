@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: trading-coordinator
-  namespace: trading-system-fresh
+  namespace: trading-system-clean
   labels:
     app: mcp-coordinator
     component: messaging

@@ -48,7 +48,48 @@ const InfrastructureTopology: React.FC = () => {
 
     const nodes: InfrastructureNode[] = [];
     const centerX = dimensions.width / 2;
-    const sectionHeight = dimensions.height / 4;
+    const sectionHeight = dimensions.height / 5; // Adjusted for better spacing
+
+    // Layer Labels (Visual hierarchy indicators)
+    nodes.push({
+      id: 'layer-1-label',
+      name: 'INFRASTRUCTURE LAYER',
+      type: 'cluster',
+      x: 80,
+      y: sectionHeight * 0.8,
+      color: '#0EA5E9',
+      status: 'healthy',
+    });
+
+    nodes.push({
+      id: 'layer-2-label',
+      name: 'CORE SERVICES LAYER',
+      type: 'service',
+      x: 80,
+      y: sectionHeight * 1.8,
+      color: '#8B5CF6',
+      status: 'healthy',
+    });
+
+    nodes.push({
+      id: 'layer-3-label',
+      name: 'AI AGENTS LAYER',
+      type: 'agent',
+      x: 80,
+      y: sectionHeight * 2.8,
+      color: '#10B981',
+      status: 'healthy',
+    });
+
+    nodes.push({
+      id: 'layer-4-label',
+      name: 'EXTERNAL SERVICES LAYER',
+      type: 'service',
+      x: 80,
+      y: sectionHeight * 4.2,
+      color: '#F59E0B',
+      status: 'healthy',
+    });
 
     // Layer 1: Infrastructure (Top)
     nodes.push({
@@ -64,9 +105,9 @@ const InfrastructureTopology: React.FC = () => {
 
     // Layer 2: Core Services (Middle-Top)
     const coreServices = [
-      { id: 'redis', name: 'Redis Cache', type: 'cache' as const, color: '#EF4444', x: centerX - 250, y: sectionHeight * 2 },
+      { id: 'redis', name: 'Redis Cache', type: 'cache' as const, color: '#EF4444', x: centerX - 280, y: sectionHeight * 2 },
       { id: 'cloud-trader', name: 'Cloud Trader API', type: 'service' as const, color: '#0EA5E9', x: centerX, y: sectionHeight * 2 },
-      { id: 'mcp-coordinator', name: 'MCP Coordinator', type: 'coordinator' as const, color: '#8B5CF6', x: centerX + 250, y: sectionHeight * 2 },
+      { id: 'mcp-coordinator', name: 'MCP Coordinator', type: 'coordinator' as const, color: '#8B5CF6', x: centerX + 280, y: sectionHeight * 2 },
     ];
 
     coreServices.forEach(service => {
@@ -77,22 +118,22 @@ const InfrastructureTopology: React.FC = () => {
       });
     });
 
-    // Layer 3: AI Agents (Middle-Bottom) - organized in data flow hierarchy
+    // Layer 3: AI Agents (Middle-Bottom) - organized in clear functional groups
     const agentHierarchy = [
-      // Analysis Layer (left side)
-      { id: 'volume-microstructure-agent', x: centerX - 300, y: sectionHeight * 2.8 },
-      { id: 'trend-momentum-agent', x: centerX - 150, y: sectionHeight * 2.8 },
-      { id: 'financial-sentiment-agent', x: centerX - 150, y: sectionHeight * 3.2 },
+      // Analysis Layer (left side - data collection & processing)
+      { id: 'volume-microstructure-agent', x: centerX - 350, y: sectionHeight * 2.8, group: 'analysis' },
+      { id: 'trend-momentum-agent', x: centerX - 200, y: sectionHeight * 2.8, group: 'analysis' },
+      { id: 'financial-sentiment-agent', x: centerX - 200, y: sectionHeight * 3.4, group: 'analysis' },
 
-      // Strategy Layer (center)
-      { id: 'strategy-optimization-agent', x: centerX, y: sectionHeight * 2.8 },
-      { id: 'market-prediction-agent', x: centerX, y: sectionHeight * 3.2 },
+      // Strategy Layer (center - decision making)
+      { id: 'strategy-optimization-agent', x: centerX, y: sectionHeight * 3.1, group: 'strategy' },
+      { id: 'market-prediction-agent', x: centerX + 150, y: sectionHeight * 3.1, group: 'strategy' },
 
-      // Execution Layer (right side)
-      { id: 'vpin-hft', x: centerX + 150, y: sectionHeight * 3 },
+      // Execution Layer (right side - trade execution)
+      { id: 'vpin-hft', x: centerX + 300, y: sectionHeight * 3.1, group: 'execution' },
     ];
 
-    agentHierarchy.forEach(({ id: agentType, x, y }) => {
+    agentHierarchy.forEach(({ id: agentType, x, y, group }) => {
       const agentActivity = agentActivities.find(a => a.agent_type === agentType);
       const agentColor = AGENT_COLORS[agentType as keyof typeof AGENT_COLORS] || AGENT_COLORS.coordinator;
 
@@ -116,8 +157,8 @@ const InfrastructureTopology: React.FC = () => {
 
     // Layer 4: External Services (Bottom)
     const externalServices = [
-      { id: 'aster-dex', name: 'Aster DEX API', color: '#10B981', x: centerX - 200, y: sectionHeight * 3.8 },
-      { id: 'vertex-ai', name: 'Vertex AI (Gemini)', color: '#F59E0B', x: centerX + 200, y: sectionHeight * 3.8 },
+      { id: 'aster-dex', name: 'Aster DEX Exchange API', color: '#10B981', x: centerX - 250, y: sectionHeight * 4.4 },
+      { id: 'vertex-ai', name: 'Google Vertex AI (Gemini)', color: '#F59E0B', x: centerX + 250, y: sectionHeight * 4.4 },
     ];
 
     externalServices.forEach(service => {
@@ -246,6 +287,22 @@ const InfrastructureTopology: React.FC = () => {
       // Draw nodes
       nodes.forEach(node => {
         const isHovered = hoveredNode === node.id;
+        const isLayerLabel = node.id.includes('layer-') && node.id.includes('-label');
+
+        // Special handling for layer labels
+        if (isLayerLabel) {
+          // Draw layer label background
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+          ctx.fillRect(node.x - 120, node.y - 15, 240, 30);
+
+          // Draw layer label text
+          ctx.fillStyle = node.color;
+          ctx.font = 'bold 14px "Inter", sans-serif';
+          ctx.textAlign = 'left';
+          ctx.fillText(node.name, node.x - 110, node.y + 5);
+          return;
+        }
+
         const size = node.type === 'cluster' ? 80 : node.type === 'coordinator' ? 60 : 50;
         const pulseSize = isHovered ? size * 1.2 : size;
 
@@ -433,11 +490,15 @@ const InfrastructureTopology: React.FC = () => {
                   <Typography
                     variant="caption"
                     sx={{
-                      color: node.color,
+                      color: node.type === 'agent' ? '#FFFFFF' : node.color,
                       fontWeight: 700,
                       fontSize: node.type === 'cluster' ? '0.9rem' : '0.75rem',
-                      textShadow: `0 0 10px ${node.color}40`,
+                      textShadow: node.type === 'agent' ? `0 0 8px ${node.color}60` : `0 0 10px ${node.color}40`,
                       display: 'block',
+                      backgroundColor: node.type === 'agent' ? 'rgba(0,0,0,0.6)' : 'transparent',
+                      padding: node.type === 'agent' ? '2px 6px' : '0px',
+                      borderRadius: node.type === 'agent' ? '4px' : '0px',
+                      border: node.type === 'agent' ? `1px solid ${node.color}40` : 'none',
                     }}
                   >
                     {node.name}

@@ -29,12 +29,12 @@ class TradingLogger:
         # Configure structlog
     structlog.configure(
         processors=[
-                structlog.contextvars.merge_contextvars,
+            structlog.contextvars.merge_contextvars,
             structlog.processors.add_log_level,
-                structlog.processors.TimeStamper(fmt="iso"),
-                self._add_service_info,
-                self._add_correlation_id,
-                self._add_request_context,
+            structlog.processors.TimeStamper(fmt="iso"),
+            self._add_service_info,
+            self._add_correlation_id,
+            self._add_request_context,
             structlog.processors.JSONRenderer(),
         ],
             wrapper_class=structlog.make_filtering_bound_logger(
