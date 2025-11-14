@@ -408,54 +408,6 @@ agents:
       - name: MONITORING_ENABLED
         value: "true"
 
-  # FreqTrade Framework Agent
-  freqtrade:
-    enabled: true
-    replicaCount: 1
-    image:
-      repository: cloud-run-source-deploy/freqtrade
-      tag: "latest"
-    resources:
-      requests:
-        cpu: 750m
-        memory: 1.5Gi
-      limits:
-        cpu: 3000m
-        memory: 6Gi
-    env:
-      - name: ENABLE_PAPER_TRADING
-        value: "true"
-      - name: ENABLED_AGENTS
-        value: '["freqtrade"]'
-      - name: AGENT_ROLE
-        value: "algorithmic-trading"
-      - name: MONITORING_ENABLED
-        value: "true"
-
-  # HummingBot Framework Agent
-  hummingbot:
-    enabled: true
-    replicaCount: 1
-    image:
-      repository: cloud-run-source-deploy/hummingbot
-      tag: "latest"
-    resources:
-      requests:
-        cpu: 500m
-        memory: 1Gi
-      limits:
-        cpu: 2000m
-        memory: 4Gi
-    env:
-      - name: ENABLE_PAPER_TRADING
-        value: "true"
-      - name: ENABLED_AGENTS
-        value: '["hummingbot"]'
-      - name: AGENT_ROLE
-        value: "market-making"
-      - name: MONITORING_ENABLED
-        value: "true"
-
   # VPIN HFT Agent
   vpin-hft:
     enabled: true
@@ -471,17 +423,17 @@ agents:
         cpu: 3000m
         memory: 12Gi
     vertexAI:
-      model: "codey-001"
+      model: "gemini-2.0-flash-exp"
       optimization:
         quantization: "int8"
-        batchSize: 4
+        batchSize: 8
         temperature: 0.1
-        maxTokens: 1024
-      roleContext: "volume-analysis"
+        maxTokens: 512
+      roleContext: "vpin-hft-analysis"
       monitoring:
-        latencyThreshold: 300
-        accuracyMetric: "volume_analysis_accuracy"
-        driftThreshold: 0.04
+        latencyThreshold: 150
+        accuracyMetric: "vpin_prediction_accuracy"
+        driftThreshold: 0.03
     env:
       - name: ENABLE_PAPER_TRADING
         value: "true"
@@ -492,13 +444,13 @@ agents:
       - name: MCP_ENABLED
         value: "true"
       - name: AGENT_ROLE
-        value: "volume-analysis"
+        value: "vpin-hft-analysis"
       - name: VERTEX_MODEL
-        value: "codey-001"
+        value: "gemini-2.0-flash-exp"
       - name: MODEL_TEMPERATURE
         value: "0.1"
       - name: MAX_OUTPUT_TOKENS
-        value: "1024"
+        value: "512"
       - name: QUANTIZATION_LEVEL
         value: "int8"
       - name: MONITORING_ENABLED
@@ -507,64 +459,6 @@ agents:
 # Trading Framework Services
 frameworks:
   enabled: true
-
-  # Freqtrade HFT
-  freqtrade:
-    enabled: true  # Disabled for minimal deployment
-    replicaCount: 1
-    image:
-      repository: cloud-run-source-deploy/freqtrade
-      tag: "latest"
-    resources:
-      requests:
-        cpu: 750m  # Optimized for vectorized operations
-        memory: 1.5Gi  # Reduced with memory optimization
-      limits:
-        cpu: 3000m  # Increased for parallel processing
-        memory: 6Gi
-    env:
-      - name: ENABLE_PAPER_TRADING
-        value: "true"
-      - name: FREQTRADE__EXCHANGE__NAME
-        value: "asterdex"
-      - name: FREQTRADE__TELEGRAM__ENABLED
-        value: "true"
-      - name: NUMBA_THREADING_LAYER
-        value: "omp"  # Optimize Numba threading
-      - name: OMP_NUM_THREADS
-        value: "4"  # Parallel computation threads
-      - name: PYTHONOPTIMIZE
-        value: "1"  # Enable Python optimizations
-      - name: VECTORIZE_OPERATIONS
-        value: "true"  # Enable SIMD vectorization
-
-  # Hummingbot Market Maker
-  hummingbot:
-    enabled: true  # Disabled for minimal deployment
-    replicaCount: 1
-    image:
-      repository: cloud-run-source-deploy/hummingbot
-      tag: "latest"
-    resources:
-      requests:
-        cpu: 500m  # Optimized resource usage
-        memory: 1Gi  # Increased for market data caching
-      limits:
-        cpu: 2000m
-        memory: 4Gi
-    env:
-      - name: ENABLE_PAPER_TRADING
-        value: "true"
-      - name: HUMMINGBOT__TELEGRAM__ENABLED
-        value: "true"
-      - name: ASYNC_IO_WORKERS
-        value: "8"  # Optimize async I/O
-      - name: CONNECTION_POOL_SIZE
-        value: "20"  # Connection pooling
-      - name: MEMORY_CACHE_SIZE
-        value: "512MB"  # In-memory cache size
-      - name: NETWORK_TIMEOUT
-        value: "5"  # Reduced network timeout
 
 # Horizontal Pod Autoscaling
 hpa:
@@ -593,22 +487,6 @@ hpa:
           target:
             type: AverageValue
             averageValue: 0.1  # Scale down if throttle rate >10%
-
-  # Freqtrade HPA
-  freqtrade:
-    enabled: true
-    minReplicas: 1
-    maxReplicas: 3
-    targetCPUUtilizationPercentage: 70
-    targetMemoryUtilizationPercentage: 80
-
-  # Hummingbot HPA
-  hummingbot:
-    enabled: true
-    minReplicas: 1
-    maxReplicas: 2
-    targetCPUUtilizationPercentage: 70
-    targetMemoryUtilizationPercentage: 80
 
 # Monitoring and Observability
 monitoring:
@@ -688,8 +566,6 @@ affinity:
             operator: In
             values:
             - cloud-trader
-            - freqtrade-hft
-            - hummingbot-mm
         topologyKey: kubernetes.io/hostname
 
 # System Initialization Job

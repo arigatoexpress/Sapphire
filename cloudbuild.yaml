@@ -27,7 +27,7 @@ steps:
         pytest tests/ -v --cov=cloud_trader --cov-report=xml || true
         echo "✅ Unit tests completed"
 
-  # Build optimized multi-stage container image for cloud-trader
+  # Build optimized single-stage container image for cloud-trader
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
@@ -38,65 +38,15 @@ steps:
       - '-t'
       - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:latest'
       - '--progress=plain'
-      - '--target=runtime'
       - '.'
     env:
-      - 'DOCKER_BUILDKIT=1'
-      - 'BUILDKIT_PROGRESS=plain'
-
-  # TEMPORARILY DISABLED: Build Freqtrade with FreqAI container image
-  # - name: 'gcr.io/cloud-builders/docker'
-  #   args:
-  #     - 'build'
-  #     - '-f'
-  #     - 'Dockerfile.freqtrade'
-  #     - '--build-arg'
-  #     - 'CACHE_BUST=${BUILD_ID}'
-  #     - '-t'
-  #     - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/freqtrade:${BUILD_ID}'
-  #     - '-t'
-  #     - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/freqtrade:latest'
-  #     - '--progress=plain'
-  #     - '.'
-  #   env:
-  #     - 'DOCKER_BUILDKIT=1'
-  #     - 'BUILDKIT_PROGRESS=plain'
-
-  # TEMPORARILY DISABLED: Build Hummingbot Gateway container image
-  # - name: 'gcr.io/cloud-builders/docker'
-  #   args:
-  #     - 'build'
-  #     - '-f'
-  #     - 'Dockerfile.hummingbot'
-  #     - '--build-arg'
-  #     - 'CACHE_BUST=${BUILD_ID}'
-  #     - '-t'
-  #     - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/hummingbot:${BUILD_ID}'
-  #     - '-t'
-  #     - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/hummingbot:latest'
-  #     - '--progress=plain'
-  #     - '.'
-  #   env:
-  #     - 'DOCKER_BUILDKIT=1'
-  #     - 'BUILDKIT_PROGRESS=plain'
+      - 'DOCKER_BUILDKIT=0'  # Disable BuildKit for simpler builds
 
   # Push container images to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
       - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:latest'
-
-  # TEMPORARILY DISABLED: Push freqtrade image
-  # - name: 'gcr.io/cloud-builders/docker'
-  #   args:
-  #     - 'push'
-  #     - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/freqtrade:latest'
-
-  # TEMPORARILY DISABLED: Push hummingbot image
-  # - name: 'gcr.io/cloud-builders/docker'
-  #   args:
-  #     - 'push'
-  #     - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/hummingbot:latest'
 
   # Deploy to GKE cluster with optimizations
   - name: 'gcr.io/cloud-builders/gcloud'
@@ -204,26 +154,23 @@ steps:
         echo "   ✅ Network: Connection pooling enabled"
         echo "   ✅ Storage: BigQuery batch streaming active"
         echo ""
-        echo "⚠️ Note: Freqtrade and Hummingbot temporarily disabled due to build issues"
+        echo "✅ System refactored to use 6 specialized AI agents with latest Gemini models"
 
 images:
   - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:latest'
   - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:${BUILD_ID}'
 
 options:
-  # Optimized performance configuration for AI workloads
-  diskSizeGb: 1000  # Increased for AI model caching
-  machineType: 'E2_HIGHCPU_32'  # High CPU for parallel builds
-  # Optimized build settings
+  # Increased resources for reliable builds
+  diskSizeGb: 2000  # More disk space for build artifacts
+  machineType: 'E2_HIGHCPU_32'  # High CPU machine
+  # Build settings
   dynamicSubstitutions: true
   substitutionOption: 'ALLOW_LOOSE'
   logging: CLOUD_LOGGING_ONLY
-  # Advanced buildkit settings for optimization
+  # Simplified build settings
   env:
-    - 'DOCKER_BUILDKIT=1'
-    - 'BUILDKIT_PROGRESS=plain'
-    - 'BUILDKIT_INLINE_CACHE=1'  # Enable inline caching
-    - 'DOCKER_BUILDKIT_INLINE_CACHE=1'  # Additional caching
+    - 'DOCKER_BUILDKIT=0'  # Disable BuildKit for compatibility
     # GPU optimization for AI builds
     - 'CUDA_VISIBLE_DEVICES='  # No GPU needed for builds
     - 'PYTORCH_CUDA_ALLOC_CONF=garbage_collection_threshold:0.6,max_split_size_mb:512'

@@ -105,9 +105,9 @@ class Settings(BaseSettings):
 
     # Agent configuration
     enabled_agents: List[str] = Field(
-        default_factory=lambda: ["trend-momentum-agent", "strategy-optimization-agent", "financial-sentiment-agent", "market-prediction-agent", "volume-microstructure-agent", "freqtrade", "hummingbot", "vpin-hft"],
+        default_factory=lambda: ["trend-momentum-agent", "strategy-optimization-agent", "financial-sentiment-agent", "market-prediction-agent", "volume-microstructure-agent", "vpin-hft"],
         validation_alias="ENABLED_AGENTS",
-        description="List of 7 advanced AI agents for autonomous trading"
+        description="List of 6 advanced AI agents for autonomous trading"
     )
     max_symbols_per_agent: int = Field(default=10, ge=1, le=50)
     agent_parallel_execution: bool = Field(default=True, validation_alias="AGENT_PARALLEL_EXECUTION")

@@ -11,59 +11,56 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self.json_resp(200, {"status": "healthy", "service": "inline_server"})
             elif path == "/portfolio-status":
                 self.json_resp(200, {
-                    'total_capital': 3500, 'agent_capital': 500, 'agent_count': 7,
+                    'total_capital': 3500, 'agent_capital': 500, 'agent_count': 6,
                     'status': 'operational', 'timestamp': datetime.utcnow().isoformat(),
                     'agents': {
-                        'trend_momentum_agent': {'status': 'active'},
-                        'strategy_optimization_agent': {'status': 'active'},
-                        'financial_sentiment_agent': {'status': 'active'},
-                        'market_prediction_agent': {'status': 'active'},
-                        'volume_microstructure_agent': {'status': 'active'},
-                        'freqtrade': {'status': 'standby'},
-                        'hummingbot': {'status': 'standby'}
+                        'trend-momentum-agent': {'status': 'active'},
+                        'strategy-optimization-agent': {'status': 'active'},
+                        'financial-sentiment-agent': {'status': 'active'},
+                        'market-prediction-agent': {'status': 'active'},
+                        'volume-microstructure-agent': {'status': 'active'},
+                        'vpin-hft': {'status': 'active'}
                     }
                 })
             elif path == "/agent-activity":
                 self.json_resp(200, [{
-                    'agent_id': f'{agent.replace("_", "-")}-1',
+                    'agent_id': f'{agent}-1',
                     'agent_type': agent,
-                    'agent_name': agent.replace('_', ' ').title(),
+                    'agent_name': agent.replace('-', ' ').title(),
                     'activity_score': 0.5 + (hash(agent) % 50) / 100,
                     'communication_count': hash(agent) % 20,
                     'trading_count': 0,
                     'last_activity': datetime.utcnow().isoformat(),
                     'participation_threshold': 0.7,
                     'specialization': {
-                        'trend_momentum_agent': 'Momentum Analysis',
-                        'strategy_optimization_agent': 'Strategy Optimization',
-                        'financial_sentiment_agent': 'Sentiment Analysis',
-                        'market_prediction_agent': 'Market Prediction',
-                        'volume_microstructure_agent': 'Volume Analysis',
-                        'freqtrade': 'Algorithmic Trading',
-                        'hummingbot': 'Market Making'
+                        'trend-momentum-agent': 'Momentum Analysis',
+                        'strategy-optimization-agent': 'Strategy Optimization',
+                        'financial-sentiment-agent': 'Sentiment Analysis',
+                        'market-prediction-agent': 'Market Prediction',
+                        'volume-microstructure-agent': 'Volume Analysis',
+                        'vpin-hft': 'VPIN HFT Trading'
                     }.get(agent, 'Trading Agent'),
                     'color': {
-                        'trend_momentum_agent': '#3b82f6',
-                        'strategy_optimization_agent': '#8b5cf6',
-                        'financial_sentiment_agent': '#10b981',
-                        'market_prediction_agent': '#f59e0b',
-                        'volume_microstructure_agent': '#ef4444',
-                        'freqtrade': '#06b6d4',
-                        'hummingbot': '#84cc16'
+                        'trend-momentum-agent': '#06b6d4',
+                        'strategy-optimization-agent': '#8b5cf6',
+                        'financial-sentiment-agent': '#ef4444',
+                        'market-prediction-agent': '#f59e0b',
+                        'volume-microstructure-agent': '#ec4899',
+                        'vpin-hft': '#06b6d4'
                     }.get(agent, '#6b7280'),
-                    'status': 'active' if agent not in ['freqtrade', 'hummingbot'] else 'standby'
-                } for agent in ['trend_momentum_agent', 'strategy_optimization_agent', 'financial_sentiment_agent', 'market_prediction_agent', 'volume_microstructure_agent', 'freqtrade', 'hummingbot']])
+                    'status': 'active'
+                } for agent in ['trend-momentum-agent', 'strategy-optimization-agent', 'financial-sentiment-agent', 'market-prediction-agent', 'volume-microstructure-agent', 'vpin-hft']])
             elif path == "/system-status":
                 self.json_resp(200, {
                     'service': 'sapphire_trade_inline', 'status': 'operational', 'version': '1.0.0-inline',
-                    'total_capital': 3500, 'active_agents': 5,
+                    'total_capital': 3500, 'active_agents': 6,
                     'features': ['Basic portfolio tracking', 'Agent status monitoring', 'Emergency fallback mode'],
                     'limitations': ['No real-time trading', 'Static demonstration data', 'Basic functionality only']
                 })
             elif path == "/":
                 self.json_resp(200, {
                     "message": "Sapphire Trade Inline Server", "status": "operational",
-                    "capital": "$3,500 allocated", "agents": "7 AI agents configured"
+                    "capital": "$3,500 allocated", "agents": "6 AI agents configured"
                 })
             else:
                 self.json_resp(404, {"error": "Not found"})

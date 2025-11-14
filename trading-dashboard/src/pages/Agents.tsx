@@ -1,152 +1,114 @@
 import React from 'react';
-import { Box, Typography, Card, CardContent, Grid, Chip, Avatar } from '@mui/material';
+import { Box, Typography, Card, CardContent, Grid, Chip, Avatar, Tabs, Tab, Container } from '@mui/material';
+import AgentActivityGrid from '../components/AgentActivityGrid';
+import AgentPerformanceMetrics from '../components/AgentPerformanceMetrics';
+import RegulatoryDisclaimer from '../components/RegulatoryDisclaimer';
+import AgentExplanation from '../components/AgentExplanation';
+import { useTrading } from '../contexts/TradingContext';
 
 const Agents: React.FC = () => {
-  const agents = [
-    {
-      name: "DeepSeek PvP Momentum",
-      emoji: "💎",
-      specialization: "Trend Predator",
-      leverage: "15x",
-      capital: "$1,000",
-      winRate: "68%",
-      strategy: "Scalp trades, exploit weak hands & stops"
-    },
-    {
-      name: "FinGPT PvP Alpha",
-      emoji: "📊",
-      specialization: "Catalyst Arbitrageur",
-      leverage: "12x",
-      capital: "$1,000",
-      winRate: "63%",
-      strategy: "Preemptive news & catalyst exploitation"
-    },
-    {
-      name: "Lag-Llama PvP Degen",
-      emoji: "🎰",
-      specialization: "Chaos Weaponizer",
-      leverage: "50x",
-      capital: "$1,000",
-      winRate: "45%",
-      strategy: "Liquidation cascades & volatility spikes"
-    },
-    {
-      name: "Profit Maximizer PvP",
-      emoji: "💰",
-      specialization: "ASTER Stacker",
-      leverage: "20x",
-      capital: "$1,000",
-      winRate: "60%",
-      strategy: "Ensemble intelligence, ASTER priority"
-    }
+  const [tabValue, setTabValue] = React.useState(0);
+  const { agentActivities } = useTrading();
+
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
+
+  const agentConfig = [
+    { id: 'trend-momentum-agent', name: 'Trend Momentum', model: 'Gemini 2.0 Flash Exp' },
+    { id: 'strategy-optimization-agent', name: 'Strategy Optimization', model: 'Gemini Exp-1206' },
+    { id: 'financial-sentiment-agent', name: 'Financial Sentiment', model: 'Gemini 2.0 Flash Exp' },
+    { id: 'market-prediction-agent', name: 'Market Prediction', model: 'Gemini Exp-1206' },
+    { id: 'volume-microstructure-agent', name: 'Volume Microstructure', model: 'Codey 001' },
+    { id: 'vpin-hft', name: 'VPIN HFT', model: 'Gemini 2.0 Flash Exp' },
   ];
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom sx={{ fontWeight: 700 }}>
-        🤖 4-Core PvP AI Agent Ensemble
-      </Typography>
-      <Typography variant="body1" color="textSecondary" sx={{ mb: 2 }}>
-        Elite trading predators optimized for Aster DEX - $360 daily target
-      </Typography>
-
-      {/* Aster DEX Context */}
-      <Box sx={{
-        mb: 4,
-        p: 2,
-        borderRadius: 2,
-        background: 'linear-gradient(135deg, rgba(138, 43, 226, 0.1) 0%, rgba(0, 212, 170, 0.1) 100%)',
-        border: '1px solid rgba(138, 43, 226, 0.3)',
-      }}>
-        <Typography variant="body1" sx={{ fontWeight: 600, color: '#8a2be2', textAlign: 'center' }}>
-          🎯 Deployed on Aster DEX - 155+ USDT Perpetual Contracts
+    <Container maxWidth="xl" sx={{ py: 4 }}>
+      <Box sx={{ mb: { xs: 3, md: 4 } }}>
+        <Typography 
+          variant="h1" 
+          gutterBottom 
+          sx={{ 
+            fontWeight: 900,
+            fontSize: { xs: '2rem', md: '3rem' },
+            color: '#FFFFFF',
+            mb: { xs: 1, md: 1.5 },
+            lineHeight: 1.1,
+          }}
+        >
+          AI Trading Agents
         </Typography>
-        <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)', textAlign: 'center', mt: 1 }}>
-          Direct market access with institutional-grade liquidity and zero intermediary fees
+        <Typography 
+          variant="h6" 
+          sx={{ 
+            fontSize: { xs: '1rem', md: '1.125rem' },
+            fontWeight: 500,
+            color: '#E2E8F0',
+            maxWidth: '900px',
+            lineHeight: 1.6,
+          }}
+        >
+          Monitor six specialized AI agents powered by Google Gemini models
         </Typography>
       </Box>
 
-      <Grid container spacing={3}>
-        {agents.map((agent, index) => (
-          <Grid item xs={12} md={6} key={index}>
-            <Card sx={{
-              background: 'rgba(255, 255, 255, 0.08)',
-              backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              transition: 'transform 0.2s',
-              '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: '0 8px 25px rgba(0, 212, 170, 0.2)'
-              }
-            }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Avatar sx={{
-                    bgcolor: index === 0 ? '#00d4aa' :
-                      index === 1 ? '#8a2be2' :
-                        index === 2 ? '#ff4757' : '#ffa502',
-                    mr: 2
-                  }}>
-                    {agent.emoji}
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                      {agent.name}
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary">
-                      {agent.specialization}
-                    </Typography>
-                  </Box>
-                </Box>
+      {/* Regulatory Disclaimer */}
+      <RegulatoryDisclaimer />
 
-                <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-                  <Chip label={`Leverage: ${agent.leverage}`} size="small" color="primary" />
-                  <Chip label={`Capital: ${agent.capital}`} size="small" color="secondary" />
-                  <Chip label={`Win Rate: ${agent.winRate}`} size="small" sx={{ bgcolor: 'rgba(0, 212, 170, 0.2)', color: '#00d4aa' }} />
-                </Box>
-
-                <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                  {agent.strategy}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
-
-      {/* System Status */}
-      <Box sx={{ mt: 4 }}>
-        <Card sx={{
-          background: 'rgba(255, 255, 255, 0.05)',
-          backdropFilter: 'blur(10px)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-        }}>
-          <CardContent>
-            <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-              🚀 PvP Combat Configuration
-            </Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={6} sm={3}>
-                <Typography variant="body2" color="textSecondary">Total Capital</Typography>
-                <Typography variant="h6" sx={{ color: '#00d4aa', fontWeight: 600 }}>$4,000</Typography>
-              </Grid>
-              <Grid item xs={6} sm={3}>
-                <Typography variant="body2" color="textSecondary">Daily Target</Typography>
-                <Typography variant="h6" sx={{ color: '#8a2be2', fontWeight: 600 }}>$360</Typography>
-              </Grid>
-              <Grid item xs={6} sm={3}>
-                <Typography variant="body2" color="textSecondary">Risk Profile</Typography>
-                <Typography variant="h6" sx={{ color: '#ff4757', fontWeight: 600 }}>Extreme PvP</Typography>
-              </Grid>
-              <Grid item xs={6} sm={3}>
-                <Typography variant="body2" color="textSecondary">Trading Venue</Typography>
-                <Typography variant="h6" sx={{ color: '#00d4aa', fontWeight: 600 }}>Aster DEX</Typography>
-              </Grid>
+      {/* Agent Explanations */}
+      <Box sx={{ mb: 4 }}>
+        <Typography 
+          variant="h5" 
+          sx={{ 
+            fontWeight: 700, 
+            mb: 3,
+            fontSize: '1.5rem',
+            color: 'text.primary',
+          }}
+        >
+          Understanding Our AI Agents
+        </Typography>
+        <Grid container spacing={3}>
+          {agentConfig.map((agent) => (
+            <Grid item xs={12} key={agent.id}>
+              <AgentExplanation 
+                agentId={agent.id}
+                agentName={agent.name}
+                model={agent.model}
+              />
             </Grid>
-          </CardContent>
-        </Card>
+          ))}
+        </Grid>
       </Box>
-    </Box>
+
+      <Tabs 
+        value={tabValue} 
+        onChange={handleTabChange} 
+        sx={{ 
+          mb: 4, 
+          borderBottom: 1, 
+          borderColor: 'divider',
+          '& .MuiTab-root': {
+            fontSize: '1.1rem',
+            fontWeight: 600,
+            minHeight: 56,
+            textTransform: 'none',
+          },
+        }}
+      >
+        <Tab label="Agent Activity" />
+        <Tab label="Performance Metrics" />
+      </Tabs>
+
+      {tabValue === 0 && (
+        <AgentActivityGrid />
+      )}
+
+      {tabValue === 1 && (
+        <AgentPerformanceMetrics />
+      )}
+    </Container>
   );
 };
 

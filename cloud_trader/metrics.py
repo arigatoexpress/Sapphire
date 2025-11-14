@@ -34,6 +34,90 @@ LLM_CONFIDENCE = Histogram(
     buckets=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
 )
 
+# Per-agent performance metrics
+AGENT_INFERENCE_TIME = Histogram(
+    "agent_inference_time_seconds",
+    "Time taken for agent inference per agent",
+    ["agent_id", "model"],
+    buckets=[0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0],
+)
+AGENT_DECISION_LATENCY = Histogram(
+    "agent_decision_latency_seconds",
+    "Time from market data to trading decision per agent",
+    ["agent_id"],
+    buckets=[0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0],
+)
+AGENT_THROUGHPUT = Counter(
+    "agent_throughput_total",
+    "Total number of decisions made per agent",
+    ["agent_id"],
+)
+AGENT_INFERENCE_TOKENS = Histogram(
+    "agent_inference_tokens",
+    "Number of tokens used per inference per agent",
+    ["agent_id", "model", "type"],  # type: input, output
+    buckets=[10, 50, 100, 250, 500, 1000, 2000, 5000],
+)
+AGENT_INFERENCE_COST = Histogram(
+    "agent_inference_cost_usd",
+    "Estimated cost per inference in USD per agent",
+    ["agent_id", "model"],
+    buckets=[0.0001, 0.0005, 0.001, 0.002, 0.005, 0.01, 0.02, 0.05],
+)
+AGENT_ERROR_RATE = Counter(
+    "agent_errors_total",
+    "Total number of errors per agent",
+    ["agent_id", "error_type"],
+)
+AGENT_SUCCESS_RATE = Gauge(
+    "agent_success_rate",
+    "Success rate of agent decisions (0-1)",
+    ["agent_id"],
+)
+AGENT_AVG_CONFIDENCE = Gauge(
+    "agent_avg_confidence",
+    "Average confidence score of agent decisions",
+    ["agent_id"],
+)
+AGENT_LAST_INFERENCE_TIME = Gauge(
+    "agent_last_inference_time_seconds",
+    "Last inference time for each agent",
+    ["agent_id"],
+)
+AGENT_INFERENCE_COUNT = Counter(
+    "agent_inference_count_total",
+    "Total number of inferences per agent",
+    ["agent_id", "model"],
+)
+AGENT_RESPONSE_TIME = Histogram(
+    "agent_response_time_seconds",
+    "Total response time from request to response per agent",
+    ["agent_id"],
+    buckets=[0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 20.0],
+)
+AGENT_MARKET_DATA_LATENCY = Histogram(
+    "agent_market_data_latency_seconds",
+    "Latency from market data timestamp to agent receipt",
+    ["agent_id", "symbol"],
+    buckets=[0.01, 0.05, 0.1, 0.25, 0.5, 1.0],
+)
+AGENT_TRADE_EXECUTION_LATENCY = Histogram(
+    "agent_trade_execution_latency_seconds",
+    "Time from decision to trade execution per agent",
+    ["agent_id", "symbol"],
+    buckets=[0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0],
+)
+AGENT_CIRCUIT_BREAKER_STATE = Gauge(
+    "agent_circuit_breaker_state",
+    "Circuit breaker state per agent (0=closed, 1=open, 2=half-open)",
+    ["agent_id"],
+)
+AGENT_FALLBACK_USAGE = Counter(
+    "agent_fallback_usage_total",
+    "Total number of times fallback was used per agent",
+    ["agent_id", "fallback_type"],
+)
+
 # Portfolio and risk metrics
 PORTFOLIO_BALANCE = Gauge("portfolio_balance_usd", "Current portfolio balance in USD")
 PORTFOLIO_LEVERAGE = Gauge("portfolio_leverage_ratio", "Current portfolio leverage ratio")
@@ -180,18 +264,6 @@ INVENTORY_SKEW_RATIO = Gauge(
     "inventory_skew_ratio",
     "Current inventory skew ratio (-1 to 1, where 0 is balanced)",
     ["symbol", "bot_type"],
-)
-
-FREQTRADE_STRATEGY_PROFIT = Gauge(
-    "freqtrade_strategy_profit_usd",
-    "Running profit for Freqtrade strategies",
-    ["strategy_name"],
-)
-
-HUMMINGBOT_PNL = Gauge(
-    "hummingbot_pnl_usd",
-    "Running PnL for Hummingbot market making",
-    ["symbol"],
 )
 
 CONSENSUS_DECISIONS = Counter(

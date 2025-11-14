@@ -228,15 +228,15 @@ const EnhancedMetrics: React.FC = () => {
       <Grid container spacing={3}>
         <Grid item xs={12} sm={6} md={3}>
           <MetricCard
-            title="Portfolio Value"
-            value={portfolio?.portfolio_value || 0}
-            subtitle="Account balance"
+            title="Bot Trading Capital"
+            value={portfolio?.agent_allocations ? Object.values(portfolio.agent_allocations).reduce((sum: number, val: any) => sum + (val || 0), 0) : 3000}
+            subtitle="AI agent trading capital"
             icon={<AccountBalance />}
             color="#00d4aa"
             trend={portfolioChange.trend}
             trendValue={portfolioChange.value}
             loading={loading}
-            tooltip="Total value of all trading positions"
+            tooltip="Total trading capital allocated to AI agents ($500 per agent)"
           />
         </Grid>
 
@@ -270,7 +270,7 @@ const EnhancedMetrics: React.FC = () => {
             value={portfolio ? `${(portfolio.risk_limit * 100).toFixed(1)}%` : '15.0%'}
             subtitle="Max drawdown limit"
             icon={<Warning />}
-            color={portfolio?.portfolio_value ? '#00d4aa' : '#ffaa00'}
+            color={portfolio?.agent_allocations ? '#00d4aa' : '#ffaa00'}
             loading={loading}
             tooltip="Maximum allowed portfolio drawdown"
           />

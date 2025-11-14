@@ -1,7 +1,7 @@
 """MCP Coordinator for HFT Integration
 
-Coordinates communication between LLM agents, Freqtrade, and Hummingbot
-for unified autonomous trading decisions.
+Coordinates communication between specialized AI trading agents
+for unified autonomous trading decisions using Multi-Component Protocol.
 """
 
 from __future__ import annotations
@@ -33,8 +33,6 @@ logger = logging.getLogger(__name__)
 
 class ComponentType(str, Enum):
     LLM_AGENT = "llm_agent"
-    FREQTRADE = "freqtrade"
-    HUMMINGBOT = "hummingbot"
     DASHBOARD = "dashboard"
 
 
@@ -553,8 +551,6 @@ class MCPCoordinator:
             "financial-sentiment": "financial-sentiment-agent",
             "market-prediction": "market-prediction-agent",
             "volume-microstructure": "volume-microstructure-agent",
-            "freqtrade": "freqtrade",
-            "hummingbot": "hummingbot",
             "vpin": "vpin-hft",
         }
         return source_mapping.get(source.value, source.value)
@@ -700,16 +696,16 @@ class MCPCoordinator:
 
     async def _execute_consensus(self, consensus: Dict[str, Any]):
         """Execute a consensus trading decision."""
-        # Forward to execution components (Freqtrade, Hummingbot)
+        # Forward to execution components (LLM agents)
         execution_payload = {
             "message_type": MCPMessageType.EXECUTION,
             "consensus": consensus,
             "timestamp": datetime.now()
         }
 
-        # Send to all registered components for execution
+        # Send to all registered LLM agent components for execution
         for component_id, component_type in self.registered_components.items():
-            if component_type in [ComponentType.FREQTRADE, ComponentType.HUMMINGBOT]:
+            if component_type == ComponentType.LLM_AGENT:
                 await self._notify_component(component_id, execution_payload)
 
     async def _broadcast_market_data(self, data: MarketData):

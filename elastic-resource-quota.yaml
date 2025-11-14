@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: elastic-trading-quota
+  namespace: trading
+spec:
+  hard:
+    # Pod limits
+    pods: "50"
+    replicationcontrollers: "10"
+    secrets: "20"
+    configmaps: "20"
+    persistentvolumeclaims: "10"
+    services: "30"
+    
+    # CPU resources (increased 4x)
+    requests.cpu: "8000m"  # 8 cores
+    limits.cpu: "16000m"   # 16 cores
+    
+    # Memory resources (increased 4x)  
+    requests.memory: "16Gi"
+    limits.memory: "32Gi"
+    
+    # Storage
+    requests.storage: "50Gi"
+    persistentvolumeclaims: "10"

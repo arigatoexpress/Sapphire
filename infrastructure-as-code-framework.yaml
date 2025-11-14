@@ -1,0 +1,219 @@
+# Master Infrastructure Manifest
+# All components defined declaratively for consistent deployments
+
+---
+# Namespace Definition
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: trading-system
+  labels:
+    environment: production
+    system: sapphire-trade
+
+---
+# Resource Quota (Production Ready)
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: production-trading-quota
+  namespace: trading-system
+spec:
+  hard:
+    pods: "100"
+    services: "50"
+    configmaps: "50"
+    secrets: "20"
+    persistentvolumeclaims: "20"
+    requests.cpu: "16000m"      # 16 cores
+    requests.memory: "32Gi"
+    limits.cpu: "32000m"        # 32 cores
+    limits.memory: "64Gi"
+
+---
+# Core Secrets (Managed Separately for Security)
+# These should be created via sealed secrets or external secret management
+# apiVersion: v1
+# kind: Secret
+# metadata:
+#   name: trading-secrets
+#   namespace: trading-system
+# type: Opaque
+# data:
+#   aster-api-key: <base64-encoded>
+#   aster-api-secret: <base64-encoded>
+#   telegram-bot-token: <base64-encoded>
+#   telegram-chat-id: <base64-encoded>
+
+---
+# System Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: system-config
+  namespace: trading-system
+  labels:
+    component: configuration
+    version: v1.0.0
+data:
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  METRICS_ENABLED: "true"
+  HEALTH_CHECK_INTERVAL: "30"
+  ASTER_BASE_URL: "https://fapi.asterdex.com"
+  TELEGRAM_ENABLED: "true"
+
+---
+# Agent Resource Tiers (Version Controlled)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agent-resource-tiers
+  namespace: trading-system
+  labels:
+    component: configuration
+    version: v1.0.0
+data:
+  LIGHTWEIGHT_CPU_REQUEST: "100m"
+  LIGHTWEIGHT_MEMORY_REQUEST: "128Mi"
+  LIGHTWEIGHT_CPU_LIMIT: "300m"
+  LIGHTWEIGHT_MEMORY_LIMIT: "256Mi"
+  
+  STANDARD_CPU_REQUEST: "300m"
+  STANDARD_MEMORY_REQUEST: "384Mi"
+  STANDARD_CPU_LIMIT: "800m"
+  STANDARD_MEMORY_LIMIT: "768Mi"
+  
+  HEAVY_CPU_REQUEST: "800m"
+  HEAVY_MEMORY_REQUEST: "1536Mi"  # 1.5Gi
+  HEAVY_CPU_LIMIT: "2000m"
+  HEAVY_MEMORY_LIMIT: "3072Mi"    # 3Gi
+  
+  ACCELERATED_CPU_REQUEST: "1500m"
+  ACCELERATED_MEMORY_REQUEST: "2048Mi"  # 2Gi
+  ACCELERATED_CPU_LIMIT: "4000m"
+  ACCELERATED_MEMORY_LIMIT: "8192Mi"    # 8Gi
+
+---
+# Redis Service (Infrastructure Component)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: trading-system
+  labels:
+    app: redis
+    component: infrastructure
+    version: v1.0.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+        component: infrastructure
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        readinessProbe:
+          tcpSocket:
+            port: 6379
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: trading-system
+  labels:
+    app: redis
+    component: infrastructure
+spec:
+  selector:
+    app: redis
+  ports:
+  - port: 6379
+    targetPort: 6379
+
+---
+# Trading Coordinator (Core Component)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trading-coordinator
+  namespace: trading-system
+  labels:
+    app: trading-coordinator
+    component: core
+    version: v1.0.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: trading-coordinator
+  template:
+    metadata:
+      labels:
+        app: trading-coordinator
+        component: core
+    spec:
+      containers:
+      - name: coordinator
+        image: us-central1-docker.pkg.dev/sapphireinfinite/cloud-run-source-deploy/cloud-trader:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: SERVICE_TYPE
+          value: "coordinator"
+        - name: REDIS_URL
+          value: "redis://redis-service:6379"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: coordinator-service
+  namespace: trading-system
+  labels:
+    app: trading-coordinator
+    component: core
+spec:
+  selector:
+    app: trading-coordinator
+  ports:
+  - port: 8080
+    targetPort: 8080

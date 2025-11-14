@@ -32,11 +32,14 @@ Sapphire AI represents a fundamental rethinking of trading platform development.
 - ATR-based stop losses that adapt to volatility
 - Slippage protection with configurable tolerance
 
-**2. Open-Source Analyst Core**
-- **FinGPT Alpha**: Generates structured trade theses with risk/confidence scores and symbol validation
-- **Lag-LLaMA Visionary**: Supplies probabilistic forecasts, confidence intervals, and anomaly scoring
-- **Sui Walrus/Seal/Nautilus Hooks**: Future-proof interfaces for privacy-preserving storage, secure compute, and on-chain telemetry
-- Multi-agent gating ensures trades respect slippage, risk thresholds, and community weighting rules
+**2. Specialized AI Agent Ensemble**
+- **Trend Momentum Agent** (Gemini 2.0 Flash Exp): Real-time momentum analysis and trend detection
+- **Strategy Optimization Agent** (Gemini Exp 1206): Advanced strategy optimization and portfolio rebalancing
+- **Financial Sentiment Agent** (Gemini 2.0 Flash Exp): NLP analysis of news, social media, and financial reports
+- **Market Prediction Agent** (Gemini Exp 1206): Time series forecasting and market prediction
+- **Volume Microstructure Agent** (Codey 001): Mathematical volume analysis and order flow detection
+- **VPIN HFT Agent** (Gemini 2.0 Flash Exp): Ultra-fast order flow toxicity detection for high-frequency trading
+- Multi-agent coordination via MCP ensures trades respect slippage, risk thresholds, and portfolio constraints
 
 **3. Risk Management System**
 - Portfolio-level exposure limits (configurable leverage caps)

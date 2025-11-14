@@ -72,8 +72,8 @@ kubectl get deployments -n trading
 kubectl get services -n trading
 
 # Check logs if needed
-kubectl logs -f deployment/mcp-coordinator -n trading
-kubectl logs -f deployment/freqtrade-hft-bot -n trading
+kubectl logs -f deployment/mcp-coordinator -n trading-system
+kubectl logs -f deployment/vpin-hft -n trading-system
 ```
 
 ### **Step 4: Post-Deployment Validation**
@@ -85,9 +85,13 @@ kubectl run validator --image=python:3.9 --rm -it --restart=Never --namespace=tr
 
 ### **Step 5: Enable Trading**
 ```bash
-# Initially keep in paper trading mode
-kubectl set env deployment/freqtrade-hft-bot PAPER_TRADING=true -n trading
-kubectl set env deployment/hummingbot-market-maker PAPER_TRADING=true -n trading
+# Initially keep in paper trading mode for all agents
+kubectl set env deployment/trend-momentum-agent ENABLE_PAPER_TRADING=true -n trading-system
+kubectl set env deployment/strategy-optimization-agent ENABLE_PAPER_TRADING=true -n trading-system
+kubectl set env deployment/financial-sentiment-agent ENABLE_PAPER_TRADING=true -n trading-system
+kubectl set env deployment/market-prediction-agent ENABLE_PAPER_TRADING=true -n trading-system
+kubectl set env deployment/volume-microstructure-agent ENABLE_PAPER_TRADING=true -n trading-system
+kubectl set env deployment/vpin-hft ENABLE_PAPER_TRADING=true -n trading-system
 
 # Monitor for 24-48 hours
 # Then gradually enable live trading components

@@ -99,22 +99,6 @@ class PubSubClient:
         """Publish strategy parameter adjustment."""
         await self._publish(self._reasoning_topic, payload)
 
-    async def publish_freqtrade_proposal(self, payload: Dict[str, Any]) -> None:
-        """Publish Freqtrade strategy proposal."""
-        await self._publish(self._decisions_topic, payload)
-
-    async def publish_hummingbot_proposal(self, payload: Dict[str, Any]) -> None:
-        """Publish Hummingbot market making proposal."""
-        await self._publish(self._decisions_topic, payload)
-
-    async def publish_freqtrade_execution(self, payload: Dict[str, Any]) -> None:
-        """Publish Freqtrade order execution."""
-        await self._publish(self._positions_topic, payload)
-
-    async def publish_hummingbot_execution(self, payload: Dict[str, Any]) -> None:
-        """Publish Hummingbot order execution."""
-        await self._publish(self._positions_topic, payload)
-
     async def publish_liquidity_update(self, payload: Dict[str, Any]) -> None:
         """Publish liquidity provision update."""
         await self._publish(self._reasoning_topic, payload)

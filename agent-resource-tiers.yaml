@@ -1,0 +1,34 @@
+# Agent Resource Tiers for Optimal Performance
+
+# Lightweight Agents (Basic strategies)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agent-tiers-config
+  namespace: trading
+data:
+  # Tier 1: Lightweight (20% of agents)
+  LIGHTWEIGHT_CPU_REQUEST: "50m"
+  LIGHTWEIGHT_MEMORY_REQUEST: "64Mi"
+  LIGHTWEIGHT_CPU_LIMIT: "200m"
+  LIGHTWEIGHT_MEMORY_LIMIT: "256Mi"
+  
+  # Tier 2: Standard (60% of agents) 
+  STANDARD_CPU_REQUEST: "200m"
+  STANDARD_MEMORY_REQUEST: "256Mi"
+  STANDARD_CPU_LIMIT: "500m"
+  STANDARD_MEMORY_LIMIT: "512Mi"
+  
+  # Tier 3: Heavy (15% of agents - AI/ML intensive)
+  HEAVY_CPU_REQUEST: "500m"
+  HEAVY_MEMORY_REQUEST: "1Gi"
+  HEAVY_CPU_LIMIT: "2000m"
+  HEAVY_MEMORY_LIMIT: "4Gi"
+  
+  # Tier 4: TPU/GPU (5% of agents - HFT/VPIN)
+  ACCELERATED_CPU_REQUEST: "1000m"
+  ACCELERATED_MEMORY_REQUEST: "2Gi"
+  ACCELERATED_CPU_LIMIT: "4000m"
+  ACCELERATED_MEMORY_LIMIT: "8Gi"
+  ACCELERATED_TPU_REQUEST: "1"
+  ACCELERATED_GPU_REQUEST: "1"

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import time
 from decimal import Decimal, ROUND_DOWN
 from datetime import datetime
@@ -55,6 +56,7 @@ OrderIntent = None  # type: ignore[assignment]
 from .mcp import MCPClient, MCPMessageType, MCPProposalPayload, MCPResponsePayload
 from .vertex_ai_client import get_vertex_client, VertexAIClient
 # Open-source analyst removed - now using Google Cloud AI exclusively
+from .metrics_tracker import get_metrics_tracker
 from .metrics import (
     ASTER_API_REQUESTS,
     LLM_CONFIDENCE,
@@ -80,6 +82,21 @@ from .metrics import (
     AGENT_MARGIN_REMAINING,
     AGENT_MARGIN_UTILIZATION,
     PORTFOLIO_DRAWDOWN,
+    AGENT_INFERENCE_TIME,
+    AGENT_DECISION_LATENCY,
+    AGENT_THROUGHPUT,
+    AGENT_INFERENCE_TOKENS,
+    AGENT_INFERENCE_COST,
+    AGENT_ERROR_RATE,
+    AGENT_SUCCESS_RATE,
+    AGENT_AVG_CONFIDENCE,
+    AGENT_LAST_INFERENCE_TIME,
+    AGENT_INFERENCE_COUNT,
+    AGENT_RESPONSE_TIME,
+    AGENT_MARKET_DATA_LATENCY,
+    AGENT_TRADE_EXECUTION_LATENCY,
+    AGENT_CIRCUIT_BREAKER_STATE,
+    AGENT_FALLBACK_USAGE,
 )
 
 
@@ -218,68 +235,22 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         "market_regime_preference": "liquid",
     },
     {
-        "id": "freqtrade",
-        "name": "FreqTrade Algorithmic",
-        "model": "FreqTrade-ML",
-        "emoji": "🤖",
-        "symbols": [],
-        "description": "Advanced algorithmic trading bot using machine learning for strategy optimization and execution.",
-        "personality": "Systematic and data-driven, focuses on statistical edge and risk management.",
-        "baseline_win_rate": 0.62,
-        "risk_multiplier": 1.6,
-        "profit_target": 0.008,
-        "margin_allocation": 500.0,
-        "specialization": "algorithmic_trading",
-        "dynamic_position_sizing": True,
-        "adaptive_leverage": True,
-        "intelligence_tp_sl": True,
-        "max_leverage_limit": 16.0,
-        "min_position_size_pct": 0.015,
-        "max_position_size_pct": 0.25,
-        "risk_tolerance": "moderate",
-        "time_horizon": "short",
-        "market_regime_preference": "ranging",
-    },
-    {
-        "id": "hummingbot",
-        "name": "HummingBot Market Maker",
-        "model": "HummingBot-AI",
-        "emoji": "📈",
-        "symbols": [],
-        "description": "AI-powered market making bot that provides liquidity while optimizing for profit through intelligent spread management.",
-        "personality": "Strategic and patient, focuses on providing liquidity while capturing spreads and market inefficiencies.",
-        "baseline_win_rate": 0.70,
-        "risk_multiplier": 1.2,
-        "profit_target": 0.004,
-        "margin_allocation": 500.0,
-        "specialization": "market_making",
-        "dynamic_position_sizing": True,
-        "adaptive_leverage": True,
-        "intelligence_tp_sl": True,
-        "max_leverage_limit": 8.0,
-        "min_position_size_pct": 0.01,
-        "max_position_size_pct": 0.15,
-        "risk_tolerance": "low",
-        "time_horizon": "continuous",
-        "market_regime_preference": "all_regimes",
-    },
-    {
         "id": "vpin-hft",
         "name": "VPIN HFT Agent",
-        "model": "VPIN Volatility",
+        "model": "gemini-2.0-flash-exp",
         "emoji": "⚡",
         "symbols": [],  # All symbols
-        "margin_allocation": 500.0,
-        "max_leverage_limit": 30.0,
-        "specialization": "volatility_hft",
-        "description": "High-frequency trading agent using VPIN to detect order flow toxicity and predict short-term price movements.",
-        "personality": "Aggressive, high-frequency, reacts to market microstructure.",
-        "baseline_win_rate": 0.55, # Win rate depends on market conditions
+        "description": "High-frequency trading agent using Gemini 2.0 Flash Experimental for real-time order flow toxicity detection and volume microstructure analysis to predict short-term price movements.",
+        "personality": "Aggressive, high-frequency, AI-powered pattern recognition in market microstructure.",
+        "baseline_win_rate": 0.55,
         "risk_multiplier": 3.0,
-        "profit_target": 0.005, # Small, frequent profits
+        "profit_target": 0.005,  # Small, frequent profits
+        "margin_allocation": 500.0,
+        "specialization": "volume_hft",
         "dynamic_position_sizing": True,
         "adaptive_leverage": True,
-        "intelligence_tp_sl": False, # VPIN has its own logic
+        "intelligence_tp_sl": True,  # AI-powered take profit/stop loss
+        "max_leverage_limit": 30.0,
         "min_position_size_pct": 0.01,
         "max_position_size_pct": 0.10,
         "risk_tolerance": "very_high",
@@ -386,7 +357,8 @@ class TradingService:
 
         # Initialize self-healing system
         self._healing_manager = get_self_healing_manager()
-        self._setup_self_healing_checks()
+        # Defer self-healing setup to async start() method to avoid event loop issues
+        # self._setup_self_healing_checks()
 
         # Initialize graceful degradation system
         initialize_graceful_degradation()
@@ -450,6 +422,7 @@ class TradingService:
             self._rate_limit_manager = None
         else:
             try:
+                # Initialize with default parameters
                 self._rate_limit_manager = RateLimitManager(default_rps=10, default_rpm=1200)
             except Exception as e:
                 logger.error(f"Failed to initialize rate limiter: {e}")
@@ -648,6 +621,64 @@ class TradingService:
             )
         
         logger.info(f"Total agents initialized: {len(self._agent_states)}/{len(AGENT_DEFINITIONS)}")
+
+    async def _register_agents_with_coordinator(self) -> None:
+        """Register all initialized agents with the MCP coordinator for inter-agent communication."""
+        logger.info("Starting agent registration process...")
+        coordinator_url = self._settings.mcp_url or os.getenv("MCP_URL") or os.getenv("COORDINATOR_URL")
+        logger.info(f"Coordinator URL resolved to: {coordinator_url}")
+        if not coordinator_url:
+            logger.warning("No coordinator URL configured (checked MCP_URL and COORDINATOR_URL), skipping agent registration")
+            return
+
+        if not self._agent_states:
+            logger.warning("No agents initialized, skipping coordinator registration")
+            return
+
+        logger.info(f"Registering {len(self._agent_states)} agents with MCP coordinator at {coordinator_url}...")
+
+        # Import the coordinator message types
+        from .mcp_coordinator import ComponentType, CoordinatorMessage
+
+        import httpx
+
+        registered_count = 0
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            for agent_id, agent_state in self._agent_states.items():
+                try:
+                    # Register each agent as an LLM_AGENT component
+                    registration_message = CoordinatorMessage(
+                        message_type="register",
+                        component_id=agent_id,
+                        component_type=ComponentType.LLM_AGENT,
+                        payload={
+                            "agent_name": agent_state.name,
+                            "model": agent_state.model,
+                            "specialization": getattr(agent_state, 'specialization', 'general'),
+                            "personality": agent_state.personality,
+                            "margin_allocation": agent_state.margin_allocation,
+                            "symbol_count": len(agent_state.symbols),
+                        },
+                        timestamp=datetime.utcnow()
+                    )
+
+                    # Send HTTP POST request to coordinator's /register endpoint
+                    response = await client.post(
+                        f"{coordinator_url}/register",
+                        json=registration_message.model_dump(),
+                        headers={"Content-Type": "application/json"}
+                    )
+
+                    if response.status_code == 200:
+                        registered_count += 1
+                        logger.info(f"Registered agent {agent_id} ({agent_state.name}) with coordinator")
+                    else:
+                        logger.warning(f"Failed to register agent {agent_id}: HTTP {response.status_code} - {response.text}")
+
+                except Exception as exc:
+                    logger.warning(f"Failed to register agent {agent_id} with coordinator: {exc}")
+
+        logger.info(f"Successfully registered {registered_count}/{len(self._agent_states)} agents with MCP coordinator")
 
     async def _refresh_symbols(self) -> None:
         """Periodically check for new symbols and reassign if needed."""
@@ -1194,6 +1225,12 @@ class TradingService:
         if self._health.running:
             logger.warning("Trading service already running.")
             return
+        
+        # Setup self-healing checks now that we have an event loop
+        try:
+            self._setup_self_healing_checks()
+        except Exception as e:
+            logger.warning(f"Failed to setup self-healing checks: {e}, continuing without it")
 
         credentials = self._credential_manager.get_credentials()
         if not (credentials.api_key and credentials.api_secret) and not self._settings.enable_paper_trading:
@@ -1248,6 +1285,14 @@ class TradingService:
             
         # Initialize agents with dynamic symbol discovery
         await self._initialize_agents()
+        logger.info("Agents initialized, now registering with coordinator...")
+
+        # Register agents with MCP coordinator for inter-agent communication
+        try:
+            await self._register_agents_with_coordinator()
+        except Exception as exc:
+            logger.warning(f"Failed to register agents with coordinator: {exc}")
+            # Don't fail startup if registration fails
 
         # Initialize the Aster client with credentials
         self._exchange = AsterClient(
@@ -1871,12 +1916,9 @@ class TradingService:
             tasks = []
             for agent in agents_to_query:
                 # Agent-specific logic removed - all agents now use unified processing
-                    tasks.append(self._query_vertex_agent(
-                        agent, symbol, side, price, market_context, take_profit, stop_loss
-                    ))
-                else:
-                    # Open-source analyst removed - now using Google Cloud AI exclusively
-                    pass  # All agents now use Vertex AI
+                tasks.append(self._query_vertex_agent(
+                    agent, symbol, side, price, market_context, take_profit, stop_loss
+                ))
 
             results = await asyncio.gather(*tasks, return_exceptions=True)
             
@@ -1951,6 +1993,7 @@ class TradingService:
 
             if not risk_rejected:
                 # Agent-specific validation removed - all agents now use unified validation
+                pass
 
         change_24h = market_context.get('change_24h', 0)
         volume = market_context.get('volume', 0)
@@ -2041,6 +2084,13 @@ The output should be a JSON object with these keys.
 
         try:
             start_time = time.time()
+            # Get agent model for metrics
+            agent_model = None
+            for agent_def in AGENT_DEFINITIONS:
+                if agent_def["id"] == agent_id:
+                    agent_model = agent_def.get("vertex_model", "unknown")
+                    break
+            
             # Use circuit breaker for Vertex AI calls
             prediction = await VERTEX_AI_BREAKER.call(
                 self._vertex_client.predict_with_fallback,
@@ -2051,23 +2101,106 @@ The output should be a JSON object with these keys.
             )
             inference_time = time.time() - start_time
 
-            response_text = prediction.get("response", "{}")
+            # Record per-agent metrics
+            if agent_model:
+                AGENT_INFERENCE_TIME.labels(agent_id=agent_id, model=agent_model).observe(inference_time)
+                AGENT_LAST_INFERENCE_TIME.labels(agent_id=agent_id).set(inference_time)
+                AGENT_INFERENCE_COUNT.labels(agent_id=agent_id, model=agent_model).inc()
+            
+            # Record general LLM metrics
+            LLM_INFERENCE_TIME.observe(inference_time)
+            
+            # Get response text
+            response_text = prediction.get("response", "")
+            
+            # Get token counts if available
+            metadata = prediction.get("metadata", {})
+            input_tokens = metadata.get("input_tokens", metadata.get("prompt_token_count", 0))
+            output_tokens = metadata.get("output_tokens", metadata.get("candidates_token_count", 0))
+            
+            # If token counts not available, estimate from text length (rough: ~4 characters per token)
+            if input_tokens == 0:
+                input_tokens = len(prompt) // 4
+            if output_tokens == 0:
+                output_tokens = len(response_text) // 4
+            
+            if agent_model and input_tokens > 0:
+                AGENT_INFERENCE_TOKENS.labels(agent_id=agent_id, model=agent_model, type="input").observe(input_tokens)
+            if agent_model and output_tokens > 0:
+                AGENT_INFERENCE_TOKENS.labels(agent_id=agent_id, model=agent_model, type="output").observe(output_tokens)
+            
+            # Estimate cost (Gemini pricing: varies by model)
+            estimated_cost = 0.0
+            if agent_model and input_tokens > 0 and output_tokens > 0:
+                # Pricing estimates per 1M tokens (varies by model)
+                # Gemini 2.0 Flash Exp: ~$0.075 per 1M input tokens, ~$0.30 per 1M output tokens
+                # Gemini Exp 1206: ~$0.10 per 1M input tokens, ~$0.40 per 1M output tokens
+                # Codey: ~$0.05 per 1M input tokens, ~$0.15 per 1M output tokens
+                if "flash" in agent_model.lower():
+                    input_cost_per_m = 0.075
+                    output_cost_per_m = 0.30
+                elif "exp" in agent_model.lower() or "1206" in agent_model.lower():
+                    input_cost_per_m = 0.10
+                    output_cost_per_m = 0.40
+                elif "codey" in agent_model.lower():
+                    input_cost_per_m = 0.05
+                    output_cost_per_m = 0.15
+                else:
+                    # Default pricing (Gemini 1.5 Flash)
+                    input_cost_per_m = 0.075
+                    output_cost_per_m = 0.30
+                
+                estimated_cost = (input_tokens / 1_000_000) * input_cost_per_m + (output_tokens / 1_000_000) * output_cost_per_m
+                
+                if agent_model:
+                    AGENT_INFERENCE_COST.labels(agent_id=agent_id, model=agent_model).observe(estimated_cost)
+
             try:
                 analysis = json.loads(response_text)
             except json.JSONDecodeError:
                 analysis = {"thesis": response_text}
 
-
+            confidence = analysis.get("confidence", prediction.get("confidence", 0.5))
             analysis["source"] = f"vertex-ai-{agent_id}"
-            analysis.setdefault("confidence", prediction.get("confidence", 0.5))
+            analysis.setdefault("confidence", confidence)
             analysis.setdefault("risk_score", 0.5) # Default risk score
             analysis["inference_time"] = inference_time
+
+            # Record confidence metrics
+            LLM_CONFIDENCE.observe(confidence)
+            # Update average confidence (would need to calculate from history in production)
+            # For now, just set the current confidence
+            AGENT_AVG_CONFIDENCE.labels(agent_id=agent_id).set(confidence)
+            
+            # Record success
+            AGENT_THROUGHPUT.labels(agent_id=agent_id).inc()
+            
+            # Record in metrics tracker
+            metrics_tracker = get_metrics_tracker()
+            metrics_tracker.record_inference(
+                agent_id=agent_id,
+                inference_time=inference_time,
+                model=agent_model or "unknown",
+                input_tokens=input_tokens if input_tokens > 0 else None,
+                output_tokens=output_tokens if output_tokens > 0 else None,
+                cost=estimated_cost if estimated_cost > 0 else None,
+                confidence=confidence,
+            )
+            metrics_tracker.record_success(agent_id)
+            metrics_tracker.record_decision(agent_id, inference_time)
 
             await cache.set(cache_key, analysis, ttl=60) # Cache for 60 seconds
             return analysis
 
         except Exception as e:
             logger.error(f"Vertex AI query failed for agent {agent_id}: {e}")
+            # Record error
+            AGENT_ERROR_RATE.labels(agent_id=agent_id, error_type=type(e).__name__).inc()
+            
+            # Record in metrics tracker
+            metrics_tracker = get_metrics_tracker()
+            metrics_tracker.record_error(agent_id, type(e).__name__)
+            
             return {
                 "thesis": f"Error during analysis for {symbol}. Fallback initiated.",
                 "confidence": 0.4,

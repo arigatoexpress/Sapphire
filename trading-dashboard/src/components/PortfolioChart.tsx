@@ -47,7 +47,9 @@ const PortfolioChart: React.FC = () => {
     const data = [];
     const points = timeRange === '1h' ? 60 : timeRange === '24h' ? 24 : timeRange === '7d' ? 7 : 30;
 
-    let currentValue = portfolio?.portfolio_value || 10000;
+    // Use bot trading capital baseline ($3,000) instead of portfolio_value
+    const botCapital = portfolio?.agent_allocations ? Object.values(portfolio.agent_allocations).reduce((sum: number, val: any) => sum + (val || 0), 0) : 3000;
+    let currentValue = botCapital;
 
     // Generate data chronologically: oldest (past) to newest (present)
     // Chart will display left-to-right: past → present
@@ -61,7 +63,7 @@ const PortfolioChart: React.FC = () => {
             timeRange === '7d' ? `Day ${points - i + 1}` :
               `Day ${points - i + 1}`,
         value: Math.max(0, currentValue),
-        pnl: currentValue - (portfolio?.portfolio_value || 10000),
+        pnl: currentValue - botCapital,
         change: change,
       });
     }
@@ -74,13 +76,12 @@ const PortfolioChart: React.FC = () => {
   // Generate agent trade data for visualization
   const generateAgentTradeData = () => {
     const agentColors = {
-      trend_momentum_agent: '#06b6d4',
-      strategy_optimization_agent: '#8b5cf6',
-      financial_sentiment_agent: '#ef4444',
-      market_prediction_agent: '#f59e0b',
-      volume_microstructure_agent: '#ec4899',
-      freqtrade: '#3b82f6',
-      hummingbot: '#10b981'
+      'trend-momentum-agent': '#06b6d4',
+      'strategy-optimization-agent': '#8b5cf6',
+      'financial-sentiment-agent': '#ef4444',
+      'market-prediction-agent': '#f59e0b',
+      'volume-microstructure-agent': '#ec4899',
+      'vpin-hft': '#06b6d4'
     };
 
     const trades: any[] = [];
@@ -412,7 +413,7 @@ const PortfolioChart: React.FC = () => {
             </Typography>
             <Box display="flex" alignItems="center" gap={2}>
               <Typography variant="h3" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                {formatValue(portfolio?.portfolio_value || 0)}
+                {formatValue(botCapital)}
               </Typography>
               <Box display="flex" alignItems="center">
                 {performance.changePercent >= 0 ? (

@@ -163,8 +163,6 @@ class PortfolioOrchestrator:
             "market-prediction-agent": AgentRole.MARKET_PREDICTOR,
             "volume-microstructure-agent": AgentRole.VOLUME_ANALYST,
             "vpin-hft": AgentRole.VOLATILITY_SPECIALIST,
-            "freqtrade": AgentRole.TECHNICAL_ANALYST,
-            "hummingbot": AgentRole.MARKET_MAKER,
         }
 
         for agent_id, role in standard_agents.items():

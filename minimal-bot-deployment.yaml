@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: minimal-trading-bot-config
+  namespace: trading
+data:
+  BOT_NAME: "minimal-trading-bot"
+  BOT_STRATEGY: "basic-trend-following"
+  CAPITAL_ALLOCATION: "100"
+  TELEGRAM_ENABLED: "true"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minimal-trading-bot
+  namespace: trading
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minimal-trading-bot
+  template:
+    metadata:
+      labels:
+        app: minimal-trading-bot
+    spec:
+      containers:
+      - name: minimal-trading-bot
+        image: us-central1-docker.pkg.dev/sapphireinfinite/cloud-run-source-deploy/cloud-trader:latest
+        env:
+        - name: BOT_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: minimal-trading-bot-config
+              key: BOT_NAME
+        - name: BOT_STRATEGY
+          valueFrom:
+            configMapKeyRef:
+              name: minimal-trading-bot-config
+              key: BOT_STRATEGY
+        - name: CAPITAL_ALLOCATION
+          valueFrom:
+            configMapKeyRef:
+              name: minimal-trading-bot-config
+              key: CAPITAL_ALLOCATION
+        - name: TELEGRAM_BOT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: telegram-secret
+              key: TELEGRAM_BOT_TOKEN
+        - name: TELEGRAM_CHAT_ID
+          valueFrom:
+            secretKeyRef:
+              name: telegram-secret
+              key: TELEGRAM_CHAT_ID
+        - name: TELEGRAM_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: minimal-trading-bot-config
+              key: TELEGRAM_ENABLED
+        resources:
+          requests:
+            memory: "32Mi"
+            cpu: "20m"
+          limits:
+            memory: "64Mi"
+            cpu: "50m"

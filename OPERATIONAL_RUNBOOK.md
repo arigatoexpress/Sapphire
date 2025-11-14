@@ -8,7 +8,7 @@ This runbook provides operational procedures for the Sapphire Trading System, a 
 ### Core Components
 - **Cloud Trader**: Main trading service with AI agents
 - **MCP Coordinator**: Multi-agent communication protocol coordinator
-- **AI Agents**: Specialized trading algorithms (DeepSeek, Qwen, FinGPT, Lag-LLaMA, VPIN)
+- **AI Agents**: 6 specialized AI trading agents (Trend Momentum, Strategy Optimization, Financial Sentiment, Market Prediction, Volume Microstructure, VPIN HFT) powered by Gemini models
 - **Redis**: Caching and session management
 - **PostgreSQL**: Trade and market data storage
 - **Vertex AI**: Machine learning inference service

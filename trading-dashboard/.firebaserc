@@ -1,15 +1,1 @@
-{
-  "projects": {
-    "default": "sapphireinfinite"
-  },
-  "targets": {
-    "sapphireinfinite": {
-      "hosting": {
-        "sapphire-prod": [
-          "sapphire-trading"
-        ]
-      }
-    }
-  }
-}
-EOF && echo "✅ Firebase config ready" && echo "" && echo "🚀 DEPLOYING FRONTEND TO TEMPORARY SITE:" && cd trading-dashboard && firebase hosting:sites:create temp-trading-dashboard --project=sapphireinfinite 2>/dev/null || echo "Site may already exist or creation not needed"
+{"projects": {"default": "sapphireinfinite"}}

@@ -29,10 +29,6 @@ class BigQueryStreamer:
             "positions": "positions_stream",
             "market_data": "market_data_stream",
             "agent_performance": "agent_performance_stream",
-            "freqtrade_proposals": "freqtrade_proposals_stream",
-            "hummingbot_proposals": "hummingbot_proposals_stream",
-            "freqtrade_executions": "freqtrade_executions_stream",
-            "hummingbot_executions": "hummingbot_executions_stream",
             "liquidity_updates": "liquidity_updates_stream",
             "market_making_status": "market_making_status_stream",
             "portfolio_rebalances": "portfolio_rebalances_stream",
@@ -139,64 +135,6 @@ class BigQueryStreamer:
             bigquery.SchemaField("metadata", "JSON", mode="NULLABLE"),
         ]
 
-        # Freqtrade proposals table schema
-        freqtrade_proposals_schema = [
-            bigquery.SchemaField("timestamp", "TIMESTAMP", mode="REQUIRED"),
-            bigquery.SchemaField("symbol", "STRING", mode="REQUIRED"),
-            bigquery.SchemaField("strategy", "STRING", mode="REQUIRED"),
-            bigquery.SchemaField("timeframe", "STRING", mode="REQUIRED"),
-            bigquery.SchemaField("signal", "STRING", mode="REQUIRED"),
-            bigquery.SchemaField("confidence", "FLOAT", mode="REQUIRED"),
-            bigquery.SchemaField("indicators", "JSON", mode="NULLABLE"),
-            bigquery.SchemaField("entry_price", "FLOAT", mode="NULLABLE"),
-            bigquery.SchemaField("stop_loss", "FLOAT", mode="NULLABLE"),
-            bigquery.SchemaField("take_profit", "FLOAT", mode="NULLABLE"),
-            bigquery.SchemaField("rationale", "STRING", mode="REQUIRED"),
-            bigquery.SchemaField("freqai_prediction", "JSON", mode="NULLABLE"),
-        ]
-
-        # Hummingbot proposals table schema
-        hummingbot_proposals_schema = [
-            bigquery.SchemaField("timestamp", "TIMESTAMP", mode="REQUIRED"),
-            bigquery.SchemaField("symbol", "STRING", mode="REQUIRED"),
-            bigquery.SchemaField("strategy", "STRING", mode="REQUIRED"),
-            bigquery.SchemaField("spread_percentage", "FLOAT", mode="REQUIRED"),
-            bigquery.SchemaField("order_amount", "FLOAT", mode="REQUIRED"),
-            bigquery.SchemaField("inventory_skew", "FLOAT", mode="NULLABLE"),
-            bigquery.SchemaField("market_depth", "JSON", mode="NULLABLE"),
-            bigquery.SchemaField("rationale", "STRING", mode="REQUIRED"),
-            bigquery.SchemaField("expected_pnl", "FLOAT", mode="NULLABLE"),
-        ]
-
-        # Freqtrade executions table schema
-        freqtrade_executions_schema = [
-            bigquery.SchemaField("timestamp", "TIMESTAMP", mode="REQUIRED"),
-            bigquery.SchemaField("symbol", "STRING", mode="REQUIRED"),
-            bigquery.SchemaField("strategy", "STRING", mode="REQUIRED"),
-            bigquery.SchemaField("order_id", "STRING", mode="REQUIRED"),
-            bigquery.SchemaField("side", "STRING", mode="REQUIRED"),
-            bigquery.SchemaField("amount", "FLOAT", mode="REQUIRED"),
-            bigquery.SchemaField("price", "FLOAT", mode="REQUIRED"),
-            bigquery.SchemaField("fee", "FLOAT", mode="REQUIRED"),
-            bigquery.SchemaField("status", "STRING", mode="REQUIRED"),
-            bigquery.SchemaField("pnl", "FLOAT", mode="NULLABLE"),
-            bigquery.SchemaField("roi", "FLOAT", mode="NULLABLE"),
-        ]
-
-        # Hummingbot executions table schema
-        hummingbot_executions_schema = [
-            bigquery.SchemaField("timestamp", "TIMESTAMP", mode="REQUIRED"),
-            bigquery.SchemaField("symbol", "STRING", mode="REQUIRED"),
-            bigquery.SchemaField("strategy", "STRING", mode="REQUIRED"),
-            bigquery.SchemaField("order_id", "STRING", mode="REQUIRED"),
-            bigquery.SchemaField("side", "STRING", mode="REQUIRED"),
-            bigquery.SchemaField("amount", "FLOAT", mode="REQUIRED"),
-            bigquery.SchemaField("price", "FLOAT", mode="REQUIRED"),
-            bigquery.SchemaField("fee", "FLOAT", mode="REQUIRED"),
-            bigquery.SchemaField("status", "STRING", mode="REQUIRED"),
-            bigquery.SchemaField("spread_earned", "FLOAT", mode="NULLABLE"),
-        ]
-
         # Liquidity updates table schema
         liquidity_updates_schema = [
             bigquery.SchemaField("timestamp", "TIMESTAMP", mode="REQUIRED"),
@@ -279,10 +217,6 @@ class BigQueryStreamer:
             "positions": positions_schema,
             "market_data": market_data_schema,
             "agent_performance": agent_performance_schema,
-            "freqtrade_proposals": freqtrade_proposals_schema,
-            "hummingbot_proposals": hummingbot_proposals_schema,
-            "freqtrade_executions": freqtrade_executions_schema,
-            "hummingbot_executions": hummingbot_executions_schema,
             "liquidity_updates": liquidity_updates_schema,
             "market_making_status": market_making_status_schema,
             "portfolio_rebalances": portfolio_rebalances_schema,
@@ -504,138 +438,6 @@ class BigQueryStreamer:
         except Exception as e:
             logger.warning(f"Failed to stream agent performance to BigQuery: {e}")
             return False
-
-    async def stream_freqtrade_proposal(
-        self,
-        timestamp: datetime,
-        symbol: str,
-        strategy: str,
-        timeframe: str,
-        signal: str,
-        confidence: float,
-        indicators: Optional[Dict[str, Any]] = None,
-        entry_price: Optional[float] = None,
-        stop_loss: Optional[float] = None,
-        take_profit: Optional[float] = None,
-        rationale: str = "",
-        freqai_prediction: Optional[Dict[str, Any]] = None,
-    ) -> bool:
-        """Stream Freqtrade proposal to BigQuery."""
-        if not self.is_ready():
-            return False
-
-        row = {
-            "timestamp": timestamp,
-            "symbol": symbol,
-            "strategy": strategy,
-            "timeframe": timeframe,
-            "signal": signal,
-            "confidence": confidence,
-            "indicators": json.dumps(indicators) if indicators else None,
-            "entry_price": entry_price,
-            "stop_loss": stop_loss,
-            "take_profit": take_profit,
-            "rationale": rationale,
-            "freqai_prediction": json.dumps(freqai_prediction) if freqai_prediction else None,
-        }
-
-        return await self._insert_row("freqtrade_proposals", row)
-
-    async def stream_hummingbot_proposal(
-        self,
-        timestamp: datetime,
-        symbol: str,
-        strategy: str,
-        spread_percentage: float,
-        order_amount: float,
-        inventory_skew: Optional[float] = None,
-        market_depth: Optional[Dict[str, Any]] = None,
-        rationale: str = "",
-        expected_pnl: Optional[float] = None,
-    ) -> bool:
-        """Stream Hummingbot proposal to BigQuery."""
-        if not self.is_ready():
-            return False
-
-        row = {
-            "timestamp": timestamp,
-            "symbol": symbol,
-            "strategy": strategy,
-            "spread_percentage": spread_percentage,
-            "order_amount": order_amount,
-            "inventory_skew": inventory_skew,
-            "market_depth": json.dumps(market_depth) if market_depth else None,
-            "rationale": rationale,
-            "expected_pnl": expected_pnl,
-        }
-
-        return await self._insert_row("hummingbot_proposals", row)
-
-    async def stream_freqtrade_execution(
-        self,
-        timestamp: datetime,
-        symbol: str,
-        strategy: str,
-        order_id: str,
-        side: str,
-        amount: float,
-        price: float,
-        fee: float,
-        status: str,
-        pnl: Optional[float] = None,
-        roi: Optional[float] = None,
-    ) -> bool:
-        """Stream Freqtrade execution to BigQuery."""
-        if not self.is_ready():
-            return False
-
-        row = {
-            "timestamp": timestamp,
-            "symbol": symbol,
-            "strategy": strategy,
-            "order_id": order_id,
-            "side": side,
-            "amount": amount,
-            "price": price,
-            "fee": fee,
-            "status": status,
-            "pnl": pnl,
-            "roi": roi,
-        }
-
-        return await self._insert_row("freqtrade_executions", row)
-
-    async def stream_hummingbot_execution(
-        self,
-        timestamp: datetime,
-        symbol: str,
-        strategy: str,
-        order_id: str,
-        side: str,
-        amount: float,
-        price: float,
-        fee: float,
-        status: str,
-        spread_earned: Optional[float] = None,
-    ) -> bool:
-        """Stream Hummingbot execution to BigQuery."""
-        if not self.is_ready():
-            return False
-
-        row = {
-            "timestamp": timestamp,
-            "symbol": symbol,
-            "strategy": strategy,
-            "order_id": order_id,
-            "side": side,
-            "amount": amount,
-            "price": price,
-            "fee": fee,
-            "status": status,
-            "spread_earned": spread_earned,
-        }
-
-        return await self._insert_row("hummingbot_executions", row)
 
     async def stream_liquidity_update(
         self,

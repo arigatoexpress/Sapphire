@@ -1,37 +1,18 @@
-# Multi-stage optimized build for high-performance trading service
-# Stage 1: Base dependencies (cached layer)
-FROM python:3.11-slim AS base
+# Simplified single-stage build for reliable deployment
+FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Install system dependencies (minimal set)
+# Install system dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
-        && rm -rf /var/lib/apt/lists/*
-
-# Stage 2: Builder stage for Python dependencies
-FROM base AS builder
-
-WORKDIR /build
-
-# Install build tools
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
         build-essential \
         && rm -rf /var/lib/apt/lists/*
-
-# Copy requirements and install with cache mount
-COPY requirements.txt .
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --user --no-cache-dir -r requirements.txt
-
-# Stage 3: Production runtime (ultra-minimal)
-FROM base AS runtime
 
 # Create non-root user
 RUN groupadd -r trader && useradd -r -g trader trader
@@ -39,27 +20,26 @@ RUN groupadd -r trader && useradd -r -g trader trader
 # Set working directory
 WORKDIR /app
 
-# Copy Python packages from builder
-COPY --from=builder --chown=trader:trader /root/.local /home/trader/.local
+# Copy requirements and install Python packages
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code with forced cache invalidation
 ARG CACHE_BUST
 RUN echo "Cache bust: $CACHE_BUST"
-COPY --chown=trader:trader cloud_trader ./cloud_trader
-COPY --chown=trader:trader pyproject.toml README.md ./
+COPY cloud_trader ./cloud_trader
+COPY pyproject.toml README.md ./
 
-# Copy system initialization and testing scripts
-COPY --chown=trader:trader system_initializer.py comprehensive_test.py deploy_system.py ./
+# Copy system initialization and testing scripts (optional - only if they exist)
+# These files are not required for the trading service to run
 
 # Force rebuild marker with timestamp
 RUN echo "MCP endpoints included - $(date +%s)" > /tmp/build_marker && ls -la /app/cloud_trader/api.py
 
-# Set environment
-ENV PATH=/home/trader/.local/bin:$PATH \
-    PYTHONPATH=/app \
+# Set environment and permissions
+ENV PYTHONPATH=/app \
     PYTHONUNBUFFERED=1
-
-# Switch to non-root user
+RUN chown -R trader:trader /app
 USER trader
 
 EXPOSE 8080

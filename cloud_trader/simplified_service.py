@@ -29,18 +29,17 @@ class SimplifiedTradingService:
         self.vertex_client = VertexAIClient()
         self.is_running = False
         self.agent_status = {
-            'trend_momentum_agent': {'status': 'active', 'last_trade': None},
-            'strategy_optimization_agent': {'status': 'active', 'last_trade': None},
-            'financial_sentiment_agent': {'status': 'active', 'last_trade': None},
-            'market_prediction_agent': {'status': 'active', 'last_trade': None},
-            'volume_microstructure_agent': {'status': 'active', 'last_trade': None},
-            'freqtrade': {'status': 'standby', 'last_trade': None},
-            'hummingbot': {'status': 'standby', 'last_trade': None}
+            'trend-momentum-agent': {'status': 'active', 'last_trade': None},
+            'strategy-optimization-agent': {'status': 'active', 'last_trade': None},
+            'financial-sentiment-agent': {'status': 'active', 'last_trade': None},
+            'market-prediction-agent': {'status': 'active', 'last_trade': None},
+            'volume-microstructure-agent': {'status': 'active', 'last_trade': None},
+            'vpin-hft': {'status': 'active', 'last_trade': None}
         }
 
         # Simplified capital allocation
         self.total_capital = float(os.getenv('TOTAL_CAPITAL', '3500'))
-        self.agent_capital = self.total_capital / 7  # $500 per agent
+        self.agent_capital = self.total_capital / 6  # $500 per trading agent (6 agents total)
 
         logger.info(f"🟢 Simplified Trading Service initialized with ${self.total_capital} capital")
 
@@ -78,7 +77,7 @@ class SimplifiedTradingService:
         return {
             'total_capital': self.total_capital,
             'agent_capital': self.agent_capital,
-            'agent_count': 7,
+            'agent_count': 6,
             'status': 'operational' if self.is_running else 'stopped',
             'timestamp': datetime.utcnow().isoformat(),
             'agents': self.agent_status
@@ -89,9 +88,9 @@ class SimplifiedTradingService:
         activities = []
         for agent_id, status in self.agent_status.items():
             activities.append({
-                'agent_id': f'{agent_id.replace("_", "-")}-1',
+                'agent_id': f'{agent_id}-1',
                 'agent_type': agent_id,
-                'agent_name': agent_id.replace('_', ' ').title(),
+                'agent_name': agent_id.replace('-', ' ').title(),
                 'activity_score': 0.5 + (hash(agent_id) % 50) / 100,  # Pseudo-random score
                 'communication_count': hash(agent_id) % 20,
                 'trading_count': 0,  # No real trading yet
@@ -106,26 +105,24 @@ class SimplifiedTradingService:
     def _get_agent_specialization(self, agent_type: str) -> str:
         """Get agent specialization description"""
         specializations = {
-            'trend_momentum_agent': 'Momentum Analysis',
-            'strategy_optimization_agent': 'Strategy Optimization',
-            'financial_sentiment_agent': 'Sentiment Analysis',
-            'market_prediction_agent': 'Market Prediction',
-            'volume_microstructure_agent': 'Volume Analysis',
-            'freqtrade': 'Algorithmic Trading',
-            'hummingbot': 'Market Making'
+            'trend-momentum-agent': 'Momentum Analysis',
+            'strategy-optimization-agent': 'Strategy Optimization',
+            'financial-sentiment-agent': 'Sentiment Analysis',
+            'market-prediction-agent': 'Market Prediction',
+            'volume-microstructure-agent': 'Volume Analysis',
+            'vpin-hft': 'VPIN High-Frequency Trading'
         }
         return specializations.get(agent_type, 'Trading Agent')
 
     def _get_agent_color(self, agent_type: str) -> str:
         """Get agent color"""
         colors = {
-            'trend_momentum_agent': '#3b82f6',
-            'strategy_optimization_agent': '#8b5cf6',
-            'financial_sentiment_agent': '#10b981',
-            'market_prediction_agent': '#f59e0b',
-            'volume_microstructure_agent': '#ef4444',
-            'freqtrade': '#06b6d4',
-            'hummingbot': '#84cc16'
+            'trend-momentum-agent': '#06b6d4',
+            'strategy-optimization-agent': '#8b5cf6',
+            'financial-sentiment-agent': '#ef4444',
+            'market-prediction-agent': '#f59e0b',
+            'volume-microstructure-agent': '#ec4899',
+            'vpin-hft': '#06b6d4'
         }
         return colors.get(agent_type, '#6b7280')
 

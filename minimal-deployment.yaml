@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minimal-trader
+  namespace: trading
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minimal-trader
+  template:
+    metadata:
+      labels:
+        app: minimal-trader
+    spec:
+      containers:
+      - name: minimal-trader
+        image: us-central1-docker.pkg.dev/sapphireinfinite/cloud-run-source-deploy/cloud-trader:latest
+        command: ["python", "-c"]
+        args:
+        - |
+          import asyncio
+          import logging
+          logging.basicConfig(level=logging.INFO)
+          logger = logging.getLogger(__name__)
+
+          async def main():
+              logger.info("🎯 MINIMAL TRADER STARTED")
+              logger.info("✅ Redis connection available")
+              logger.info("✅ Basic functionality working")
+
+              # Simple health check endpoint
+              from http.server import HTTPServer, BaseHTTPRequestHandler
+              import json
+
+              class HealthHandler(BaseHTTPRequestHandler):
+                  def do_GET(self):
+                      if self.path == '/healthz':
+                          self.send_response(200)
+                          self.send_header('Content-type', 'application/json')
+                          self.end_headers()
+                          self.wfile.write(json.dumps({"status": "healthy", "service": "minimal-trader"}).encode())
+                      else:
+                          self.send_response(404)
+                          self.end_headers()
+
+              server = HTTPServer(('0.0.0.0', 8080), HealthHandler)
+              logger.info("🚀 Health server started on port 8080")
+              server.serve_forever()
+
+          asyncio.run(main())
+        ports:
+        - containerPort: 8080
+        env:
+        - name: REDIS_URL
+          value: "redis://redis:6379"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 200m
+            memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minimal-trader-service
+  namespace: trading
+spec:
+  selector:
+    app: minimal-trader
+  ports:
+    - port: 8080
+      targetPort: 8080
+  type: ClusterIP

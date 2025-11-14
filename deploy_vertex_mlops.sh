@@ -26,13 +26,13 @@ gcloud ai metadata-stores create sapphire-metadata-store \
 # Create experiment tracking
 echo "🧪 Setting up Experiment Tracking..."
 gcloud ai experiments create momentum-analysis-experiment \
-  --display-name="DeepSeek Momentum Analysis Optimization" \
-  --description="Experiment tracking for momentum prediction optimization" \
+  --display-name="Gemini 2.0 Flash Momentum Analysis Optimization" \
+  --description="Experiment tracking for momentum prediction optimization using Gemini 2.0 Flash Experimental" \
   --location=$LOCATION
 
 gcloud ai experiments create strategy-optimization-experiment \
-  --display-name="Qwen Strategy Optimization" \
-  --description="Multi-armed bandit and reinforcement learning optimization" \
+  --display-name="Gemini Experimental 1206 Strategy Optimization" \
+  --description="Multi-armed bandit and reinforcement learning optimization using Gemini Experimental 1206" \
   --location=$LOCATION
 
 gcloud ai experiments create vpin-hft-experiment \

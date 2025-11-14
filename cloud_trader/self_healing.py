@@ -195,8 +195,15 @@ class SelfHealingManager:
             return
 
         self.monitoring_active = True
-        self._monitoring_task = asyncio.create_task(self.health_monitoring_loop())
-        logger.info("Self-healing health monitoring started")
+        try:
+            # Try to get running event loop
+            loop = asyncio.get_running_loop()
+            self._monitoring_task = asyncio.create_task(self.health_monitoring_loop())
+            logger.info("Self-healing health monitoring started")
+        except RuntimeError:
+            # No event loop running, schedule for later
+            logger.warning("No event loop available, self-healing monitoring will start when loop is available")
+            self.monitoring_active = False
 
     def stop_monitoring(self):
         """Stop the health monitoring system."""

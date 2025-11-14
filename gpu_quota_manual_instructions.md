@@ -25,7 +25,7 @@
 ### 4. Provide Justification
    Copy and paste this justification:
 
-   "Sapphire Trading System is a cost-optimized AI-powered algorithmic trading platform that uses selective GPU acceleration only where absolutely necessary. The system employs 5 specialized AI agents with intelligent resource allocation: 4 CPU-optimized agents (DeepSeek, Qwen, FinGPT, Lag-LLaMA) and 1 GPU-accelerated VPIN trader for real-time volume-based informed trading analysis.
+   "Sapphire Trading System is a cost-optimized AI-powered algorithmic trading platform that uses selective TPU/GPU acceleration only where absolutely necessary. The system employs 6 specialized AI agents powered by Google Gemini models: 5 CPU-optimized agents (Trend Momentum, Strategy Optimization, Financial Sentiment, Market Prediction, Volume Microstructure) using Gemini 2.0 Flash Exp, Gemini Exp 1206, and Codey models, with 1 TPU-accelerated VPIN HFT agent for real-time volume-based informed trading analysis.
 
    GPU acceleration is strategically applied only to the VPIN trader, which requires high-performance computing for real-time market microstructure analysis. This cost-effective approach provides GPU precision where critical while maintaining CPU efficiency for other trading strategies.
 

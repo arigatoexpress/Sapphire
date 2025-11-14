@@ -1,0 +1,130 @@
+# Tiered Agent Deployment Templates
+
+# Template 1: Lightweight Agent (Basic strategies)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lightweight-agent-template
+  namespace: trading
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lightweight-agent
+      tier: lightweight
+  template:
+    metadata:
+      labels:
+        app: lightweight-agent
+        tier: lightweight
+    spec:
+      containers:
+      - name: lightweight-agent
+        image: us-central1-docker.pkg.dev/sapphireinfinite/cloud-run-source-deploy/cloud-trader:latest
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        envFrom:
+        - configMapRef:
+            name: agent-tiers-config
+        # Add standard trading environment variables here
+---
+# Template 2: Standard Agent (Most trading strategies)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: standard-agent-template
+  namespace: trading
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: standard-agent
+      tier: standard
+  template:
+    metadata:
+      labels:
+        app: standard-agent
+        tier: standard
+    spec:
+      containers:
+      - name: standard-agent
+        image: us-central1-docker.pkg.dev/sapphireinfinite/cloud-run-source-deploy/cloud-trader:latest
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+---
+# Template 3: Heavy Agent (Complex AI/ML strategies)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: heavy-agent-template
+  namespace: trading
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: heavy-agent
+      tier: heavy
+  template:
+    metadata:
+      labels:
+        app: heavy-agent
+        tier: heavy
+    spec:
+      containers:
+      - name: heavy-agent
+        image: us-central1-docker.pkg.dev/sapphireinfinite/cloud-run-source-deploy/cloud-trader:latest
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+---
+# Template 4: Accelerated Agent (TPU/GPU enabled)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: accelerated-agent-template
+  namespace: trading
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: accelerated-agent
+      tier: accelerated
+  template:
+    metadata:
+      labels:
+        app: accelerated-agent
+        tier: accelerated
+    spec:
+      nodeSelector:
+        accelerator: tpu-v5e
+      tolerations:
+      - key: accelerator
+        operator: Equal
+        value: tpu
+        effect: NoSchedule
+      containers:
+      - name: accelerated-agent
+        image: us-central1-docker.pkg.dev/sapphireinfinite/cloud-run-source-deploy/cloud-trader:latest
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+            google.com/tpu: "1"
+          limits:
+            memory: "8Gi"
+            cpu: "4000m"
+            google.com/tpu: "1"

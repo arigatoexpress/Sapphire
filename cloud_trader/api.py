@@ -34,6 +34,21 @@ from .metrics import (
     RATE_LIMIT_EVENTS,
     RISK_LIMITS_BREACHED,
     TRADING_DECISIONS,
+    AGENT_INFERENCE_TIME,
+    AGENT_DECISION_LATENCY,
+    AGENT_THROUGHPUT,
+    AGENT_INFERENCE_TOKENS,
+    AGENT_INFERENCE_COST,
+    AGENT_ERROR_RATE,
+    AGENT_SUCCESS_RATE,
+    AGENT_AVG_CONFIDENCE,
+    AGENT_LAST_INFERENCE_TIME,
+    AGENT_INFERENCE_COUNT,
+    AGENT_RESPONSE_TIME,
+    AGENT_MARKET_DATA_LATENCY,
+    AGENT_TRADE_EXECUTION_LATENCY,
+    AGENT_CIRCUIT_BREAKER_STATE,
+    AGENT_FALLBACK_USAGE,
 )
 
 logger = logging.getLogger(__name__)
@@ -58,6 +73,43 @@ class RateLimiter:
         return True
 
 rate_limiter = RateLimiter(requests_per_minute=60)  # 60 requests per minute per IP
+
+# Create the FastAPI app instance at module level
+trading_service = TradingService()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Handle application startup and shutdown."""
+    print("🚀 STARTUP: Starting trading service...")
+    logger.info("🚀 STARTUP: Starting trading service...")
+    try:
+        await trading_service.start()
+        print("✅ STARTUP: Trading service started successfully")
+        logger.info("✅ STARTUP: Trading service started successfully")
+    except Exception as exc:
+        print(f"❌ STARTUP: Failed to start trading service: {exc}")
+        logger.exception("❌ STARTUP: Failed to start trading service: %s", exc)
+
+    yield
+
+    logger.info("🛑 SHUTDOWN: Stopping trading service...")
+    try:
+        await trading_service.stop()
+        logger.info("✅ SHUTDOWN: Trading service stopped successfully")
+    except Exception as exc:
+        logger.exception("❌ SHUTDOWN: Failed to stop trading service: %s", exc)
+
+app = FastAPI(title="Cloud Trader", version="1.0", lifespan=lifespan)
+
+# CORS headers will be handled manually in OPTIONS handlers
+
+# Add Prometheus instrumentation
+Instrumentator().instrument(app).expose(app, endpoint="/metrics")
+
+# Serve static files if they exist
+static_path = "/app/static"
+if os.path.exists(static_path):
+    app.mount("/static", StaticFiles(directory=static_path), name="static")
 
 
 def build_app(service: TradingService | None = None) -> FastAPI:
@@ -131,7 +183,7 @@ def build_app(service: TradingService | None = None) -> FastAPI:
         """Alias for /healthz for compatibility"""
         return await healthz()
 
-    admin_token = trading_service.settings.admin_api_token
+    admin_token = trading_service.settings.admin_api_token if trading_service and hasattr(trading_service, 'settings') else None
     admin_guard_disabled = admin_token is None
 
     def require_admin(request: Request) -> None:
@@ -213,7 +265,7 @@ def build_app(service: TradingService | None = None) -> FastAPI:
         if chat_request.temperature and (chat_request.temperature < 0 or chat_request.temperature > 2):
             raise HTTPException(status_code=400, detail="temperature must be between 0 and 2")
 
-        endpoint = chat_request.endpoint or f"{trading_service.settings.model_endpoint}/v1/chat/completions"
+        endpoint = chat_request.endpoint or (f"{trading_service.settings.model_endpoint}/v1/chat/completions" if trading_service and hasattr(trading_service, 'settings') and trading_service.settings.model_endpoint else None)
         payload = {
             "model": chat_request.model,
             "messages": [message.model_dump() for message in chat_request.messages],
@@ -361,6 +413,97 @@ def build_app(service: TradingService | None = None) -> FastAPI:
         except Exception as exc:
             logger.exception("Failed to get agent performance: %s", exc)
             response = JSONResponse(content={"error": str(exc)}, status_code=500)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+    
+    @app.get("/api/agents/metrics")
+    async def get_agent_metrics(
+        agent_id: Optional[str] = None,
+    ) -> Dict[str, object]:
+        """Get real-time performance metrics for agents"""
+        from fastapi.responses import JSONResponse
+        from .metrics_tracker import get_metrics_tracker
+        
+        try:
+            import time
+            metrics_tracker = get_metrics_tracker()
+            result = metrics_tracker.get_metrics(agent_id)
+            
+            # If no metrics found, return default structure for known agents
+            # Check if result is empty or if agent_id was requested but not found
+            from .service import AGENT_DEFINITIONS
+            if not result or (agent_id and agent_id not in result):
+                # Ensure result is a dict
+                if not result:
+                    result = {}
+                # Add default structure for all agents or just the requested one
+                for agent_def in AGENT_DEFINITIONS:
+                    agent = agent_def['id']
+                    if agent_id and agent != agent_id:
+                        continue
+                    if agent not in result:
+                        result[agent] = {
+                            'agent_id': agent,
+                            'latency': {
+                                'last_inference_ms': 0,
+                                'avg_inference_ms': 0,
+                                'p95_inference_ms': 0,
+                            },
+                            'inference': {
+                                'total_count': 0,
+                                'total_tokens_input': 0,
+                                'total_tokens_output': 0,
+                                'avg_cost_usd': 0,
+                                'model': agent_def.get('vertex_model', 'unknown'),
+                            },
+                            'performance': {
+                                'throughput': 0,
+                                'success_rate': 1.0,
+                                'avg_confidence': 0.5,
+                                'error_count': 0,
+                            },
+                            'timestamp': time.time(),
+                        }
+            
+            # Return response
+            if agent_id and agent_id in result:
+                response = JSONResponse(content={**result[agent_id]})
+            else:
+                response = JSONResponse(content={"agents": dict(result), "count": len(result)})
+            
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            return response
+            
+        except Exception as exc:
+            logger.exception("Failed to get agent metrics: %s", exc)
+            # Return default structure on error
+            from .service import AGENT_DEFINITIONS
+            import time
+            result = {}
+            for agent_def in AGENT_DEFINITIONS:
+                agent = agent_def['id']
+                if agent_id and agent != agent_id:
+                    continue
+                result[agent] = {
+                    'agent_id': agent,
+                    'latency': {'last_inference_ms': 0, 'avg_inference_ms': 0, 'p95_inference_ms': 0},
+                    'inference': {
+                        'total_count': 0,
+                        'total_tokens_input': 0,
+                        'total_tokens_output': 0,
+                        'avg_cost_usd': 0,
+                        'model': agent_def.get('vertex_model', 'unknown'),
+                    },
+                    'performance': {'throughput': 0, 'success_rate': 1.0, 'avg_confidence': 0.5, 'error_count': 0},
+                    'timestamp': time.time(),
+                }
+            
+            if agent_id and agent_id in result:
+                response = JSONResponse(content={**result[agent_id]})
+            else:
+                response = JSONResponse(content={"agents": dict(result), "count": len(result), "error": str(exc)})
             response.headers["Access-Control-Allow-Origin"] = "*"
             response.headers["Access-Control-Allow-Credentials"] = "true"
             return response

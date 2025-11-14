@@ -30,26 +30,24 @@ import { useTrading } from '../contexts/TradingContext';
 // Advanced Agent Descriptions and Features
 const getAgentRoleDescription = (agentType: string): string => {
   const descriptions: Record<string, string> = {
-    'trend_momentum_agent': '🎯 Momentum Analyzer - Gemini 2.0 Flash Exp',
-    'strategy_optimization_agent': '🧠 Strategy Optimizer - Gemini Exp-1206',
-    'financial_sentiment_agent': '💭 Sentiment Analyst - Gemini 2.0 Flash Exp',
-    'market_prediction_agent': '🔮 Market Predictor - Gemini Exp-1206',
-    'volume_microstructure_agent': '📊 Volume Analyst - Codey Model',
-    'freqtrade': '⚡ FreqTrade Bot - Traditional Algorithmic Trading',
-    'hummingbot': '🤖 HummingBot - Market Making & Arbitrage'
+    'trend-momentum-agent': '🎯 Momentum Analyzer - Gemini 2.0 Flash Exp',
+    'strategy-optimization-agent': '🧠 Strategy Optimizer - Gemini Exp-1206',
+    'financial-sentiment-agent': '💭 Sentiment Analyst - Gemini 2.0 Flash Exp',
+    'market-prediction-agent': '🔮 Market Predictor - Gemini Exp-1206',
+    'volume-microstructure-agent': '📊 Volume Analyst - Codey Model',
+    'vpin-hft': '⚡ VPIN HFT Agent - Gemini 2.0 Flash Exp'
   };
   return descriptions[agentType] || 'Unknown Agent';
 };
 
 const getAgentAdvancedFeatures = (agentType: string): string => {
   const features: Record<string, string> = {
-    'trend_momentum_agent': 'Fast momentum detection using TPU-optimized inference. Analyzes price action, volume, and technical indicators for short-term trading signals.',
-    'strategy_optimization_agent': 'Advanced reasoning for complex strategy optimization. Uses experimental Gemini models for portfolio rebalancing and risk-adjusted position sizing.',
-    'financial_sentiment_agent': 'Real-time NLP analysis of news, social media, and financial reports. Detects market psychology shifts and sentiment-driven opportunities.',
-    'market_prediction_agent': 'Time series forecasting with advanced ML models. Predicts price movements using historical patterns and macroeconomic indicators.',
-    'volume_microstructure_agent': 'High-frequency volume analysis using Codey for mathematical processing. Detects order book imbalances and institutional activity.',
-    'freqtrade': 'Traditional algorithmic trading framework. Implements proven technical analysis strategies with FreqAI machine learning integration.',
-    'hummingbot': 'Decentralized market making bot. Provides liquidity and executes arbitrage strategies across multiple exchanges.'
+    'trend-momentum-agent': 'Fast momentum detection using TPU-optimized inference. Analyzes price action, volume, and technical indicators for short-term trading signals.',
+    'strategy-optimization-agent': 'Advanced reasoning for complex strategy optimization. Uses experimental Gemini models for portfolio rebalancing and risk-adjusted position sizing.',
+    'financial-sentiment-agent': 'Real-time NLP analysis of news, social media, and financial reports. Detects market psychology shifts and sentiment-driven opportunities.',
+    'market-prediction-agent': 'Time series forecasting with advanced ML models. Predicts price movements using historical patterns and macroeconomic indicators.',
+    'volume-microstructure-agent': 'High-frequency volume analysis using Codey for mathematical processing. Detects order book imbalances and institutional activity.',
+    'vpin-hft': 'Ultra-fast order flow toxicity detection using Gemini 2.0 Flash Exp. Analyzes market microstructure for high-frequency trading signals.'
   };
   return features[agentType] || 'Advanced AI-powered trading agent with specialized market analysis capabilities.';
 };
@@ -57,7 +55,7 @@ const getAgentAdvancedFeatures = (agentType: string): string => {
 interface AgentModelCardProps {
   agent: {
     agent_id: string;
-    agent_type: 'trend_momentum_agent' | 'strategy_optimization_agent' | 'financial_sentiment_agent' | 'market_prediction_agent' | 'volume_microstructure_agent' | 'freqtrade' | 'hummingbot';
+    agent_type: 'trend-momentum-agent' | 'strategy-optimization-agent' | 'financial-sentiment-agent' | 'market-prediction-agent' | 'volume-microstructure-agent' | 'vpin-hft';
     agent_name: string;
     activity_score: number;
     communication_count: number;
@@ -77,13 +75,12 @@ const AgentModelCard: React.FC<AgentModelCardProps> = ({ agent, onAgentClick }) 
 
   const getAgentIcon = () => {
     switch (agent.agent_type) {
-      case 'trend_momentum_agent': return '🧠';
-      case 'strategy_optimization_agent': return '🎯';
-      case 'financial_sentiment_agent': return '📊';
-      case 'market_prediction_agent': return '📈';
-      case 'volume_microstructure_agent': return '🔍';
-      case 'freqtrade': return '⚡';
-      case 'hummingbot': return '🤖';
+      case 'trend-momentum-agent': return '🎯';
+      case 'strategy-optimization-agent': return '🧠';
+      case 'financial-sentiment-agent': return '💭';
+      case 'market-prediction-agent': return '🔮';
+      case 'volume-microstructure-agent': return '📊';
+      case 'vpin-hft': return '⚡';
       default: return '🎯';
     }
   };

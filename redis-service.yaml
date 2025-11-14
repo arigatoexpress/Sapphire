@@ -1,0 +1,58 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: trading
+spec:
+  selector:
+    app: redis
+  ports:
+  - name: redis
+    port: 6379
+    targetPort: 6379
+    protocol: TCP
+  type: ClusterIP
+EOF && echo "✅ Redis service YAML created" && echo "" && kubectl apply -f redis-service.yaml && echo "✅ Redis service applied" && echo "" && kubectl get services -n trading && echo "" && echo "🧪 FINAL REDIS CONNECTIVITY TEST:" && kubectl exec -n trading deployment/sapphire-cloud-trader -- python -c "
+import redis
+import time
+
+print('🔍 COMPREHENSIVE REDIS TESTING...')
+
+try:
+    # Test basic connectivity
+    r = redis.Redis(host='redis', port=6379, decode_responses=True, socket_timeout=5)
+    pong = r.ping()
+    print(f'✅ Basic connectivity: {pong}')
+    
+    # Test data operations
+    r.set('system_status', 'production_ready')
+    r.set('total_capital', '3000')
+    r.set('active_agents', '6')
+    
+    status = r.get('system_status')
+    capital = r.get('total_capital') 
+    agents = r.get('active_agents')
+    
+    print(f'✅ Data operations: status={status}, capital=\${capital}, agents={agents}')
+    
+    # Test performance
+    start = time.time()
+    operations = 1000
+    for i in range(operations):
+        r.set(f'perf_{i}', f'data_{i}')
+        r.get(f'perf_{i}')
+    end = time.time()
+    
+    ops_per_sec = (operations * 2) / (end - start)
+    print(f'✅ Performance: {ops_per_sec:.0f} ops/sec')
+    
+    # Clean up
+    for i in range(operations):
+        r.delete(f'perf_{i}')
+    
+    print('🎯 REDIS: FULLY OPERATIONAL FOR HIGH-PERFORMANCE TRADING')
+    
+except Exception as e:
+    print(f'❌ REDIS FAILURE: {e}')
+    print('🚨 CRITICAL: REDIS REQUIRED FOR PRODUCTION')
+" 2>/dev/null

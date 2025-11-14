@@ -1,0 +1,35 @@
+# Cost Optimization Configuration
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cost-optimization-config
+  namespace: trading
+data:
+  # Scale down during low volatility periods
+  SCALE_DOWN_CPU_THRESHOLD: "30"
+  SCALE_DOWN_MEMORY_THRESHOLD: "40"
+  SCALE_DOWN_TIME_WINDOW: "1800"  # 30 minutes
+  
+  # Scale up during high volatility
+  SCALE_UP_CPU_THRESHOLD: "80"
+  SCALE_UP_MEMORY_THRESHOLD: "90"
+  SCALE_UP_TIME_WINDOW: "300"  # 5 minutes
+  
+  # Cost tiers based on trading activity
+  LOW_ACTIVITY_MAX_REPLICAS: "2"
+  MEDIUM_ACTIVITY_MAX_REPLICAS: "5"
+  HIGH_ACTIVITY_MAX_REPLICAS: "10"
+  
+  # TPU usage optimization
+  TPU_SCALE_DOWN_DELAY: "3600"  # 1 hour after inactivity
+  TPU_COST_THRESHOLD: "0.50"    # Max cost per inference
+  
+  # Spot instance configuration
+  SPOT_INSTANCE_RATIO: "0.7"    # 70% spot, 30% on-demand
+  SPOT_MAX_PRICE_BUFFER: "1.2"  # 20% above spot price
+  
+  # Resource efficiency targets
+  CPU_EFFICIENCY_TARGET: "70"
+  MEMORY_EFFICIENCY_TARGET: "80"
+  TPU_UTILIZATION_TARGET: "85"

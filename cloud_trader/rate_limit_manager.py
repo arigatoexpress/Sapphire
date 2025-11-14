@@ -9,9 +9,15 @@ class RateLimitManager:
     Tracks requests, detects throttling, and coordinates agent activity.
     """
 
-    def __init__(self, default_rps: int = 10, default_rpm: int = 600):
-        self.default_rps = default_rps  # Default requests per second
-        self.default_rpm = default_rpm  # Default requests per minute
+    def __init__(self, default_rps: int = 10, default_rpm: int = 600, limits: dict = None):
+        # Backward compatibility for old API
+        if limits is not None:
+            # Handle old API where limits dict was passed
+            self.default_rps = limits.get("rps", default_rps)
+            self.default_rpm = limits.get("rpm", default_rpm)
+        else:
+            self.default_rps = default_rps  # Default requests per second
+            self.default_rpm = default_rpm  # Default requests per minute
 
         self._request_timestamps: Dict[str, list[float]] = defaultdict(list)
         self._rate_limits: Dict[str, Dict[str, Any]] = defaultdict(

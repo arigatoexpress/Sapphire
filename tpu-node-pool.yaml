@@ -1,0 +1,26 @@
+# TPU v5e Node Pool for Cost-Effective AI Inference
+apiVersion: container.googleapis.com/v1
+kind: NodePool
+metadata:
+  name: tpu-v5e-pool
+  cluster: hft-trading-cluster
+spec:
+  nodeConfig:
+    machineType: ct5lp-hightpu-1t  # TPU v5e: 2x better performance per dollar than GPUs
+    accelerators:
+    - acceleratorCount: 1
+      acceleratorType: TPU_V5_LITE_DEVICE
+    taint:
+    - effect: NO_SCHEDULE
+      key: accelerator
+      value: tpu
+    labels:
+      accelerator: tpu-v5e
+      workload: ai-inference
+  autoscaling:
+    enabled: true
+    minNodeCount: 0
+    maxNodeCount: 3
+  management:
+    autoRepair: true
+    autoUpgrade: true

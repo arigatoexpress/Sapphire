@@ -23,11 +23,12 @@ import {
 import { useTrading } from '../contexts/TradingContext';
 import { useTheme } from '@mui/material/styles';
 import { XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
+import { AGENT_COLORS, STATUS_COLORS } from '../constants/colors';
 
 interface AgentCardProps {
   agent: {
     agent_id: string;
-    agent_type: 'trend_momentum_agent' | 'strategy_optimization_agent' | 'financial_sentiment_agent' | 'market_prediction_agent' | 'volume_microstructure_agent' | 'freqtrade' | 'hummingbot';
+    agent_type: 'trend-momentum-agent' | 'strategy-optimization-agent' | 'financial-sentiment-agent' | 'market-prediction-agent' | 'volume-microstructure-agent' | 'vpin-hft';
     agent_name: string;
     activity_score: number;
     communication_count: number;
@@ -48,16 +49,17 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent }) => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return theme.palette.success.main;
-      case 'trading': return theme.palette.info.main;
-      case 'analyzing': return theme.palette.warning.main;
-      case 'idle': return theme.palette.text.secondary;
-      default: return theme.palette.primary.main;
+      case 'active': return STATUS_COLORS.active;
+      case 'trading': return STATUS_COLORS.trading;
+      case 'analyzing': return STATUS_COLORS.analyzing;
+      case 'idle': return STATUS_COLORS.idle;
+      default: return STATUS_COLORS.active;
     }
   };
 
   const getAgentThemeColor = () => {
-    return theme.agent[agent.agent_type] || theme.palette.primary.main;
+    const agentColor = AGENT_COLORS[agent.agent_type as keyof typeof AGENT_COLORS];
+    return agentColor ? agentColor.primary : AGENT_COLORS.coordinator.primary;
   };
 
   const getStatusLabel = (status: string) => {
@@ -82,28 +84,23 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent }) => {
 
   const getAgentIcon = () => {
     switch (agent.agent_type) {
-      case 'trend_momentum_agent': return '🧠'; // Brain for momentum analysis
-      case 'strategy_optimization_agent': return '🎯'; // Target for strategy optimization
-      case 'financial_sentiment_agent': return '📊'; // Chart for sentiment analysis
-      case 'market_prediction_agent': return '📈'; // Trending chart for prediction
-      case 'volume_microstructure_agent': return '🔍'; // Magnifying glass for microstructure
-      case 'freqtrade': return '⚡'; // Lightning for algorithmic execution
-      case 'hummingbot': return '🤖'; // Robot for market making
+      case 'trend-momentum-agent': return '🎯'; // Target for momentum analysis
+      case 'strategy-optimization-agent': return '🧠'; // Brain for strategy optimization
+      case 'financial-sentiment-agent': return '💭'; // Thought bubble for sentiment analysis
+      case 'market-prediction-agent': return '🔮'; // Crystal ball for prediction
+      case 'volume-microstructure-agent': return '📊'; // Chart for microstructure
+      case 'vpin-hft': return '⚡'; // Lightning for high-frequency trading
       default: return '🎯';
     }
   };
 
   const getAgentTypeLabel = (type: string) => {
-    switch (type) {
-      case 'trend_momentum_agent': return 'Trend Momentum Agent';
-      case 'strategy_optimization_agent': return 'Strategy Optimization Agent';
-      case 'financial_sentiment_agent': return 'Financial Sentiment Agent';
-      case 'market_prediction_agent': return 'Market Prediction Agent';
-      case 'volume_microstructure_agent': return 'Volume Microstructure Agent';
-      case 'freqtrade': return 'FreqTrade';
-      case 'hummingbot': return 'HummingBot';
-      default: return type.toUpperCase();
+    const agentColor = AGENT_COLORS[type as keyof typeof AGENT_COLORS];
+    if (agentColor) {
+      return agentColor.name;
     }
+    // Fallback formatting
+    return type.replace(/-/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
   };
 
   return (

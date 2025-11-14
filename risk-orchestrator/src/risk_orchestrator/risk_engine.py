@@ -16,13 +16,14 @@ def _to_float(value, default: float = 0.0) -> float:
         return default
 
 
-# Per-agent allocation limits (in USD) - PvP 4-core configuration
+# Per-agent allocation limits (in USD) - 6 specialized AI agents configuration
 AGENT_ALLOCATIONS = {
-    "deepseek-v3": 1000.0,      # PvP Momentum
-    "fingpt-alpha": 1000.0,     # PvP Alpha
-    "lagllama-degen": 1000.0,   # PvP Degen
-    "profit-maximizer": 1000.0, # PvP Maximizer
-    "vpin-hft": 1000.0,         # New
+    "trend-momentum-agent": 500.0,           # Gemini 2.0 Flash Experimental
+    "strategy-optimization-agent": 500.0,    # Gemini Experimental 1206
+    "financial-sentiment-agent": 500.0,      # Gemini 2.0 Flash Experimental
+    "market-prediction-agent": 500.0,        # Gemini Experimental 1206
+    "volume-microstructure-agent": 500.0,    # Codey 001
+    "vpin-hft": 500.0,                       # Gemini 2.0 Flash Experimental
 }
 
 # Default allocation applied when an agent is not explicitly listed above

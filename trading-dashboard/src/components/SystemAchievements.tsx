@@ -42,33 +42,33 @@ const SystemAchievements: React.FC = () => {
       category: "AI & Machine Learning",
       icon: <BrainIcon sx={{ color: '#8b5cf6' }} />,
       items: [
-        { name: "7-Specialized AI Agent Ensemble", description: "Momentum, Strategy, Sentiment, Prediction, Volume, FreqTrade, Hummingbot agents", status: "active" },
-        { name: "Latest Gemini AI Models", description: "Gemini 2.0 Flash Exp, Exp-1206, Codey - cutting-edge AI technology", status: "active" },
-        { name: "Multi-Component Protocol (MCP)", description: "Advanced inter-agent communication and coordination system", status: "active" },
-        { name: "Elastic VPIN Service", description: "Intelligent scaling with TPU→GPU→CPU fallback system", status: "active" },
-        { name: "Multi-Tier Model Optimization", description: "Automatic resource scaling based on market conditions", status: "active" },
-        { name: "Circuit Breaker Protection", description: "Automatic failure isolation and recovery", status: "active" },
+        { name: "6-Specialized AI Agent Ensemble", description: "Each agent optimized for specific market analysis: Momentum (Gemini 2.0 Flash Exp), Strategy (Gemini Exp-1206), Sentiment (Gemini 2.0 Flash Exp), Prediction (Gemini Exp-1206), Volume (Codey), VPIN HFT (Gemini 2.0 Flash Exp)", status: "active" },
+        { name: "Latest Gemini AI Models", description: "Powered by Google's latest experimental models: Gemini 2.0 Flash Experimental for speed, Gemini Experimental 1206 for advanced reasoning, Codey for mathematical analysis", status: "active" },
+        { name: "Multi-Component Protocol (MCP)", description: "Real-time inter-agent communication system enabling collaborative trading decisions and shared market intelligence", status: "active" },
+        { name: "Elastic Resource Scaling", description: "Intelligent resource allocation with automatic scaling based on market volatility and trading activity", status: "active" },
+        { name: "Model-Specific Optimization", description: "Each agent configured with optimal temperature, token limits, and inference parameters for maximum performance", status: "active" },
+        { name: "Circuit Breaker Protection", description: "Multi-layer fault tolerance with automatic failure isolation and graceful degradation", status: "active" },
       ]
     },
     {
       category: "Enterprise Performance",
       icon: <Bolt sx={{ color: '#06b6d4' }} />,
       items: [
-        { name: "Sub-Millisecond HFT", description: "High-frequency trading with async processing", status: "active" },
-        { name: "32 vCPU GKE Cluster", description: "Upgraded to e2-standard-8 nodes with 128GB RAM", status: "active" },
-        { name: "TPU v5e Acceleration", description: "Cost-effective AI inference (2-5x better than GPUs)", status: "active" },
-        { name: "Multi-Level Caching", description: "L1/L2/L3 caching with intelligent eviction", status: "active" },
-        { name: "$3,500 Capital Allocation", description: "$500 equity per agent for leveraged trading", status: "active" },
+        { name: "Sub-Second Decision Latency", description: "Real-time market analysis and trade execution with optimized async processing pipelines", status: "active" },
+        { name: "Kubernetes Orchestration", description: "Cloud-native deployment on GKE with automatic scaling and resource optimization", status: "active" },
+        { name: "Cost-Optimized AI Inference", description: "Efficient model deployment with selective acceleration for high-frequency operations", status: "active" },
+        { name: "Multi-Level Caching", description: "Intelligent caching layers for market data, AI responses, and trading signals to minimize latency", status: "active" },
+        { name: "Live Trading Capital", description: "$500 equity allocation per agent for leveraged perpetual futures trading on Aster DEX", status: "active" },
       ]
     },
     {
       category: "Risk Management",
       icon: <Shield sx={{ color: '#10b981' }} />,
       items: [
-        { name: "Advanced Portfolio Analytics", description: "VaR, Sharpe ratio, drawdown control", status: "active" },
-        { name: "Real-time Risk Monitoring", description: "Continuous exposure assessment", status: "active" },
-        { name: "Market Regime Adaptation", description: "Dynamic risk adjustment", status: "active" },
-        { name: "Automated Risk Controls", description: "Intelligent position management", status: "active" },
+        { name: "Advanced Portfolio Analytics", description: "Real-time calculation of Value at Risk (VaR), Sharpe/Sortino ratios, maximum drawdown, and correlation analysis", status: "active" },
+        { name: "Real-time Risk Monitoring", description: "Continuous portfolio exposure assessment with per-agent capital limits and position sizing controls", status: "active" },
+        { name: "Market Regime Adaptation", description: "Dynamic risk parameter adjustment based on volatility regimes and market conditions", status: "active" },
+        { name: "Automated Risk Controls", description: "Intelligent position management with ATR-based stops, leverage limits, and liquidation prevention", status: "active" },
       ]
     },
     {
@@ -79,6 +79,16 @@ const SystemAchievements: React.FC = () => {
         { name: "Self-Healing Architecture", description: "Automated recovery systems", status: "active" },
         { name: "Graceful Degradation", description: "Maintains operation during failures", status: "active" },
         { name: "Comprehensive Monitoring", description: "24/7 system health tracking", status: "active" },
+      ]
+    },
+    {
+      category: "Live Market Data Integration",
+      icon: <Timeline sx={{ color: '#06b6d4' }} />,
+      items: [
+        { name: "Aster DEX Official API", description: "Direct integration with Aster DEX Futures API for live market data and trade execution", status: "active" },
+        { name: "Real-Time Price Data", description: "Live price streaming for perpetual futures contracts with real-time order book updates", status: "active" },
+        { name: "Order Book Depth Analysis", description: "Full market depth analysis for liquidity assessment and optimal entry/exit timing", status: "active" },
+        { name: "Secure Authentication", description: "Enterprise-grade API authentication with HMAC SHA256 signing and IP whitelisting", status: "active" },
       ]
     },
     {
@@ -120,20 +130,25 @@ const SystemAchievements: React.FC = () => {
         🏆 System Achievements & Capabilities
       </Typography>
 
-      <Typography
-        variant="body1"
-        sx={{
-          mb: 4,
-          textAlign: 'center',
-          color: 'text.secondary',
-          maxWidth: '800px',
-          mx: 'auto',
-          lineHeight: 1.6
-        }}
-      >
-        Enterprise-grade algorithmic trading platform featuring cutting-edge AI technology,
-        military-level resilience, and institutional-grade risk management.
-      </Typography>
+        <Typography
+          variant="body1"
+          sx={{
+            mb: 4,
+            textAlign: 'center',
+            color: 'text.secondary',
+            maxWidth: '900px',
+            mx: 'auto',
+            lineHeight: 1.7,
+            fontSize: '1.1rem'
+          }}
+        >
+          Enterprise-grade algorithmic trading platform featuring cutting-edge AI technology,
+          military-level resilience, and institutional-grade risk management.
+          <br />
+          <Box sx={{ mt: 2, fontSize: '0.9rem', opacity: 0.8 }}>
+            Built with 6 specialized Gemini AI agents, real-time Aster DEX integration, and comprehensive risk controls.
+          </Box>
+        </Typography>
 
       <Grid container spacing={3}>
         {achievements.map((category, categoryIndex) => (
@@ -245,10 +260,10 @@ const SystemAchievements: React.FC = () => {
               <Grid item xs={12} md={3}>
                 <Box sx={{ textAlign: 'center' }}>
                   <Typography variant="h3" sx={{ fontWeight: 900, color: '#10b981', mb: 1 }}>
-                    99.9%
+                    6
                   </Typography>
                   <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-                    System Uptime
+                    Specialized AI Agents
                   </Typography>
                 </Box>
               </Grid>
@@ -256,10 +271,10 @@ const SystemAchievements: React.FC = () => {
               <Grid item xs={12} md={3}>
                 <Box sx={{ textAlign: 'center' }}>
                   <Typography variant="h3" sx={{ fontWeight: 900, color: '#06b6d4', mb: 1 }}>
-                    100ms
+                    Real-Time
                   </Typography>
                   <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-                    P95 Latency
+                    Market Analysis
                   </Typography>
                 </Box>
               </Grid>
@@ -267,10 +282,10 @@ const SystemAchievements: React.FC = () => {
               <Grid item xs={12} md={3}>
                 <Box sx={{ textAlign: 'center' }}>
                   <Typography variant="h3" sx={{ fontWeight: 900, color: '#8b5cf6', mb: 1 }}>
-                    1000+
+                    $3,000
                   </Typography>
                   <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-                    RPS Capacity
+                    Live Trading Capital
                   </Typography>
                 </Box>
               </Grid>
@@ -278,10 +293,10 @@ const SystemAchievements: React.FC = () => {
               <Grid item xs={12} md={3}>
                 <Box sx={{ textAlign: 'center' }}>
                   <Typography variant="h3" sx={{ fontWeight: 900, color: '#f59e0b', mb: 1 }}>
-                    7-Layer
+                    Multi-Layer
                   </Typography>
                   <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-                    Resilience Stack
+                    Risk Management
                   </Typography>
                 </Box>
               </Grid>
