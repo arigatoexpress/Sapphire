@@ -662,7 +662,7 @@ class TradingService:
                     registration_message = CoordinatorMessage(
                         message_type="register",
                         component_id=agent_id,
-                        component_type=ComponentType.LLM_AGENT,
+                        component_type="llm_agent",  # Use string value instead of enum
                         payload={
                             "agent_name": agent_state.name,
                             "model": agent_state.model,
