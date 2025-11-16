@@ -1163,9 +1163,11 @@ class TradingService:
             try:
                 storage = await get_storage()
                 if storage and storage.is_ready():
-                    # Try a simple query using existing method
-                    trades = await storage.get_trades(limit=1)
-                    return trades is not None
+                    # Try a simple SQL query that doesn't depend on existing tables
+                    from sqlalchemy import text
+                    async with storage._session_factory() as session:
+                        await session.execute(text("SELECT 1"))
+                    return True
                 return False
             except Exception:
                 return False
