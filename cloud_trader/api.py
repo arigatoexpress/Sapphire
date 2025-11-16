@@ -83,9 +83,10 @@ async def lifespan(app: FastAPI):
     print("🚀 STARTUP: Starting trading service...")
     logger.info("🚀 STARTUP: Starting trading service...")
     try:
+        print("🔧 STARTUP: Calling trading_service.start()...")
         await trading_service.start()
-        print("✅ STARTUP: Trading service started successfully")
-        logger.info("✅ STARTUP: Trading service started successfully")
+        print(f"✅ STARTUP: Trading service started successfully - {len(trading_service._agent_states)} agents initialized")
+        logger.info(f"✅ STARTUP: Trading service started successfully - {len(trading_service._agent_states)} agents initialized")
     except Exception as exc:
         print(f"❌ STARTUP: Failed to start trading service: {exc}")
         logger.exception("❌ STARTUP: Failed to start trading service: %s", exc)
