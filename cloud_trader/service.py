@@ -1162,10 +1162,10 @@ class TradingService:
         async def check_database():
             try:
                 storage = await get_storage()
-                if storage:
-                    # Try a simple query
-                    await storage.health_check()
-                    return True
+                if storage and storage.is_ready():
+                    # Try a simple query using existing method
+                    trades = await storage.get_trades(limit=1)
+                    return trades is not None
                 return False
             except Exception:
                 return False
@@ -1174,10 +1174,12 @@ class TradingService:
         async def check_redis():
             try:
                 cache = await get_cache()
-                if cache:
-                    # Try a simple ping
-                    await cache.ping()
-                    return True
+                if cache and cache.is_connected():
+                    # Try a simple set/get operation
+                    test_key = "health_check_test"
+                    await cache.set(test_key, "test", ttl=10)
+                    result = await cache.get(test_key)
+                    return result == "test"
                 return False
             except Exception:
                 return False
