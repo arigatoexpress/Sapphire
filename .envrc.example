@@ -8,10 +8,10 @@ export PYTHONPATH="${PWD}:$PYTHONPATH"
 # Autonomous Trading System Configuration
 # ======================================
 
-# Service Endpoints
-export REDIS_URL="redis://10.161.118.219:6379"
-export ORCHESTRATOR_URL="https://wallet-orchestrator-880429861698.us-central1.run.app"
-export LLM_ENDPOINT="https://model-router-880429861698.us-central1.run.app"
+# Service Endpoints (replace with your actual endpoints)
+export REDIS_URL="redis://your-redis-host:6379"
+export ORCHESTRATOR_URL="https://your-orchestrator-url.run.app"
+export LLM_ENDPOINT="https://your-model-router-url.run.app"
 
 # Bot Configuration
 export BOT_ID="cloud_trader"
@@ -28,6 +28,8 @@ export MAX_POSITION_PCT="0.02"
 export MIN_POSITION_SIZE="0.001"
 export KELLY_FRACTION_CAP="0.5"
 
-# API Credentials (from Google Secret Manager)
+# API Credentials (from Google Secret Manager or environment variables)
+# These should reference secret names, not actual keys
 export ASTER_API_KEY="ASTER_API_KEY:latest"
 export ASTER_SECRET_KEY="ASTER_SECRET_KEY:latest"
+
