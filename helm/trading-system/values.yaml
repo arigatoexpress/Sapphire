@@ -594,14 +594,6 @@ affinity:
             - cloud-trader
         topologyKey: kubernetes.io/hostname
 
-# Global readiness probe configuration
-readinessProbe:
-  initialDelaySeconds: 60
-  periodSeconds: 30
-  timeoutSeconds: 20
-  failureThreshold: 3
-  successThreshold: 1
-
 # System Initialization Job
 systemInitialization:
   enabled: false  # Disabled as initialization is now handled by the main service
