@@ -18,12 +18,54 @@ const Agents: React.FC = () => {
   };
 
   const agentConfig = [
-    { id: 'trend-momentum-agent', name: 'Trend Momentum', model: 'Gemini 2.0 Flash Exp' },
-    { id: 'strategy-optimization-agent', name: 'Strategy Optimization', model: 'Gemini Exp-1206' },
-    { id: 'financial-sentiment-agent', name: 'Financial Sentiment', model: 'Gemini 2.0 Flash Exp' },
-    { id: 'market-prediction-agent', name: 'Market Prediction', model: 'Gemini Exp-1206' },
-    { id: 'volume-microstructure-agent', name: 'Volume Microstructure', model: 'Codey 001' },
-    { id: 'vpin-hft', name: 'VPIN HFT', model: 'Gemini 2.0 Flash Exp' },
+    { 
+      id: 'trend-momentum-agent', 
+      name: 'Trend Momentum', 
+      model: 'Gemini 2.0 Flash Exp',
+      capital: '$100',
+      specialty: 'Lightning-fast momentum trading',
+      status: 'active'
+    },
+    { 
+      id: 'strategy-optimization-agent', 
+      name: 'Strategy Optimization', 
+      model: 'Gemini Exp-1206',
+      capital: '$100',
+      specialty: 'Advanced analytical reasoning',
+      status: 'active'
+    },
+    { 
+      id: 'financial-sentiment-agent', 
+      name: 'Financial Sentiment', 
+      model: 'Gemini 2.0 Flash Exp',
+      capital: '$100',
+      specialty: 'Real-time sentiment analysis',
+      status: 'active'
+    },
+    { 
+      id: 'market-prediction-agent', 
+      name: 'Market Prediction', 
+      model: 'Gemini Exp-1206',
+      capital: '$100',
+      specialty: 'Time series forecasting',
+      status: 'active'
+    },
+    { 
+      id: 'volume-microstructure-agent', 
+      name: 'Volume Microstructure', 
+      model: 'Codey 001',
+      capital: '$100',
+      specialty: 'Order flow analysis',
+      status: 'active'
+    },
+    { 
+      id: 'vpin-hft', 
+      name: 'VPIN HFT', 
+      model: 'Gemini 2.0 Flash Exp',
+      capital: '$100',
+      specialty: 'Toxicity detection HFT',
+      status: 'active'
+    },
   ];
 
   return (
@@ -52,7 +94,8 @@ const Agents: React.FC = () => {
             lineHeight: 1.6,
           }}
         >
-          Monitor six specialized AI agents powered by Google Gemini models
+          Six specialized AI agents powered by Google Gemini models, with Grok 4.1 arbitration resolving conflicts. 
+          Each agent trades independently with $100 capital and competes for best performance.
         </Typography>
       </Box>
 

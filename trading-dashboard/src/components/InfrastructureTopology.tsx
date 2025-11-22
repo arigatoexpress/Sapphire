@@ -83,11 +83,12 @@ const InfrastructureTopology: React.FC = () => {
       metrics: { cpu: 45, memory: 62 },
     });
 
-    // Layer 2: Core Services - Clean horizontal layout
+    // Layer 2: Core Services - Clean horizontal layout with Grok
     const services = [
-      { id: 'cloud-trader', name: 'Trading Engine', x: centerX - 200, color: '#0EA5E9' },
-      { id: 'mcp-coordinator', name: 'Agent Coordinator', x: centerX, color: '#8B5CF6' },
-      { id: 'redis', name: 'Redis Cache', x: centerX + 200, color: '#EF4444' },
+      { id: 'cloud-trader', name: 'Trading Engine', x: centerX - 250, color: '#0EA5E9' },
+      { id: 'grok-arbitrator', name: 'Grok 4.1 Arbitrator', x: centerX - 50, color: '#FFD700' },
+      { id: 'mcp-coordinator', name: 'Agent Coordinator', x: centerX + 150, color: '#8B5CF6' },
+      { id: 'redis', name: 'Redis Cache', x: centerX + 350, color: '#EF4444' },
     ];
 
     services.forEach(service => {
@@ -140,7 +141,7 @@ const InfrastructureTopology: React.FC = () => {
           y: baseY + (agentIndex * 80),
           color: agentColor.primary,
           status: agentActivity?.status === 'active' || agentActivity?.status === 'trading' ? 'healthy' :
-                  agentActivity?.status === 'analyzing' ? 'warning' : 'idle',
+            agentActivity?.status === 'analyzing' ? 'warning' : 'idle',
           metrics: {
             cpu: Math.random() * 35 + 10,
             memory: Math.random() * 25 + 15,
@@ -326,7 +327,7 @@ const InfrastructureTopology: React.FC = () => {
           const time = Date.now() / 1000;
           const pulse = (Math.sin(time * 2 + node.x * 0.01) + 1) / 2;
           const glowIntensity = 0.5 + pulse * 0.3;
-          
+
           const glowGradient = ctx.createRadialGradient(
             node.x, node.y, size * 0.5,
             node.x, node.y, size * 2.5
@@ -339,7 +340,7 @@ const InfrastructureTopology: React.FC = () => {
           ctx.beginPath();
           ctx.arc(node.x, node.y, size * 2.5, 0, Math.PI * 2);
           ctx.fill();
-          
+
           // Additional outer neon ring
           ctx.strokeStyle = `${node.color}${Math.floor(glowIntensity * 0.3 * 255).toString(16).padStart(2, '0')}`;
           ctx.lineWidth = 2;
@@ -361,9 +362,9 @@ const InfrastructureTopology: React.FC = () => {
         ctx.fill();
 
         // Status ring
-        ctx.strokeStyle = node.status === 'healthy' ? node.color : 
-                         node.status === 'warning' ? '#F59E0B' : 
-                         node.status === 'error' ? '#EF4444' : '#64748B';
+        ctx.strokeStyle = node.status === 'healthy' ? node.color :
+          node.status === 'warning' ? '#F59E0B' :
+            node.status === 'error' ? '#EF4444' : '#64748B';
         ctx.lineWidth = 3;
         ctx.beginPath();
         ctx.arc(node.x, node.y, size * 0.5 + 5, 0, Math.PI * 2);
@@ -537,11 +538,11 @@ const InfrastructureTopology: React.FC = () => {
                     sx={{
                       mt: 0.5,
                       bgcolor: node.status === 'healthy' ? 'rgba(16, 185, 129, 0.2)' :
-                               node.status === 'warning' ? 'rgba(245, 158, 11, 0.2)' :
-                               node.status === 'error' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(100, 116, 139, 0.2)',
+                        node.status === 'warning' ? 'rgba(245, 158, 11, 0.2)' :
+                          node.status === 'error' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(100, 116, 139, 0.2)',
                       color: node.status === 'healthy' ? '#10B981' :
-                             node.status === 'warning' ? '#F59E0B' :
-                             node.status === 'error' ? '#EF4444' : '#64748B',
+                        node.status === 'warning' ? '#F59E0B' :
+                          node.status === 'error' ? '#EF4444' : '#64748B',
                       fontSize: '0.7rem',
                       height: 20,
                     }}
