@@ -68,7 +68,7 @@ redis:
     enabled: false  # Disable metrics exporter to avoid image pull issues
   persistence:
     enabled: true
-    size: 4Gi  # Smaller size for core deployment
+    size: 4Gi
   redisConfig:
     maxmemory: "256mb"
     maxmemory-policy: "allkeys-lru"

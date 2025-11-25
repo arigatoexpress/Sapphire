@@ -30,7 +30,7 @@ redis:
     enabled: false  # Disable metrics exporter to avoid image pull issues
   persistence:
     enabled: true
-    size: 8Gi
+    size: 4Gi
 
 secrets:
   syncFromGcp: true
