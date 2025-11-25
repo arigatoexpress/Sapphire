@@ -17,7 +17,7 @@ redis:
   image:
     registry: docker.io
     repository: bitnami/redis
-    tag: 7.2-debian-12
+    tag: 7.0-debian-11-r12
   master:
     resources:
       requests:
