@@ -1,7 +1,7 @@
 variable "project_id" {
   description = "The GCP project ID to deploy resources to."
   type        = string
-  default     = "sapphire-477307"
+  default     = "sapphire-479610"
 }
 
 variable "region" {

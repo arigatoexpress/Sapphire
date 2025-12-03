@@ -118,6 +118,10 @@ class AsterClient:
         exchange_info = await self._request("GET", "/fapi/v1/exchangeInfo")
         return exchange_info.get("symbols", [])
 
+    async def get_exchange_info(self) -> Dict[str, Any]:
+        """Get full exchange information."""
+        return await self._request("GET", "/fapi/v1/exchangeInfo")
+
     async def get_historical_klines(
         self, symbol: str, interval: str = "1h", limit: int = 100
     ) -> List[List[Any]]:

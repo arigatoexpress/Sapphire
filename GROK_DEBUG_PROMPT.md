@@ -20,10 +20,10 @@ The build is failing at **Step 7 (Deploy Phase 2: DB Migration)**.
       # Deploy migration job standalone
       # Clean up previous job if exists
       kubectl delete job trading-db-migration -n trading --ignore-not-found=true
-      
+
       # Apply the debug-migration.yaml which runs "alembic upgrade head"
       kubectl apply -f debug-migration.yaml
-      
+
       # Wait for completion
       kubectl wait --for=condition=complete job/debug-db-migration -n trading --timeout=300s || {
         echo "Migration failed - debugging..."
@@ -87,4 +87,3 @@ Please analyze this setup and provide a checklist of CLI commands I can run to:
 
 **Output Format:**
 Provide a step-by-step "Emergency Debug Protocol" with exact `kubectl` and `gcloud` commands.
-

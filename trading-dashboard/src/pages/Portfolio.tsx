@@ -1,428 +1,269 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { Box, Typography, Card, CardContent, Grid, Chip, Divider, LinearProgress, Container } from '@mui/material';
-import { useTrading } from '../contexts/TradingContext';
-import PortfolioChart from '../components/PortfolioChart';
-import TradeAlertEffect from '../components/TradeAlertEffect';
-import SapphireDust from '../components/SapphireDust';
-import DiamondSparkle from '../components/DiamondSparkle';
-import RegulatoryDisclaimer from '../components/RegulatoryDisclaimer';
+import React, { useMemo } from 'react';
+import { 
+  TrendingUp, 
+  TrendingDown, 
+  Wallet, 
+  Target, 
+  PieChart, 
+  BarChart3,
+  Globe,
+  Zap,
+  Activity
+} from 'lucide-react';
 
-const Portfolio: React.FC = () => {
-  const { portfolio, agentActivities, recentSignals } = useTrading();
-  const [showTradeEffect, setShowTradeEffect] = useState(false);
-  const [tradeEffectType, setTradeEffectType] = useState<'buy' | 'sell' | 'signal'>('signal');
-  const previousSignalsCount = useRef(0);
+interface PortfolioProps {
+  totalValue: number;
+  totalPnl: number;
+  pnlPercent: number;
+  trades: any[];
+  openPositions: any[];
+}
 
-  const calculateTotalValue = () => {
-    // Use the actual portfolio value from the API/context
-    return portfolio?.portfolio_value || 3000;
-  };
+export const Portfolio: React.FC<PortfolioProps> = ({ totalValue, totalPnl, pnlPercent, trades, openPositions }) => {
+  
+  // Calculate real asset allocation
+  const positionGroups: { [key: string]: number } = {};
+  let totalPositionValue = 0;
 
-  const totalValue = calculateTotalValue();
-  const activeAgents = agentActivities.filter(a => a.status === 'active' || a.status === 'trading').length;
+  openPositions.forEach(pos => {
+    const val = pos.quantity * (pos.current_price || pos.entry_price);
+    positionGroups[pos.symbol] = (positionGroups[pos.symbol] || 0) + val;
+    totalPositionValue += val;
+  });
 
-  // Trigger trade alert effect when new signals arrive
-  useEffect(() => {
-    if (recentSignals.length > previousSignalsCount.current && recentSignals.length > 0) {
-      const latestSignal = recentSignals[0];
-      const signalType = latestSignal.side?.toLowerCase() === 'buy' ? 'buy' :
-        latestSignal.side?.toLowerCase() === 'sell' ? 'sell' : 'signal';
-      setTradeEffectType(signalType);
-      setShowTradeEffect(true);
+  const cashValue = Math.max(0, totalValue - totalPositionValue);
+  
+  const allocations = Object.entries(positionGroups).map(([symbol, value]) => ({
+    symbol,
+    value,
+    percentage: (value / totalValue) * 100,
+    type: 'Crypto'
+  }));
+
+  if (cashValue > 1) {
+      allocations.push({
+          symbol: 'USDT (Cash)',
+          value: cashValue,
+          percentage: (cashValue / totalValue) * 100,
+          type: 'Stablecoin'
+      });
+  }
+
+  allocations.sort((a, b) => b.value - a.value);
+
+  // Separate Positions for Duality View
+  const asterPositions = useMemo(() => openPositions.filter(p => !p.system || p.system === 'aster'), [openPositions]);
+  const hypePositions = useMemo(() => openPositions.filter(p => p.system === 'hyperliquid'), [openPositions]);
+
+  const stats = [
+    {
+      title: 'NET LIQUIDITY',
+      value: `$${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      change: `${pnlPercent >= 0 ? '+' : ''}${pnlPercent.toFixed(2)}%`,
+      icon: Wallet,
+      gradient: 'from-blue-500/20 to-purple-500/20',
+      color: 'text-blue-400',
+      isPositive: pnlPercent >= 0
+    },
+    {
+      title: '24H PNL',
+      value: `${totalPnl >= 0 ? '+' : ''}$${Math.abs(totalPnl).toFixed(2)}`,
+      change: 'Realized + Unrealized',
+      icon: TrendingUp,
+      gradient: totalPnl >= 0 ? 'from-emerald-500/20 to-green-500/20' : 'from-rose-500/20 to-red-500/20',
+      color: totalPnl >= 0 ? 'text-emerald-400' : 'text-rose-400',
+      isPositive: totalPnl >= 0
+    },
+    {
+      title: 'EXPOSURE',
+      value: `${((totalPositionValue / totalValue) * 100).toFixed(1)}%`,
+      change: 'Capital Deployed',
+      icon: Activity,
+      gradient: 'from-orange-500/20 to-amber-500/20',
+      color: 'text-orange-400',
+      isPositive: true
+    },
+    {
+      title: 'ACTIVE BETS',
+      value: openPositions.length.toString(),
+      change: `${asterPositions.length} Aster / ${hypePositions.length} Hype`,
+      icon: Target,
+      gradient: 'from-cyan-500/20 to-blue-500/20',
+      color: 'text-cyan-400',
+      isPositive: true
     }
-    previousSignalsCount.current = recentSignals.length;
-  }, [recentSignals]);
+  ];
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4, position: 'relative', minHeight: '100vh' }}>
-      {/* Sapphire dust background effect */}
-      <SapphireDust intensity={0.3} speed={0.3} size="small" enabled={true} />
+    <div className="space-y-8 font-sans">
+      {/* Background Effects */}
+      <div className="holographic-grid" />
+      <div className="fixed inset-0 pointer-events-none">
+         <div className="absolute top-[10%] right-[10%] w-[30%] h-[30%] bg-purple-900/10 rounded-full blur-[120px] animate-pulse-slow" />
+      </div>
 
-      {/* Trade alert effect */}
-      <TradeAlertEffect
-        trigger={showTradeEffect}
-        type={tradeEffectType}
-        onComplete={() => setShowTradeEffect(false)}
-      />
+      {/* Header */}
+      <div className="glass-card p-8 rounded-3xl relative overflow-hidden">
+         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
+         
+         <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
+           <div>
+             <h1 className="text-3xl font-black text-white mb-2 flex items-center gap-3 tracking-tight">
+               <div className="p-2 bg-white/5 rounded-xl">
+                 <PieChart className="w-6 h-6 text-purple-400" />
+               </div>
+               PORTFOLIO ALLOCATION
+             </h1>
+             <p className="text-white/40 font-mono text-xs uppercase tracking-widest ml-1">
+               System-Wide Asset Distribution
+             </p>
+           </div>
+           
+           <div className="flex gap-3">
+              <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl backdrop-blur-sm text-right">
+                 <div className="text-[10px] text-white/40 uppercase font-bold tracking-wider">Risk Model</div>
+                 <div className="text-emerald-400 font-code font-bold text-sm">DYNAMIC</div>
+              </div>
+           </div>
+         </div>
+      </div>
 
-      {/* Professional Header - Bold and Clean */}
-      <Box sx={{ mb: { xs: 3, md: 4 }, position: 'relative', zIndex: 1 }}>
-        <Typography
-          variant="h1"
-          gutterBottom
-          sx={{
-            fontWeight: 900,
-            fontSize: { xs: '2rem', md: '3rem' },
-            color: '#FFFFFF',
-            mb: { xs: 1, md: 1.5 },
-            lineHeight: 1.1,
-          }}
-        >
-          Trading Portfolio
-        </Typography>
-        <Typography
-          variant="h6"
-          sx={{
-            fontSize: { xs: '1rem', md: '1.125rem' },
-            fontWeight: 500,
-            maxWidth: '900px',
-            lineHeight: 1.6,
-            color: '#E2E8F0',
-          }}
-        >
-          Real-time AI agent trading capital and performance metrics
-        </Typography>
-      </Box>
+      {/* Key Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {stats.map((stat, index) => (
+          <div key={index} className="glass-card p-6 rounded-2xl relative overflow-hidden group hover:-translate-y-1 transition-all duration-300">
+             <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${stat.gradient} rounded-bl-[100px] -mr-8 -mt-8 transition-all group-hover:scale-110 opacity-50`}></div>
+            
+            <div className="relative z-10">
+              <div className="flex justify-between items-start mb-4">
+                <div className={`p-3 rounded-xl bg-white/5 border border-white/10 ${stat.color}`}>
+                  <stat.icon className="w-5 h-5" />
+                </div>
+                {index === 1 && (
+                   <div className={`flex items-center gap-1 text-xs font-bold ${stat.isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
+                     {stat.isPositive ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                   </div>
+                )}
+              </div>
+              
+              <div>
+                <p className="text-white/40 text-[10px] font-bold uppercase tracking-wider mb-1">{stat.title}</p>
+                <h3 className="text-2xl font-code font-bold text-white">{stat.value}</h3>
+                <p className="text-xs text-white/30 mt-1 font-mono">{stat.change}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
 
-      {/* Regulatory Disclaimer */}
-      <RegulatoryDisclaimer />
+      {/* Split Position View */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        {/* ASTER POSITIONS */}
+        <div className="glass-card rounded-3xl border border-blue-500/20 bg-blue-950/5 overflow-hidden">
+          <div className="p-6 border-b border-white/5 flex justify-between items-center bg-blue-500/5">
+            <div className="flex items-center gap-3">
+              <Globe className="w-5 h-5 text-blue-400" />
+              <h2 className="font-bold text-lg">ASTER POSITIONS</h2>
+            </div>
+            <span className="text-xs font-code text-blue-300 bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20">{asterPositions.length} ACTIVE</span>
+          </div>
+          <div className="p-6 space-y-3">
+            {asterPositions.length === 0 && (
+              <div className="text-center py-12 text-white/20 font-mono text-sm">NO ACTIVE POSITIONS</div>
+            )}
+            {asterPositions.map((pos: any, i: number) => (
+              <div key={i} className="group flex items-center justify-between p-4 bg-white/5 border border-white/5 rounded-xl hover:border-blue-500/30 transition-all">
+                <div className="flex items-center gap-4">
+                  <div className={`w-1 h-8 rounded-full ${pos.side === 'BUY' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                  <div>
+                    <div className="font-code font-bold text-white">{pos.symbol}</div>
+                    <div className={`text-[10px] font-bold uppercase ${pos.side === 'BUY' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {pos.side} • {pos.quantity} Units
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[10px] text-white/40 mb-1">ENTRY PRICE</div>
+                  <div className="font-mono text-sm text-slate-300">${Number(pos.entry_price).toFixed(4)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
 
-      {/* Simplified Portfolio Summary - Only Critical Metrics */}
-      <Grid container spacing={{ xs: 2, md: 3 }} sx={{ mb: { xs: 3, md: 4 }, position: 'relative', zIndex: 1 }}>
-        <Grid item xs={12} sm={6}>
-          <Card sx={{
-            background: '#000000',
-            border: '2px solid rgba(0, 255, 255, 0.4)',
-            transition: 'all 0.2s ease',
-            '&:hover': {
-              borderColor: '#00ffff',
-              boxShadow: '0 8px 32px rgba(0, 255, 255, 0.4)',
-              transform: 'translateY(-4px)',
-            }
-          }}>
-            <CardContent>
-              <Typography variant="body1" sx={{ color: '#e2e8f0', mb: 1.5, fontSize: { xs: '0.9rem', md: '1rem' }, fontWeight: 600 }}>
-                Total Bot Trading Capital
-              </Typography>
-              <Typography variant="h2" sx={{ fontWeight: 900, color: '#00ffff', fontSize: { xs: '2.5rem', md: '3rem' }, lineHeight: 1 }}>
-                ${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
+        {/* HYPE POSITIONS */}
+        <div className="glass-card rounded-3xl border border-green-500/20 bg-green-950/5 overflow-hidden">
+          <div className="p-6 border-b border-white/5 flex justify-between items-center bg-green-500/5">
+            <div className="flex items-center gap-3">
+              <Zap className="w-5 h-5 text-emerald-400" />
+              <h2 className="font-bold text-lg">HYPE POSITIONS</h2>
+            </div>
+            <span className="text-xs font-code text-emerald-300 bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20">{hypePositions.length} ACTIVE</span>
+          </div>
+          <div className="p-6 space-y-3">
+            {hypePositions.length === 0 && (
+              <div className="text-center py-12 text-white/20 font-mono text-sm">NO ACTIVE POSITIONS</div>
+            )}
+            {hypePositions.map((pos: any, i: number) => (
+              <div key={i} className="group flex items-center justify-between p-4 bg-white/5 border border-white/5 rounded-xl hover:border-emerald-500/30 transition-all">
+                <div className="flex items-center gap-4">
+                  <div className={`w-1 h-8 rounded-full ${pos.side === 'BUY' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                  <div>
+                    <div className="font-code font-bold text-white">{pos.symbol}</div>
+                    <div className={`text-[10px] font-bold uppercase ${pos.side === 'BUY' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {pos.side} • {pos.quantity} Units
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[10px] text-white/40 mb-1">ENTRY PRICE</div>
+                  <div className="font-mono text-sm text-slate-300">${Number(pos.entry_price).toFixed(4)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
 
-        <Grid item xs={12} sm={6}>
-          <Card sx={{
-            background: '#000000',
-            border: '2px solid rgba(168, 85, 247, 0.4)',
-            transition: 'all 0.2s ease',
-            '&:hover': {
-              borderColor: '#a855f7',
-              boxShadow: '0 8px 32px rgba(168, 85, 247, 0.4)',
-              transform: 'translateY(-4px)',
-            }
-          }}>
-            <CardContent>
-              <Typography variant="body1" sx={{ color: '#e2e8f0', mb: 1.5, fontSize: { xs: '0.9rem', md: '1rem' }, fontWeight: 600 }}>
-                Active Agents
-              </Typography>
-              <Typography variant="h2" sx={{ fontWeight: 900, color: '#a855f7', fontSize: { xs: '2.5rem', md: '3rem' }, lineHeight: 1 }}>
-                {activeAgents} / {agentActivities.length}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+      </div>
 
-      {/* Portfolio Chart with Agent Position Highlights */}
-      <Box sx={{ mb: 4 }}>
-        <PortfolioChart />
-      </Box>
+      {/* Asset Allocation Bar */}
+      <div className="glass-card p-8 rounded-3xl">
+        <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+          <BarChart3 className="w-5 h-5 text-white/60" />
+          ALLOCATION BREAKDOWN
+        </h2>
+        
+        <div className="flex h-4 w-full rounded-full overflow-hidden mb-6 bg-white/5">
+          {allocations.map((asset, i) => (
+            <div 
+              key={asset.symbol}
+              className={`h-full hover:opacity-80 transition-opacity`}
+              style={{ 
+                width: `${asset.percentage}%`,
+                backgroundColor: `hsl(${210 + (i * 40)}, 70%, 60%)`
+              }}
+              title={`${asset.symbol}: ${asset.percentage.toFixed(1)}%`}
+            />
+          ))}
+        </div>
 
-      {/* Agent Performance - Focused on Portfolio Allocation */}
-      <Box sx={{ mb: 4 }}>
-        <Typography
-          variant="h5"
-          sx={{
-            fontWeight: 700,
-            mb: 3,
-            fontSize: { xs: '1.25rem', md: '1.5rem' },
-            color: '#00ffff',
-          }}
-        >
-          Agent Capital Allocation
-        </Typography>
-        <Grid container spacing={3}>
-          {agentActivities.map((agent) => {
-            const positions = recentSignals.filter(s =>
-              s.source?.toLowerCase().includes(agent.agent_type) ||
-              agent.agent_id.includes(s.source?.toLowerCase() || '')
-            ).length;
-            const winRate = Math.min(0.95, 0.5 + agent.activity_score * 0.45);
-            const avgPnl = (Math.random() - 0.2) * 50;
-            const totalPnl = avgPnl * (agent.trading_count || 0);
-
-            return (
-              <Grid item xs={12} sm={6} md={4} key={agent.agent_id}>
-                <Card
-                  sx={{
-                    background: `linear-gradient(135deg, ${agent.color}15, ${agent.color}05)`,
-                    border: `2px solid ${agent.color}40`,
-                    borderRadius: 3,
-                    transition: 'all 0.3s ease',
-                    position: 'relative',
-                    overflow: 'hidden',
-                    '&:hover': {
-                      transform: 'translateY(-4px)',
-                      borderColor: agent.color,
-                      boxShadow: `0 8px 24px ${agent.color}30`,
-                    },
-                  }}
-                >
-                  <CardContent>
-                    {/* Agent Color Dot */}
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 2,
-                        mb: 2,
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          width: 16,
-                          height: 16,
-                          borderRadius: '50%',
-                          bgcolor: agent.color,
-                          boxShadow: `0 0 12px ${agent.color}`,
-                          animation: 'pulse 2s ease-in-out infinite',
-                          '@keyframes pulse': {
-                            '0%, 100%': { opacity: 1, transform: 'scale(1)' },
-                            '50%': { opacity: 0.7, transform: 'scale(1.2)' },
-                          },
-                        }}
-                      />
-                      <Typography
-                        variant="h6"
-                        sx={{
-                          fontWeight: 700,
-                          color: agent.color,
-                          fontSize: '1rem',
-                        }}
-                      >
-                        {agent.agent_name}
-                      </Typography>
-                    </Box>
-
-                    {/* Performance Metrics */}
-                    <Grid container spacing={2}>
-                      <Grid item xs={6}>
-                        <Box>
-                          <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.6)', display: 'block', mb: 0.5 }}>
-                            Total P&L
-                          </Typography>
-                          <Typography
-                            variant="h6"
-                            sx={{
-                              fontWeight: 700,
-                              color: totalPnl >= 0 ? '#10b981' : '#ef4444',
-                              fontSize: '1.1rem',
-                            }}
-                          >
-                            {totalPnl >= 0 ? '+' : ''}${totalPnl.toFixed(2)}
-                          </Typography>
-                        </Box>
-                      </Grid>
-                      <Grid item xs={6}>
-                        <Box>
-                          <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.6)', display: 'block', mb: 0.5 }}>
-                            Win Rate
-                          </Typography>
-                          <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF', fontSize: '1.1rem' }}>
-                            {(winRate * 100).toFixed(1)}%
-                          </Typography>
-                        </Box>
-                      </Grid>
-                      <Grid item xs={6}>
-                        <Box>
-                          <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.6)', display: 'block', mb: 0.5 }}>
-                            Trades
-                          </Typography>
-                          <Typography variant="h6" sx={{ fontWeight: 700, color: '#FFFFFF', fontSize: '1.1rem' }}>
-                            {agent.trading_count || 0}
-                          </Typography>
-                        </Box>
-                      </Grid>
-                      <Grid item xs={6}>
-                        <Box>
-                          <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.6)', display: 'block', mb: 0.5 }}>
-                            Positions
-                          </Typography>
-                          <Typography variant="h6" sx={{ fontWeight: 700, color: positions > 0 ? '#10b981' : '#FFFFFF', fontSize: '1.1rem' }}>
-                            {positions}
-                          </Typography>
-                        </Box>
-                      </Grid>
-                    </Grid>
-
-                    {/* Activity Score Bar */}
-                    <Box sx={{ mt: 2 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                        <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.6)' }}>
-                          Activity Score
-                        </Typography>
-                        <Typography variant="caption" sx={{ fontWeight: 600, color: agent.color }}>
-                          {(agent.activity_score * 10).toFixed(1)}/10
-                        </Typography>
-                      </Box>
-                      <LinearProgress
-                        variant="determinate"
-                        value={agent.activity_score * 100}
-                        sx={{
-                          height: 6,
-                          borderRadius: 3,
-                          bgcolor: 'rgba(255, 255, 255, 0.1)',
-                          '& .MuiLinearProgress-bar': {
-                            bgcolor: agent.color,
-                            borderRadius: 3,
-                          },
-                        }}
-                      />
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
-            );
-          })}
-        </Grid>
-      </Box>
-
-      {/* Agent Allocations */}
-      {portfolio?.agent_allocations && (
-        <Card sx={{
-          background: '#0A0A0F',
-          border: '2px solid rgba(255, 255, 255, 0.2)',
-          mb: { xs: 3, md: 4 },
-        }}>
-          <CardContent sx={{ p: { xs: 2, md: 3 } }}>
-            <Typography variant="h4" gutterBottom sx={{ fontWeight: 800, fontSize: { xs: '1.25rem', md: '1.5rem' }, mb: 3, color: '#FFFFFF' }}>
-              Agent Capital Allocations
-            </Typography>
-            <Divider sx={{ mb: 3, borderColor: 'rgba(255,255,255,0.2)', borderWidth: 1 }} />
-            <Grid container spacing={{ xs: 2, md: 2 }}>
-              {Object.entries(portfolio.agent_allocations).map(([agentId, allocation]: [string, any]) => {
-                const agent = agentActivities.find(a => a.agent_id.includes(agentId) || a.agent_type === agentId);
-                const dollarAmount = totalValue * allocation;
-                const percentage = allocation * 100;
-                return (
-                  <Grid item xs={12} sm={6} md={4} key={agentId}>
-                    <Box sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 2 }}>
-                      <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                          {agent?.agent_name || agentId.replace(/-/g, ' ').replace(/\b\w/g, char => char.toUpperCase())}
-                        </Typography>
-                        <Chip
-                          label={`$${dollarAmount.toFixed(0)}`}
-                          size="small"
-                          sx={{ bgcolor: 'rgba(0, 212, 170, 0.2)', color: '#00d4aa', fontWeight: 600 }}
-                        />
-                      </Box>
-                      <LinearProgress
-                        variant="determinate"
-                        value={percentage}
-                        sx={{
-                          height: 8,
-                          borderRadius: 4,
-                          bgcolor: 'rgba(255,255,255,0.1)',
-                          '& .MuiLinearProgress-bar': { bgcolor: agent?.color || '#00d4aa' }
-                        }}
-                      />
-                      <Typography variant="caption" color="textSecondary" sx={{ mt: 0.5, display: 'block' }}>
-                        {percentage.toFixed(1)}% of portfolio
-                      </Typography>
-                    </Box>
-                  </Grid>
-                );
-              })}
-            </Grid>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Recent Trading Signals */}
-      {recentSignals.length > 0 && (
-        <Card sx={{
-          background: '#0A0A0F',
-          border: '2px solid rgba(255, 255, 255, 0.2)',
-        }}>
-          <CardContent sx={{ p: { xs: 2, md: 3 } }}>
-            <Typography variant="h4" gutterBottom sx={{ fontWeight: 800, fontSize: { xs: '1.25rem', md: '1.5rem' }, mb: 3, color: '#FFFFFF' }}>
-              Recent Trading Signals
-            </Typography>
-            <Divider sx={{ mb: 3, borderColor: 'rgba(255,255,255,0.2)', borderWidth: 1 }} />
-            <Grid container spacing={{ xs: 2, md: 2 }}>
-              {recentSignals.slice(0, 6).map((signal, index) => (
-                <Grid item xs={12} sm={6} md={4} key={index}>
-                  <Box sx={{
-                    p: 2,
-                    bgcolor: 'rgba(255,255,255,0.05)',
-                    borderRadius: 2,
-                    position: 'relative',
-                    overflow: 'hidden',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      bgcolor: 'rgba(255,255,255,0.08)',
-                      transform: 'translateY(-2px)',
-                      boxShadow: `0 4px 20px ${signal.side.toLowerCase() === 'buy' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
-                    }
-                  }}>
-                    {/* Diamond sparkle effect on signal cards */}
-                    {index === 0 && <DiamondSparkle count={2} duration={2000} size={12} enabled={true}
-                      color={signal.side.toLowerCase() === 'buy' ? '#10b981' : '#ef4444'} />}
-                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {signal.symbol}
-                      </Typography>
-                      <Chip
-                        label={signal.side.toUpperCase()}
-                        size="small"
-                        color={signal.side.toLowerCase() === 'buy' ? 'success' : 'error'}
-                        sx={{
-                          fontWeight: 600,
-                          animation: index === 0 ? 'pulse 2s ease-in-out infinite' : 'none',
-                          '@keyframes pulse': {
-                            '0%, 100%': { opacity: 1, transform: 'scale(1)' },
-                            '50%': { opacity: 0.8, transform: 'scale(1.05)' },
-                          },
-                        }}
-                      />
-                    </Box>
-                    <Typography variant="body2" color="textSecondary">
-                      Price: ${signal.price.toFixed(2)}
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary">
-                      Size: ${signal.notional.toFixed(2)}
-                    </Typography>
-                    <Box display="flex" alignItems="center" mt={1}>
-                      <Typography variant="caption" color="textSecondary" sx={{ mr: 1 }}>
-                        Confidence:
-                      </Typography>
-                      <LinearProgress
-                        variant="determinate"
-                        value={signal.confidence * 100}
-                        sx={{
-                          flexGrow: 1,
-                          height: 6,
-                          borderRadius: 3,
-                          bgcolor: 'rgba(255,255,255,0.1)',
-                          '& .MuiLinearProgress-bar': {
-                            bgcolor: signal.confidence > 0.7 ? '#10b981' : signal.confidence > 0.5 ? '#f59e0b' : '#ef4444'
-                          }
-                        }}
-                      />
-                      <Typography variant="caption" sx={{ ml: 1, fontWeight: 600 }}>
-                        {(signal.confidence * 100).toFixed(0)}%
-                      </Typography>
-                    </Box>
-                  </Box>
-                </Grid>
-              ))}
-            </Grid>
-          </CardContent>
-        </Card>
-      )}
-    </Container>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          {allocations.map((asset, i) => (
+            <div key={asset.symbol} className="flex items-center gap-3 p-3 rounded-lg bg-white/5 border border-white/5">
+               <div 
+                 className="w-2 h-2 rounded-full" 
+                 style={{ backgroundColor: `hsl(${210 + (i * 40)}, 70%, 60%)` }}
+               />
+               <div>
+                 <div className="text-xs font-bold text-white">{asset.symbol}</div>
+                 <div className="text-[10px] font-mono text-white/50">{asset.percentage.toFixed(1)}%</div>
+               </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 };
 

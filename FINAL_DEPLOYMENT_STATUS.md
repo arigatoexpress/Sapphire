@@ -9,7 +9,7 @@
 ✅ **Secret Manager Access**: Permissions granted, secrets synced.
 
 ### What Failed
-❌ **Deployment Error**: 
+❌ **Deployment Error**:
 ```
 spec.template.spec.containers[1].restartPolicy: Forbidden: may not be set for non-init containers
 ```
@@ -47,4 +47,3 @@ Within 15-20 minutes, we should see:
 3. Monitor Grok Trader logs for symbol discovery
 4. Set up `TRADING_SYMBOLS` environment variable with desired symbols
 5. Monitor first trades via Telegram notifications
-

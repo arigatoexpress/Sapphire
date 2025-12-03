@@ -1,7 +1,8 @@
-from sqlalchemy import Column, String, Float, DateTime
+from sqlalchemy import Column, DateTime, Float, String
 from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
+
 
 class Trade(Base):
     __tablename__ = "trades"

@@ -43,4 +43,3 @@ Trigger `gcloud builds submit` again.
 
 ## 4. Execution
 I am ready to apply this fix immediately.
-

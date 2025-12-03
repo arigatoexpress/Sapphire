@@ -1,13 +1,15 @@
 import asyncio
-import httpx
+import json
 import logging
 import os
-import json
-from typing import Dict, Optional
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Dict, Optional
+
+import httpx
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class GrokTradeSignal:
@@ -20,6 +22,7 @@ class GrokTradeSignal:
     position_size: float
     reasoning: str
 
+
 class GrokTrader:
     def __init__(self):
         self.api_key = os.getenv("GROK4_API_KEY")
@@ -31,11 +34,13 @@ class GrokTrader:
         self.liquidation_threshold = float(os.getenv("GROK_LIQUIDATION_THRESHOLD", "0.85"))
         self.trade_frequency = os.getenv("GROK_FREQUENCY", "ultra")
         self.current_drawdown = 0.0
-        
-        # Placeholder for Aster Client
-        self.aster_client = None 
 
-    async def get_trade_signal(self, symbol: str, current_price: float, market_context: str, margin_ratio: float) -> Optional[GrokTradeSignal]:
+        # Placeholder for Aster Client
+        self.aster_client = None
+
+    async def get_trade_signal(
+        self, symbol: str, current_price: float, market_context: str, margin_ratio: float
+    ) -> Optional[GrokTradeSignal]:
         prompt = f"""You are Grok 4.1 Ultra HFT Trader. Your mission is to maximize profits on {symbol} with {self.leverage}x leverage while mitigating liquidation risk.
 
 Current price: ${current_price}
@@ -73,18 +78,18 @@ Rules:
                     "model": "grok-beta",
                     "messages": [{"role": "user", "content": prompt}],
                     "temperature": 0.05,
-                    "max_tokens": 250
-                }
+                    "max_tokens": 250,
+                },
             )
             resp.raise_for_status()
             result = resp.json()["choices"][0]["message"]["content"]
             result = result.replace("```json", "").replace("```", "").strip()
             data = json.loads(result)
-            
+
             if data.get("side") in ["long", "short"] and data.get("confidence", 0) > 0.7:
                 # Simulate 5% adverse move check
                 # ... logic here ...
-                
+
                 position_size = self.capital * data["position_size_pct"] * self.leverage
                 return GrokTradeSignal(
                     symbol=symbol,
@@ -94,10 +99,10 @@ Rules:
                     stop_loss=data["stop_loss"],
                     take_profit=data["take_profit"],
                     position_size=position_size,
-                    reasoning=data["reasoning"]
+                    reasoning=data["reasoning"],
                 )
             elif data.get("side") == "flat":
-                 return None
+                return None
             return None
         except Exception as e:
             logger.error(f"Grok Trader signal failed: {e}")
@@ -107,7 +112,7 @@ Rules:
         if not self.aster_client:
             logger.warning("Aster client not initialized - skipping trade")
             return False
-            
+
         try:
             # Mock execution
             self.positions[signal.symbol] = {
@@ -117,9 +122,11 @@ Rules:
                 "take": signal.take_profit,
                 "size": signal.position_size,
                 "timestamp": datetime.utcnow(),
-                "reasoning": signal.reasoning
+                "reasoning": signal.reasoning,
             }
-            logger.info(f"Grok Trader executed {signal.side} {signal.symbol} at ${signal.entry_price}")
+            logger.info(
+                f"Grok Trader executed {signal.side} {signal.symbol} at ${signal.entry_price}"
+            )
             return True
         except Exception as e:
             logger.error(f"Grok Trader execution failed: {e}")
@@ -130,30 +137,34 @@ Rules:
             return
 
         # Mock margin ratio retrieval
-        margin_ratio = 0.95 
-        
+        margin_ratio = 0.95
+
         # Liquidation mitigation: Close if margin < 85%
         if margin_ratio < self.liquidation_threshold:
-            logger.warning(f"Margin ratio {margin_ratio:.2f} < threshold {self.liquidation_threshold}. Closing all positions.")
-            self.positions.clear() # Mock close
+            logger.warning(
+                f"Margin ratio {margin_ratio:.2f} < threshold {self.liquidation_threshold}. Closing all positions."
+            )
+            self.positions.clear()  # Mock close
             return
 
         for symbol, pos in list(self.positions.items()):
             try:
                 # Mock current price
-                current_price = pos["entry"] 
-                
+                current_price = pos["entry"]
+
                 # Stop Loss / Take Profit checks
-                if (pos["side"] == "long" and current_price <= pos["stop"]) or \
-                   (pos["side"] == "short" and current_price >= pos["stop"]):
+                if (pos["side"] == "long" and current_price <= pos["stop"]) or (
+                    pos["side"] == "short" and current_price >= pos["stop"]
+                ):
                     logger.info(f"Stop loss hit for {symbol}")
                     del self.positions[symbol]
-                elif (pos["side"] == "long" and current_price >= pos["take"]) or \
-                     (pos["side"] == "short" and current_price <= pos["take"]):
+                elif (pos["side"] == "long" and current_price >= pos["take"]) or (
+                    pos["side"] == "short" and current_price <= pos["take"]
+                ):
                     logger.info(f"Take profit hit for {symbol}")
                     # Auto-compounding: 50% to stablecoin logic would go here
                     del self.positions[symbol]
-                    
+
             except Exception as e:
                 logger.error(f"Error monitoring {symbol}: {e}")
 
@@ -163,42 +174,59 @@ Rules:
 
     async def run(self):
         logger.info("Starting Grok Trader (Ultra HFT Mode)...")
-        
+
         # Load symbols from environment
         symbols_env = os.getenv("TRADING_SYMBOLS", "")
         symbols = [s.strip() for s in symbols_env.split(",") if s.strip()]
-        
+
         if not symbols:
-            logger.info("No specific symbols configured. Fetching all available tradeable symbols...")
+            logger.info(
+                "No specific symbols configured. Fetching all available tradeable symbols..."
+            )
             # In a real implementation, we would fetch this from the Aster/Exchange client.
             # For now, we default to a broad market set including tokenized equities.
-            symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "AVAXUSDT", "AAPL", "TSLA", "NVDA", "SPY", "QQQ", "AMZN", "MSFT", "GOOGL"]
+            symbols = [
+                "BTCUSDT",
+                "ETHUSDT",
+                "SOLUSDT",
+                "AVAXUSDT",
+                "AAPL",
+                "TSLA",
+                "NVDA",
+                "SPY",
+                "QQQ",
+                "AMZN",
+                "MSFT",
+                "GOOGL",
+            ]
             logger.info(f"Trading active on {len(symbols)} symbols: {symbols}")
-        
-        interval = 5 # 5s fixed for Ultra
-        
+
+        interval = 5  # 5s fixed for Ultra
+
         while True:
             try:
                 await self.monitor_positions()
-                
+
                 # Mock margin for prompt
-                margin_ratio = 0.95 
-                
+                margin_ratio = 0.95
+
                 for symbol in symbols:
-                    current_price = 100.0 # Mock
+                    current_price = 100.0  # Mock
                     market_context = await self.get_market_context(symbol)
-                    
-                    signal = await self.get_trade_signal(symbol, current_price, market_context, margin_ratio)
+
+                    signal = await self.get_trade_signal(
+                        symbol, current_price, market_context, margin_ratio
+                    )
                     if signal:
                         await self.execute_trade(signal)
-                
+
                 await asyncio.sleep(interval)
             except Exception as e:
                 logger.error(f"Grok Trader loop error: {e}")
                 await asyncio.sleep(interval)
 
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     trader = GrokTrader()
     asyncio.run(trader.run())
-

@@ -139,11 +139,16 @@ Your expertise:
         """Build market data section of the prompt."""
         md = context.market_data
 
+        # Handle missing volume_24h attribute gracefully
+        volume_24h = getattr(md, "volume_24h", 0.0)
+        if volume_24h is None:
+            volume_24h = 0.0
+
         section = f"""**Symbol**: {context.symbol}
 **Current Price**: ${md.price:.4f}
 **24h Change**: {md.change_24h:.2f}%
-**24h Volume**: {md.volume_24h:,.0f}
-**Volatility (ATR)**: {md.volatility:.4f}
+**24h Volume**: {volume_24h:,.0f}
+**Volatility (ATR)**: {getattr(md, 'atr', 0.0) or 0.0:.4f}
 """
 
         if hasattr(md, "sma_20") and md.sma_20:

@@ -1,0 +1,8 @@
+hyperliquid-python-sdk
+eth-account
+python-dotenv
+aiohttp
+requests
+redis
+python-telegram-bot
+google-generativeai

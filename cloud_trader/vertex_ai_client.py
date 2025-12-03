@@ -9,9 +9,21 @@ import time
 from typing import Any, Dict, Optional, Union
 
 import httpx
-from google.api_core.exceptions import GoogleAPIError
-from google.cloud import aiplatform
-from vertexai.preview.generative_models import GenerativeModel
+try:
+    from google.api_core.exceptions import GoogleAPIError
+    from google.cloud import aiplatform
+    from google.protobuf import json_format
+    from google.protobuf.struct_pb2 import Value
+except ImportError:
+    GoogleAPIError = Exception
+    aiplatform = None
+    json_format = None
+    Value = None
+    print("⚠️ Vertex AI not found. AI predictions disabled.")
+try:
+    from vertexai.preview.generative_models import GenerativeModel
+except ImportError:
+    GenerativeModel = None
 
 # Try to import Google Generative AI (for API key mode)
 try:
@@ -37,6 +49,7 @@ class VertexAIClient:
         self._endpoints: Dict[str, str] = {}
         self._health_cache: Dict[str, Dict[str, Any]] = {}
         self._health_cache_ttl = 300  # 5 minutes
+        self._initialized = False
 
         # Circuit breaker state for each agent
         self._circuit_breakers: Dict[str, Dict[str, Any]] = {}
@@ -60,27 +73,41 @@ class VertexAIClient:
                     "GEMINI_API_KEY present but google-generativeai package not installed"
                 )
 
-        if not self._use_api_key and self._settings.enable_vertex_ai and self._project_id:
-            try:
-                aiplatform.init(project=self._project_id, location=self._region)
-                logger.info("Vertex AI initialized successfully")
-            except Exception as e:
-                logger.error(f"Failed to initialize Vertex AI: {e}")
-                if not self._use_api_key:
-                    raise
-
-        # Initialize endpoint mappings
+        # Defer Vertex AI initialization to initialize() method or first use
         self._initialize_endpoints()
 
         # Model mapping for Direct API Mode
         self._model_map = {
-            "trend-momentum-agent": "gemini-2.0-flash-exp",
-            "strategy-optimization-agent": "gemini-exp-1206",
-            "financial-sentiment-agent": "gemini-2.0-flash-exp",
-            "market-prediction-agent": "gemini-exp-1206",
-            "volume-microstructure-agent": "gemini-2.0-flash-exp",  # Fallback from Codey
-            "vpin-hft": "gemini-2.0-flash-exp",
+            "trend-momentum-agent": "gemini-1.5-flash-002",
+            "strategy-optimization-agent": "gemini-1.5-flash-002",
+            "financial-sentiment-agent": "gemini-1.5-flash-002",
+            "market-prediction-agent": "gemini-1.5-flash-002",
+            "volume-microstructure-agent": "gemini-1.5-flash-002",
+            "vpin-hft": "gemini-1.5-flash-002",
+            "market-analysis": "gemini-1.5-flash-002",
         }
+
+    async def initialize(self) -> None:
+        """Initialize Vertex AI connection asynchronously."""
+        if self._initialized:
+            return
+
+        if not self._use_api_key and self._settings.enable_vertex_ai and self._project_id:
+            try:
+                # Run blocking init in executor
+                await asyncio.get_event_loop().run_in_executor(
+                    None, 
+                    lambda: aiplatform.init(project=self._project_id, location=self._region)
+                )
+                logger.info("Vertex AI initialized successfully")
+                self._initialized = True
+            except Exception as e:
+                logger.error(f"Failed to initialize Vertex AI: {e}")
+                if not self._use_api_key:
+                    # Don't raise here, allow fallback to other methods or graceful degradation
+                    pass
+        else:
+            self._initialized = True
 
     def _initialize_endpoints(self) -> None:
         """Initialize Vertex AI endpoint mappings for each agent."""
@@ -92,6 +119,9 @@ class VertexAIClient:
 
     async def predict(self, agent_id: str, prompt: str, **kwargs) -> Dict[str, Any]:
         """Make prediction using specified agent model with circuit breaker protection."""
+        if not self._initialized:
+            await self.initialize()
+
         if not self._settings.enable_vertex_ai and not self._use_api_key:
             raise ValueError("Both Vertex AI and Gemini API Key modes are disabled")
 
@@ -107,8 +137,20 @@ class VertexAIClient:
                 return await self._predict_with_vertex(agent_id, prompt, **kwargs)
 
         except Exception as e:
+            # Detailed error logging
+            import traceback
+            logger.error(f"Prediction error for {agent_id}: {str(e)}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            
+            # Check for specific Google API errors
+            if hasattr(e, 'code'):
+                logger.error(f"Google API Error Code: {e.code}")
+            if hasattr(e, 'message'):
+                logger.error(f"Google API Error Message: {e.message}")
+            if hasattr(e, 'details'):
+                logger.error(f"Google API Error Details: {e.details}")
+
             self._record_failure(agent_id)
-            logger.error(f"Prediction error for {agent_id}: {e}")
             raise RuntimeError(f"Prediction failed: {e}")
 
     async def _predict_with_api_key(self, agent_id: str, prompt: str, **kwargs) -> Dict[str, Any]:
@@ -153,13 +195,79 @@ class VertexAIClient:
             raise
 
     async def _predict_with_vertex(self, agent_id: str, prompt: str, **kwargs) -> Dict[str, Any]:
-        """Make prediction using Vertex AI Endpoint."""
+        """Make prediction using Vertex AI (GenerativeModel or Endpoint)."""
+        start_time = time.time()
+        
+        # 1. Check if it's a Generative Model (Gemini)
+        model_name = self._model_map.get(agent_id)
+        if model_name:
+            try:
+                # Initialize model
+                model = GenerativeModel(model_name)
+                
+                # Config
+                generation_config = {
+                    "max_output_tokens": kwargs.get("max_tokens", 1024),
+                    "temperature": kwargs.get("temperature", 0.7),
+                    "top_p": kwargs.get("top_p", 0.95),
+                    "top_k": kwargs.get("top_k", 40),
+                }
+
+                # Run prediction (in executor to be async-friendly)
+                # Note: stream=False by default
+                response = await asyncio.get_event_loop().run_in_executor(
+                    None, 
+                    lambda: model.generate_content(prompt, generation_config=generation_config)
+                )
+                
+                inference_time = time.time() - start_time
+                
+                # Safe response extraction
+                try:
+                    text_response = response.text
+                except Exception:
+                    # Fallback if .text property fails (e.g. safety blocks)
+                    if response.candidates and response.candidates[0].content.parts:
+                         text_response = response.candidates[0].content.parts[0].text
+                    else:
+                         # Log safety ratings if available
+                         logger.warning(f"Empty response from Vertex AI for {agent_id}. Safety attributes: {getattr(response, 'prompt_feedback', 'N/A')}")
+                         raise ValueError("Vertex AI returned empty response (possibly blocked)")
+
+                self._record_success(agent_id)
+                self._record_performance_metric(agent_id, inference_time)
+                
+                return {
+                    "response": text_response,
+                    "confidence": 0.9, 
+                    "metadata": {
+                        "inference_time": inference_time,
+                        "model": model_name,
+                        "mode": "vertex_generative",
+                        "circuit_breaker": "healthy",
+                    },
+                }
+            except Exception as e:
+                # If it fails, we log it. 
+                # We ONLY fall back to endpoint if one is explicitly configured.
+                logger.error(f"GenerativeModel prediction failed for {agent_id} ({model_name}): {e}")
+                if not self._endpoints.get(agent_id):
+                    raise e
+
+        # 2. Fallback to Custom Endpoint (if configured)
         endpoint_url = self._endpoints.get(agent_id)
         if not endpoint_url:
-            raise ValueError(f"No Vertex AI endpoint configured for agent: {agent_id}")
-
-        # ... (Existing Vertex Logic would go here, but since endpoints are empty in current codebase, this path will fail unless endpoints are populated)
-        # For safety, I'll preserve the original logic structure if endpoints existed
+            # This is where the previous error came from. 
+            # If we had a model_name but failed, and have no endpoint, we should have raised e above.
+            if not model_name:
+                 raise ValueError(f"No Vertex AI endpoint or model configured for agent: {agent_id}")
+            # If we are here, it means model_name existed, failed, and we fell through.
+            # But the updated logic above raises e if no endpoint, so we shouldn't reach here in that case.
+            return {
+                "response": "", 
+                "confidence": 0.0, 
+                "metadata": {"error": f"Prediction failed and no fallback endpoint for {agent_id}"}
+            }
 
         # Extract endpoint ID from URL
         endpoint_id = endpoint_url.split("/")[-1]
@@ -179,7 +287,6 @@ class VertexAIClient:
             ]
         }
 
-        start_time = time.time()
         response = endpoint.predict(instances=payload["instances"])
         inference_time = time.time() - start_time
 

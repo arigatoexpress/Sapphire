@@ -17,7 +17,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, 
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-# from fastapi.middleware.cors import CORSMiddleware  # CORS handled manually
+from fastapi.middleware.cors import CORSMiddleware  # CORS handled manually
 from prometheus_fastapi_instrumentator import Instrumentator
 
 # Prometheus metrics
@@ -49,7 +49,9 @@ from .metrics import (
     TRADING_DECISIONS,
 )
 from .schemas import ChatCompletionRequest, InferenceRequest
-from .service import TradingService
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from .service import TradingService
 
 logger = logging.getLogger(__name__)
 
@@ -77,25 +79,39 @@ class RateLimiter:
 rate_limiter = RateLimiter(requests_per_minute=60)  # 60 requests per minute per IP
 
 # Create the FastAPI app instance at module level
-trading_service = TradingService()
+# Create the FastAPI app instance at module level
+# Lazy load trading service to avoid circular imports/startup hangs
+trading_service = None
+
+def get_service_instance():
+    """Helper to get the trading service instance safely."""
+    global trading_service
+    if trading_service is None:
+        # Try to initialize if not already done (e.g. during tests)
+        try:
+            from .minimal_trading_service import get_trading_service
+            trading_service = get_trading_service()
+        except ImportError:
+            pass
+    return trading_service
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Handle application startup and shutdown."""
-    print("🚀 STARTUP: Starting trading service...")
     logger.info("🚀 STARTUP: Starting trading service...")
+    global trading_service
     try:
-        print("🔧 STARTUP: Calling trading_service.start()...")
+        logger.info("🔧 STARTUP: Importing and initializing trading service...")
+        from .minimal_trading_service import get_trading_service
+        trading_service = get_trading_service()
+        
+        logger.info("🔧 STARTUP: Calling trading_service.start()...")
         await trading_service.start()
-        print(
-            f"✅ STARTUP: Trading service started successfully - {len(trading_service._agent_states)} agents initialized"
-        )
         logger.info(
             f"✅ STARTUP: Trading service started successfully - {len(trading_service._agent_states)} agents initialized"
         )
     except Exception as exc:
-        print(f"❌ STARTUP: Failed to start trading service: {exc}")
         logger.exception("❌ STARTUP: Failed to start trading service: %s", exc)
 
     yield
@@ -110,6 +126,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Cloud Trader", version="1.0", lifespan=lifespan)
 
+# Add CORS Middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # CORS headers will be handled manually in OPTIONS handlers
 
 # Add Prometheus instrumentation
@@ -121,7 +146,7 @@ if os.path.exists(static_path):
     app.mount("/static", StaticFiles(directory=static_path), name="static")
 
 
-def build_app(service: TradingService | None = None) -> FastAPI:
+def build_app(service: "TradingService" | None = None) -> FastAPI:
     return app
 
 
@@ -136,6 +161,16 @@ async def root():
     if os.path.exists(index_path):
         return FileResponse(index_path, media_type="text/html")
     return {"status": "ok", "service": "cloud-trader"}
+
+
+@app.get("/portfolio-status")
+async def get_portfolio_status() -> Dict[str, Any]:
+    """Get current portfolio status."""
+    try:
+        return trading_service.get_portfolio_status()
+    except Exception as e:
+        logger.error(f"Failed to get portfolio status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/healthz")
@@ -168,16 +203,20 @@ async def health() -> Dict[str, object]:
     return await healthz()
 
 
-admin_token = (
-    trading_service.settings.admin_api_token
-    if trading_service and hasattr(trading_service, "settings")
-    else None
-)
-admin_guard_disabled = admin_token is None
+def get_admin_token() -> str | None:
+    """Get admin token dynamically."""
+    service = get_service_instance()
+    if service and hasattr(service, "settings"):
+        return service.settings.admin_api_token
+    return None
+
+admin_guard_disabled = False  # Will be checked dynamically
 
 
 def require_admin(request: Request) -> None:
-    if admin_guard_disabled:
+    admin_token = get_admin_token()
+    
+    if admin_token is None:
         if not hasattr(require_admin, "_warned"):
             logger.warning("ADMIN_API_TOKEN not configured; allowing admin endpoint access")
             setattr(require_admin, "_warned", True)
@@ -1014,6 +1053,7 @@ async def batch_order_request(request: Dict[str, Any]) -> Dict[str, Any]:
 
 
 @app.websocket("/ws")
+@app.websocket("/ws/dashboard")
 async def websocket_endpoint(websocket: WebSocket) -> None:
     """WebSocket endpoint for real-time updates."""
     client_id = None
@@ -2388,15 +2428,16 @@ async def dashboard_websocket(websocket: WebSocket) -> None:
         while True:
             await asyncio.sleep(2)
             live_data = await get_live_dashboard_data()
-            
+
             # Add trade execution events if available in a buffer
             # trade_events = trading_service.get_recent_trade_events(last_poll_time)
             # live_data["trade_events"] = trade_events
-            
+
             await websocket.send_json(live_data)
 
     except Exception as exc:
-        logger.info(f"Dashboard WebSocket disconnected: {exc}")
+        # logger.info(f"Dashboard WebSocket disconnected: {exc}") # Reduce verbosity
+        pass
     finally:
         logger.info("Dashboard WebSocket connection closed")
 
@@ -2404,54 +2445,8 @@ async def dashboard_websocket(websocket: WebSocket) -> None:
 async def get_live_dashboard_data() -> Dict[str, Any]:
     """Gather live dashboard metrics from trading service."""
     try:
-        if not trading_service or not hasattr(trading_service, "_agent_states"):
-            return {"error": "Service not initialized", "timestamp": time.time()}
-
-        # Aggregate data from all agents
-        total_pnl = 0.0
-        agent_metrics = []
-
-        if hasattr(trading_service, "_agent_states"):
-            for agent_id, agent_state in trading_service._agent_states.items():
-                agent_pnl = agent_state.total_pnl if hasattr(agent_state, "total_pnl") else 0.0
-                total_pnl += agent_pnl
-
-                agent_metrics.append(
-                    {
-                        "id": agent_id,
-                        "name": agent_state.name if hasattr(agent_state, "name") else agent_id,
-                        "pnl": agent_pnl,
-                        "active_positions": (
-                            len(agent_state.open_positions)
-                            if hasattr(agent_state, "open_positions")
-                            else 0
-                        ),
-                        "total_trades": (
-                            agent_state.total_trades if hasattr(agent_state, "total_trades") else 0
-                        ),
-                    }
-                )
-
-        return {
-            "timestamp": time.time(),
-            "total_pnl": total_pnl,
-            "portfolio_balance": (
-                trading_service._portfolio.balance
-                if hasattr(trading_service, "_portfolio")
-                else 0.0
-            ),
-            "total_exposure": (
-                trading_service._portfolio.total_exposure
-                if hasattr(trading_service, "_portfolio")
-                else 0.0
-            ),
-            "agents": agent_metrics,
-            "active_positions_count": (
-                len(trading_service._portfolio.positions)
-                if hasattr(trading_service, "_portfolio")
-                else 0
-            ),
-        }
+        # Delegate to the service's snapshot method for consistency
+        return await trading_service.dashboard_snapshot()
     except Exception as e:
         logger.error(f"Failed to gather dashboard data: {e}")
         return {"error": str(e), "timestamp": time.time()}

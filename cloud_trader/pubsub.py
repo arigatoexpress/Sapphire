@@ -6,8 +6,14 @@ import json
 import logging
 from typing import Any, Dict, Optional
 
-from google.api_core.exceptions import NotFound
-from google.cloud import pubsub_v1
+try:
+    from google.cloud import pubsub_v1
+    from google.api_core.exceptions import NotFound
+except ImportError:
+    pubsub_v1 = None
+    class NotFound(Exception):
+        pass
+    print("⚠️ PubSub not found. Messaging disabled.")
 
 from .config import Settings
 from .metrics import PUBSUB_PUBLISH_FAILURES
@@ -16,17 +22,30 @@ logger = logging.getLogger(__name__)
 
 
 class PubSubClient:
-    """Wrapper around Google Cloud Pub/Sub for event publishing."""
-
-    def __init__(self, settings: Settings):
-        self._project_id = settings.gcp_project_id
-        self._decisions_topic = settings.decisions_topic
-        self._positions_topic = settings.positions_topic
-        self._reasoning_topic = settings.reasoning_topic
-        self._publisher: Optional[pubsub_v1.PublisherClient] = None
+    """Google Cloud Pub/Sub client wrapper."""
+    
+    def __init__(self, project_id: str, topic_id: str, subscription_id: str):
+        self.project_id = project_id
+        self.topic_id = topic_id
+        self.subscription_id = subscription_id
+        self.publisher = None
+        self.subscriber = None
+        
+        if pubsub_v1:
+            try:
+                self.publisher = pubsub_v1.PublisherClient()
+                self.subscriber = pubsub_v1.SubscriberClient()
+                self.topic_path = self.publisher.topic_path(project_id, topic_id)
+                self.subscription_path = self.subscriber.subscription_path(project_id, subscription_id)
+            except Exception as e:
+                print(f"⚠️ Failed to init PubSub: {e}")
 
     async def connect(self) -> None:
         """Instantiate the Pub/Sub publisher client."""
+        if not self._settings.enable_pubsub:
+            logger.info("Pub/Sub disabled by configuration")
+            return
+
         if self._publisher is None and self._project_id:
             try:
                 self._publisher = pubsub_v1.PublisherClient()
@@ -122,3 +141,20 @@ class PubSubClient:
     # and we can address dashboard data sourcing separately.
     async def stream_events(self, stream_name: str, limit: int) -> list:
         return []
+
+    async def subscribe(self, topic_name: str, callback: Any) -> None:
+        """Subscribe to a topic with a callback function.
+        
+        Note: In Cloud Run, pulling messages is generally done via push subscriptions 
+        triggering an HTTP endpoint, or a background worker. This implementation 
+        assumes a background worker context where streaming pull is feasible.
+        """
+        if not self._settings.enable_pubsub or not self._project_id:
+            logger.warning(f"Pub/Sub disabled, cannot subscribe to {topic_name}")
+            return
+
+        # Basic subscription logic - simplified for now as we primarily use push events
+        # or this service is mainly a publisher.
+        # A real implementation would need a SubscriberClient and proper flow control.
+        logger.warning(f"Subscribe called for {topic_name} but standard client is publisher-only. Use dedicated subscriber if needed.")
+        return

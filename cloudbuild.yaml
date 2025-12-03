@@ -1,226 +1,27 @@
 steps:
-  # Lint and test Python code
-  - name: 'python:3.11-slim'
-    entrypoint: bash
-    args:
-      - -c
-      - |
-        echo "🔍 Running code quality checks..."
-        pip install flake8 black isort mypy pytest
-        echo "Running flake8 linting..."
-        flake8 cloud_trader/ --count --select=E9,F63,F7,F82 --show-source --statistics || true
-        echo "Running black formatting check..."
-        black --check --diff cloud_trader/ || true
-        echo "Running isort import sorting check..."
-        isort --check-only --diff cloud_trader/ || echo "⚠️  Import sorting issues found (non-blocking)"
-        echo "✅ Code quality checks completed"
-
-  # Run unit tests
-  - name: 'python:3.11-slim'
-    entrypoint: bash
-    args:
-      - -c
-      - |
-        echo "🧪 Running unit tests..."
-        pip install -r requirements.txt
-        pip install pytest pytest-cov
-        if [ -d "tests" ] && [ "$(ls -A tests 2>/dev/null)" ]; then
-          pytest tests/ -v --cov=cloud_trader --cov-report=xml || true
-        else
-          echo "⚠️  No tests directory or tests found, skipping tests"
-        fi
-        echo "✅ Unit tests completed"
-
-  # Build optimized single-stage container image for cloud-trader
+  # Build Cloud Trader
   - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'build'
-      - '--build-arg'
-      - 'CACHE_BUST=${BUILD_ID}'
-      - '-t'
-      - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:${BUILD_ID}'
-      - '-t'
-      - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:latest'
-      - '--progress=plain'
-      - '.'
-    env:
-      - 'DOCKER_BUILDKIT=0'  # Disable BuildKit for simpler builds
+    args: ['build', '-t', 'gcr.io/${PROJECT_ID}/cloud-trader:latest', '-t', 'gcr.io/${PROJECT_ID}/cloud-trader:${BUILD_ID}', '-f', 'Dockerfile', '.']
+    id: 'Build Cloud Trader'
 
-  # Push container images to Artifact Registry
+  # Build Hyperliquid Trader
   - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'push'
-      - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:latest'
+    args: ['build', '-t', 'gcr.io/${PROJECT_ID}/hyperliquid-trader:latest', '-f', 'hyperliquid_trader/Dockerfile', 'hyperliquid_trader']
+    id: 'Build Hyperliquid Trader'
+
+  # Build Dashboard
   - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'push'
-      - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:${BUILD_ID}'
-
-  # Validate Helm Chart
-  - name: 'gcr.io/cloud-builders/gcloud'
-    entrypoint: sh
-    args:
-      - -c
-      - |
-        echo "🔍 Validating Helm Chart..."
-        # Install Helm
-        curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
-        chmod 700 get_helm.sh
-        ./get_helm.sh --version v3.12.1 > /dev/null
-        rm get_helm.sh
-
-        # Add Bitnami repo for Redis dependency
-        echo "Adding Bitnami repository..."
-        helm repo add bitnami https://charts.bitnami.com/bitnami --force-update
-        helm repo update
-
-        # Build chart dependencies before validation
-        echo "Building chart dependencies..."
-        helm dependency build ./helm/trading-system || {
-          echo "❌ Helm dependency build failed"
-          exit 1
-        }
-
-        # Lint with error handling
-        echo "Linting chart..."
-        if ! helm lint ./helm/trading-system; then
-          echo "❌ Helm lint failed"
-          helm lint ./helm/trading-system --debug
-          exit 1
-        fi
-
-        echo "✅ Helm chart validation passed"
-
-  # Deploy Phase 1: Infrastructure (Redis, Secrets)
-  - name: 'gcr.io/cloud-builders/gcloud'
-    id: 'deploy-infra'
-    entrypoint: 'bash'
-    args:
-    - '-c'
-    - |
-      # Install Helm
-      curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
-      chmod 700 get_helm.sh
-      ./get_helm.sh --version v3.12.1
-      rm get_helm.sh
-      
-      # Add Bitnami repo
-      helm repo add bitnami https://charts.bitnami.com/bitnami --force-update
-      helm repo update
-      
-      gcloud container clusters get-credentials hft-trading-cluster --region us-central1-a
-
-      # Sync secrets from GCP Secret Manager
-      echo "Syncing secrets..."
-      gcloud secrets versions access latest --secret=DATABASE_URL --project=sapphireinfinite > /tmp/db_url
-      gcloud secrets versions access latest --secret=DB_PASSWORD --project=sapphireinfinite > /tmp/db_pass
-      
-      # Only create if both exist
-      if [ -s /tmp/db_url ] && [ -s /tmp/db_pass ]; then
-         # Read values into variables - USE FILES DIRECTLY to avoid variable substitution issues
-         
-         # Create secret with explicit keys using --from-file to avoid shell variable complexity in cloudbuild
-         # We rename the files to match the key names we want
-         mv /tmp/db_url /tmp/DATABASE_URL
-         mv /tmp/db_pass /tmp/DB_PASSWORD
-         
-         # Fetch other secrets directly to files
-         gcloud secrets versions access latest --secret=ASTER_API_KEY --project=sapphireinfinite > /tmp/ASTER_API_KEY
-         gcloud secrets versions access latest --secret=ASTER_SECRET_KEY --project=sapphireinfinite > /tmp/ASTER_SECRET_KEY
-         gcloud secrets versions access latest --secret=TELEGRAM_BOT_TOKEN --project=sapphireinfinite > /tmp/TELEGRAM_BOT_TOKEN
-         gcloud secrets versions access latest --secret=TELEGRAM_CHAT_ID --project=sapphireinfinite > /tmp/TELEGRAM_CHAT_ID
-         gcloud secrets versions access latest --secret=GROK4_API_KEY --project=sapphireinfinite > /tmp/GROK4_API_KEY
-         
-         kubectl create secret generic cloud-trader-secrets \
-          --from-file=DATABASE_URL=/tmp/DATABASE_URL \
-          --from-file=DB_PASSWORD=/tmp/DB_PASSWORD \
-          --from-file=ASTER_API_KEY=/tmp/ASTER_API_KEY \
-          --from-file=ASTER_SECRET_KEY=/tmp/ASTER_SECRET_KEY \
-          --from-file=TELEGRAM_BOT_TOKEN=/tmp/TELEGRAM_BOT_TOKEN \
-          --from-file=TELEGRAM_CHAT_ID=/tmp/TELEGRAM_CHAT_ID \
-          --from-file=GROK4_API_KEY=/tmp/GROK4_API_KEY \
-          -n trading --dry-run=client -o yaml | kubectl apply -f -
-         echo "Secrets synced ✅"
-      else
-         echo "⚠️ Secrets not found in Secret Manager, relying on existing k8s secrets or manual entry"
-      fi
-
-      # Deploy infrastructure first (Redis, secrets)
-      helm upgrade --install trading-infra ./helm/trading-system \
-        --values ./helm/trading-system/values-infra.yaml \
-        --namespace trading \
-        --create-namespace \
-        --timeout 5m \
-        --set redis.enabled=true \
-        --set agents.enabled=false \
-        --set cloudTrader.enabled=false \
-        --atomic
-      kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=redis -n trading --timeout=120s
-      echo "Infra deployed ✅"
-
-  # Deploy Phase 2: Deployment (No Migration Job)
-  - name: 'gcr.io/cloud-builders/gcloud'
-    id: 'deploy-apps'
-    entrypoint: 'bash'
-    args:
-    - '-c'
-    - |
-      # Install Helm
-      curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
-      chmod 700 get_helm.sh
-      ./get_helm.sh --version v3.12.1
-      rm get_helm.sh
-      
-      # Add Bitnami repo
-      helm repo add bitnami https://charts.bitnami.com/bitnami --force-update
-      helm repo update
-      
-      gcloud container clusters get-credentials hft-trading-cluster --region us-central1-a
-      
-      # Deploy Core
-      helm upgrade --install trading-core ./helm/trading-system \
-        --values ./helm/trading-system/values-core.yaml \
-        --namespace trading \
-        --timeout 10m \
-        --set cloudTrader.image.tag=${BUILD_ID} \
-        --set agents.enabled=false \
-        --set grokTrader.enabled=false \
-        --wait
-        
-      # Deploy Agents
-      helm upgrade --install trading-agents ./helm/trading-system \
-        --values ./helm/trading-system/values-agents.yaml \
-        --namespace trading \
-        --set cloudTrader.image.tag=${BUILD_ID} \
-        --timeout 15m \
-        --wait
-
-      # Deploy Grok
-      helm upgrade --install trading-grok ./helm/trading-system \
-        --values ./helm/trading-system/values-grok.yaml \
-        --namespace trading \
-        --set cloudTrader.image.tag=${BUILD_ID} \
-        --timeout 10m \
-        --wait
-      
-      echo "Deployment complete ✅"
+    args: ['build', '--build-arg', 'VITE_API_URL=${_VITE_API_URL}', '-t', 'gcr.io/${PROJECT_ID}/dashboard:latest', '-f', 'trading-dashboard/Dockerfile', 'trading-dashboard']
+    id: 'Build Dashboard'
 
 images:
-  - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:latest'
-  - 'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/cloud-trader:${BUILD_ID}'
+  - 'gcr.io/${PROJECT_ID}/cloud-trader:latest'
+  - 'gcr.io/${PROJECT_ID}/cloud-trader:${BUILD_ID}'
+  - 'gcr.io/${PROJECT_ID}/hyperliquid-trader:latest'
+  - 'gcr.io/${PROJECT_ID}/dashboard:latest'
 
 options:
-  diskSizeGb: 2000
-  machineType: 'E2_HIGHCPU_32'
-  dynamicSubstitutions: true
-  substitutionOption: 'ALLOW_LOOSE'
   logging: CLOUD_LOGGING_ONLY
-  env:
-    - 'DOCKER_BUILDKIT=0'
-    - 'CUDA_VISIBLE_DEVICES='
-    - 'PYTORCH_CUDA_ALLOC_CONF=garbage_collection_threshold:0.6,max_split_size_mb:512'
-    - 'NUMBA_THREADING_LAYER=omp'
-    - 'OMP_NUM_THREADS=8'
-    - 'PYTHONOPTIMIZE=1'
+  machineType: 'E2_HIGHCPU_8'
 
-timeout: '3600s'
+timeout: 3600s

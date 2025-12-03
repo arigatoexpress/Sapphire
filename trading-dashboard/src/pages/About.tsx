@@ -1,257 +1,131 @@
 import React from 'react';
-import { Container, Box, Typography, Grid, Card, CardContent, Chip, Divider } from '@mui/material';
-import RegulatoryDisclaimer from '../components/RegulatoryDisclaimer';
-import {
-  Psychology,
-  Speed,
-  Shield,
-  CloudQueue,
-  Analytics,
-  TrendingUp,
-  Security,
-  Verified,
-  Timeline,
-  Memory,
-  Bolt,
-  SmartToy,
-} from '@mui/icons-material';
+import { Cpu, Brain, Zap, Shield, TrendingUp, Users } from 'lucide-react';
 
-const About: React.FC = () => {
+export const About: React.FC = () => {
+
   const features = [
     {
-      icon: <Psychology sx={{ fontSize: 40, color: '#8b5cf6' }} />,
-      title: '6 Specialized AI Agents',
-      description: 'Each agent powered by Google\'s latest Gemini models, optimized for specific market analysis tasks. From momentum detection to sentiment analysis, each agent brings unique intelligence to trading decisions.',
-      details: [
-        'Trend Momentum Agent: Gemini 2.0 Flash Experimental for fast momentum signals',
-        'Strategy Optimization Agent: Gemini Experimental 1206 for advanced reasoning',
-        'Financial Sentiment Agent: Gemini 2.0 Flash Experimental for NLP analysis',
-        'Market Prediction Agent: Gemini Experimental 1206 for time series forecasting',
-        'Volume Microstructure Agent: Codey for mathematical volume analysis',
-        'VPIN HFT Agent: Gemini 2.0 Flash Experimental for high-frequency order flow analysis'
-      ]
+      icon: Brain,
+      title: 'AI-Powered Trading',
+      description: 'Six specialized AI agents powered by Google Gemini models with unique trading strategies'
     },
     {
-      icon: <Speed sx={{ fontSize: 40, color: '#06b6d4' }} />,
-      title: 'Real-Time Market Analysis',
-      description: 'Direct integration with Aster DEX Futures API provides live market data, order book depth, and real-time price streaming for perpetual futures contracts.',
-      details: [
-        'Live price feeds for BTCUSDT, ETHUSDT, and other perpetual futures',
-        'Real-time order book depth analysis for liquidity assessment',
-        'Sub-second decision latency with optimized async processing',
-        'Automated position management with intelligent entry/exit timing'
-      ]
+      icon: Zap,
+      title: 'Real-Time Execution',
+      description: 'Instant order placement and market connectivity with advanced risk management'
     },
     {
-      icon: <Shield sx={{ fontSize: 40, color: '#10b981' }} />,
-      title: 'Institutional-Grade Risk Management',
-      description: 'Multi-layer risk controls with real-time portfolio analytics, automated position sizing, and dynamic risk parameter adjustment based on market conditions.',
-      details: [
-        'Value at Risk (VaR) and Expected Shortfall calculations',
-        'Sharpe and Sortino ratio tracking for risk-adjusted returns',
-        'Maximum drawdown monitoring and correlation analysis',
-        'ATR-based stop losses with liquidation prevention',
-        'Per-agent capital limits and leverage controls'
-      ]
+      icon: TrendingUp,
+      title: 'Advanced Analytics',
+      description: 'Comprehensive performance metrics, risk analysis, and market insights'
     },
     {
-      icon: <CloudQueue sx={{ fontSize: 40, color: '#8b5cf6' }} />,
-      title: 'Cloud-Native Architecture',
-      description: 'Built on Google Cloud Platform with Kubernetes orchestration, enabling automatic scaling, high availability, and cost-optimized resource allocation.',
-      details: [
-        'Kubernetes-based microservices architecture',
-        'Automatic horizontal pod autoscaling',
-        'Multi-level caching for performance optimization',
-        'Event-driven processing with Pub/Sub messaging',
-        'Distributed system with fault tolerance'
-      ]
-    },
-    {
-      icon: <Security sx={{ fontSize: 40, color: '#f59e0b' }} />,
-      title: 'Enterprise Security & Compliance',
-      description: 'Comprehensive security measures including API authentication, audit trails, data retention policies, and regulatory compliance monitoring.',
-      details: [
-        'HMAC SHA256 API authentication with IP whitelisting',
-        'Tamper-proof transaction logging and audit trails',
-        'Automated compliance monitoring and reporting',
-        'Multi-level access controls and data encryption',
-        'Secure credential management via Kubernetes secrets'
-      ]
-    },
-    {
-      icon: <Bolt sx={{ fontSize: 40, color: '#ec4899' }} />,
-      title: 'Self-Healing & Resilient',
-      description: 'Advanced fault tolerance with circuit breakers, automatic recovery systems, and graceful degradation to maintain operation during component failures.',
-      details: [
-        'Circuit breaker protection for automatic failure isolation',
-        'Self-healing architecture with automated recovery',
-        'Graceful degradation maintains core functionality',
-        'Comprehensive health monitoring and alerting',
-        '24/7 system health tracking with Prometheus metrics'
-      ]
+      icon: Shield,
+      title: 'Enterprise Security',
+      description: 'Military-grade security with encrypted communications and regulatory compliance'
     }
   ];
 
-  const stats = [
-    { label: 'AI Agents', value: '6', description: 'Specialized trading agents' },
-    { label: 'Live Capital', value: '$3,000', description: 'Active trading funds' },
-    { label: 'AI Models', value: '3', description: 'Gemini model variants' },
-    { label: 'Market Data', value: 'Real-Time', description: 'Aster DEX integration' },
+  const technologies = [
+    'Python', 'Google Gemini AI', 'FastAPI', 'PostgreSQL', 'Redis', 'Docker', 'React', 'TypeScript'
   ];
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
-      <Box sx={{ textAlign: 'center', mb: 6 }}>
-        <Typography
-          variant="h2"
-          sx={{
-            fontWeight: 900,
-            mb: 2,
-            fontSize: { xs: '2rem', md: '3rem' },
-            background: 'linear-gradient(135deg, #0EA5E9 0%, #8B5CF6 50%, #0EA5E9 100%)',
-            backgroundSize: '200% 200%',
-            backgroundClip: 'text',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            animation: 'gradientShift 3s ease infinite',
-            '@keyframes gradientShift': {
-              '0%, 100%': { backgroundPosition: '0% 50%' },
-              '50%': { backgroundPosition: '100% 50%' },
-            },
-          }}
-        >
-          Sapphire AI Trading System
-        </Typography>
-        <Typography
-          variant="h6"
-          sx={{
-            color: 'text.secondary',
-            maxWidth: '900px',
-            mx: 'auto',
-            lineHeight: 1.8,
-            mb: 4,
-            fontSize: { xs: '1rem', md: '1.125rem' },
-            fontWeight: 400,
-          }}
-        >
-          An enterprise-grade AI-powered algorithmic trading platform designed for institutional performance. 
-          Built on Google Cloud Platform with cutting-edge Gemini AI models, the system executes automated 
-          trades on Aster DEX with sophisticated risk management, real-time market analysis, and multi-agent 
-          collaboration through the Multi-Component Protocol (MCP).
-        </Typography>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-xl p-6 border border-slate-700">
+        <h1 className="text-3xl font-bold text-white mb-2">About Sapphire AI</h1>
+        <p className="text-slate-400">
+          Advanced AI-powered cryptocurrency trading system with real-time market analysis and automated execution
+        </p>
+      </div>
 
-        {/* Key Stats */}
-        <Grid container spacing={3} sx={{ mb: 6 }}>
-          {stats.map((stat, index) => (
-            <Grid item xs={6} md={3} key={index}>
-              <Card sx={{
-                background: 'rgba(255, 255, 255, 0.08)',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: 3,
-                p: 2
-              }}>
-                <Typography variant="h3" sx={{ fontWeight: 900, color: 'primary.main', mb: 0.5 }}>
-                  {stat.value}
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', mb: 0.5 }}>
-                  {stat.label}
-                </Typography>
-                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  {stat.description}
-                </Typography>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
-      </Box>
+      {/* Mission Statement */}
+      <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-xl p-6 border border-blue-500/20">
+        <h2 className="text-xl font-semibold text-blue-400 mb-4">Our Mission</h2>
+        <p className="text-slate-300 leading-relaxed">
+          Sapphire AI revolutionizes cryptocurrency trading by combining cutting-edge artificial intelligence with
+          sophisticated market analysis. Our platform empowers traders with automated, intelligent decision-making
+          that operates 24/7, adapting to market conditions and executing trades with precision and discipline.
+        </p>
+      </div>
 
-      {/* Features Grid */}
-      <Grid container spacing={4}>
+      {/* Key Features */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {features.map((feature, index) => (
-          <Grid item xs={12} md={6} key={index}>
-            <Card sx={{
-              height: '100%',
-              background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(30, 41, 59, 0.4))',
-              backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(139, 92, 246, 0.2)',
-              borderRadius: 3,
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                transform: 'translateY(-4px)',
-                border: '1px solid rgba(139, 92, 246, 0.4)',
-                boxShadow: '0 20px 40px rgba(139, 92, 246, 0.1)',
-              }
-            }}>
-              <CardContent sx={{ p: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  {feature.icon}
-                  <Typography variant="h5" sx={{ fontWeight: 700, ml: 2 }}>
-                    {feature.title}
-                  </Typography>
-                </Box>
-                <Typography variant="body1" sx={{ color: 'text.secondary', mb: 3, lineHeight: 1.7 }}>
-                  {feature.description}
-                </Typography>
-                <Divider sx={{ mb: 2, borderColor: 'rgba(255,255,255,0.1)' }} />
-                <Box>
-                  {feature.details.map((detail, idx) => (
-                    <Box key={idx} sx={{ mb: 1.5, display: 'flex', alignItems: 'flex-start' }}>
-                      <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.6, pl: 1 }}>
-                        • {detail}
-                      </Typography>
-                    </Box>
-                  ))}
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
+          <div key={index} className="bg-slate-900/50 rounded-xl p-6 border border-slate-800">
+            <div className="flex items-center gap-4 mb-4">
+              <feature.icon className="h-8 w-8 text-blue-400" />
+              <h3 className="text-lg font-semibold text-white">{feature.title}</h3>
+            </div>
+            <p className="text-slate-400 leading-relaxed">{feature.description}</p>
+          </div>
         ))}
-      </Grid>
+      </div>
 
       {/* Technology Stack */}
-      <Box sx={{ mt: 6, p: 4, borderRadius: 3, background: 'rgba(30, 41, 59, 0.4)', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
-        <Typography variant="h5" sx={{ fontWeight: 700, mb: 3, textAlign: 'center' }}>
-          Technology Stack
-        </Typography>
-        <Grid container spacing={2}>
-          {[
-            'Google Cloud Platform (GKE)',
-            'Kubernetes Orchestration',
-            'Gemini AI Models (2.0 Flash Exp, Exp-1206, Codey)',
-            'Aster DEX Futures API',
-            'Python Async/Await',
-            'FastAPI & Uvicorn',
-            'Redis Caching',
-            'Prometheus Monitoring',
-            'Firebase Hosting',
-            'React + TypeScript',
-            'Material-UI',
-            'BigQuery Analytics'
-          ].map((tech, index) => (
-            <Grid item xs={6} sm={4} md={3} key={index}>
-              <Chip
-                label={tech}
-                sx={{
-                  bgcolor: 'rgba(139, 92, 246, 0.1)',
-                  color: '#8b5cf6',
-                  border: '1px solid rgba(139, 92, 246, 0.3)',
-                  width: '100%',
-                  '&:hover': {
-                    bgcolor: 'rgba(139, 92, 246, 0.2)',
-                  }
-                }}
-              />
-            </Grid>
+      <div className="bg-slate-900/50 rounded-xl p-6 border border-slate-800">
+        <h2 className="text-xl font-semibold text-white mb-6">Technology Stack</h2>
+        <div className="flex flex-wrap gap-3">
+          {technologies.map((tech, index) => (
+            <span key={index} className="bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full text-sm font-medium">
+              {tech}
+            </span>
           ))}
-        </Grid>
-      </Box>
+        </div>
+      </div>
 
-      {/* Regulatory Disclaimer */}
-      <Box sx={{ mt: 6 }}>
-        <RegulatoryDisclaimer />
-      </Box>
-    </Container>
+      {/* Our Approach */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-slate-900/50 rounded-xl p-6 border border-slate-800">
+          <h2 className="text-xl font-semibold text-white mb-4">Our Approach</h2>
+          <div className="space-y-4">
+            <p className="text-slate-400 leading-relaxed">
+              Sapphire AI combines quantitative analysis with artificial intelligence to create a trading system
+              that learns, adapts, and evolves. Our multi-agent architecture ensures diverse perspectives and
+              robust decision-making.
+            </p>
+            <p className="text-slate-400 leading-relaxed">
+              We believe in transparency, security, and responsible AI development. Every trade is logged,
+              every decision is auditable, and every risk is calculated with precision.
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-slate-900/50 rounded-xl p-6 border border-slate-800">
+          <h2 className="text-xl font-semibold text-white mb-4">System Architecture</h2>
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <Cpu className="h-5 w-5 text-blue-400" />
+              <span className="text-slate-300">Docker containerized services</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Users className="h-5 w-5 text-purple-400" />
+              <span className="text-slate-300">6 specialized AI trading agents</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Brain className="h-5 w-5 text-emerald-400" />
+              <span className="text-slate-300">Google Gemini AI integration</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Shield className="h-5 w-5 text-orange-400" />
+              <span className="text-slate-300">Advanced risk management</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Disclaimer */}
+      <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-6">
+        <h3 className="text-lg font-semibold text-amber-400 mb-3">⚠️ Important Disclaimer</h3>
+        <p className="text-slate-400 leading-relaxed">
+          Cryptocurrency trading involves significant risk and may not be suitable for all investors.
+          Past performance does not guarantee future results. This system is for educational and
+          informational purposes. Always conduct your own research and consider your risk tolerance
+          before investing.
+        </p>
+      </div>
+    </div>
   );
 };
 

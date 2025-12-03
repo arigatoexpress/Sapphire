@@ -25,4 +25,3 @@ I will trigger the build again (`gcloud builds submit`).
 
 ## 4. Execution
 I am ready to execute this fix immediately.
-

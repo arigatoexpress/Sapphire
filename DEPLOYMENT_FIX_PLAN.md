@@ -14,7 +14,7 @@ The build failed at **Step 5** of `cloudbuild.yaml`:
       - |
         echo "🔍 Validating Helm Chart..."
         # ... Install Helm ...
-        
+
         # Lint with error handling
         if ! helm lint ./helm/trading-system; then
           # ...
@@ -46,4 +46,3 @@ I will now:
 1.  Read the `deployment-cloud-trader.yaml` file again to check indentation.
 2.  Run a dry-run lint check if possible.
 3.  Patch the file if errors are found.
-

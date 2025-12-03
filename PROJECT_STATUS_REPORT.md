@@ -63,4 +63,3 @@ spec:
 2. How do I ensure the Cloud SQL Proxy sidecar terminates after the migration completes? (Currently, the Job might hang indefinitely because the sidecar keeps running).
 3. Are there standard "best practice" patterns for "Job with Sidecar" in Kubernetes 1.29+ (e.g., native sidecar support)?
 ```
-

@@ -42,6 +42,17 @@ interface DashboardData {
   agents: AgentMetrics[];
   messages: ChatMessage[];
   recentTrades: Trade[];
+  open_positions: Array<{
+    symbol: string;
+    side: string;
+    quantity: number;
+    entry_price: number;
+    current_price: number;
+    pnl: number;
+    agent: string;
+    tp?: number;
+    sl?: number;
+  }>;
 }
 
 interface UseWebSocketReturn {
@@ -63,9 +74,19 @@ export const useDashboardWebSocket = (url?: string): UseWebSocketReturn => {
 
   const connect = () => {
     try {
-      // Use provided URL or fallback to environment/default
-      const backendUrl = import.meta.env.VITE_API_URL || 'wss://api.sapphiretrade.xyz';
-      const fullWsUrl = url || `${backendUrl}/ws/dashboard`;
+      // Determine WebSocket URL
+      // If we are in a local/docker environment (proxied), we should connect relative to the current page
+      let fullWsUrl;
+      const apiUrl = import.meta.env.VITE_API_URL;
+
+      if (!apiUrl || apiUrl.includes('cloud-trader') || apiUrl.includes('localhost')) {
+        // Use relative path which goes through Vite proxy
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        fullWsUrl = `${protocol}//${window.location.host}/ws/dashboard`;
+      } else {
+        // Use configured external URL
+        fullWsUrl = url || `${apiUrl}/ws/dashboard`;
+      }
 
       console.log(`🔌 Connecting to WebSocket: ${fullWsUrl}`);
       const ws = new WebSocket(fullWsUrl);

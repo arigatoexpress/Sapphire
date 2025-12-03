@@ -235,6 +235,8 @@ protobuf==5.29.5
     #   grpc-google-iam-v1
     #   grpcio-status
     #   proto-plus
+psycopg2-binary==2.9.7
+    # via cloud-trader (for database connectivity)
 psutil==7.1.3
     # via accelerate
 pyasn1==0.6.1

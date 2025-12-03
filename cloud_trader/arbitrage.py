@@ -7,7 +7,12 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
+import random
+
+try:
+    import numpy as np
+except ImportError:
+    np = None
 
 from .client import AsterClient
 from .config import Settings
@@ -190,7 +195,7 @@ class ArbitrageEngine:
             
             # Simplified: assume historical ratio based on correlation
             # In production, would use actual historical data
-            historical_ratio = current_ratio * (1 + np.random.normal(0, 0.01))
+            historical_ratio = current_ratio * (1 + random.gauss(0, 0.01))
             
             divergence = abs(current_ratio - historical_ratio) / historical_ratio
             
@@ -237,7 +242,7 @@ class ArbitrageEngine:
             # For now, simulate funding rates
             for symbol in symbols:
                 # Simulate funding rates between -0.1% and 0.1%
-                self._funding_rate_cache[symbol] = np.random.uniform(-0.001, 0.001)
+                self._funding_rate_cache[symbol] = random.uniform(-0.001, 0.001)
             
             self._last_funding_update = datetime.utcnow()
         except Exception as e:

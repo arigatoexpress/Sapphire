@@ -74,4 +74,3 @@ helm upgrade --install trading-system ./helm/trading-system \
 
 ## Executing Now
 I will deploy the AI Agents and Grok Trader using Option 1 (incremental approach for safety).
-

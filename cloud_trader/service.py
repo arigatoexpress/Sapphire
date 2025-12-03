@@ -137,153 +137,10 @@ def _reward_for(side: str, change: float) -> float:
     return 0.0
 
 
-@dataclass
-class HealthStatus:
-    running: bool
-    paper_trading: bool
-    last_error: Optional[str]
+from .definitions import HealthStatus, AGENT_DEFINITIONS
 
 
-AGENT_DEFINITIONS: List[Dict[str, Any]] = [
-    {
-        "id": "trend-momentum-agent",
-        "name": "Trend Momentum Agent",
-        "model": "gemini-2.0-flash-exp",
-        "emoji": "📈",
-        "symbols": [],
-        "description": "High-speed momentum analysis using Gemini 2.0 Flash Experimental for real-time trend detection and fast execution.",
-        "personality": "Aggressive momentum trader, identifies and exploits strong directional moves with lightning-fast execution.",
-        "baseline_win_rate": 0.65,
-        "risk_multiplier": 1.4,
-        "profit_target": 0.008,
-        "margin_allocation": 500.0,
-        "specialization": "momentum_trading",
-        "dynamic_position_sizing": True,
-        "adaptive_leverage": True,
-        "intelligence_tp_sl": True,
-        "max_leverage_limit": 12.0,
-        "min_position_size_pct": 0.08,  # Increased to ensure $8+ orders with $100 capital
-        "max_position_size_pct": 0.25,
-        "risk_tolerance": "high",
-        "time_horizon": "very_short",
-        "market_regime_preference": "trending",
-    },
-    {
-        "id": "strategy-optimization-agent",
-        "name": "Strategy Optimization Agent",
-        "model": "gemini-exp-1206",
-        "emoji": "🧠",
-        "symbols": [],
-        "description": "Advanced strategy optimization using Gemini Experimental 1206 for complex analytical reasoning and portfolio optimization.",
-        "personality": "Analytical strategist, continuously optimizes trading approaches using advanced reasoning and market analysis.",
-        "baseline_win_rate": 0.62,
-        "risk_multiplier": 1.6,
-        "profit_target": 0.010,
-        "margin_allocation": 500.0,
-        "specialization": "strategy_optimization",
-        "dynamic_position_sizing": True,
-        "adaptive_leverage": True,
-        "intelligence_tp_sl": True,
-        "max_leverage_limit": 10.0,
-        "min_position_size_pct": 0.08,  # Increased to ensure $8+ orders with $100 capital
-        "max_position_size_pct": 0.22,
-        "risk_tolerance": "moderate",
-        "time_horizon": "short",
-        "market_regime_preference": "all_regimes",
-    },
-    {
-        "id": "financial-sentiment-agent",
-        "name": "Financial Sentiment Agent",
-        "model": "gemini-2.0-flash-exp",
-        "emoji": "💭",
-        "symbols": [],
-        "description": "Real-time sentiment analysis using Gemini 2.0 Flash Experimental for fast processing of news and social media sentiment.",
-        "personality": "Sentiment-focused trader, analyzes market psychology and news impact to identify sentiment-driven opportunities.",
-        "baseline_win_rate": 0.58,
-        "risk_multiplier": 1.8,
-        "profit_target": 0.012,
-        "margin_allocation": 500.0,
-        "specialization": "sentiment_analysis",
-        "dynamic_position_sizing": True,
-        "adaptive_leverage": True,
-        "intelligence_tp_sl": True,
-        "max_leverage_limit": 14.0,
-        "min_position_size_pct": 0.08,  # Increased to ensure $8+ orders with $100 capital
-        "max_position_size_pct": 0.28,
-        "risk_tolerance": "high",
-        "time_horizon": "short_medium",
-        "market_regime_preference": "news_driven",
-    },
-    {
-        "id": "market-prediction-agent",
-        "name": "Market Prediction Agent",
-        "model": "gemini-exp-1206",
-        "emoji": "🔮",
-        "symbols": [],
-        "description": "Advanced market prediction using Gemini Experimental 1206 for time series forecasting and macroeconomic analysis.",
-        "personality": "Predictive analyst, uses advanced models to forecast market movements and identify high-probability setups.",
-        "baseline_win_rate": 0.60,
-        "risk_multiplier": 1.7,
-        "profit_target": 0.011,
-        "margin_allocation": 500.0,
-        "specialization": "market_prediction",
-        "dynamic_position_sizing": True,
-        "adaptive_leverage": True,
-        "intelligence_tp_sl": True,
-        "max_leverage_limit": 11.0,
-        "min_position_size_pct": 0.08,  # Increased to ensure $8+ orders with $100 capital
-        "max_position_size_pct": 0.24,
-        "risk_tolerance": "moderate_high",
-        "time_horizon": "medium",
-        "market_regime_preference": "predictable",
-    },
-    {
-        "id": "volume-microstructure-agent",
-        "name": "Volume Microstructure Agent",
-        "model": "codey-001",
-        "emoji": "📊",
-        "symbols": [],
-        "description": "Mathematical volume analysis using Codey for precise order flow and microstructure analysis.",
-        "personality": "Quantitative analyst, focuses on order book dynamics and institutional activity patterns.",
-        "baseline_win_rate": 0.55,
-        "risk_multiplier": 2.0,
-        "profit_target": 0.006,
-        "margin_allocation": 500.0,
-        "specialization": "volume_analysis",
-        "dynamic_position_sizing": True,
-        "adaptive_leverage": True,
-        "intelligence_tp_sl": True,
-        "max_leverage_limit": 16.0,
-        "min_position_size_pct": 0.08,  # Increased to ensure $8+ orders with $100 capital
-        "max_position_size_pct": 0.20,
-        "risk_tolerance": "high",
-        "time_horizon": "very_short",
-        "market_regime_preference": "liquid",
-    },
-    {
-        "id": "vpin-hft",
-        "name": "VPIN HFT Agent",
-        "model": "gemini-2.0-flash-exp",
-        "emoji": "⚡",
-        "symbols": [],  # All symbols
-        "description": "High-frequency trading agent using Gemini 2.0 Flash Experimental for real-time order flow toxicity detection and volume microstructure analysis to predict short-term price movements.",
-        "personality": "Aggressive, high-frequency, AI-powered pattern recognition in market microstructure.",
-        "baseline_win_rate": 0.55,
-        "risk_multiplier": 3.0,
-        "profit_target": 0.005,  # Small, frequent profits
-        "margin_allocation": 500.0,
-        "specialization": "volume_hft",
-        "dynamic_position_sizing": True,
-        "adaptive_leverage": True,
-        "intelligence_tp_sl": True,  # AI-powered take profit/stop loss
-        "max_leverage_limit": 30.0,
-        "min_position_size_pct": 0.08,  # Increased to ensure $8+ orders with $100 capital
-        "max_position_size_pct": 0.10,
-        "risk_tolerance": "very_high",
-        "time_horizon": "very_short",
-        "market_regime_preference": "volatile",
-    },
-]
+
 
 
 @dataclass
@@ -327,8 +184,16 @@ class TradingService:
         return cls._running_instance
 
     def __init__(self, settings: Optional[Settings] = None) -> None:
+        # MINIMAL WORKING CONSTRUCTOR - Essential attributes first
         self._settings = settings or get_settings()
         self._credential_manager = CredentialManager()
+
+        # CRITICAL: Initialize essential attributes immediately
+        self._agent_states: Dict[str, AgentState] = {}
+        self._symbol_to_agent: Dict[str, str] = {}
+        self._rate_limit_manager = None
+        self._fallback_strategy_selector = None
+        self._health = HealthStatus(running=False, paper_trading=False, last_error=None)
 
         # Create live and paper trading exchange clients
         self._exchange, self._paper_exchange = create_exchange_clients(
@@ -337,16 +202,12 @@ class TradingService:
         )
         self._stop_event = asyncio.Event()
         self._task: Optional[asyncio.Task[None]] = None
-        self._risk = RiskManager(self._settings)
-        self._strategy = MomentumStrategy(
-            threshold=self._settings.momentum_threshold,
-            notional_fraction=self._settings.notional_fraction,
-        )
         self._task = None
         self._health = HealthStatus(running=False, paper_trading=False, last_error=None)
         self._portfolio = PortfolioState(balance=1_000.0, total_exposure=0.0, positions={})
         self._bandit = EpsilonGreedyBandit(self._settings.bandit_epsilon, min_reward=-0.5)
         self._streams = PubSubClient(self._settings)
+
         self._orchestrator: Optional[RiskOrchestratorClientType] = None
         if self._settings.orchestrator_url:
             logger.warning(
@@ -386,6 +247,7 @@ class TradingService:
 
         # Fetch all available symbols from Aster DEX
         self._available_symbols: List[str] = []
+
         self._symbol_refresh_task: Optional[asyncio.Task[None]] = None
         self._observation_task: Optional[asyncio.Task[None]] = None
 
@@ -400,12 +262,14 @@ class TradingService:
         # Initialize graceful degradation system
         initialize_graceful_degradation()
         self._degradation_manager = get_graceful_degradation_manager()
+
         self._setup_degradation_handlers()
         self._symbol_to_agent: Dict[str, str] = {}
         # Agents will be initialized in start() method
 
         # Market data cache with timestamps for validation
         self._market_cache: Dict[str, Tuple[MarketSnapshot, float]] = {}
+
         self._market_cache_ttl = 60.0  # 60 seconds max age
 
         self._recent_trades: Deque[Dict[str, Any]] = deque(maxlen=200)
@@ -417,6 +281,11 @@ class TradingService:
         # Open-source analyst removed - now using Google Cloud AI exclusively
         self._strategy_selector = StrategySelector(enable_rl=self._settings.enable_rl_strategies)
         self._arbitrage_engine = ArbitrageEngine(self._exchange, self._settings)
+
+    @property
+    def _exchange_client(self):
+        """Return the appropriate exchange client based on paper trading setting."""
+        return self._paper_exchange if self._settings.enable_paper_trading else self._exchange
         self._cache: Optional[BaseCache] = None
         self._cache_connected: bool = False
         self._cache_backend: str = "memory"
@@ -1050,18 +919,18 @@ class TradingService:
                         "bot_id": self._settings.bot_id,
                         "symbol": symbol,
                         "strategy": "execution_guard",
-                        "message": "slippage_rejection",
-                        "context": json.dumps(
-                            {
-                                "reference_price": round(reference_price, 6),
-                                "market_price": round(market_price, 6),
-                                "slippage_bps": round(slippage_bps, 2),
-                                "tolerance_bps": tolerance_bps,
-                            }
-                        ),
-                        "timestamp": datetime.utcnow().isoformat(),
-                    }
-                )
+                    "message": "slippage_rejection",
+                    "context": json.dumps(
+                        {
+                            "reference_price": round(reference_price, 6),
+                            "market_price": round(market_price, 6),
+                            "slippage_bps": round(slippage_bps, 2),
+                            "tolerance_bps": tolerance_bps,
+                        }
+                    ),
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+            )
             return False, market_price
 
         return True, market_price
@@ -1155,15 +1024,15 @@ class TradingService:
                             "strategy": "snapshot",
                             "message": "dashboard_snapshot_generated",
                             "context": json.dumps(
-                                {
-                                    "portfolio_balance": portfolio.get("balance"),
-                                    "positions": len(portfolio.get("positions", {})),
-                                    "timestamp": datetime.utcnow().isoformat(),
-                                }
-                            ),
-                            "timestamp": datetime.utcnow().isoformat(),
-                        }
-                    )
+                            {
+                                "portfolio_balance": portfolio.get("balance"),
+                                "positions": len(portfolio.get("positions", {})),
+                                "timestamp": datetime.utcnow().isoformat(),
+                            }
+                        ),
+                        "timestamp": datetime.utcnow().isoformat(),
+                    }
+                )
                 else:
                     reasoning = None
             except Exception as exc:
@@ -1875,17 +1744,17 @@ class TradingService:
                                 "bot_id": self._settings.bot_id,
                                 "symbol": symbol,
                                 "strategy": strategy_signal.strategy_name,
-                                "message": "hold_position",
-                                "context": json.dumps(
-                                    {
-                                        "reasoning": strategy_signal.reasoning,
-                                        "confidence": strategy_signal.confidence,
-                                        "metadata": strategy_signal.metadata,
-                                    }
-                                ),
-                                "timestamp": datetime.utcnow().isoformat(),
-                            }
-                        )
+                            "message": "hold_position",
+                            "context": json.dumps(
+                                {
+                                    "reasoning": strategy_signal.reasoning,
+                                    "confidence": strategy_signal.confidence,
+                                    "metadata": strategy_signal.metadata,
+                                }
+                            ),
+                            "timestamp": datetime.utcnow().isoformat(),
+                        }
+                    )
                     continue
 
                 decision = strategy_signal.direction
@@ -2020,9 +1889,9 @@ class TradingService:
                                 "symbol": symbol,
                                 "strategy": "bandit",
                                 "message": "bandit_suppressed_trade",
-                                "timestamp": datetime.utcnow().isoformat(),
-                            }
-                        )
+                            "timestamp": datetime.utcnow().isoformat(),
+                        }
+                    )
                     continue
 
                 # Use Kelly Criterion for position sizing if enabled
@@ -2042,22 +1911,22 @@ class TradingService:
                             logger.warning(f"Failed to send margin breach Telegram alert: {exc}")
                     if self._streams:
                         await self._streams.publish_reasoning(
-                            {
-                                "bot_id": agent_id_for_symbol,
-                                "symbol": symbol,
-                                "strategy": "margin",
-                                "message": "agent_margin_exceeded",
-                                "context": json.dumps(
-                                    {
-                                        "requested_notional": round(notional, 2),
-                                        "remaining_margin": round(
-                                            self._get_agent_margin_remaining(agent_id_for_symbol), 2
-                                        ),
-                                    }
-                                ),
-                                "timestamp": datetime.utcnow().isoformat(),
-                            }
-                        )
+                        {
+                            "bot_id": agent_id_for_symbol,
+                            "symbol": symbol,
+                            "strategy": "margin",
+                            "message": "agent_margin_exceeded",
+                            "context": json.dumps(
+                                {
+                                    "requested_notional": round(notional, 2),
+                                    "remaining_margin": round(
+                                        self._get_agent_margin_remaining(agent_id_for_symbol), 2
+                                    ),
+                                }
+                            ),
+                            "timestamp": datetime.utcnow().isoformat(),
+                        }
+                    )
                     continue
                 # Enhanced risk check with volatility awareness
                 volatility_estimate = getattr(strategy_signal, "volatility", 1.0)
@@ -2080,14 +1949,14 @@ class TradingService:
                             )
                     if self._streams:
                         await self._streams.publish_reasoning(
-                            {
-                                "bot_id": self._settings.bot_id,
-                                "symbol": symbol,
-                                "strategy": "risk",
-                                "message": "risk_limit_block",
-                                "timestamp": datetime.utcnow().isoformat(),
-                            }
-                        )
+                        {
+                            "bot_id": self._settings.bot_id,
+                            "symbol": symbol,
+                            "strategy": "risk",
+                            "message": "risk_limit_block",
+                            "timestamp": datetime.utcnow().isoformat(),
+                        }
+                    )
                     continue
 
                 TRADING_DECISIONS.labels(
@@ -2135,23 +2004,23 @@ class TradingService:
                 }
                 if self._streams:
                     await self._streams.publish_decision(decision_event)
-                    await self._streams.publish_reasoning(
-                        {
-                            "bot_id": self._settings.bot_id,
-                            "symbol": symbol,
-                            "strategy": "momentum",
-                            "message": "24h_change_crossed_threshold",
-                            "context": json.dumps(
-                                {
-                                    "change_24h": round(snapshot.change_24h, 4),
-                                    "take_profit": round(take_profit, 4),
-                                    "stop_loss": round(stop_loss, 4),
-                                    "trail_step": trail_step,
-                                }
-                            ),
-                            "timestamp": decision_event["timestamp"],
-                        }
-                    )
+                await self._streams.publish_reasoning(
+                    {
+                        "bot_id": self._settings.bot_id,
+                        "symbol": symbol,
+                        "strategy": "momentum",
+                        "message": "24h_change_crossed_threshold",
+                        "context": json.dumps(
+                            {
+                                "change_24h": round(snapshot.change_24h, 4),
+                                "take_profit": round(take_profit, 4),
+                                "stop_loss": round(stop_loss, 4),
+                                "trail_step": trail_step,
+                            }
+                        ),
+                        "timestamp": decision_event["timestamp"],
+                    }
+                )
 
                 if self.paper_trading:
                     logger.info("[PAPER] %s %s @ %.2f", decision, symbol, snapshot.price)
@@ -2862,12 +2731,16 @@ The output should be a JSON object with these keys.
             final_notional_dec = final_quantity_dec * reference_price_dec
             final_notional = float(final_quantity_dec)
 
+            step_size = filters.get("step_size", Decimal("1"))
+            if not isinstance(step_size, Decimal):
+                step_size = Decimal(str(step_size))
+
             for attempt in range(2):
-                quantity_str = format(final_quantity_dec.normalize(), "f")
-                if "." in quantity_str:
-                    decimals = len(quantity_str.split(".")[1])
-                    if decimals > quantity_precision:
-                        quantity_str = format(final_quantity_dec, f".{quantity_precision}f")
+                # Precision fix: Always quantize to step_size
+                if step_size > 0:
+                    final_quantity_dec = final_quantity_dec.quantize(step_size, rounding=ROUND_DOWN)
+                
+                quantity_str = format(final_quantity_dec, "f")
 
                 order_payload = {
                     "symbol": symbol,
@@ -2929,29 +2802,39 @@ The output should be a JSON object with these keys.
                         final_notional,
                     )
                     break
-                except RuntimeError as exc:
+                except Exception as exc:
                     # Record API failure
                     self._safeguards.record_failure("api")
                     self._safeguards.record_failure("orders")
 
                     error_msg = str(exc)
-                    if "Precision is over the maximum" in error_msg and attempt == 0:
-                        adjusted_quantity_dec = final_quantity_dec.quantize(
+                    if ("Precision is over the maximum" in error_msg or "BAD_PRECISION" in error_msg) and attempt == 0:
+                        # If quantize didn't work (maybe step_size was wrong), try integer
+                        logger.warning(
+                            "Precision error for %s; retrying with integer quantity. Error: %s",
+                            symbol, error_msg
+                        )
+                        # Force integer for retry
+                        step_size = Decimal("1")
+                        final_quantity_dec = final_quantity_dec.quantize(
                             Decimal("1"), rounding=ROUND_DOWN
                         )
                         if (
-                            adjusted_quantity_dec <= 0
-                            or adjusted_quantity_dec == final_quantity_dec
+                            final_quantity_dec <= 0
                         ):
+                            logger.error("Quantity became zero after precision adjustment, aborting")
                             raise
-                        logger.warning(
-                            "Precision error for %s; retrying with integer quantity %s",
-                            symbol,
-                            adjusted_quantity_dec,
-                        )
-                        final_quantity_dec = adjusted_quantity_dec
-                        final_notional_dec = adjusted_quantity_dec * reference_price_dec
-                        continue
+                        continue  # Retry loop
+
+                    # Filter expected errors to avoid noise
+                    if "Margin is insufficient" in error_msg:
+                        logger.warning("Insufficient margin for %s: %s", symbol, error_msg)
+                        TRADE_EXECUTION_FAILURE.labels(symbol=symbol.upper(), reason="insufficient_margin").inc()
+                        # Don't raise, just return to avoid crash loop
+                        return
+                    
+                    logger.error("Failed to place order for %s: %s", symbol, exc)
+                    TRADE_EXECUTION_FAILURE.labels(symbol=symbol.upper(), reason="api_error").inc()
                     raise
 
             quantity = final_quantity
@@ -4523,15 +4406,15 @@ The output should be a JSON object with these keys.
         }
         if self._streams:
             await self._streams.publish_position(
-                {
-                    "bot_id": self._settings.bot_id,
-                    "paper": str(self.paper_trading).lower(),
-                    "balance": f"{self._portfolio.balance:.2f}",
-                    "total_exposure": f"{self._portfolio.total_exposure:.2f}",
-                    "positions": json.dumps(positions),
-                    "timestamp": datetime.utcnow().isoformat(),
-                }
-            )
+            {
+                "bot_id": self._settings.bot_id,
+                "paper": str(self.paper_trading).lower(),
+                "balance": f"{self._portfolio.balance:.2f}",
+                "total_exposure": f"{self._portfolio.total_exposure:.2f}",
+                "positions": json.dumps(positions),
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        )
 
     async def _publish_trade_execution(
         self,
@@ -4633,20 +4516,20 @@ The output should be a JSON object with these keys.
         adjusted = max(notional * factor, 0.0)
         if self._streams:
             await self._streams.publish_reasoning(
-                {
-                    "bot_id": self._settings.bot_id,
-                    "symbol": symbol,
-                    "strategy": "auto_delever",
-                    "message": "volatility_threshold_triggered",
-                    "context": json.dumps(
-                        {
-                            "change_24h": round(snapshot.change_24h, 4),
-                            "factor": factor,
-                        }
-                    ),
-                    "timestamp": datetime.utcnow().isoformat(),
-                }
-            )
+            {
+                "bot_id": self._settings.bot_id,
+                "symbol": symbol,
+                "strategy": "auto_delever",
+                "message": "volatility_threshold_triggered",
+                "context": json.dumps(
+                    {
+                        "change_24h": round(snapshot.change_24h, 4),
+                        "factor": factor,
+                    }
+                ),
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        )
         return adjusted
 
     @property
@@ -4905,4 +4788,8 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
         return float(value)
     except (TypeError, ValueError):
         logger.warning("Unable to parse numeric value", raw_value=raw_value, default=default)
-        return default
+                # CRITICAL: Ensure essential attributes are initialized BEFORE anything else
+        self._agent_states: Dict[str, AgentState] = {}
+        self._symbol_to_agent: Dict[str, str] = {}
+        self._rate_limit_manager = None
+        self._fallback_strategy_selector = None

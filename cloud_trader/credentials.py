@@ -50,4 +50,13 @@ def load_credentials(gcp_secret_project: Optional[str] = None) -> Credentials:
         except (ValueError, UnicodeDecodeError):
             pass
 
+    if api_key:
+        api_key = api_key.strip()
+        print(f"DEBUG: Loaded API Key: {api_key[:4]}... (len={len(api_key)})")
+    
+    if api_secret:
+        api_secret = api_secret.strip()
+        # Don't print secret parts for security, just length
+        print(f"DEBUG: Loaded API Secret (len={len(api_secret)})")
+
     return Credentials(api_key=api_key, api_secret=api_secret)

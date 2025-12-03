@@ -224,7 +224,9 @@ class AsterClient:
         if not self._credentials or not self._credentials.api_secret:
             raise ValueError("API secret is not configured")
         params["timestamp"] = int(time.time() * 1000)
-        query_string = urlencode(list(params.items()), doseq=True)
+        # Sort parameters for consistent signature generation
+        sorted_params = sorted(params.items())
+        query_string = urlencode(sorted_params, doseq=True)
         signature = hmac.new(
             self._credentials.api_secret.encode("utf-8"),
             query_string.encode("utf-8"),
@@ -241,18 +243,71 @@ class AsterClient:
         signed: bool = False,
     ) -> Dict[str, Any]:
         params = params or {}
+        print("DEBUG: VERSION 2.0 - GET URL FIX")
+        # Send params in body for state-changing methods, query string for GET
+        if method.upper() in ["POST", "PUT", "DELETE"]:
+            if signed:
+                # For signed requests, we must ensure the body matches the signature exactly.
+                # httpx might reorder params, so we construct the body string manually.
+                if not self._credentials or not self._credentials.api_secret:
+                    raise ValueError("API secret is not configured")
+                
+                # Timestamp is already added by _sign_request if we called it, 
+                # but here we are handling it manually to control the string.
+                # Let's NOT call _sign_request above for these methods to avoid double timestamping/signing issues
+                # if we were to refactor. But currently _sign_request is called above.
+                # Wait, if we call _sign_request above, params has 'signature' and 'timestamp'.
+                # And it is sorted? No, params is a dict.
+                
+                # Let's redo the signing here to be safe and explicit, 
+                # OR trust that we can reconstruct the string from params.
+                # Better to redo it or modify the flow.
+                
+                # RE-IMPLEMENTING logic to avoid the _sign_request call above which returns a dict.
+                # We need the sorted query string.
+                pass 
+
+        # Let's rewrite the whole block to be cleaner.
+        
         if signed:
             if not self._credentials or not self._credentials.api_key:
                 raise ValueError("API key is not configured for a signed request")
-            params = self._sign_request(params)
+            
+            if not self._credentials.api_secret:
+                raise ValueError("API secret is not configured")
+
+            params["timestamp"] = int(time.time() * 1000)
+            sorted_params = sorted(params.items())
+            query_string = urlencode(sorted_params, doseq=True)
+            signature = hmac.new(
+                self._credentials.api_secret.encode("utf-8"),
+                query_string.encode("utf-8"),
+                hashlib.sha256,
+            ).hexdigest()
+            
             headers = {"X-MBX-APIKEY": self._credentials.api_key}
+            
+            if method.upper() in ["POST", "PUT", "DELETE"]:
+                payload = query_string + "&signature=" + signature
+                headers["Content-Type"] = "application/x-www-form-urlencoded"
+                response = await self._client.request(method, endpoint, content=payload, headers=headers)
+            else:
+                # For GET, we must also ensure the query string in the URL matches the signature.
+                # httpx might reorder params if we pass them as a dict.
+                full_query = query_string + "&signature=" + signature
+                url = f"{endpoint}?{full_query}"
+                response = await self._client.request(method, url, headers=headers)
         else:
             headers = {}
+            if method.upper() in ["POST", "PUT", "DELETE"]:
+                response = await self._client.request(method, endpoint, data=params, headers=headers)
+            else:
+                response = await self._client.request(method, endpoint, params=params, headers=headers)
 
-        response = await self._client.request(method, endpoint, params=params, headers=headers)
         try:
             response.raise_for_status()
         except HTTPStatusError as exc:
+            print(f"DEBUG: Error Response: {exc.response.text}")
             content = exc.response.text
             # Try to parse Aster API error format
             try:
@@ -316,6 +371,17 @@ class AsterClient:
         except Exception:
             return None
 
+    async def get_ticker(self, symbol: str) -> Dict[str, Any]:
+        """Get 24hr ticker price change statistics."""
+        params = {"symbol": symbol}
+        tickers = await self._make_request("GET", "/fapi/v1/ticker/24hr", params=params)
+        # API returns a list for a single symbol request, or a single dict?
+        # Documentation usually says list if symbol is not provided, or single object if symbol is provided.
+        # Let's handle both just in case, but typically it returns a dict or a list with one dict.
+        if isinstance(tickers, list) and len(tickers) > 0:
+            return tickers[0]
+        return tickers if isinstance(tickers, dict) else {}
+
     async def get_ticker_price(self, symbol: str) -> Dict[str, Any]:
         return await self._make_request("GET", "/fapi/v1/ticker/price", params={"symbol": symbol})
 
@@ -350,6 +416,10 @@ class AsterClient:
         """Get all trading symbols from exchange info."""
         exchange_info = await self._make_request("GET", "/fapi/v1/exchangeInfo")
         return exchange_info.get("symbols", [])
+
+    async def get_exchange_info(self) -> Dict[str, Any]:
+        """Get full exchange information."""
+        return await self._make_request("GET", "/fapi/v1/exchangeInfo")
 
     async def get_account_info(self) -> Dict[str, Any]:
         return await self._make_request("GET", "/fapi/v4/account", signed=True)
@@ -459,6 +529,17 @@ class AsterClient:
         # Remove None values that the API will reject
         params = {k: v for k, v in params.items() if v is not None}
         return await self._make_request("POST", "/fapi/v1/order", params=params, signed=True)
+
+    async def get_order(
+        self, symbol: str, order_id: Optional[str] = None, orig_client_order_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Check an order's status."""
+        params = {"symbol": symbol}
+        if order_id:
+            params["orderId"] = order_id
+        if orig_client_order_id:
+            params["origClientOrderId"] = orig_client_order_id
+        return await self._make_request("GET", "/fapi/v1/order", params=params, signed=True)
 
     async def get_open_orders(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
         params = {"symbol": symbol} if symbol else {}
@@ -1115,3 +1196,62 @@ def create_exchange_clients(
 
 if __name__ == "__main__":
     asyncio.run(main())
+class AsterSpotClient(AsterClient):
+    """Client for Aster Spot API."""
+
+    def __init__(
+        self,
+        credentials: Optional[Credentials] = None,
+        base_url: str = "https://api.asterdex.com", # Spot API URL
+    ):
+        super().__init__(credentials, base_url)
+
+    async def get_exchange_info(self) -> Dict[str, Any]:
+        """Get full exchange information (Spot)."""
+        return await self._make_request("GET", "/api/v3/exchangeInfo")
+
+    async def get_ticker(self, symbol: str) -> Dict[str, Any]:
+        """Get 24hr ticker price change statistics (Spot)."""
+        params = {"symbol": symbol}
+        return await self._make_request("GET", "/api/v3/ticker/24hr", params=params)
+
+    async def get_account_info(self) -> Dict[str, Any]:
+        """Get current account information (Spot)."""
+        return await self._make_request("GET", "/api/v3/account", signed=True)
+
+    async def place_order(
+        self,
+        symbol: str,
+        side: str,
+        order_type: OrderType,
+        quantity: Optional[float] = None,
+        price: Optional[float] = None,
+        time_in_force: Optional[TimeInForce] = None,
+        new_client_order_id: Optional[str] = None,
+        stop_price: Optional[float] = None,
+        quote_order_qty: Optional[float] = None, # Spot specific
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Place a Spot order."""
+        params = {
+            "symbol": symbol,
+            "side": side,
+            "type": order_type.value,
+        }
+
+        if quantity is not None:
+            params["quantity"] = quantity
+        if quote_order_qty is not None:
+            params["quoteOrderQty"] = quote_order_qty
+        if price is not None:
+            params["price"] = price
+        if time_in_force:
+            params["timeInForce"] = time_in_force.value
+        if new_client_order_id:
+            params["newClientOrderId"] = new_client_order_id
+        if stop_price is not None:
+            params["stopPrice"] = stop_price
+
+        # Remove None values
+        params = {k: v for k, v in params.items() if v is not None}
+        return await self._make_request("POST", "/api/v3/order", params=params, signed=True)

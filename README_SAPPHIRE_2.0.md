@@ -66,4 +66,3 @@ To update the database schema:
 ## Key Configuration
 -   **Symbols**: Controlled via `TRADING_SYMBOLS` env var. Empty string = All Market Mode.
 -   **Secrets**: Managed via GCP Secret Manager (`DATABASE_URL`, `GROK4_API_KEY`, etc.) and synced to K8s secrets at deployment time.
-

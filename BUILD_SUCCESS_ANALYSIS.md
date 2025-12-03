@@ -65,11 +65,11 @@ Add Helm installation at the start of Steps 6 and 7:
     chmod 700 get_helm.sh
     ./get_helm.sh --version v3.12.1
     rm get_helm.sh
-    
+
     # Add Bitnami repo
     helm repo add bitnami https://charts.bitnami.com/bitnami --force-update
     helm repo update
-    
+
     gcloud container clusters get-credentials hft-trading-cluster --region us-central1-a
     # ... rest of the script ...
 ```
@@ -87,4 +87,3 @@ gcloud builds submit --config cloudbuild.yaml
 2. Update `cloudbuild.yaml` to install Helm in deployment steps.
 3. Trigger the build.
 4. Verify pods are running: `kubectl get pods -n trading -w`
-

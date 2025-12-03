@@ -1,80 +1,90 @@
-"""Feature ingestion stubs for Feast and embedding pipelines."""
-
 from __future__ import annotations
-
-from datetime import datetime
-from typing import Iterable, Mapping, Sequence
-
-import pandas as pd
-
-try:  # Optional dependencies documented in README
-    from feast import FeatureStore  # type: ignore
-except ImportError:  # pragma: no cover - optional dependency
-    FeatureStore = None  # type: ignore
+import asyncio
+from typing import List, Dict, Any
+from datetime import datetime, timedelta
 
 try:
-    from sentence_transformers import SentenceTransformer  # type: ignore
-except ImportError:  # pragma: no cover - optional dependency
-    SentenceTransformer = None  # type: ignore
+    import pandas as pd
+except ImportError:
+    pd = None
+    print("⚠️ Pandas not found. FeaturePipeline will be disabled.")
 
+# Mocking Aster Client dependency to avoid circular imports if possible, 
+# but in real app we inject it.
 
-def build_feature_repo(repo_path: str) -> FeatureStore | None:
-    """Initialise a Feast feature store if the dependency is available."""
+class FeaturePipeline:
+    def __init__(self, exchange_client):
+        self.client = exchange_client
+        
+    async def fetch_candles(self, symbol: str, interval: str = "1h", limit: int = 100) -> Any:
+        """Fetch OHLCV data and return as DataFrame."""
+        if pd is None:
+            return []
+            
+        try:
+            klines = await self.client.get_historical_klines(symbol, interval, limit)
+            if not klines:
+                return pd.DataFrame()
+                
+            # Parse binance-like kline format: [time, open, high, low, close, volume, ...]
+            df = pd.DataFrame(klines, columns=[
+                "timestamp", "open", "high", "low", "close", "volume", 
+                "close_time", "quote_volume", "trades", "taker_buy_base", "taker_buy_quote", "ignore"
+            ])
+            
+            # Convert types
+            numeric_cols = ["open", "high", "low", "close", "volume"]
+            df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric)
+            df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+            
+            return df
+        except Exception as e:
+            print(f"⚠️ Failed to fetch candles for {symbol}: {e}")
+            return pd.DataFrame()
 
-    if FeatureStore is None:
-        return None
-    return FeatureStore(repo_path=repo_path)
+    def calculate_indicators(self, df: Any) -> Any:
+        """Calculate comprehensive technical indicators."""
+        if pd is None or not isinstance(df, pd.DataFrame) or df.empty:
+            return df
+            
+        # Trend (Manual Calculation to bypass pandas-ta issue)
+        df["EMA_20"] = df["close"].ewm(span=20, adjust=False).mean()
+        df["EMA_50"] = df["close"].ewm(span=50, adjust=False).mean()
+        
+        # RSI 14
+        delta = df["close"].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        rs = gain / loss
+        df["RSI_14"] = 100 - (100 / (1 + rs))
+        
+        # ATR 14
+        high_low = df["high"] - df["low"]
+        high_close = (df["high"] - df["close"].shift()).abs()
+        low_close = (df["low"] - df["close"].shift()).abs()
+        ranges = pd.concat([high_low, high_close, low_close], axis=1)
+        true_range = ranges.max(axis=1)
+        df["ATRr_14"] = true_range.rolling(window=14).mean()
+        
+        return df
 
-
-def ingest_onchain_metrics(store: FeatureStore, rows: Iterable[Mapping[str, object]]) -> None:
-    """Placeholder ingestion hook for Glassnode/on-chain metrics."""
-
-    if FeatureStore is None:
-        raise RuntimeError("Feast not installed. See docs/monitoring/SETUP.md")
-    store.write_to_online_store("onchain_metrics", list(rows))
-
-
-def embed_news_headlines(headlines: list[str]) -> list[list[float]]:
-    """Embed sentiment/news data using SentenceTransformers."""
-
-    if SentenceTransformer is None:
-        raise RuntimeError("sentence-transformers not installed. See docs/monitoring/SETUP.md")
-    model = SentenceTransformer("all-MiniLM-L6-v2")
-    return model.encode(headlines, convert_to_numpy=False).tolist()
-
-
-def feature_row(symbol: str, price: float, funding: float, volatility: float) -> Mapping[str, object]:
-    return {
-        "symbol": symbol,
-        "price": price,
-        "funding": funding,
-        "volatility": volatility,
-        "ingested_at": datetime.utcnow(),
-    }
-
-
-def load_feature_df(
-    repo_path: str,
-    feature_refs: Sequence[str],
-    entity_rows: Iterable[Mapping[str, object]],
-) -> pd.DataFrame:
-    """Fetch historical features from Feast into a DataFrame.
-
-    Parameters
-    ----------
-    repo_path: str
-        Path to the Feast repo (e.g. ``infra/data_toolkit/feast_repo``).
-    feature_refs: Sequence[str]
-        Feature references (`view:feature` strings).
-    entity_rows: Iterable[Mapping[str, object]]
-        Iterable of rows containing entity keys and event timestamps.
-    """
-
-    if FeatureStore is None:
-        raise RuntimeError("Feast not installed. Install optional deps as per infra/data_toolkit/README.md")
-
-    store = FeatureStore(repo_path=repo_path)
-    entity_df = pd.DataFrame(list(entity_rows))
-    retrieval_job = store.get_historical_features(entity_df=entity_df, features=list(feature_refs))
-    return retrieval_job.to_df().sort_values("event_timestamp")
-
+    async def get_market_analysis(self, symbol: str) -> Dict[str, Any]:
+        """Get full analysis snapshot for an agent."""
+        df = await self.fetch_candles(symbol, interval="1h", limit=100)
+        if pd is None or not isinstance(df, pd.DataFrame) or df.empty:
+            return {}
+            
+        df = self.calculate_indicators(df)
+        latest = df.iloc[-1]
+        
+        return {
+            "symbol": symbol,
+            "price": latest["close"],
+            "rsi": latest.get("RSI_14"),
+            # "macd": latest.get("MACD_12_26_9"), # Skipped for now
+            "atr": latest.get("ATRr_14"),
+            "ema_20": latest.get("EMA_20"),
+            "ema_50": latest.get("EMA_50"),
+            "trend": "BULLISH" if latest["close"] > latest.get("EMA_50", 0) else "BEARISH",
+            "volatility_state": "HIGH" if latest.get("ATRr_14", 0) > (latest["close"] * 0.02) else "LOW"
+        }

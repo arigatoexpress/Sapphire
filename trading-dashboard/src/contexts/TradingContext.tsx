@@ -85,7 +85,8 @@ export const TradingProvider: React.FC<TradingProviderProps> = ({ children }) =>
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   // Use mock data for production (API not available)
-  const USE_MOCK_DATA = typeof window !== 'undefined' && window.location.hostname !== 'localhost';
+  // DISABLED for Docker environment - always try to fetch real data
+  const USE_MOCK_DATA = false; // Force real data usage
 
   // Apply 1-minute delay to sensitive trading data (positions, trades)
   // But keep other real-time data (metrics, activity scores) immediate
@@ -102,16 +103,16 @@ export const TradingProvider: React.FC<TradingProviderProps> = ({ children }) =>
     if (USE_MOCK_DATA) {
       // Use mock data for production
       const mockPortfolio: PortfolioData = {
-        portfolio_value: 3000, // $500 per agent × 6 agents
+        portfolio_value: 1000, // Adjusted to $1000 under agent control
         portfolio_goal: "Conservative growth with risk management",
         risk_limit: 0.15,
         agent_allocations: {
-          'trend-momentum-agent': 0.1667,      // ~$500 (equal allocation)
-          'strategy-optimization-agent': 0.1667, // ~$500
-          'financial-sentiment-agent': 0.1667,   // ~$500
-          'market-prediction-agent': 0.1667,     // ~$500
-          'volume-microstructure-agent': 0.1667, // ~$500
-          'vpin-hft': 0.1667                     // ~$500
+          'trend-momentum-agent': 0.1667,      // ~$166
+          'strategy-optimization-agent': 0.1667, // ~$166
+          'financial-sentiment-agent': 0.1667,   // ~$166
+          'market-prediction-agent': 0.1667,     // ~$166
+          'volume-microstructure-agent': 0.1667, // ~$166
+          'vpin-hft': 0.1667                     // ~$166
         },
         agent_roles: {
           'trend-momentum-agent': 'High-frequency directional trading',
@@ -155,6 +156,11 @@ export const TradingProvider: React.FC<TradingProviderProps> = ({ children }) =>
 
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       const data = await response.json();
+      // Ensure portfolio value reflects only what is under agent control (~$1000 usually)
+      // If the API returns total account balance, we might need to adjust here or ensure API sends correct value
+      // For now, we assume the API sends the correct 'managed' value or we clamp/verify it if needed.
+      // Given the user request, let's trust the API but if it was mocking $3000, we changed the mock above.
+
       setPortfolio(data);
       setLastUpdated(new Date());
       setError(null); // Clear any previous errors
@@ -294,105 +300,7 @@ export const TradingProvider: React.FC<TradingProviderProps> = ({ children }) =>
         ...activity
       }));
 
-      // If no real data, use enhanced mock data (reset for pre-trading state)
-      if (activities.length === 0) {
-        const mockActivities: AgentActivity[] = [
-          {
-            agent_id: 'trend-momentum-1',
-            agent_type: 'trend-momentum-agent',
-            agent_name: 'Trend Momentum Agent',
-            activity_score: 0.92,
-            communication_count: 47,
-            trading_count: Math.floor(Math.random() * 15) + 5, // Reset - no real trading yet
-            last_activity: new Date(Date.now() - 300000).toISOString(),
-            participation_threshold: 0.8,
-            specialization: 'Real-time momentum analysis using Gemini 2.0 Flash Exp',
-            color: '#3b82f6',
-            status: Math.random() > 0.5 ? 'trading' : 'analyzing',
-            gpu_utilization: 45,
-            memory_usage: 2.1
-          },
-          {
-            agent_id: 'strategy-optimization-1',
-            agent_type: 'strategy-optimization-agent',
-            agent_name: 'Strategy Optimization Agent',
-            activity_score: 0.88,
-            communication_count: 32,
-            trading_count: Math.floor(Math.random() * 15) + 5, // Reset - no real trading yet
-            last_activity: new Date(Date.now() - 180000).toISOString(),
-            participation_threshold: 0.75,
-            specialization: 'Advanced strategy optimization using Gemini Exp-1206',
-            color: '#8b5cf6',
-            status: 'active',
-            gpu_utilization: 52,
-            memory_usage: 1.8
-          },
-          {
-            agent_id: 'financial-sentiment-1',
-            agent_type: 'financial-sentiment-agent',
-            agent_name: 'Financial Sentiment Agent',
-            activity_score: 0.85,
-            communication_count: 28,
-            trading_count: Math.floor(Math.random() * 15) + 5, // Reset - no real trading yet
-            last_activity: new Date(Date.now() - 120000).toISOString(),
-            participation_threshold: 0.85,
-            specialization: 'Real-time sentiment analysis using Gemini 2.0 Flash Exp',
-            color: '#f59e0b',
-            status: 'trading',
-            gpu_utilization: 38,
-            memory_usage: 1.6
-          },
-          {
-            agent_id: 'market-prediction-1',
-            agent_type: 'market-prediction-agent',
-            agent_name: 'Market Prediction Agent',
-            activity_score: 0.87,
-            communication_count: 35,
-            trading_count: Math.floor(Math.random() * 15) + 5, // Reset - no real trading yet
-            last_activity: new Date(Date.now() - 90000).toISOString(),
-            participation_threshold: 0.8,
-            specialization: 'Time series forecasting using Gemini Exp-1206',
-            color: '#10b981',
-            status: Math.random() > 0.5 ? 'trading' : 'analyzing',
-            gpu_utilization: 61,
-            memory_usage: 2.3
-          },
-          {
-            agent_id: 'volume-microstructure-1',
-            agent_type: 'volume-microstructure-agent',
-            agent_name: 'Volume Microstructure Agent',
-            activity_score: 0.86,
-            communication_count: 10,
-            trading_count: Math.floor(Math.random() * 15) + 5, // Reset - no real trading yet
-            last_activity: new Date(Date.now() - 240000).toISOString(),
-            participation_threshold: 0.85,
-            specialization: 'Volume analysis using Codey Model',
-            color: '#ef4444',
-            status: Math.random() > 0.5 ? 'trading' : 'analyzing',
-            gpu_utilization: 68,
-            memory_usage: 1.9
-          },
-          {
-            agent_id: 'vpin-hft-1',
-            agent_type: 'vpin-hft',
-            agent_name: 'VPIN HFT Agent',
-            activity_score: 0.89,
-            communication_count: 42,
-            trading_count: Math.floor(Math.random() * 15) + 5, // Reset - no real trading yet
-            last_activity: new Date(Date.now() - 60000).toISOString(),
-            participation_threshold: 0.9,
-            specialization: 'High-frequency trading using Gemini 2.0 Flash Exp',
-            color: '#06b6d4',
-            status: 'active',
-            gpu_utilization: 85,
-            memory_usage: 2.8
-          }
-        ];
-        setAgentActivities(mockActivities);
-      } else {
-        setAgentActivities(activities);
-      }
-
+      setAgentActivities(activities);
       setLastUpdated(new Date());
       setError(null);
       setIsOnline(true);
@@ -404,90 +312,9 @@ export const TradingProvider: React.FC<TradingProviderProps> = ({ children }) =>
         setTimeout(() => fetchAgentActivities(retryCount + 1), Math.pow(2, retryCount) * 1000);
         return;
       } else {
-        // Use enhanced mock data as fallback
-        const fallbackActivities: AgentActivity[] = [
-          {
-            agent_id: 'trend-momentum-1',
-            agent_type: 'trend-momentum-agent',
-            agent_name: 'Trend Momentum Agent',
-            activity_score: 0.92,
-            communication_count: 47,
-            trading_count: Math.floor(Math.random() * 15) + 5, // Reset - no real trading yet
-            last_activity: new Date(Date.now() - 300000).toISOString(),
-            participation_threshold: 0.8,
-            specialization: 'Real-time momentum analysis using Gemini 2.0 Flash Exp',
-            color: '#3b82f6',
-            status: 'analyzing'
-          },
-          {
-            agent_id: 'strategy-optimization-1',
-            agent_type: 'strategy-optimization-agent',
-            agent_name: 'Strategy Optimization Agent',
-            activity_score: 0.88,
-            communication_count: 39,
-            trading_count: Math.floor(Math.random() * 15) + 5, // Reset - no real trading yet
-            last_activity: new Date(Date.now() - 180000).toISOString(),
-            participation_threshold: 0.7,
-            specialization: 'Advanced strategy optimization using Gemini Exp-1206',
-            color: '#8b5cf6',
-            status: 'active'
-          },
-          {
-            agent_id: 'financial-sentiment-1',
-            agent_type: 'financial-sentiment-agent',
-            agent_name: 'Financial Sentiment Agent',
-            activity_score: 0.95,
-            communication_count: 52,
-            trading_count: Math.floor(Math.random() * 15) + 5, // Reset - no real trading yet
-            last_activity: new Date(Date.now() - 120000).toISOString(),
-            participation_threshold: 0.9,
-            specialization: 'Real-time sentiment analysis using Gemini 2.0 Flash Exp',
-            color: '#f59e0b',
-            status: 'analyzing'
-          },
-          {
-            agent_id: 'market-prediction-1',
-            agent_type: 'market-prediction-agent',
-            agent_name: 'Market Prediction Agent',
-            activity_score: 0.87,
-            communication_count: 35,
-            trading_count: Math.floor(Math.random() * 15) + 5, // Reset - no real trading yet
-            last_activity: new Date(Date.now() - 90000).toISOString(),
-            participation_threshold: 0.8,
-            specialization: 'Time series forecasting using Gemini Exp-1206',
-            color: '#10b981',
-            status: 'analyzing'
-          },
-          {
-            agent_id: 'volume-microstructure-1',
-            agent_type: 'volume-microstructure-agent',
-            agent_name: 'Volume Microstructure Agent',
-            activity_score: 0.89,
-            communication_count: 35,
-            trading_count: Math.floor(Math.random() * 15) + 5, // Reset - no real trading yet
-            last_activity: new Date(Date.now() - 180000).toISOString(),
-            participation_threshold: 0.85,
-            specialization: 'Volume analysis using Codey Model',
-            color: '#ef4444',
-            status: 'analyzing'
-          },
-          {
-            agent_id: 'vpin-hft-1',
-            agent_type: 'vpin-hft',
-            agent_name: 'VPIN HFT Agent',
-            activity_score: 0.91,
-            communication_count: 63,
-            trading_count: Math.floor(Math.random() * 15) + 5, // Reset - no real trading yet
-            last_activity: new Date(Date.now() - 60000).toISOString(),
-            participation_threshold: 0.9,
-            specialization: 'High-frequency trading using Gemini 2.0 Flash Exp',
-            color: '#06b6d4',
-            status: 'active'
-          }
-        ];
-        setAgentActivities(fallbackActivities);
-        // Don't show error for demo data - it's expected during initial load
-        // setError('Using demo data - backend not available');
+        console.warn('Failed to fetch agent activities:', error);
+        // Do NOT fallback to mock data - show empty/stale state instead
+        // setAgentActivities([]); // Optional: clear data if you want strict "no stale data"
       }
     }
   }, [API_BASE_URL]);

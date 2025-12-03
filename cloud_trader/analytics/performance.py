@@ -1,9 +1,10 @@
 import logging
-from typing import Dict, List, Any, Optional
-from datetime import datetime, timedelta
 import math
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+
 
 class PerformanceAnalyzer:
     """Analyzes trading performance metrics for agents and strategies."""
@@ -28,23 +29,27 @@ class PerformanceAnalyzer:
 
         winning_trades = [t for t in trades if t.get("pnl", 0) > 0]
         losing_trades = [t for t in trades if t.get("pnl", 0) <= 0]
-        
+
         total_trades = len(trades)
         win_rate = len(winning_trades) / total_trades if total_trades > 0 else 0.0
-        
+
         gross_profit = sum(t.get("pnl", 0) for t in winning_trades)
         gross_loss = abs(sum(t.get("pnl", 0) for t in losing_trades))
-        
-        profit_factor = gross_profit / gross_loss if gross_loss > 0 else float('inf') if gross_profit > 0 else 0.0
+
+        profit_factor = (
+            gross_profit / gross_loss
+            if gross_loss > 0
+            else float("inf") if gross_profit > 0 else 0.0
+        )
         total_pnl = sum(t.get("pnl", 0) for t in trades)
-        
+
         # Calculate Max Drawdown
         # Assuming trades are sorted by time
         cumulative_pnl = [0.0]
         current_pnl = 0.0
         peak = 0.0
         max_dd = 0.0
-        
+
         for t in trades:
             current_pnl += t.get("pnl", 0)
             cumulative_pnl.append(current_pnl)
@@ -53,7 +58,7 @@ class PerformanceAnalyzer:
             dd = peak - current_pnl
             if dd > max_dd:
                 max_dd = dd
-                
+
         # Calculate Sharpe Ratio (simplified annualization)
         returns = [t.get("pnl", 0) for t in trades]
         if len(returns) > 1:
@@ -75,7 +80,9 @@ class PerformanceAnalyzer:
             "sharpe_ratio": sharpe,
         }
 
-    async def analyze_agent_performance(self, agent_id: str, timeframe_hours: int = 24) -> Dict[str, Any]:
+    async def analyze_agent_performance(
+        self, agent_id: str, timeframe_hours: int = 24
+    ) -> Dict[str, Any]:
         """
         Analyze performance for a specific agent over a timeframe.
         Currently uses mock/in-memory data structure until DB is fully live.
@@ -85,7 +92,6 @@ class PerformanceAnalyzer:
         return {
             "agent_id": agent_id,
             "period": f"{timeframe_hours}h",
-            "metrics": self.calculate_metrics([]), # Empty until DB connection
-            "status": "pending_db_connection"
+            "metrics": self.calculate_metrics([]),  # Empty until DB connection
+            "status": "pending_db_connection",
         }
-

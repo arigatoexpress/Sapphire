@@ -36,5 +36,3 @@ This means the **secret needs to be properly synced** from Google Secret Manager
 The secret-gcp-sync template should handle this. Let me verify it's working and trigger a final build that will properly mount the credentials.
 
 **Next**: Submit build that will sync secrets from GCP Secret Manager into the pods properly.
-
-

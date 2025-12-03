@@ -13,7 +13,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
+try:
+    import numpy as np
+except ImportError:
+    np = None
 
 logger = logging.getLogger(__name__)
 
@@ -387,6 +390,13 @@ class RLStrategyManager:
     """Manages reinforcement learning strategies with online learning."""
 
     def __init__(self, models_dir: Optional[str] = None):
+        if np is None:
+            logger.warning("Numpy not found. RL strategies disabled.")
+            self.training_enabled = False
+            self.dqn_agent = None
+            self.ppo_agent = None
+            return
+
         default_dir = Path(os.environ.get("RL_MODELS_DIR", "/tmp/models/rl"))
         self.models_dir = Path(models_dir) if models_dir else default_dir
         self.models_dir.mkdir(parents=True, exist_ok=True)

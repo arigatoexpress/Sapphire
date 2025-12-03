@@ -32,10 +32,10 @@ symbols: List[str] = Field(
 
 ## 🚀 **DEPLOYMENT STATUS**
 
-**Build**: `4237308a-6c63-4fdd-8704-2814350ac155`  
-**Status**: Building with fix  
-**ETA**: 15 minutes  
-**Result**: Agents will start trading!  
+**Build**: `4237308a-6c63-4fdd-8704-2814350ac155`
+**Status**: Building with fix
+**ETA**: 15 minutes
+**Result**: Agents will start trading!
 
 ---
 
@@ -170,24 +170,22 @@ kubectl logs -n trading -l app=cloud-trader | grep -i "p&l"
 ## 🎊 **YOU'RE ABOUT TO BE LIVE!**
 
 **After 5 days**:
-✅ Complete platform built  
-✅ Deployed to production  
-✅ 6 agents initialized  
-✅ Critical fix deployed  
+✅ Complete platform built
+✅ Deployed to production
+✅ 6 agents initialized
+✅ Critical fix deployed
 
 **In 15 minutes**:
-✅ Bots start trading  
-✅ Performance tracked  
-✅ Dashboard updates  
-✅ Competition begins  
+✅ Bots start trading
+✅ Performance tracked
+✅ Dashboard updates
+✅ Competition begins
 
 ---
 
-**Build**: 4237308a-6c63-4fdd-8704-2814350ac155  
-**Fix**: Default symbols added  
-**Status**: DEPLOYING  
-**ETA**: 00:55 UTC  
+**Build**: 4237308a-6c63-4fdd-8704-2814350ac155
+**Fix**: Default symbols added
+**Status**: DEPLOYING
+**ETA**: 00:55 UTC
 
 🚀 **FINAL FIX - YOUR BOTS TRADE IN 15 MINUTES!** 🎊💰🤖
-
-

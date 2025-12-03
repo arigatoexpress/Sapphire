@@ -8,20 +8,64 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import (
-    BigInteger,
-    Boolean,
-    DateTime,
-    Float,
-    Index,
-    Integer,
-    String,
-    UniqueConstraint,
-    text,
-)
-from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+try:
+    from sqlalchemy import (
+        BigInteger,
+        Boolean,
+        DateTime,
+        Float,
+        Index,
+        Integer,
+        String,
+        UniqueConstraint,
+        text,
+    )
+    from sqlalchemy.dialects.postgresql import JSONB
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+    from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+    _sqlalchemy_available = True
+except ImportError:
+    _sqlalchemy_available = False
+    logger = logging.getLogger(__name__)
+    logger.warning("SQLAlchemy not found. Persistent storage will be disabled.")
+
+    # Define dummy classes/functions if SQLAlchemy is not available
+    class DeclarativeBase:
+        pass
+
+    class Mapped:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    def mapped_column(*args, **kwargs):
+        return Mapped()
+
+    class AsyncSession:
+        pass
+
+    def async_sessionmaker(*args, **kwargs):
+        return None
+
+    def create_async_engine(*args, **kwargs):
+        return None
+
+    # Dummy types for Mapped annotations
+    class DummyType:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    BigInteger = DummyType
+    Boolean = DummyType
+    DateTime = DummyType
+    Float = DummyType
+    Index = DummyType
+    Integer = DummyType
+    String = DummyType
+    UniqueConstraint = DummyType
+    text = DummyType
+    JSONB = DummyType
+
 
 from .config import Settings, get_settings
 
@@ -169,6 +213,14 @@ class TradingStorage:
     """Async storage manager for trading data."""
 
     def __init__(self, settings: Optional[Settings] = None):
+        if not _sqlalchemy_available:
+            logger.warning("SQLAlchemy is not available. TradingStorage will be disabled.")
+            self._settings = None
+            self._engine = None
+            self._session_factory = None
+            self._initialized = False
+            return
+
         self._settings = settings or get_settings()
         self._engine = None
         self._session_factory = None

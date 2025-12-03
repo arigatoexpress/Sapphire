@@ -8,8 +8,8 @@ venv/
 venv311/
 env/
 node_modules/
-cloud-trader-dashboard/node_modules/
-cloud-trader-dashboard/dist/
+trading-dashboard/node_modules/
+trading-dashboard/dist/
 *.log
 *.zip
 *.tar
@@ -47,3 +47,13 @@ models/qwen/
 models/router/
 # Keep only the model files we actually use
 !models/common/
+
+# Heavy binaries and backups
+skaffold
+helm/
+backup/
+logs/
+terraform/
+darwin-amd64/
+helm.tar.gz
+sapphire-dashboard-ready.zip

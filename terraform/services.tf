@@ -10,6 +10,8 @@ resource "google_project_service" "project_services" {
     "compute.googleapis.com",
     "vpcaccess.googleapis.com",
     "secretmanager.googleapis.com",
+    "sqladmin.googleapis.com",
+    "servicenetworking.googleapis.com",
   ])
 
   service                    = each.key

@@ -1,0 +1,27 @@
+apiVersion: skaffold/v4beta6
+kind: Config
+metadata:
+  name: sapphire-trading
+build:
+  artifacts:
+  - image: us-central1-docker.pkg.dev/sapphireinfinite/cloud-run-source-deploy/cloud-trader
+    context: .
+    docker:
+      dockerfile: Dockerfile
+      buildArgs:
+        DOCKER_BUILDKIT: "1"
+deploy:
+  helm:
+    releases:
+    - name: trading-system
+      chartPath: helm/trading-system
+      valuesFiles:
+      - helm/trading-system/values-prod.yaml
+      namespace: trading
+      createNamespace: true
+      setValues:
+        cloudTrader.image.tag: latest
+hooks:
+  before:
+    - host:
+        command: ["./scripts/sync-secrets.sh"]

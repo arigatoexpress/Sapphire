@@ -29,7 +29,7 @@ redis:
   image:
     registry: docker.io
     repository: bitnami/redis
-    tag: 7.4.1-debian-12-r0
+    tag: 7.4-debian-12
   master:
     resources:
       requests:
@@ -43,8 +43,11 @@ redis:
     size: 4Gi
 
 # Secrets configuration
+# helmManaged: false means sync-secrets.sh script manages the secret, NOT Helm
+# This prevents Helm from creating an empty secret that overwrites the script's work
 secrets:
   syncFromGcp: true
+  helmManaged: false
 
 # Core Services
 cloudTrader:

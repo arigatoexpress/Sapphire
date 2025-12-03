@@ -1,0 +1,31 @@
+# Minimal Dockerfile for local debugging
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+WORKDIR /app
+
+# Install minimal system deps
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy minimal requirements
+COPY requirements-minimal.txt .
+RUN pip install --default-timeout=100 --no-cache-dir -r requirements-minimal.txt
+
+# Create non-root user
+RUN groupadd -r trader && useradd -r -g trader trader
+
+# Copy application code
+COPY --chown=trader:trader cloud_trader ./cloud_trader
+COPY --chown=trader:trader start.py ./
+
+# Switch to non-root user
+USER trader
+
+EXPOSE 8080
+
+CMD ["python3", "start.py"]

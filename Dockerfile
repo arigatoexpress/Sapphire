@@ -10,10 +10,10 @@ ENV PYTHONUNBUFFERED=1 \
 # Install build dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        build-essential \
-        gcc \
-        g++ \
-        && rm -rf /var/lib/apt/lists/*
+    build-essential \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
@@ -33,9 +33,9 @@ ENV PYTHONUNBUFFERED=1 \
 # Install runtime dependencies only
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        ca-certificates \
-        curl \
-        && rm -rf /var/lib/apt/lists/*
+    ca-certificates \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
 RUN groupadd -r trader && useradd -r -g trader trader
@@ -51,7 +51,7 @@ COPY --from=builder /install/bin /usr/local/bin
 
 # Copy application code with forced cache invalidation
 ARG CACHE_BUST
-RUN echo "Cache bust: $CACHE_BUST"
+RUN echo "CACHE_BUST=1764645934" > /dev/null
 COPY --chown=trader:trader cloud_trader ./cloud_trader
 COPY --chown=trader:trader start.py ./
 COPY --chown=trader:trader pyproject.toml ./

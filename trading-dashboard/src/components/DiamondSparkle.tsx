@@ -82,10 +82,13 @@ const DiamondSparkle: React.FC<DiamondSparkleProps> = ({
       {sparkles.map((sparkle) => {
         if (sparkle.life < sparkle.delay || sparkle.opacity <= 0) return null;
 
+        // FIX: Use Math.max(0, ...) to prevent negative values and clamp opacity
         const fadeOut = sparkle.life > duration * 0.7;
-        const currentOpacity = fadeOut
+        let currentOpacity = fadeOut
           ? sparkle.opacity * (1 - (sparkle.life - duration * 0.7) / (duration * 0.3))
           : sparkle.opacity;
+        
+        currentOpacity = Math.max(0, currentOpacity);
 
         return (
           <Box

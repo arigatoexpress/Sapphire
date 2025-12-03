@@ -26,10 +26,10 @@ from telegram.ext import (
 )
 
 from .ai_analyzer import AITradingAnalyzer
+from .analytics.performance import PerformanceAnalyzer
 from .config import Settings
 from .market_sentiment import MarketSentimentAnalyzer
 from .risk_analyzer import RiskAnalyzer
-from .analytics.performance import PerformanceAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -443,7 +443,7 @@ class EnhancedTelegramService:
         message += f"• Sharpe Ratio: {metrics.get('sharpe_ratio', 0):.2f}\n"
         message += f"• Max Drawdown: {metrics.get('max_drawdown', 0):.1%}\n"
         # Fix volume formatting if it's None
-        total_volume = metrics.get('total_volume', 0) or 0
+        total_volume = metrics.get("total_volume", 0) or 0
         message += f"• Total Volume: `${total_volume:.0f}`\n\n"
 
         # AI commentary

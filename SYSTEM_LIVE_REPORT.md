@@ -50,7 +50,7 @@ Update the Telegram token:
 kubectl create secret generic cloud-trader-secrets \
   --from-literal=TELEGRAM_BOT_TOKEN="YOUR_NEW_TOKEN" \
   -n trading --dry-run=client -o yaml | kubectl apply -f -
-  
+
 kubectl rollout restart deployment/cloud-trader -n trading
 ```
 
@@ -83,4 +83,3 @@ kubectl port-forward -n trading svc/cloud-trader 8080:8080
 **Trading Mode:** LIVE (Paper trading disabled)
 
 The system is operational and ready to trade!
-

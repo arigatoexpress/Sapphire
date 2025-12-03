@@ -33,26 +33,39 @@ def main():
             logger.info(f"  {var}: {value}")
 
     try:
-        # Import the app first (this will trigger module-level initialization)
-        logger.info("🔧 IMPORTING AND INITIALIZING TRADING SERVICE...")
-        from cloud_trader.api import app
-        logger.info("✅ TRADING SERVICE IMPORTED AND INITIALIZED")
+        dev_mode = os.getenv("DEV_MODE", "false").lower() == "true"
+        
+        if dev_mode:
+            logger.info("🔥 DEV_MODE ENABLED: Starting with hot-reload...")
+            import uvicorn
+            uvicorn.run(
+                "cloud_trader.api:app",
+                host="0.0.0.0",
+                port=8080,
+                reload=True,
+                log_level="debug"
+            )
+        else:
+            # Import the app first (this will trigger module-level initialization)
+            logger.info("🔧 IMPORTING AND INITIALIZING TRADING SERVICE...")
+            from cloud_trader.api import app
+            logger.info("✅ TRADING SERVICE IMPORTED AND INITIALIZED")
 
-        # Now start uvicorn with the initialized app
-        logger.info("🌟 STARTING FASTAPI SERVER...")
-        import uvicorn
+            # Now start uvicorn with the initialized app
+            logger.info("🌟 STARTING FASTAPI SERVER...")
+            import uvicorn
 
-        logger.info("🚀 SERVER STARTING ON 0.0.0.0:8080")
-        uvicorn.run(
-            app,
-            host="0.0.0.0",
-            port=8080,
-            workers=1,
-            loop="uvloop",
-            http="httptools",
-            access_log=True,
-            log_level="info"
-        )
+            logger.info("🚀 SERVER STARTING ON 0.0.0.0:8080")
+            uvicorn.run(
+                app,
+                host="0.0.0.0",
+                port=8080,
+                workers=1,
+                loop="uvloop",
+                http="httptools",
+                access_log=True,
+                log_level="info"
+            )
 
     except Exception as e:
         logger.error(f"❌ STARTUP FAILED: {e}")

@@ -5,23 +5,23 @@
 graph TD
     User[Trader/Admin] -->|HTTPS| Ingress[GKE Ingress]
     Ingress --> Service[Cloud Trader Service]
-    
+
     subgraph GKE Cluster (hft-trading-cluster)
         direction TB
-        
+
         subgraph Core Services
             Service --> API[Cloud Trader API Pod]
             API --> Sidecar[Cloud SQL Proxy v2]
             API --> Redis[Redis Cache]
         end
-        
+
         subgraph Agent Layer
             Coordinator[MCP Coordinator]
             Grok[Grok HFT Trader]
             Momentum[Momentum Agent]
             Sentiment[Sentiment Agent]
             Strategy[Strategy Agent]
-            
+
             API <--> Coordinator
             Coordinator <--> Grok
             Coordinator <--> Momentum
@@ -29,7 +29,7 @@ graph TD
             Coordinator <--> Strategy
         end
     end
-    
+
     subgraph Google Cloud Platform
         Sidecar -->|Secure Tunnel| CloudSQL[(Cloud SQL PostgreSQL)]
         API -->|API Call| VertexAI[Vertex AI (Gemini Models)]
@@ -71,4 +71,3 @@ We use Kubernetes 1.29+ **Native Sidecars** for the Cloud SQL Proxy.
 3.  **Agent Processing**: Agents (Grok, Momentum, etc.) consume data, query Vertex AI/xAI models for inference, and publish signals back to Redis.
 4.  **Execution**: `Cloud Trader` consumes signals, validates against Risk checks, and executes orders.
 5.  **Persistence**: All trades, signals, and PnL snapshots are stored in Cloud SQL.
-

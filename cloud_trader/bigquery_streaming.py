@@ -7,8 +7,16 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from google.cloud import bigquery
-from google.cloud.exceptions import NotFound
+try:
+    from google.cloud import bigquery
+except ImportError:
+    bigquery = None
+    print("⚠️ BigQuery not found. Streaming disabled.")
+try:
+    from google.cloud.exceptions import NotFound
+except ImportError:
+    class NotFound(Exception):
+        pass
 
 from .config import Settings, get_settings
 

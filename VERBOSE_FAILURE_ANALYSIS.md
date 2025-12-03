@@ -48,4 +48,3 @@ We are currently executing the **Master Fix**.
 4.  **Manifest**: Uses modern Native Sidecar pattern for reliable DB migrations.
 
 **Action:** Monitor the current build. If it succeeds, Sapphire AI 2.0 will be live with full trading capabilities. If the migration fails again, the new debug logging in `cloudbuild.yaml` will show us *exactly* why (e.g., specific SQL error or network timeout) without guessing.
-

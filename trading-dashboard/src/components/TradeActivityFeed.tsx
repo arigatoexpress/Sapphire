@@ -47,7 +47,7 @@ export const TradeActivityFeed: React.FC<Props> = ({ trades }) => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/50 text-sm">
-            {trades.length === 0 ? (
+            {(!trades || trades.length === 0) ? (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
                   No trades recorded yet today
@@ -67,8 +67,8 @@ export const TradeActivityFeed: React.FC<Props> = ({ trades }) => {
                   </td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold ${
-                      trade.side === 'BUY' 
-                        ? 'bg-emerald-500/10 text-emerald-400' 
+                      trade.side === 'BUY'
+                        ? 'bg-emerald-500/10 text-emerald-400'
                         : 'bg-rose-500/10 text-rose-400'
                     }`}>
                       {trade.side === 'BUY' ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
@@ -76,10 +76,10 @@ export const TradeActivityFeed: React.FC<Props> = ({ trades }) => {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right text-slate-300 font-mono">
-                    ${trade.price.toFixed(trade.price < 1 ? 4 : 2)}
+                    ${(trade.price ?? 0).toFixed((trade.price ?? 0) < 1 ? 4 : 2)}
                   </td>
                   <td className="px-4 py-3 text-right text-slate-300 font-mono">
-                    ${trade.total.toFixed(2)}
+                    ${(trade.total ?? 0).toFixed(2)}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <StatusBadge status={trade.status} />
@@ -107,4 +107,3 @@ const StatusBadge = ({ status }: { status: string }) => {
     </span>
   );
 };
-
