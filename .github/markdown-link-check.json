@@ -1,0 +1,17 @@
+{
+  "ignorePatterns": [
+    {"pattern": "^http://localhost"},
+    {"pattern": "^https://localhost"},
+    {"pattern": "^http://127.0.0.1"},
+    {"pattern": "docs/archive"},
+    {"pattern": "^https://sapphire"},
+    {"pattern": "^https://cloud-trader"},
+    {"pattern": "^https://console.firebase"},
+    {"pattern": "^https://console.cloud.google"},
+    {"pattern": "^file://"}
+  ],
+  "retryOn429": true,
+  "retryCount": 3,
+  "fallbackRetryDelay": "10s",
+  "timeout": "10s"
+}
