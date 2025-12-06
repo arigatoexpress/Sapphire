@@ -1,24 +1,26 @@
-# Sapphire Trading Dashboard
+# 📊 Trading Dashboard
 
-Real-time monitoring interface for the autonomous trading system.
+Real-time visualization dashboard for Agent Symphony trading system.
 
-## Features
+## Overview
 
-- **Live Portfolio Tracking**: Real-time account balance and P&L monitoring
-- **AI Agent Status**: Activity levels and performance metrics for all trading agents
-- **Risk Management**: Position limits and drawdown controls
-- **Performance Charts**: Historical portfolio value with multiple timeframes
-- **System Health**: Service status and operational metrics
+A modern React application providing:
+- Real-time P&L tracking
+- Agent performance monitoring
+- Position management
+- Market regime visualization
+- Trade history
 
-## Technology
+## Tech Stack
 
-- React 18 with TypeScript
-- Material-UI component library
-- Firebase Hosting for deployment
-- Responsive design for mobile and desktop
-- Real-time data updates
+- **Framework**: React 18 + TypeScript
+- **Styling**: Tailwind CSS + MUI
+- **Charts**: Recharts
+- **State**: React Hooks + WebSocket
+- **Build**: Vite
+- **Deployment**: Firebase Hosting
 
-## Development
+## Quick Start
 
 ```bash
 # Install dependencies
@@ -34,12 +36,65 @@ npm run build
 npm run deploy
 ```
 
-## Architecture
+## Project Structure
 
-The dashboard connects to the trading backend API to display:
-- Current portfolio positions and values
-- AI agent activity and decision-making
-- Trading signals and execution results
-- System health and performance metrics
+```
+src/
+├── components/          # UI components
+│   ├── AgentCard.tsx    # Agent performance card
+│   ├── PositionGrid.tsx # Position table
+│   └── PnLChart.tsx     # P&L visualization
+├── hooks/
+│   └── useWebSocket.ts  # Real-time data hook
+├── pages/
+│   └── DualityDashboard.tsx  # Main dashboard
+├── lib/
+│   └── firebase.ts      # Firebase config
+└── App.tsx              # Root component
+```
 
-All data is updated in real-time with automatic error handling and connection recovery.
+## Environment Variables
+
+Create `.env.local` for development:
+
+```bash
+VITE_API_URL=http://localhost:8080
+VITE_FIREBASE_API_KEY=your_key
+VITE_FIREBASE_PROJECT_ID=sapphire-479610
+```
+
+For production, create `.env.production`:
+
+```bash
+VITE_API_URL=https://cloud-trader-267358751314.northamerica-northeast1.run.app
+VITE_FIREBASE_API_KEY=your_key
+VITE_FIREBASE_PROJECT_ID=sapphire-479610
+```
+
+## WebSocket Connection
+
+The dashboard connects to the backend via WebSocket:
+
+```typescript
+// Automatic connection via useWebSocket hook
+const { data, connected, error } = useDashboardWebSocket();
+```
+
+## Deployment
+
+### Firebase Hosting
+
+```bash
+npm run build
+firebase deploy --only hosting --project sapphire-479610
+```
+
+### Custom Domain
+
+The dashboard is accessible at:
+- https://sapphiretrade.xyz (custom domain)
+- https://sapphire-479610.web.app (Firebase default)
+
+## Screenshots
+
+_Dashboard showing real-time trading data and agent performance._

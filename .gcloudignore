@@ -1,59 +1,18 @@
-# Default gcloudignore file. Copy of .gitignore rules plus additional heavy directories.
-
 .git/
-.gcloudignore
-**/__pycache__/
-**/.pytest_cache/
+.gitignore
+.dockerignore
 venv/
-venv311/
-env/
+.venv/
 node_modules/
 trading-dashboard/node_modules/
-trading-dashboard/dist/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
 *.log
-*.zip
-*.tar
-*.tar.gz
-**/.DS_Store
-# Additional exclusions for faster builds
-.ipynb_checkpoints/
-**/*.pyc
-**/*.pyo
-**/*.pyd
-.cache/
-.pytest_cache/
-.mypy_cache/
-.coverage
-htmlcov/
-.tox/
-.venv/
-*.egg-info/
-dist/
-build/
-# Documentation and non-essential files
-docs/
-notebooks/
-*.md
-!README.md
-# Test files (keep only essential ones)
-tests/
-!tests/test_trading_flow.py
-# Remove large model directories that aren't needed
-models/deepseek/
-models/fingpt/
-models/lagllama/
-models/phi3/
-models/qwen/
-models/router/
-# Keep only the model files we actually use
-!models/common/
-
-# Heavy binaries and backups
-skaffold
-helm/
-backup/
+tmp/
+temp/
 logs/
-terraform/
-darwin-amd64/
-helm.tar.gz
-sapphire-dashboard-ready.zip
+run/
+.terraform/

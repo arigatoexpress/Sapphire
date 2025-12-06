@@ -10,14 +10,13 @@ import time
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import httpx
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect, status
+from fastapi.middleware.cors import CORSMiddleware  # CORS handled manually
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-
-from fastapi.middleware.cors import CORSMiddleware  # CORS handled manually
 from prometheus_fastapi_instrumentator import Instrumentator
 
 # Prometheus metrics
@@ -49,7 +48,7 @@ from .metrics import (
     TRADING_DECISIONS,
 )
 from .schemas import ChatCompletionRequest, InferenceRequest
-from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from .service import TradingService
 
@@ -83,13 +82,15 @@ rate_limiter = RateLimiter(requests_per_minute=60)  # 60 requests per minute per
 # Lazy load trading service to avoid circular imports/startup hangs
 trading_service = None
 
+
 def get_service_instance():
     """Helper to get the trading service instance safely."""
     global trading_service
     if trading_service is None:
         # Try to initialize if not already done (e.g. during tests)
         try:
-            from .minimal_trading_service import get_trading_service
+            from .trading_service import get_trading_service
+
             trading_service = get_trading_service()
         except ImportError:
             pass
@@ -103,9 +104,10 @@ async def lifespan(app: FastAPI):
     global trading_service
     try:
         logger.info("🔧 STARTUP: Importing and initializing trading service...")
-        from .minimal_trading_service import get_trading_service
+        from .trading_service import get_trading_service
+
         trading_service = get_trading_service()
-        
+
         logger.info("🔧 STARTUP: Calling trading_service.start()...")
         await trading_service.start()
         logger.info(
@@ -129,7 +131,12 @@ app = FastAPI(title="Cloud Trader", version="1.0", lifespan=lifespan)
 # Add CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://sapphiretrade.xyz",
+        "https://www.sapphiretrade.xyz",
+        "https://sapphire-479610.web.app",
+        "https://sapphire-479610.firebaseapp.com",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -144,6 +151,10 @@ Instrumentator().instrument(app).expose(app, endpoint="/metrics")
 static_path = "/app/static"
 if os.path.exists(static_path):
     app.mount("/static", StaticFiles(directory=static_path), name="static")
+    # Mount /assets for frontend build artifacts
+    assets_path = os.path.join(static_path, "assets")
+    if os.path.exists(assets_path):
+        app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
 
 
 def build_app(service: "TradingService" | None = None) -> FastAPI:
@@ -167,7 +178,10 @@ async def root():
 async def get_portfolio_status() -> Dict[str, Any]:
     """Get current portfolio status."""
     try:
-        return trading_service.get_portfolio_status()
+        service = get_service_instance()
+        if not service:
+            raise HTTPException(status_code=503, detail="Trading service not initialized")
+        return service.get_portfolio_status()
     except Exception as e:
         logger.error(f"Failed to get portfolio status: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -178,14 +192,23 @@ async def healthz() -> Dict[str, object]:
     from fastapi.responses import JSONResponse
 
     try:
-        status = trading_service.health()
-        data = {
-            "running": status.running,
-            "paper_trading": status.paper_trading,
-            "last_error": status.last_error,
-        }
+        service = get_service_instance()
+        if service:
+            status = service.health()
+            data = {
+                "running": status.running,
+                "paper_trading": status.paper_trading,
+                "last_error": status.last_error,
+            }
+        else:
+             data = {
+                "running": False,
+                "paper_trading": False,
+                "last_error": "Trading service not initialized (None)",
+            }
     except Exception as e:
         # Return a basic response if health check fails
+        logger.error(f"Health check failed: {e}")
         data = {
             "running": False,
             "paper_trading": True,
@@ -210,12 +233,13 @@ def get_admin_token() -> str | None:
         return service.settings.admin_api_token
     return None
 
+
 admin_guard_disabled = False  # Will be checked dynamically
 
 
 def require_admin(request: Request) -> None:
     admin_token = get_admin_token()
-    
+
     if admin_token is None:
         if not hasattr(require_admin, "_warned"):
             logger.warning("ADMIN_API_TOKEN not configured; allowing admin endpoint access")

@@ -1,0 +1,30 @@
+{
+  "hosting": {
+    "public": "dist",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/api/**",
+        "run": {
+          "serviceId": "cloud-trader",
+          "region": "northamerica-northeast1"
+        }
+      },
+      {
+        "source": "/ws/**",
+        "run": {
+          "serviceId": "cloud-trader",
+          "region": "northamerica-northeast1"
+        }
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}

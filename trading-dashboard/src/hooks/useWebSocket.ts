@@ -34,6 +34,20 @@ interface Trade {
   agentId: string;
 }
 
+interface MarketRegimeData {
+  regime: string;
+  confidence: number;
+  trend_strength: number;
+  volatility_level: number;
+  range_bound_score: number;
+  momentum_score: number;
+  timestamp_us: number;
+  adx_score: number;
+  rsi_score: number;
+  bb_position: number;
+  volume_trend: number;
+}
+
 interface DashboardData {
   timestamp: number;
   total_pnl: number;
@@ -53,6 +67,7 @@ interface DashboardData {
     tp?: number;
     sl?: number;
   }>;
+  marketRegime?: MarketRegimeData;
 }
 
 interface UseWebSocketReturn {
@@ -76,16 +91,19 @@ export const useDashboardWebSocket = (url?: string): UseWebSocketReturn => {
     try {
       // Determine WebSocket URL
       // If we are in a local/docker environment (proxied), we should connect relative to the current page
-      let fullWsUrl;
+      // Determine WebSocket URL
       const apiUrl = import.meta.env.VITE_API_URL;
+      let fullWsUrl;
 
-      if (!apiUrl || apiUrl.includes('cloud-trader') || apiUrl.includes('localhost')) {
-        // Use relative path which goes through Vite proxy
+      if (apiUrl && !apiUrl.includes('localhost')) {
+        // Use the explicit Cloud Run URL
+        const wsProtocol = apiUrl.startsWith('https') ? 'wss' : 'ws';
+        const host = apiUrl.replace(/^https?:\/\//, '');
+        fullWsUrl = `${wsProtocol}://${host}/ws/dashboard`;
+      } else {
+        // Fallback to relative (good for proxy/localhost)
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         fullWsUrl = `${protocol}//${window.location.host}/ws/dashboard`;
-      } else {
-        // Use configured external URL
-        fullWsUrl = url || `${apiUrl}/ws/dashboard`;
       }
 
       console.log(`🔌 Connecting to WebSocket: ${fullWsUrl}`);
@@ -101,12 +119,21 @@ export const useDashboardWebSocket = (url?: string): UseWebSocketReturn => {
 
       ws.onmessage = (event) => {
         try {
-          const update = JSON.parse(event.data);
+          const message = JSON.parse(event.data);
 
-          // Transform raw API data to frontend format if needed
-          // For now assuming direct mapping, but we can add transformers here
-
-          setData(update);
+          if (message.type === 'market_regime') {
+            setData(prev => prev ? { ...prev, marketRegime: message.data } : null);
+          } else if (message.type === 'trade_update') {
+            // Handle trade update (append to recentTrades, update PnL)
+            // For now, we might just rely on snapshots for heavy data, but let's support it
+            console.log("Trade update received:", message.data);
+          } else if (message.portfolio_value !== undefined) {
+            // Assume it's a full snapshot if it has portfolio_value
+            setData(message);
+          } else {
+            // Fallback or other message types
+            console.log("Received message:", message);
+          }
         } catch (e) {
           console.error('Failed to parse WebSocket message:', e);
         }

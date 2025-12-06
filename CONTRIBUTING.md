@@ -1,137 +1,239 @@
-# Contributing to Cloud Trader
+# Contributing to Agent Symphony
 
-Thank you for your interest in contributing to the AsterAI Trading Platform! This document provides guidelines for contributing to the project.
+Thank you for your interest in contributing to Agent Symphony! This document provides guidelines and instructions for contributing.
 
-## Code of Conduct
+## 📋 Table of Contents
 
-This project adheres to a code of conduct. By participating, you are expected to uphold this code.
+- [Code of Conduct](#code-of-conduct)
+- [Development Setup](#development-setup)
+- [Branching Strategy](#branching-strategy)
+- [Commit Guidelines](#commit-guidelines)
+- [Pull Request Process](#pull-request-process)
+- [Code Style](#code-style)
+- [Testing](#testing)
 
-## Getting Started
+---
+
+## 📜 Code of Conduct
+
+By participating in this project, you agree to maintain a professional and respectful environment.
+
+---
+
+## 🛠️ Development Setup
 
 ### Prerequisites
 
 - Python 3.11+
-- Git
-- Docker (optional, for running the container image)
-- Google Cloud SDK (optional, for Cloud Run testing)
+- Node.js 18+
+- Docker
+- Google Cloud SDK
 
-### Development Setup
+### Backend Setup
 
-1. Fork the repository
-2. Clone your fork:
-   ```bash
-   git clone https://github.com/your-username/AsterAI.git
-   cd AsterAI
-   ```
+```bash
+# Clone the repository
+git clone https://github.com/arigatoexpress/AsterAI.git
+cd AsterAI
 
-3. Create a virtual environment:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # or `venv\Scripts\activate` on Windows
 
-4. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+# Install dependencies
+pip install -e ".[dev]"
 
+# Copy environment template
+cp env.example .env
+# Edit .env with your credentials
+```
 
-The dependency set is intentionally small; please avoid adding heavy libraries unless they are required for the live trading loop.
+### Frontend Setup
 
-## Development Guidelines
+```bash
+cd trading-dashboard
+npm install
+cp .env.example .env.local
+npm run dev
+```
 
-### Security Guidelines
+### Verify Setup
 
-**⚠️ NEVER commit credentials or sensitive information!**
+```bash
+# Run tests
+pytest tests/ -v
 
-Before committing, ensure:
-- ✅ No API keys, tokens, or passwords in code
-- ✅ No `.env`, `.envrc`, or `.env.*` files committed
-- ✅ Use `.env.example` or `.envrc.example` as templates
-- ✅ All secrets use environment variables or secret managers
-- ✅ Run `pre-commit install` to enable security hooks (see `scripts/setup-security-hooks.sh`)
+# Lint code
+ruff check .
 
-If you accidentally commit credentials:
-1. Remove from git: `git rm --cached <file>`
-2. Add to `.gitignore`
-3. Rotate the exposed credentials immediately
-4. See `scripts/rotate-credentials.sh` for rotation steps
+# Type check
+mypy cloud_trader/
+```
 
-### Code Style
+---
 
-- Follow PEP 8 style guidelines
-- Use type hints for all function parameters and return values
-- Write docstrings for all public functions and classes
-- Keep functions small and focused
-- Use meaningful variable and function names
+## 🌿 Branching Strategy
 
-### Testing
+We follow **GitHub Flow**:
 
-- Add lightweight unit tests for new functionality (place them under `tests/`)
-- Run `pytest` before submitting a pull request when tests are present
+```
+main (production)
+  └── feature/your-feature
+  └── fix/bug-description
+  └── refactor/component-name
+```
 
-### Documentation
+### Branch Naming
 
-- Update documentation for any new features
-- Include examples in docstrings
-- Update README.md if necessary
+| Prefix | Purpose | Example |
+|--------|---------|---------|
+| `feature/` | New functionality | `feature/grok-agent` |
+| `fix/` | Bug fixes | `fix/telegram-timeout` |
+| `refactor/` | Code improvements | `refactor/trading-loop` |
+| `docs/` | Documentation | `docs/architecture` |
+| `chore/` | Maintenance | `chore/update-deps` |
 
-## Pull Request Process
+---
 
-1. Create a feature branch from `main`:
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
+## ✍️ Commit Guidelines
 
-2. Make your changes and commit them:
-   ```bash
-   git add .
-   git commit -m "Add your feature description"
-   ```
+We use **Conventional Commits**:
 
-3. Push your branch:
-   ```bash
-   git push origin feature/your-feature-name
-   ```
+```
+<type>(<scope>): <description>
 
-4. Create a pull request on GitHub
+[optional body]
 
-### Pull Request Guidelines
+[optional footer]
+```
 
-- Provide a clear description of changes
-- Reference any related issues
-- Ensure all tests pass
-- Request review from maintainers
+### Types
 
-## Issue Reporting
+| Type | Description |
+|------|-------------|
+| `feat` | New feature |
+| `fix` | Bug fix |
+| `docs` | Documentation |
+| `style` | Formatting (no logic change) |
+| `refactor` | Code restructuring |
+| `test` | Adding tests |
+| `chore` | Maintenance tasks |
 
-When reporting issues, please include:
+### Examples
 
-- Clear description of the problem
-- Steps to reproduce
-- Expected vs actual behavior
-- Environment details (OS, Python version, etc.)
-- Screenshots if applicable
+```bash
+feat(trading): add new entry logic for agents
+fix(telegram): resolve silent notification failures
+docs(readme): add architecture diagrams
+refactor(client): extract position manager
+```
 
-## Feature Requests
+---
 
-For feature requests, please:
+## 🔀 Pull Request Process
 
-- Check existing issues first
-- Provide a clear use case
-- Explain the expected benefit
-- Consider implementation complexity
+1. **Create a feature branch** from `main`
+2. **Make your changes** with clear commits
+3. **Run tests** and linting locally
+4. **Push** and create a Pull Request
+5. **Fill out the PR template**
+6. **Request review** from maintainers
+7. **Address feedback** if any
+8. **Merge** once approved
 
-## Security
+### PR Checklist
 
-- Do not commit API keys or secrets
-- Report security vulnerabilities privately
-- Follow responsible disclosure practices
+- [ ] Tests pass locally
+- [ ] Code is linted and type-checked
+- [ ] Documentation updated if needed
+- [ ] No secrets or credentials in code
+- [ ] Meaningful commit messages
 
-## License
+---
 
-By contributing, you agree that your contributions will be licensed under the MIT License.
+## 🎨 Code Style
 
-## Questions?
+### Python
 
-Feel free to open an issue or start a discussion for any questions about contributing.
+We use **Ruff** for linting and formatting:
+
+```bash
+ruff check .
+ruff format .
+```
+
+Key conventions:
+- Line length: 100 characters
+- Use type hints for all functions
+- Docstrings for public functions
+- Async/await for I/O operations
+
+### TypeScript
+
+We use **ESLint** and **Prettier**:
+
+```bash
+cd trading-dashboard
+npm run lint
+npm run format
+```
+
+---
+
+## 🧪 Testing
+
+### Python Tests
+
+```bash
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=cloud_trader
+
+# Run specific test file
+pytest tests/test_trading_service.py -v
+```
+
+### Frontend Tests
+
+```bash
+cd trading-dashboard
+npm test
+```
+
+---
+
+## 📁 File Organization
+
+When adding new features:
+
+```
+cloud_trader/
+├── feature_name.py       # Main implementation
+├── feature_name_test.py  # Tests (or in tests/)
+└── __init__.py           # Export new modules
+```
+
+---
+
+## 🔐 Security
+
+- Never commit API keys or secrets
+- Use `.env` files for local development
+- All secrets in Google Secret Manager for production
+- Run security scans before PRs
+
+---
+
+## 💬 Getting Help
+
+- Check existing [issues](https://github.com/arigatoexpress/AsterAI/issues)
+- Read the [documentation](docs/)
+- Ask in project discussions
+
+---
+
+<div align="center">
+<sub>Thank you for contributing! 🎉</sub>
+</div>
