@@ -1,240 +1,321 @@
-# 🎻 Agent Symphony - AI-Powered Multi-Exchange Trading System
+# 🎻 Agent Symphony
 
 <div align="center">
 
 [![GCP](https://img.shields.io/badge/Deployed%20on-Google%20Cloud-4285F4?logo=googlecloud&logoColor=white)](https://cloud.google.com)
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6?logo=typescript&logoColor=white)](https://typescriptlang.org)
 [![License](https://img.shields.io/badge/License-Proprietary-red)](LICENSE)
 
-**Agent Symphony** is an enterprise-grade AI trading system that orchestrates multiple autonomous trading agents across Aster and Hyperliquid exchanges using a central AI "Conductor" for market analysis and coordination.
+**An Autonomous Multi-Agent System for Algorithmic Cryptocurrency Trading**
 
-[Live Dashboard](https://sapphiretrade.xyz) • [Documentation](docs/) • [Architecture](#architecture)
+*Inspired by the emergent coordination of symphonic orchestras, where specialized musicians follow a unified conductor to create complex harmonies greater than the sum of individual parts.*
+
+[Live Dashboard](https://sapphire-479610.web.app) • [Technical Specification](docs/TECHNICAL_SPECIFICATION.md) • [Architecture](docs/ARCHITECTURE.md)
 
 </div>
 
 ---
 
-## 🏗️ Architecture Overview
+## Abstract
 
-The system follows a **Conductor-Orchestra** pattern where a central AI analyst coordinates multiple specialized trading agents:
+Agent Symphony represents a novel approach to algorithmic trading that draws inspiration from **swarm intelligence** and **collective decision-making systems** found in nature. Rather than relying on a single monolithic trading algorithm, the system employs multiple specialized autonomous agents—each with distinct strategies, risk tolerances, and market perspectives—coordinated by a central AI "Conductor" that provides global market context.
+
+This architecture enables:
+- **Adaptive Response**: Different agents naturally activate in different market conditions
+- **Risk Distribution**: Capital allocation across multiple uncorrelated strategies
+- **Emergent Intelligence**: Collective behavior more robust than individual agent decisions
+
+---
+
+## 1. System Philosophy
+
+### 1.1 The Orchestra Metaphor
+
+Traditional algorithmic trading systems operate as soloists—single strategies attempting to master all market conditions. Agent Symphony reimagines this paradigm:
+
+```
+Traditional Approach:          Agent Symphony Approach:
+                              
+┌─────────────────────┐       ┌─────────────────────────────────┐
+│                     │       │         🎼 CONDUCTOR            │
+│   Single Strategy   │       │    (Market Regime Analysis)     │
+│                     │       └───────────────┬─────────────────┘
+│   • All conditions  │                       │
+│   • All symbols     │       ┌───────────────┼───────────────┐
+│   • All risk        │       │               │               │
+│                     │       ▼               ▼               ▼
+└─────────────────────┘   ┌───────┐      ┌───────┐      ┌───────┐
+                          │🐂 Bull│      │🏄 Surf│      │🌊 Vol │
+                          │Agents │      │Agents │      │Agents │
+                          └───────┘      └───────┘      └───────┘
+```
+
+### 1.2 Biological Inspiration
+
+The system draws from three key biological concepts:
+
+| Concept | Biological Source | System Implementation |
+|---------|-------------------|----------------------|
+| **Swarm Intelligence** | Ant colonies, bee hives | Multiple agents with local rules creating global behavior |
+| **Specialization** | Cell differentiation | Agents optimized for specific market conditions |
+| **Homeostasis** | Biological temperature regulation | Circuit breakers and risk controls maintaining system stability |
+
+---
+
+## 2. System Architecture
+
+### 2.1 High-Level Overview
 
 ```mermaid
 flowchart TB
     subgraph "🧠 Intelligence Layer"
-        CONDUCTOR[Symphony Conductor<br/>Gemini AI]
-        PUBSUB[(Google Pub/Sub<br/>Market Regime)]
+        CONDUCTOR[Symphony Conductor<br/>Gemini 1.5 Flash]
+        style CONDUCTOR fill:#4285F4,color:#fff
     end
-
+    
+    subgraph "📡 Communication Layer"
+        PUBSUB[(Google Pub/Sub<br/>Market Regime Topic)]
+        style PUBSUB fill:#34A853,color:#fff
+    end
+    
     subgraph "⚡ Execution Layer"
-        CT[Cloud Trader<br/>Aster Exchange]
-        HT[Hyperliquid Trader<br/>Hyperliquid Exchange]
+        CT[Cloud Trader<br/>10 AI Agents]
+        HT[Hyperliquid Trader<br/>HFT Engine]
+        style CT fill:#EA4335,color:#fff
+        style HT fill:#FBBC04,color:#000
     end
-
-    subgraph "📊 Visualization Layer"
-        DASH[Trading Dashboard<br/>React + WebSocket]
+    
+    subgraph "📊 Observation Layer"
+        DASH[Trading Dashboard<br/>Real-time Visualization]
         TG[Telegram Bot<br/>Notifications]
     end
-
-    subgraph "🔐 Infrastructure"
-        REDIS[(Redis<br/>State Cache)]
-        PG[(PostgreSQL<br/>Trade History)]
-        SM[Secret Manager<br/>API Keys]
-    end
-
-    CONDUCTOR -->|Publishes Regime| PUBSUB
-    PUBSUB -->|Subscribes| CT
-    PUBSUB -->|Subscribes| HT
-    CT -->|WebSocket| DASH
-    CT -->|Notifications| TG
-    CT <-->|State| REDIS
-    CT -->|Trades| PG
-    SM -->|Secrets| CT
-    SM -->|Secrets| HT
+    
+    CONDUCTOR -->|"Publishes Regime"| PUBSUB
+    PUBSUB -->|"Subscribes"| CT
+    PUBSUB -->|"Subscribes"| HT
+    CT -->|"WebSocket Stream"| DASH
+    CT -->|"Alerts"| TG
 ```
 
+### 2.2 Component Breakdown
+
+#### Symphony Conductor (The Brain)
+The Conductor employs **Gemini 1.5 Flash** to analyze macro market conditions and classify the current **Market Regime**:
+
+| Regime | Conditions | Agent Response |
+|--------|------------|----------------|
+| `BULL_TRENDING` | ADX > 25, Price > 200 EMA | Aggressive long positions |
+| `BULL_VOLATILE` | High VIX, Upward bias | Quick scalps with tight stops |
+| `BEAR_TRENDING` | ADX > 25, Price < 200 EMA | Short positions, defensive |
+| `BEAR_VOLATILE` | High VIX, Downward bias | Minimal exposure |
+| `RANGE_BOUND` | ADX < 20, Bollinger squeeze | Mean reversion strategies |
+
+#### Cloud Trader (The Orchestra)
+Houses **10 specialized AI agents**, each with:
+- Unique trading strategy
+- Individual risk limits (circuit breakers)
+- Symbol restrictions (optional)
+- Confidence-based position sizing
+
 ---
 
-## 🎯 Core Components
+## 3. Trading Algorithm
 
-| Component | Description | Technology |
-|-----------|-------------|------------|
-| **Symphony Conductor** | AI market analyst that determines global market regime (Bull/Bear/Volatile) | Python, Gemini AI |
-| **Cloud Trader** | Main trading engine with 7+ specialized AI agents | Python, FastAPI, AsyncIO |
-| **Hyperliquid Trader** | High-frequency trading on Hyperliquid | Python, HFT optimized |
-| **Trading Dashboard** | Real-time visualization with live P&L and positions | React, TypeScript, WebSocket |
-| **Symphony Lib** | Shared data models and Pub/Sub client | Python dataclasses |
+### 3.1 Signal Generation
+
+Each agent generates signals using a multi-factor scoring model:
+
+$$
+S = \sum_{i=1}^{n} w_i \cdot f_i(X)
+$$
+
+Where:
+- $S$ = Composite signal score
+- $w_i$ = Factor weight
+- $f_i$ = Factor function (momentum, RSI, MACD, volume, etc.)
+- $X$ = Market data input
+
+### 3.2 Decision Logic
+
+```mermaid
+stateDiagram-v2
+    [*] --> SelectAgent: Every 5 seconds
+    SelectAgent --> PickSymbol
+    PickSymbol --> HasPosition
+    
+    HasPosition --> ManagePosition: Position exists
+    HasPosition --> AnalyzeMarket: No position
+    
+    ManagePosition --> CheckTPSL
+    CheckTPSL --> ClosePosition: Hit TP/SL
+    CheckTPSL --> HoldPosition: Continue
+    
+    AnalyzeMarket --> GenerateSignal
+    GenerateSignal --> EvaluateConfidence
+    EvaluateConfidence --> OpenPosition: Confidence ≥ 65%
+    EvaluateConfidence --> Skip: Confidence < 65%
+    
+    ClosePosition --> [*]
+    HoldPosition --> [*]
+    OpenPosition --> [*]
+    Skip --> [*]
+```
+
+### 3.3 Position Sizing
+
+Position size scales with confidence using dynamic notional calculation:
+
+$$
+\text{Notional} = \$150 \times (0.8 + 0.4 \times c)
+$$
+
+Where $c \in [0.65, 1.0]$ is the confidence score, yielding positions between **$120 - $210**.
 
 ---
 
-## 🤖 Trading Agents
+## 4. Agent Taxonomy
 
 ```mermaid
 mindmap
   root((Agent<br/>Symphony))
-    Bull Agents
-      Momentum Hunter
-      Breakout Sniper
-      Trend Surfer
-    Bear Agents
-      Volatility Harvester
-      Mean Reversion
-    Special Ops
-      Grok Alpha<br/>Deep Reasoning
-      Whale Tracker
-```
-
-Each agent has:
-- **Unique Strategy**: Tailored for specific market conditions
-- **Risk Controls**: Individual circuit breakers and loss limits
-- **AI Analysis**: Uses Gemini/Grok for trade decisions
-- **Emoji Identity**: Visual identification in logs and dashboard
-
----
-
-## 📁 Project Structure
-
-```
-AIAster/
-├── symphony_conductor/      # 🧠 Market Analysis Service
-│   └── conductor.py         # Gemini-powered regime detection
-├── cloud_trader/            # ⚡ Main Trading Engine
-│   ├── trading_service.py   # Core trading loop
-│   ├── enhanced_telegram.py # AI-powered notifications
-│   ├── position_manager.py  # Position tracking
-│   ├── market_data.py       # Exchange data fetching
-│   └── agents/              # Individual agent strategies
-├── hyperliquid_trader/      # 🚀 HFT Exchange Service
-├── trading-dashboard/       # 📊 React Frontend
-│   ├── src/components/      # UI components
-│   ├── src/hooks/           # WebSocket & data hooks
-│   └── src/pages/           # Dashboard views
-├── symphony_lib/            # 📚 Shared Models
-├── terraform/               # 🏗️ Infrastructure as Code
-├── docs/                    # 📖 Documentation
-└── cloudbuild*.yaml         # 🔄 CI/CD Configs
+    Bull Market Specialists
+      🐂 Momentum Hunter
+        Trend following
+        High conviction
+      ⚡ Breakout Sniper
+        Key level breaks
+        Volume confirmation
+      🏄 Trend Surfer
+        Extended moves
+        Trailing stops
+    Bear Market Specialists
+      🌊 Volatility Harvester
+        Vol expansion plays
+        Quick exits
+      📊 Mean Reversion
+        Oversold bounces
+        Support levels
+    Quantitative Agents
+      ⚡ VPIN HFT
+        Volume-informed
+        Order flow analysis
+      🧠 Strategy Optimizer
+        Meta-learning
+        Adaptive weights
 ```
 
 ---
 
-## 🚀 Deployment
+## 5. Infrastructure
+
+### 5.1 Cloud Architecture
+
+```mermaid
+flowchart TB
+    subgraph GCP["Google Cloud Platform"]
+        subgraph Compute["Compute (Cloud Run)"]
+            CT[cloud-trader]
+            SC[symphony-conductor]
+        end
+        
+        subgraph Data["Data Services"]
+            PS[(Pub/Sub)]
+            RD[(Redis Cache)]
+            PG[(PostgreSQL)]
+        end
+        
+        subgraph Security["Security Layer"]
+            SM[Secret Manager]
+            VPC[VPC Connector]
+            NAT[Cloud NAT<br/>Static IP: 34.118.185.110]
+        end
+    end
+    
+    subgraph External["External Services"]
+        ASTER[Aster Exchange]
+        GEMINI[Gemini AI]
+    end
+    
+    CT & SC --> PS
+    CT --> RD & PG
+    VPC --> NAT --> ASTER
+    SC --> GEMINI
+    SM -.-> CT & SC
+```
+
+### 5.2 Security Model
+
+| Layer | Implementation |
+|-------|----------------|
+| **Secrets** | Google Secret Manager (never in code) |
+| **Network** | VPC with static NAT IP for exchange whitelisting |
+| **Authentication** | Service accounts with least privilege |
+| **Audit** | All trades logged to PostgreSQL and BigQuery |
+
+---
+
+## 6. Results and Metrics
+
+The system exposes real-time metrics via Prometheus and visualization via the dashboard:
+
+| Metric | Description |
+|--------|-------------|
+| `trades_executed_total` | Cumulative trade count |
+| `position_pnl_dollars` | Real-time profit/loss |
+| `agent_confidence_avg` | Average signal confidence |
+| `loop_duration_seconds` | Trading loop latency |
+
+---
+
+## 7. Getting Started
 
 ### Prerequisites
-- Google Cloud SDK (`gcloud`)
+- Google Cloud SDK
 - Docker
-- Node.js 18+ (for frontend)
+- Node.js 18+ (for dashboard)
 - Python 3.11+
 
 ### Quick Deploy
 
 ```bash
-# Deploy all services
-gcloud builds submit --config cloudbuild_trader.yaml .     # Backend
-gcloud builds submit --config cloudbuild_conductor.yaml .   # AI Conductor
-cd trading-dashboard && npm run deploy                      # Frontend
-```
+# Backend (Cloud Trader)
+gcloud builds submit --config cloudbuild_trader.yaml .
 
-### Environment Variables
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `GCP_PROJECT_ID` | Google Cloud project ID | ✅ |
-| `ASTER_API_KEY` | Aster exchange API key | ✅ |
-| `ASTER_SECRET_KEY` | Aster exchange secret | ✅ |
-| `GEMINI_API_KEY` | Google Gemini AI key | ✅ |
-| `TELEGRAM_BOT_TOKEN` | Telegram notifications | ⚠️ |
-| `REDIS_URL` | Redis connection string | ✅ |
-| `DATABASE_URL` | PostgreSQL connection | ✅ |
-
----
-
-## 📊 Data Flow
-
-```mermaid
-sequenceDiagram
-    participant M as Market Data
-    participant C as Conductor
-    participant PS as Pub/Sub
-    participant T as Cloud Trader
-    participant E as Exchange
-    participant D as Dashboard
-
-    loop Every 5 minutes
-        M->>C: Price & Volume Data
-        C->>C: Gemini AI Analysis
-        C->>PS: Publish MarketRegime
-    end
-
-    PS->>T: Market Regime Update
-
-    loop Every 5 seconds
-        T->>T: Agent Analysis
-        T->>E: Place/Manage Orders
-        E-->>T: Order Confirmation
-        T->>D: WebSocket Update
-    end
+# Frontend (Dashboard)
+cd trading-dashboard && npm run deploy
 ```
 
 ---
 
-## 🔒 Security
+## 8. Project Structure
 
-- **Secret Manager**: All API keys stored in GCP Secret Manager
-- **VPC Connector**: Static IP for exchange whitelisting
-- **IAM**: Least-privilege service accounts
-- **Audit Logging**: All trades logged to BigQuery
-
----
-
-## 📈 Monitoring
-
-| Tool | Purpose | Link |
-|------|---------|------|
-| Cloud Logging | Service logs | GCP Console |
-| Prometheus | Metrics collection | `/metrics` endpoint |
-| Telegram | Real-time alerts | Bot notifications |
-| Dashboard | Visual monitoring | [sapphiretrade.xyz](https://sapphiretrade.xyz) |
-
----
-
-## 🛠️ Development
-
-### Local Setup
-
-```bash
-# Clone and setup
-git clone https://github.com/arigatoexpress/AsterAI.git
-cd AsterAI
-python -m venv venv && source venv/bin/activate
-pip install -e .
-
-# Run locally
-python -m cloud_trader.api
 ```
-
-### Testing
-
-```bash
-pytest tests/ -v
+AIAster/
+├── symphony_conductor/     # 🧠 AI Market Analyst
+├── cloud_trader/           # ⚡ Multi-Agent Trading Engine
+├── trading-dashboard/      # 📊 React Visualization
+├── symphony_lib/           # 📚 Shared Data Models
+├── terraform/              # 🏗️ Infrastructure as Code
+├── docs/                   # 📖 Technical Documentation
+└── tests/                  # 🧪 Test Suite
 ```
 
 ---
 
-## 📚 Documentation
+## 9. References
 
-- [Architecture Deep Dive](docs/ARCHITECTURE.md)
-- [Deployment Checklist](docs/DEPLOYMENT_CHECKLIST.md)
-- [Multi-Agent Features](docs/MULTI_AGENT_FEATURES.md)
-- [Security Review](docs/security_review.md)
+1. Kennedy, J., & Eberhart, R. (1995). *Particle swarm optimization*. IEEE International Conference on Neural Networks.
+2. Hasbrouck, J. (2007). *Empirical Market Microstructure*. Oxford University Press.
+3. Google Cloud Architecture Framework. https://cloud.google.com/architecture/framework
 
 ---
 
-## 📄 License
+## License
 
 Proprietary - All Rights Reserved
 
 ---
 
 <div align="center">
-<sub>Built with ❤️ by the Sapphire Team</sub>
+<sub>Built with 💎 by the Sapphire Team | December 2025</sub>
 </div>
