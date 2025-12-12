@@ -1143,6 +1143,11 @@ class MinimalTradingService:
             if symbol in self._open_positions:
                 continue
 
+            # COOLDOWN: Don't enter new position if we traded this symbol in last 30 mins
+            if hasattr(self, "_last_trade_time") and symbol in self._last_trade_time:
+                if time.time() - self._last_trade_time[symbol] < 1800:  # 30 minutes
+                    continue
+
             # Each agent has a chance to analyze this symbol
             # Specialized agents might always check their niche?
             for agent in active_agents:
@@ -1152,7 +1157,7 @@ class MinimalTradingService:
                 analysis = await self._analyze_market_for_agent(agent, symbol)
 
                 # If actionable, Submit to Consensus
-                if analysis["signal"] in ["BUY", "SELL"] and analysis["confidence"] >= 0.60:
+                if analysis["signal"] in ["BUY", "SELL"] and analysis["confidence"] >= 0.75:
 
                     # Register if needed
                     if agent.id not in self._consensus_engine.agent_registry:
@@ -1545,24 +1550,25 @@ class MinimalTradingService:
 
                             logger.info(f"🛡️ Placing Native TP/SL: TP {tp_str} | SL {sl_str}")
 
-                            # We launch these as background tasks to not delay the loop
-                            # (but strictly they should be awaited for safety, we'll await)
-                            await self._exchange_client.create_order(
+                            # Place STOP_MARKET order for Stop Loss
+                            await self._exchange_client.place_order(
                                 symbol=symbol,
                                 side=sl_side,
-                                type="STOP_MARKET",
-                                quantity=formatted_quantity,
-                                stopPrice=sl_str,
-                                reduceOnly=True,
+                                order_type=OrderType.STOP_MARKET,
+                                quantity=float(formatted_quantity),
+                                stop_price=float(sl_str),
+                                reduce_only=True,
                             )
-                            await self._exchange_client.create_order(
+                            # Place TAKE_PROFIT_MARKET order for Take Profit
+                            await self._exchange_client.place_order(
                                 symbol=symbol,
                                 side=sl_side,
-                                type="TAKE_PROFIT_MARKET",
-                                quantity=formatted_quantity,
-                                stopPrice=tp_str,
-                                reduceOnly=True,
+                                order_type=OrderType.TAKE_PROFIT_MARKET,
+                                quantity=float(formatted_quantity),
+                                stop_price=float(tp_str),
+                                reduce_only=True,
                             )
+                            print(f"✅ Native TP/SL orders placed: TP {tp_str} | SL {sl_str}")
                         except Exception as e:
                             logger.warning(f"⚠️ Failed to place Native TP/SL orders: {e}")
 
@@ -1581,12 +1587,13 @@ class MinimalTradingService:
                         }
                         self._save_positions()
 
-                        # NATIVE TP/SL PLACEMENT
-                        asyncio.create_task(
-                            self._place_native_tp_sl(symbol, side, executed_qty, tp_price, sl_price)
-                        )
+                        # Track last trade time for cooldown
+                        if not hasattr(self, "_last_trade_time"):
+                            self._last_trade_time = {}
+                        self._last_trade_time[symbol] = time.time()
+
                         print(
-                            f"🎯 Position Opened (Instant): {symbol} @ {entry_price} (TP: {tp_price:.2f}, SL: {sl_price:.2f})"
+                            f"🎯 Position Opened: {symbol} @ {avg_price:.2f} (TP: {tp_price:.2f}, SL: {sl_price:.2f})"
                         )
 
                 # Save persistent trade record
