@@ -29,7 +29,7 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         "dynamic_position_sizing": True,
         "adaptive_leverage": True,
         "intelligence_tp_sl": True,
-        "max_leverage_limit": 12.0,
+        "max_leverage_limit": 50.0,
         "min_position_size_pct": 0.08,
         "max_position_size_pct": 0.25,
         "risk_tolerance": "high",
@@ -53,7 +53,7 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         "dynamic_position_sizing": True,
         "adaptive_leverage": True,
         "intelligence_tp_sl": True,
-        "max_leverage_limit": 14.0,
+        "max_leverage_limit": 50.0,
         "min_position_size_pct": 0.08,
         "max_position_size_pct": 0.28,
         "risk_tolerance": "high",
@@ -77,7 +77,7 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         "dynamic_position_sizing": True,
         "adaptive_leverage": True,
         "intelligence_tp_sl": True,
-        "max_leverage_limit": 15.0,
+        "max_leverage_limit": 50.0,
         "min_position_size_pct": 0.05,
         "max_position_size_pct": 0.15,
         "risk_tolerance": "high",
@@ -101,7 +101,7 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         "dynamic_position_sizing": True,
         "adaptive_leverage": True,
         "intelligence_tp_sl": True,
-        "max_leverage_limit": 8.0,
+        "max_leverage_limit": 50.0,
         "min_position_size_pct": 0.1,
         "max_position_size_pct": 0.3,
         "risk_tolerance": "low",
@@ -110,32 +110,9 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
     },
 ]
 
-# Preferred trading symbols for Aster DEX
-PREFERRED_SYMBOLS = [
-    "ASTERUSDT",
-    "SOLUSDT",
-    "ETHUSDT",
-    "ZECUSDT",
-    "PENGUUSDT",
-    "HYPEUSDT",
-    "MONUSDT",
-    "AVLUSDT",
-    "PIPPINUSDT",
-    "RLSUSDT",
-]
-
-# Manual configuration for PREFERRED symbols only (fallback)
+# Agents trade all available symbols dynamically
+# SYMBOL_CONFIG only used as fallback for quantity/precision if exchange info unavailable
 SYMBOL_CONFIG = {
-    # --- User Preferred (for Grok Agent) ---
-    "ASTERUSDT": {"qty": 1000.0, "precision": 1},
-    "SOLUSDT": {"qty": 1.0, "precision": 2},
-    "ETHUSDT": {"qty": 0.1, "precision": 2},
-    "ZECUSDT": {"qty": 1.0, "precision": 2},
-    "PENGUUSDT": {"qty": 5000.0, "precision": 0},
-    "HYPEUSDT": {"qty": 2000.0, "precision": 1},
-    "MONUSDT": {"qty": 3000.0, "precision": 1},
-    "AVLUSDT": {"qty": 500.0, "precision": 1},  # Approx $50-$100 depending on price
-    "RLSUSDT": {"qty": 1000.0, "precision": 1},  # New listing
     # Dynamic agents will use exchange info for precision
 }
 

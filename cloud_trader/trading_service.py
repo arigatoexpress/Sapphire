@@ -26,7 +26,6 @@ from .credentials import CredentialManager
 from .data.feature_pipeline import FeaturePipeline
 from .definitions import (
     AGENT_DEFINITIONS,
-    PREFERRED_SYMBOLS,
     SYMBOL_CONFIG,
     HealthStatus,
     MinimalAgentState,
@@ -1126,10 +1125,10 @@ class MinimalTradingService:
         """
 
         # --- PHASE 1: GATHER SIGNALS ---
-        # Iterate through all agents and all preferred symbols
+        # Iterate through all agents and all tradeable symbols from exchange
 
-        # We limit to PREFERRED_SYMBOLS for now to avoid request spam
-        # In future, agents could propose symbols dynamically.
+        # Use all available symbols from market structure (fetched from exchange)
+        # Agents trade dynamically across all available markets
 
         active_agents = [a for a in self._agent_states.values() if a.active]
         if not active_agents:
@@ -1139,7 +1138,10 @@ class MinimalTradingService:
         # Randomly select a subset of symbols to analyze to simulate "attention"
         import random
 
-        symbols_to_scan = PREFERRED_SYMBOLS.copy()
+        # Get all available symbols from market structure (dynamic)
+        all_symbols = list(self._market_structure.keys()) if self._market_structure else []
+        # Limit to 20 random symbols per cycle to avoid API spam
+        symbols_to_scan = random.sample(all_symbols, min(20, len(all_symbols))) if all_symbols else []
 
         # Map to store which agents looked at which symbols (for logging)
         scan_activity = defaultdict(int)
