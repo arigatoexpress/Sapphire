@@ -37,6 +37,11 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         "max_leverage_limit": 50.0,
         "risk_tolerance": "high",
         "time_horizon": "very_short",
+        # ATR-based dynamic TP/SL (multipliers of ATR)
+        "atr_tp_multiplier": 3.0,
+        "atr_sl_multiplier": 1.0,
+        # Regime preferences (boost/reduce activity)
+        "preferred_regimes": ["trending_up", "trending_down"],
     },
     {
         "id": "market-maker-agent",
@@ -63,6 +68,11 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         "max_leverage_limit": 50.0,
         "risk_tolerance": "medium",
         "time_horizon": "very_short",
+        # ATR-based dynamic TP/SL (multipliers of ATR)
+        "atr_tp_multiplier": 2.0,
+        "atr_sl_multiplier": 1.0,
+        # Regime preferences (boost/reduce activity)
+        "preferred_regimes": ["ranging"],
     },
     {
         "id": "swing-trader-agent",
@@ -89,6 +99,11 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         "max_leverage_limit": 50.0,
         "risk_tolerance": "low",
         "time_horizon": "medium",
+        # ATR-based dynamic TP/SL (multipliers of ATR)
+        "atr_tp_multiplier": 4.0,
+        "atr_sl_multiplier": 1.5,
+        # Regime preferences (boost/reduce activity)
+        "preferred_regimes": ["trending_up", "trending_down"],
     },
 ]
 
