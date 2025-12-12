@@ -95,13 +95,71 @@ export const TradingProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [connected, setConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const wsFailCountRef = useRef(0);
+  const maxWsFailures = 3; // Fallback to REST after 3 WS failures
 
-  // Determine WS URL
+  // Get API/WS URLs
+  const getApiUrl = () => {
+    if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+    return 'https://cloud-trader-267358751314.northamerica-northeast1.run.app';
+  };
+
   const getWsUrl = () => {
     if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL;
-
-    // Cloud Run northamerica-northeast1
     return 'wss://cloud-trader-267358751314.northamerica-northeast1.run.app/ws/dashboard';
+  };
+
+  // REST API fallback fetch
+  const fetchViaRest = async () => {
+    try {
+      const apiUrl = getApiUrl();
+      console.log('📡 [Context] REST fallback fetch:', apiUrl);
+
+      const [stateRes, healthRes] = await Promise.all([
+        fetch(`${apiUrl}/api/state`).catch(() => null),
+        fetch(`${apiUrl}/health`).catch(() => null)
+      ]);
+
+      if (stateRes?.ok) {
+        const stateData = await stateRes.json();
+        const healthData = healthRes?.ok ? await healthRes.json() : { running: true };
+
+        console.log('✅ [Context] REST data received:', Object.keys(stateData));
+
+        setData(prev => ({
+          ...prev,
+          ...normalizeSnapshot({ ...stateData, ...healthData }),
+          logs: prev.logs,
+          connected: false, // WS not connected, but REST works
+          apiBaseUrl: apiUrl
+        }));
+        return true;
+      }
+    } catch (e) {
+      console.error('❌ [Context] REST fetch failed:', e);
+    }
+    return false;
+  };
+
+  // Start REST polling (used when WS fails)
+  const startRestPolling = () => {
+    if (pollIntervalRef.current) return; // Already polling
+
+    console.log('🔄 [Context] Starting REST polling (WS unavailable)');
+    fetchViaRest(); // Initial fetch
+
+    pollIntervalRef.current = setInterval(() => {
+      fetchViaRest();
+    }, 5000); // Poll every 5 seconds
+  };
+
+  const stopRestPolling = () => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+      console.log('⏹️ [Context] Stopped REST polling');
+    }
   };
 
   const connect = () => {
@@ -110,62 +168,86 @@ export const TradingProvider: React.FC<{ children: ReactNode }> = ({ children })
     const url = getWsUrl();
     console.log(`🔌 [Context] Connecting to ${url}`);
 
-    const ws = new WebSocket(url);
-    wsRef.current = ws;
+    try {
+      const ws = new WebSocket(url);
+      wsRef.current = ws;
 
-    ws.onopen = () => {
-      console.log('✅ [Context] Connected');
-      setConnected(true);
-      setData(prev => ({ ...prev, connected: true }));
-    };
+      ws.onopen = () => {
+        console.log('✅ [Context] WebSocket connected');
+        setConnected(true);
+        setData(prev => ({ ...prev, connected: true }));
+        wsFailCountRef.current = 0; // Reset failure count
+        stopRestPolling(); // Stop REST polling, WS is working
+      };
 
-    ws.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(event.data);
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
 
-        // 1. Partial Updates (Logs)
-        if (msg.type === 'agent_log') {
-          setData(prev => ({
-            ...prev,
-            logs: [transformLog(msg.data), ...prev.logs].slice(0, 100)
-          }));
-          return;
+          // 1. Partial Updates (Logs)
+          if (msg.type === 'agent_log') {
+            setData(prev => ({
+              ...prev,
+              logs: [transformLog(msg.data), ...prev.logs].slice(0, 100)
+            }));
+            return;
+          }
+
+          // 2. Full Snapshots (Standard)
+          if (msg.portfolio_value !== undefined || msg.total_pnl !== undefined) {
+            setData(prev => ({
+              ...prev,
+              ...normalizeSnapshot(msg),
+              logs: prev.logs, // Keep existing logs stream
+              connected: true
+            }));
+          }
+
+        } catch (e) {
+          console.warn('⚠️ [Context] Malformed message:', e);
         }
+      };
 
-        // 2. Full Snapshots (Standard)
-        if (msg.portfolio_value !== undefined || msg.total_pnl !== undefined) {
-          setData(prev => ({
-            ...prev,
-            ...normalizeSnapshot(msg),
-            logs: prev.logs, // Keep existing logs stream
-            connected: true
-          }));
+      ws.onclose = () => {
+        console.log('❌ [Context] WebSocket disconnected');
+        setConnected(false);
+        setData(prev => ({ ...prev, connected: false }));
+        wsRef.current = null;
+        wsFailCountRef.current++;
+
+        if (wsFailCountRef.current >= maxWsFailures) {
+          console.log(`⚠️ [Context] WS failed ${wsFailCountRef.current} times, switching to REST polling`);
+          startRestPolling();
+          // Still try WS reconnect in background, but slower
+          reconnectTimeoutRef.current = setTimeout(connect, 30000);
+        } else {
+          reconnectTimeoutRef.current = setTimeout(connect, 3000);
         }
+      };
 
-      } catch (e) {
-        console.warn('⚠️ [Context] Malformed message:', e);
+      ws.onerror = (err) => {
+        console.error('🔥 [Context] WebSocket error:', err);
+        ws.close();
+      };
+    } catch (e) {
+      console.error('🔥 [Context] Failed to create WebSocket:', e);
+      wsFailCountRef.current++;
+      if (wsFailCountRef.current >= maxWsFailures) {
+        startRestPolling();
       }
-    };
-
-    ws.onclose = () => {
-      console.log('❌ [Context] Disconnected');
-      setConnected(false);
-      setData(prev => ({ ...prev, connected: false }));
-      wsRef.current = null;
-      reconnectTimeoutRef.current = setTimeout(connect, 3000);
-    };
-
-    ws.onerror = (err) => {
-      console.error('🔥 [Context] Error:', err);
-      ws.close();
-    };
+    }
   };
 
   useEffect(() => {
     connect();
+
+    // Also do an initial REST fetch for immediate data
+    fetchViaRest();
+
     return () => {
       wsRef.current?.close();
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      stopRestPolling();
     };
   }, []);
 
