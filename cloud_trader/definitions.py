@@ -146,6 +146,7 @@ class MinimalAgentState:
     
     # Self-tuning parameters (agent can modify these)
     self_tuning_enabled: bool = True
+    dynamic_position_sizing: bool = True  # Whether to use dynamic position sizing
     adaptive_params: Optional[Dict[str, Any]] = None
     
     # Risk limits
