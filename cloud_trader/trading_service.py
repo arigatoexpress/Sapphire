@@ -438,6 +438,7 @@ class MinimalTradingService:
             self._agent_states[agent_def["id"]] = MinimalAgentState(
                 id=agent_def["id"],
                 name=agent_def["name"],
+                type=agent_def.get("type", "general"),  # Agent type for consensus
                 model=model,
                 emoji=agent_def["emoji"],
                 symbols=None,  # No symbol restrictions - agents can trade any symbol
@@ -2072,6 +2073,7 @@ class MinimalTradingService:
             agent = MinimalAgentState(
                 id="reviewer",
                 name="Portfolio Reviewer",
+                type="reviewer",
                 model="gemini-2.0-flash-exp",
                 emoji="🕵️",
                 symbols=[symbol],
@@ -2219,6 +2221,7 @@ class MinimalTradingService:
                         agent = MinimalAgentState(
                             id="risk_bot",
                             name="Risk Bot",
+                            type="risk",
                             model="gemini-2.0-flash-exp",
                             emoji="🚑",
                             symbols=[symbol],
