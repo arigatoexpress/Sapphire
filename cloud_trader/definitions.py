@@ -21,6 +21,7 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         "model": "gemini-2.0-flash-exp",
         "system": "aster",
         "emoji": "📈",
+        "type": "momentum",
         "symbols": [],
         "description": "High-speed momentum analysis for rapid directional trades.",
         "personality": "Aggressive momentum trader chasing breakouts.",
@@ -52,6 +53,7 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         "model": "gemini-2.0-flash-exp",
         "system": "aster",
         "emoji": "⚡",
+        "type": "market_maker",
         "symbols": [],
         "description": "High-frequency market making capturing bid-ask spreads.",
         "personality": "Precision market maker seeking consistent small profits.",
@@ -83,6 +85,7 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         "model": "gemini-2.0-flash-exp",
         "system": "aster",
         "emoji": "🧠",
+        "type": "swing",
         "symbols": [],
         "description": "Strategic swing trader for multi-day trending positions.",
         "personality": "Patient swing trader capturing larger trend moves.",
@@ -124,6 +127,7 @@ class MinimalAgentState:
     # Core identity
     id: str
     name: str
+    type: str = "general"  # Agent type for consensus engine (general, trend, momentum, etc.)
     model: str
     emoji: str
     symbols: Optional[List[str]] = None  # None = trade all symbols
