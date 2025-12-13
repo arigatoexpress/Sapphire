@@ -125,6 +125,7 @@ class MinimalTradingService:
 
         # Hyperliquid (Removed Phase 25)
         self._hyperliquid_metrics = {}  # Keeping empty dict to avoid attr errors until full purge
+        self._hyperliquid_positions = {}  # Empty dict to prevent AttributeError
 
         # Telegram
         self._telegram = None

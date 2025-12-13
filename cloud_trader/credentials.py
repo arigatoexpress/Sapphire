@@ -16,6 +16,7 @@ _secret_manager = GcpSecretManager()
 @dataclass
 class Credentials:
     api_key: Optional[str] = None
+    api_secret: Optional[str] = None
 
 
 class CredentialManager:
