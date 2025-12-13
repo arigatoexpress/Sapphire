@@ -26,7 +26,7 @@ from telegram.ext import (
 )
 
 from .ai_analyzer import AITradingAnalyzer
-from .analytics.performance import PerformanceAnalyzer
+from .analytics.performance import PerformanceTracker
 from .config import Settings
 from .market_sentiment import MarketSentimentAnalyzer
 from .risk_analyzer import RiskAnalyzer
@@ -183,7 +183,7 @@ class EnhancedTelegramService:
         ai_analyzer: Optional[AITradingAnalyzer] = None,
         sentiment_analyzer: Optional[MarketSentimentAnalyzer] = None,
         risk_analyzer: Optional[RiskAnalyzer] = None,
-        performance_analyzer: Optional[PerformanceAnalyzer] = None,
+        performance_analyzer: Optional[PerformanceTracker] = None,
     ):
         bot_token = bot_token.strip() if bot_token else bot_token
         self.bot = Bot(token=bot_token)
@@ -194,7 +194,7 @@ class EnhancedTelegramService:
         self.ai_analyzer = ai_analyzer
         self.sentiment_analyzer = sentiment_analyzer
         self.risk_analyzer = risk_analyzer
-        self.performance_analyzer = performance_analyzer or PerformanceAnalyzer()
+        self.performance_analyzer = performance_analyzer or PerformanceTracker()
 
         # Smart throttling and batching
         self.throttler = SmartNotificationThrottler()
@@ -894,7 +894,7 @@ async def create_enhanced_telegram_service(
     ai_analyzer: Optional[AITradingAnalyzer] = None,
     sentiment_analyzer: Optional[MarketSentimentAnalyzer] = None,
     risk_analyzer: Optional[RiskAnalyzer] = None,
-    performance_analyzer: Optional[PerformanceAnalyzer] = None,
+    performance_analyzer: Optional[PerformanceTracker] = None,
 ) -> Optional[EnhancedTelegramService]:
     """Create enhanced Telegram service with AI capabilities."""
     if not (settings.telegram_bot_token and settings.telegram_chat_id):
