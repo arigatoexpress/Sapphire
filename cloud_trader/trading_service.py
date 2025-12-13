@@ -100,7 +100,8 @@ class MinimalTradingService:
         self._portfolio = PortfolioState(balance=0.0, equity=0.0)
         self._recent_trades = deque(maxlen=200)
         self._pending_orders: Dict[str, Dict] = {}
-        self._open_positions: Dict[str, Dict] = {}  # Replaces PositionManager internal state access
+        self._internal_open_positions: Dict[str, Dict] = {}  # Internal storage, accessed via property
+        self._internal_market_structure: Dict[str, Dict] = {}  # Internal storage for property fallback
 
         # AI & Agents
         self._agent_states: Dict[str, MinimalAgentState] = {}
@@ -145,15 +146,7 @@ class MinimalTradingService:
             self.market_data_manager = MarketDataManager(None)
             self.position_manager = PositionManager(None, self._agent_states)
 
-            # Symphony (Optional)
-            if not self._settings.enable_paper_trading:
-                try:
-                    self.symphony = SymphonyClient(
-                        project_id=self._settings.gcp_project_id or "sapphire-479610",
-                        service_name="cloud-trader",
-                    )
-                except Exception as e:
-                    logger.warning(f"Symphony client init failed (non-critical): {e}")
+            # Symphony removed - was deprecated Pub/Sub system
 
             # Telegram
             if TELEGRAM_AVAILABLE and self._settings.enable_telegram:
@@ -179,19 +172,29 @@ class MinimalTradingService:
 
     @property
     def _market_structure(self) -> Dict[str, Dict[str, Any]]:
-        return self.market_data_manager.market_structure
+        if self.market_data_manager is not None:
+            return self.market_data_manager.market_structure
+        return self._internal_market_structure
 
     @_market_structure.setter
     def _market_structure(self, value):
-        self.market_data_manager.market_structure = value
+        if self.market_data_manager is not None:
+            self.market_data_manager.market_structure = value
+        else:
+            self._internal_market_structure = value
 
     @property
     def _open_positions(self) -> Dict[str, Dict[str, Any]]:
-        return self.position_manager.open_positions
+        if self.position_manager is not None:
+            return self.position_manager.open_positions
+        return self._internal_open_positions
 
     @_open_positions.setter
     def _open_positions(self, value):
-        self.position_manager.open_positions = value
+        if self.position_manager is not None:
+            self.position_manager.open_positions = value
+        else:
+            self._internal_open_positions = value
 
     async def send_test_telegram_message(self):
         """Send a test message to Telegram to verify integration."""
