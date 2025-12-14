@@ -1137,9 +1137,11 @@ class MinimalTradingService:
 
         # Use all available symbols from market structure (fetched from exchange)
         # Agents trade dynamically across all available markets
+        print(f"🚀 SCAN: Starting _scan_and_execute_new_trades...")
 
         active_agents = [a for a in self._agent_states.values() if a.active]
         if not active_agents:
+            print("⚠️ No active agents, returning early")
             return
 
         # Optimization: Don't let every agent analyze every symbol every tick.
