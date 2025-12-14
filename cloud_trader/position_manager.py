@@ -69,6 +69,34 @@ class PositionManager:
 
             print(f"✅ Sync complete: Inherited {len(self.open_positions)} positions")
 
+            # NATIVE TP/SL: Place orders for ALL inherited positions
+            # This ensures risk is managed even if bot goes offline
+            if self.open_positions:
+                print(f"🛡️ Placing native TP/SL for {len(self.open_positions)} inherited positions...")
+                for symbol, pos in self.open_positions.items():
+                    try:
+                        entry_price = pos["entry_price"]
+                        side = pos["side"]
+                        quantity = abs(pos["quantity"])
+                        
+                        # Determine side from quantity sign if side is ambiguous
+                        if side == "BOTH":
+                            side = "BUY" if pos["quantity"] > 0 else "SELL"
+                        
+                        if entry_price > 0 and quantity > 0:
+                            await self.place_tpsl_orders(
+                                symbol=symbol,
+                                entry_price=entry_price,
+                                side=side,
+                                quantity=quantity,
+                                tp_pct=0.05,  # 5% TP
+                                sl_pct=0.03,  # 3% SL
+                            )
+                    except Exception as tpsl_err:
+                        print(f"⚠️ Failed to place native TP/SL for inherited {symbol}: {tpsl_err}")
+                
+                print(f"✅ Native TP/SL setup complete for inherited positions")
+
         except Exception as e:
             print(f"⚠️ Failed to sync open positions from exchange: {e}")
 
