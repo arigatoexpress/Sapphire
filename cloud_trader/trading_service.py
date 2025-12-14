@@ -32,6 +32,7 @@ from .enhanced_telegram import EnhancedTelegramService, NotificationPriority
 from .enums import OrderType
 from .exchange import AsterClient
 from .market_data import MarketDataManager
+from .partial_exits import PartialExitStrategy
 from .position_manager import PositionManager
 from .risk import PortfolioState, RiskManager
 from .self_healing import SelfHealingWatchdog
@@ -150,6 +151,9 @@ class MinimalTradingService:
             # they will be updated in start() with real clients.
             self.market_data_manager = MarketDataManager(None)
             self.position_manager = PositionManager(None, self._agent_states)
+            
+            # Partial Exit Strategy for multi-target profit taking
+            self.partial_exit_strategy = PartialExitStrategy()
 
             # Symphony removed - was deprecated Pub/Sub system
 
@@ -750,6 +754,18 @@ class MinimalTradingService:
                                 )
                             except Exception as tpsl_err:
                                 print(f"⚠️ Failed to place native TP/SL for {symbol}: {tpsl_err}")
+
+                            # PARTIAL EXIT STRATEGY: Create exit plan for multi-target profit taking
+                            try:
+                                self.partial_exit_strategy.create_exit_plan(
+                                    symbol=symbol,
+                                    entry_price=entry_price,
+                                    position_size=executed_qty,
+                                    side=order_info["side"],
+                                )
+                                print(f"📊 Partial Exit Plan created for {symbol}")
+                            except Exception as pe_err:
+                                print(f"⚠️ Failed to create partial exit plan for {symbol}: {pe_err}")
 
                     # MCP Notification: Execution
                     self._mcp.add_message(
@@ -2051,6 +2067,40 @@ class MinimalTradingService:
                 pnl_pct = (current_price - entry_price) / entry_price
             else:
                 pnl_pct = (entry_price - current_price) / entry_price
+
+            # PARTIAL EXIT STRATEGY: Check for partial profit targets
+            try:
+                exit_signals = self.partial_exit_strategy.update_position_price(symbol, current_price)
+                for exit_signal in exit_signals:
+                    if exit_signal.exit_size > 0:
+                        partial_qty = exit_signal.exit_size
+                        print(f"📊 PARTIAL EXIT: {symbol} taking {partial_qty:.4f} @ ${current_price:.4f} ({exit_signal.reason})")
+                        
+                        # Execute partial exit
+                        await self._execute_trade_order(
+                            agent, symbol, side, partial_qty,
+                            f"Partial Exit: {exit_signal.reason}",
+                            is_closing=True
+                        )
+                        
+                        # Telegram notification for partial exit
+                        try:
+                            await self._telegram.send_message(
+                                f"📊 **Partial Exit**\n"
+                                f"Symbol: `{symbol}`\n"
+                                f"Size: `{partial_qty:.4f}`\n"
+                                f"PnL: `{pnl_pct:+.2%}`\n"
+                                f"Reason: {exit_signal.reason}",
+                                priority=NotificationPriority.MEDIUM
+                            )
+                        except Exception:
+                            pass
+                        
+                        # Execute in strategy
+                        self.partial_exit_strategy.execute_exit(symbol, exit_signal)
+            except Exception as pe_err:
+                # Silent fail - partial exits are bonus, not critical
+                pass
 
             # RISK THRESHOLDS (Aster - optimized for crypto volatility)
             TP_THRESHOLD = 0.05       # +5% Take Profit
