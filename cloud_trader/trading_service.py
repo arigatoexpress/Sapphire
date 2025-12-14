@@ -736,9 +736,20 @@ class MinimalTradingService:
                             print(
                                 f"🎯 Position Opened: {symbol} @ {entry_price} (TP: {tp_price:.2f}, SL: {sl_price:.2f})"
                             )
-                    else:
-                        tp_price = None
-                        sl_price = None
+
+                            # NATIVE TP/SL: Place actual orders on Aster DEX
+                            # This ensures TP/SL triggers even if bot goes offline
+                            try:
+                                await self.position_manager.place_tpsl_orders(
+                                    symbol=symbol,
+                                    entry_price=entry_price,
+                                    side=order_info["side"],
+                                    quantity=executed_qty,
+                                    tp_pct=0.05,  # 5% Take Profit
+                                    sl_pct=0.03,  # 3% Stop Loss
+                                )
+                            except Exception as tpsl_err:
+                                print(f"⚠️ Failed to place native TP/SL for {symbol}: {tpsl_err}")
 
                     # MCP Notification: Execution
                     self._mcp.add_message(
@@ -1150,8 +1161,8 @@ class MinimalTradingService:
 
         # Get all available symbols from market structure (dynamic)
         all_symbols = list(self._market_structure.keys()) if self._market_structure else []
-        # Limit to 5 random symbols per cycle to allow vote phase to complete
-        symbols_to_scan = random.sample(all_symbols, min(5, len(all_symbols))) if all_symbols else []
+        # Limit to 10 random symbols per cycle for good trade frequency
+        symbols_to_scan = random.sample(all_symbols, min(10, len(all_symbols))) if all_symbols else []
 
         # Map to store which agents looked at which symbols (for logging)
         scan_activity = defaultdict(int)
@@ -1161,9 +1172,9 @@ class MinimalTradingService:
             if symbol in self._open_positions:
                 continue
 
-            # COOLDOWN: Don't enter new position if we traded this symbol in last 30 mins
+            # COOLDOWN: Don't enter new position if we traded this symbol in last 15 mins
             if hasattr(self, "_last_trade_time") and symbol in self._last_trade_time:
-                if time.time() - self._last_trade_time[symbol] < 1800:  # 30 minutes
+                if time.time() - self._last_trade_time[symbol] < 900:  # 15 minutes
                     continue
 
             # Each agent has a chance to analyze this symbol
@@ -2160,7 +2171,7 @@ class MinimalTradingService:
                 await self._check_liquidation_risk()
 
                 # 4. Manage Open Positions (TP/SL)
-                # await self._manage_positions(ticker_map={})
+                await self._manage_positions()
 
                 # 5. Execute Trading Cycle (Position Management + New Entries)
                 await self._execute_trading_cycle()

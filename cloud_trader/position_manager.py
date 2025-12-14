@@ -1,8 +1,12 @@
 import asyncio
+import logging
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from .definitions import SYMBOL_CONFIG, MinimalAgentState
+from .exchange import OrderType
+
+logger = logging.getLogger(__name__)
 
 
 class PositionManager:
@@ -178,13 +182,90 @@ class PositionManager:
                 "reduceOnly": True,
             }
 
-            # Execute via exchange client (assuming create_order method exists)
-            # We wrap in try/except because some exchanges might reject if price is too close
-            logger.info(f"🛡️ Syncing Hard Stop for {symbol}: {order_side} {quantity} @ {sl_price}")
-            await self.exchange_client.create_order(**order_params)
+            # Execute via exchange client
+            print(f"🛡️ Syncing Hard Stop for {symbol}: {order_side} {quantity} @ {sl_price}")
+            await self.exchange_client.place_order(
+                symbol=symbol,
+                side=order_side,
+                order_type=OrderType.STOP_MARKET,
+                quantity=abs(quantity),
+                stop_price=sl_price,
+                reduce_only=True,
+            )
+            print(f"✅ NATIVE SL ORDER PLACED: {symbol} @ {sl_price}")
 
         except Exception as e:
             print(f"⚠️ Failed to sync SL to exchange for {symbol}: {e}")
+
+    async def update_tp_on_exchange(self, symbol: str, tp_price: float, side: str, quantity: float):
+        """
+        Places a TAKE_PROFIT_MARKET order on the exchange.
+        This ensures profits are captured even if the bot goes offline.
+        """
+        try:
+            # Determine order side (Closing logic)
+            order_side = "SELL" if side == "BUY" else "BUY"
+
+            # Place TAKE_PROFIT_MARKET order
+            print(f"💰 Syncing Take Profit for {symbol}: {order_side} {quantity} @ {tp_price}")
+            await self.exchange_client.place_order(
+                symbol=symbol,
+                side=order_side,
+                order_type=OrderType.TAKE_PROFIT_MARKET,
+                quantity=abs(quantity),
+                stop_price=tp_price,
+                reduce_only=True,
+            )
+            print(f"✅ NATIVE TP ORDER PLACED: {symbol} @ {tp_price}")
+
+        except Exception as e:
+            print(f"⚠️ Failed to sync TP to exchange for {symbol}: {e}")
+
+    async def place_tpsl_orders(
+        self, 
+        symbol: str, 
+        entry_price: float, 
+        side: str, 
+        quantity: float,
+        tp_pct: float = 0.05,  # Default 5% TP
+        sl_pct: float = 0.03   # Default 3% SL
+    ):
+        """
+        Place both TP and SL orders on the exchange after position entry.
+        This is the main method to call after opening a new position.
+        """
+        try:
+            # Cancel any existing orders for this symbol first
+            await self.exchange_client.cancel_all_orders(symbol)
+
+            # Calculate TP/SL prices based on side
+            if side == "BUY":  # Long position
+                tp_price = entry_price * (1 + tp_pct)
+                sl_price = entry_price * (1 - sl_pct)
+            else:  # Short position
+                tp_price = entry_price * (1 - tp_pct)
+                sl_price = entry_price * (1 + sl_pct)
+
+            print(f"📊 Placing native TP/SL for {symbol}: Entry={entry_price:.6f}, TP={tp_price:.6f} ({tp_pct*100}%), SL={sl_price:.6f} ({sl_pct*100}%)")
+
+            # Place both orders concurrently
+            await asyncio.gather(
+                self.update_tp_on_exchange(symbol, tp_price, side, quantity),
+                self.update_sl_on_exchange(symbol, sl_price, side, quantity),
+                return_exceptions=True
+            )
+
+            # Update internal tracking
+            if symbol in self.open_positions:
+                self.open_positions[symbol]["tp_price"] = tp_price
+                self.open_positions[symbol]["sl_price"] = sl_price
+
+            print(f"✅ NATIVE TP/SL ACTIVE for {symbol}")
+            return True
+
+        except Exception as e:
+            print(f"❌ Failed to place TP/SL orders for {symbol}: {e}")
+            return False
 
     async def check_profit_taking(
         self, symbol: str, position: Dict[str, Any], current_price: float
