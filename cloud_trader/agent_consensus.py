@@ -201,8 +201,11 @@ class AgentConsensusEngine:
 
     def submit_signal(self, signal: AgentSignal) -> None:
         """Submit a signal from an agent for consensus consideration."""
+        print(f"🔔 SUBMIT_SIGNAL: {signal.agent_id} → {signal.symbol} {signal.signal_type.value} ({signal.confidence:.2f})")
+        
         # Validate agent is registered
         if signal.agent_id not in self.agent_registry:
+            print(f"❌ REJECTED: Agent {signal.agent_id} not registered! Registry has: {list(self.agent_registry.keys())}")
             logger.warning(f"Received signal from unregistered agent: {signal.agent_id}")
             return
 
@@ -211,6 +214,8 @@ class AgentConsensusEngine:
 
         # Add to pending aggregation
         self.pending_signals[signal.symbol].append(signal)
+        
+        print(f"✅ SIGNAL ADDED: {signal.symbol} now has {len(self.pending_signals[signal.symbol])} pending signals")
 
         # Signal will be processed in consensus voting
         logger.debug(
