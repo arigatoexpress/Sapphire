@@ -1275,6 +1275,29 @@ class MinimalTradingService:
 
             target_notional = base_notional * multiplier
 
+            # === RISK CHECKS ===
+            # Risk Constants
+            MAX_TOTAL_EXPOSURE = 0.50  # 50% of account in positions
+            MAX_POSITION_SIZE = 0.05   # 5% of account per position
+            
+            # Check 1: Exposure Limit
+            total_position_value = sum(
+                abs(p["quantity"] * p["entry_price"]) 
+                for p in self._open_positions.values()
+            )
+            account_balance = self._account_balance or 1000  # Fallback
+            current_exposure = total_position_value / account_balance if account_balance > 0 else 1.0
+            
+            if current_exposure >= MAX_TOTAL_EXPOSURE:
+                print(f"⚠️ Risk Check: Exposure Limit Hit ({current_exposure:.1%} >= {MAX_TOTAL_EXPOSURE:.0%})")
+                continue  # Skip this trade
+                
+            # Check 2: Position Size Limit
+            max_allowed_notional = account_balance * MAX_POSITION_SIZE
+            if target_notional > max_allowed_notional:
+                print(f"⚠️ Risk Check: Position Size Reduced (${target_notional:.2f} -> ${max_allowed_notional:.2f})")
+                target_notional = max_allowed_notional
+
             # Get Price
             try:
                 ticker = await self._exchange_client.get_ticker(symbol)
@@ -2029,16 +2052,27 @@ class MinimalTradingService:
             else:
                 pnl_pct = (entry_price - current_price) / entry_price
 
-            # Thresholds (Aster - tighter)
-            TP_THRESHOLD = 0.05  # +5%
-            SL_THRESHOLD = -0.03  # -3%
+            # RISK THRESHOLDS (Aster - optimized for crypto volatility)
+            TP_THRESHOLD = 0.05       # +5% Take Profit
+            SL_THRESHOLD = -0.03      # -3% Stop Loss
+            EMERGENCY_SL = -0.08      # -8% Emergency Stop (prevent liquidation)
 
             action = None
             reason = None
+            is_emergency = False
 
-            if pnl_pct >= TP_THRESHOLD:
+            # Priority 1: Emergency Stop Loss (-8%)
+            if pnl_pct <= EMERGENCY_SL:
+                action = "SELL" if side == "BUY" else "BUY"
+                reason = f"🚨 EMERGENCY STOP ({pnl_pct:.1%})"
+                is_emergency = True
+                print(f"🚨🚨 EMERGENCY: {symbol} at {pnl_pct:.1%} - FORCE CLOSING")
+
+            # Priority 2: Take Profit
+            elif pnl_pct >= TP_THRESHOLD:
                 action = "SELL" if side == "BUY" else "BUY"
                 reason = f"Take Profit (+{pnl_pct:.1%})"
+            # Priority 3: Stop Loss
             elif pnl_pct <= SL_THRESHOLD:
                 action = "SELL" if side == "BUY" else "BUY"
                 reason = f"Stop Loss ({pnl_pct:.1%})"
@@ -2047,6 +2081,26 @@ class MinimalTradingService:
                 print(f"🚨 PORTFOLIO GUARD: {symbol} PnL {pnl_pct:.1%} -> {reason}")
 
                 thesis = f"Portfolio Guard: {reason}"
+
+                # Calculate PnL in USD
+                pnl_usd = (current_price - entry_price) * quantity if side == "BUY" else (entry_price - current_price) * quantity
+
+                # Telegram Notification for TP/SL
+                emoji = "💰" if pnl_pct > 0 else ("🚨" if is_emergency else "❌")
+                priority = NotificationPriority.CRITICAL if is_emergency else NotificationPriority.HIGH
+                
+                try:
+                    await self._telegram.send_message(
+                        f"{emoji} **Position Closed**\n"
+                        f"Symbol: `{symbol}`\n"
+                        f"Reason: {reason}\n"
+                        f"PnL: `{pnl_pct:+.2%}` (`${pnl_usd:+.2f}`)\n"
+                        f"Entry: `${entry_price:.4f}`\n"
+                        f"Exit: `${current_price:.4f}`",
+                        priority=priority
+                    )
+                except Exception as tg_err:
+                    print(f"⚠️ Telegram notification failed: {tg_err}")
 
                 # Execute Close
                 # Note: side passed to _execute_trade_order is the CURRENT position side.
@@ -2209,8 +2263,23 @@ class MinimalTradingService:
             # Calculate Margin Ratio
             margin_ratio = maint_margin / margin_balance
 
+            # WARNING ZONE: > 60% Margin Usage
+            if margin_ratio > 0.6 and margin_ratio <= 0.8:
+                print(f"⚠️ HIGH MARGIN WARNING: Margin Ratio {margin_ratio:.1%}")
+                try:
+                    await self._telegram.send_message(
+                        f"⚠️ **Risk Warning**\n"
+                        f"Margin Ratio: `{margin_ratio:.1%}`\n"
+                        f"Margin Balance: `${margin_balance:.2f}`\n"
+                        f"Maintenance: `${maint_margin:.2f}`\n"
+                        f"📉 Consider reducing exposure",
+                        priority=NotificationPriority.HIGH,
+                    )
+                except Exception:
+                    pass
+
             # DANGER ZONE: > 80% Margin Usage
-            if margin_ratio > 0.8:
+            elif margin_ratio > 0.8:
                 print(f"🚨 CRITICAL LIQUIDATION RISK: Margin Ratio {margin_ratio:.1%}")
                 await self._telegram.send_message(
                     f"🚨 **LIQUIDATION WARNING** 🚨\n"
