@@ -1325,9 +1325,9 @@ class MinimalTradingService:
 
             # === RISK CHECKS (CONCENTRATED POSITION STRATEGY) ===
             # Fewer, larger, higher-conviction positions for optimal returns
-            MAX_TOTAL_EXPOSURE = 0.60   # 60% of account in positions
-            MAX_POSITION_SIZE = 0.12    # 12% of account per position (larger bets)
-            MAX_CONCURRENT_POSITIONS = 4  # Focus on 4 best opportunities
+            MAX_TOTAL_EXPOSURE = 0.80   # 80% of account in positions (was 60%)
+            MAX_POSITION_SIZE = 0.15    # 15% of account per position (was 12%)
+            MAX_CONCURRENT_POSITIONS = 8  # Allow 8 positions (was 4, blocked all trades)
             
             # Check 0: Max Positions Limit (concentrated strategy)
             if len(self._open_positions) >= MAX_CONCURRENT_POSITIONS:
