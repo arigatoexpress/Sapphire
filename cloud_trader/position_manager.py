@@ -52,10 +52,14 @@ class PositionManager:
                 )
 
                 # Store position in our tracking
+                # Compute actual side from quantity sign (Aster hedge mode)
+                raw_quantity = float(pos.get("positionAmt", 0))
+                actual_side = "BUY" if raw_quantity > 0 else "SELL"
+                
                 self.open_positions[symbol] = {
                     "symbol": symbol,
-                    "side": pos.get("positionSide", "LONG"),
-                    "quantity": float(pos.get("positionAmt", 0)),
+                    "side": actual_side,  # Use computed side, not 'BOTH'
+                    "quantity": abs(raw_quantity),  # Always store positive quantity
                     "entry_price": float(pos.get("entryPrice", 0)),
                     "unrealized_pnl": float(pos.get("unrealizedProfit", 0)),
                     "leverage": int(pos.get("leverage", 1)),
@@ -63,9 +67,10 @@ class PositionManager:
                     "agent_id": agent.id,
                     "tp_price": float(pos.get("entryPrice", 0)) * 1.05,  # Default TP
                     "sl_price": float(pos.get("entryPrice", 0)) * 0.95,  # Default SL
+                    "actual_side": actual_side,  # Explicit tracking
                 }
                 print(
-                    f"   ✅ Inherited position: {symbol} {self.open_positions[symbol]['side']} x{self.open_positions[symbol]['quantity']}"
+                    f"   ✅ Inherited position: {symbol} {actual_side} x{abs(raw_quantity)}"
                 )
 
             print(f"✅ Sync complete: Inherited {len(self.open_positions)} positions")

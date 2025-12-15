@@ -2069,8 +2069,19 @@ class MinimalTradingService:
             if entry_price == 0:
                 continue
 
-            side = pos["side"]  # BUY or SELL
+            side = pos["side"]  # BUY, SELL, or BOTH (hedge mode)
             quantity = pos["quantity"]
+            
+            # Handle Aster hedge mode: side='BOTH' means direction is in quantity sign
+            if side == "BOTH":
+                if quantity > 0:
+                    side = "BUY"  # Long position
+                else:
+                    side = "SELL"  # Short position
+                print(f"⚠️ Warning: Position {symbol} has side 'BOTH', detected as {side} from quantity {quantity}")
+            
+            # Always use absolute quantity for calculations
+            abs_quantity = abs(quantity)
 
             if side == "BUY":
                 pnl_pct = (current_price - entry_price) / entry_price
@@ -2153,7 +2164,7 @@ class MinimalTradingService:
                 # is_closing=True tells it to close.
                 try:
                     await self._execute_trade_order(
-                        agent, symbol, side, quantity, thesis, is_closing=True
+                        agent, symbol, side, abs_quantity, thesis, is_closing=True
                     )
                     
                     # Only send Telegram notification AFTER successful execution
