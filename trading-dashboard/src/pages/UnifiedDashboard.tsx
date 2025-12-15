@@ -1,10 +1,12 @@
 import React from 'react';
 import { Box, Grid, Paper, Typography, Chip } from '@mui/material';
-import { TrendingUp, TrendingDown, Wallet, Activity, Users } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wallet, Activity, Users, Zap } from 'lucide-react';
 import { useTradingData } from '../contexts/TradingContext';
 import { NewAsterAgentGrid } from '../components/mission-control/NewAsterAgentGrid';
 import UnifiedPositionsTable from '../components/UnifiedPositionsTable';
 import { NewAsterBrainStream } from '../components/mission-control/NewAsterBrainStream';
+import ConsensusPanel from '../components/ConsensusPanel';
+import StrategyStatusCard from '../components/StrategyStatusCard';
 
 // Stat Card Component
 const StatCard: React.FC<{
@@ -13,21 +15,38 @@ const StatCard: React.FC<{
     subtitle?: string;
     trend?: 'up' | 'down' | 'neutral';
     icon: React.ReactNode;
-}> = ({ title, value, subtitle, trend, icon }) => (
+    highlight?: boolean;
+}> = ({ title, value, subtitle, trend, icon, highlight }) => (
     <Paper
         sx={{
             p: 2.5,
             borderRadius: 2,
-            background: 'linear-gradient(135deg, rgba(10,11,16,0.95), rgba(15,16,22,0.9))',
-            border: '1px solid rgba(255,255,255,0.06)',
+            background: highlight
+                ? 'linear-gradient(135deg, rgba(0,212,170,0.1), rgba(10,11,16,0.95))'
+                : 'linear-gradient(135deg, rgba(10,11,16,0.95), rgba(15,16,22,0.9))',
+            border: highlight
+                ? '1px solid rgba(0,212,170,0.2)'
+                : '1px solid rgba(255,255,255,0.06)',
             height: '100%',
+            position: 'relative',
+            overflow: 'hidden'
         }}
     >
+        {highlight && (
+            <Box sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 2,
+                background: 'linear-gradient(90deg, #00d4aa, transparent)',
+            }} />
+        )}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
             <Typography variant="caption" sx={{ color: '#666', textTransform: 'uppercase', letterSpacing: 1, fontSize: '0.65rem' }}>
                 {title}
             </Typography>
-            <Box sx={{ color: '#444' }}>{icon}</Box>
+            <Box sx={{ color: highlight ? '#00d4aa' : '#444' }}>{icon}</Box>
         </Box>
         <Typography variant="h5" sx={{
             fontWeight: 700,
@@ -52,7 +71,6 @@ export const UnifiedDashboard: React.FC = () => {
         total_pnl_percent,
         agents,
         open_positions,
-        // connected is available but shown in header
         market_regime
     } = useTradingData();
 
@@ -60,15 +78,30 @@ export const UnifiedDashboard: React.FC = () => {
     const pnlTrend = total_pnl >= 0 ? 'up' : 'down';
 
     return (
-        <Box sx={{ maxWidth: 1600, mx: 'auto' }}>
+        <Box sx={{ maxWidth: 1800, mx: 'auto' }}>
             {/* Header */}
             <Box sx={{ mb: 4 }}>
-                <Typography variant="h4" sx={{ fontWeight: 700, color: '#fff', mb: 0.5 }}>
-                    Dashboard
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 0.5 }}>
+                    <Typography variant="h4" sx={{ fontWeight: 700, color: '#fff' }}>
+                        Dashboard
+                    </Typography>
+                    <Chip
+                        icon={<Zap size={12} />}
+                        label="ULTRA-CONCENTRATED MODE"
+                        size="small"
+                        sx={{
+                            bgcolor: 'rgba(138,43,226,0.15)',
+                            color: '#8a2be2',
+                            fontWeight: 700,
+                            fontSize: '0.6rem',
+                            height: 24,
+                            '& .MuiChip-icon': { color: '#8a2be2' }
+                        }}
+                    />
+                </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                     <Typography variant="body2" sx={{ color: '#666' }}>
-                        Sapphire AI Trading System
+                        Sapphire AI Trading System • PvP Optimized
                     </Typography>
                     {market_regime && (
                         <Chip
@@ -87,14 +120,15 @@ export const UnifiedDashboard: React.FC = () => {
 
             {/* Stats Row */}
             <Grid container spacing={2} sx={{ mb: 4 }}>
-                <Grid item xs={6} md={3}>
+                <Grid item xs={6} md={2.4}>
                     <StatCard
                         title="Portfolio Value"
                         value={`$${portfolio_value.toLocaleString()}`}
                         icon={<Wallet size={18} />}
+                        highlight
                     />
                 </Grid>
-                <Grid item xs={6} md={3}>
+                <Grid item xs={6} md={2.4}>
                     <StatCard
                         title="Total P&L"
                         value={`${total_pnl >= 0 ? '+' : ''}$${total_pnl.toFixed(2)}`}
@@ -103,28 +137,44 @@ export const UnifiedDashboard: React.FC = () => {
                         icon={pnlTrend === 'up' ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
                     />
                 </Grid>
-                <Grid item xs={6} md={3}>
+                <Grid item xs={6} md={2.4}>
                     <StatCard
                         title="Active Agents"
                         value={`${activeAgents} / ${agents.length}`}
-                        subtitle="AI agents running"
+                        subtitle="Swarm consensus"
                         icon={<Users size={18} />}
                     />
                 </Grid>
-                <Grid item xs={6} md={3}>
+                <Grid item xs={6} md={2.4}>
                     <StatCard
                         title="Open Positions"
-                        value={`${open_positions.length}`}
-                        subtitle="Active trades"
+                        value={`${open_positions.length} / 4`}
+                        subtitle="Ultra-focused"
                         icon={<Activity size={18} />}
+                    />
+                </Grid>
+                <Grid item xs={12} md={2.4}>
+                    <StatCard
+                        title="Strategy"
+                        value="High Conviction"
+                        subtitle="80% min confidence"
+                        icon={<Zap size={18} />}
                     />
                 </Grid>
             </Grid>
 
-            {/* Main Content */}
+            {/* Main Content - 3 Column Layout */}
             <Grid container spacing={3}>
-                {/* Left Column: Agents & Positions */}
-                <Grid item xs={12} lg={7}>
+                {/* Left Column: Consensus & Strategy */}
+                <Grid item xs={12} lg={4}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        <ConsensusPanel />
+                        <StrategyStatusCard positionCount={open_positions.length} />
+                    </Box>
+                </Grid>
+
+                {/* Middle Column: Agents & Positions */}
+                <Grid item xs={12} lg={4}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                         <NewAsterAgentGrid />
                         <Paper
@@ -148,15 +198,15 @@ export const UnifiedDashboard: React.FC = () => {
                 </Grid>
 
                 {/* Right Column: Activity Feed */}
-                <Grid item xs={12} lg={5}>
+                <Grid item xs={12} lg={4}>
                     <Paper
                         sx={{
                             p: 3,
                             borderRadius: 2,
                             background: 'linear-gradient(135deg, rgba(10,11,16,0.95), rgba(15,16,22,0.9))',
                             border: '1px solid rgba(255,255,255,0.06)',
-                            height: 'calc(100vh - 350px)',
-                            minHeight: 400,
+                            height: 'calc(100vh - 280px)',
+                            minHeight: 500,
                             overflow: 'hidden',
                             display: 'flex',
                             flexDirection: 'column'
