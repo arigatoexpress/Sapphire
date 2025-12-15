@@ -2415,8 +2415,8 @@ class MinimalTradingService:
                 await self._exchange_client.place_order(
                     symbol=symbol,
                     side=side,
-                    order_type="MARKET",
-                    quantity=qty,
+                    order_type=OrderType.MARKET,
+                    quantity=abs(qty),
                     reduce_only=True,
                     new_client_order_id=f"shutdown_{int(time.time())}_{symbol}",
                 )
