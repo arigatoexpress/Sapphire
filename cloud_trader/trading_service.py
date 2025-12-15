@@ -2152,8 +2152,8 @@ class MinimalTradingService:
 
                 thesis = f"Portfolio Guard: {reason}"
 
-                # Calculate PnL in USD (use abs(quantity) for correct sign)
-                pnl_usd = (current_price - entry_price) * abs(quantity) if side == "BUY" else (entry_price - current_price) * abs(quantity)
+                # Calculate PnL in USD
+                pnl_usd = (current_price - entry_price) * abs_quantity if side == "BUY" else (entry_price - current_price) * abs_quantity
 
                 # Telegram Notification for TP/SL
                 emoji = "💰" if pnl_pct > 0 else ("🚨" if is_emergency else "❌")
