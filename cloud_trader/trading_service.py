@@ -127,6 +127,8 @@ class MinimalTradingService:
         self._pending_orders: Dict[str, Dict] = {}
         self._internal_open_positions: Dict[str, Dict] = {}  # Internal storage, accessed via property
         self._internal_market_structure: Dict[str, Dict] = {}  # Internal storage for property fallback
+        self._account_balance: float = 0.0  # Will be updated from exchange
+        self._last_balance_fetch: float = 0.0  # Timestamp of last balance fetch
 
         # AI & Agents
         self._agent_states: Dict[str, MinimalAgentState] = {}
@@ -276,6 +278,9 @@ class MinimalTradingService:
             logger.debug("Syncing positions...")
             await self._sync_positions_from_exchange()
             await self._review_inherited_positions()
+            
+            # 5b. Fetch Account Balance (critical for position sizing)
+            await self._update_account_balance()
 
             logger.debug("Starting Watchdog...")
             self._watchdog.start()
@@ -2494,6 +2499,47 @@ class MinimalTradingService:
             
         except Exception as e:
             return None
+
+    async def _update_account_balance(self):
+        """
+        Fetch and update account balance from exchange.
+        Critical for position sizing and risk management.
+        """
+        try:
+            # Cache for 60 seconds to avoid excessive API calls
+            import time
+            current_time = time.time()
+            if self._account_balance > 0 and (current_time - self._last_balance_fetch) < 60:
+                return  # Use cached value
+            
+            balances = await self._exchange_client.get_account_balance()
+            
+            # Find USDT balance
+            for balance in balances:
+                if balance.get("asset") == "USDT":
+                    available = float(balance.get("availableBalance", 0) or balance.get("free", 0))
+                    wallet = float(balance.get("walletBalance", 0) or balance.get("balance", 0))
+                    self._account_balance = max(available, wallet)
+                    self._last_balance_fetch = current_time
+                    print(f"💰 Account Balance: ${self._account_balance:.2f} USDT")
+                    return
+            
+            # Fallback: sum all USDT-equivalent balances
+            total = sum(
+                float(b.get("availableBalance", 0) or b.get("free", 0))
+                for b in balances
+            )
+            if total > 0:
+                self._account_balance = total
+                self._last_balance_fetch = current_time
+                print(f"💰 Account Balance (Total): ${self._account_balance:.2f}")
+            else:
+                print("⚠️ Could not fetch balance, using fallback of $1000")
+                self._account_balance = 1000.0
+                
+        except Exception as e:
+            print(f"⚠️ Balance fetch error: {e}, using fallback of $1000")
+            self._account_balance = 1000.0
 
     async def _sync_positions_from_exchange(self):
         """Sync positions from exchange to inherit existing positions on startup."""
