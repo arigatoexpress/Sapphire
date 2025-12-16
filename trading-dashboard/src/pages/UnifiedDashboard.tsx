@@ -79,30 +79,17 @@ export const UnifiedDashboard: React.FC = () => {
 
     return (
         <Box sx={{ maxWidth: 1800, mx: 'auto' }}>
-            {/* Header */}
-            <Box sx={{ mb: 4 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 0.5 }}>
-                    <Typography variant="h4" sx={{ fontWeight: 700, color: '#fff' }}>
-                        Dashboard
+            {/* Clean Header */}
+            <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Box>
+                    <Typography variant="h4" sx={{ fontWeight: 700, color: '#fff', mb: 0.5 }}>
+                        Sapphire AI
                     </Typography>
-                    <Chip
-                        icon={<Zap size={12} />}
-                        label="ULTRA-CONCENTRATED MODE"
-                        size="small"
-                        sx={{
-                            bgcolor: 'rgba(138,43,226,0.15)',
-                            color: '#8a2be2',
-                            fontWeight: 700,
-                            fontSize: '0.6rem',
-                            height: 24,
-                            '& .MuiChip-icon': { color: '#8a2be2' }
-                        }}
-                    />
+                    <Typography variant="body2" sx={{ color: '#555' }}>
+                        Ultra-Concentrated Trading • PvP Optimized
+                    </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Typography variant="body2" sx={{ color: '#666' }}>
-                        Sapphire AI Trading System • PvP Optimized
-                    </Typography>
                     {market_regime && (
                         <Chip
                             label={market_regime.current_regime}
@@ -110,11 +97,23 @@ export const UnifiedDashboard: React.FC = () => {
                             sx={{
                                 bgcolor: 'rgba(0,212,170,0.1)',
                                 color: '#00d4aa',
-                                fontSize: '0.65rem',
-                                height: 20
+                                fontSize: '0.7rem',
+                                fontWeight: 600
                             }}
                         />
                     )}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box sx={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: '50%',
+                            bgcolor: '#00ff00',
+                            boxShadow: '0 0 8px #00ff00'
+                        }} />
+                        <Typography variant="caption" sx={{ color: '#00ff00', fontWeight: 600 }}>
+                            LIVE
+                        </Typography>
+                    </Box>
                 </Box>
             </Box>
 
