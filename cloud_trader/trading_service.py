@@ -2791,8 +2791,8 @@ class MinimalTradingService:
                     
                     if cancelled_count > 0:
                         logger.info(f"✅ Capital Efficiency Guard: Cancelled {cancelled_count} ghost orders")
-                        # Send Telegram notification
-                        if self._telegram:
+                        # Send Telegram notification only if significant cleanup (5+ orders)
+                        if cancelled_count >= 5 and self._telegram:
                             await self._telegram.send_notification(
                                 f"🧹 Capital Efficiency Guard\nCancelled {cancelled_count} ghost orders\nFreed up locked capital",
                                 priority=NotificationPriority.LOW

@@ -923,7 +923,47 @@ async def get_consensus_state() -> Dict[str, Any]:
                 
                 unrealized_pnl = sum(p.get("pnl", 0) for p in all_positions)
                 realized_pnl = getattr(service, "_total_realized_pnl", 0.0)
-                total_pnl = unrealized_pnl + realized_pnl
+                
+                # Calculate fees and funding (WORLD-CLASS ACCURACY)
+                total_fees = 0.0
+                total_funding = 0.0
+                
+                if hasattr(service, "_exchange_client") and service._exchange_client:
+                    try:
+                        # Get trading fees from last 7 days
+                        seven_days_ago = int((time.time() - 7 * 24 * 3600) * 1000)
+                        
+                        # Aggregate fees across all traded symbols
+                        symbols_traded = set(p.get("symbol") for p in all_positions)
+                        for symbol in symbols_traded:
+                            try:
+                                trades = await service._exchange_client.get_account_trades(
+                                    symbol=symbol,
+                                    start_time=seven_days_ago,
+                                    limit=100
+                                )
+                                # Sum commission from all trades
+                                total_fees += sum(float(t.get('commission', 0)) for t in trades)
+                            except:
+                                pass  # Skip if symbol fails
+                        
+                        # Get funding payments (income type: FUNDING_FEE)
+                        try:
+                            funding_history = await service._exchange_client.get_income_history(
+                                income_type='FUNDING_FEE',
+                                start_time=seven_days_ago,
+                                limit=100
+                            )
+                            # Sum funding payments (negative = paid, positive = received)
+                            total_funding = sum(float(f.get('income', 0)) for f in funding_history)
+                        except:
+                            pass  # Funding might not be available on all exchanges
+                            
+                    except Exception as fee_err:
+                        logger.debug(f"Could not fetch fees/funding: {fee_err}")
+                
+                # Calculate NET PnL (after fees and funding)
+                total_pnl = unrealized_pnl + realized_pnl - total_fees + total_funding
                 
                 # Calculate % return
                 initial_balance = service._portfolio.balance if service._portfolio.balance > 0 else 3000.0
@@ -934,6 +974,8 @@ async def get_consensus_state() -> Dict[str, Any]:
                     "total_pnl_percent": total_pnl_percent,
                     "unrealized_pnl": unrealized_pnl,
                     "realized_pnl": realized_pnl,
+                    "total_fees": total_fees,
+                    "total_funding": total_funding,
                     "portfolio_value": initial_balance + total_pnl,
                 }
             except Exception as pnl_err:

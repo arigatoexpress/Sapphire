@@ -122,13 +122,11 @@ export const PortfolioPro: React.FC = () => {
                                         <th className="p-4 text-right">Size</th>
                                         <th className="p-4 text-right">Entry</th>
                                         <th className="p-4 text-right">Mark</th>
-                                        <th className="p-4 text-right">Notional</th>
                                         <th className="p-4 text-right rounded-tr-xl">PnL</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
                                     {open_positions.map((pos, i) => {
-                                        const notional = pos.size * pos.mark_price;
                                         const isProfit = pos.pnl >= 0;
                                         return (
                                             <tr key={i} className="hover:bg-white/5 transition-colors group">
@@ -151,9 +149,6 @@ export const PortfolioPro: React.FC = () => {
                                                 </td>
                                                 <td className="p-4 text-right font-mono text-sm text-white font-bold">
                                                     ${pos.mark_price.toFixed(2)}
-                                                </td>
-                                                <td className="p-4 text-right font-mono text-sm text-slate-300">
-                                                    ${notional.toFixed(2)}
                                                 </td>
                                                 <td className="p-4 text-right">
                                                     <div className={`font-mono font-bold text-sm ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
