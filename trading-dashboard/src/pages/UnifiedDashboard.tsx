@@ -1,14 +1,15 @@
 import React from 'react';
 import { Box, Grid, Paper, Typography, Chip } from '@mui/material';
-import { TrendingUp, TrendingDown, Wallet, Activity, Users, Zap } from 'lucide-react';
+import { TrendingUp, TrendingDown, Activity, Users, Zap, Target } from 'lucide-react';
 import { useTradingData } from '../contexts/TradingContext';
 import { NewAsterAgentGrid } from '../components/mission-control/NewAsterAgentGrid';
 import UnifiedPositionsTable from '../components/UnifiedPositionsTable';
 import { NewAsterBrainStream } from '../components/mission-control/NewAsterBrainStream';
 import ConsensusPanel from '../components/ConsensusPanel';
 import StrategyStatusCard from '../components/StrategyStatusCard';
+import PerformanceChart from '../components/PerformanceChart';
 
-// Stat Card Component
+// Stat Card Component - Now showing % instead of exact values
 const StatCard: React.FC<{
     title: string;
     value: string;
@@ -22,7 +23,7 @@ const StatCard: React.FC<{
             p: 2.5,
             borderRadius: 2,
             background: highlight
-                ? 'linear-gradient(135deg, rgba(0,212,170,0.1), rgba(10,11,16,0.95))'
+                ? 'linear-gradient(135deg, rgba(0,212,170,0.08), rgba(10,11,16,0.95))'
                 : 'linear-gradient(135deg, rgba(10,11,16,0.95), rgba(15,16,22,0.9))',
             border: highlight
                 ? '1px solid rgba(0,212,170,0.2)'
@@ -43,7 +44,7 @@ const StatCard: React.FC<{
             }} />
         )}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-            <Typography variant="caption" sx={{ color: '#666', textTransform: 'uppercase', letterSpacing: 1, fontSize: '0.65rem' }}>
+            <Typography variant="caption" sx={{ color: '#666', textTransform: 'uppercase', letterSpacing: 1, fontSize: '0.6rem' }}>
                 {title}
             </Typography>
             <Box sx={{ color: highlight ? '#00d4aa' : '#444' }}>{icon}</Box>
@@ -52,12 +53,13 @@ const StatCard: React.FC<{
             fontWeight: 700,
             color: trend === 'up' ? '#00d4aa' : trend === 'down' ? '#ff6b6b' : '#fff',
             fontFamily: 'JetBrains Mono, monospace',
+            fontSize: '1.4rem',
             mb: 0.5
         }}>
             {value}
         </Typography>
         {subtitle && (
-            <Typography variant="caption" sx={{ color: '#666', fontSize: '0.7rem' }}>
+            <Typography variant="caption" sx={{ color: '#555', fontSize: '0.65rem' }}>
                 {subtitle}
             </Typography>
         )}
@@ -66,8 +68,6 @@ const StatCard: React.FC<{
 
 export const UnifiedDashboard: React.FC = () => {
     const {
-        portfolio_value,
-        total_pnl,
         total_pnl_percent,
         agents,
         open_positions,
@@ -75,7 +75,15 @@ export const UnifiedDashboard: React.FC = () => {
     } = useTradingData();
 
     const activeAgents = agents.filter(a => a.status === 'active').length;
-    const pnlTrend = total_pnl >= 0 ? 'up' : 'down';
+
+    // Calculate aggregate returns
+    const pnlTrend = total_pnl_percent >= 0 ? 'up' : 'down';
+    const formattedPnL = `${total_pnl_percent >= 0 ? '+' : ''}${total_pnl_percent.toFixed(2)}%`;
+
+    // Calculate average win rate across agents (as %)
+    const avgWinRate = agents.length > 0
+        ? agents.reduce((sum, a) => sum + (a.win_rate > 1 ? a.win_rate : a.win_rate * 100), 0) / agents.length
+        : 0;
 
     return (
         <Box sx={{ maxWidth: 1800, mx: 'auto' }}>
@@ -117,50 +125,49 @@ export const UnifiedDashboard: React.FC = () => {
                 </Box>
             </Box>
 
-            {/* Stats Row */}
+            {/* Stats Row - Now showing % returns, not exact $ amounts */}
             <Grid container spacing={2} sx={{ mb: 4 }}>
-                <Grid item xs={6} md={2.4}>
+                <Grid item xs={6} md={3}>
                     <StatCard
-                        title="Portfolio Value"
-                        value={`$${portfolio_value.toLocaleString()}`}
-                        icon={<Wallet size={18} />}
+                        title="Portfolio Return"
+                        value={formattedPnL}
+                        subtitle="Total P&L"
+                        trend={pnlTrend}
+                        icon={pnlTrend === 'up' ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
                         highlight
                     />
                 </Grid>
-                <Grid item xs={6} md={2.4}>
+                <Grid item xs={6} md={3}>
                     <StatCard
-                        title="Total P&L"
-                        value={`${total_pnl >= 0 ? '+' : ''}$${total_pnl.toFixed(2)}`}
-                        subtitle={`${total_pnl_percent >= 0 ? '+' : ''}${total_pnl_percent.toFixed(2)}%`}
-                        trend={pnlTrend}
-                        icon={pnlTrend === 'up' ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
+                        title="Avg Win Rate"
+                        value={`${avgWinRate.toFixed(0)}%`}
+                        subtitle="Across all agents"
+                        trend={avgWinRate >= 50 ? 'up' : 'down'}
+                        icon={<Target size={18} />}
                     />
                 </Grid>
-                <Grid item xs={6} md={2.4}>
+                <Grid item xs={6} md={3}>
                     <StatCard
                         title="Active Agents"
-                        value={`${activeAgents} / ${agents.length}`}
-                        subtitle="Swarm consensus"
+                        value={`${activeAgents}`}
+                        subtitle={`${agents.length} total in swarm`}
                         icon={<Users size={18} />}
                     />
                 </Grid>
-                <Grid item xs={6} md={2.4}>
+                <Grid item xs={6} md={3}>
                     <StatCard
                         title="Open Positions"
-                        value={`${open_positions.length} / 4`}
-                        subtitle="Ultra-focused"
+                        value={`${open_positions.length}`}
+                        subtitle="Max 4 concentrated"
                         icon={<Activity size={18} />}
                     />
                 </Grid>
-                <Grid item xs={12} md={2.4}>
-                    <StatCard
-                        title="Strategy"
-                        value="High Conviction"
-                        subtitle="80% min confidence"
-                        icon={<Zap size={18} />}
-                    />
-                </Grid>
             </Grid>
+
+            {/* Performance Chart - Full Width */}
+            <Box sx={{ mb: 4 }}>
+                <PerformanceChart />
+            </Box>
 
             {/* Main Content - 3 Column Layout */}
             <Grid container spacing={3}>
@@ -204,8 +211,8 @@ export const UnifiedDashboard: React.FC = () => {
                             borderRadius: 2,
                             background: 'linear-gradient(135deg, rgba(10,11,16,0.95), rgba(15,16,22,0.9))',
                             border: '1px solid rgba(255,255,255,0.06)',
-                            height: 'calc(100vh - 280px)',
-                            minHeight: 500,
+                            height: 'calc(100vh - 500px)',
+                            minHeight: 400,
                             overflow: 'hidden',
                             display: 'flex',
                             flexDirection: 'column'
