@@ -12,6 +12,7 @@ import { About } from './pages/About';
 import Leaderboard from './pages/Leaderboard';
 import Login from './pages/Login';
 import { TerminalPro } from './pages/TerminalPro';
+import { MonadMIT } from './pages/MonadMIT';
 
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -35,6 +36,9 @@ const App: React.FC = () => {
 
                     {/* Terminal Pro (New Social Dashboard) */}
                     <Route path="/terminal" element={<TerminalPro />} />
+
+                    {/* Monad MIT (Symphony Integration) */}
+                    <Route path="/mit" element={<MonadMIT />} />
 
                     {/* Agents Page */}
                     <Route path="/agents" element={<AgentLab />} />
