@@ -376,3 +376,5 @@ bandit
 google-cloud-pubsub>=2.18.0
 google-cloud-firestore>=2.14.0
 firebase-admin>=6.5.0
+solders>=0.18.0
+base58>=2.1.0
