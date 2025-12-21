@@ -2,7 +2,51 @@
 
 ## ✅ Setup Complete
 
-- **API Key Configured**: `sk_live_MZDK1SgMeRQzEKpuRFM7FXbcMgD833YA8Y69DnpprvE`
+- **API Key Configured**: `$SYMPHONY_API_KEY` (stored securely in environment)
+- **Wallet Funded**: $250 USDC ✅
+- **Fund Created**: MIT Agent
+
+---
+
+## 📋 Step 1: Get Your Agent ID
+
+1. Go to **https://app.symphony.io/agentic-funds**
+2. Find your "MIT" fund
+3. Click on it to view details
+4. Copy the **Agent ID** (looks like: `63946153-9f33-4b7e-9b32-b99a4a6037e2`)
+
+---
+
+## 🔥 Step 2: Execute 5 Activation Trades
+
+Once you have your Agent ID, run these commands:
+
+### **Trade 1: Long BTC**
+```bash
+curl -X POST 'https://api.symphony.io/agent/batch-open' \
+  -H "x-api-key: $SYMPHONY_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "agentId": "YOUR_AGENT_ID_HERE",
+    "symbol": "BTC",
+    "action": "LONG",
+    "weight": 10,
+    "leverage": 1,
+    "orderOptions": {
+      "triggerPrice": 0,
+      "stopLossPrice": 0,
+      "takeProfitPrice": 0
+    }
+  }'
+```
+
+### **Trades 2-5**: Repeat with different symbols/sides
+
+**Your API Key**: Stored in `$SYMPHONY_API_KEY` environment variable
+**Funded Amount**: $250 USDC ✅  
+**Activation Required**: 5 trades  
+**Current Progress**: 0/5
+
 - **Wallet Funded**: $250 USDC ✅
 - **Fund Created**: MIT Agent
 

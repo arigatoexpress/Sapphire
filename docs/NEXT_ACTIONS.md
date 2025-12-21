@@ -4,7 +4,7 @@
 
 ### **What's Done**
 - ✅ **$250 USDC Funded** - Wallet ready
-- ✅ **API Key Configured** - `sk_live_MZDK1SgMeRQzEKpuRFM7FXbcMgD833YA8Y69DnpprvE`
+- ✅ **API Key Configured** - `sk_live_***` (stored in environment)
 - ✅ **Backend Deployed** - Cloud Run updated with real Symphony API
 - ✅ **Frontend Live** - https://sapphire-479610.web.app/mit
 - ✅ **Documentation** - Complete activation guides created

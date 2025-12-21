@@ -9,8 +9,8 @@ import os
 
 import httpx
 
-# Your Symphony API Key
-API_KEY = "sk_live_MZDK1SgMeRQzEKpuRFM7FXbcMgD833YA8Y69DnpprvE"
+# Your Symphony API Key (set via environment variable)
+API_KEY = os.getenv("SYMPHONY_API_KEY", "")
 BASE_URL = "https://api.symphony.io"
 
 
