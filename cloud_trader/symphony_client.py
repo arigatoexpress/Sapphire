@@ -12,13 +12,14 @@ import httpx
 logger = logging.getLogger(__name__)
 
 # Symphony API Configuration
-SYMPHONY_BASE_URL = "https://api.symphony.finance"  # Update with actual Symphony API endpoint
-SYMPHONY_API_VERSION = "v1"
+SYMPHONY_BASE_URL = "https://api.symphony.io"  # Official Symphony API
+SYMPHONY_API_VERSION = ""  # No version prefix in URLs
 
 
 class SymphonyClient:
     """
     Client for Symphony API - Monad blockchain trading platform.
+    Official API Documentation: https://docs.symphony.io
 
     Features:
     - Perpetual futures trading
@@ -40,13 +41,13 @@ class SymphonyClient:
                 "Symphony API key required. Set SYMPHONY_API_KEY env var or pass api_key param."
             )
 
-        self.base_url = f"{SYMPHONY_BASE_URL}/{SYMPHONY_API_VERSION}"
+        self.base_url = SYMPHONY_BASE_URL
         self.client = httpx.AsyncClient(
             timeout=30.0,
             headers={
-                "Authorization": f"Bearer {self.api_key}",
+                "x-api-key": self.api_key,  # Symphony uses x-api-key header
                 "Content-Type": "application/json",
-                "User-Agent": "MIT-Agent/1.0",
+                "User-Agent": "Sapphire-MIT-Agent/1.0",
             },
         )
 
