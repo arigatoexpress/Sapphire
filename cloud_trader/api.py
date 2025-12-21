@@ -109,24 +109,27 @@ class SecurityHeadersMiddleware:
         async def send_with_security_headers(message):
             if message["type"] == "http.response.start":
                 headers = list(message.get("headers", []))
-                
+
                 # Security Best Practices - OWASP Recommendations
                 security_headers = [
                     (b"X-Content-Type-Options", b"nosniff"),
                     (b"X-Frame-Options", b"DENY"),
                     (b"X-XSS-Protection", b"1; mode=block"),
                     (b"Strict-Transport-Security", b"max-age=31536000; includeSubDomains"),
-                    (b"Content-Security-Policy", b"default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' *;"),
+                    (
+                        b"Content-Security-Policy",
+                        b"default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' *;",
+                    ),
                     (b"Referrer-Policy", b"strict-origin-when-cross-origin"),
                     (b"Permissions-Policy", b"geolocation=(), microphone=(), camera=()"),
                 ]
-                
+
                 # Avoid duplicates
                 existing_header_names = {h[0].lower() for h in headers}
                 for name, value in security_headers:
                     if name.lower() not in existing_header_names:
                         headers.append((name, value))
-                        
+
                 message["headers"] = headers
             await send(message)
 
@@ -404,13 +407,13 @@ async def get_dashboard_data() -> Dict[str, Any]:
 async def get_symphony_status() -> Dict[str, Any]:
     """
     Get Symphony (Monad) MIT fund status and activation progress.
-    
+
     Returns activation status and fund information for the MIT dashboard.
     """
     try:
         from .symphony_client import get_symphony_client
         from .symphony_config import validate_symphony_config
-        
+
         # Check if Symphony is configured
         if not validate_symphony_config():
             return {
@@ -420,7 +423,7 @@ async def get_symphony_status() -> Dict[str, Any]:
                     "name": "Sapphire MIT Agent",
                     "balance": 0,
                     "is_activated": False,
-                    "trades_count": 0
+                    "trades_count": 0,
                 },
                 "trades_count": 0,
                 "is_activated": False,
@@ -428,14 +431,14 @@ async def get_symphony_status() -> Dict[str, Any]:
                     "current": 0,
                     "required": 5,
                     "percentage": 0,
-                    "activated": False
-                }
+                    "activated": False,
+                },
             }
-        
+
         # Get Symphony client and fetch account info
         client = get_symphony_client()
         account = await client.get_account_info()
-        
+
         return {
             "configured": True,
             "fund": {
@@ -443,12 +446,12 @@ async def get_symphony_status() -> Dict[str, Any]:
                 "name": account.get("name", "Sapphire MIT Agent"),
                 "balance": account.get("balance", {}).get("USDC", 0),
                 "is_activated": account.get("is_activated", False),
-                "trades_count": account.get("trades_count", 0)
+                "trades_count": account.get("trades_count", 0),
             },
             "trades_count": account.get("trades_count", 0),
             "is_activated": account.get("is_activated", False),
             "activation_progress": client.activation_progress,
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     except Exception as e:
         logger.error(f"Symphony status check failed: {e}")
@@ -459,7 +462,7 @@ async def get_symphony_status() -> Dict[str, Any]:
                 "name": "Sapphire MIT Agent",
                 "balance": 0,
                 "is_activated": False,
-                "trades_count": 0
+                "trades_count": 0,
             },
             "trades_count": 0,
             "is_activated": False,
@@ -467,8 +470,8 @@ async def get_symphony_status() -> Dict[str, Any]:
                 "current": 0,
                 "required": 5,
                 "percentage": 0,
-                "activated": False
-            }
+                "activated": False,
+            },
         }
 
 
@@ -476,7 +479,7 @@ async def get_symphony_status() -> Dict[str, Any]:
 async def execute_symphony_perpetual(request: Request) -> Dict[str, Any]:
     """
     Execute a perpetual futures trade on Symphony/Monad.
-    
+
     Body:
     {
         "symbol": "BTC-USDC",
@@ -490,12 +493,12 @@ async def execute_symphony_perpetual(request: Request) -> Dict[str, Any]:
     try:
         from .symphony_client import get_symphony_client
         from .symphony_config import MIT_DEFAULT_LEVERAGE, MIT_MAX_POSITION_SIZE_USDC
-        
+
         # Require authentication
         uid = getattr(request.state, "uid", None)
         if not uid:
             raise HTTPException(status_code=401, detail="Authentication required")
-        
+
         body = await request.json()
         symbol = body.get("symbol")
         side = body.get("side")
@@ -503,7 +506,7 @@ async def execute_symphony_perpetual(request: Request) -> Dict[str, Any]:
         leverage = int(body.get("leverage", MIT_DEFAULT_LEVERAGE))
         stop_loss = body.get("stop_loss")
         take_profit = body.get("take_profit")
-        
+
         # Validation
         if not symbol or not side:
             raise HTTPException(status_code=400, detail="symbol and side are required")
@@ -511,10 +514,9 @@ async def execute_symphony_perpetual(request: Request) -> Dict[str, Any]:
             raise HTTPException(status_code=400, detail="size must be positive")
         if size > MIT_MAX_POSITION_SIZE_USDC:
             raise HTTPException(
-                status_code=400,
-                detail=f"size exceeds maximum of ${MIT_MAX_POSITION_SIZE_USDC}"
+                status_code=400, detail=f"size exceeds maximum of ${MIT_MAX_POSITION_SIZE_USDC}"
             )
-        
+
         # Execute trade
         client = get_symphony_client()
         position = await client.open_perpetual_position(
@@ -523,16 +525,16 @@ async def execute_symphony_perpetual(request: Request) -> Dict[str, Any]:
             size=size,
             leverage=leverage,
             stop_loss=stop_loss,
-            take_profit=take_profit
+            take_profit=take_profit,
         )
-        
+
         logger.info(f"Symphony perpetual opened: {symbol} {side} {size} @ {leverage}x by {uid}")
-        
+
         return {
             "success": True,
             "position": position,
             "message": f"Perpetual position opened: {side} {symbol}",
-            "activation_progress": client.activation_progress
+            "activation_progress": client.activation_progress,
         }
     except HTTPException:
         raise
@@ -545,7 +547,7 @@ async def execute_symphony_perpetual(request: Request) -> Dict[str, Any]:
 async def execute_symphony_spot(request: Request) -> Dict[str, Any]:
     """
     Execute a spot trade on Symphony/Monad.
-    
+
     Body:
     {
         "symbol": "BTC-USDC",
@@ -556,40 +558,37 @@ async def execute_symphony_spot(request: Request) -> Dict[str, Any]:
     """
     try:
         from .symphony_client import get_symphony_client
-        
+
         # Require authentication
         uid = getattr(request.state, "uid", None)
         if not uid:
             raise HTTPException(status_code=401, detail="Authentication required")
-        
+
         body = await request.json()
         symbol = body.get("symbol")
         side = body.get("side")
         quantity = float(body.get("quantity", 0))
         order_type = body.get("order_type", "market")
-        
+
         # Validation
         if not symbol or not side:
             raise HTTPException(status_code=400, detail="symbol and side are required")
         if quantity <= 0:
             raise HTTPException(status_code=400, detail="quantity must be positive")
-        
+
         # Execute trade
         client = get_symphony_client()
         order = await client.execute_spot_trade(
-            symbol=symbol,
-            side=side,
-            quantity=quantity,
-            order_type=order_type
+            symbol=symbol, side=side, quantity=quantity, order_type=order_type
         )
-        
+
         logger.info(f"Symphony spot trade: {side} {quantity} {symbol} by {uid}")
-        
+
         return {
             "success": True,
             "order": order,
             "message": f"Spot trade executed: {side} {quantity} {symbol}",
-            "activation_progress": client.activation_progress
+            "activation_progress": client.activation_progress,
         }
     except HTTPException:
         raise
@@ -603,15 +602,11 @@ async def get_symphony_positions() -> Dict[str, Any]:
     """Get all open Symphony perpetual positions."""
     try:
         from .symphony_client import get_symphony_client
-        
+
         client = get_symphony_client()
         positions = await client.get_perpetual_positions()
-        
-        return {
-            "success": True,
-            "positions": positions,
-            "count": len(positions)
-        }
+
+        return {"success": True, "positions": positions, "count": len(positions)}
     except Exception as e:
         logger.error(f"Failed to get Symphony positions: {e}")
         return {"success": False, "error": str(e), "positions": []}
@@ -621,7 +616,7 @@ async def get_symphony_positions() -> Dict[str, Any]:
 async def create_symphony_fund(request: Request) -> Dict[str, Any]:
     """
     Create a new agentic fund on Symphony.
-    
+
     Body:
     {
         "name": "My Trading Fund",
@@ -632,38 +627,206 @@ async def create_symphony_fund(request: Request) -> Dict[str, Any]:
     """
     try:
         from .symphony_client import get_symphony_client
-        
+
         # Require authentication
         uid = getattr(request.state, "uid", None)
         if not uid:
             raise HTTPException(status_code=401, detail="Authentication required")
-        
+
         body = await request.json()
         name = body.get("name", "Sapphire MIT Agent")
         description = body.get("description", "Autonomous AI trading on Monad")
         fund_type = body.get("fund_type", "perpetuals")
         autosubscribe = body.get("autosubscribe", True)
-        
+
         client = get_symphony_client()
         fund = await client.create_agentic_fund(
-            name=name,
-            description=description,
-            fund_type=fund_type,
-            autosubscribe=autosubscribe
+            name=name, description=description, fund_type=fund_type, autosubscribe=autosubscribe
         )
-        
+
         logger.info(f"MIT fund created: {name} by {uid}")
-        
+
         return {
             "success": True,
             "fund": fund,
-            "message": f"Agentic fund '{name}' created successfully"
+            "message": f"Agentic fund '{name}' created successfully",
         }
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Symphony fund creation failed: {e}")
         return {"success": False, "error": str(e)}
+
+
+# ===================================================================
+# JUPITER (SOLANA DEX) INTEGRATION ENDPOINTS
+# ===================================================================
+
+
+@app.get("/api/jupiter/quote")
+async def get_jupiter_quote(
+    input_mint: str, output_mint: str, amount: int, slippage_bps: int = 50
+) -> Dict[str, Any]:
+    """
+    Get Jupiter swap quote for Solana tokens.
+
+    Query Parameters:
+        input_mint: Input token mint address (e.g., SOL, USDC)
+        output_mint: Output token mint address
+        amount: Amount in smallest unit (lamports for SOL)
+        slippage_bps: Slippage tolerance in basis points (default: 50 = 0.5%)
+
+    Example:
+        /api/jupiter/quote?input_mint=So11...&output_mint=EPj...&amount=1000000000
+    """
+    try:
+        from .jupiter_client import get_jupiter_client
+
+        client = get_jupiter_client()
+        quote = await client.get_quote(
+            input_mint=input_mint, output_mint=output_mint, amount=amount, slippage_bps=slippage_bps
+        )
+
+        return {
+            "success": True,
+            "quote": quote,
+            "input_amount": amount,
+            "output_amount": int(quote.get("outAmount", 0)),
+            "price_impact_pct": float(quote.get("priceImpactPct", 0)),
+            "route_plan": quote.get("routePlan", []),
+            "context_slot": quote.get("contextSlot"),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as e:
+        logger.error(f"Jupiter quote failed: {e}")
+        return {"success": False, "error": str(e), "message": "Failed to fetch swap quote"}
+
+
+@app.post("/api/jupiter/swap")
+async def execute_jupiter_swap(request: Request) -> Dict[str, Any]:
+    """
+    Execute Jupiter token swap on Solana.
+
+    Body:
+    {
+        "input_mint": "So11111111111111111111111111111111111111112",
+        "output_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "amount": 1000000000,
+        "slippage_bps": 50,
+        "priority_level": "medium"
+    }
+
+    Requires authentication via Firebase.
+    """
+    try:
+        from .jupiter_client import get_jupiter_client
+        from .solana_wallet_manager import get_user_solana_wallet
+
+        # Require authentication
+        uid = getattr(request.state, "uid", None)
+        if not uid:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
+        body = await request.json()
+        input_mint = body.get("input_mint")
+        output_mint = body.get("output_mint")
+        amount = int(body.get("amount"))
+        slippage_bps = int(body.get("slippage_bps", 50))
+        priority_level = body.get("priority_level", "medium")
+
+        # Validation
+        if not input_mint or not output_mint:
+            raise HTTPException(status_code=400, detail="input_mint and output_mint are required")
+        if amount <= 0:
+            raise HTTPException(status_code=400, detail="amount must be positive")
+
+        # Get user's Solana wallet keypair
+        wallet_keypair = get_user_solana_wallet(uid)
+
+        # Get quote
+        client = get_jupiter_client()
+        quote = await client.get_quote(input_mint, output_mint, amount, slippage_bps)
+
+        # Execute swap
+        result = await client.execute_swap(
+            quote=quote, user_keypair=wallet_keypair, priority_level=priority_level
+        )
+
+        logger.info(
+            f"Jupiter swap executed by {uid}: {input_mint[:8]}... → {output_mint[:8]}... "
+            f"Signature: {result.get('signature', 'N/A')}"
+        )
+
+        return {
+            "success": True,
+            "signature": result.get("signature"),
+            "input_amount": amount,
+            "output_amount": int(quote.get("outAmount", 0)),
+            "message": "Swap executed successfully on Solana",
+            "explorer_url": f"https://solscan.io/tx/{result.get('signature')}",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Jupiter swap failed: {e}")
+        return {"success": False, "error": str(e), "message": "Swap execution failed"}
+
+
+@app.get("/api/jupiter/tokens")
+async def get_jupiter_tokens(verified_only: bool = True) -> Dict[str, Any]:
+    """
+    Get list of supported Jupiter tokens.
+
+    Query Parameters:
+        verified_only: If true, only return verified tokens (default: true)
+    """
+    try:
+        from .jupiter_client import get_jupiter_client
+
+        client = get_jupiter_client()
+        tags = ["verified"] if verified_only else None
+        tokens = await client.get_tokens(tags=tags)
+
+        return {
+            "success": True,
+            "tokens": tokens,
+            "count": len(tokens),
+            "verified_only": verified_only,
+        }
+    except Exception as e:
+        logger.error(f"Jupiter tokens fetch failed: {e}")
+        return {"success": False, "error": str(e), "tokens": []}
+
+
+@app.get("/api/jupiter/price/{token_mint}")
+async def get_jupiter_price(
+    token_mint: str, vs_token: str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"  # USDC
+) -> Dict[str, Any]:
+    """
+    Get current token price from Jupiter.
+
+    Path Parameters:
+        token_mint: Token mint address to price
+
+    Query Parameters:
+        vs_token: Quote token (default: USDC)
+    """
+    try:
+        from .jupiter_client import get_jupiter_client
+
+        client = get_jupiter_client()
+        price = await client.get_price(token_mint, vs_token)
+
+        return {
+            "success": True,
+            "token_mint": token_mint,
+            "vs_token": vs_token,
+            "price": price,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as e:
+        logger.error(f"Jupiter price fetch failed: {e}")
+        return {"success": False, "error": str(e), "price": 0}
 
 
 @app.get("/healthz")
