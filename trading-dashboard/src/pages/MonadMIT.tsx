@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Zap, TrendingUp, Shield, Users, CheckCircle, Circle } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { SymphonyTradeForm } from '../components/SymphonyTradeForm';
 
 interface ActivationProgress {
     current: number;
@@ -35,7 +36,8 @@ export const MonadMIT: React.FC = () => {
 
     const fetchMITStatus = async () => {
         try {
-            const response = await fetch('/api/symphony/status');
+            const apiUrl = import.meta.env.VITE_API_URL || 'https://cloud-trader-267358751314.europe-west1.run.app';
+            const response = await fetch(`${apiUrl}/api/symphony/status`);
             const data = await response.json();
 
             setFund(data.fund);
@@ -227,6 +229,18 @@ export const MonadMIT: React.FC = () => {
                         description="Earn management fees once your fund is activated"
                     />
                 </div>
+
+                {/* Trading Interface - Only show if not activated */}
+                {!activationProgress.activated && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 }}
+                        className="mt-8"
+                    >
+                        <SymphonyTradeForm onTradeComplete={fetchMITStatus} />
+                    </motion.div>
+                )}
             </div>
         </div>
     );
