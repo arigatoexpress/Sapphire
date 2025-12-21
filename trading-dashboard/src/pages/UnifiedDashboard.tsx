@@ -307,7 +307,7 @@ export const UnifiedDashboard: React.FC = () => {
                 />
                 <StatCard
                     title="Portfolio Value"
-                    value={`$${portfolio_value.toLocaleString()}`}
+                    value={`$${(portfolio_value ?? 0).toLocaleString()}`}
                     subtitle="Live Balance"
                     icon={<Activity size={16} />}
                 />

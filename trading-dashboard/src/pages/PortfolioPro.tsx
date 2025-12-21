@@ -66,7 +66,7 @@ export const PortfolioPro: React.FC = () => {
                 </div>
                 <div className="text-right hidden sm:block">
                     <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Total Equity</div>
-                    <div className="text-4xl font-black text-white">${portfolio_value.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                    <div className="text-4xl font-black text-white">${(portfolio_value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                 </div>
             </div>
 
@@ -74,19 +74,19 @@ export const PortfolioPro: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 <PortfolioStat
                     label="Total Equity"
-                    value={`$${portfolio_value.toLocaleString()}`}
-                    trend={total_pnl >= 0 ? `+${total_pnl_percent.toFixed(2)}%` : `${total_pnl_percent.toFixed(2)}%`}
-                    trendColor={total_pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}
+                    value={`$${(portfolio_value ?? 0).toLocaleString()}`}
+                    trend={(total_pnl ?? 0) >= 0 ? `+${(total_pnl_percent ?? 0).toFixed(2)}%` : `${(total_pnl_percent ?? 0).toFixed(2)}%`}
+                    trendColor={(total_pnl ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}
                     icon={<Wallet size={20} />}
                 />
                 <PortfolioStat
                     label="Unrealized PnL"
-                    value={`${total_pnl >= 0 ? '+' : ''}$${total_pnl.toFixed(2)}`}
+                    value={`${(total_pnl ?? 0) >= 0 ? '+' : ''}$${(total_pnl ?? 0).toFixed(2)}`}
                     icon={<TrendingUp size={20} />}
                 />
                 <PortfolioStat
                     label="Available Cash"
-                    value={`$${cash_balance.toLocaleString()}`}
+                    value={`$${(cash_balance ?? 0).toLocaleString()}`}
                     icon={<DollarSign size={20} />}
                 />
                 <PortfolioStat
