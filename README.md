@@ -1,152 +1,68 @@
-# SapphireAI 💎
+# 💎 Aster AI Trading System
+> *The First Multi-Chain Swarm Intelligence for High-Frequency DeFi.*
 
-<div align="center">
+![License](https://img.shields.io/badge/license-MIT-blue.svg) ![Python](https://img.shields.io/badge/python-3.11+-blue.svg) ![Solana](https://img.shields.io/badge/Solana-HFT-purple) ![Monad](https://img.shields.io/badge/Monad-EVM-red)
 
-[![GCP](https://img.shields.io/badge/Deployed%20on-Google%20Cloud-4285F4?logo=googlecloud&logoColor=white)](https://cloud.google.com)
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org)
-[![License](https://img.shields.io/badge/License-Proprietary-red)](LICENSE)
+**Aster** is a production-grade, autonomous trading system that orchestrates a "Swarm" of specialized AI agents across **Solana** and **Monad**. It combines high-frequency signal processing with agentic portfolio management to capture alpha in all market regimes.
 
-**Autonomous AI Trading System for Aster DEX Perpetual Futures**
+![Architecture](https://mermaid.ink/img/pako:eNqVVEFv2zAM_iuCTu2AJEG3Fdtl26HAYtuwYRiKXYaJSLZMWTIlO0mR4v9HyU6cOmmH9RLJ9_iRjxJ9oEprhECV1U_Gk_gW_Vbgl6q65o24J-Vb0qA0OqO1OaGzOaOzBUNnC4bOLhn2O2Q47JHhsE-GwyEZDkdkeEiGh2MyPJyQ4fCUDE-nZHg6I8PzGRl-nJPh5ZwMzxdk-HlFht9XZPjjigx_r8nwzy0Z_r0lw_93ZPig_4Rj8Scciz_hWPwJx-LPZfhbV0T4W_8TEdHPGf789D8TEdHPGf768j8TEbFOyPC3j4iIdUaGv31ERPznZPj7R0TEPyfDt6iIiH9Ohm9REfHPyfAtKiL-ORm-RUXEvyDDt6iI-Bdk-BYVEf-C_B_FiP8v9H8UI_6_0P9RjPj_Qv9HMeL_C_0fxYj_L_R_FCP-v9D_UYz4_0L_RzHi_wv9H8WI_y_0fxQj_r_Q_1GM-P9C_0fvq_8D3aL-D3SL-j_QLer_QL_Q_wPd4X-hW_Q_0C36H-gW_f8XukX_A92i_4F-of8HukX_A92i_4F-of8HukX_A92i_4F-of9f6Bb9D3SL_ge6Rf8D3aL_gX6h_we6Rf8D3aL_gX6h_we6Rf8D3aL_gX6h_we6Rf8D3aL_gX6h_we6Rf8D3aL_gX6h_we6xf4HukX_A91i_wPdYv8D3WL_A91i_wPdYv8D3WL_A91i_wPdYv8D3WL_A91i_wPdYv8D3WL_A91i_wPdYv8D3WL_A91i_wPdYv8D3WL_A91i_wPdYv8D3WL_A91i_wPdYv8D3WL_A91i_wPdYv8D3aL_ge5Qf6B7VF_odlUf6A7VF7pD9YXuUH2hO1Rf6A7VF7pD9YXuUH2hO1Rf6A7VF7pD9YXuUH2hO1Rf6A7VF7pD9YXuUH2hO1Rf6A7VF7pD9YXuUH2hO1Rf6A7VF7pD9YXuUH2h21V9oDtUf6BbVF_oLtUXukv1he5SfaG7VF_oLtUXukv1he5SfaG7VF_oLtUXukv1he5SfaG7VF_oLtUXukv1he5SfaG7VF_oLtUXukv1he5SfaG7VF_oLtUXukv1he5SfaG7VF_oLtUXukv1he5SfaG7VF_oLtUXukP1he5QfaE7VF_oDtUXukP1he5QfaE7VF_oDtUXukP1he5Q_f8B3aH6Qneo_kC3qL7QXaovdLf_Bbpb9YXuVn2hu1Vf6G7VF7pb9YXunn-hu1df6O7VF7oH9YXugX-he1Bf6B7VF7oH9YXuvv-h29df6Pb1F7p9_YV-X__P_wGz7i_k)
 
-[Live Dashboard](https://sapphire-479610.web.app) • [Backend API](https://cloud-trader-267358751314.europe-west1.run.app)
+## ⚡ Cutting-Edge Architecture
 
-</div>
+Aster is not just a bot; it's a **distributed swarm architecture** running on a microservices backbone.
 
----
+### 🧠 The Core Brain: `Market Regime Engine`
+*   **Regime Detection**: Real-time classification of "Bull", "Bear", or "Crab" markets using multi-factor analysis (Volume, Volatility, Momentum).
+*   **Context Awareness**: Filters signals that don't match the macro environment (e.g., blocks Longs in Bear trends).
 
-## Overview
-
-SapphireAI is a **3-agent autonomous trading system** that trades perpetual futures on [Aster DEX](https://aster.exchange). Each agent uses Google's **Gemini 2.0 Flash** for market analysis and self-tunes its parameters based on performance.
-
-### Key Features
-- ⚡ **3 Specialized Agents** - Momentum, Market Maker, Swing Trader
-- 🧠 **Self-Tuning** - Agents adjust confidence thresholds based on wins/losses
-- 📈 **50x Leverage** - Maximum leverage available per agent
-- 🔄 **Dynamic Symbols** - Trades all available markets, not a fixed list
-- 📊 **Real-time Dashboard** - WebSocket-powered React frontend
-
----
-
-## Agents
-
-| Agent | Specialization | TP / SL | Default Leverage |
-|-------|---------------|---------|------------------|
-| 📈 **Momentum Trader** | Breakout hunting | 2.5% / 1.2% | 20x |
-| ⚡ **Market Maker** | Bid-ask spreads | 0.8% / 0.4% | 25x |
-| 🧠 **Swing Trader** | Multi-day trends | 5% / 2% | 10x |
-
-### Self-Tuning Mechanism
-Each agent has `adaptive_params` that adjust after every closed trade:
-- **Win** → Lower confidence threshold by 1% (take more trades)
-- **Loss** → Raise confidence threshold by 2% (be more selective)
+### 🐝 The Swarm (Specialized Agents)
+1.  **🎵 Monad Vanguard (The Ecosystem Capture)**:
+    *   **Tech**: High-Frequency EVM Native.
+    *   **Role**: Aggressively captures early ecosystem value. Handles "Launch Season" rotations and maintains a basket of high-conviction assets (**$MON**, **$EMO**, **$MONCOCK**).
+2.  **🌊 Drift Sniper (The Alpha Generator)**:
+    *   **Tech**: Solana RPC + Drift Protocol SDK.
+    *   **Role**: Executes **Symmetric Mean Reversion** trades on Perps with sub-second latency.
+3.  **🪐 Jupiter Treasurer (The Smart Sweeper)**:
+    *   **Tech**: **Jupiter Ultra API (v1)** + GPU Pathfinding.
+    *   **Role**: Automatically sweeps USDC profits into hard assets (SOL) using the most efficient routes on-chain.
 
 ---
 
-## Architecture
+## 🛠 Technology Stack
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    GCP Cloud Run                        │
-│  ┌─────────────────────────────────────────────────┐   │
-│  │           trading_service.py (2600 LOC)          │   │
-│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐        │   │
-│  │  │ Momentum │ │  Market  │ │  Swing   │        │   │
-│  │  │  Trader  │ │  Maker   │ │  Trader  │        │   │
-│  │  └────┬─────┘ └────┬─────┘ └────┬─────┘        │   │
-│  │       └────────────┼────────────┘               │   │
-│  │                    ▼                            │   │
-│  │            Gemini 2.0 Flash                     │   │
-│  │                    │                            │   │
-│  │                    ▼                            │   │
-│  │            Aster DEX API                        │   │
-│  └─────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────┘
-                        │
-                        ▼ WebSocket
-┌─────────────────────────────────────────────────────────┐
-│                Firebase Hosting                         │
-│              React Dashboard (Vite)                     │
-└─────────────────────────────────────────────────────────┘
-```
+*   **Language**: Python 3.11+ (Asyncio Core).
+*   **Cloud infrastructure**: Google Cloud Run (Serverless, Auto-Scaling).
+*   **Data Engineering**: `pandas` + `polars` for vectorised signal processing.
+*   **Integrations**:
+    *   **Drift Protocol** (Perps)
+    *   **Symphony** (Monad Agentic Layer)
+    *   **Jupiter Ultra** (Aggregator)
 
----
+## 🚀 Deployment
 
-## Project Structure
+Aster is designed for **"One-Click" Cloud Deployment**.
 
-```
-AIAster/
-├── cloud_trader/           # Python backend (FastAPI)
-│   ├── trading_service.py  # Main trading loop (2600 lines)
-│   ├── definitions.py      # Agent definitions & MinimalAgentState
-│   ├── api.py              # FastAPI endpoints
-│   ├── mcp.py              # MCP messaging
-│   └── client.py           # Aster DEX API client
-├── trading-dashboard/      # React frontend (Vite)
-├── Dockerfile              # Backend container
-├── cloudbuild.yaml         # GCP Cloud Build config
-└── terraform/              # Infrastructure as Code
-```
+1.  **Configure Secrets**:
+    ```bash
+    export SYMPHONY_API_KEY="..."
+    export SOLANA_PRIVATE_KEY="..."
+    export JUPITER_API_KEY="..."
+    ```
+2.  **Verify Integrity**:
+    ```bash
+    python3 scripts/verification/verify_accounts.py
+    ```
+3.  **Launch**:
+    ```bash
+    gcloud builds submit --tag gcr.io/project/aster
+    gcloud run deploy aster --image gcr.io/project/aster
+    ```
+
+## 🛡 Security
+
+*   **Secret Redaction**: Custom `ContextLogger` automatically masks keys and sensitive data in logs.
+*   **Non-Custodial**: Private keys are injected at runtime; never stored in code.
+*   **Risk Engine**: Hard-stops on drawdown limits and toxic flow detection.
 
 ---
-
-## Trading Logic
-
-1. **Every ~60 seconds:** Sample 20 random symbols from Aster market structure
-2. **For each symbol:**
-   - Skip if already have open position
-   - Skip if traded in last 30 minutes (cooldown)
-3. **For each agent:**
-   - Fetch OHLCV data
-   - Run Gemini analysis
-   - If `confidence >= threshold` → execute trade
-4. **Place TP/SL** as limit/stop orders on Aster DEX
-5. **After trade closes:** Call `adjust_params()` for self-tuning
-
----
-
-## Deployment
-
-### Backend (Cloud Run)
-```bash
-gcloud builds submit --config cloudbuild.yaml .
-```
-
-### Frontend (Firebase)
-```bash
-cd trading-dashboard && npm run build && firebase deploy
-```
-
----
-
-## Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| `ASTER_API_KEY` | Aster DEX API key |
-| `ASTER_SECRET_KEY` | Aster DEX secret |
-| `GEMINI_API_KEY` | Google Gemini API key |
-| `TELEGRAM_BOT_TOKEN` | Optional: Telegram alerts |
-| `TELEGRAM_CHAT_ID` | Optional: Telegram chat ID |
-
----
-
-## API Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | Health check |
-| `/api/snapshot` | GET | Full dashboard data |
-| `/api/agents` | GET | Agent list |
-| `/ws/dashboard` | WS | Real-time WebSocket |
-
----
-
-## License
-
-Proprietary - All Rights Reserved
-
----
-
-<div align="center">
-<sub>Built with 💎 by Sapphire Team | December 2025</sub>
-</div>
+*Built with ❤️ by the Sapphire AI Team for the Future of Finance.*

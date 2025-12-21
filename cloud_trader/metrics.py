@@ -260,6 +260,25 @@ TRADE_EXECUTION_TIME = Histogram(
     buckets=[0.1, 0.25, 0.5, 1.0, 2.5, 5.0],
 )
 
+# Granular Transaction Metrics (User Request)
+TOTAL_FEES_PAID = Counter(
+    "total_fees_paid_usd",
+    "Total trading fees paid in USD",
+    ["platform", "symbol"],
+)
+
+SLIPPAGE_PERCENTAGE = Histogram(
+    "slippage_percentage",
+    "Realized slippage percentage per trade",
+    ["symbol", "side"],
+    buckets=[0.01, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0],
+)
+
+AVERAGE_FEE_GAUGE = Gauge(
+    "average_fee_usd",
+    "Moving average of fees paid per trade",
+)
+
 
 # MCP metrics
 MCP_MESSAGES_TOTAL = Counter(

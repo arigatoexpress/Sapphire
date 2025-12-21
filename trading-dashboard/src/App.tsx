@@ -13,6 +13,10 @@ import Leaderboard from './pages/Leaderboard';
 import Login from './pages/Login';
 import { TerminalPro } from './pages/TerminalPro';
 import { MonadMIT } from './pages/MonadMIT';
+import SystemMetrics from './pages/SystemMetrics';
+import JupiterSwap from './pages/JupiterSwap';
+
+import { SolanaWalletProvider } from './contexts/SolanaWalletContext'; // Import Wallet Provider
 
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -29,33 +33,41 @@ const App: React.FC = () => {
             path="/*"
             element={
               <ProtectedRoute>
-                <MasterLayout>
-                  <Routes>
-                    {/* Main Dashboard */}
-                    <Route path="/" element={<UnifiedDashboard />} />
+                <SolanaWalletProvider>
+                  <MasterLayout>
+                    <Routes>
+                      {/* Main Dashboard */}
+                      <Route path="/" element={<UnifiedDashboard />} />
 
-                    {/* Terminal Pro (New Social Dashboard) */}
-                    <Route path="/terminal" element={<TerminalPro />} />
+                      {/* Terminal Pro (New Social Dashboard) */}
+                      <Route path="/terminal" element={<TerminalPro />} />
 
-                    {/* Monad MIT (Symphony Integration) */}
-                    <Route path="/mit" element={<MonadMIT />} />
+                      {/* Monad MIT (Symphony Integration) */}
+                      <Route path="/mit" element={<MonadMIT />} />
 
-                    {/* Agents Page */}
-                    <Route path="/agents" element={<AgentLab />} />
+                      {/* System Observability */}
+                      <Route path="/system" element={<SystemMetrics />} />
 
-                    {/* Portfolio Page */}
-                    <Route path="/portfolio" element={<PortfolioPro />} />
+                      {/* Jupiter Swap */}
+                      <Route path="/jupiter" element={<JupiterSwap />} />
 
-                    {/* About Page */}
-                    <Route path="/about" element={<About />} />
+                      {/* Agents Page */}
+                      <Route path="/agents" element={<AgentLab />} />
 
-                    {/* Leaderboard Page */}
-                    <Route path="/leaderboard" element={<Leaderboard />} />
+                      {/* Portfolio Page */}
+                      <Route path="/portfolio" element={<PortfolioPro />} />
 
-                    {/* Fallback */}
-                    <Route path="*" element={<UnifiedDashboard />} />
-                  </Routes>
-                </MasterLayout>
+                      {/* About Page */}
+                      <Route path="/about" element={<About />} />
+
+                      {/* Leaderboard Page */}
+                      <Route path="/leaderboard" element={<Leaderboard />} />
+
+                      {/* Fallback */}
+                      <Route path="*" element={<UnifiedDashboard />} />
+                    </Routes>
+                  </MasterLayout>
+                </SolanaWalletProvider>
               </ProtectedRoute>
             }
           />

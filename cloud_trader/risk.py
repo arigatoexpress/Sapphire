@@ -399,7 +399,39 @@ class RiskManager:
             "max_leverage": dynamic_config["max_leverage"],
         }
 
-    def update_portfolio_risk(self, portfolio: PortfolioState) -> tuple[bool, str]:
+    async def check_position_health(
+        self, portfolio: PortfolioState, close_callback: Callable[[Position, str], Awaitable[None]]
+    ):
+        """
+        Monitor positions for age and excessive drawdown.
+        Aggressively close violations.
+        """
+        current_time = datetime.utcnow()
+
+        for symbol, position in portfolio.positions.items():
+            # Check Position Age (Max 2 hours)
+            # Assuming position.entry_time is datetime
+            age = (current_time - position.entry_time).total_seconds()
+            MAX_AGE_SECONDS = 2 * 3600  # 2 hours
+
+            if age > MAX_AGE_SECONDS:
+                logger.warning(f"⏳ Position {symbol} too old ({age/3600:.1f}h). Closing.")
+                await close_callback(position, "max_age_exceeded")
+                continue
+
+            # Check Drawdown (Max 10%)
+            # Calculate unrealized PnL %
+            if position.notional > 0:
+                pnl_pct = position.unrealized_pnl / position.notional
+                MAX_DRAWDOWN_PCT = -0.10  # -10%
+
+                if pnl_pct < MAX_DRAWDOWN_PCT:
+                    logger.critical(
+                        f"🛑 Position {symbol} hit max drawdown ({pnl_pct:.1%}). Emergency close."
+                    )
+                    await close_callback(position, "max_drawdown_exceeded")
+
+    def update_portfolio_risk(self, portfolio: PortfolioState):
         """
         Updates and checks the overall portfolio risk, including VPIN positions.
         """

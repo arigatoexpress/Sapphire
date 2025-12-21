@@ -8,7 +8,7 @@ from typing import Optional
 
 # Symphony API Configuration
 SYMPHONY_API_KEY: Optional[str] = os.getenv("SYMPHONY_API_KEY")
-SYMPHONY_BASE_URL: str = os.getenv("SYMPHONY_BASE_URL", "https://api.symphony.finance")
+SYMPHONY_BASE_URL: str = os.getenv("SYMPHONY_BASE_URL", "https://api.symphony.io")
 
 # MIT (Monad Implementation Treasury) Settings
 MIT_FUND_NAME: str = os.getenv("MIT_FUND_NAME", "Sapphire MIT Agent")

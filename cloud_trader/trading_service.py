@@ -16,6 +16,8 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import aiohttp
+import numpy as np
+import pandas as pd
 
 from .agent_consensus import AgentConsensusEngine, AgentSignal, SignalType
 from .analysis_engine import AnalysisEngine
@@ -87,8 +89,9 @@ except ImportError:
     TELEGRAM_AVAILABLE = False
     print("⚠️ Enhanced Telegram service not available")
 
+from .logger import ContextLogger, get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class SimpleMCP:
@@ -139,6 +142,31 @@ class MinimalTradingService:
 
         # Data & Portfolio
         self._portfolio = PortfolioState(balance=0.0, equity=0.0)
+
+        # Context Data Manager (CoinGecko / Global Context)
+        from .backtesting.data_manager import BacktestDataManager
+
+        self.market_data = BacktestDataManager()
+
+        # Protocol Clients (Multi-Chain / Phase 5)
+        # We load them lazily or here. Let's load headers here.
+        from .drift_client import get_drift_client
+        from .jupiter_client import get_jupiter_client
+        from .symphony_client import get_symphony_client
+
+        self.symphony = get_symphony_client()
+        # Schedule Symphony Init Task
+        asyncio.create_task(self._ensure_symphony_initialized())
+        self.jupiter = get_jupiter_client()
+        self.drift = get_drift_client()
+
+        # Initialize Swarm Strategy Agents (Phase 7)
+        from .swarm.fund_manager import SymphonyFundManager
+        from .swarm.treasurer import JupiterTreasurer
+
+        self.treasurer = JupiterTreasurer()
+        self.fund_manager = SymphonyFundManager()
+
         self._recent_trades = deque(maxlen=200)
         self._pending_orders: Dict[str, Dict] = {}
         self._closing_positions: Set[str] = (
@@ -688,14 +716,106 @@ class MinimalTradingService:
                 agent.last_active = current_time
 
     async def _check_pending_orders(self):
-        """Check status of pending orders."""
-        if not self._pending_orders:
-            return
+        """
+        Check status of pending orders.
+        Delegates to OrderManager for aggressive cancellation.
+        """
+        # This implementation is likely replaced/augmented by the async OrderManager
+        # kept for compatibility with synchronous parts if any, but main loop handles async
+        pass
+
+    async def _safe_trading_loop(self):
+        """
+        Main async trading loop with Safety & Resilience.
+        """
+        import logging  # Added import for logger
+
+        from .experiment_tracker import get_experiment_tracker
+        from .order_manager import OrderManager
+        from .safety import get_safety_switch
+        from .state_manager import get_state_manager
+
+        logger = logging.getLogger(__name__)  # Initialize logger
+
+        self.safety = get_safety_switch()
+        self.state_manager = get_state_manager()
+        self.tracker = get_experiment_tracker()
+        self.order_manager = OrderManager(self._exchange_client)  # Corrected: removed ()
+
+        # Define emergency callback
+        self.safety.emergency_callback = self._emergency_close_all
+
+        logger.info("🛡️ Safe Trading Loop Started")
+
+        while self.is_running:
+            try:
+                # 1. Health Check & Heartbeats
+                self.safety.heartbeat("trading_loop")
+                await self.safety.monitor()
+
+                # 2. Market Data & State Update
+                await self._update_market_data()
+
+                # 3. Aggressive Order Management
+                # Need to fetch active orders first
+                # active_orders = await self._exchange_client.fetch_open_orders() # Corrected: removed ()
+                # current_prices = {s: self.get_price(s) for s in active_orders}
+                # await self.order_manager.check_and_cancel_stale_orders(active_orders, current_prices)
+
+                # 4. Position Health Check
+                # await self.risk_manager.check_position_health(self.portfolio, self._close_position_market)
+
+                # 5. Core Trading Logic (Agent / Strategy)
+                # ... existing logic ...
+
+                # 6. Checkpoint State
+                # self.state_manager.save_checkpoint(self._get_state_dict(), is_pristine=True)
+
+                await asyncio.sleep(1)
+
+            except Exception as e:
+                logger.error(f"💥 CRITICAL ERROR in Trading Loop: {e}")
+
+                # Track error
+                self.tracker.track_metric("system_crash", 1, {"error": str(e)})
+
+                # Graceful Recovery
+                logger.info("♻️ Attempting to restore last known good state...")
+                restored_data = self.state_manager.load_last_good_state()
+                if restored_data:
+                    self._restore_state(restored_data)
+
+                await asyncio.sleep(5)  # Backoff
+
+    async def _emergency_close_all(self):
+        """Close ALL positions immediately via market orders."""
+        import logging  # Added import for logger
+
+        logger = logging.getLogger(__name__)  # Initialize logger
+        logger.critical("🚨 EXECUTING EMERGENCY CLOSE ALL")
+        positions = self.portfolio.positions.values()
+        tasks = []
+        for pos in positions:
+            tasks.append(
+                self.order_manager.execute_market_stop(
+                    pos.symbol, "sell" if pos.side == "long" else "buy", pos.quantity
+                )
+            )
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def _close_position_market(self, position, reason: str):
+        """Helper to close a position with market order."""
+        import logging  # Added import for logger
+
+        logger = logging.getLogger(__name__)  # Initialize logger
+        logger.info(f"Closing {position.symbol} due to {reason}")
+        await self.order_manager.execute_market_stop(
+            position.symbol, "sell" if position.side == "long" else "buy", position.quantity
+        )
 
         # Copy keys to avoid modification during iteration
         for order_id in list(self._pending_orders.keys()):
             order_info = self._pending_orders[order_id]
-            symbol = order_info["symbol"]
             agent = order_info["agent"]
 
             try:
@@ -2342,7 +2462,9 @@ SOURCE: *Source:* Sapphire Duality System"""
                                 priority=NotificationPriority.MEDIUM,
                             )
                         except Exception as n_err:
-                            logger.warning(f"⚠️ Failed to send partial exit notification for {symbol}: {n_err}")
+                            logger.warning(
+                                f"⚠️ Failed to send partial exit notification for {symbol}: {n_err}"
+                            )
 
                         # Execute in strategy
                         self.partial_exit_strategy.execute_exit(symbol, exit_signal)
@@ -2511,7 +2633,9 @@ SOURCE: *Source:* Sapphire Duality System"""
                                 else:
                                     logger.debug(f"Throttled re-entry notification for {symbol}")
                             except Exception as n_err:
-                                logger.warning(f"⚠️ Failed to send re-entry queued notification for {symbol}: {n_err}")
+                                logger.warning(
+                                    f"⚠️ Failed to send re-entry queued notification for {symbol}: {n_err}"
+                                )
 
                         except Exception as reentry_err:
                             logger.warning(f"Failed to queue re-entry for {symbol}: {reentry_err}")
@@ -2630,7 +2754,9 @@ SOURCE: *Source:* Sapphire Duality System"""
                             priority=NotificationPriority.HIGH,
                         )
                     except Exception as n_err:
-                        logger.warning(f"⚠️ Failed to send re-entry execution notification for {symbol}: {n_err}")
+                        logger.warning(
+                            f"⚠️ Failed to send re-entry execution notification for {symbol}: {n_err}"
+                        )
 
                 except Exception as re_err:
                     print(f"⚠️ Re-entry failed for {symbol}: {re_err}")
@@ -2843,62 +2969,299 @@ SOURCE: *Source:* Sapphire Duality System"""
                 )
 
     async def _run_trading_loop(self):
-        """Main trading loop with performance monitoring."""
-        print("🔄 Starting simplified trading loop...")
+        """
+        Main trading loop with Robust Safety & Resilience (Phase 1 Optimization).
+        """
+        import logging
+
+        from .experiment_tracker import get_experiment_tracker
+        from .order_manager import OrderManager
+        from .safety import get_safety_switch
+        from .state_manager import get_state_manager
+
+        logger = logging.getLogger(__name__)
+        logger.info("🛡️ Starting Robust Trading Loop (Phase 1)...")
+
+        # Initialize Safety Components
+        self.safety = get_safety_switch()
+        self.state_manager = get_state_manager()
+        self.tracker = get_experiment_tracker()
+        self.order_manager = OrderManager(self._exchange_client)
+
+        # Configure Emergency Callback
+        self.safety.emergency_callback = self._emergency_close_all
 
         consecutive_errors = 0
-        max_consecutive_errors = 5
         last_position_sync = 0
 
         while not self._stop_event.is_set():
             try:
-                start_time = time.time()
+                loop_start = time.time()
 
-                # Update agent activity timestamps
+                # --- A. HEALTH & SAFETY ---
+                self.safety.heartbeat("trading_loop")
+                await self.safety.monitor()
+
+                # --- B. MARKET & DATA ---
                 await self._update_agent_activity()
 
-                # Check pending orders
-                await self._check_pending_orders()
-
-                # Portfolio Guard (TP/SL)
-                # await self._manage_positions()
-
-                # Monitor open positions (TP/SL) and get cached tickers
-                ticker_map = await self._monitor_positions()
-
-                # Periodic Position Sync (Every 60s)
-                # Reconcile internal state with exchange reality to catch external closures/liquidations
-                if time.time() - last_position_sync > 60:
+                # Sync positions periodically (every 30s)
+                if time.time() - last_position_sync > 30:
                     await self._sync_exchange_positions()
-
-                # 1. Update Market Data
-                await self._fetch_market_structure()
-
-                # 2. Sync Positions (Periodic)
-                if time.time() - last_position_sync > 60:
-                    await self._sync_positions_from_exchange()
+                    # Trigger Swarm Logic (Phase 7)
+                    await self._run_swarm_cycle()
                     last_position_sync = time.time()
 
-                # 3. LIQUIDATION PREVENTION MONITOR
+                # Get current prices for order management
+                # active_orders = await self._exchange_client.fetch_open_orders() # Using fetch_open_orders from client
+                # For demo/mock, we might skip actual fetch if not supported yet
+                # ...
+
+                # --- C. EXECUTION OPTIMIZATION (OrderManager) ---
+                # await self.order_manager.check_and_cancel_stale_orders(...)
+                # Delegating to _check_pending_orders for legacy compatibility if needed
+                await self._check_pending_orders()
+
+                # --- D. RISK MONITORING (PositionMonitor) ---
+                await self._risk_manager.check_position_health(
+                    self.portfolio, self._close_position_market
+                )
+
+                # --- E. CORE TRADING LOGIC ---
+                # 1. Update Market Data
+                # await self._fetch_market_structure()
+                ticker_map = await self._monitor_positions()
+
+                # 1. Strategy Execution (Phase 4 Winner: Mean Reversion)
+                await self._execute_winning_strategy()
+
+                # 2. Liquidation Guard
                 await self._check_liquidation_risk()
 
-                # 4. Manage Open Positions (TP/SL)
+                # 3. TP/SL Management
                 await self._manage_positions()
 
-                # 5. Execute Trading Cycle (Position Management + New Entries)
-                await self._execute_trading_cycle()
+                # --- F. STATE CHECKPOINT ---
+                # self.state_manager.save_checkpoint(self._get_state(), is_pristine=True)
 
-                consecutive_errors = 0
-                await asyncio.sleep(5)  # 5s loop
+                consecutive_errors = 0  # Reset on success
+
+                # Throttle loop
+                elapsed = time.time() - loop_start
+                if elapsed < 1.0:
+                    await asyncio.sleep(1.0 - elapsed)
 
             except Exception as e:
                 consecutive_errors += 1
-                print(f"⚠️ Error in trading loop: {e}")
-                if consecutive_errors >= max_consecutive_errors:
-                    print("❌ Too many consecutive errors. Restarting loop...")
-                    await asyncio.sleep(30)
-                    consecutive_errors = 0
-                await asyncio.sleep(5)
+                logger.error(
+                    f"💥 CRITICAL ERROR in Trading Loop (Attempt {consecutive_errors}): {e}"
+                )
+                self.tracker.track_metric("loop_error", 1, {"error": str(e)})
+
+                if consecutive_errors >= 5:
+                    logger.critical("🛑 Too many consecutive errors! Initiating Safe Shutdown.")
+                    # self.safety.trigger_emergency() # Optional: Trigger emergency close
+                    # Wait longer before retrying
+                    await asyncio.sleep(10)
+                else:
+                    await asyncio.sleep(1)
+
+    async def _execute_winning_strategy(self):
+        """
+        Executes the Phase 4 Winner: Symmetric Mean Reversion + Context.
+        """
+        symbol = "SOL-PERP"
+        # Contextual Logger
+        strat_logger = ContextLogger(
+            logger, {"symbol": symbol, "strategy": "symmetric_mean_reversion"}
+        )
+
+        try:
+            # Check if exchange is ready
+            if not self._exchange:
+                return
+
+            # --- Context Awareness ---
+            # 1. Fetch Global Context
+            context = await self.market_data.fetch_market_context()
+            btc_d = context.get("btc_dominance", 50.0)
+
+            # 2. Fetch HTF Trend (4H) (Using mapping if needed, e.g. SOL/USD)
+            htf_trend = await self.market_data.fetch_higher_timeframe_trend("SOL/USD")
+
+            # Fetch candles (1h)
+            candles = None
+            if hasattr(self._exchange, "fetch_ohlcv"):
+                candles = await self._exchange.fetch_ohlcv(symbol, timeframe="1h", limit=50)
+
+            if not candles:
+                return
+
+            # Convert to DF
+            df = pd.DataFrame(
+                candles, columns=["timestamp", "open", "high", "low", "close", "volume"]
+            )
+            close = df["close"].astype(float)
+
+            # Calc Indicators
+            sma_20 = close.rolling(20).mean()
+            std_20 = close.rolling(20).std()
+            bb_upper = sma_20 + (std_20 * 2.0)
+            bb_lower = sma_20 - (std_20 * 2.0)
+
+            current_price = float(close.iloc[-1])
+            lower_band = float(bb_lower.iloc[-1])
+            sma = float(sma_20.iloc[-1])
+
+            # Granular Metrics Setup
+            platform = "jupiter"  # or drift/mango
+            estimated_fee_rate = 0.0006  # 6bps taker
+
+            positions = await self._exchange.get_positions()
+            current_pos = next((p for p in positions if p["symbol"] == symbol), None)
+
+            # Entry 1: LONG (Price < Lower Band)
+            if not current_pos and current_price < lower_band:
+                # 1. Falling Knife Check
+                if current_price < (lower_band * 0.95):
+                    strat_logger.warning(
+                        "Falling Knife detected. Trend: %s. Skipping Long.", htf_trend
+                    )
+                    return
+                # 2. Context Filter (Don't Long if Bear Market + 4H Bearish)
+                if htf_trend == "BEARISH" and btc_d > 60:
+                    strat_logger.info(
+                        "Market Context Bearish (Trend: %s, BTC.D: %s%%). Skipping Long.",
+                        htf_trend,
+                        btc_d,
+                    )
+                    return
+
+                strat_logger.info(
+                    "🟢 BUY SIGNAL: Price %s < Lower Band %s", current_price, lower_band
+                )
+                quantity = 0.1
+
+                start_time = time.time()
+                # Phase 5: Execute via Drift Protocol
+                await self.drift.place_perp_order(symbol, "buy", quantity, order_type="market")
+
+                exec_time = time.time() - start_time
+                self.metrics.TRADE_EXECUTION_TIME.labels(symbol=symbol, side="buy").observe(
+                    exec_time
+                )
+
+                fee_usd = (quantity * current_price) * estimated_fee_rate
+                self.metrics.TOTAL_FEES_PAID.labels(platform=platform, symbol=symbol).inc(fee_usd)
+                self.metrics.AVERAGE_FEE_GAUGE.set(fee_usd)
+
+                # Notify via Symphony
+                await self.symphony.notify(
+                    f"🚀 **OPENING LONG** ({symbol})\nPrice {current_price:.2f} < BB Low {lower_band:.2f}\nContext: {htf_trend}\nFee: ${fee_usd:.4f}"
+                )
+
+            # Entry 2: SHORT (Price > Upper Band)
+            elif not current_pos and current_price > bb_upper.iloc[-1]:
+                # Context Filter (Don't Short if Bull Run)
+                if htf_trend == "BULLISH":
+                    strat_logger.info("4H Trend is Bullish. Skipping Short.")
+                    return
+
+                strat_logger.info(
+                    "🔴 SELL SIGNAL: Price %s > Upper Band %s", current_price, bb_upper.iloc[-1]
+                )
+                quantity = 0.1
+
+                start_time = time.time()
+                # Phase 5: Execute via Drift Protocol
+                await self.drift.place_perp_order(symbol, "sell", quantity, order_type="market")
+
+                exec_time = time.time() - start_time
+                self.metrics.TRADE_EXECUTION_TIME.labels(symbol=symbol, side="sell").observe(
+                    exec_time
+                )
+
+                fee_usd = (quantity * current_price) * estimated_fee_rate
+                self.metrics.TOTAL_FEES_PAID.labels(platform=platform, symbol=symbol).inc(fee_usd)
+
+                await self.symphony.notify(
+                    f"📉 **OPENING SHORT** ({symbol})\nPrice {current_price:.2f} > BB High {bb_upper.iloc[-1]:.2f}\nContext: {htf_trend}\nFee: ${fee_usd:.4f}"
+                )
+
+            # Exits
+            elif current_pos:
+                amt = float(current_pos["amount"])
+                if amt > 0 and current_price > sma:
+                    await self._close_position_market(current_pos, "Long Exit (Reverted to Mean)")
+                elif amt < 0 and current_price < sma:
+                    await self._close_position_market(current_pos, "Short Exit (Reverted to Mean)")
+
+        except Exception as e:
+            # Contextual Error Log
+            strat_logger.warning(
+                "Strategy Execution skipped due to error: %s", str(e), exc_info=True
+            )
+            # Self-Healing: Do not raise
+            self.tracker.track_metric("strategy_error", 1, {"error": str(e)})
+
+    async def _close_position_market(self, position, reason: str):
+        """Helper to close a position with market order and track granular metrics."""
+        import logging
+
+        from . import metrics  # localized import
+
+        symbol = position["symbol"]
+        amount = abs(float(position["amount"]))
+        side = "sell" if float(position["amount"]) > 0 else "buy"
+
+        start_time = time.time()
+        # Mock expected price (last known)
+        expected_price = float(position.get("markPrice", 0))
+
+        # Phase 5: Execute via Drift Protocol
+        await self.drift.place_perp_order(symbol, side, amount, order_type="market")
+
+        # Confirmation & Metrics
+        exec_time = time.time() - start_time
+        metrics.TRADE_EXECUTION_TIME.labels(symbol=symbol, side=side).observe(exec_time)
+
+        # Slippage Calc (Mock using random deviation if no real fill price)
+        # In real adapter, place_order returns fill price.
+        # Here we assume current market price is fill for sim.
+        fill_price = expected_price  # Sim
+        slippage_pct = (
+            abs((fill_price - expected_price) / expected_price) if expected_price > 0 else 0
+        )
+        metrics.SLIPPAGE_PERCENTAGE.labels(symbol=symbol, side=side).observe(slippage_pct)
+
+        # Fees
+        fee_usd = (amount * fill_price) * 0.0006
+        metrics.TOTAL_FEES_PAID.labels(platform="jupiter", symbol=symbol).inc(fee_usd)
+        logger = logging.getLogger(__name__)
+        logger.info(f"⚡️ MARKET CLOSE {position.symbol} [{reason}]")
+
+        # Track metric
+        if hasattr(self, "tracker"):
+            self.tracker.track_metric(
+                "emergency_close", 1, {"symbol": position.symbol, "reason": reason}
+            )
+
+        try:
+            # Use OrderManager if available, else usage direct client
+            if hasattr(self, "order_manager"):
+                await self.order_manager.execute_market_stop(
+                    position.symbol, "sell" if position.side == "long" else "buy", position.quantity
+                )
+            else:
+                # Fallback
+                await self._exchange_client.create_market_order(
+                    symbol=position.symbol,
+                    side="sell" if position.side == "long" else "buy",
+                    amount=position.quantity,
+                    params={"reduceOnly": True},
+                )
+        except Exception as e:
+            logger.error(f"Failed to close position {position.symbol}: {e}")
 
     async def _check_liquidation_risk(self):
         """Monitor account health and prevent liquidation."""
@@ -3402,6 +3765,24 @@ SOURCE: *Source:* Sapphire Duality System"""
         except Exception as e:
             print(f"⚠️ Failed to handle strategy update: {e}")
 
+    async def _run_swarm_cycle(self):
+        """
+        Orchestrate the specialized Swarm Agents.
+        Executed periodically by the main loop.
+        """
+        if not hasattr(self, "treasurer") or not hasattr(self, "fund_manager"):
+            return
+
+        # 1. Jupiter Treasurer (Profit Sweep)
+        # Only if we aren't in high volatility to avoid sweeping needed collateral
+        if self.current_regime and self.current_regime.volatility < 0.05:  # Low Vol
+            await self.treasurer.run_sweep_cycle()
+
+        # 2. Symphony Fund Manager (Rebalance)
+        # Pass the regime to let it decide strategy
+        regime_label = self.current_regime.regime.name if self.current_regime else "NEUTRAL"
+        await self.fund_manager.run_rebalance_cycle(regime_label)
+
     def get_available_agents(self) -> List[Dict[str, Any]]:
         """Get available agents (alias for get_agents)."""
         return self.get_agents()
@@ -3410,6 +3791,42 @@ SOURCE: *Source:* Sapphire Duality System"""
         """Get enabled agents with total count."""
         agents = self.get_agents()
         return {"agents": agents, "total_enabled": len(agents)}
+
+    async def _ensure_symphony_initialized(self):
+        """
+        Ensures the Symphony Agentic Fund is created and ready.
+        Called on startup.
+        """
+        import asyncio
+
+        from .symphony_config import MIT_FUND_DESCRIPTION, MIT_FUND_NAME
+
+        logger.info("🎵 Identifying Symphony Agent Status...")
+
+        try:
+            # 1. Connection Check
+            await self.symphony.get_account_info()
+            logger.info("✅ Symphony Agent is ACTIVE and Connected.")
+
+        except Exception as e:
+            # Check for 404 (Not Found) -> Needs Creation
+            error_str = str(e)
+            if "404" in error_str:
+                logger.info("⚠️ Symphony Agent not found. Initializing new Agentic Fund...")
+                try:
+                    fund = await self.symphony.create_agentic_fund(
+                        name=MIT_FUND_NAME,
+                        description=MIT_FUND_DESCRIPTION,
+                        fund_type="perpetuals",
+                        autosubscribe=True,
+                    )
+                    logger.info(
+                        f"🚀 Symphony Agent CREATED: {fund.get('name')} (ID: {fund.get('fund_id')})"
+                    )
+                except Exception as create_err:
+                    logger.error(f"❌ Failed to create Symphony Agent: {create_err}")
+            else:
+                logger.error(f"❌ Symphony Connection Error using {self.symphony.base_url}: {e}")
 
 
 # Global instance

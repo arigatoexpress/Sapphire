@@ -9,11 +9,12 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
-logger = logging.getLogger(__name__)
+from .logger import get_logger
+
+logger = get_logger(__name__)
 
 # Symphony API Configuration
-SYMPHONY_BASE_URL = "https://api.symphony.io"  # Official Symphony API
-SYMPHONY_API_VERSION = ""  # No version prefix in URLs
+from .symphony_config import SYMPHONY_BASE_URL
 
 
 class SymphonyClient:
@@ -58,6 +59,10 @@ class SymphonyClient:
     async def close(self):
         """Close the HTTP client."""
         await self.client.aclose()
+
+    async def notify(self, message: str):
+        """Send notification via Symphony (Logs for now)."""
+        logger.info(f"🔔 SYMPHONY NOTICE: {message}")
 
     # ==================== ACCOUNT MANAGEMENT ====================
 

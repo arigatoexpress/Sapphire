@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Zap, LayoutDashboard, Terminal, LogOut, User as UserIcon, Sparkles } from 'lucide-react';
+import { Zap, LayoutDashboard, Terminal, LogOut, User as UserIcon, Sparkles, Activity, ArrowRightLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface MasterLayoutProps {
@@ -63,6 +63,26 @@ export const MasterLayout: React.FC<MasterLayoutProps> = ({ children }) => {
                             >
                                 <Sparkles className="w-4 h-4" />
                                 MIT
+                            </Link>
+                            <Link
+                                to="/jupiter"
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${isActive('/jupiter')
+                                    ? 'bg-green-500/20 text-green-400'
+                                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                                    }`}
+                            >
+                                <ArrowRightLeft className="w-4 h-4" />
+                                Swap
+                            </Link>
+                            <Link
+                                to="/system"
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${isActive('/system')
+                                    ? 'bg-pink-500/20 text-pink-400'
+                                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                                    }`}
+                            >
+                                <Activity className="w-4 h-4" />
+                                System
                             </Link>
                         </div>
 

@@ -19,7 +19,9 @@ from solders.keypair import Keypair
 from solders.pubkey import Pubkey
 from solders.transaction import VersionedTransaction
 
-logger = logging.getLogger(__name__)
+from .logger import get_logger
+
+logger = get_logger(__name__)
 
 # Jupiter API Configuration
 JUPITER_API_BASE = "https://api.jup.ag"
@@ -38,13 +40,10 @@ class JupiterSwapClient:
 
     def __init__(self, api_key: Optional[str] = None):
         """
-        Initialize Jupiter client.
-
-        Args:
-            api_key: Jupiter API key (optional, for higher rate limits)
+        Initialize Jupiter Ultra client.
         """
         self.api_key = api_key or os.getenv("JUPITER_API_KEY")
-        self.base_url = f"{JUPITER_API_BASE}/{JUPITER_API_VERSION}"
+        self.base_url = "https://api.jup.ag/ultra/v1"
 
         headers = {
             "Content-Type": "application/json",
@@ -53,153 +52,85 @@ class JupiterSwapClient:
         }
 
         if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
+            headers["x-api-key"] = self.api_key
 
         self.client = httpx.AsyncClient(base_url=self.base_url, headers=headers, timeout=30.0)
 
-    async def close(self):
-        """Close HTTP client."""
-        await self.client.close()
-
-    async def get_quote(
+    async def get_order(
         self,
         input_mint: str,
         output_mint: str,
         amount: int,
-        slippage_bps: int = 50,  # 0.5% default
-        only_direct_routes: bool = False,
+        taker: Optional[str] = None,
+        slippage_bps: int = 50,
     ) -> Dict[str, Any]:
         """
-        Get best swap quote from Jupiter.
-
-        Args:
-            input_mint: Input token mint address
-            output_mint: Output token mint address
-            amount: Input amount in smallest unit (lamports/base units)
-            slippage_bps: Slippage tolerance in basis points (50 = 0.5%)
-            only_direct_routes: If True, only use direct routes (faster but may miss best prices)
-
-        Returns:
-            Quote response with route plan and price info
-
-        Example:
-            # SOL to USDC
-            quote = await client.get_quote(
-                input_mint="So11111111111111111111111111111111111111112",
-                output_mint="EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-                amount=1000000000  # 1 SOL = 1e9 lamports
-            )
+        Get an Ultra Order (Quote + Transaction).
         """
         params = {
             "inputMint": input_mint,
             "outputMint": output_mint,
             "amount": str(amount),
             "slippageBps": slippage_bps,
-            "onlyDirectRoutes": str(only_direct_routes).lower(),
-            "asLegacyTransaction": "false",  # Use versioned transactions
         }
+        if taker:
+            params["taker"] = taker
 
-        logger.info(
-            f"Fetching Jupiter quote: {input_mint[:8]}... → {output_mint[:8]}... ({amount})"
-        )
-
+        logger.info(f"Fetching Ultra Order: {input_mint[:8]}... -> {output_mint[:8]}...")
         try:
-            response = await self.client.get("/quote", params=params)
+            response = await self.client.get("/order", params=params)
             response.raise_for_status()
-            quote = response.json()
-
-            logger.info(
-                f"Quote received: {quote.get('inAmount')} → {quote.get('outAmount')} "
-                f"(impact: {quote.get('priceImpactPct', 0):.3f}%)"
-            )
-
-            return quote
+            return response.json()
         except httpx.HTTPError as e:
-            logger.error(f"Jupiter quote error: {e}")
-            raise
-
-    async def get_swap_transaction(
-        self,
-        quote: Dict[str, Any],
-        user_public_key: str,
-        wrap_unwrap_sol: bool = True,
-        priority_level: str = "medium",
-        dynamic_compute_units: bool = True,
-    ) -> Dict[str, Any]:
-        """
-        Get swap transaction from quote.
-
-        Args:
-            quote: Quote response from get_quote()
-            user_public_key: User's Solana wallet public key
-            wrap_unwrap_sol: Auto wrap/unwrap SOL to WSOL
-            priority_level: Priority fee level - "low", "medium", "high", "veryHigh"
-            dynamic_compute_units: Auto-optimize compute unit limit
-
-        Returns:
-            Swap transaction as base64 encoded string
-        """
-        payload = {
-            "quoteResponse": quote,
-            "userPublicKey": user_public_key,
-            "wrapAndUnwrapSol": wrap_unwrap_sol,
-            "priorityLevelWithMaxLamports": {"priorityLevel": priority_level},
-            "dynamicComputeUnitLimit": dynamic_compute_units,
-        }
-
-        logger.info(f"Building swap transaction for {user_public_key[:8]}...")
-
-        try:
-            response = await self.client.post("/swap", json=payload)
-            response.raise_for_status()
-            swap_result = response.json()
-
-            return swap_result
-        except httpx.HTTPError as e:
-            logger.error(f"Jupiter swap transaction error: {e}")
+            logger.error(f"Jupiter Ultra order error: {e}")
             raise
 
     async def execute_swap(
-        self, quote: Dict[str, Any], user_keypair: Keypair, priority_level: str = "medium"
+        self,
+        input_mint: str,
+        output_mint: str,
+        amount: int,
+        user_keypair: Keypair,
+        slippage_bps: int = 50,
     ) -> Dict[str, Any]:
         """
-        Complete swap execution flow using Jupiter's execute endpoint.
-
-        Args:
-            quote: Quote from get_quote()
-            user_keypair: User's Solana keypair for signing
-            priority_level: Transaction priority
-
-        Returns:
-            Execution result with transaction signature
+        Execute an Ultra Swap (Get Order -> Sign -> Execute).
         """
-        # Get swap transaction
-        swap_result = await self.get_swap_transaction(
-            quote=quote, user_public_key=str(user_keypair.pubkey()), priority_level=priority_level
+        taker_pubkey = str(user_keypair.pubkey())
+
+        # 1. Get Order with Transaction
+        order = await self.get_order(
+            input_mint=input_mint,
+            output_mint=output_mint,
+            amount=amount,
+            taker=taker_pubkey,
+            slippage_bps=slippage_bps,
         )
 
-        # Deserialize transaction
-        tx_bytes = base64.b64decode(swap_result["swapTransaction"])
+        if not order.get("transaction"):
+            raise ValueError(
+                f"No transaction returned in order. Error: {order.get('errorCode')} - {order.get('errorMessage')}"
+            )
+
+        # 2. Sign Transaction
+        tx_bytes = base64.b64decode(order["transaction"])
         tx = VersionedTransaction.from_bytes(tx_bytes)
-
-        # Sign transaction
         tx.sign([user_keypair])
-
-        # Encode signed transaction
         signed_tx_base64 = base64.b64encode(bytes(tx)).decode("utf-8")
 
-        # Submit to Jupiter's execute endpoint (handles RPC submission)
-        logger.info("Submitting signed transaction to Jupiter...")
-
+        # 3. Execute
+        logger.info("Submitting signed Ultra transaction...")
         try:
-            execute_response = await self.client.post(
-                "/swap/execute", json={"swapTransaction": signed_tx_base64}
+            response = await self.client.post(
+                "/execute",
+                json={
+                    "transaction": signed_tx_base64,
+                    "requestId": order.get("requestId"),  # Required for execute
+                },
             )
-            execute_response.raise_for_status()
-            result = execute_response.json()
-
-            logger.info(f"Swap executed! Signature: {result.get('signature', 'N/A')}")
-
+            response.raise_for_status()
+            result = response.json()
+            logger.info(f"Ultra Swap Executed! Signature: {result.get('signature')}")
             return result
         except httpx.HTTPError as e:
             logger.error(f"Jupiter execute error: {e}")

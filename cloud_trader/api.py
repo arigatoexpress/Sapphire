@@ -64,7 +64,9 @@ from .schemas import ChatCompletionRequest, InferenceRequest
 if TYPE_CHECKING:
     from .service import TradingService
 
-logger = logging.getLogger(__name__)
+from .logger import get_logger
+
+logger = get_logger(__name__)
 
 
 # Rate limiting
@@ -397,6 +399,16 @@ async def get_dashboard_data() -> Dict[str, Any]:
             "error": str(e),
         }
 
+
+# ===================================================================
+# SYSTEM OBSERVABILITY ENDPOINTS
+# ===================================================================
+from .observability_api import router as observability_router
+
+app.include_router(observability_router)
+from . import symphony_endpoints
+
+app.include_router(symphony_endpoints.router)
 
 # ===================================================================
 # SYMPHONY / MONAD INTEGRATION ENDPOINTS

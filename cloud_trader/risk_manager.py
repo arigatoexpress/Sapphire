@@ -12,10 +12,11 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Set
 
 from .config import get_settings
+from .logger import get_logger
 from .metrics import PORTFOLIO_DRAWDOWN, PORTFOLIO_LEVERAGE, POSITION_SIZE, RISK_LIMITS_BREACHED
 from .pubsub import PubSubClient
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class RiskManager:
