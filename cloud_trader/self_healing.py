@@ -15,12 +15,14 @@ class SelfHealingWatchdog:
     Designed to run in a background thread.
     """
 
-    def __init__(self, check_interval=60):
+    def __init__(self, check_interval=30):
         self.check_interval = check_interval
-        self.redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
-        self.api_url = "http://localhost:8080/healthz"
         self.running = False
         self._thread = None
+        self._heartbeats = {}  # {component_name: last_timestamp}
+        self._stall_threshold = 120  # 2 minutes
+        self.recovery_callback = None
+        self.api_url = "http://localhost:8080/healthz"
 
     def start(self):
         if self.running:
@@ -35,15 +37,34 @@ class SelfHealingWatchdog:
         if self._thread:
             self._thread.join(timeout=5)
 
+    def heartbeat(self, component: str):
+        """Register a heartbeat for a component."""
+        self._heartbeats[component] = time.time()
+
     def _run_loop(self):
         while self.running:
             try:
-                self._check_redis()
+                # 1. Check API health
                 self._check_api()
+                
+                # 2. Check for stalls in heartbeats
+                self._check_stalls()
+                
             except Exception as e:
-                logger.error(f"Watchdog error: {e}")
+                logger.error(f"Watchdog loop error: {e}")
 
             time.sleep(self.check_interval)
+
+    def _check_stalls(self):
+        now = time.time()
+        for component, last_ts in self._heartbeats.items():
+            if now - last_ts > self._stall_threshold:
+                logger.error(f"🚨 CRITICAL: Component '{component}' stalled for {int(now - last_ts)}s!")
+                if self.recovery_callback:
+                    logger.info(f"🔄 Triggering recovery callback for stalled component: {component}")
+                    self.recovery_callback(component)
+                # Reset heartbeat to prevent loop spam if recovery is slow
+                self._heartbeats[component] = now
 
     def _check_redis(self):
         # Redis not deployed in Cloud Run - skip check to avoid error spam

@@ -8,9 +8,16 @@ from typing import Dict, Literal, Optional
 
 @dataclass
 class MarketSnapshot:
-    price: float
-    volume: float
-    change_24h: float
+    price: float = 0.0
+    volume: float = 0.0
+    change_24h: float = 0.0
+    volume_24h: float = 0.0
+    volatility: float = 0.0
+    sma_20: float = 0.0
+    rsi: float = 0.0
+    macd: float = 0.0
+    ma_50: float = 0.0
+    ma_200: float = 0.0
     atr: Optional[float] = field(default=None)
 
 

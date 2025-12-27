@@ -9,9 +9,10 @@ from typing import Any, Dict, List, Optional
 
 @dataclass
 class HealthStatus:
-    running: bool
-    paper_trading: bool
-    last_error: Optional[str]
+    running: bool = True
+    paper_trading: bool = True
+    api_connected: bool = True
+    last_error: Optional[str] = None
 
 
 AGENT_DEFINITIONS: List[Dict[str, Any]] = [
@@ -116,8 +117,32 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
 # Agents trade all available symbols dynamically
 # SYMBOL_CONFIG only used as fallback for quantity/precision if exchange info unavailable
 SYMBOL_CONFIG = {
-    # Dynamic agents will use exchange info for precision
+    # Liquid / Major
+    "BTC-USDC": {"qty": 0.001, "precision": 3},
+    "ETH-USDC": {"qty": 0.01, "precision": 2},
+    "SOL-USDC": {"qty": 0.1, "precision": 2},
+    # Monad Ecosystem
+    "MON-USDC": {"qty": 1.0, "precision": 1},
+    "CHOG-USDC": {"qty": 100.0, "precision": 0},
+    "DAC-USDC": {"qty": 10.0, "precision": 1},
+    # Base Ecosystem
+    "ASTER-USDC": {"qty": 10.0, "precision": 1},
+    "BRETT-USDC": {"qty": 100.0, "precision": 0},
+    "DEGEN-USDC": {"qty": 1000.0, "precision": 0},
+    "TOSHI-USDC": {"qty": 1000.0, "precision": 0},
+    # Hyperliquid Only
+    "HYPE-USDC": {"qty": 1.0, "precision": 1},
+    "PURR-USDC": {"qty": 100.0, "precision": 0},
 }
+
+# Assets supported by Symphony Agents
+SYMPHONY_SYMBOLS = ["MON-USDC", "CHOG-USDC", "DAC-USDC", "ASTER-USDC", "BRETT-USDC", "DEGEN-USDC", "TOSHI-USDC"]
+
+# Assets supported by Hyperliquid
+HYPERLIQUID_SYMBOLS = ["BTC-USDC", "ETH-USDC", "SOL-USDC", "HYPE-USDC", "PURR-USDC"]
+
+# Assets supported by Drift
+DRIFT_SYMBOLS = ["JUP-USDC", "PYTH-USDC", "BONK-USDC"]
 
 
 @dataclass

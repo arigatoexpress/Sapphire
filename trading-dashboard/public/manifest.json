@@ -16,19 +16,17 @@
       "purpose": "any maskable"
     },
     {
-      "src": "/sapphire-icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/sapphire-icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
+      "src": "/sapphire-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     }
   ],
-  "categories": ["finance", "productivity", "business"],
+  "categories": [
+    "finance",
+    "productivity",
+    "business"
+  ],
   "lang": "en-US",
   "dir": "ltr",
   "screenshots": [

@@ -31,10 +31,11 @@ def test_check_rate_limit_rps(rate_limit_manager):
 
 
 def test_check_rate_limit_rpm(rate_limit_manager):
-    # Simulate 100 requests within a second
+    # Simulate 100 requests spread over 30 seconds (to avoid RPS limit)
     now = time.time()
-    for _ in range(100):
-        rate_limit_manager._request_timestamps["agent1"].append(now)
+    for i in range(100):
+        # Spread requests over 30s, so RPS check (~3 per second) doesn't trigger
+        rate_limit_manager._request_timestamps["agent1"].append(now - 30 + (i * 0.3))
     assert rate_limit_manager.check_rate_limit("agent1") is True
     rate_limit_manager.record_request("agent1")  # 101st request
     assert rate_limit_manager.check_rate_limit("agent1") is False
@@ -65,9 +66,9 @@ def test_get_available_capacity(rate_limit_manager):
 
 def test_is_rate_limited(rate_limit_manager):
     assert rate_limit_manager.is_rate_limited() is False
-    for _ in range(5):
+    # Record 6 requests to exceed RPS limit of 5
+    for _ in range(6):
         rate_limit_manager.record_request("agent1")
-    rate_limit_manager.record_request("agent1")  # Exceed RPS
     assert rate_limit_manager.is_rate_limited() is True
 
 

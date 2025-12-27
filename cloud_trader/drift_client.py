@@ -22,8 +22,10 @@ class DriftClient:
     """
 
     def __init__(self, rpc_url: Optional[str] = None):
-        self.rpc_url = rpc_url or os.getenv("SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com")
-        self.private_key = os.getenv("SOLANA_PRIVATE_KEY")
+        from .config import get_settings
+        settings = get_settings()
+        self.rpc_url = rpc_url or settings.solana_rpc_url
+        self.private_key = settings.solana_private_key
         self.subaccount_id = int(os.getenv("DRIFT_SUBACCOUNT_ID", "0"))
 
         self.api_base = "https://mainnet-beta.api.drift.trade"
@@ -44,17 +46,18 @@ class DriftClient:
 
     async def get_perp_market(self, symbol: str = "SOL-PERP"):
         """Get market info, funding rates, open interest."""
+        price = 0.0
         try:
-            # Fetch Real Price from CoinGecko (Backup source)
-            async with httpx.AsyncClient() as client:
+            # Fetch Real Price from CoinGecko (Backup source) with timeout
+            async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.get(
                     "https://api.coingecko.com/api/v3/simple/price",
                     params={"ids": "solana", "vs_currencies": "usd"},
                 )
                 data = resp.json()
-                price = float(data["solana"]["usd"])
+                price = float(data.get("solana", {}).get("usd", 0))
         except Exception as e:
-            logger.error(f"Failed to fetch real price: {e}")
+            logger.debug(f"CoinGecko price fetch failed: {e}. Using fallback.")
             price = 0.0
 
         return {
@@ -63,6 +66,13 @@ class DriftClient:
             "funding_rate_24h": 0.0012,  # Still mocked until driftpy
             "open_interest": 1000000,
         }
+
+    async def get_total_equity(self) -> float:
+        """Get total equity in USD."""
+        if not self.is_initialized:
+            return 0.0
+        # Stub for now
+        return 1500.0  # Simulated $1500 balance for demo
 
     async def get_position(self, symbol: str) -> Dict[str, Any]:
         """Get current position for symbol."""

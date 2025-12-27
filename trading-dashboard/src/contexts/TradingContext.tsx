@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
 import { useDashboardWebSocket } from '../hooks/useWebSocket';
+import { useDashboardState } from '../hooks/useApi';
 
 // --- Types ---
 export interface Agent {
@@ -92,6 +93,14 @@ export interface DashboardData {
   portfolio_history: number[];  // Last 24 values for sparkline
 }
 
+// --- Local Storage Keys ---
+const STORAGE_KEYS = {
+  PORTFOLIO_HISTORY: 'aster_portfolio_history',
+  AGENT_PERFORMANCE: 'aster_agent_performance',
+  RECENT_ACTIVITY: 'aster_recent_activity',
+  LAST_SYNC: 'aster_last_sync'
+};
+
 // --- Context Definition ---
 const TradingContext = createContext<DashboardData | undefined>(undefined);
 
@@ -133,23 +142,107 @@ const DEFAULT_DATA: DashboardData = {
   },
   logs: [],
   connected: false,
-  apiBaseUrl: 'https://cloud-trader-267358751314.europe-west1.run.app',
+  apiBaseUrl: 'https://sapphire-cloud-trader-s77j6bxyra-nn.a.run.app',
   portfolio_history: [],
+};
+
+// --- Helper Functions for LocalStorage ---
+const loadFromStorage = <T,>(key: string, defaultValue: T): T => {
+  try {
+    const item = localStorage.getItem(key);
+    return item ? JSON.parse(item) : defaultValue;
+  } catch (error) {
+    console.error(`Failed to load ${key} from localStorage:`, error);
+    return defaultValue;
+  }
+};
+
+const saveToStorage = <T,>(key: string, value: T): void => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    console.error(`Failed to save ${key} to localStorage:`, error);
+  }
 };
 
 // --- Provider ---
 export const TradingProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [data, setData] = useState<DashboardData>(DEFAULT_DATA);
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const portfolioHistoryRef = useRef<number[]>([]);
+  // Load initial state from localStorage
+  const [data, setData] = useState<DashboardData>(() => ({
+    ...DEFAULT_DATA,
+    portfolio_history: loadFromStorage(STORAGE_KEYS.PORTFOLIO_HISTORY, []),
+    recent_activity: loadFromStorage(STORAGE_KEYS.RECENT_ACTIVITY, []),
+  }));
+
+  const portfolioHistoryRef = useRef<number[]>(loadFromStorage(STORAGE_KEYS.PORTFOLIO_HISTORY, []));
+  const lastSyncRef = useRef<number>(loadFromStorage(STORAGE_KEYS.LAST_SYNC, 0));
+  const historicalDataLoadedRef = useRef<boolean>(false);
 
   // WebSocket connection - primary data source
   const { data: wsData, connected: wsConnected } = useDashboardWebSocket();
 
+  // REST API Polling (Fallback)
+  const { data: apiData } = useDashboardState(wsConnected ? 0 : 5000); // Disable polling if WS connected
+
   const getApiUrl = () => {
     if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
-    return 'https://cloud-trader-267358751314.europe-west1.run.app';
+    if (window.location.hostname.includes('run.app') || window.location.hostname.includes('sapphiretrade')) {
+      return window.location.origin;
+    }
+    return 'https://sapphire-cloud-trader-s77j6bxyra-nn.a.run.app';
   };
+
+  // Load historical data from backend on mount
+  useEffect(() => {
+    const loadHistoricalData = async () => {
+      if (historicalDataLoadedRef.current) return;
+
+      try {
+        const apiUrl = getApiUrl();
+        const [consensusRes, portfolioRes, agentRes] = await Promise.all([
+          fetch(`${apiUrl}/api/history/consensus?limit=100`).catch(() => null),
+          fetch(`${apiUrl}/api/history/portfolio?hours=24`).catch(() => null),
+          fetch(`${apiUrl}/api/history/agents`).catch(() => null)
+        ]);
+
+        // Load consensus history
+        if (consensusRes?.ok) {
+          const consensusData = await consensusRes.json();
+          if (consensusData.success && consensusData.data) {
+            saveToStorage(STORAGE_KEYS.RECENT_ACTIVITY, consensusData.data);
+            setData(prev => ({ ...prev, recent_activity: consensusData.data }));
+          }
+        }
+
+        // Load portfolio history
+        if (portfolioRes?.ok) {
+          const portfolioData = await portfolioRes.json();
+          if (portfolioData.success && portfolioData.data) {
+            const values = portfolioData.data.map((snapshot: any) => snapshot.value);
+            portfolioHistoryRef.current = values;
+            saveToStorage(STORAGE_KEYS.PORTFOLIO_HISTORY, values);
+            setData(prev => ({ ...prev, portfolio_history: values }));
+          }
+        }
+
+        // Load agent performance
+        if (agentRes?.ok) {
+          const agentData = await agentRes.json();
+          if (agentData.success && agentData.data) {
+            saveToStorage(STORAGE_KEYS.AGENT_PERFORMANCE, agentData.data);
+          }
+        }
+
+        historicalDataLoadedRef.current = true;
+        lastSyncRef.current = Date.now();
+        saveToStorage(STORAGE_KEYS.LAST_SYNC, Date.now());
+      } catch (error) {
+        console.error('Failed to load historical data:', error);
+      }
+    };
+
+    loadHistoricalData();
+  }, []);
 
   // Process WebSocket data when received
   useEffect(() => {
@@ -162,6 +255,8 @@ export const TradingProvider: React.FC<{ children: ReactNode }> = ({ children })
           ...portfolioHistoryRef.current.slice(-23),
           portfolioValue
         ];
+        // Persist to localStorage
+        saveToStorage(STORAGE_KEYS.PORTFOLIO_HISTORY, portfolioHistoryRef.current);
       }
 
       // Transform WebSocket data to our format
@@ -213,75 +308,60 @@ export const TradingProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   }, [wsData, wsConnected]);
 
-  // Fallback polling when WebSocket is disconnected
-  const fetchData = async () => {
-    if (wsConnected) return; // Skip if WebSocket is connected
-
-    try {
-      const apiUrl = getApiUrl();
-      const [consensusRes, healthRes] = await Promise.all([
-        fetch(`${apiUrl}/consensus/state`).catch(() => null),
-        fetch(`${apiUrl}/health`).catch(() => null)
-      ]);
-
-      if (consensusRes?.ok) {
-        const consensusData = await consensusRes.json();
-        const healthData = healthRes?.ok ? await healthRes.json() : { running: true };
-        const stats = consensusData.stats || {};
-
-        const agentPerformance = stats.agent_performance || {};
-        const agents: Agent[] = Object.entries(agentPerformance).map(([id, perf]: [string, any]) => ({
-          id,
-          name: AGENT_NAMES[id] || id.replace(/-/g, ' ').replace('agent', '').trim(),
-          type: 'AI Agent',
-          status: 'active' as const,
-          pnl: 0,
-          pnl_percent: 0,
-          total_trades: perf.total_trades || 0,
-          win_rate: perf.win_rate || 0,
-          allocation: (perf.current_weight || 1) * 333,
-          emoji: AGENT_EMOJIS[id] || '🤖',
-          active: true
-        }));
-
-        const recentActivity: RecentActivityItem[] = Array.isArray(stats.recent_activity)
-          ? stats.recent_activity
-          : [];
-
-        setData(prev => ({
-          ...prev,
-          agents,
-          total_pnl: consensusData.total_pnl || 0,
-          total_pnl_percent: consensusData.total_pnl_percent || 0,
-          portfolio_value: consensusData.portfolio_value || prev.portfolio_value || 0,
-          cash_balance: consensusData.cash_balance || prev.cash_balance || 0,
-          market_regime: {
-            current_regime: healthData.running ? 'Active Trading' : 'Idle',
-            volatility_score: stats.avg_confidence || 0,
-            trend_score: stats.avg_agreement || 0,
-            liquidity_score: stats.success_rate || 0
-          },
-          recent_activity: recentActivity,
-          connected: healthData.running,
-          apiBaseUrl: apiUrl
-        }));
-      }
-    } catch (e) {
-      console.error('❌ [Context] Fetch failed:', e);
-    }
-  };
-
+  // Fallback: Update state from API polling when WebSocket is disconnected
   useEffect(() => {
-    fetchData();
-    // Poll every 15 seconds as fallback (increased from 10s since WebSocket is primary)
-    pollIntervalRef.current = setInterval(fetchData, 15000);
+    if (wsConnected || !apiData) return;
 
-    return () => {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-      }
-    };
-  }, [wsConnected]);
+    // Transform API data to Context format if needed (types match generally)
+    const agents: Agent[] = apiData.agents.map(a => ({
+      id: a.id,
+      name: a.name,
+      type: 'AI Agent',
+      status: a.status === 'error' ? 'stopped' : (a.status as 'active' | 'idle'),
+      pnl: a.pnl || 0,
+      pnl_percent: a.pnlPercent || 0,
+      total_trades: 0, // Not in AgentData currently, add if needed
+      win_rate: 0, // Not in AgentData currently
+      allocation: a.allocation,
+      emoji: a.emoji,
+      active: a.status === 'active'
+    }));
+
+    setData(prev => ({
+      ...prev,
+      // Only update fields if API provided them
+      portfolio_value: apiData.portfolio_balance || prev.portfolio_value,
+      total_pnl: apiData.total_pnl || prev.total_pnl,
+      total_pnl_percent: apiData.total_pnl_percent || prev.total_pnl_percent,
+      agents: agents.length > 0 ? agents : prev.agents,
+      open_positions: apiData.positions.map(p => ({
+        ...p,
+        mark_price: p.current_price,
+        leverage: 1, // Default if missing
+        size: p.quantity,
+        side: p.side === 'LONG' ? 'BUY' : 'SELL',
+        system: 'ASTER' as const
+      })),
+      recent_trades: apiData.recent_trades.map(t => ({
+        id: t.id,
+        symbol: t.symbol,
+        side: t.side,
+        price: t.price,
+        timestamp: t.timestamp,
+        size: t.quantity,
+        agent: t.agentId
+      })),
+      market_regime: apiData.market_regime ? {
+        current_regime: apiData.market_regime.regime,
+        volatility_score: 0,
+        trend_score: apiData.market_regime.trend_strength,
+        liquidity_score: apiData.market_regime.confidence
+      } : prev.market_regime,
+      connected: apiData.running,
+      // Keep existing derived state
+      cash_balance: apiData.portfolio_balance || prev.cash_balance,
+    }));
+  }, [apiData, wsConnected]);
 
   return (
     <TradingContext.Provider value={data}>

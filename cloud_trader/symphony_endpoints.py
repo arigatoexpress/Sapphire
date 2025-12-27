@@ -1,6 +1,6 @@
-
-from typing import Any, Dict
 from datetime import datetime, timezone
+from typing import Any, Dict
+
 from fastapi import APIRouter, HTTPException, Request
 
 from .logger import get_logger
@@ -84,6 +84,84 @@ async def get_symphony_status() -> Dict[str, Any]:
                 "activated": False,
             },
         }
+
+
+@router.post("/api/symphony/activate-demo")
+async def activate_symphony_demo() -> Dict[str, Any]:
+    """
+    Execute 5 small trades to activate the Symphony fund for demo purposes.
+
+    This endpoint does NOT require authentication and is for development only.
+    Each trade is a minimal size to meet the activation threshold.
+
+    Returns:
+        Activation progress and trade results.
+    """
+    try:
+        from .symphony_client import get_symphony_client
+
+        client = get_symphony_client()
+
+        # Check current activation status
+        progress = client.activation_progress
+        if progress["activated"]:
+            return {
+                "success": True,
+                "already_activated": True,
+                "message": "Fund is already activated!",
+                "activation_progress": progress,
+            }
+
+        trades_needed = 5 - progress["current"]
+        trade_results = []
+
+        # Execute minimal trades to activate
+        symbols = ["BTC-USDC", "ETH-USDC", "SOL-USDC", "BTC-USDC", "ETH-USDC"]
+        sides = ["LONG", "SHORT", "LONG", "SHORT", "LONG"]
+
+        for i in range(min(trades_needed, 5)):
+            try:
+                result = await client.open_perpetual_position(
+                    symbol=symbols[i % len(symbols)],
+                    side=sides[i % len(sides)],
+                    size=10.0,  # Minimum $10 trade
+                    leverage=1,
+                )
+                trade_results.append(
+                    {
+                        "trade_number": i + 1,
+                        "symbol": symbols[i % len(symbols)],
+                        "side": sides[i % len(sides)],
+                        "result": result,
+                        "success": True,
+                    }
+                )
+                logger.info(
+                    f"✅ Activation trade {i + 1}/{trades_needed}: {symbols[i % len(symbols)]} {sides[i % len(sides)]}"
+                )
+            except Exception as trade_error:
+                trade_results.append(
+                    {
+                        "trade_number": i + 1,
+                        "symbol": symbols[i % len(symbols)],
+                        "side": sides[i % len(sides)],
+                        "error": str(trade_error),
+                        "success": False,
+                    }
+                )
+                logger.warning(f"⚠️ Activation trade {i + 1} failed: {trade_error}")
+
+        return {
+            "success": True,
+            "trades_executed": len([t for t in trade_results if t.get("success")]),
+            "trades_needed": trades_needed,
+            "trade_results": trade_results,
+            "activation_progress": client.activation_progress,
+            "message": f"Executed {len(trade_results)} activation trades",
+        }
+    except Exception as e:
+        logger.error(f"Symphony activation failed: {e}")
+        return {"success": False, "error": str(e)}
 
 
 @router.post("/api/symphony/trade/perpetual")

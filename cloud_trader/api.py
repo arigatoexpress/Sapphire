@@ -12,24 +12,33 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-import firebase_admin
-import httpx
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, status
-from fastapi.middleware.cors import CORSMiddleware  # CORS handled manually
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from firebase_admin import auth, credentials
 from prometheus_fastapi_instrumentator import Instrumentator
-from starlette.websockets import WebSocketDisconnect
 
-from .analytics.performance import AgentMetrics
+from .logger import get_logger
+
+logger = get_logger(__name__)
 
 # Initialize Firebase Admin
 try:
-    firebase_admin.get_app()
-except ValueError:
-    firebase_admin.initialize_app()
+    import firebase_admin
+    from firebase_admin import auth, credentials
+    try:
+        firebase_admin.get_app()
+    except ValueError:
+        firebase_admin.initialize_app()
+except ImportError:
+    firebase_admin = None
+    logger.warning("⚠️ firebase-admin not installed. Auth features disabled.")
+except Exception as e:
+    logger.warning(f"⚠️ Firebase initialization failed: {e}")
+    firebase_admin = None
 
+
+from .data_validator import get_data_validator
 
 # Prometheus metrics
 from .metrics import (
@@ -64,9 +73,7 @@ from .schemas import ChatCompletionRequest, InferenceRequest
 if TYPE_CHECKING:
     from .service import TradingService
 
-from .logger import get_logger
 
-logger = get_logger(__name__)
 
 
 # Rate limiting
@@ -120,7 +127,7 @@ class SecurityHeadersMiddleware:
                     (b"Strict-Transport-Security", b"max-age=31536000; includeSubDomains"),
                     (
                         b"Content-Security-Policy",
-                        b"default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' *;",
+                        b"default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' *;",
                     ),
                     (b"Referrer-Policy", b"strict-origin-when-cross-origin"),
                     (b"Permissions-Policy", b"geolocation=(), microphone=(), camera=()"),
@@ -256,14 +263,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 # Add Prometheus instrumentation
 Instrumentator().instrument(app).expose(app, endpoint="/metrics")
 
-# Serve static files if they exist
-static_path = "/app/static"
-if os.path.exists(static_path):
-    app.mount("/static", StaticFiles(directory=static_path), name="static")
-    # Mount /assets for frontend build artifacts
-    assets_path = os.path.join(static_path, "assets")
-    if os.path.exists(assets_path):
-        app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
+# Static file serving relocated to end of file to ensure all API routes are registered first
 
 
 def build_app(service: "TradingService" | None = None) -> FastAPI:
@@ -322,23 +322,143 @@ async def get_dashboard_data() -> Dict[str, Any]:
 
         # Gather all data concurrently
         portfolio_data = service.get_portfolio_status()
+        agents_data = service.get_agents()
 
-        # Get agents
+        # Mock other data for now until real systems hooked up
+        signals_data = [] # service.get_consensus_history()
+        stats_data = {
+            "total_trades": len(service._recent_trades),
+            "win_rate": portfolio_data.get("systems", {}).get("aster", {}).get("win_rate", 0),
+        }
+        history_data = [] # service.get_portfolio_history()
+
+        return {
+             "portfolio": portfolio_data,
+             "agents": agents_data,
+             "signals": signals_data,
+             "stats": stats_data,
+             "history": history_data
+        }
+    except Exception as e:
+        logger.error(f"Error in get_dashboard: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/agents/metrics")
+async def get_agent_metrics_endpoint():
+    """Get metrics for all configured agents."""
+    try:
+        service = trading_service
+        if not service:
+            raise HTTPException(status_code=503, detail="Trading service not initialized")
+
+        # Return basic agent configuration
         agents_data = []
-        if hasattr(service, "_agent_states"):
-            for agent_id, agent in service._agent_states.items():
-                agents_data.append(
-                    {
-                        "id": agent_id,
-                        "name": getattr(agent, "name", agent_id),
-                        "emoji": getattr(agent, "emoji", "🤖"),
-                        "status": "active" if getattr(agent, "is_active", True) else "idle",
-                        "win_rate": getattr(agent, "win_rate", 0.5),
-                        "total_trades": getattr(agent, "total_trades", 0),
-                        "weight": getattr(agent, "voting_weight", 1.0),
-                    }
-                )
+        try:
+            # Try to access agent states if available
+            if hasattr(service, "_agent_states"):
+                for agent_id, agent in service._agent_states.items():
+                    agents_data.append(
+                        {
+                            "id": agent.id,
+                            "name": agent.name,
+                            "type": agent.type,
+                            "active": True,
+                            "emoji": getattr(agent, "emoji", "🤖"),
+                        }
+                    )
+        except Exception as e:
+            logger.warning(f"Could not fetch agent states: {e}")
 
+        return {"agents": agents_data, "total": len(agents_data)}
+    except Exception as e:
+        logger.error(f"Error in get_agent_metrics_endpoint: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+#  =============================================================================
+# AUTONOMOUS AGENT MONITORING ENDPOINTS (NEW)
+# =============================================================================
+
+
+@app.get("/api/agents/autonomous-performance")
+async def get_autonomous_agent_performance():
+    """
+    Get performance metrics for all autonomous trading agents.
+    Returns win rates, health status, and preferred indicators.
+    """
+    try:
+        service = trading_service
+        if not service:
+            raise HTTPException(status_code=503, detail="Trading service not initialized")
+
+        metrics = await service.get_agent_performance_metrics()
+
+        return {"agents": metrics, "total_agents": len(metrics), "timestamp": time.time()}
+    except Exception as e:
+        logger.error(f"Error fetching autonomous agent performance: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/agents/consensus-history")
+async def get_consensus_history_endpoint(limit: int = 20):
+    """
+    Get recent consensus decisions with agent votes and outcomes.
+    Used by the agent performance dashboard.
+
+    Args:
+        limit: Maximum number of decisions to return (default: 20, max: 100)
+    """
+    try:
+        service = trading_service
+        if not service:
+            raise HTTPException(status_code=503, detail="Trading service not initialized")
+
+        # Cap limit to prevent excessive data transfer
+        limit = min(limit, 100)
+
+        history = await service.get_consensus_history(limit=limit)
+
+        return {
+            "decisions": history,
+            "count": len(history),
+            "limit": limit,
+            "timestamp": time.time(),
+        }
+    except Exception as e:
+        logger.error(f"Error fetching consensus history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/agents/evolution/{agent_id}")
+async def get_agent_evolution_endpoint(agent_id: str):
+    """
+    Get evolution of a specific agent's strategy over time.
+    Shows how preferred indicators and performance have changed.
+
+    Args:
+        agent_id: ID of the agent to get evolution data for
+    """
+    try:
+        service = trading_service
+        if not service:
+            raise HTTPException(status_code=503, detail="Trading service not initialized")
+
+        evolution = await service.get_agent_evolution(agent_id=agent_id)
+
+        if not evolution.get("snapshots"):
+            raise HTTPException(
+                status_code=404, detail=f"No evolution data found for agent {agent_id}"
+            )
+
+        return evolution
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching agent evolution: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+        # =============================================================================
         # Get recent signals from consensus engine
         signals = []
         if hasattr(service, "_consensus_engine"):
@@ -403,12 +523,19 @@ async def get_dashboard_data() -> Dict[str, Any]:
 # ===================================================================
 # SYSTEM OBSERVABILITY ENDPOINTS
 # ===================================================================
-from .observability_api import router as observability_router
+# from .observability_api import router as observability_router
 
-app.include_router(observability_router)
+# app.include_router(observability_router)
 from . import symphony_endpoints
 
 app.include_router(symphony_endpoints.router)
+
+# ===================================================================
+# HISTORICAL DATA ENDPOINTS (Frontend Persistence)
+# ===================================================================
+# from .history_api import router as history_router
+
+# app.include_router(history_router)
 
 # ===================================================================
 # SYMPHONY / MONAD INTEGRATION ENDPOINTS
@@ -531,13 +658,16 @@ async def execute_symphony_perpetual(request: Request) -> Dict[str, Any]:
 
         # Execute trade
         client = get_symphony_client()
+        agent_id = body.get("agent_id")
+
         position = await client.open_perpetual_position(
             symbol=symbol,
-            side=side,
-            size=size,
+            action=side,  # Map side -> action
+            weight=size,  # Map size -> weight
             leverage=leverage,
             stop_loss=stop_loss,
             take_profit=take_profit,
+            agent_id=agent_id,
         )
 
         logger.info(f"Symphony perpetual opened: {symbol} {side} {size} @ {leverage}x by {uid}")
@@ -590,8 +720,10 @@ async def execute_symphony_spot(request: Request) -> Dict[str, Any]:
 
         # Execute trade
         client = get_symphony_client()
+        agent_id = body.get("agent_id")
+
         order = await client.execute_spot_trade(
-            symbol=symbol, side=side, quantity=quantity, order_type=order_type
+            symbol=symbol, side=side, quantity=quantity, order_type=order_type, agent_id=agent_id
         )
 
         logger.info(f"Symphony spot trade: {side} {quantity} {symbol} by {uid}")
@@ -667,6 +799,89 @@ async def create_symphony_fund(request: Request) -> Dict[str, Any]:
         raise
     except Exception as e:
         logger.error(f"Symphony fund creation failed: {e}")
+        return {"success": False, "error": str(e)}
+
+
+# ===================================================================
+# SYMPHONY DEMO ACTIVATION ENDPOINT
+# ===================================================================
+
+
+@app.post("/api/symphony/activate-demo")
+async def activate_symphony_demo() -> Dict[str, Any]:
+    """
+    Execute 5 small trades to activate the Symphony fund for demo purposes.
+
+    This endpoint does NOT require authentication and is for development only.
+    Each trade is a minimal size to meet the activation threshold.
+
+    Returns:
+        Activation progress and trade results.
+    """
+    try:
+        from .symphony_client import get_symphony_client
+
+        client = get_symphony_client()
+
+        # Check current activation status
+        progress = client.activation_progress
+        if progress["activated"]:
+            return {
+                "success": True,
+                "already_activated": True,
+                "message": "Fund is already activated!",
+                "activation_progress": progress,
+            }
+
+        trades_needed = 5 - progress["current"]
+        trade_results = []
+
+        # Execute minimal trades to activate
+        symbols = ["BTC-USDC", "ETH-USDC", "SOL-USDC", "BTC-USDC", "ETH-USDC"]
+        sides = ["LONG", "SHORT", "LONG", "SHORT", "LONG"]
+
+        for i in range(min(trades_needed, 5)):
+            try:
+                result = await client.open_perpetual_position(
+                    symbol=symbols[i % len(symbols)],
+                    side=sides[i % len(sides)],
+                    size=10.0,  # Minimum $10 trade
+                    leverage=1,
+                )
+                trade_results.append(
+                    {
+                        "trade_number": i + 1,
+                        "symbol": symbols[i % len(symbols)],
+                        "side": sides[i % len(sides)],
+                        "result": result,
+                        "success": True,
+                    }
+                )
+                logger.info(
+                    f"✅ Activation trade {i + 1}/{trades_needed}: {symbols[i % len(symbols)]} {sides[i % len(sides)]}"
+                )
+            except Exception as trade_error:
+                trade_results.append(
+                    {
+                        "trade_number": i + 1,
+                        "symbol": symbols[i % len(symbols)],
+                        "side": sides[i % len(sides)],
+                        "error": str(trade_error),
+                        "success": False,
+                    }
+                )
+                logger.warning(f"⚠️ Activation trade {i + 1} failed: {trade_error}")
+
+        return {
+            "success": True,
+            "trades_executed": len([t for t in trade_results if t.get("success")]),
+            "trades_needed": trades_needed,
+            "trade_results": trade_results,
+            "activation_progress": client.activation_progress,
+            "message": f"Executed {len(trade_results)} activation trades",
+        }
+    except Exception as e:
+        logger.error(f"Symphony activation failed: {e}")
         return {"success": False, "error": str(e)}
 
 
@@ -1726,6 +1941,17 @@ async def get_consensus_state() -> Dict[str, Any]:
                     (total_pnl / initial_balance) * 100 if initial_balance > 0 else 0.0
                 )
 
+                # Add External Integration Data (Symphony & Hyperliquid)
+                symphony_balance = getattr(service, "_symphony_balance", 0.0)
+                hyperliquid_balance = getattr(service, "_hyperliquid_balance", 0.0)
+                drift_balance = getattr(service, "_drift_balance", 0.0)
+
+                # Aggregate Portfolio Value
+                # Only include Aster if enabled
+                aster_balance = initial_balance if (hasattr(service, "_settings") and service._settings.enable_aster) else 0.0
+                
+                total_portfolio_value = aster_balance + symphony_balance + hyperliquid_balance + drift_balance + total_pnl
+
                 portfolio_data = {
                     "total_pnl": total_pnl,
                     "total_pnl_percent": total_pnl_percent,
@@ -1733,8 +1959,12 @@ async def get_consensus_state() -> Dict[str, Any]:
                     "realized_pnl": realized_pnl,
                     "total_fees": total_fees,
                     "total_funding": total_funding,
-                    "portfolio_value": initial_balance + total_pnl,
-                    "cash_balance": initial_balance,
+                    "portfolio_value": total_portfolio_value,
+                    "cash_balance": aster_balance,
+                    "symphony_balance": symphony_balance,
+                    "hyperliquid_balance": hyperliquid_balance,
+                    "drift_balance": drift_balance,
+                    "aster_enabled": hasattr(service, "_settings") and service._settings.enable_aster
                 }
             except Exception as pnl_err:
                 logger.warning(f"Could not calculate PnL: {pnl_err}")
@@ -4092,3 +4322,15 @@ async def get_bot_stats() -> Dict[str, Any]:
         return {"error": str(e)}
 
     return app
+
+# Full root static file serving (at the end to avoid shadowing API routes)
+static_path = "/app/static"
+if os.path.exists(static_path):
+    # Serve assets under /assets specifically
+    assets_path = os.path.join(static_path, "assets")
+    if os.path.exists(assets_path):
+        app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
+    
+    # Serve everything else from root (manifest.json, icons, etc.)
+    # html=True serves index.html for the root and subdirectories
+    app.mount("/", StaticFiles(directory=static_path, html=True), name="frontend")

@@ -63,9 +63,9 @@ class RateLimitManager:
         current_rps = sum(1 for ts in self._request_timestamps[agent_id] if now - ts <= 1)
         current_rpm = len(self._request_timestamps[agent_id])
 
-        if current_rps >= agent_limits["rps"]:
+        if current_rps > agent_limits["rps"]:
             return False
-        if current_rpm >= agent_limits["rpm"]:
+        if current_rpm > agent_limits["rpm"]:
             return False
 
         return True
@@ -108,8 +108,9 @@ class RateLimitManager:
         Checks if any agent is currently being rate-limited or throttled.
         This can be used to determine if a global fallback is needed.
         """
-        now = time.time()
-        for agent_id in self._rate_limits:
+        # Check all known agents (from both rate_limits and request_timestamps)
+        all_agents = set(self._rate_limits.keys()) | set(self._request_timestamps.keys())
+        for agent_id in all_agents:
             if self.should_throttle_agent(agent_id):
                 return True
         return False

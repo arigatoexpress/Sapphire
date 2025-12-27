@@ -46,6 +46,9 @@ class AgentMetrics:
     win_rate: float = 0.0
     sharpe_ratio: float = 0.0
     sortino_ratio: float = 0.0
+    calmar_ratio: float = 0.0  # Return / Max Drawdown
+    alpha: float = 0.0  # Excess return vs benchmark
+    beta: float = 0.0  # Correlation with benchmark
     profit_factor: float = 0.0
     average_win: float = 0.0
     average_loss: float = 0.0
@@ -191,6 +194,32 @@ class PerformanceTracker:
             if downside_dev > 0:
                 # Penalize only downside
                 m.sortino_ratio = (avg_return) / downside_dev * math.sqrt(365)
+
+        # Calmar Ratio: Annualized Return / Max Drawdown
+        if m.max_drawdown > 0 and len(m.returns_history) > 0:
+            annualized_return = sum(m.returns_history) * 365 / max(len(m.returns_history), 1)
+            m.calmar_ratio = annualized_return / m.max_drawdown
+        else:
+            m.calmar_ratio = 0.0
+
+        # Alpha/Beta (simplified - assumes SOL benchmark ~0.1% daily return, 2% std dev)
+        # In production, this would fetch actual SOL price history
+        benchmark_daily_return = 0.001  # Approx 36% annual
+        benchmark_std = 0.02  # 2% daily std dev
+
+        if len(returns) > 1:
+            avg_return = sum(returns) / len(returns)
+            agent_std = self._std_dev(returns)
+
+            # Beta = Cov(agent, benchmark) / Var(benchmark)
+            # Simplified: Beta = agent_std / benchmark_std (correlation assumption)
+            m.beta = agent_std / benchmark_std if benchmark_std > 0 else 1.0
+
+            # Alpha = Agent Return - (Risk-free + Beta * (Benchmark - Risk-free))
+            risk_free_daily = self.risk_free_rate / 365
+            m.alpha = (
+                avg_return - risk_free_daily - m.beta * (benchmark_daily_return - risk_free_daily)
+            ) * 365
 
     def _get_pnl_history(self, m: AgentMetrics) -> List[float]:
         """Reconstruct PnL steps from equity curve."""

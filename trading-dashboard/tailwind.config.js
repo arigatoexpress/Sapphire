@@ -25,6 +25,21 @@ export default {
           800: '#075985',
           900: '#0c4a6e',
         },
+        // Firedancer-inspired Neon Palette
+        fd: {
+          bg: '#000000',      // Deep Black
+          card: '#121212',    // Card Background
+          border: '#1E1E1E',  // Subtle Border
+          success: '#00FF9D', // Neon Green
+          purple: '#9D00FF',  // Electric Purple
+          warning: '#FF9D00', // Warning Orange
+          error: '#FF0055',   // Error Red
+          blue: '#00D1FF',    // Cyan/Blue Accent
+          muted: '#525252',   // Muted Text
+        }
+      },
+      backgroundImage: {
+        'fd-gradient': 'linear-gradient(to bottom, #000000, #0a0a0a)',
       },
       animation: {
         'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',

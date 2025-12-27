@@ -7,8 +7,12 @@ const getApiUrl = (): string => {
     if (envUrl && !envUrl.includes('localhost')) {
         return envUrl.replace(/\/$/, ''); // Remove trailing slash
     }
-    // Fallback to Cloud Run URL for production
-    return 'https://cloud-trader-267358751314.europe-west1.run.app';
+    // Production relative URL if on Cloud Run or same domain
+    if (window.location.hostname.includes('run.app') || window.location.hostname.includes('sapphiretrade')) {
+        return window.location.origin;
+    }
+    // Fallback for local dev if env not set
+    return '';
 };
 
 export interface AgentData {
@@ -186,19 +190,23 @@ export function useDashboardState(pollInterval = 5000): UseApiResult<DashboardSt
         pollInterval: 30000 // Health less frequently
     });
 
-    const stateResult = useApi<any>('/api/state', { pollInterval });
+    const stateResult = useApi<any>('/api/dashboard', { pollInterval });
 
-    // Transform and combine data
+    // Transform and combine data from batch endpoint
     const combinedData: DashboardState | null = stateResult.data ? {
         running: healthData?.running ?? true,
         paper_trading: healthData?.paper_trading ?? false,
-        portfolio_balance: stateResult.data.portfolio_balance ?? stateResult.data.portfolio_value ?? 100000,
-        total_pnl: stateResult.data.total_pnl ?? 0,
-        total_pnl_percent: stateResult.data.total_pnl_percent ?? 0,
+        portfolio_balance: stateResult.data.portfolio?.portfolio_balance ?? 0,
+        total_pnl: stateResult.data.portfolio?.total_pnl ?? 0,
+        total_pnl_percent: stateResult.data.portfolio?.total_pnl_percent ?? 0,
         agents: stateResult.data.agents ?? [],
-        positions: stateResult.data.open_positions ?? stateResult.data.positions ?? [],
-        recent_trades: stateResult.data.recent_trades ?? [],
-        market_regime: stateResult.data.market_regime,
+        positions: stateResult.data.portfolio?.open_positions ?? [],
+        recent_trades: stateResult.data.portfolio?.recentTrades ?? [],
+        market_regime: stateResult.data.market_regime ?? {
+            regime: "NEUTRAL",
+            confidence: 0,
+            trend_strength: 0
+        },
         last_updated: Date.now(),
     } : null;
 

@@ -1,9 +1,8 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
-import App from './App.tsx'
+import App from './App'
 import './index.css'
-import { TradingProvider } from './contexts/TradingContext.tsx'
 
 // Register service worker for PWA and caching
 // 🚀 FORCE UNREGISTER SERVICE WORKER TO FIX CACHING ISSUES
@@ -44,10 +43,8 @@ window.addEventListener('offline', () => {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <TradingProvider>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
-    </TradingProvider>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
   </React.StrictMode>,
 )

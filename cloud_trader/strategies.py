@@ -23,6 +23,7 @@ from .cache import BaseCache, get_cache
 from .config import get_settings
 from .rl_strategies import RLStrategyManager
 from .strategy import MarketSnapshot
+from .vertex_ai_client import get_vertex_client
 
 logger = logging.getLogger(__name__)
 

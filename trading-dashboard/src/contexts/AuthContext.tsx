@@ -24,6 +24,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export const useAuth = () => {
     const context = useContext(AuthContext);
     if (!context) {
+        console.trace('[useAuth] Error: Context not found. Caller stack trace:');
         throw new Error('useAuth must be used within AuthProvider');
     }
     return context;
@@ -34,11 +35,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        // If auth is a mock object (no onAuthStateChanged), skip subscription
+        if (typeof onAuthStateChanged !== 'function' || !auth.app) {
+            console.warn("Skipping onAuthStateChanged (Demo Mode)");
+            setLoading(false);
+            return;
+        }
+
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             setUser(user);
 
             // Create user profile in Firestore if it doesn't exist (non-blocking)
-            if (user) {
+            if (user && db.type === 'firestore') { // Only try if db is real
                 try {
                     const userRef = doc(db, 'users', user.uid);
                     const userSnap = await getDoc(userRef);
@@ -90,9 +98,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         resetPassword
     };
 
+    console.log('[AuthProvider] Rendering. loading:', loading, 'hasValue:', !!value);
     return (
         <AuthContext.Provider value={value}>
-            {!loading && children}
+            {!loading && (
+                <>
+                    {console.log('[AuthProvider] Rendering Children')}
+                    {children}
+                </>
+            )}
         </AuthContext.Provider>
     );
 };

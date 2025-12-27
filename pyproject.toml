@@ -41,6 +41,11 @@ dependencies = [
     "accelerate>=0.28.0",
     "matplotlib>=3.8.0",
     "google-generativeai>=0.4.0",
+    "hyperliquid-python-sdk>=0.21.0",
+    "eth-account>=0.11.0",
+    "solana>=0.34.0",
+    "solders>=0.18.0",
+    "base58>=2.1.0",
 ]
 
 [project.optional-dependencies]

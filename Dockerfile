@@ -60,16 +60,16 @@ COPY --from=builder /install/bin /usr/local/bin
 COPY trading-dashboard/dist /app/static
 
 # Copy application code with forced cache invalidation
-ARG CACHE_BUST=20251219_073000
+ARG CACHE_BUST=20251226_175000
 RUN echo "CACHE_BUST=${CACHE_BUST}" > /dev/null
 COPY --chown=trader:trader cloud_trader ./cloud_trader
-COPY --chown=trader:trader start.py ./
+COPY --chown=trader:trader run.py ./
 COPY --chown=trader:trader pyproject.toml ./
 COPY --chown=trader:trader requirements.txt ./
 COPY --chown=trader:trader alembic.ini ./
 
-# Create data directory for agent performance tracking
-RUN mkdir -p /app/data /tmp/logs
+# Create data directory for agent performance tracking and logs
+RUN mkdir -p /app/data /tmp/logs && chown -R trader:trader /app/data /tmp/logs
 # Ensure system site-packages are in PYTHONPATH for all Python invocations
 # Also ensure /usr/local/bin is in PATH
 ENV PYTHONPATH=/usr/local/lib/python3.11/site-packages:$PYTHONPATH \
@@ -87,4 +87,4 @@ HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -f http://127.0.0.1:8080/healthz || exit 1
 
 # Startup script to ensure proper initialization
-CMD ["python3", "start.py"]
+CMD ["python3", "run.py"]

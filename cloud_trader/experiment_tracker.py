@@ -11,7 +11,12 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from google.cloud import firestore
+try:
+    from google.cloud import firestore
+except ImportError:
+    firestore = None
+    print("⚠️ Google Cloud Firestore not found. Experiment tracking will be disabled.")
+
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +41,14 @@ class ExperimentTracker:
     def __init__(self, version_id: str = "v1.0.0"):
         self.version_id = version_id
         self.current_experiment: Optional[Experiment] = None
-        self.db = firestore.Client()
+        if firestore:
+            try:
+                self.db = firestore.Client()
+            except Exception as e:
+                print(f"⚠️ Failed to init Firestore: {e}")
+                self.db = None
+        else:
+            self.db = None
         self.collection = "trading_experiments"
         self._setup_logging()
 
@@ -68,17 +80,18 @@ class ExperimentTracker:
         )
 
         # Log start to DB
-        doc_ref = self.db.collection(self.collection).document(exp_id)
-        doc_ref.set(
-            {
-                "name": name,
-                "hypothesis": hypothesis,
-                "start_time": datetime.utcnow(),
-                "version_id": self.version_id,
-                "status": "running",
-                "metadata": metadata or {},
-            }
-        )
+        if self.db:
+            doc_ref = self.db.collection(self.collection).document(exp_id)
+            doc_ref.set(
+                {
+                    "name": name,
+                    "hypothesis": hypothesis,
+                    "start_time": datetime.utcnow(),
+                    "version_id": self.version_id,
+                    "status": "running",
+                    "metadata": metadata or {},
+                }
+            )
 
         logger.info(f"🧪 Started Experiment {exp_id}: {name}")
         return exp_id
@@ -111,7 +124,7 @@ class ExperimentTracker:
         logger.info(f"📊 Metric: {json.dumps(log_entry)}")
 
         # Store in Firestore sub-collection for granular analysis
-        if self.current_experiment:
+        if self.current_experiment and self.db:
             self.db.collection(self.collection).document(self.current_experiment.id).collection(
                 "metrics"
             ).add(log_entry)
@@ -141,15 +154,16 @@ class ExperimentTracker:
                 }
 
         # Update DB
-        self.db.collection(self.collection).document(self.current_experiment.id).update(
-            {
-                "status": "completed",
-                "end_time": end_time,
-                "duration_seconds": duration,
-                "conclusion": conclusion,
-                "results_summary": summary,
-            }
-        )
+        if self.db:
+            self.db.collection(self.collection).document(self.current_experiment.id).update(
+                {
+                    "status": "completed",
+                    "end_time": end_time,
+                    "duration_seconds": duration,
+                    "conclusion": conclusion,
+                    "results_summary": summary,
+                }
+            )
 
         logger.info(
             f"🧪 Concluded Experiment {self.current_experiment.id}. Duration: {duration:.2f}s"

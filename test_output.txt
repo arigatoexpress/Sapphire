@@ -1,0 +1,231 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.13.5, pytest-8.4.1, pluggy-1.6.0
+rootdir: /Users/aribs/AIAster
+configfile: pyproject.toml
+plugins: asyncio-1.1.0, anyio-4.10.0
+asyncio: mode=Mode.AUTO, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 2 items
+
+tests/test_final_integration.py {"timestamp": "2025-12-27T00:18:53.856678Z", "level": "INFO", "message": "\ud83d\ude80 VERSION: 2.1.0 (Refactored Init)", "module": "trading_service", "function": "__init__", "line": 167, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:53.857672Z", "level": "WARNING", "message": "\ud83e\ude90 Treasurer: No Private Key found. Read-only mode.", "module": "treasurer", "function": "_load_wallet", "line": 51, "logger": "cloud_trader.swarm.treasurer"}
+{"timestamp": "2025-12-27T00:18:53.857812Z", "level": "INFO", "message": "\u2705 Initialized 3 Symphony agents from config", "module": "trading_service", "function": "__init__", "line": 284, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:53.858460Z", "level": "INFO", "message": "\u2705 ActiveProfitManager initialized", "module": "profit_manager", "function": "__init__", "line": 75, "logger": "cloud_trader.profit_manager"}
+{"timestamp": "2025-12-27T00:18:53.858484Z", "level": "INFO", "message": "\u2705 ActiveProfitManager initialized", "module": "trading_service", "function": "_init_managers_offline", "line": 319, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:53.920247Z", "level": "INFO", "message": "\u2705 Telegram notifications enabled", "module": "trading_service", "function": "_init_managers_offline", "line": 330, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:53.920341Z", "level": "INFO", "message": "==================================================", "module": "trading_service", "function": "__init__", "line": 297, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:53.920366Z", "level": "INFO", "message": "\ud83d\ude80 SAPPHIRE TRADER v2.1.0 - 2025-12-26 17:18:53.920359", "module": "trading_service", "function": "__init__", "line": 298, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:53.920383Z", "level": "INFO", "message": "\ud83d\udce6 Telegram: ENABLED", "module": "trading_service", "function": "__init__", "line": 299, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:53.920397Z", "level": "INFO", "message": "==================================================", "module": "trading_service", "function": "__init__", "line": 302, "logger": "cloud_trader.trading_service"}
+
+>>> Calling service.start()...
+{"timestamp": "2025-12-27T00:18:53.920414Z", "level": "INFO", "message": "\ud83d\ude80 Starting Aster Bull Agents (Minimal Service)...", "module": "trading_service", "function": "start", "line": 399, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:53.920426Z", "level": "INFO", "message": "\ud83d\udd10 STARTING AUTH DIAGNOSTICS...", "module": "trading_service", "function": "_run_auth_diagnostics", "line": 453, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:53.920787Z", "level": "INFO", "message": "\ud83c\udfb5 Identifying Symphony Agent Status...", "module": "trading_service", "function": "_ensure_symphony_initialized", "line": 4220, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:53.921007Z", "level": "INFO", "message": "\u2705 Symphony Agent is ACTIVE and Connected.", "module": "trading_service", "function": "_ensure_symphony_initialized", "line": 4225, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:55.846466Z", "level": "INFO", "message": "   \u2705 Public API Accessible (200 OK)", "module": "trading_service", "function": "_run_auth_diagnostics", "line": 461, "logger": "cloud_trader.trading_service"}
+DEBUG: Loaded API Key: a951... (len=64)
+DEBUG: Loaded API Secret (len=64)
+{"timestamp": "2025-12-27T00:18:55.848297Z", "level": "INFO", "message": "   \ud83d\udd11 Using Key Prefix: a951d1...", "module": "trading_service", "function": "_run_auth_diagnostics", "line": 468, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:55.848531Z", "level": "INFO", "message": "\ud83d\udd10 AUTH DIAGNOSTICS COMPLETE", "module": "trading_service", "function": "_run_auth_diagnostics", "line": 474, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:55.873038Z", "level": "INFO", "message": "\ud83c\udfbb Subscribing to Symphony Strategy...", "module": "trading_service", "function": "_init_online_components", "line": 504, "logger": "cloud_trader.trading_service"}
+🌍 Fetching global market structure (all symbols)...
+⚠️ Failed to fetch market structure: object MagicMock can't be used in 'await' expression. Falling back to config.
+⚠️ Could not sync portfolio balance: object MagicMock can't be used in 'await' expression
+🔍 Scanning exchange for existing positions to takeover...
+⚠️ Failed to sync open positions from exchange: object MagicMock can't be used in 'await' expression
+✅ Initialized 6 advanced AI agents (unrestricted symbol trading)
+   🤖 MILF (SWAP) - Win Rate: 60.0%
+   🤖 AGDG (PERPS) - Win Rate: 60.0%
+   🤖 MIT (PERPS) - Win Rate: 60.0%
+   📈 Momentum Trader (momentum_trading) - Win Rate: 65.0%
+   ⚡ Market Maker (market_making) - Win Rate: 62.0%
+   🧠 Swing Trader (swing_trading) - Win Rate: 68.0%
+{"timestamp": "2025-12-27T00:18:55.873921Z", "level": "INFO", "message": "\ud83e\udd16 Initializing autonomous trading components...", "module": "trading_service", "function": "_init_online_components", "line": 524, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:55.874271Z", "level": "INFO", "message": "   \u2705 Initialized 3 autonomous agents", "module": "trading_service", "function": "_init_online_components", "line": 539, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:55.874311Z", "level": "INFO", "message": "\ud83d\udc1b DEBUG: self._settings.enable_paper_trading = False", "module": "trading_service", "function": "_init_online_components", "line": 546, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:55.874338Z", "level": "INFO", "message": "\ud83e\udd16 Initializing Telegram bot handlers...", "module": "trading_service", "function": "start", "line": 409, "logger": "cloud_trader.trading_service"}
+🔍 Scanning exchange for existing positions to takeover...
+⚠️ Failed to sync open positions from exchange: object MagicMock can't be used in 'await' expression
+🕵️ Reviewing inherited positions for quality...
+⚠️ Balance fetch error: 'str' object has no attribute 'get', using fallback of $1000
+{"timestamp": "2025-12-27T00:18:55.874868Z", "level": "INFO", "message": "\u2705 Minimal trading service started successfully", "module": "trading_service", "function": "start", "line": 443, "logger": "cloud_trader.trading_service"}
+>>> service.start() returned: True
+>>> Agent States: 6
+>>> Verifying DataStore...
+>>> Health Running: True
+>>> Health Paper Trading: False
+>>> Service Settings Paper Msg: False
+>>> Test Settings Paper Msg: False
+⚠️ Google Cloud Firestore not found. Experiment tracking will be disabled.
+{"timestamp": "2025-12-27T00:18:55.877576Z", "level": "INFO", "message": "\ud83d\udee1\ufe0f Starting Robust Trading Loop (Phase 1)...", "module": "trading_service", "function": "_run_trading_loop", "line": 3055, "logger": "cloud_trader.trading_service"}
+⚠️ Position Sync Failed: object MagicMock can't be used in 'await' expression
+{"timestamp": "2025-12-27T00:18:55.877680Z", "level": "INFO", "message": "\ud83c\udfb5 Fund Manager: Assessing Portfolio (Regime: NEUTRAL)", "module": "fund_manager", "function": "run_rebalance_cycle", "line": 35, "logger": "cloud_trader.swarm.fund_manager"}
+{"timestamp": "2025-12-27T00:18:55.877889Z", "level": "INFO", "message": "   Strategy: BALANCED HOLD \u2696\ufe0f", "module": "fund_manager", "function": "run_rebalance_cycle", "line": 54, "logger": "cloud_trader.swarm.fund_manager"}
+{"timestamp": "2025-12-27T00:18:55.877931Z", "level": "INFO", "message": "   \u2705 Portfolio aligned with regime target.", "module": "fund_manager", "function": "run_rebalance_cycle", "line": 57, "logger": "cloud_trader.swarm.fund_manager"}
+{"timestamp": "2025-12-27T00:18:55.878102Z", "level": "INFO", "message": "\ud83d\udee1\ufe0f Capital Efficiency Guard started (runs hourly)", "module": "trading_service", "function": "_capital_efficiency_guard", "line": 3532, "logger": "cloud_trader.trading_service"}
+📨 Sending test Telegram message...
+F{"timestamp": "2025-12-27T00:18:55.926057Z", "level": "INFO", "message": "Capital Efficiency Guard stopped", "module": "trading_service", "function": "_capital_efficiency_guard", "line": 3578, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:55.934091Z", "level": "INFO", "message": "\ud83d\ude80 VERSION: 2.1.0 (Refactored Init)", "module": "trading_service", "function": "__init__", "line": 167, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:55.934249Z", "level": "WARNING", "message": "\ud83e\ude90 Treasurer: No Private Key found. Read-only mode.", "module": "treasurer", "function": "_load_wallet", "line": 51, "logger": "cloud_trader.swarm.treasurer"}
+{"timestamp": "2025-12-27T00:18:55.934329Z", "level": "INFO", "message": "\u2705 Initialized 3 Symphony agents from config", "module": "trading_service", "function": "__init__", "line": 284, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:55.934367Z", "level": "INFO", "message": "\u2705 ActiveProfitManager initialized", "module": "trading_service", "function": "_init_managers_offline", "line": 319, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:55.978462Z", "level": "INFO", "message": "\u2705 Telegram notifications enabled", "module": "trading_service", "function": "_init_managers_offline", "line": 330, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:55.978523Z", "level": "INFO", "message": "==================================================", "module": "trading_service", "function": "__init__", "line": 297, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:55.978545Z", "level": "INFO", "message": "\ud83d\ude80 SAPPHIRE TRADER v2.1.0 - 2025-12-26 17:18:55.978540", "module": "trading_service", "function": "__init__", "line": 298, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:55.978558Z", "level": "INFO", "message": "\ud83d\udce6 Telegram: ENABLED", "module": "trading_service", "function": "__init__", "line": 299, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:55.978569Z", "level": "INFO", "message": "==================================================", "module": "trading_service", "function": "__init__", "line": 302, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:55.978579Z", "level": "INFO", "message": "\ud83d\ude80 Starting Aster Bull Agents (Minimal Service)...", "module": "trading_service", "function": "start", "line": 399, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:55.978589Z", "level": "INFO", "message": "\ud83d\udd10 STARTING AUTH DIAGNOSTICS...", "module": "trading_service", "function": "_run_auth_diagnostics", "line": 453, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:55.978844Z", "level": "INFO", "message": "\ud83c\udfb5 Identifying Symphony Agent Status...", "module": "trading_service", "function": "_ensure_symphony_initialized", "line": 4220, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:55.978899Z", "level": "INFO", "message": "\u2705 Symphony Agent is ACTIVE and Connected.", "module": "trading_service", "function": "_ensure_symphony_initialized", "line": 4225, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:57.877214Z", "level": "INFO", "message": "   \u2705 Public API Accessible (200 OK)", "module": "trading_service", "function": "_run_auth_diagnostics", "line": 461, "logger": "cloud_trader.trading_service"}
+DEBUG: Loaded API Key: a951... (len=64)
+DEBUG: Loaded API Secret (len=64)
+{"timestamp": "2025-12-27T00:18:57.879223Z", "level": "INFO", "message": "   \ud83d\udd11 Using Key Prefix: a951d1...", "module": "trading_service", "function": "_run_auth_diagnostics", "line": 468, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:57.879425Z", "level": "INFO", "message": "\ud83d\udd10 AUTH DIAGNOSTICS COMPLETE", "module": "trading_service", "function": "_run_auth_diagnostics", "line": 474, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:57.903408Z", "level": "INFO", "message": "\ud83c\udfbb Subscribing to Symphony Strategy...", "module": "trading_service", "function": "_init_online_components", "line": 504, "logger": "cloud_trader.trading_service"}
+🌍 Fetching global market structure (all symbols)...
+⚠️ Failed to fetch market structure: object MagicMock can't be used in 'await' expression. Falling back to config.
+⚠️ Could not sync portfolio balance: object MagicMock can't be used in 'await' expression
+🔍 Scanning exchange for existing positions to takeover...
+⚠️ Failed to sync open positions from exchange: object MagicMock can't be used in 'await' expression
+✅ Initialized 6 advanced AI agents (unrestricted symbol trading)
+   🤖 MILF (SWAP) - Win Rate: 60.0%
+   🤖 AGDG (PERPS) - Win Rate: 60.0%
+   🤖 MIT (PERPS) - Win Rate: 60.0%
+   📈 Momentum Trader (momentum_trading) - Win Rate: 65.0%
+   ⚡ Market Maker (market_making) - Win Rate: 62.0%
+   🧠 Swing Trader (swing_trading) - Win Rate: 68.0%
+{"timestamp": "2025-12-27T00:18:57.903937Z", "level": "INFO", "message": "\ud83e\udd16 Initializing autonomous trading components...", "module": "trading_service", "function": "_init_online_components", "line": 524, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:57.904013Z", "level": "INFO", "message": "   \u2705 Initialized 3 autonomous agents", "module": "trading_service", "function": "_init_online_components", "line": 539, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:57.904044Z", "level": "INFO", "message": "\ud83d\udc1b DEBUG: self._settings.enable_paper_trading = False", "module": "trading_service", "function": "_init_online_components", "line": 546, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:57.904074Z", "level": "INFO", "message": "\ud83e\udd16 Initializing Telegram bot handlers...", "module": "trading_service", "function": "start", "line": 409, "logger": "cloud_trader.trading_service"}
+🔍 Scanning exchange for existing positions to takeover...
+⚠️ Failed to sync open positions from exchange: object MagicMock can't be used in 'await' expression
+🕵️ Reviewing inherited positions for quality...
+⚠️ Balance fetch error: 'str' object has no attribute 'get', using fallback of $1000
+{"timestamp": "2025-12-27T00:18:57.904357Z", "level": "INFO", "message": "\u2705 Minimal trading service started successfully", "module": "trading_service", "function": "start", "line": 443, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:57.904456Z", "level": "INFO", "message": "\ud83d\udee1\ufe0f Capital Efficiency Guard started (runs hourly)", "module": "trading_service", "function": "_capital_efficiency_guard", "line": 3532, "logger": "cloud_trader.trading_service"}
+📨 Sending test Telegram message...
+.{"timestamp": "2025-12-27T00:18:57.905840Z", "level": "INFO", "message": "Capital Efficiency Guard stopped", "module": "trading_service", "function": "_capital_efficiency_guard", "line": 3578, "logger": "cloud_trader.trading_service"}
+
+
+=================================== FAILURES ===================================
+_____________________ test_full_system_startup_and_wiring ______________________
+
+test_settings = Settings(aster_api_key='a951d11fda5023b288630ffe4263115d133d29c5c943760246b92bfbde79640f', aster_api_secret='0b6178cf1...redis_url=None, cache_backend='memory', database_url='postgresql://trading_user:password123@localhost:5432/trading_db')
+
+    @pytest.mark.asyncio
+    async def test_full_system_startup_and_wiring(test_settings):
+        """
+        Verify that the TradingService starts up completely, initializes all sub-components,
+        and wires them together correctly.
+        """
+    
+        # We need to mock network clients to avoid actual connection errors during "start"
+        # But we want the internal logic to run.
+    
+        with patch("cloud_trader.trading_service.AsterClient") as MockAster, \
+             patch("cloud_trader.symphony_client.get_symphony_client") as MockSymFactory, \
+             patch("cloud_trader.drift_client.get_drift_client") as MockDriftFactory, \
+             patch("cloud_trader.jupiter_client.get_jupiter_client") as MockJupFactory:
+    
+            # Setup Client Mocks
+            # Aster
+            mock_aster = MockAster.return_value
+            mock_aster.get_historical_klines = AsyncMock(return_value=[])
+            mock_aster.get_order_book = AsyncMock(return_value={"bids": [], "asks": []})
+            mock_aster.get_positions = AsyncMock(return_value={})
+            mock_aster.get_account_balance = AsyncMock(return_value={"USDC": 1000.0})
+            mock_aster.get_ticker = AsyncMock(return_value={"last_price": 100.0})
+            mock_aster.get_batched_tickers = AsyncMock(return_value=[{"symbol": "SOL-USDC", "last_price": 100.0}])
+            mock_aster.initialize = AsyncMock()
+            mock_aster.close = AsyncMock()
+    
+            # Symphony
+            mock_symphony = AsyncMock()
+            mock_symphony.subscribe_strategy = AsyncMock(return_value=True)
+            MockSymFactory.return_value = mock_symphony
+    
+            # Drift
+            mock_drift = AsyncMock()
+            MockDriftFactory.return_value = mock_drift
+    
+            # Jupiter
+            mock_jup = AsyncMock()
+            MockJupFactory.return_value = mock_jup
+    
+            # Instantiate Service
+            service = TradingService(settings=test_settings)
+    
+            # 1. Verify Managers are initialized (offline)
+            assert service.market_data_manager is not None
+            assert service.position_manager is not None
+    
+            # 2. START THE SERVICE
+            print("\n>>> Calling service.start()...")
+            started = await service.start()
+            print(f">>> service.start() returned: {started}")
+            assert started is True
+    
+            # 3. Verify Agents Initialized
+            # We expect at least the configurable agents + autonomous agents
+            print(f">>> Agent States: {len(service._agent_states)}")
+            assert len(service._agent_states) > 0 # Symphony/Config agents
+            assert service.autonomous_agents is not None
+            # Check Autonomous Components were wired
+            print(">>> Verifying DataStore...")
+            assert service.data_store is not None
+            assert service.platform_router is not None
+    
+            # 4. Verify Wiring
+            # Agent should have access to DataStore
+            if service.autonomous_agents:
+                agent = service.autonomous_agents[0]
+                assert isinstance(agent, AutonomousAgent)
+                assert agent.data_store == service.data_store
+    
+                # DataStore should have providers
+                assert len(service.data_store.providers) >= 4
+                available_indicators = service.data_store.get_available_indicators()
+                assert "bollinger_bands" in available_indicators
+                assert "fib_levels" in available_indicators # Checked new ones
+    
+            # 5. Check Health Status
+            print(f">>> Health Running: {service._health.running}")
+            print(f">>> Health Paper Trading: {service._health.paper_trading}")
+            print(f">>> Service Settings Paper Msg: {service._settings.enable_paper_trading}")
+            print(f">>> Test Settings Paper Msg: {test_settings.enable_paper_trading}")
+            assert service._health.running is True
+>           assert service._health.paper_trading is True
+E           assert False is True
+E            +  where False = HealthStatus(running=True, paper_trading=False, api_connected=True, last_error=None).paper_trading
+E            +    where HealthStatus(running=True, paper_trading=False, api_connected=True, last_error=None) = <cloud_trader.trading_service.TradingService object at 0x10e9a1e80>._health
+
+tests/test_final_integration.py:105: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    cloud_trader.self_healing:self_healing.py:69 ❌ API Unreachable: HTTPConnectionPool(host='localhost', port=8080): Max retries exceeded with url: /healthz (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x10eb9cc20>: Failed to establish a new connection: [Errno 61] Connection refused'))
+=============================== warnings summary ===============================
+<frozen importlib._bootstrap>:488
+  <frozen importlib._bootstrap>:488: DeprecationWarning: Type google._upb._message.MessageMapContainer uses PyType_Spec with a metaclass that has custom tp_new. This is deprecated and will no longer be allowed in Python 3.14.
+
+<frozen importlib._bootstrap>:488
+  <frozen importlib._bootstrap>:488: DeprecationWarning: Type google._upb._message.ScalarMapContainer uses PyType_Spec with a metaclass that has custom tp_new. This is deprecated and will no longer be allowed in Python 3.14.
+
+tests/test_final_integration.py: 53 warnings
+  /Users/aribs/AIAster/cloud_trader/logger.py:56: DeprecationWarning: datetime.datetime.utcfromtimestamp() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.fromtimestamp(timestamp, datetime.UTC).
+    "timestamp": datetime.utcfromtimestamp(record.created).isoformat() + "Z",
+
+tests/test_final_integration.py::test_full_system_startup_and_wiring
+tests/test_final_integration.py::test_api_dashboard_structure
+  /Users/aribs/AIAster/cloud_trader/enhanced_telegram.py:244: PTBUserWarning: No `JobQueue` set up. To use `JobQueue`, you must install PTB via `pip install "python-telegram-bot[job-queue]"`.
+    job_queue = self.application.job_queue
+
+tests/test_final_integration.py::test_full_system_startup_and_wiring
+  /Users/aribs/AIAster/cloud_trader/risk.py:410: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    current_time = datetime.utcnow()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_final_integration.py::test_full_system_startup_and_wiring
+=================== 1 failed, 1 passed, 58 warnings in 4.78s ===================

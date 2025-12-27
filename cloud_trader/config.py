@@ -30,6 +30,13 @@ class Settings(BaseSettings):
         validation_alias="TELEGRAM_ENABLE_MARKET_OBSERVER",
         description="Enable periodic portfolio summaries via Telegram",
     )
+    # LLM & AI Keys
+    grok_api_key: str | None = Field(default=None, validation_alias="GROK_API_KEY")
+    gemini_api_key: str | None = Field(default=None, validation_alias="GEMINI_API_KEY")
+    hl_secret_key: str | None = Field(default=None, validation_alias="HL_SECRET_KEY")
+    hl_account_address: str | None = Field(default=None, validation_alias="HL_ACCOUNT_ADDRESS")
+    solana_private_key: str | None = Field(default=None, validation_alias="SOLANA_PRIVATE_KEY")
+    solana_rpc_url: str = Field(default="https://api.mainnet-beta.solana.com", validation_alias="SOLANA_RPC_URL")
     telegram_summary_interval_seconds: int = Field(
         default=14_400,
         ge=0,
@@ -143,10 +150,32 @@ class Settings(BaseSettings):
         default=True, validation_alias="ENABLE_PROFIT_MAXIMIZATION"
     )
 
+    # Symphony Agent Registration
+    symphony_milf_agent_id: str | None = Field(default="f6cc5590-ff96-4077-ac80-9775c7f805cc", validation_alias="SYMPHONY_MILF_AGENT_ID")
+    symphony_agdg_agent_id: str | None = Field(default="01b8c2b7-b210-493f-8c76-dafd97663e2c", validation_alias="SYMPHONY_AGDG_AGENT_ID")
+    symphony_degen_agent_id: str | None = Field(default="01b8c2b7-b210-493f-8c76-dafd97663e2c", validation_alias="SYMPHONY_DEGEN_AGENT_ID")
+    symphony_mit_agent_id: str | None = Field(default="ee5bcfda-0919-469c-ac8f-d665a5dd444e", validation_alias="SYMPHONY_MIT_AGENT_ID")
+    symphony_api_key: str | None = Field(default=None, validation_alias="SYMPHONY_API_KEY")
+    symphony_strategy_id: str = Field(default="aster-strategy-sub", validation_alias="SYMPHONY_STRATEGY_ID")
+
     # Vertex AI Configuration
     enable_vertex_ai: bool = Field(default=True, validation_alias="ENABLE_VERTEX_AI")
     vertex_ai_region: str = Field(default="us-central1", validation_alias="VERTEX_AI_REGION")
     vertex_ai_project: str | None = Field(default=None, validation_alias="VERTEX_AI_PROJECT")
+
+    # MIT (Monad Implementation Treasury) Settings
+    mit_fund_name: str = Field(default="Sapphire MIT Agent", validation_alias="MIT_FUND_NAME")
+    mit_fund_description: str = Field(
+        default="Autonomous AI trading agent powered by Sapphire intelligence on Monad blockchain",
+        validation_alias="MIT_FUND_DESCRIPTION",
+    )
+    mit_auto_subscribe: bool = Field(default=True, validation_alias="MIT_AUTO_SUBSCRIBE")
+    mit_default_leverage: int = Field(default=3, validation_alias="MIT_DEFAULT_LEVERAGE")
+    mit_max_position_size_usdc: float = Field(default=100.0, validation_alias="MIT_MAX_POSITION_SIZE_USDC")
+    mit_enable_stop_loss: bool = Field(default=True, validation_alias="MIT_ENABLE_STOP_LOSS")
+    mit_enable_take_profit: bool = Field(default=True, validation_alias="MIT_ENABLE_TAKE_PROFIT")
+    mit_default_sl_percent: float = Field(default=0.03, validation_alias="MIT_DEFAULT_SL_PERCENT")
+    mit_default_tp_percent: float = Field(default=0.08, validation_alias="MIT_DEFAULT_TP_PERCENT")
 
     # Prompt Engineering Configuration
     prompt_version: str = Field(default="v1.0", validation_alias="PROMPT_VERSION")
@@ -270,8 +299,9 @@ class Settings(BaseSettings):
         validation_alias="ENABLE_RL_STRATEGIES",
         description="Enable reinforcement learning strategies",
     )
-    enable_telegram: bool = Field(default=False, validation_alias="ENABLE_TELEGRAM")
+    enable_telegram: bool = Field(default=True, validation_alias="ENABLE_TELEGRAM")
     enable_pubsub: bool = Field(default=False, validation_alias="ENABLE_PUBSUB")
+    enable_aster: bool = Field(default=True, validation_alias="ENABLE_ASTER")
 
     # Paper trading testnet configuration
     aster_testnet_api_key: str | None = Field(

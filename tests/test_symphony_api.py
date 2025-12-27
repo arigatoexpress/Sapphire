@@ -2,10 +2,11 @@
 """Test Symphony API directly to check fund status."""
 
 import asyncio
+import os
 
 import httpx
 
-API_KEY = "sk_live_MZDK1SgMeRQzEKpuRFM7FXbcMgD833YA8Y69DnpprvE"
+API_KEY = os.getenv("SYMPHONY_API_KEY")
 BASE_URL = "https://api.symphony.io"
 MIT_AGENT_ID = "ee5bcfda-0919-469c-ac8f-d665a5dd444e"
 

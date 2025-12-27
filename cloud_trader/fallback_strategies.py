@@ -37,7 +37,8 @@ class FallbackStrategySelector:
                 ["low_frequency_momentum", "reduced_symbol_scanning"]
             )
             logger.info(f"Selecting '{selected_strategy_name}' fallback for {symbol}.")
-            return await self.strategies[selected_strategy_name](symbol, position)
+            strategy_method = getattr(self, f"_{selected_strategy_name}")
+            return await strategy_method(symbol, position)
 
     async def _low_frequency_momentum(self, symbol: str, position: Optional[Dict[str, Any]]) -> str:
         """

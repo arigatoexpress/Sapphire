@@ -192,8 +192,22 @@ class JupiterSwapClient:
             price = price_data.get("data", {}).get(token_mint, {}).get("price", 0)
             return float(price)
         except Exception as e:
-            logger.error(f"Price fetch error: {e}")
-            return 0.0
+            logger.warning(f"Jupiter Price API failed ({e}). Attempting CoinGecko fallback...")
+            try:
+                # CoinGecko Fallback
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(
+                        "https://api.coingecko.com/api/v3/simple/price",
+                        params={"ids": "solana", "vs_currencies": "usd"},
+                        timeout=5.0,
+                    )
+                    data = resp.json()
+                    price = float(data.get("solana", {}).get("usd", 0.0))
+                    logger.info(f"✅ CoinGecko Fallback: SOL @ ${price}")
+                    return price
+            except Exception as e2:
+                logger.error(f"Price fetch fallback failed: {e2}")
+                return 0.0
 
 
 # Singleton instance

@@ -42,15 +42,16 @@ class Position:
 @dataclass
 class PortfolioState:
     """Track portfolio state."""
-
     balance: float = 0.0
-    equity: float = 0.0  # Added for dynamic margin scaling
+    equity: float = 0.0
     unrealized_pnl: float = 0.0
     margin_used: float = 0.0
     leverage: float = 0.0
     daily_pnl: float = 0.0
     peak_balance: float = 0.0
     max_drawdown: float = 0.0
+    total_exposure: float = 0.0
+    positions: Dict[str, Position] = field(default_factory=dict)
 
 
 class RiskManager:

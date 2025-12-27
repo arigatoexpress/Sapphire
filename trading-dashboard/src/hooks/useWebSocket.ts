@@ -98,14 +98,15 @@ export const useDashboardWebSocket = (url?: string): UseWebSocketReturn => {
       const apiUrl = import.meta.env.VITE_API_URL;
       let fullWsUrl;
 
-      if (apiUrl && !apiUrl.includes('localhost')) {
+      if (apiUrl && !apiUrl.includes('localhost') && !apiUrl.includes('127.0.0.1')) {
         // Use the explicit Cloud Run URL
         const wsProtocol = apiUrl.startsWith('https') ? 'wss' : 'ws';
         const host = apiUrl.replace(/^https?:\/\//, '');
         fullWsUrl = `${wsProtocol}://${host}/ws/dashboard`;
       } else {
-        // Fallback to relative (good for proxy/localhost)
+        // Fallback to relative (best for Cloud Run on same domain)
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        // Ensure we handle port for non-standard local dev if needed, but on Cloud Run host is fine
         fullWsUrl = `${protocol}//${window.location.host}/ws/dashboard`;
       }
 

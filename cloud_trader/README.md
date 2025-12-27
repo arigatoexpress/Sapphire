@@ -1,62 +1,56 @@
-# Cloud Trader 🤖
+# Cloud Trader Engine 🤖
 
-The main trading engine for SapphireAI.
+The core execution engine for the Sapphire AI Trading System.
 
 ## Overview
 
-Cloud Trader is a Python FastAPI service that:
-- Manages **3 specialized AI trading agents**
-- Executes perpetual futures trades on Aster DEX
-- Provides WebSocket connections for the dashboard
-- Sends Telegram notifications (optional)
-- Self-tunes agent parameters based on performance
+Cloud Trader is a high-performance Python service designed for autonomous multi-chain trading. It implements a decoupled, agentic architecture that separates discovery, deliberation, and execution.
 
-## Agents
+### Key Capabilities
+- **Multi-Agent Swarm**: Coordinates 6 specialized AI agents for market analysis and decision making.
+- **Cross-Chain Execution**: Unified routing to Symphony (Monad/Base) and Aster (Solana).
+- **Self-Improving Intelligence**: Autonomous feedback loops that update agent strategy weights based on real-time PnL.
+- **Microservices Core**: FastAPI-based REST and WebSocket endpoints for low-latency dashboard synchronization.
 
-| Agent | TP / SL | Specialization |
-|-------|---------|----------------|
-| Momentum Trader | 2.5% / 1.2% | Breakout hunting |
-| Market Maker | 0.8% / 0.4% | Bid-ask spreads |
-| Swing Trader | 5% / 2% | Multi-day trends |
+## The Swarm (Agents)
 
-## Key Files
+| Agent | Focus | Strategy Evolution |
+|-------|-------|-------------------|
+| **Trend Momentum** | Macro breakouts | Volatility-aware weighting |
+| **Strategy Optimizer** | TP/SL optimization | Dynamic risk adjustment |
+| **Sentiment Analyst** | Social/News impact | Confidence-based filtering |
+| **Market Predictor** | Price action forecasting | Pattern-match learning |
+| **Microstructure** | Order flow / VPIN | Latency-optimized execution |
+| **Risk Guard** | Drawdown protection | Global exposure management |
 
-| File | Description |
-|------|-------------|
-| `trading_service.py` | Main trading loop (2600 lines) |
-| `definitions.py` | Agent definitions & MinimalAgentState |
-| `api.py` | FastAPI application & WebSocket |
-| `client.py` | Aster DEX API client |
-| `mcp.py` | MCP messaging for agent coordination |
+## Core Engine Structure
+
+| Module | Purpose |
+|--------|---------|
+| `trading_service.py` | Main event loop and agent orchestration. |
+| `market_scanner.py` | Discovery engine for high-probability setups. |
+| `platform_router.py` | Platform-agnostic execution adapter (Symphony/Aster). |
+| `autonomous_agent.py` | Base class for self-learning intelligence. |
+| `data_store.py` | Unified data access with TTL multi-level caching. |
 
 ## Running Locally
 
 ```bash
-# From project root
-python -m cloud_trader.api
+# Ensure you are in the project root
+python3 start.py
 ```
 
-## Environment Variables
+## Environment Configuration
 
-```bash
-ASTER_API_KEY=your_key
-ASTER_SECRET_KEY=your_secret
-GEMINI_API_KEY=your_gemini_key
-TELEGRAM_BOT_TOKEN=optional
-TELEGRAM_CHAT_ID=optional
-```
+Key variables required in `.env`:
+- `SYMPHONY_API_KEY`: Authentication for Monad/Base agents.
+- `HL_SECRET_KEY`: Private key for Hyperliquid/Aster DEX.
+- `GROK_API_KEY`: Intelligence source for agent arbitration.
+- `DATABASE_URL`: (Optional) Persistence layer for trade history.
 
-## API Endpoints
+## Monitoring
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | Health check |
-| `/api/snapshot` | GET | Full dashboard data |
-| `/api/agents` | GET | Agent list with stats |
-| `/ws/dashboard` | WS | Real-time WebSocket updates |
+Access the **Sapphire Command Center** at [https://api.sapphiretrade.xyz/dashboard](https://api.sapphiretrade.xyz/dashboard) (or your local port: 8080).
 
-## Deployment
-
-```bash
-gcloud builds submit --config cloudbuild.yaml .
-```
+---
+*For internal tools and legacy modules, see the [`internal/`](../internal/) directory.*

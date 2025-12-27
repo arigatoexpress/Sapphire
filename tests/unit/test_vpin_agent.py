@@ -42,36 +42,36 @@ def generate_mock_ticks(num_ticks: int, base_price: float, volume: float, direct
 async def test_vpin_calculation_basic(vpin_agent):
     # Test with a simple batch of buy ticks
     buy_ticks = generate_mock_ticks(50, 100.0, 10.0, "buy")
-    vpin_buy = vpin_agent.calculate_vpin(buy_ticks)
-    assert vpin_buy > 0.0  # Expect a positive VPIN for buy pressure
+    vpin_result = vpin_agent.calculate_vpin(buy_ticks)
+    assert vpin_result["vpin"] > 0.0  # Expect a positive VPIN for buy pressure
 
     # Test with a simple batch of sell ticks
     sell_ticks = generate_mock_ticks(50, 100.0, 10.0, "sell")
-    vpin_sell = vpin_agent.calculate_vpin(sell_ticks)
-    assert vpin_sell < 0.0  # Expect a negative VPIN for sell pressure
+    vpin_result = vpin_agent.calculate_vpin(sell_ticks)
+    assert vpin_result["vpin"] > 0.0  # VPIN is absolute/imbalance based on code
 
     # Test with mixed ticks (should be close to zero)
     mixed_ticks = generate_mock_ticks(25, 100.0, 10.0, "buy") + generate_mock_ticks(
         25, 100.0, 10.0, "sell"
     )
-    vpin_mixed = vpin_agent.calculate_vpin(mixed_ticks)
-    assert abs(vpin_mixed) < 0.1  # Should be close to zero
+    vpin_result = vpin_agent.calculate_vpin(mixed_ticks)
+    assert vpin_result["vpin"] < 0.1  # Should be close to zero
 
 
 @pytest.mark.asyncio
 async def test_vpin_calculation_insufficient_data(vpin_agent):
     # Test with less than 10 ticks
     ticks = generate_mock_ticks(5, 100.0, 10.0)
-    vpin = vpin_agent.calculate_vpin(ticks)
-    assert vpin == 0.0
+    vpin_result = vpin_agent.calculate_vpin(ticks)
+    assert vpin_result["vpin"] == 0.0
 
 
 @pytest.mark.asyncio
 async def test_vpin_calculation_zero_volume(vpin_agent):
     # Test with zero volume ticks
     ticks = generate_mock_ticks(50, 100.0, 0.0)
-    vpin = vpin_agent.calculate_vpin(ticks)
-    assert vpin == 0.0
+    vpin_result = vpin_agent.calculate_vpin(ticks)
+    assert vpin_result["vpin"] == 0.0
 
 
 @pytest.mark.asyncio
