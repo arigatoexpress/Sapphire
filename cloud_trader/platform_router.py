@@ -308,7 +308,7 @@ class AsterAdapter(PlatformAdapter):
     async def execute_trade(self, symbol: str, side: str, quantity: float, **kwargs) -> TradeResult:
         """Execute market order on Aster with automatic retry."""
         try:
-            from ..enums import OrderType
+            from .enums import OrderType
 
             order = await self.client.place_order(
                 symbol=symbol, side=side, order_type=OrderType.MARKET, quantity=quantity
