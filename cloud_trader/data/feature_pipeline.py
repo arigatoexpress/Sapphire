@@ -15,6 +15,10 @@ except ImportError:
     print("⚠️ Pandas not found. FeaturePipeline will be disabled.")
 
 from ..definitions import SYMPHONY_SYMBOLS
+from ..logger import get_logger
+
+logger = get_logger(__name__)
+
 
 # Mocking Aster Client dependency to avoid circular imports if possible,
 # but in real app we inject it.
@@ -23,6 +27,8 @@ from ..definitions import SYMPHONY_SYMBOLS
 class FeaturePipeline:
     def __init__(self, exchange_client):
         self.client = exchange_client
+        self._analysis_cache: Dict[str, Dict[str, Any]] = {}
+        self._cache_ttl = 60  # Cache analysis for 60 seconds
 
     async def fetch_candles(self, symbol: str, interval: str = "1h", limit: int = 100) -> Any:
         """Fetch OHLCV data and return as DataFrame."""
@@ -126,10 +132,14 @@ class FeaturePipeline:
         df = pd.DataFrame(data)
         return df
 
-    def calculate_indicators(self, df: Any) -> Any:
+    def calculate_indicators(self, df: Any, symbol: str = "Unknown") -> Any:
         """Calculate comprehensive technical indicators."""
         if pd is None or not isinstance(df, pd.DataFrame) or df.empty:
             return df
+            
+        print(f"📊 [TA] Starting {symbol} indicators...")
+        import sys
+        sys.stdout.flush()
 
         # Trend (Manual Calculation to bypass pandas-ta issue)
         df["EMA_20"] = df["close"].ewm(span=20, adjust=False).mean()
@@ -269,22 +279,39 @@ class FeaturePipeline:
         return df
 
     async def get_market_analysis(self, symbol: str) -> Dict[str, Any]:
-        """Get full analysis snapshot for an agent."""
+        """Get full analysis snapshot for an agent (with caching)."""
         
-        # Parallel fetch for speed
+        # Check cache
+        now = time.time()
+        if symbol in self._analysis_cache:
+            cached_data, timestamp = self._analysis_cache[symbol]
+            if now - timestamp < self._cache_ttl:
+                print(f"💾 [PIPELINE] Cache HIT for {symbol}")
+                import sys
+                sys.stdout.flush()
+                return cached_data
+                
+        # Cache miss - Parallel fetch for speed
         candles_task = self.fetch_candles(symbol, interval="1h", limit=100)
         orderbook_task = self.client.get_order_book(symbol, limit=20)
         
+        print(f"🕯️ [PIPELINE] Gathering data for {symbol}...")
         results = await asyncio.gather(candles_task, orderbook_task, return_exceptions=True)
+        print(f"📊 [PIPELINE] Gathered data for {symbol}")
+        
         df, orderbook = results[0], results[1] # orderbook might be an exception? No, return_exceptions=True
         if isinstance(orderbook, Exception): orderbook = {} 
 
         # 1. Technical Analysis
         ta_data = {}
         if pd is not None and isinstance(df, pd.DataFrame) and not df.empty:
-            df = self.calculate_indicators(df)
+            df = self.calculate_indicators(df, symbol)
+            print(f"✅ [PIPELINE] Complete for {symbol}")
+            import sys
+            sys.stdout.flush()
             latest = df.iloc[-1]
             ta_data = {
+                "price": float(latest["close"]),
                 "rsi": float(latest.get("RSI_14", 50)),
                 "atr": float(latest.get("ATRr_14", 0)),
                 "ema_20": float(latest.get("EMA_20", 0)),
@@ -332,9 +359,15 @@ class FeaturePipeline:
             except Exception:
                 pass
 
-        return {
+        result = {
             "symbol": symbol,
             "price": ta_data.get("close", 0) if ta_data else 0,  # Fallback
             **ta_data,
             **ob_data,
         }
+
+        # Save to cache
+        self._analysis_cache[symbol] = (result, time.time())
+        logger.debug(f"💾 [PIPELINE] Cached TA result for {symbol}")
+        
+        return result

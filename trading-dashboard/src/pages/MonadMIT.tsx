@@ -1,34 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { Zap, TrendingUp, Shield, Users, CheckCircle, Circle } from 'lucide-react';
-import { motion } from 'framer-motion';
-import { SymphonyTradeForm } from '../components/SymphonyTradeForm';
-
-interface ActivationProgress {
-    current: number;
-    required: number;
-    percentage: number;
-    activated: boolean;
-}
+import { Container, Grid, Paper, Typography, Box, Button, Chip } from '@mui/material';
+import { Shield, Zap, ExternalLink } from 'lucide-react';
+import { getApiUrl } from '../utils/apiConfig';
 
 interface MITFund {
-    id?: string;
     name: string;
-    description: string;
-    balance: number;
-    is_activated: boolean;
-    trades_count: number;
+    symbol: string;
+    total_assets: number;
+    performance_fee: number;
+    management_fee: number;
+    strategy: string;
+    active: boolean;
 }
 
-export const MonadMIT: React.FC = () => {
-    const [activationProgress, setActivationProgress] = useState<ActivationProgress>({
-        current: 0,
-        required: 5,
-        percentage: 0,
-        activated: false
-    });
-
+const MonadMIT: React.FC = () => {
     const [fund, setFund] = useState<MITFund | null>(null);
     const [loading, setLoading] = useState(true);
+
+    const API_URL = getApiUrl();
 
     useEffect(() => {
         fetchMITStatus();
@@ -36,234 +25,115 @@ export const MonadMIT: React.FC = () => {
 
     const fetchMITStatus = async () => {
         try {
-            const apiUrl = import.meta.env.VITE_API_URL || 'https://cloud-trader-267358751314.europe-west1.run.app';
-            const response = await fetch(`${apiUrl}/api/symphony/status`);
+            const response = await fetch(`${API_URL}/api/symphony/status`);
             const data = await response.json();
-
-            setFund(data.fund);
-            setActivationProgress({
-                current: Math.min(data.trades_count || 0, 5),
-                required: 5,
-                percentage: Math.min(((data.trades_count || 0) / 5) * 100, 100),
-                activated: data.is_activated || false
-            });
-        } catch (error) {
-            console.error('Failed to fetch MIT status:', error);
+            setFund(data);
+        } catch (e) {
+            console.error("MIT fetch failed", e);
         } finally {
             setLoading(false);
         }
     };
 
-    if (loading) {
-        return (
-            <div className="min-h-screen bg-gradient-to-br from-[#0a0a0f] via-[#1a0a2e] to-[#0a0a0f] text-white p-8 flex items-center justify-center">
-                <div className="text-center">
-                    <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mb-4 mx-auto" />
-                    <p className="text-purple-300">Loading MIT Dashboard...</p>
-                </div>
-            </div>
-        );
-    }
-
-    const renderActivationSteps = () => {
-        const steps = [1, 2, 3, 4, 5];
-        return (
-            <div className="flex items-center justify-between mb-8">
-                {steps.map((step, index) => (
-                    <React.Fragment key={step}>
-                        <div className="flex flex-col items-center">
-                            <motion.div
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
-                                transition={{ delay: index * 0.1 }}
-                                className={`w-12 h-12 rounded-full flex items-center justify-center border-2 ${step <= activationProgress.current
-                                    ? 'bg-purple-600 border-purple-400 text-white'
-                                    : 'bg-gray-800 border-gray-600 text-gray-500'
-                                    }`}
-                            >
-                                {step <= activationProgress.current ? (
-                                    <CheckCircle className="w-6 h-6" />
-                                ) : (
-                                    <Circle className="w-6 h-6" />
-                                )}
-                            </motion.div>
-                            <span className="mt-2 text-xs text-gray-400">Trade {step}</span>
-                        </div>
-                        {index < steps.length - 1 && (
-                            <div className="flex-1 h-0.5 mx-2 bg-gray-700 relative">
-                                <motion.div
-                                    initial={{ width: 0 }}
-                                    animate={{
-                                        width: step < activationProgress.current ? '100%' : '0%'
-                                    }}
-                                    transition={{ delay: index * 0.1 + 0.2 }}
-                                    className="absolute inset-0 bg-purple-600"
-                                />
-                            </div>
-                        )}
-                    </React.Fragment>
-                ))}
-            </div>
-        );
-    };
-
     return (
-        <div className="min-h-screen bg-gradient-to-br from-[#0a0a0f] via-[#1a0a2e] to-[#0a0a0f] text-white p-8">
-            {/* Header */}
-            <div className="max-w-6xl mx-auto">
-                <motion.div
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-center mb-12"
-                >
-                    <div className="inline-flex items-center gap-3 mb-4">
-                        <Zap className="w-10 h-10 text-purple-400" />
-                        <h1 className="text-5xl font-bold bg-gradient-to-r from-purple-400 via-purple-300 to-purple-500 bg-clip-text text-transparent">
-                            MIT
-                        </h1>
-                    </div>
-                    <p className="text-xl text-purple-300 font-medium">
-                        Monad Implementation Treasury
-                    </p>
-                    <p className="text-gray-400 mt-2">
-                        Autonomous AI Agent Trading on Symphony
-                    </p>
-                </motion.div>
-
-                {/* Activation Status Card */}
-                <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="bg-gradient-to-br from-purple-900/30 via-purple-800/20 to-purple-900/30 backdrop-blur-xl border border-purple-500/30 rounded-2xl p-8 mb-8"
-                >
-                    <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-2xl font-bold text-purple-100">
-                            Activate Your Agentic Fund
-                        </h2>
-                        {activationProgress.activated && (
-                            <div className="px-4 py-2 bg-green-500/20 border border-green-400/50 rounded-full flex items-center gap-2">
-                                <CheckCircle className="w-5 h-5 text-green-400" />
-                                <span className="text-green-300 font-medium">Activated</span>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Progress Bar */}
-                    <div className="mb-6">
-                        <div className="flex justify-between text-sm mb-2">
-                            <span className="text-purple-300">Activation Progress</span>
-                            <span className="text-purple-200 font-bold">
-                                {activationProgress.current}/{activationProgress.required} trades
-                            </span>
-                        </div>
-                        <div className="h-3 bg-gray-800 rounded-full overflow-hidden">
-                            <motion.div
-                                initial={{ width: 0 }}
-                                animate={{ width: `${activationProgress.percentage}%` }}
-                                transition={{ duration: 1, ease: 'easeOut' }}
-                                className="h-full bg-gradient-to-r from-purple-600 to-purple-400"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Activation Steps */}
-                    {renderActivationSteps()}
-
-                    {/* Status Message */}
-                    <div className="bg-purple-950/50 border border-purple-500/30 rounded-xl p-6">
-                        {activationProgress.activated ? (
-                            <div>
-                                <h3 className="text-lg font-semibold text-purple-200 mb-2">
-                                    🎉 Fund Activated!
-                                </h3>
-                                <p className="text-gray-300">
-                                    Your agentic fund is now live. You can start accepting subscribers and earning management fees.
-                                </p>
-                            </div>
-                        ) : (
-                            <div>
-                                <h3 className="text-lg font-semibold text-purple-200 mb-2">
-                                    Welcome! Get started by making your first trade
-                                </h3>
-                                <p className="text-gray-300 mb-4">
-                                    Your agentic fund is not yet activated. Complete{' '}
-                                    <span className="text-purple-400 font-semibold">
-                                        {5 - activationProgress.current} more trade{5 - activationProgress.current !== 1 ? 's' : ''}
-                                    </span>{' '}
-                                    to activate it and begin accepting subscribers.
-                                </p>
-                                <ul className="space-y-2 text-sm text-gray-400">
-                                    <li className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 bg-purple-400 rounded-full" />
-                                        Execute trades via perpetuals or spot markets
-                                    </li>
-                                    <li className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 bg-purple-400 rounded-full" />
-                                        Maintain full custody through your Symphony smart account
-                                    </li>
-                                    <li className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 bg-purple-400 rounded-full" />
-                                        Set custom fee structures once activated
-                                    </li>
-                                </ul>
-                            </div>
-                        )}
-                    </div>
-                </motion.div>
-
-                {/* Features Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <FeatureCard
-                        icon={<TrendingUp className="w-6 h-6" />}
-                        title="Autonomous Trading"
-                        description="AI-powered execution on Monad's high-performance blockchain"
-                    />
-                    <FeatureCard
-                        icon={<Shield className="w-6 h-6" />}
-                        title="Full Custody"
-                        description="Your funds stay in your Symphony smart account"
-                    />
-                    <FeatureCard
-                        icon={<Users className="w-6 h-6" />}
-                        title="Subscriber Fees"
-                        description="Earn management fees once your fund is activated"
-                    />
+        <Container maxWidth="lg" className="py-12">
+            <Box className="flex justify-between items-center mb-10">
+                <div>
+                    <Typography variant="h3" className="font-bold text-white mb-2">
+                        Monad MIT
+                    </Typography>
+                    <Typography variant="subtitle1" className="text-slate-400">
+                        Symphony-powered managed investment tokens
+                    </Typography>
                 </div>
+                <Button variant="contained" color="primary" startIcon={<ExternalLink size={18} />}>
+                    Connect Wallet
+                </Button>
+            </Box>
 
-                {/* Trading Interface - Only show if not activated */}
-                {!activationProgress.activated && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.3 }}
-                        className="mt-8"
-                    >
-                        <SymphonyTradeForm onTradeComplete={fetchMITStatus} />
-                    </motion.div>
-                )}
-            </div>
-        </div>
-    );
-};
+            <Grid container spacing={4}>
+                <Grid item xs={12} md={8}>
+                    <Paper className="p-8 bg-slate-800/40 border border-slate-700 backdrop-blur-xl rounded-2xl">
+                        <Box className="flex justify-between items-start mb-6">
+                            <Box className="flex items-center space-x-4">
+                                <div className="p-4 bg-indigo-500/20 rounded-2xl">
+                                    <Shield className="text-indigo-400" size={32} />
+                                </div>
+                                <div>
+                                    <Typography variant="h5" className="text-white font-bold">
+                                        Sapphire Alpha Fund
+                                    </Typography>
+                                    <Typography variant="body2" className="text-slate-500 font-mono">
+                                        sALP-v1
+                                    </Typography>
+                                </div>
+                            </Box>
+                            <Chip label="LIVE" color="success" size="small" />
+                        </Box>
 
-interface FeatureCardProps {
-    icon: React.ReactNode;
-    title: string;
-    description: string;
-}
+                        <Typography className="text-slate-300 mb-8 leading-relaxed">
+                            The Sapphire Alpha Fund utilizes the Aster Analysis Engine to rotate capital between high-conviction
+                            narratives across Monad and Solana. Managed by Symphony, sALP offers institutional-grade
+                            risk management with autonomous execution.
+                        </Typography>
 
-const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description }) => {
-    return (
-        <motion.div
-            whileHover={{ scale: 1.02 }}
-            className="bg-purple-900/20 backdrop-blur-sm border border-purple-500/20 rounded-xl p-6 hover:border-purple-400/40 transition-all"
-        >
-            <div className="w-12 h-12 bg-purple-600/20 rounded-lg flex items-center justify-center mb-4 text-purple-400">
-                {icon}
-            </div>
-            <h3 className="text-lg font-semibold text-purple-100 mb-2">{title}</h3>
-            <p className="text-gray-400 text-sm">{description}</p>
-        </motion.div>
+                        <Grid container spacing={2}>
+                            {[
+                                { label: 'Min. TVL', value: '$1.2M' },
+                                { label: 'Perf. Fee', value: '15%' },
+                                { label: 'Mgt. Fee', value: '1%' },
+                                { label: 'Settlement', value: 'Daily' },
+                            ].map((stat, i) => (
+                                <Grid item xs={6} sm={3} key={i}>
+                                    <Box className="p-4 bg-slate-900/50 rounded-xl border border-slate-800">
+                                        <Typography variant="caption" className="text-slate-500 block mb-1">
+                                            {stat.label}
+                                        </Typography>
+                                        <Typography className="text-white font-bold font-mono">
+                                            {stat.value}
+                                        </Typography>
+                                    </Box>
+                                </Grid>
+                            ))}
+                        </Grid>
+                    </Paper>
+                </Grid>
+
+                <Grid item xs={12} md={4}>
+                    <Paper className="p-6 bg-slate-800/40 border border-slate-700 backdrop-blur-xl rounded-2xl h-full">
+                        <Typography variant="h6" className="text-white font-bold mb-6 flex items-center gap-2">
+                            <Zap size={20} className="text-yellow-400" /> Performance
+                        </Typography>
+
+                        <Box className="space-y-6">
+                            <Box className="text-center p-8 bg-slate-900/60 rounded-2xl border border-slate-800">
+                                <Typography variant="h3" className="text-green-400 font-mono font-bold mb-1">
+                                    +24.8%
+                                </Typography>
+                                <Typography variant="body2" className="text-slate-500 uppercase tracking-widest">
+                                    Last 30 Days
+                                </Typography>
+                            </Box>
+
+                            <Box className="space-y-4">
+                                <Typography variant="subtitle2" className="text-slate-400 font-bold uppercase text-xs">
+                                    Fund Composition
+                                </Typography>
+                                <div className="space-y-2">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-slate-400">Stablecoins</span>
+                                        <span className="text-white font-mono">42%</span>
+                                    </div>
+                                    <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
+                                        <div className="bg-indigo-500 h-full" style={{ width: '42%' }}></div>
+                                    </div>
+                                </div>
+                            </Box>
+                        </Box>
+                    </Paper>
+                </Grid>
+            </Grid>
+        </Container>
     );
 };
 

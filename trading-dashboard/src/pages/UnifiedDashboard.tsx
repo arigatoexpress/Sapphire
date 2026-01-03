@@ -6,6 +6,7 @@ import { useTradingData } from '../contexts/TradingContext';
 import { LiveChatPanel } from '../components/LiveChatPanel';
 import { AnimatedNumber } from '../components/ui/AnimatedNumber';
 import { Sparkline } from '../components/ui/Sparkline';
+import { getApiUrl } from '../utils/apiConfig';
 
 // ============ STAT CARD ============
 const StatCard = memo<{
@@ -242,24 +243,25 @@ export const UnifiedDashboard: React.FC = () => {
     } = useTradingData();
 
     const [consensusStats, setConsensusStats] = useState<any>(null);
+    const API_URL = getApiUrl();
 
     // Fetch consensus stats directly for more data
     useEffect(() => {
         const fetchStats = async () => {
             try {
-                const res = await fetch('https://cloud-trader-267358751314.europe-west1.run.app/consensus/state');
+                const res = await fetch(`${API_URL}/consensus/state`);
                 if (res.ok) {
                     const data = await res.json();
                     setConsensusStats(data.stats);
                 }
             } catch (e) {
-                console.error('Failed to fetch consensus stats');
+                console.error('Failed to fetch consensus stats', e);
             }
         };
         fetchStats();
         const interval = setInterval(fetchStats, 15000);
         return () => clearInterval(interval);
-    }, []);
+    }, [API_URL]);
 
     const activeAgents = agents.filter(a => a.status === 'active').length;
     const pnlTrend = total_pnl_percent >= 0 ? 'up' : 'down';

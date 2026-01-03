@@ -16,6 +16,7 @@ class Settings(BaseSettings):
         extra="ignore",
         env_file_encoding="utf-8",
         populate_by_name=True,
+        protected_namespaces=('settings_',),
     )
 
     # API credentials
@@ -54,7 +55,7 @@ class Settings(BaseSettings):
     admin_api_token: str | None = Field(default=None, validation_alias="ADMIN_API_TOKEN")
 
     # Database configuration
-    database_enabled: bool = Field(default=False, validation_alias="DATABASE_ENABLED")
+    database_enabled: bool = Field(default=True, validation_alias="DATABASE_ENABLED")
 
     # API endpoints
     rest_base_url: str = Field(
@@ -143,6 +144,13 @@ class Settings(BaseSettings):
         description="List of 6 advanced AI agents for autonomous trading",
     )
     max_symbols_per_agent: int = Field(default=10, ge=1, le=50)
+    max_positions: int = Field(
+        default=25,
+        ge=1,
+        le=100,
+        description="Maximum concurrent open positions allowed by risk engine",
+        validation_alias="MAX_POSITIONS",
+    )
     agent_parallel_execution: bool = Field(
         default=True, validation_alias="AGENT_PARALLEL_EXECUTION"
     )
@@ -156,7 +164,7 @@ class Settings(BaseSettings):
     symphony_degen_agent_id: str | None = Field(default="01b8c2b7-b210-493f-8c76-dafd97663e2c", validation_alias="SYMPHONY_DEGEN_AGENT_ID")
     symphony_mit_agent_id: str | None = Field(default="ee5bcfda-0919-469c-ac8f-d665a5dd444e", validation_alias="SYMPHONY_MIT_AGENT_ID")
     symphony_api_key: str | None = Field(default=None, validation_alias="SYMPHONY_API_KEY")
-    symphony_strategy_id: str = Field(default="aster-strategy-sub", validation_alias="SYMPHONY_STRATEGY_ID")
+    symphony_strategy_id: str = Field(default="default", validation_alias="SYMPHONY_STRATEGY_ID")
 
     # Vertex AI Configuration
     enable_vertex_ai: bool = Field(default=True, validation_alias="ENABLE_VERTEX_AI")

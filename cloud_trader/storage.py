@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import traceback
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
@@ -240,6 +241,8 @@ class TradingStorage:
             # Convert postgres:// to postgresql+asyncpg:// for async support
             if database_url.startswith("postgres://"):
                 database_url = database_url.replace("postgres://", "postgresql+asyncpg://", 1)
+            elif database_url.startswith("postgresql://"):
+                database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
             elif not database_url.startswith("postgresql+asyncpg://"):
                 database_url = f"postgresql+asyncpg://{database_url}"
 
@@ -306,7 +309,8 @@ class TradingStorage:
             self._initialized = True
             logger.info("Database storage initialized")
         except Exception as e:
-            logger.error(f"Failed to initialize database storage: {e}")
+            error_msg = traceback.format_exc()
+            logger.error(f"Failed to initialize database storage: {e}\n{error_msg}")
             self._engine = None
             self._session_factory = None
 

@@ -1,11 +1,6 @@
-/**
- * Trading API utilities for agent and system controls
- */
+import { getApiUrl } from './apiConfig';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ||
-  (typeof window !== 'undefined' && window.location.hostname === 'localhost'
-    ? 'http://localhost:8080'
-    : 'https://api.sapphiretrade.xyz');
+const API_BASE_URL = getApiUrl();
 
 // Get admin token from localStorage or env
 const getAdminToken = (): string | null => {

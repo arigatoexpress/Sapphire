@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import sys
 from datetime import datetime
 from typing import Any, Dict
@@ -89,7 +90,9 @@ def get_logger(name: str) -> logging.Logger:
     if logger.handlers:
         return logger
 
-    logger.setLevel(logging.INFO)
+    level_name = os.getenv("LOG_LEVEL", "DEBUG").upper()
+    level = getattr(logging, level_name, logging.DEBUG)
+    logger.setLevel(level)
 
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(JSONFormatter())

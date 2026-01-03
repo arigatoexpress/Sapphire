@@ -22,7 +22,8 @@ if __name__ == "__main__":
             port=port,
             log_level="info",
             proxy_headers=True,
-            forwarded_allow_ips="*"
+            forwarded_allow_ips="*",
+            ws="wsproto"  # Use wsproto instead of websockets for WebSocket handling
         )
     except KeyboardInterrupt:
         logger.info("👋 User stopped server.")

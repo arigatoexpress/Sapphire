@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { getApiUrl } from '../utils/apiConfig';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     ArrowDownUp,
@@ -45,7 +46,7 @@ const JupiterSwap: React.FC = () => {
     const [slippage, setSlippage] = useState(0.5); // 0.5%
     const [showSettings, setShowSettings] = useState(false);
 
-    const API_URL = import.meta.env.VITE_API_URL || 'https://cloud-trader-267358751314.europe-west1.run.app';
+    const API_URL = getApiUrl();
 
     // Fetch tokens on mount
     useEffect(() => {

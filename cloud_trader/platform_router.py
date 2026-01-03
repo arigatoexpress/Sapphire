@@ -306,12 +306,26 @@ class AsterAdapter(PlatformAdapter):
     )
     @with_timeout(30.0)
     async def execute_trade(self, symbol: str, side: str, quantity: float, **kwargs) -> TradeResult:
-        """Execute market order on Aster with automatic retry."""
+        """Execute market order on Aster with automatic retry and precision rounding."""
         try:
             from .enums import OrderType
 
+            # Fetch symbol filters for precision rounding
+            filters = await self.client.get_symbol_filters(symbol)
+            precision = filters.get("quantity_precision", 0)
+            
+            # Application of world-class precision rounding
+            rounded_quantity = round(quantity, precision)
+            
+            # Floor adjustment if rounding went up (avoiding over-balance issues)
+            if rounded_quantity > quantity:
+                rounded_quantity = quantity - (10**-precision) if precision > 0 else int(quantity)
+                rounded_quantity = round(rounded_quantity, precision)
+
+            logger.info(f"⚡ [ASTER] Executing {side} {rounded_quantity} (original: {quantity}, precision: {precision})")
+
             order = await self.client.place_order(
-                symbol=symbol, side=side, order_type=OrderType.MARKET, quantity=quantity
+                symbol=symbol, side=side, order_type=OrderType.MARKET, quantity=rounded_quantity
             )
 
             return TradeResult(

@@ -1,4 +1,5 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
+import { getApiUrl } from '../utils/apiConfig';
 import { Box, Typography, Button, Paper, Alert, Chip, Collapse, IconButton } from '@mui/material';
 import { ErrorOutline, Refresh, ExpandMore, ContentCopy, Home } from '@mui/icons-material';
 
@@ -53,7 +54,7 @@ class ErrorBoundary extends Component<Props, State> {
 
   private logErrorToBackend = async (error: Error, errorInfo: ErrorInfo) => {
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'https://cloud-trader-267358751314.europe-west1.run.app';
+      const apiUrl = getApiUrl();
       await fetch(`${apiUrl}/api/log-client-error`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

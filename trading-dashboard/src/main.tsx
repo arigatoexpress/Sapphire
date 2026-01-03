@@ -41,10 +41,17 @@ window.addEventListener('offline', () => {
   }
 });
 
+import { AuthProvider } from './contexts/AuthContext';
+import { TradingProvider } from './contexts/TradingContext';
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
-      <App />
+      <AuthProvider>
+        <TradingProvider>
+          <App />
+        </TradingProvider>
+      </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>,
 )

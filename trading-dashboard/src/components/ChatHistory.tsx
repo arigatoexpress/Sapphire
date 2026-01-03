@@ -37,7 +37,7 @@ import {
   Security,
   Message,
 } from '@mui/icons-material';
-import { useTrading } from '../contexts/TradingContext';
+// useTrading is not used here, removing broken import
 
 interface ChatMessage {
   id: string;
@@ -50,6 +50,8 @@ interface ChatMessage {
   confidence?: number;
   metadata?: Record<string, any>;
 }
+
+import { getApiUrl } from '../utils/apiConfig';
 
 const ChatHistory: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -65,10 +67,7 @@ const ChatHistory: React.FC = () => {
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState<'jsonl' | 'json'>('jsonl');
 
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ||
-    (typeof window !== 'undefined' && window.location.hostname === 'localhost'
-      ? 'http://localhost:8080'
-      : 'https://api.sapphiretrade.xyz');
+  const API_BASE_URL = getApiUrl();
 
   const fetchChatHistory = async () => {
     setLoading(true);
@@ -405,11 +404,11 @@ const ChatHistory: React.FC = () => {
                       }}
                     >
                       {msg.agent_type === 'trend-momentum-agent' ? '🎯' :
-                       msg.agent_type === 'strategy-optimization-agent' ? '🧠' :
-                       msg.agent_type === 'financial-sentiment-agent' ? '💭' :
-                       msg.agent_type === 'market-prediction-agent' ? '🔮' :
-                       msg.agent_type === 'volume-microstructure-agent' ? '📊' :
-                       msg.agent_type === 'vpin-hft' ? '⚡' : '🤖'}
+                        msg.agent_type === 'strategy-optimization-agent' ? '🧠' :
+                          msg.agent_type === 'financial-sentiment-agent' ? '💭' :
+                            msg.agent_type === 'market-prediction-agent' ? '🔮' :
+                              msg.agent_type === 'volume-microstructure-agent' ? '📊' :
+                                msg.agent_type === 'vpin-hft' ? '⚡' : '🤖'}
                     </Avatar>
                   </ListItemAvatar>
                   <ListItemText

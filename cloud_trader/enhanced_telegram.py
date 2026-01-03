@@ -485,7 +485,14 @@ class EnhancedTelegramService:
 
             full_message = f"{priority_prefix} {text}"
 
-            await self.bot.send_message(
+            # Use initialized bot from application if available
+            bot = self.application.bot if hasattr(self, 'application') and self.application else self.bot
+
+            print(f"📡 [TELEGRAM_ENGINE] Delivering message to {self.chat_id} (len={len(full_message)})...")
+            import sys
+            sys.stdout.flush()
+
+            await bot.send_message(
                 chat_id=self.chat_id,
                 text=full_message,
                 parse_mode=parse_mode,
@@ -499,10 +506,17 @@ class EnhancedTelegramService:
             logger.error(f"Failed to send Telegram message: {exc}")
             # Fallback without parse mode
             try:
-                await self.bot.send_message(
+                # Use the same bot instance as above
+                bot = self.application.bot if hasattr(self, 'application') and self.application else self.bot
+                print(f"📡 [TELEGRAM_ENGINE] Falling back (no parse_mode) for {self.chat_id}...")
+                import sys
+                sys.stdout.flush()
+                
+                await bot.send_message(
                     chat_id=self.chat_id, text=text, parse_mode=None, reply_markup=reply_markup
                 )
             except Exception as fallback_exc:
+                print(f"❌ [TELEGRAM_ENGINE] Fallback failed: {fallback_exc}")
                 logger.error(f"Fallback Telegram send failed: {fallback_exc}")
 
     # Command Handlers

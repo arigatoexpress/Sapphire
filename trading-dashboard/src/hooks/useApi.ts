@@ -61,6 +61,7 @@ export interface DashboardState {
     agents: AgentData[];
     positions: Position[];
     recent_trades: Trade[];
+    signals: any[];
     market_regime?: {
         regime: string;
         confidence: number;
@@ -200,8 +201,9 @@ export function useDashboardState(pollInterval = 5000): UseApiResult<DashboardSt
         total_pnl: stateResult.data.portfolio?.total_pnl ?? 0,
         total_pnl_percent: stateResult.data.portfolio?.total_pnl_percent ?? 0,
         agents: stateResult.data.agents ?? [],
-        positions: stateResult.data.portfolio?.open_positions ?? [],
-        recent_trades: stateResult.data.portfolio?.recentTrades ?? [],
+        positions: stateResult.data.portfolio?.open_positions ?? stateResult.data.positions ?? [],
+        recent_trades: stateResult.data.portfolio?.recent_trades ?? stateResult.data.recent_trades ?? [],
+        signals: stateResult.data.signals ?? [],
         market_regime: stateResult.data.market_regime ?? {
             regime: "NEUTRAL",
             confidence: 0,

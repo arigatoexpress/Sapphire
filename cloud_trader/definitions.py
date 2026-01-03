@@ -116,23 +116,22 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
 
 # Agents trade all available symbols dynamically
 # SYMBOL_CONFIG only used as fallback for quantity/precision if exchange info unavailable
+# ⚠️ ASTER VERIFIED: Only symbols confirmed on fapi.asterdex.com/fapi/v1/exchangeInfo
 SYMBOL_CONFIG = {
-    # Liquid / Major
-    "BTC-USDC": {"qty": 0.001, "precision": 3},
-    "ETH-USDC": {"qty": 0.01, "precision": 2},
-    "SOL-USDC": {"qty": 0.1, "precision": 2},
-    # Monad Ecosystem
-    "MON-USDC": {"qty": 1.0, "precision": 1},
-    "CHOG-USDC": {"qty": 100.0, "precision": 0},
-    "DAC-USDC": {"qty": 10.0, "precision": 1},
-    # Base Ecosystem
-    "ASTER-USDC": {"qty": 10.0, "precision": 1},
-    "BRETT-USDC": {"qty": 100.0, "precision": 0},
-    "DEGEN-USDC": {"qty": 1000.0, "precision": 0},
-    "TOSHI-USDC": {"qty": 1000.0, "precision": 0},
-    # Hyperliquid Only
-    "HYPE-USDC": {"qty": 1.0, "precision": 1},
-    "PURR-USDC": {"qty": 100.0, "precision": 0},
+    # Liquid / Major (Aster Verified)
+    "BTCUSDC": {"qty": 0.001, "precision": 3},
+    "ETHUSDC": {"qty": 0.01, "precision": 2},
+    "SOLUSDC": {"qty": 0.1, "precision": 2},
+    # Monad Ecosystem (Aster Verified)
+    "MONUSDC": {"qty": 1.0, "precision": 1},
+    # Base Ecosystem (Aster Verified)
+    "ASTERUSDC": {"qty": 10.0, "precision": 1},
+    "TOSHIUSDC": {"qty": 1000.0, "precision": 0},
+    # Hyperliquid Cross-Listed (Aster Verified)
+    "HYPEUSDC": {"qty": 1.0, "precision": 1},
+    # Additional Aster-Verified Pairs
+    "ZECUSDC": {"qty": 0.1, "precision": 2},
+    "TRUMPUSDC": {"qty": 1.0, "precision": 1},
 }
 
 # Assets supported by Symphony Agents

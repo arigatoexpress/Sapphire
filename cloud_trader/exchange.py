@@ -219,6 +219,12 @@ class AsterClient:
         self._filter_cache: Dict[str, Dict[str, Any]] = {}
         self._filter_cache_time: Dict[str, float] = {}
 
+    def _normalize_symbol(self, symbol: str) -> str:
+        """Centralized normalization for Aster API (USDC -> USDT)."""
+        if symbol and isinstance(symbol, str) and symbol.endswith("USDC"):
+            return symbol.replace("USDC", "USDT")
+        return symbol
+
     async def close(self) -> None:
         await self._client.aclose()
 
@@ -245,7 +251,14 @@ class AsterClient:
         signed: bool = False,
     ) -> Dict[str, Any]:
         params = params or {}
-        print("DEBUG: VERSION 2.0 - GET URL FIX")
+        
+        # ⚠️ CENTRALIZED FIX: Normalize symbols in params before sending
+        if "symbol" in params:
+            params["symbol"] = self._normalize_symbol(params["symbol"])
+        if "pair" in params:
+            params["pair"] = self._normalize_symbol(params["pair"])
+            
+        # removed flood print
         # Send params in body for state-changing methods, query string for GET
         if method.upper() in ["POST", "PUT", "DELETE"]:
             if signed:

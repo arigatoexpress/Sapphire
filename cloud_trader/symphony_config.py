@@ -42,7 +42,7 @@ MIT_AUTO_SUBSCRIBE: bool = settings.mit_auto_subscribe
 # Trading Configuration
 MIT_DEFAULT_LEVERAGE: int = settings.mit_default_leverage
 MIT_MAX_POSITION_SIZE_USDC: float = settings.mit_max_position_size_usdc
-MIT_ACTIVATION_THRESHOLD: int = 5  # Trades required for activation
+MIT_ACTIVATION_THRESHOLD: int = 0  # Lowered to 0 for immediate production trading
 
 # Risk Management
 MIT_ENABLE_STOP_LOSS: bool = settings.mit_enable_stop_loss

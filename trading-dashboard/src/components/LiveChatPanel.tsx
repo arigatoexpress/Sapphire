@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, memo, useCallback } from 'react';
+import { getApiUrl } from '../utils/apiConfig';
 import { Send, Heart, MessageCircle, Sparkles, TrendingUp, Bot, Lock, Trophy, RefreshCw, AlertCircle, CheckCircle, Zap, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -36,10 +37,6 @@ interface Toast {
     message: string;
 }
 
-const getApiUrl = () => {
-    if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
-    return 'https://cloud-trader-267358751314.europe-west1.run.app';
-};
 const API_URL = getApiUrl();
 
 // Quick ticker buttons
@@ -113,14 +110,13 @@ const ChatMessageItem: React.FC<{
 
     return (
         <div className={`group p-3 rounded-lg transition-all ${isBot
-            ? 'bg-gradient-to-r from-purple-500/10 to-slate-800/50 border border-purple-500/20'
-            : message.points_awarded > 0
-                ? 'bg-gradient-to-r from-yellow-500/10 to-slate-800/50 border border-yellow-500/20'
-                : isOwn
-                    ? 'bg-cyan-500/5 border border-cyan-500/10'
-                    : 'bg-slate-800/30 hover:bg-slate-800/50 border border-transparent'
+                ? 'bg-gradient-to-r from-purple-500/10 to-slate-800/50 border border-purple-500/20'
+                : message.points_awarded > 0
+                    ? 'bg-gradient-to-r from-yellow-500/10 to-slate-800/50 border border-yellow-500/20'
+                    : isOwn
+                        ? 'bg-cyan-500/5 border border-cyan-500/10'
+                        : 'bg-slate-800/30 hover:bg-slate-800/50 border border-transparent'
             }`}>
-            {/* Point Award Banner */}
             {message.points_awarded > 0 && (
                 <div className="flex items-center gap-2 mb-2 text-xs">
                     <div className="flex items-center gap-1 bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full animate-pulse">
@@ -131,7 +127,6 @@ const ChatMessageItem: React.FC<{
                 </div>
             )}
 
-            {/* Header */}
             <div className="flex items-center gap-2 mb-1">
                 <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ${isBot ? 'bg-purple-500/30' : isOwn ? 'bg-cyan-500/30' : 'bg-slate-700'
                     }`}>
@@ -150,12 +145,10 @@ const ChatMessageItem: React.FC<{
                 </span>
             </div>
 
-            {/* Content */}
             <p className="text-sm text-slate-300 leading-relaxed ml-8">
                 {formatMessage(message.content)}
             </p>
 
-            {/* Footer */}
             <div className="flex items-center gap-3 mt-2 ml-8">
                 <button
                     onClick={() => onLike(message.id)}
@@ -180,7 +173,6 @@ const ChatMessageItem: React.FC<{
     );
 };
 
-// Main Chat Panel Component
 export const LiveChatPanel: React.FC = () => {
     const { user, loading: authLoading } = useAuth();
     const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -196,11 +188,10 @@ export const LiveChatPanel: React.FC = () => {
     const [toasts, setToasts] = useState<Toast[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
-    let toastId = useRef(0);
+    const toastIdRef = useRef(0);
 
-    // Add toast notification
     const addToast = useCallback((type: ToastType, message: string) => {
-        const id = ++toastId.current;
+        const id = ++toastIdRef.current;
         setToasts(prev => [...prev, { id, type, message }]);
     }, []);
 
@@ -208,7 +199,6 @@ export const LiveChatPanel: React.FC = () => {
         setToasts(prev => prev.filter(t => t.id !== id));
     }, []);
 
-    // Fetch messages
     const fetchMessages = useCallback(async (showRefresh = false) => {
         if (showRefresh) setRefreshing(true);
         setError(null);
@@ -230,7 +220,6 @@ export const LiveChatPanel: React.FC = () => {
         }
     }, []);
 
-    // Fetch user profile
     const fetchProfile = useCallback(async () => {
         if (!user) return;
 
@@ -243,7 +232,7 @@ export const LiveChatPanel: React.FC = () => {
                 const data = await res.json();
                 if (!data.error) {
                     setProfile(data);
-                    if (data.username.startsWith('user_')) {
+                    if (data.username && data.username.startsWith('user_')) {
                         setShowUsernameModal(true);
                     }
                 }
@@ -253,24 +242,20 @@ export const LiveChatPanel: React.FC = () => {
         }
     }, [user]);
 
-    // Initial load
     useEffect(() => {
         fetchMessages();
         if (user) fetchProfile();
     }, [fetchMessages, fetchProfile, user]);
 
-    // Poll for new messages
     useEffect(() => {
         const interval = setInterval(() => fetchMessages(false), 5000);
         return () => clearInterval(interval);
     }, [fetchMessages]);
 
-    // Scroll to bottom when messages change
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
-    // Send message
     const handleSend = async () => {
         if (!user) {
             addToast('error', 'Please sign in to send messages');
@@ -285,8 +270,6 @@ export const LiveChatPanel: React.FC = () => {
         setSending(true);
         try {
             const token = await user.getIdToken();
-            console.log('Sending message with token:', token.substring(0, 20) + '...');
-
             const res = await fetch(`${API_URL}/api/chat/send`, {
                 method: 'POST',
                 headers: {
@@ -302,8 +285,6 @@ export const LiveChatPanel: React.FC = () => {
             }
 
             const data = await res.json();
-            console.log('Send response:', data);
-
             if (res.ok && data.success) {
                 setNewMessage('');
                 addToast('success', 'Message sent!');
@@ -320,7 +301,6 @@ export const LiveChatPanel: React.FC = () => {
         }
     };
 
-    // Like message
     const handleLike = async (messageId: string) => {
         if (!user) {
             addToast('info', 'Sign in to like messages');
@@ -346,13 +326,11 @@ export const LiveChatPanel: React.FC = () => {
         }
     };
 
-    // Insert ticker into message
     const insertTicker = (ticker: string) => {
         setNewMessage(prev => prev + (prev.endsWith(' ') || prev === '' ? '' : ' ') + ticker + ' ');
         inputRef.current?.focus();
     };
 
-    // Set username
     const handleSetUsername = async () => {
         if (!user || !usernameInput.trim()) return;
 
@@ -386,7 +364,6 @@ export const LiveChatPanel: React.FC = () => {
         }
     };
 
-    // Handle key events - FIXED: Using onKeyDown instead of deprecated onKeyPress
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -396,14 +373,12 @@ export const LiveChatPanel: React.FC = () => {
 
     return (
         <div className="flex flex-col h-full bg-slate-900/60 backdrop-blur-xl rounded-xl border border-white/5 overflow-hidden relative">
-            {/* Toast Container */}
             <div className="absolute top-12 right-3 z-50 space-y-2">
                 {toasts.map(toast => (
                     <ToastNotification key={toast.id} toast={toast} onClose={() => removeToast(toast.id)} />
                 ))}
             </div>
 
-            {/* Header */}
             <div className="flex items-center justify-between p-3 border-b border-white/5">
                 <div className="flex items-center gap-2">
                     <MessageCircle className="w-4 h-4 text-cyan-400" />
@@ -431,7 +406,6 @@ export const LiveChatPanel: React.FC = () => {
                 </div>
             </div>
 
-            {/* Info Banner */}
             <div className="px-3 py-2 bg-gradient-to-r from-purple-500/10 to-cyan-500/10 border-b border-white/5">
                 <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-400">
                     <span>💡 Mention tickers like <span className="text-cyan-400">$BTC</span></span>
@@ -442,7 +416,6 @@ export const LiveChatPanel: React.FC = () => {
                 </div>
             </div>
 
-            {/* Messages */}
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
                 {loading ? (
                     <div className="flex items-center justify-center h-full text-slate-500">
@@ -478,10 +451,8 @@ export const LiveChatPanel: React.FC = () => {
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* Input Section */}
             {!authLoading && user ? (
                 <div className="p-3 border-t border-white/5 space-y-2">
-                    {/* Quick Ticker Buttons */}
                     <div className="flex items-center gap-1">
                         <span className="text-[10px] text-slate-600 mr-1">Quick:</span>
                         {QUICK_TICKERS.map(ticker => (
@@ -501,7 +472,6 @@ export const LiveChatPanel: React.FC = () => {
                         </button>
                     </div>
 
-                    {/* Message Input */}
                     <div className="flex items-center gap-2">
                         <input
                             ref={inputRef}
@@ -527,7 +497,6 @@ export const LiveChatPanel: React.FC = () => {
                         </button>
                     </div>
 
-                    {/* Character count and hints */}
                     <div className="flex items-center justify-between text-[10px] text-slate-600">
                         <span>{newMessage.length}/500</span>
                         <span>Press Enter or click Send</span>
@@ -545,7 +514,6 @@ export const LiveChatPanel: React.FC = () => {
                 </div>
             ) : null}
 
-            {/* Username Modal */}
             {showUsernameModal && (
                 <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
                     <div className="bg-slate-900 border border-white/10 rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
@@ -589,4 +557,4 @@ export const LiveChatPanel: React.FC = () => {
     );
 };
 
-export default LiveChatPanel;
+export default memo(LiveChatPanel);

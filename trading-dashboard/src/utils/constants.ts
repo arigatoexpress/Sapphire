@@ -44,10 +44,9 @@ export const AGENT_CONFIG = {
   },
 } as const;
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ||
-  (typeof window !== 'undefined' && window.location.hostname === 'localhost'
-    ? 'http://localhost:8080'
-    : 'http://mock-api.local'); // Temporarily disable API calls
+import { getApiUrl } from './apiConfig';
+
+export const API_BASE_URL = getApiUrl();
 
 export const REFRESH_INTERVALS = {
   data: 5000, // 5 seconds

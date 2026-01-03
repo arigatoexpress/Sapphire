@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { getApiUrl } from '../../utils/apiConfig';
 import { Box, Typography, Chip } from '@mui/material';
 import { Brain, Zap, TrendingUp, TrendingDown, Users, Target } from 'lucide-react';
 
@@ -28,7 +29,7 @@ interface ActivityItem {
     color: string;
 }
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://cloud-trader-267358751314.europe-west1.run.app';
+const API_BASE = getApiUrl();
 
 export const NewAsterBrainStream: React.FC = () => {
     const [activities, setActivities] = useState<ActivityItem[]>([]);
@@ -97,11 +98,8 @@ export const NewAsterBrainStream: React.FC = () => {
                 const res = await fetch(`${API_BASE}/consensus/state`);
                 if (res.ok) {
                     const data = await res.json();
-                    // Add null safety check
                     if (!data.stats) return;
                     const newStats = data.stats as ConsensusStats;
-
-                    // Generate new activities based on changes
                     const newActivities = generateActivities(newStats, lastEventCount);
 
                     if (newActivities.length > 0) {
@@ -116,10 +114,8 @@ export const NewAsterBrainStream: React.FC = () => {
             }
         };
 
-        // Initial fetch
         fetchConsensus();
 
-        // Add initial system messages
         const now = new Date();
         setActivities([
             {
@@ -140,10 +136,9 @@ export const NewAsterBrainStream: React.FC = () => {
             }
         ]);
 
-        // Poll every 5 seconds
         const interval = setInterval(fetchConsensus, 5000);
         return () => clearInterval(interval);
-    }, []);
+    }, [lastEventCount]);
 
     return (
         <Box sx={{
@@ -156,7 +151,6 @@ export const NewAsterBrainStream: React.FC = () => {
             borderRadius: 2,
             overflow: 'hidden'
         }}>
-            {/* Header */}
             <Box sx={{
                 p: 1.5,
                 borderBottom: '1px solid rgba(255,255,255,0.08)',
@@ -195,7 +189,6 @@ export const NewAsterBrainStream: React.FC = () => {
                 </Box>
             </Box>
 
-            {/* Activity Stream */}
             <Box sx={{ flex: 1, overflowY: 'auto', p: 2 }}>
                 {activities.length === 0 ? (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, opacity: 0.5 }}>
@@ -237,7 +230,6 @@ export const NewAsterBrainStream: React.FC = () => {
                 <div ref={bottomRef} />
             </Box>
 
-            {/* Footer Stats */}
             {stats && (
                 <Box sx={{
                     p: 1.5,

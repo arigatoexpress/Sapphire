@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { getWebSocketUrl } from '../utils/apiConfig';
 
 interface AgentMetrics {
   id: string;
@@ -79,38 +80,32 @@ interface UseWebSocketReturn {
   error: string | null;
 }
 
-export const useDashboardWebSocket = (url?: string): UseWebSocketReturn => {
+export const useDashboardWebSocket = (url?: string, token?: string | null): UseWebSocketReturn => {
   const [data, setData] = useState<DashboardData | null>(null);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Backoff strategy for reconnection
+  // NUCLEAR: Aggressive reconnection for maximum reliability
   const reconnectAttemptsRef = useRef(0);
-  const maxReconnectDelay = 30000; // 30 seconds
+  const maxReconnectDelay = 10000; // 10 seconds max (was 30s)
+  const baseReconnectDelay = 500; // Start at 500ms (was 1000ms)
 
   const connect = () => {
+    if (!token) {
+      // console.debug('⏳ [WS] Waiting for auth token...');
+      return;
+    }
+
     try {
       // Determine WebSocket URL
       // If we are in a local/docker environment (proxied), we should connect relative to the current page
-      // Determine WebSocket URL
-      const apiUrl = import.meta.env.VITE_API_URL;
-      let fullWsUrl;
+      // Determine WebSocket URL using centralized config
+      const baseUrl = getWebSocketUrl();
+      const fullWsUrl = `${baseUrl}?token=${token}`;
 
-      if (apiUrl && !apiUrl.includes('localhost') && !apiUrl.includes('127.0.0.1')) {
-        // Use the explicit Cloud Run URL
-        const wsProtocol = apiUrl.startsWith('https') ? 'wss' : 'ws';
-        const host = apiUrl.replace(/^https?:\/\//, '');
-        fullWsUrl = `${wsProtocol}://${host}/ws/dashboard`;
-      } else {
-        // Fallback to relative (best for Cloud Run on same domain)
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        // Ensure we handle port for non-standard local dev if needed, but on Cloud Run host is fine
-        fullWsUrl = `${protocol}//${window.location.host}/ws/dashboard`;
-      }
-
-      console.log(`🔌 Connecting to WebSocket: ${fullWsUrl}`);
+      console.log(`🔌 Connecting to WebSocket: ${baseUrl} (Auth Token Attached)`);
       const ws = new WebSocket(fullWsUrl);
       wsRef.current = ws;
 
@@ -149,6 +144,9 @@ export const useDashboardWebSocket = (url?: string): UseWebSocketReturn => {
             });
           } else if (message.type === 'trade_update') {
             console.log('📈 [WS] Trade update received:', message.data);
+          } else if (message.type === 'ping') {
+            // Heartbeat - silent connection check
+            // console.debug('💓 [WS] Heartbeat received');
           } else if (message.portfolio_value !== undefined) {
             // Full snapshot with portfolio_value
             console.log('🎯 [WS] Setting dashboard data (portfolio_value present)');
@@ -179,12 +177,11 @@ export const useDashboardWebSocket = (url?: string): UseWebSocketReturn => {
         setConnected(false);
 
         // Calculate exponential backoff with jitter
-        const baseDelay = 1000;
         const exponentialDelay = Math.min(
           maxReconnectDelay,
-          baseDelay * Math.pow(1.5, reconnectAttemptsRef.current)
+          baseReconnectDelay * Math.pow(1.5, reconnectAttemptsRef.current)
         );
-        const jitter = Math.random() * 1000;
+        const jitter = Math.random() * 500;
         const delay = exponentialDelay + jitter;
 
         reconnectAttemptsRef.current += 1;
@@ -213,7 +210,7 @@ export const useDashboardWebSocket = (url?: string): UseWebSocketReturn => {
         wsRef.current.close();
       }
     };
-  }, [url]);
+  }, [url, token]);
 
   return { data, connected, error };
 };

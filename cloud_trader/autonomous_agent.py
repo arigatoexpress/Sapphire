@@ -6,6 +6,7 @@ Agents that formulate their own strategies by:
 3. Learning from trade outcomes
 """
 
+import asyncio
 import logging
 import random
 import time
@@ -23,6 +24,7 @@ class Thesis:
     signal: str  # "BUY" | "SELL" | "HOLD"
     confidence: float  # 0.0 to 1.0
     reasoning: str
+    agent_id: str = "" # ID of the agent that produced this thesis
     data_used: List[str] = field(default_factory=list)
     expected_profit: Optional[float] = None
 
@@ -73,50 +75,66 @@ class AutonomousAgent:
 
         Agent autonomously decides what data to request.
         """
-        logger.info(f"{self.name} analyzing {symbol}")
+        print(f"🤖 [{self.id}] Analyzing {symbol}...")
+        import sys
+        sys.stdout.flush()
 
         # 1. Gather data
-        indicators = await self._gather_data(symbol)
-
-        # 2. Formulate thesis
-        thesis = self._formulate_thesis(symbol, indicators)
-
-        # 3. Track what data was used
-        thesis.data_used = list(indicators.keys())
-
-        logger.info(
-            f"{self.name} thesis for {symbol}: {thesis.signal} "
-            f"(confidence={thesis.confidence:.2f}, reason={thesis.reasoning})"
-        )
-
-        return thesis
+        try:
+            # Add a safety timeout for the entire analysis
+            indicators = await asyncio.wait_for(self._gather_data(symbol), timeout=15.0)
+            
+            # 2. Formulate thesis
+            thesis = self._formulate_thesis(symbol, indicators)
+            thesis.agent_id = self.id
+            
+            # 3. Track what data was used
+            thesis.data_used = list(indicators.keys())
+            
+            print(f"✅ [{self.id}] Thesis for {symbol}: {thesis.signal} (conf: {thesis.confidence:.2f})")
+            sys.stdout.flush()
+            
+            return thesis
+        except asyncio.TimeoutError:
+            print(f"⏳ [{self.id}] Analysis TIMEOUT for {symbol}")
+            return Thesis(symbol=symbol, signal="HOLD", confidence=0.0, reasoning="Analysis timeout")
+        except Exception as e:
+            print(f"❌ [{self.id}] Analysis error for {symbol}: {e}")
+            import traceback
+            traceback.print_exc()
+            return Thesis(symbol=symbol, signal="HOLD", confidence=0.0, reasoning=f"Error: {e}")
+        finally:
+            sys.stdout.flush()
 
     async def _gather_data(self, symbol: str) -> Dict[str, Any]:
-        """
-        Agent decides what data to fetch.
-
-        This is where autonomous behavior happens:
-        - Prefers indicators that have worked in the past
-        - Occasionally explores new indicators
-        """
+        """Gather all necessary data for analysis."""
         data = {}
+        core_indicators = ["price", "rsi", "trend", "volatility_state"]
 
-        # Always fetch core indicators
-        core_indicators = ["price", "volume"]
+        # Fetch core indicators
         for indicator in core_indicators:
             try:
+                print(f"🔍 [{self.id}] Fetching {indicator} for {symbol}...")
+                import sys
+                sys.stdout.flush()
                 value = await self.data_store.get(indicator, symbol)
                 if value is not None:
                     data[indicator] = value
+                print(f"✅ [{self.id}] Got {indicator}")
+                sys.stdout.flush()
             except Exception as e:
                 logger.debug(f"Failed to fetch {indicator}: {e}")
 
         # Fetch preferred indicators
         for indicator in self.strategy_config["preferred_indicators"]:
             try:
+                print(f"🔍 [{self.id}] Fetching PREF {indicator}...")
+                sys.stdout.flush()
                 value = await self.data_store.get(indicator, symbol)
                 if value is not None:
                     data[indicator] = value
+                print(f"✅ [{self.id}] Got PREF {indicator}")
+                sys.stdout.flush()
             except Exception as e:
                 logger.debug(f"Failed to fetch {indicator}: {e}")
 
@@ -127,10 +145,14 @@ class AutonomousAgent:
             if unused:
                 new_indicator = random.choice(unused)
                 try:
+                    print(f"🔍 [{self.id}] Exploring {new_indicator}...")
+                    sys.stdout.flush()
                     value = await self.data_store.get(new_indicator, symbol)
                     if value is not None:
                         data[new_indicator] = value
                         logger.info(f"{self.name} exploring new indicator: {new_indicator}")
+                    print(f"✅ [{self.id}] Finished EXPLORE")
+                    sys.stdout.flush()
                 except Exception as e:
                     logger.debug(f"Failed to explore {new_indicator}: {e}")
 

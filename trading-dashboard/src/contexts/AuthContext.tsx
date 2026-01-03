@@ -23,9 +23,8 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export const useAuth = () => {
     const context = useContext(AuthContext);
-    if (!context) {
-        console.trace('[useAuth] Error: Context not found. Caller stack trace:');
-        throw new Error('useAuth must be used within AuthProvider');
+    if (context === null) {
+        throw new Error('useAuth must be used within an AuthProvider');
     }
     return context;
 };

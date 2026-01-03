@@ -23,7 +23,8 @@ import {
   Timeline,
   Assessment,
 } from '@mui/icons-material';
-import { useTrading } from '../contexts/TradingContext';
+import { useTradingData } from '../contexts/TradingContext';
+import { getApiUrl } from '../utils/apiConfig';
 
 interface LiveTrade {
   id: string;
@@ -31,6 +32,7 @@ interface LiveTrade {
   agent_id: string;
   agent_name: string;
   agent_type: string;
+  agent: string; // Add this back for compatibility with components
   symbol: string;
   side: 'buy' | 'sell';
   price: number;
@@ -42,15 +44,12 @@ interface LiveTrade {
 }
 
 const LiveTrades: React.FC = () => {
-  const { recentSignals, agentActivities, portfolio } = useTrading();
+  const { recent_activity: recentSignals = [], agents: agentActivities = [], total_pnl: portfolio = 0 } = useTradingData();
   const [trades, setTrades] = useState<LiveTrade[]>([]);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [loading, setLoading] = useState(false);
 
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ||
-    (typeof window !== 'undefined' && window.location.hostname === 'localhost'
-      ? 'http://localhost:8080'
-      : 'https://api.sapphiretrade.xyz');
+  const API_BASE_URL = getApiUrl();
 
   // Generate live trades from recent signals
   useEffect(() => {
@@ -58,25 +57,23 @@ const LiveTrades: React.FC = () => {
       const liveTrades: LiveTrade[] = [];
 
       recentSignals.forEach((signal, index) => {
-        const agent = agentActivities.find(a =>
-          a.agent_id.includes(signal.source?.toLowerCase() || '') ||
-          signal.source?.toLowerCase().includes(a.agent_type)
-        );
+        const side = (signal.winning_signal || '').toLowerCase().includes('buy') || (signal.winning_signal || '').toLowerCase().includes('long') ? 'buy' : 'sell';
 
         liveTrades.push({
-          id: `trade-${signal.timestamp}-${index}`,
-          timestamp: signal.timestamp,
-          agent_id: agent?.agent_id || 'unknown',
-          agent_name: agent?.agent_name || signal.source || 'Unknown Agent',
-          agent_type: agent?.agent_type || 'unknown',
+          id: `signal-${index}-${signal.timestamp}`,
+          timestamp: new Date(signal.timestamp * 1000).toISOString(),
+          agent_id: 'consensus',
+          agent_name: 'AI Swarm',
+          agent_type: 'Consensus',
+          agent: 'AI Swarm', // Map to general agent field
           symbol: signal.symbol,
-          side: signal.side.toLowerCase() as 'buy' | 'sell',
-          price: signal.price,
-          size: signal.notional / signal.price,
-          notional: signal.notional,
-          confidence: signal.confidence,
-          status: index === 0 ? 'filled' : index < 3 ? 'partial' : 'pending',
-          pnl: (Math.random() - 0.3) * signal.notional * 0.1, // Simulated P&L
+          side: side,
+          price: 0,
+          size: 0,
+          notional: 0,
+          confidence: signal.confidence || 0,
+          status: 'pending',
+          pnl: 0
         });
       });
 
@@ -100,8 +97,9 @@ const LiveTrades: React.FC = () => {
   }, [autoRefresh]);
 
   const getAgentColor = (agentType: string) => {
-    const agent = agentActivities.find(a => a.agent_type === agentType);
-    return agent?.color || '#8b5cf6';
+    if (agentType === 'Consensus') return '#8b5cf6';
+    const agent = agentActivities.find(a => (a.type || 'AI Agent') === agentType);
+    return '#8b5cf6'; // Default color
   };
 
   const getStatusColor = (status: string) => {
@@ -109,6 +107,7 @@ const LiveTrades: React.FC = () => {
       case 'filled': return '#10b981';
       case 'partial': return '#f59e0b';
       case 'pending': return '#06b6d4';
+      case 'PROPOSED': return '#06b6d4'; // Added PROPOSED status color
       case 'cancelled': return '#ef4444';
       default: return '#6b7280';
     }
@@ -269,8 +268,8 @@ const LiveTrades: React.FC = () => {
                     <ListItemAvatar>
                       <Avatar
                         sx={{
-                          bgcolor: `${getAgentColor(trade.agent_type)}20`,
-                          border: `2px solid ${getAgentColor(trade.agent_type)}`,
+                          bgcolor: `${getAgentColor(trade.agent)}20`,
+                          border: `2px solid ${getAgentColor(trade.agent)}`,
                           width: 40,
                           height: 40,
                         }}
@@ -334,17 +333,14 @@ const LiveTrades: React.FC = () => {
                       secondary={
                         <Box>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1, flexWrap: 'wrap' }}>
-                            <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                              <strong>Agent:</strong> {trade.agent_name}
+                            <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: '0.75rem' }}>
+                              {trade.agent_name}
                             </Typography>
                             <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.8)' }}>
                               <strong>Price:</strong> ${trade.price.toFixed(4)}
                             </Typography>
                             <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                              <strong>Size:</strong> {trade.size.toFixed(4)}
-                            </Typography>
-                            <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                              <strong>Notional:</strong> ${trade.notional.toFixed(2)}
+                              <strong>Notional:</strong> ${trade.notional ? trade.notional.toFixed(2) : '0.00'}
                             </Typography>
                           </Box>
                           {trade.pnl !== undefined && (

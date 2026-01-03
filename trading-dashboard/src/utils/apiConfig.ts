@@ -3,8 +3,8 @@
  * Eliminates hardcoded legacy URLs and ensures consistency across components.
  */
 
-// Production Cloud Run URL (europe-west1 deployment)
-const CLOUD_RUN_URL = 'https://sapphire-cloud-trader-267358751314.europe-west1.run.app';
+// Production Cloud Run URL (northamerica-northeast1 deployment)
+const CLOUD_RUN_URL = 'https://sapphire-cloud-trader-s77j6bxyra-nn.a.run.app';
 
 export const getApiUrl = (): string => {
     // 1. Priority: Vite Environment Variable (Local Dev / Explicit Override)

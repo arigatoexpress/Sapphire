@@ -92,6 +92,37 @@ echo -e "\n${GREEN}📤 Image pushed automatically by Cloud Build.${NC}"
 # Step 4: Deploy to Cloud Run
 echo -e "\n${GREEN}☁️ Deploying to Cloud Run...${NC}"
 
+# Redis Config
+REDIS_IP=$(gcloud redis instances list --region ${REGION} --filter="name:projects/${PROJECT_ID}/locations/${REGION}/instances/sapphire-cache" --format="value(host)" 2>/dev/null || echo "")
+REDIS_URL_ENV=""
+
+if [ -n "$REDIS_IP" ]; then
+    echo -e "${GREEN}✅ Found Redis at ${REDIS_IP}${NC}"
+    REDIS_URL_ENV="REDIS_URL=redis://${REDIS_IP}:6379,CACHE_BACKEND=redis"
+else
+    echo -e "${YELLOW}⚠️ Redis not found. Using memory cache.${NC}"
+    REDIS_URL_ENV="CACHE_BACKEND=memory"
+fi
+
+# Database Config
+DB_INSTANCE=$(gcloud sql instances list --project "${PROJECT_ID}" --filter="name:sapphire-db*" --format="value(name)" --limit=1 2>/dev/null || echo "")
+DB_IP=""
+
+if [ -n "$DB_INSTANCE" ]; then
+    echo -e "${GREEN}🔍 Fetching Private IP for ${DB_INSTANCE}...${NC}"
+    # Use jq for robust parsing
+    DB_IP=$(gcloud sql instances describe "$DB_INSTANCE" --project "${PROJECT_ID}" --format="json" | jq -r '.ipAddresses[] | select(.type=="PRIVATE") | .ipAddress' | head -n 1)
+fi
+
+if [ -n "$DB_IP" ]; then
+    echo -e "${GREEN}✅ Found Database at ${DB_IP}. Updating Secret Manager...${NC}"
+    DB_URL="postgresql://trading_user:changeme123@${DB_IP}:5432/trading_db"
+    # Update secret with -n to avoid trailing newline
+    echo -n "$DB_URL" | gcloud secrets versions add DATABASE_URL --data-file=- --project="$PROJECT_ID" &>/dev/null
+else
+    echo -e "${RED}❌ Database instance not found! Storage will fail.${NC}"
+fi
+
 # Dynamic Secret Mapping
 SECRETS_LIST=(
     "ASTER_API_KEY"
@@ -104,6 +135,7 @@ SECRETS_LIST=(
     "GEMINI_API_KEY"
     "GROK_API_KEY"
     "SOLANA_PRIVATE_KEY"
+    "DATABASE_URL"
 )
 
 ACTIVE_SECRETS=""
@@ -116,9 +148,16 @@ for secret in "${SECRETS_LIST[@]}"; do
     fi
 done
 
-# Features
-ENABLE_ASTER="${ENABLE_ASTER:-False}"
-ENABLE_TELEGRAM="${ENABLE_TELEGRAM:-True}"
+# Features and standard Env Vars
+ENABLE_ASTER=${ENABLE_ASTER:-true}
+ENABLE_TELEGRAM=${ENABLE_TELEGRAM:-true}
+DATABASE_ENABLED=true
+
+# Construct literal Env Vars string (minimal to avoid shell concatenation issues)
+ENV_VARS_LIST="PYTHONUNBUFFERED=1,ENABLE_ASTER=${ENABLE_ASTER},ENABLE_TELEGRAM=${ENABLE_TELEGRAM},DATABASE_ENABLED=${DATABASE_ENABLED}"
+if [ -n "$REDIS_URL_ENV" ]; then
+    ENV_VARS_LIST="${ENV_VARS_LIST},${REDIS_URL_ENV}"
+fi
 
 run_cmd "gcloud run deploy ${SERVICE_NAME} \
     --image ${IMAGE_NAME}:${CACHE_BUST} \
@@ -131,7 +170,9 @@ run_cmd "gcloud run deploy ${SERVICE_NAME} \
     --concurrency 80 \
     --min-instances 0 \
     --max-instances 10 \
-    --set-env-vars=PYTHONUNBUFFERED=1,CACHE_BACKEND=memory,ENABLE_ASTER=${ENABLE_ASTER},ENABLE_TELEGRAM=${ENABLE_TELEGRAM} \
+    --vpc-connector sapphire-conn \
+    --vpc-egress all-traffic \
+    --set-env-vars=${ENV_VARS_LIST} \
     --set-secrets=${ACTIVE_SECRETS}"
 
 # Step 5: Get service URL

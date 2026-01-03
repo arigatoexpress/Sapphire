@@ -1,7 +1,9 @@
+import asyncio
 import logging
 import os
 import threading
 import time
+from typing import Callable, Optional
 
 import redis
 import requests
@@ -15,14 +17,15 @@ class SelfHealingWatchdog:
     Designed to run in a background thread.
     """
 
-    def __init__(self, check_interval=30):
+    def __init__(self, check_interval=30, loop=None, stall_threshold=600):
         self.check_interval = check_interval
         self.running = False
         self._thread = None
         self._heartbeats = {}  # {component_name: last_timestamp}
-        self._stall_threshold = 120  # 2 minutes
+        self._stall_threshold = stall_threshold  # Default 10 minutes for slow scans
         self.recovery_callback = None
         self.api_url = "http://localhost:8080/healthz"
+        self._loop = loop or (asyncio.get_event_loop() if asyncio.get_event_loop().is_running() else None)
 
     def start(self):
         if self.running:
@@ -44,8 +47,8 @@ class SelfHealingWatchdog:
     def _run_loop(self):
         while self.running:
             try:
-                # 1. Check API health
-                self._check_api()
+                # 1. Check API health - Disabled to avoid log spam in Cloud Run
+                # self._check_api()
                 
                 # 2. Check for stalls in heartbeats
                 self._check_stalls()
@@ -62,7 +65,20 @@ class SelfHealingWatchdog:
                 logger.error(f"🚨 CRITICAL: Component '{component}' stalled for {int(now - last_ts)}s!")
                 if self.recovery_callback:
                     logger.info(f"🔄 Triggering recovery callback for stalled component: {component}")
-                    self.recovery_callback(component)
+                    try:
+                        import inspect
+                        # Check if callback is a coroutine function
+                        if inspect.iscoroutinefunction(self.recovery_callback):
+                            # Use the stored loop reference
+                            if self._loop and self._loop.is_running():
+                                asyncio.run_coroutine_threadsafe(self.recovery_callback(component), self._loop)
+                            else:
+                                # Fallback if no loop or loop stopped
+                                asyncio.run(self.recovery_callback(component))
+                        else:
+                            self.recovery_callback(component)
+                    except Exception as e:
+                        logger.error(f"Recovery callback failed: {e}")
                 # Reset heartbeat to prevent loop spam if recovery is slow
                 self._heartbeats[component] = now
 

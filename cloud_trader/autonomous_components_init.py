@@ -3,6 +3,7 @@ Initialization helper for autonomous trading components.
 Separated to keep trading_service.py cleaner.
 """
 
+import logging
 from typing import List
 
 from .autonomous_agent import AutonomousAgent
@@ -10,6 +11,8 @@ from .data_store import DataStore
 from .market_scanner import MarketScanner
 from .platform_router import AsterAdapter, PlatformRouter, SymphonyAdapter
 from .symphony_config import AGENTS_CONFIG
+
+logger = logging.getLogger(__name__)
 
 
 def init_autonomous_components(
@@ -42,26 +45,39 @@ def init_autonomous_components(
         feature_pipeline=feature_pipeline, market_data=None  # Can be injected later if needed
     )
 
-    # 4. Initialize Autonomous Agents (3 specialized agents)
-    autonomous_agents = [
-        AutonomousAgent(
-            agent_id="tech_agent_001",
-            name="Technical Analyst",
+    # 4. Initialize Autonomous Agents (Dynamic based on settings)
+    autonomous_agents = []
+    
+    enabled_agents = getattr(settings, "enabled_agents", [])
+    if not enabled_agents:
+        logger.warning("No agents enabled in settings, falling back to defaults")
+        enabled_agents = [
+            "trend-momentum-agent", 
+            "strategy-optimization-agent", 
+            "financial-sentiment-agent"
+        ]
+
+    for agent_id in enabled_agents:
+        # Map IDs to human-readable names or just use ID
+        name = agent_id.replace("-", " ").title()
+        
+        # Determine specialization based on ID keywords
+        specialization = "technical"
+        if "sentiment" in agent_id.lower():
+            specialization = "sentiment"
+        elif "hybrid" in agent_id.lower() or "strategy" in agent_id.lower():
+            specialization = "hybrid"
+        elif "market" in agent_id.lower() or "prediction" in agent_id.lower():
+            specialization = "predictive"
+        elif "volume" in agent_id.lower() or "vpin" in agent_id.lower():
+            specialization = "microstructure"
+
+        agent = AutonomousAgent(
+            agent_id=agent_id,
+            name=name,
             data_store=data_store,
-            specialization="technical",
-        ),
-        AutonomousAgent(
-            agent_id="sentiment_agent_001",
-            name="Sentiment Analyst",
-            data_store=data_store,
-            specialization="sentiment",
-        ),
-        AutonomousAgent(
-            agent_id="hybrid_agent_001",
-            name="Hybrid Strategist",
-            data_store=data_store,
-            specialization="hybrid",
-        ),
-    ]
+            specialization=specialization,
+        )
+        autonomous_agents.append(agent)
 
     return data_store, autonomous_agents, platform_router, market_scanner

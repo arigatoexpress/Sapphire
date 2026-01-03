@@ -73,7 +73,9 @@ class TechnicalIndicatorProvider(DataProvider):
             "volume",
             "wyckoff",
             "fib_levels",
-            "vsop"
+            "vsop",
+            "price",
+            "volatility_state"
         }
 
     def supports(self, indicator: str) -> bool:
@@ -143,6 +145,12 @@ class TechnicalIndicatorProvider(DataProvider):
             
         elif indicator == "vsop":
             return analysis.get("vsop", 50.0)
+
+        elif indicator == "price":
+            return analysis.get("price", 0.0)
+
+        elif indicator == "volatility_state":
+            return analysis.get("volatility_state", "LOW")
 
         # Default: return None if not implemented
         return None
@@ -322,11 +330,27 @@ class DataStore:
         return dict(self.usage_stats)
 
 
-# Legacy helpers for tests
+# Optimized BigQuery Streaming Integration
+async def get_bigquery_streamer():
+    """Get the optimized BigQuery streamer instance for production."""
+    try:
+        from .optimized_bigquery import get_optimized_bigquery_streamer
+        return await get_optimized_bigquery_streamer()
+    except Exception as e:
+        logger.error(f"Failed to load BigQuery streamer: {e}")
+        return None
+
+async def close_bigquery_streamer():
+    """Close the optimized BigQuery streamer."""
+    try:
+        from .optimized_bigquery import close_optimized_bigquery_streamer
+        await close_optimized_bigquery_streamer()
+    except Exception:
+        pass
+
 async def get_cache(): return None
 async def get_storage(): return None
 async def get_feature_store(): return None
-async def get_bigquery_streamer(): return None
+
 async def close_cache(): pass
 async def close_storage(): pass
-async def close_bigquery_streamer(): pass

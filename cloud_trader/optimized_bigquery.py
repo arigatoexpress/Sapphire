@@ -54,6 +54,7 @@ class OptimizedBigQueryStreamer:
             "strategy_performance_optimized": "strategy_performance_optimized_stream",
             "trade_theses_optimized": "trade_theses_optimized_stream",
             "strategy_discussions_optimized": "strategy_discussions_optimized_stream",
+            "portfolio_history_optimized": "portfolio_history_optimized_stream",
         }
 
     async def initialize(self) -> None:
@@ -144,6 +145,21 @@ class OptimizedBigQueryStreamer:
                 bigquery.SchemaField("funding_rate", "FLOAT", mode="NULLABLE"),
                 bigquery.SchemaField("open_interest", "FLOAT", mode="NULLABLE"),
                 bigquery.SchemaField("compressed_data", "BYTES", mode="NULLABLE"),  # LZ4 compressed
+            ],
+            "portfolio_history_optimized": [
+                bigquery.SchemaField("timestamp", "TIMESTAMP", mode="REQUIRED"),
+                bigquery.SchemaField("balance", "FLOAT", mode="REQUIRED"),
+                bigquery.SchemaField("equity", "FLOAT", mode="REQUIRED"),
+                bigquery.SchemaField("pnl_drawn_down", "FLOAT", mode="NULLABLE"),
+                bigquery.SchemaField("metadata", "JSON", mode="NULLABLE"),
+            ],
+            "agent_performance_optimized": [
+                bigquery.SchemaField("timestamp", "TIMESTAMP", mode="REQUIRED"),
+                bigquery.SchemaField("agent_id", "STRING", mode="REQUIRED"),
+                bigquery.SchemaField("total_trades", "INTEGER", mode="REQUIRED"),
+                bigquery.SchemaField("win_rate", "FLOAT", mode="REQUIRED"),
+                bigquery.SchemaField("pnl_total", "FLOAT", mode="REQUIRED"),
+                bigquery.SchemaField("metadata", "JSON", mode="NULLABLE"),
             ],
         }
 
@@ -293,6 +309,14 @@ class OptimizedBigQueryStreamer:
     async def stream_market_data_optimized(self, **kwargs) -> bool:
         """Stream market data with compression."""
         return await self.stream_optimized("market_data_optimized", **kwargs)
+
+    async def stream_portfolio_snapshot(self, **kwargs) -> bool:
+        """Stream portfolio balance/equity snapshot."""
+        return await self.stream_optimized("portfolio_history_optimized", **kwargs)
+
+    async def stream_agent_metrics(self, **kwargs) -> bool:
+        """Stream agent performance metrics."""
+        return await self.stream_optimized("agent_performance_optimized", **kwargs)
 
     async def close(self) -> None:
         """Flush all pending batches and close."""

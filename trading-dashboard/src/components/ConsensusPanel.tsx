@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Paper, Typography, LinearProgress, Chip } from '@mui/material';
 import { Brain, Target, Users, Zap } from 'lucide-react';
+import { getApiUrl } from '../utils/apiConfig';
 
 interface ConsensusData {
     stats: {
@@ -16,7 +17,7 @@ interface ConsensusData {
     };
 }
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://cloud-trader-267358751314.europe-west1.run.app';
+const API_BASE = getApiUrl();
 
 export const ConsensusPanel: React.FC = () => {
     const [data, setData] = useState<ConsensusData | null>(null);

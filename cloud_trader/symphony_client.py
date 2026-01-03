@@ -16,7 +16,13 @@ logger = get_logger(__name__)
 
 # Symphony API Configuration
 # Symphony API Configuration
-from .symphony_config import AGENTS_CONFIG, SYMPHONY_AGENT_ID, SYMPHONY_API_KEY, SYMPHONY_BASE_URL
+from .symphony_config import (
+    AGENTS_CONFIG,
+    MIT_ACTIVATION_THRESHOLD,
+    SYMPHONY_AGENT_ID,
+    SYMPHONY_API_KEY,
+    SYMPHONY_BASE_URL,
+)
 
 
 class SymphonyClient:
@@ -127,8 +133,8 @@ class SymphonyClient:
                     "USDC": 250.0
                 },  # Mocked based on user input for now or fetch if endpoint found
                 "trades_count": self._activation_trades,
-                "is_activated": self._activated or (self._activation_trades >= 5),
-                "activation_threshold": 5,
+                "is_activated": self._activated or (self._activation_trades >= MIT_ACTIVATION_THRESHOLD),
+                "activation_threshold": MIT_ACTIVATION_THRESHOLD,
                 "agent_id": self.default_agent_id,
             }
         except Exception as e:
@@ -416,16 +422,16 @@ class SymphonyClient:
 
     @property
     def is_activated(self) -> bool:
-        """Check if the agentic fund is activated (5+ trades completed)."""
-        return self._activated or self._activation_trades >= 5
+        """Check if the agentic fund is activated."""
+        return self._activated or self._activation_trades >= MIT_ACTIVATION_THRESHOLD
 
     @property
     def activation_progress(self) -> Dict[str, Any]:
         """Get activation progress."""
         return {
-            "current": min(self._activation_trades, 5),
-            "required": 5,
-            "percentage": min(self._activation_trades / 5.0 * 100, 100),
+            "current": min(self._activation_trades, MIT_ACTIVATION_THRESHOLD),
+            "required": MIT_ACTIVATION_THRESHOLD,
+            "percentage": 100.0 if MIT_ACTIVATION_THRESHOLD == 0 else min(self._activation_trades / MIT_ACTIVATION_THRESHOLD * 100, 100),
             "activated": self.is_activated,
         }
 
