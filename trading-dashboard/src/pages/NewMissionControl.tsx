@@ -6,6 +6,8 @@ import { NewAsterBrainStream } from '../components/mission-control/NewAsterBrain
 import UnifiedPositionsTable from '../components/UnifiedPositionsTable'; // Legacy for now, needs context wiring
 import { NeuralConsensus } from '../components/mission-control/NeuralConsensus';
 import { useTradingData } from '../contexts/TradingContext';
+import PlatformRouterStatus from '../components/PlatformRouterStatus';
+import TradeExecutionPanel from '../components/TradeExecutionPanel';
 
 // Wrapper for Legacy Position Table to use Context Data
 const ConnectedPositionsTable = () => {
@@ -24,6 +26,11 @@ const ConnectedPositionsTable = () => {
 const NewMissionControl: React.FC = () => {
     return (
         <MissionControlLayout>
+            {/* Platform Router Status - Full Width Header */}
+            <Box sx={{ mb: 3 }}>
+                <PlatformRouterStatus />
+            </Box>
+
             <Grid container spacing={3}>
                 {/* LEFT COLUMN: AGENTS & POSITIONS */}
                 <Grid item xs={12} lg={7}>
@@ -33,11 +40,12 @@ const NewMissionControl: React.FC = () => {
                     </Box>
                 </Grid>
 
-                {/* --- RIGHT COLUMN (25%) --- */}
-                <Grid item xs={12} lg={5}> {/* Keeping Grid item for consistency with MUI layout */}
+                {/* RIGHT COLUMN: BRAIN STREAM, CONSENSUS, EXECUTIONS */}
+                <Grid item xs={12} lg={5}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, height: '100%', overflow: 'hidden' }}>
                         <NewAsterBrainStream />
                         <NeuralConsensus />
+                        <TradeExecutionPanel />
                     </Box>
                 </Grid>
             </Grid>

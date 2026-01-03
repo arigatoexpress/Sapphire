@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Card,
@@ -6,21 +6,14 @@ import {
   Typography,
   Grid,
   Button,
-  Chip,
   Avatar,
   LinearProgress,
   IconButton,
   Tooltip,
-  Paper,
 } from '@mui/material';
 import {
-  TrendingUp,
-  TrendingDown,
-  ShowChart,
   Visibility,
   VisibilityOff,
-  Timeline,
-  Assessment,
 } from '@mui/icons-material';
 import { useTrading } from '../contexts/TradingContext';
 
@@ -69,10 +62,12 @@ const agentNames = {
 };
 
 export const AdvancedAnalytics: React.FC = () => {
-  const { portfolio } = useTrading();
-  const [trades, setTrades] = useState(generateMockTrades());
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { portfolio: _portfolio } = useTrading();
+  const [trades] = useState(generateMockTrades());
   const [showTrades, setShowTrades] = useState(true);
   const [selectedTimeframe, setSelectedTimeframe] = useState<'1H' | '4H' | '1D' | '7D'>('1D');
+
 
   // Calculate agent performance
   const agentPerformance = trades.reduce((acc, trade) => {

@@ -31,6 +31,26 @@ Sapphire has evolved from a monolithic bot into a **decoupled, modular architect
 *   **Intelligence**: Grok & Gemini-powered arbitration and reasoning.
 *   **Monitoring**: Real-time React dashboard with sub-second WebSocket updates.
 
+## 🛡️ Enterprise-Grade Resilience
+
+Sapphire features world-class reliability patterns:
+
+### Backend Resilience
+- **`resilience.py`**: Retry with exponential backoff, timeouts, bulkheads
+- **`event_bus.py`**: Redis Pub/Sub with local fallback
+- **Circuit Breakers**: Automatic failure isolation per platform
+- **GZip Compression**: API response optimization
+
+### Real-Time Observability
+- **`/health/detailed`**: Comprehensive system health endpoint
+- **WebSocket Events**: Live platform router status updates
+- **Execution History**: Last 100 trades with latency metrics
+
+### Frontend Performance
+- **React.memo**: Optimized component re-rendering
+- **Memoized Sub-components**: PlatformHealthCard, TradeExecutionItem
+- **TypeScript Strict Mode**: Full type safety across components
+
 ## 🚀 Deployment
 
 Sapphire is designed for **"One-Click" Cloud Deployment** using Docker and Cloud Run.

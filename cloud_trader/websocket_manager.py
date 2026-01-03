@@ -31,6 +31,7 @@ class MessageType(Enum):
     MEMORY_UPDATE = "memory_update"
     ALERT = "alert"
     MARKET_REGIME = "market_regime"
+    PLATFORM_ROUTER_STATUS = "platform_router_status"  # NEW: Real-time platform router updates
 
 
 class SubscriptionType(Enum):
@@ -45,6 +46,7 @@ class SubscriptionType(Enum):
     SYSTEM_ALERTS = "system_alerts"
     AGENT_MEMORY = "agent_memory"
     MARKET_REGIME = "market_regime"
+    PLATFORM_ROUTER = "platform_router"  # NEW: Platform router health/metrics updates
 
 
 @dataclass
@@ -501,3 +503,18 @@ async def broadcast_market_regime(regime_data: Dict[str, Any]) -> None:
         print("✅ Market Regime broadcasted successfully")
     except Exception as e:
         print(f"❌ Failed to broadcast market regime: {e}")
+
+
+async def broadcast_platform_router_status(status_data: Dict[str, Any]) -> None:
+    """Broadcast platform router status update (health, metrics, circuit breaker)."""
+    try:
+        manager = await get_websocket_manager()
+        message = WebSocketMessage(
+            message_type=MessageType.PLATFORM_ROUTER_STATUS,
+            subscription_type=SubscriptionType.PLATFORM_ROUTER,
+            data=status_data,
+            priority=3,  # High priority for platform health updates
+        )
+        await manager.broadcast_message(message)
+    except Exception as e:
+        print(f"❌ Failed to broadcast platform router status: {e}")

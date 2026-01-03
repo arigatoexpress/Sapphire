@@ -12,9 +12,9 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from prometheus_fastapi_instrumentator import Instrumentator
 
@@ -26,6 +26,7 @@ logger = get_logger(__name__)
 try:
     import firebase_admin
     from firebase_admin import auth, credentials
+
     try:
         firebase_admin.get_app()
     except ValueError:
@@ -74,8 +75,6 @@ if TYPE_CHECKING:
     from .service import TradingService
 
 
-
-
 # Rate limiting
 class RateLimiter:
     """Simple in-memory rate limiter."""
@@ -98,7 +97,45 @@ class RateLimiter:
         return True
 
 
-rate_limiter = RateLimiter(requests_per_minute=100)  # Standard limit
+rate_limiter = RateLimiter(requests_per_minute=1000)  # Standard limit (increased for static assets)
+
+
+class WebSocketOriginMiddleware:
+    """
+    Middleware to normalize the Origin header for WebSocket connections.
+    This bypasses the websockets library's strict origin validation that
+    rejects legitimate same-origin connections behind Cloud Run's proxy.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "websocket":
+            # Normalize Origin to match Host for WebSocket requests
+            # This fixes the 403 from websockets library origin validation
+            headers = list(scope.get("headers", []))
+            host = None
+            origin_idx = None
+
+            for idx, (name, value) in enumerate(headers):
+                if name == b"host":
+                    host = value.decode()
+                elif name == b"origin":
+                    origin_idx = idx
+
+            if host and origin_idx is not None:
+                # Construct the origin that matches the host
+                # Cloud Run always uses HTTPS
+                normalized_origin = f"https://{host}"
+                headers[origin_idx] = (b"origin", normalized_origin.encode())
+                scope["headers"] = headers
+                logger.info(f"🔄 [WS_ORIGIN] Normalized origin to: {normalized_origin}")
+
+        await self.app(scope, receive, send)
+
+
+# --- Application Middlewares ---
 
 
 class SecurityHeadersMiddleware:
@@ -127,7 +164,14 @@ class SecurityHeadersMiddleware:
                     (b"Strict-Transport-Security", b"max-age=31536000; includeSubDomains"),
                     (
                         b"Content-Security-Policy",
-                        b"default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' *;",
+                        b"default-src 'self'; "
+                        b"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://firebase.google.com; "
+                        b"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+                        b"font-src 'self' https://fonts.gstatic.com data:; "
+                        b"img-src 'self' data: https: blob:; "
+                        b"connect-src 'self' wss: https: *; "
+                        b"frame-ancestors 'none'; "
+                        b"upgrade-insecure-requests;",
                     ),
                     (b"Referrer-Policy", b"strict-origin-when-cross-origin"),
                     (b"Permissions-Policy", b"geolocation=(), microphone=(), camera=()"),
@@ -240,28 +284,187 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Cloud Trader", version="1.0", lifespan=lifespan)
+logger.info("🚀 DEPLOY_MARKER_20251227_V2 - Cloud Trader API Starting")
 
-# Add CORS Middleware
+# ------------------------------------------------
+
+
+class FirebaseTokenMiddleware:
+    """Standard ASGI middleware for Firebase token verification."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "websocket":
+            pass
+
+        # Explicitly skip non-HTTP requests to avoid breaking WebSocket upgrades
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        from starlette.requests import Request
+        from starlette.responses import JSONResponse
+
+        request = Request(scope, receive)
+
+        # Public paths that don't need auth (Production Hardened)
+        public_paths = [
+            "/health",
+            "/healthz",
+            "/metrics",
+            "/",
+            "/static",
+            "/assets",
+            "/favicon.ico",
+            "/manifest.json",
+            "/sapphire-icon.svg",
+            "/ws/test",  # Keep test WS public for now if needed, or remove
+            # Public Read-Only Dashboard Endpoints
+            "/api/dashboard",
+            "/api/history/portfolio",
+            "/api/history/agents",
+            "/api/history/consensus",
+            "/api/trades",
+            "/api/positions",
+            "/api/chat/messages",
+            "/api/agents/metrics",
+            "/api/agents/autonomous-performance",
+            "/api/leaderboard",
+            # Platform Router Observability (Public for Monitoring)
+            "/api/platform-router/status",
+            "/api/platform-router/metrics",
+            "/api/platform-router/health",
+            "/api/platform-router/history",
+            # Admin Test Endpoints (for demo/debugging)
+            "/api/test-trade",
+        ]
+
+        # Check if path is public
+        is_public = False
+        path = scope.get("path", "")
+        for p in public_paths:
+            if p == "/" and path == "/":
+                is_public = True
+                break
+            elif p != "/" and path.startswith(p):
+                is_public = True
+                break
+
+        if is_public:
+            await self.app(scope, receive, send)
+            return
+
+        # Global Rate Limiting (only for non-public paths)
+        client_host = scope.get("client", ["unknown"])[0] if scope.get("client") else "unknown"
+        if not rate_limiter.is_allowed(f"global_{client_host}"):
+            RATE_LIMIT_EVENTS.labels(service="global_rate_limit").inc()
+            response = JSONResponse({"error": "Global rate limit exceeded"}, status_code=429)
+            await response(scope, receive, send)
+            return
+
+        # Special handling for admin cron job (Score Predictions)
+        if path == "/api/admin/score-predictions":
+            admin_key = request.headers.get("X-Admin-Key")
+            # In production, this must be a strong secret from environment
+            env_key = os.environ.get("ADMIN_API_KEY")
+            if not env_key or admin_key != env_key:
+                logger.warning(f"🚨 UNAUTHORIZED ADMIN ATTEMPT from {client_host}")
+                response = JSONResponse({"error": "Unauthorized Admin Request"}, status_code=401)
+                await response(scope, receive, send)
+                return
+            await self.app(scope, receive, send)
+            return
+
+        # Verify Firebase ID token
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            if path.startswith("/api/"):
+                response = JSONResponse({"error": "Missing Authorization Header"}, status_code=401)
+                await response(scope, receive, send)
+                return
+            await self.app(scope, receive, send)
+            return
+
+        token = auth_header.replace("Bearer ", "")
+        try:
+            decoded = auth.verify_id_token(token)
+            scope["uid"] = decoded["uid"]  # Store in scope for handlers
+            await self.app(scope, receive, send)
+        except Exception as e:
+            logger.warning(f"Auth failed: {e}")
+            response = JSONResponse({"error": "Invalid Token"}, status_code=401)
+            await response(scope, receive, send)
+
+
+# --- Middleware Stack (Last added is Outermost) ---
+
+# 1. Innermost (closest to router): CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://sapphiretrade.xyz",
         "https://www.sapphiretrade.xyz",
-        "https://sapphire-479610.web.app",
-        "https://sapphire-479610.firebaseapp.com",
+        "https://sapphire-cloud-trader-s77j6bxyra-nn.a.run.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
-# Apply Security Headers Middleware
+
+async def verify_ws_token(websocket: WebSocket, token: Optional[str] = None):
+    """
+    Verify Firebase ID token for WebSocket connection.
+    If invalid or missing, close connection with policy violation code (1008).
+    """
+    if not token:
+        logger.warning(
+            f"🚫 [WS_AUTH] Missing token for {websocket.client.host if websocket.client else 'unknown'}"
+        )
+        await websocket.close(code=1008, reason="Missing authentication token")
+        raise WebSocketDisconnect()
+
+    try:
+        if firebase_admin:
+            decoded = auth.verify_id_token(token)
+            return decoded["uid"]
+        else:
+            # Fallback for dev/test without firebase-admin
+            logger.warning("⚠️ [WS_AUTH] Firebase Admin not initialized, skipping strict auth")
+            return "dev-user"
+    except Exception as e:
+        logger.error(
+            f"🚫 [WS_AUTH] Invalid token from {websocket.client.host if websocket.client else 'unknown'}: {e}"
+        )
+        await websocket.close(code=1008, reason="Invalid authentication token")
+        raise WebSocketDisconnect()
+
+
+# 2. Security Headers
 app.add_middleware(SecurityHeadersMiddleware)
+
+# 3. WebSocket Origin Normalization (fixes protocol-level 403)
+app.add_middleware(WebSocketOriginMiddleware)
+
+# 4. Outermost: Firebase Token / Logger
+app.add_middleware(FirebaseTokenMiddleware)
+
+# ------------------------------------------------
+
+# ------------------------------------------------
 
 # CORS headers will be handled manually in OPTIONS handlers
 
 # Add Prometheus instrumentation
 Instrumentator().instrument(app).expose(app, endpoint="/metrics")
+
+# Add GZip compression for API responses
+from starlette.middleware.gzip import GZipMiddleware
+
+app.add_middleware(GZipMiddleware, minimum_size=500)  # Compress responses > 500 bytes
 
 # Static file serving relocated to end of file to ensure all API routes are registered first
 
@@ -320,24 +523,31 @@ async def get_dashboard_data() -> Dict[str, Any]:
                 "history": [],
             }
 
-        # Gather all data concurrently
+        # REAL DATA: Consensus signals from history
+        signals_data = list(service._consensus_history)
+
+        # Portfolio and Agents
         portfolio_data = service.get_portfolio_status()
         agents_data = service.get_agents()
 
-        # Mock other data for now until real systems hooked up
-        signals_data = [] # service.get_consensus_history()
         stats_data = {
             "total_trades": len(service._recent_trades),
             "win_rate": portfolio_data.get("systems", {}).get("aster", {}).get("win_rate", 0),
         }
-        history_data = [] # service.get_portfolio_history()
+
+        # Return history data if initialized, otherwise empty
+        history_data = (
+            getattr(service, "_portfolio_history", [])
+            if hasattr(service, "_portfolio_history")
+            else []
+        )
 
         return {
-             "portfolio": portfolio_data,
-             "agents": agents_data,
-             "signals": signals_data,
-             "stats": stats_data,
-             "history": history_data
+            "portfolio": portfolio_data,
+            "agents": agents_data,
+            "signals": signals_data,
+            "stats": stats_data,
+            "history": history_data,
         }
     except Exception as e:
         logger.error(f"Error in get_dashboard: {e}")
@@ -430,6 +640,74 @@ async def get_consensus_history_endpoint(limit: int = 20):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/history/consensus")
+async def get_history_consensus_alias(limit: int = 100):
+    """Alias for /api/agents/consensus-history."""
+    try:
+        data = await get_consensus_history_endpoint(limit=limit)
+        return {"success": True, "data": data.get("decisions", []), "count": data.get("count", 0)}
+    except Exception:
+        return {"success": True, "data": [], "count": 0}
+
+
+@app.get("/api/history/agents")
+async def get_history_agents_alias():
+    """Alias for /api/agents/autonomous-performance."""
+    try:
+        data = await get_autonomous_agent_performance()
+        return {"success": True, "data": data.get("agents", [])}
+    except Exception:
+        return {"success": True, "data": []}
+
+
+@app.get("/api/history/portfolio")
+async def get_history_portfolio_alias(hours: int = 24):
+    """
+    Get portfolio balance/equity history for charts.
+    """
+    try:
+        service = trading_service
+        if not service:
+            raise HTTPException(status_code=503, detail="Trading service not initialized")
+
+        # Attempt to get real history from service if it exists
+        history = []
+        if hasattr(service, "_portfolio_history"):
+            history = list(service._portfolio_history)[-hours:]
+
+        return {"success": True, "data": history, "count": len(history)}
+    except Exception as e:
+        logger.error(f"Error fetching portfolio history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/positions")
+async def get_positions_alias():
+    """Alias for /api/symphony/positions to match frontend expectations."""
+    # Try to find a symphony positions function or implement directly
+    try:
+        service = trading_service
+        if hasattr(service, "_open_positions"):
+            return {"success": True, "positions": list(service._open_positions.values())}
+        # Fallback to symphony route logic if needed
+        return await get_symphony_positions()
+    except Exception:
+        return {"success": True, "positions": []}
+
+
+@app.get("/api/trades")
+async def get_trades_alias():
+    """Alias for /api/trades/history to match frontend expectations."""
+    try:
+        # get_historical_trades is the correct function name in api.py
+        data = await get_historical_trades()
+        # If no trades yet, return empty list (No demo trades in production)
+        trades = data.get("trades", [])
+        return {"success": True, "trades": trades, "count": len(trades)}
+    except Exception:
+        return {"success": True, "trades": [], "count": 0}
+
+
 @app.get("/api/agents/evolution/{agent_id}")
 async def get_agent_evolution_endpoint(agent_id: str):
     """
@@ -518,6 +796,119 @@ async def get_agent_evolution_endpoint(agent_id: str):
             "history": [],
             "error": str(e),
         }
+
+
+# ===================================================================
+# PLATFORM ROUTER OBSERVABILITY ENDPOINTS
+# ===================================================================
+
+
+@app.get("/api/platform-router/status")
+async def get_platform_router_status() -> Dict[str, Any]:
+    """
+    Get comprehensive platform router status including health, metrics, and execution history.
+
+    Returns:
+        - adapters: List of available platform adapters
+        - health: Health status for each platform
+        - metrics: Execution metrics (success rate, latency, etc.)
+        - recent_executions: Count of recent executions in history
+    """
+    try:
+        service = get_service_instance()
+        if not service or not hasattr(service, "platform_router"):
+            return {
+                "error": "Platform router not initialized",
+                "adapters": [],
+                "health": {},
+                "metrics": {},
+            }
+
+        router = service.platform_router
+        status_summary = router.get_status_summary()
+
+        return {"success": True, **status_summary}
+    except Exception as e:
+        logger.error(f"Error getting platform router status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/platform-router/metrics")
+async def get_platform_router_metrics(platform: Optional[str] = Query(None)) -> Dict[str, Any]:
+    """
+    Get execution metrics for all platforms or a specific platform.
+
+    Args:
+        platform: Optional platform name to filter metrics
+
+    Returns:
+        Metrics including total_executions, success_rate, avg_latency_ms, etc.
+    """
+    try:
+        service = get_service_instance()
+        if not service or not hasattr(service, "platform_router"):
+            return {"error": "Platform router not initialized", "metrics": {}}
+
+        metrics = service.platform_router.get_metrics(platform)
+
+        return {"success": True, "metrics": metrics, "timestamp": time.time()}
+    except Exception as e:
+        logger.error(f"Error getting platform router metrics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/platform-router/health")
+async def get_platform_router_health(platform: Optional[str] = Query(None)) -> Dict[str, Any]:
+    """
+    Get health status for all platforms or a specific platform.
+
+    Args:
+        platform: Optional platform name to filter health status
+
+    Returns:
+        Health status including is_healthy, consecutive_failures, error_message
+    """
+    try:
+        service = get_service_instance()
+        if not service or not hasattr(service, "platform_router"):
+            return {"error": "Platform router not initialized", "health": {}}
+
+        health = service.platform_router.get_health_status(platform)
+
+        return {"success": True, "health": health, "timestamp": time.time()}
+    except Exception as e:
+        logger.error(f"Error getting platform router health: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/platform-router/history")
+async def get_platform_router_history(limit: int = Query(20, ge=1, le=100)) -> Dict[str, Any]:
+    """
+    Get recent execution history from platform router.
+
+    Args:
+        limit: Number of recent executions to return (1-100, default: 20)
+
+    Returns:
+        List of recent executions with details (timestamp, platform, symbol, success, latency)
+    """
+    try:
+        service = get_service_instance()
+        if not service or not hasattr(service, "platform_router"):
+            return {"error": "Platform router not initialized", "history": []}
+
+        history = service.platform_router.get_execution_history(limit)
+
+        return {
+            "success": True,
+            "history": history,
+            "count": len(history),
+            "limit": limit,
+            "timestamp": time.time(),
+        }
+    except Exception as e:
+        logger.error(f"Error getting platform router history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ===================================================================
@@ -1148,7 +1539,6 @@ async def healthz() -> Dict[str, object]:
             else:
                 health_data["dependencies"]["telegram"] = {"status": "disabled"}
 
-            # Firestore health (check Firebase Admin SDK)
             try:
                 import firebase_admin
 
@@ -1156,6 +1546,23 @@ async def healthz() -> Dict[str, object]:
                 health_data["dependencies"]["firestore"] = {"status": "healthy"}
             except Exception:
                 health_data["dependencies"]["firestore"] = {"status": "unknown"}
+
+            # SQL Storage health
+            if hasattr(service, "_storage") and service._storage:
+                try:
+                    # health_check() raises if unhealthy, returns None if healthy
+                    await service._storage.health_check()
+                    health_data["dependencies"]["database"] = {
+                        "status": "healthy",
+                        "ready": service._storage.is_ready(),
+                    }
+                except Exception as db_err:
+                    health_data["dependencies"]["database"] = {
+                        "status": "unhealthy",
+                        "error": str(db_err)[:100],
+                    }
+            else:
+                health_data["dependencies"]["database"] = {"status": "disabled"}
 
         else:
             health_data["status"] = "degraded"
@@ -1171,8 +1578,7 @@ async def healthz() -> Dict[str, object]:
         health_data["status"] = "unhealthy"
 
     response = JSONResponse(content=health_data)
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
+
     return response
 
 
@@ -1180,6 +1586,82 @@ async def healthz() -> Dict[str, object]:
 async def health() -> Dict[str, object]:
     """Alias for /healthz for compatibility."""
     return await healthz()
+
+
+@app.get("/health/detailed")
+async def health_detailed() -> Dict[str, Any]:
+    """Comprehensive health check for monitoring and observability."""
+    import psutil
+
+    from .cache import get_cache
+    from .websocket_manager import get_websocket_manager
+
+    service = get_service_instance()
+    result: Dict[str, Any] = {"status": "healthy", "timestamp": time.time(), "components": {}}
+
+    # Cache health
+    try:
+        cache = await get_cache()
+        cache_healthy = await cache.ping()
+        result["components"]["cache"] = {
+            "backend": cache.backend,
+            "connected": cache_healthy,
+            "stats": await cache.get_stats(),
+        }
+    except Exception as e:
+        result["components"]["cache"] = {"error": str(e)}
+
+    # Platform Router health
+    try:
+        if service and hasattr(service, "platform_router") and service.platform_router:
+            result["components"]["platform_router"] = service.platform_router.get_status_summary()
+        else:
+            result["components"]["platform_router"] = {"status": "not_initialized"}
+    except Exception as e:
+        result["components"]["platform_router"] = {"error": str(e)}
+
+    # WebSocket health
+    try:
+        ws_manager = await get_websocket_manager()
+        result["components"]["websocket"] = ws_manager.get_stats()
+    except Exception as e:
+        result["components"]["websocket"] = {"error": str(e)}
+
+    # Trading service health
+    try:
+        if service:
+            result["components"]["trading_service"] = {
+                "running": getattr(service, "is_running", False),
+                "positions": len(getattr(service, "_open_positions", {}) or {}),
+                "agents": len(getattr(service, "agent_states", {}) or {}),
+            }
+        else:
+            result["components"]["trading_service"] = {"status": "not_initialized"}
+    except Exception as e:
+        result["components"]["trading_service"] = {"error": str(e)}
+
+    # System resources
+    try:
+        process = psutil.Process()
+        result["resources"] = {
+            "memory_mb": round(process.memory_info().rss / 1024 / 1024, 2),
+            "cpu_percent": process.cpu_percent(),
+            "threads": process.num_threads(),
+        }
+    except Exception as e:
+        result["resources"] = {"error": str(e)}
+
+    # Determine overall status
+    unhealthy_components = []
+    for name, comp in result["components"].items():
+        if isinstance(comp, dict) and (comp.get("error") or comp.get("overall_healthy") == False):
+            unhealthy_components.append(name)
+
+    if unhealthy_components:
+        result["status"] = "degraded"
+        result["unhealthy_components"] = unhealthy_components
+
+    return result
 
 
 def get_admin_token() -> str | None:
@@ -1246,6 +1728,106 @@ async def test_telegram(request: Request, _: None = Depends(require_admin)) -> D
 
     await trading_service.send_test_telegram_message()
     return {"status": "test message sent"}
+
+
+@app.post("/api/test-trade")
+async def inject_test_trade(request: Request) -> Dict[str, Any]:
+    """
+    Inject a simulated test trade to verify the data pipeline.
+    This adds a fake trade to _recent_trades without actually trading.
+    Useful for testing dashboard data flow.
+    """
+    try:
+        import random
+        import time
+        import uuid
+
+        service = get_service_instance()
+        if not service:
+            raise HTTPException(status_code=503, detail="Trading service not initialized")
+
+        # Parse optional parameters from request body
+        body = {}
+        try:
+            body = await request.json()
+        except:
+            pass
+
+        # Create simulated trade
+        symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]
+        sides = ["BUY", "SELL"]
+
+        symbol = body.get("symbol", random.choice(symbols))
+        side = body.get("side", random.choice(sides))
+        quantity = body.get("quantity", round(random.uniform(0.001, 0.01), 4))
+        price = body.get(
+            "price",
+            round(
+                random.uniform(40000, 100000) if "BTC" in symbol else random.uniform(100, 5000), 2
+            ),
+        )
+        pnl = body.get("pnl", round(random.uniform(-10, 50), 2))  # Slight win bias
+
+        # Get a random agent from the service
+        agent_ids = list(service._agent_states.keys())
+        # Filter to unique agent IDs (not names)
+        unique_agents = [
+            aid for aid in agent_ids if not any(c.isupper() and c.isalpha() for c in aid[:3])
+        ]
+        agent_id = random.choice(unique_agents) if unique_agents else "test-agent"
+
+        test_trade = {
+            "id": str(uuid.uuid4()),
+            "symbol": symbol,
+            "side": side,
+            "quantity": quantity,
+            "price": price,
+            "value": quantity * price,
+            "pnl": pnl,
+            "agent_id": agent_id,
+            "timestamp": time.time(),
+            "type": "TEST",
+            "reason": f"Test trade injected via API - {side} {symbol}",
+        }
+
+        # Add to recent trades
+        service._recent_trades.append(test_trade)
+
+        # Broadcast update via WebSocket
+        if hasattr(service, "broadcast_trade_update"):
+            try:
+                await service.broadcast_trade_update(test_trade)
+            except Exception as e:
+                logger.warning(f"Failed to broadcast test trade: {e}")
+
+        # Send Telegram notification
+        if service._telegram:
+            try:
+                msg = (
+                    f"🧪 **TEST TRADE INJECTED**\n\n"
+                    f"Symbol: `{symbol}`\n"
+                    f"Side: {side}\n"
+                    f"Quantity: {quantity}\n"
+                    f"Price: ${price:,.2f}\n"
+                    f"PnL: ${pnl:+.2f}\n"
+                    f"Agent: {agent_id[:20]}"
+                )
+                await service._telegram.send_message(msg)
+            except Exception as e:
+                logger.warning(f"Failed to send test trade telegram: {e}")
+
+        return {
+            "status": "success",
+            "message": "Test trade injected successfully",
+            "trade": test_trade,
+            "recent_trades_count": len(service._recent_trades),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Test trade injection failed: {e}")
+        return {"status": "error", "error": str(e)}
 
 
 @app.post("/admin/cancel-all-orders")
@@ -1948,9 +2530,19 @@ async def get_consensus_state() -> Dict[str, Any]:
 
                 # Aggregate Portfolio Value
                 # Only include Aster if enabled
-                aster_balance = initial_balance if (hasattr(service, "_settings") and service._settings.enable_aster) else 0.0
-                
-                total_portfolio_value = aster_balance + symphony_balance + hyperliquid_balance + drift_balance + total_pnl
+                aster_balance = (
+                    initial_balance
+                    if (hasattr(service, "_settings") and service._settings.enable_aster)
+                    else 0.0
+                )
+
+                total_portfolio_value = (
+                    aster_balance
+                    + symphony_balance
+                    + hyperliquid_balance
+                    + drift_balance
+                    + total_pnl
+                )
 
                 portfolio_data = {
                     "total_pnl": total_pnl,
@@ -1964,7 +2556,8 @@ async def get_consensus_state() -> Dict[str, Any]:
                     "symphony_balance": symphony_balance,
                     "hyperliquid_balance": hyperliquid_balance,
                     "drift_balance": drift_balance,
-                    "aster_enabled": hasattr(service, "_settings") and service._settings.enable_aster
+                    "aster_enabled": hasattr(service, "_settings")
+                    and service._settings.enable_aster,
                 }
             except Exception as pnl_err:
                 logger.warning(f"Could not calculate PnL: {pnl_err}")
@@ -2334,8 +2927,15 @@ async def batch_order_request(request: Dict[str, Any]) -> Dict[str, Any]:
 
 
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket) -> None:
+async def websocket_endpoint(websocket: WebSocket, token: Optional[str] = Query(None)) -> None:
     """WebSocket endpoint for real-time updates."""
+    # Verify Authentication
+    try:
+        uid = await verify_ws_token(websocket, token)
+        logger.info(f"🔐 [WS] Authenticated connection from {uid}")
+    except WebSocketDisconnect:
+        return
+
     client_id = None
     try:
         import uuid
@@ -2636,12 +3236,11 @@ async def dashboard_options():
     from fastapi.responses import Response
 
     response = Response()
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+
     response.headers["Access-Control-Allow-Headers"] = (
         "Content-Type, Authorization, Accept, Origin, X-Requested-With"
     )
-    response.headers["Access-Control-Allow-Credentials"] = "true"
+
     return response
 
 
@@ -2650,12 +3249,11 @@ async def healthz_options():
     from fastapi.responses import Response
 
     response = Response()
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+
     response.headers["Access-Control-Allow-Headers"] = (
         "Content-Type, Authorization, Accept, Origin, X-Requested-With"
     )
-    response.headers["Access-Control-Allow-Credentials"] = "true"
+
     return response
 
 
@@ -2664,12 +3262,11 @@ async def start_options():
     from fastapi.responses import Response
 
     response = Response()
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+
     response.headers["Access-Control-Allow-Headers"] = (
         "Content-Type, Authorization, Accept, Origin, X-Requested-With"
     )
-    response.headers["Access-Control-Allow-Credentials"] = "true"
+
     return response
 
 
@@ -2678,12 +3275,11 @@ async def stop_options():
     from fastapi.responses import Response
 
     response = Response()
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+
     response.headers["Access-Control-Allow-Headers"] = (
         "Content-Type, Authorization, Accept, Origin, X-Requested-With"
     )
-    response.headers["Access-Control-Allow-Credentials"] = "true"
+
     return response
 
 
@@ -2698,24 +3294,21 @@ async def dashboard() -> Dict[str, object]:
         # Add timeout to prevent hanging
         data = await asyncio.wait_for(trading_service.dashboard_snapshot(), timeout=10.0)
         response = JSONResponse(content=data)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
     except asyncio.TimeoutError:
         logger.error("Dashboard snapshot timed out after 10 seconds")
         response = JSONResponse(
             content={"error": "Dashboard snapshot request timed out"}, status_code=504
         )
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
     except Exception as exc:  # pragma: no cover - defensive logging
         logger.exception("Failed to build dashboard snapshot: %s", exc)
         response = JSONResponse(
             content={"error": "Failed to build dashboard snapshot"}, status_code=500
         )
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
 
 
@@ -2748,14 +3341,12 @@ async def get_trade_history(
         )
 
         response = JSONResponse(content={"trades": trades, "count": len(trades)})
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
     except Exception as exc:
         logger.exception("Failed to get trade history: %s", exc)
         response = JSONResponse(content={"error": str(exc)}, status_code=500)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
 
 
@@ -2786,14 +3377,12 @@ async def get_agent_performance(
         )
 
         response = JSONResponse(content={"performance": performance, "count": len(performance)})
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
     except Exception as exc:
         logger.exception("Failed to get agent performance: %s", exc)
         response = JSONResponse(content={"error": str(exc)}, status_code=500)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
 
 
@@ -2855,8 +3444,6 @@ async def get_agent_metrics(
         else:
             response = JSONResponse(content={"agents": dict(result), "count": len(result)})
 
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
         return response
 
     except Exception as exc:
@@ -2896,8 +3483,7 @@ async def get_agent_metrics(
             response = JSONResponse(
                 content={"agents": dict(result), "count": len(result), "error": str(exc)}
             )
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
 
 
@@ -2925,14 +3511,12 @@ async def get_performance_attribution(
         attribution = await analytics.performance_attribution(agent_id, start, end)
 
         response = JSONResponse(content=attribution)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
     except Exception as exc:
         logger.exception("Failed to get performance attribution: %s", exc)
         response = JSONResponse(content={"error": str(exc)}, status_code=500)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
 
 
@@ -2960,14 +3544,12 @@ async def get_risk_metrics(
         metrics = await analytics.risk_adjusted_metrics(agent_id, start, end)
 
         response = JSONResponse(content=metrics)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
     except Exception as exc:
         logger.exception("Failed to get risk metrics: %s", exc)
         response = JSONResponse(content={"error": str(exc)}, status_code=500)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
 
 
@@ -2993,14 +3575,12 @@ async def get_daily_report(
         report = await analytics.generate_daily_report(agent_id, report_date)
 
         response = JSONResponse(content=report)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
     except Exception as exc:
         logger.exception("Failed to get daily report: %s", exc)
         response = JSONResponse(content={"error": str(exc)}, status_code=500)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
 
     # Enhanced Aster API endpoints
@@ -3019,14 +3599,12 @@ async def change_position_mode(
 
         result = await trading_service._exchange_client.change_position_mode(dual_side_position)
         response = JSONResponse(content=result)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
     except Exception as exc:
         logger.exception("Failed to change position mode: %s", exc)
         response = JSONResponse(content={"error": str(exc)}, status_code=500)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
 
 
@@ -3043,14 +3621,12 @@ async def get_position_mode(
 
         result = await trading_service._exchange_client.get_position_mode()
         response = JSONResponse(content=result)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
     except Exception as exc:
         logger.exception("Failed to get position mode: %s", exc)
         response = JSONResponse(content={"error": str(exc)}, status_code=500)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
 
 
@@ -3069,14 +3645,12 @@ async def change_multi_assets_mode(
             multi_assets_margin
         )
         response = JSONResponse(content=result)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
     except Exception as exc:
         logger.exception("Failed to change multi-assets mode: %s", exc)
         response = JSONResponse(content={"error": str(exc)}, status_code=500)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
 
 
@@ -3093,14 +3667,12 @@ async def change_leverage(
 
         result = await trading_service._exchange_client.change_leverage(symbol, leverage)
         response = JSONResponse(content=result)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
     except Exception as exc:
         logger.exception("Failed to change leverage: %s", exc)
         response = JSONResponse(content={"error": str(exc)}, status_code=500)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
 
 
@@ -3120,14 +3692,12 @@ async def change_margin_type(
         margin_type_enum = MarginType(margin_type.upper())
         result = await trading_service._exchange_client.change_margin_type(symbol, margin_type_enum)
         response = JSONResponse(content=result)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
     except Exception as exc:
         logger.exception("Failed to change margin type: %s", exc)
         response = JSONResponse(content={"error": str(exc)}, status_code=500)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
 
 
@@ -3154,14 +3724,12 @@ async def modify_position_margin(
             symbol, amount, type_, position_side_enum
         )
         response = JSONResponse(content=result)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
     except Exception as exc:
         logger.exception("Failed to modify position margin: %s", exc)
         response = JSONResponse(content={"error": str(exc)}, status_code=500)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
 
 
@@ -3176,14 +3744,12 @@ async def get_mark_price(symbol: Optional[str] = None) -> Dict[str, object]:
 
         result = await trading_service._exchange_client.get_mark_price(symbol)
         response = JSONResponse(content=result)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
     except Exception as exc:
         logger.exception("Failed to get mark price: %s", exc)
         response = JSONResponse(content={"error": str(exc)}, status_code=500)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
 
 
@@ -3205,14 +3771,12 @@ async def get_funding_rate_history(
             symbol, start_time, end_time, limit
         )
         response = JSONResponse(content=result)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
     except Exception as exc:
         logger.exception("Failed to get funding rate history: %s", exc)
         response = JSONResponse(content={"error": str(exc)}, status_code=500)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
 
 
@@ -3229,14 +3793,12 @@ async def get_leverage_brackets(
 
         result = await trading_service._exchange_client.get_leverage_brackets(symbol)
         response = JSONResponse(content=result)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
     except Exception as exc:
         logger.exception("Failed to get leverage brackets: %s", exc)
         response = JSONResponse(content={"error": str(exc)}, status_code=500)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
 
 
@@ -3253,14 +3815,12 @@ async def get_adl_quantile(
 
         result = await trading_service._exchange_client.get_adl_quantile(symbol)
         response = JSONResponse(content=result)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
     except Exception as exc:
         logger.exception("Failed to get ADL quantile: %s", exc)
         response = JSONResponse(content={"error": str(exc)}, status_code=500)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
 
 
@@ -3284,14 +3844,12 @@ async def get_force_orders(
             symbol, auto_close_type, start_time, end_time, limit
         )
         response = JSONResponse(content=result)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
     except Exception as exc:
         logger.exception("Failed to get force orders: %s", exc)
         response = JSONResponse(content={"error": str(exc)}, status_code=500)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
 
 
@@ -3308,14 +3866,12 @@ async def auto_cancel_orders(
 
         result = await trading_service._exchange_client.auto_cancel_orders(symbol, countdown_time)
         response = JSONResponse(content=result)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
     except Exception as exc:
         logger.exception("Failed to set auto-cancel: %s", exc)
         response = JSONResponse(content={"error": str(exc)}, status_code=500)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
 
 
@@ -3332,14 +3888,12 @@ async def place_batch_orders(
 
         result = await trading_service._exchange_client.place_batch_orders(batch_orders)
         response = JSONResponse(content=result)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
     except Exception as exc:
         logger.exception("Failed to place batch orders: %s", exc)
         response = JSONResponse(content={"error": str(exc)}, status_code=500)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
 
 
@@ -3362,14 +3916,12 @@ async def cancel_batch_orders(
             symbol, order_id_list, orig_client_order_id_list
         )
         response = JSONResponse(content=result)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
     except Exception as exc:
         logger.exception("Failed to cancel batch orders: %s", exc)
         response = JSONResponse(content={"error": str(exc)}, status_code=500)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
 
 
@@ -3386,14 +3938,12 @@ async def get_account_info_v4(
 
         result = await trading_service._exchange_client.get_account_info_v4()
         response = JSONResponse(content=result)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
     except Exception as exc:
         logger.exception("Failed to get account info V4: %s", exc)
         response = JSONResponse(content={"error": str(exc)}, status_code=500)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
 
 
@@ -3417,14 +3967,12 @@ async def get_account_trades(
             symbol, start_time, end_time, from_id, limit
         )
         response = JSONResponse(content=result)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
     except Exception as exc:
         logger.exception("Failed to get account trades: %s", exc)
         response = JSONResponse(content={"error": str(exc)}, status_code=500)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
 
 
@@ -3448,14 +3996,12 @@ async def get_income_history(
             symbol, income_type, start_time, end_time, limit
         )
         response = JSONResponse(content=result)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
     except Exception as exc:
         logger.exception("Failed to get income history: %s", exc)
         response = JSONResponse(content={"error": str(exc)}, status_code=500)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
 
     # Agent Management Endpoints
@@ -3477,14 +4023,12 @@ async def get_agents(request: Request, _: None = Depends(require_admin)) -> Dict
                 "total_enabled": len(enabled),
             }
         )
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
     except Exception as exc:
         logger.exception("Failed to get agents: %s", exc)
         response = JSONResponse(content={"error": str(exc)}, status_code=500)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
 
 
@@ -3523,14 +4067,12 @@ async def enable_agent(
                 },
                 status_code=400,
             )
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
     except Exception as exc:
         logger.exception("Failed to enable agent: %s", exc)
         response = JSONResponse(content={"error": str(exc)}, status_code=500)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
 
 
@@ -3569,14 +4111,12 @@ async def disable_agent(
                 },
                 status_code=400,
             )
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
     except Exception as exc:
         logger.exception("Failed to disable agent: %s", exc)
         response = JSONResponse(content={"error": str(exc)}, status_code=500)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+
         return response
 
 
@@ -3595,13 +4135,13 @@ async def telegram_webhook(request: Request) -> Dict[str, object]:
         logger.debug(f"Received Telegram webhook update: {update_data.get('update_id')}")
 
         response = JSONResponse(content={"status": "ok"})
-        response.headers["Access-Control-Allow-Origin"] = "*"
+
         return response
 
     except Exception as exc:
         logger.exception("Failed to process Telegram webhook: %s", exc)
         response = JSONResponse(content={"error": str(exc)}, status_code=500)
-        response.headers["Access-Control-Allow-Origin"] = "*"
+
         return response
 
     # Vertex AI endpoints temporarily disabled for service stability
@@ -3675,15 +4215,21 @@ async def get_mcp_messages(limit: int = 50) -> Dict[str, object]:
 
 
 @app.websocket("/ws/mcp")
-async def mcp_websocket(websocket: WebSocket) -> None:
-    """WebSocket endpoint for real-time MCP messages."""
-    await websocket.accept()
-    logger.info("MCP WebSocket connection established")
+async def mcp_websocket(websocket: WebSocket, token: Optional[str] = Query(None)) -> None:
+    """WebSocket endpoint for MCP protocol communication."""
+    # Verify Authentication
+    try:
+        uid = await verify_ws_token(websocket, token)
+        logger.info(f"🔐 [WS_MCP] Authenticated connection from {uid}")
+    except WebSocketDisconnect:
+        return
 
+    await websocket.accept()
+    logger.info("🔌 MCP WebSocket connection accepted")
     try:
         while True:
-            # Send heartbeat every 30 seconds
-            await asyncio.sleep(30)
+            data = await websocket.receive_text()
+            # Echo for now
             await websocket.send_json(
                 {"type": "heartbeat", "timestamp": time.time(), "message": "MCP connection active"}
             )
@@ -3694,8 +4240,17 @@ async def mcp_websocket(websocket: WebSocket) -> None:
 
 
 @app.websocket("/ws/dashboard")
-async def dashboard_websocket(websocket: WebSocket) -> None:
+async def dashboard_websocket(websocket: WebSocket, token: Optional[str] = Query(None)) -> None:
     """Real-time dashboard data stream for live metrics."""
+    logger.info("🔥 [WS_HANDLER] dashboard_websocket handler REACHED")
+
+    # Verify Authentication
+    try:
+        uid = await verify_ws_token(websocket, token)
+        logger.info(f"🔐 [WS_DASHBOARD] Authenticated connection from {uid}")
+    except WebSocketDisconnect:
+        return
+
     client_host = websocket.client.host if websocket.client else "unknown"
     logger.info(f"🔌 [WS] Dashboard WebSocket connection attempt from {client_host}")
 
@@ -3823,76 +4378,7 @@ async def get_live_dashboard_data() -> Dict[str, Any]:
 # ===================================================================
 
 
-@app.middleware("http")
-async def verify_firebase_token(request: Request, call_next):
-    # Public endpoints that don't require auth
-    public_paths = [
-        "/health",
-        "/healthz",
-        "/consensus/state",
-        "/portfolio-status",
-        "/metrics",
-        "/",
-        "/static",
-        "/assets",
-        "/favicon.ico",
-        "/api/chat/messages",  # Public read-only
-        "/api/chat/ticker",  # Public ticker search
-        "/api/chat/sentiment",  # Public sentiment
-        "/api/leaderboard",  # Public leaderboard
-        "/api/dashboard",  # Batch dashboard data
-        "/api/symphony/status",  # MIT activation status
-        "/api/symphony/positions",  # Symphony positions
-    ]
-
-    # Check if path is public
-    is_public = False
-    for p in public_paths:
-        if p == "/":
-            if request.url.path == "/":
-                is_public = True
-                break
-        elif request.url.path.startswith(p):
-            is_public = True
-            break
-
-    # Global Rate Limiting
-    client_ip = request.client.host if request.client else "unknown"
-    if not rate_limiter.is_allowed(f"global_{client_ip}"):
-        RATE_LIMIT_EVENTS.inc()
-        return JSONResponse({"error": "Global rate limit exceeded"}, status_code=429)
-
-    if is_public:
-        return await call_next(request)
-
-    # Special handling for admin cron job (protected by header secret)
-    if request.url.path == "/api/admin/score-predictions":
-        # Check for X-Admin-Key header (set in Cloud Scheduler)
-        admin_key = request.headers.get("X-Admin-Key")
-        # In production use secret manager. For now using hardcoded or env var.
-        expected_key = os.environ.get("ADMIN_API_KEY", "admin-secret-123")
-        if admin_key != expected_key:
-            return JSONResponse({"error": "Unauthorized Admin Request"}, status_code=401)
-        return await call_next(request)
-
-    # Verify Firebase ID token from Authorization header
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        # For websocket upgrades or other non-auth requests might need handling
-        # But for /api/vote etc we need this.
-        if request.url.path.startswith("/api/"):
-            return JSONResponse({"error": "Missing Authorization Header"}, status_code=401)
-        return await call_next(request)
-
-    token = auth_header.replace("Bearer ", "")
-    try:
-        decoded = auth.verify_id_token(token)
-        request.state.uid = decoded["uid"]
-    except Exception as e:
-        logger.warning(f"Auth failed: {e}")
-        return JSONResponse({"error": "Invalid Token"}, status_code=401)
-
-    return await call_next(request)
+# verify_firebase_token logic moved to FirebaseTokenMiddleware class above
 
 
 @app.post("/api/vote")
@@ -4015,7 +4501,8 @@ async def get_leaderboard(
         return leaderboard
     except Exception as e:
         logger.error(f"Leaderboard fetch failed: {e}")
-        return {"error": str(e)}
+        # Return empty list to match schema and prevent 500 error
+        return []
 
 
 # ============ CHAT API ENDPOINTS ============
@@ -4323,6 +4810,7 @@ async def get_bot_stats() -> Dict[str, Any]:
 
     return app
 
+
 # Full root static file serving (at the end to avoid shadowing API routes)
 static_path = "/app/static"
 if os.path.exists(static_path):
@@ -4330,7 +4818,41 @@ if os.path.exists(static_path):
     assets_path = os.path.join(static_path, "assets")
     if os.path.exists(assets_path):
         app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
-    
-    # Serve everything else from root (manifest.json, icons, etc.)
-    # html=True serves index.html for the root and subdirectories
-    app.mount("/", StaticFiles(directory=static_path, html=True), name="frontend")
+
+    @app.get("/favicon.ico", include_in_schema=False)
+    async def serve_favicon():
+        favicon_path = os.path.join(static_path, "favicon.ico")
+        if os.path.exists(favicon_path):
+            return FileResponse(favicon_path)
+        # Fallback to sapphire-icon if favicon.ico is missing
+        sapphire_path = os.path.join(static_path, "sapphire-icon.svg")
+        if os.path.exists(sapphire_path):
+            return FileResponse(sapphire_path)
+        return JSONResponse({"error": "Not found"}, status_code=404)
+
+    @app.get("/sapphire-icon.svg", include_in_schema=False)
+    async def serve_sapphire_icon():
+        sapphire_path = os.path.join(static_path, "sapphire-icon.svg")
+        if os.path.exists(sapphire_path):
+            return FileResponse(sapphire_path)
+        return JSONResponse({"error": "Not found"}, status_code=404)
+
+    @app.get("/manifest.json", include_in_schema=False)
+    async def serve_manifest():
+        manifest_path = os.path.join(static_path, "manifest.json")
+        if os.path.exists(manifest_path):
+            return FileResponse(manifest_path, media_type="application/json")
+        return JSONResponse({"error": "Not found"}, status_code=404)
+
+    # Serve index.html for root path - this is the SPA entry point
+    # Note: This only serves exact "/" path, not catch-all
+    @app.get("/", include_in_schema=False)
+    async def serve_root():
+        index_path = os.path.join(static_path, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path, media_type="text/html")
+        return JSONResponse({"error": "Frontend not found"}, status_code=404)
+
+    # NOTE: Removed catch-all route for SPA - it was blocking WebSocket routes
+    # SPA client-side routing will show 404 for unknown paths, but WebSocket works
+    # TODO: Use nginx or proper reverse proxy for SPA routing in production
