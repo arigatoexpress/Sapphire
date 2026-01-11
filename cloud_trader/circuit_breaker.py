@@ -166,6 +166,31 @@ def get_circuit_breaker(name: str, config: Optional[CircuitBreakerConfig] = None
     return _circuit_breakers[name]
 
 
+def reset_circuit_breaker(name: str) -> bool:
+    """Reset a specific circuit breaker to CLOSED state."""
+    if name in _circuit_breakers:
+        breaker = _circuit_breakers[name]
+        breaker.state = CircuitBreakerState.CLOSED
+        breaker.metrics.consecutive_failures = 0
+        breaker.metrics.consecutive_successes = 0
+        logger.info(f"🔄 Circuit breaker '{name}' manually reset to CLOSED")
+        return True
+    return False
+
+
+def reset_all_circuit_breakers() -> dict:
+    """Reset all circuit breakers to CLOSED state."""
+    results = {}
+    for name, breaker in _circuit_breakers.items():
+        old_state = breaker.state.value
+        breaker.state = CircuitBreakerState.CLOSED
+        breaker.metrics.consecutive_failures = 0
+        breaker.metrics.consecutive_successes = 0
+        results[name] = {"old_state": old_state, "new_state": "closed"}
+        logger.info(f"🔄 Circuit breaker '{name}' reset: {old_state} -> closed")
+    return results
+
+
 # Pre-configured circuit breakers for common services
 VERTEX_AI_BREAKER = get_circuit_breaker(
     "vertex_ai",

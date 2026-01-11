@@ -25,10 +25,11 @@
 ### ✨ Key Features
 
 - 🤖 **6 Specialized AI Agents** - Each with unique trading strategies
-- ⚡ **Sub-second Execution** - WebSocket-powered real-time updates  
+- ⚡ **Sub-second Execution** - WebSocket-powered real-time updates and **ORJSON** optimized API.
 - 🔄 **Multi-Chain Support** - Solana, Monad, Base, and EVM chains
-- 🧠 **Self-Learning** - Agents adapt based on PnL outcomes
-- 📊 **World-Class Dashboard** - React 18 with real-time monitoring
+- 🧠 **Real-Time AI Analysis** - Direct integration with **Vertex AI & Gemini 2.0** for live market insights.
+- 💬 **Interactive AI Bot** - Telegram bot with real-time portfolio control and AI chat.
+- 📊 **World-Class Dashboard** - React 18 with **Smart Sync** technology for efficient data delivery.
 
 ---
 
@@ -39,8 +40,8 @@
 │                     Sapphire AI System                       │
 ├─────────────────────────────────────────────────────────────┤
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
-│  │ MarketScanner│  │AgentConsensus│  │   PlatformRouter   │  │
-│  │   Discovery  │─▶│   6 Agents  │─▶│ Symphony / Aster   │  │
+│  │ ADC_Analyzer │─▶│AgentConsensus│─▶│   PlatformRouter   │  │
+│  │ (Vertex AI) │  │   6 Agents  │  │ Symphony / Aster   │  │
 │  └─────────────┘  └─────────────┘  └─────────────────────┘  │
 ├─────────────────────────────────────────────────────────────┤
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
@@ -54,6 +55,7 @@
 
 | Component | Description |
 |-----------|-------------|
+| **AI Analyzer** | **NEW** Direct Vertex AI integration for real-time trade rationale and sentiment analysis |
 | **MarketScanner** | Intelligent opportunity discovery using volatility & trend analysis |
 | **AgentConsensus** | Orchestrates 6 specialized AI agents for weighted decision-making |
 | **PlatformRouter** | Abstract adapter layer routing to Symphony (Monad/Base) or Aster (Solana) |
@@ -74,11 +76,11 @@
 <table>
 <tr>
 <td><strong>Backend</strong></td>
-<td>Python 3.11+ (Asyncio), FastAPI, uvicorn</td>
+<td>Python 3.11+ (Asyncio), FastAPI (<strong>ORJSON Optimized</strong>), uvicorn</td>
 </tr>
 <tr>
 <td><strong>Frontend</strong></td>
-<td>React 18, TypeScript, Material-UI, Vite</td>
+<td>React 18, TypeScript, Material-UI, Vite, <strong>Smart Sync Polling</strong></td>
 </tr>
 <tr>
 <td><strong>Infrastructure</strong></td>
@@ -86,11 +88,11 @@
 </tr>
 <tr>
 <td><strong>AI/ML</strong></td>
-<td>Grok, Gemini 2.0 Flash, Vertex AI</td>
+<td><strong>Vertex AI, Gemini 2.0 Flash</strong> (Direct Integration), Grok</td>
 </tr>
 <tr>
 <td><strong>Monitoring</strong></td>
-<td>Real-time WebSocket, Prometheus metrics</td>
+<td>Real-time WebSocket, Prometheus metrics, Telegram Bot</td>
 </tr>
 </table>
 
@@ -110,16 +112,16 @@ Bulkhead(max_concurrent=20)                   # Concurrency limiting
 - **`resilience.py`** - Retry, timeout, bulkhead patterns
 - **`event_bus.py`** - Redis Pub/Sub with local fallback
 - **Circuit Breakers** - Automatic failure isolation per platform
-- **GZip Compression** - API response optimization
+- **GZip & ORJSON** - hyper-optimized API response handling
 
 ### Real-Time Observability
 - **`/health/detailed`** - Comprehensive system health
 - **WebSocket Events** - Live platform router updates
-- **Execution History** - Last 100 trades with latency metrics
+- **Interactive Telegram Bot** - Real-time command interface (`/status`, `/portfolio`)
 
 ### Frontend Performance
-- **React.memo** - Optimized re-rendering
-- **useMemo/useCallback** - Memoized computations
+- **Smart Sync** - Adaptive polling (5s offline / 30s online) to minimize load
+- **React.memo** - Optimized re-rendering and "Cyber-Organic" CSS architecture
 - **TypeScript Strict** - Full type safety
 
 ---
@@ -138,7 +140,7 @@ gcloud auth login
 ### Environment Variables
 ```bash
 export SYMPHONY_API_KEY="..."
-export GROK_API_KEY="..."  
+export GROK_API_KEY="..."
 export HL_SECRET_KEY="..."
 export REDIS_URL="redis://..."  # Optional: for production caching
 ```

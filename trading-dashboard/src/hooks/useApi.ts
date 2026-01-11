@@ -1,19 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { getApiUrl } from '../utils/apiConfig';
 
-// Backend API base URL
-const getApiUrl = (): string => {
-    const envUrl = import.meta.env.VITE_API_URL;
-    if (envUrl && !envUrl.includes('localhost')) {
-        return envUrl.replace(/\/$/, ''); // Remove trailing slash
-    }
-    // Production relative URL if on Cloud Run or same domain
-    if (window.location.hostname.includes('run.app') || window.location.hostname.includes('sapphiretrade')) {
-        return window.location.origin;
-    }
-    // Fallback for local dev if env not set
-    return '';
-};
 
 export interface AgentData {
     id: string;
@@ -24,6 +12,7 @@ export interface AgentData {
     allocation: number;
     activePositions: number;
     status: 'active' | 'idle' | 'error';
+    system?: string;
     lastSignal?: string;
     confidence?: number;
 }

@@ -16,7 +16,7 @@ class Settings(BaseSettings):
         extra="ignore",
         env_file_encoding="utf-8",
         populate_by_name=True,
-        protected_namespaces=('settings_',),
+        protected_namespaces=("settings_",),
     )
 
     # API credentials
@@ -37,7 +37,10 @@ class Settings(BaseSettings):
     hl_secret_key: str | None = Field(default=None, validation_alias="HL_SECRET_KEY")
     hl_account_address: str | None = Field(default=None, validation_alias="HL_ACCOUNT_ADDRESS")
     solana_private_key: str | None = Field(default=None, validation_alias="SOLANA_PRIVATE_KEY")
-    solana_rpc_url: str = Field(default="https://api.mainnet-beta.solana.com", validation_alias="SOLANA_RPC_URL")
+    solana_rpc_url: str = Field(
+        default="https://api.mainnet-beta.solana.com", validation_alias="SOLANA_RPC_URL"
+    )
+    symphony_api_key: str | None = Field(default=None, validation_alias="SYMPHONY_API_KEY")
     telegram_summary_interval_seconds: int = Field(
         default=14_400,
         ge=0,
@@ -133,12 +136,10 @@ class Settings(BaseSettings):
     # Agent configuration
     enabled_agents: List[str] = Field(
         default_factory=lambda: [
-            "trend-momentum-agent",
             "strategy-optimization-agent",
             "financial-sentiment-agent",
             "market-prediction-agent",
             "volume-microstructure-agent",
-            "vpin-hft",
         ],
         validation_alias="ENABLED_AGENTS",
         description="List of 6 advanced AI agents for autonomous trading",
@@ -159,10 +160,18 @@ class Settings(BaseSettings):
     )
 
     # Symphony Agent Registration
-    symphony_milf_agent_id: str | None = Field(default="f6cc5590-ff96-4077-ac80-9775c7f805cc", validation_alias="SYMPHONY_MILF_AGENT_ID")
-    symphony_agdg_agent_id: str | None = Field(default="01b8c2b7-b210-493f-8c76-dafd97663e2c", validation_alias="SYMPHONY_AGDG_AGENT_ID")
-    symphony_degen_agent_id: str | None = Field(default="01b8c2b7-b210-493f-8c76-dafd97663e2c", validation_alias="SYMPHONY_DEGEN_AGENT_ID")
-    symphony_mit_agent_id: str | None = Field(default="ee5bcfda-0919-469c-ac8f-d665a5dd444e", validation_alias="SYMPHONY_MIT_AGENT_ID")
+    symphony_milf_agent_id: str | None = Field(
+        default="f6cc5590-ff96-4077-ac80-9775c7f805cc", validation_alias="SYMPHONY_MILF_AGENT_ID"
+    )
+    symphony_agdg_agent_id: str | None = Field(
+        default="01b8c2b7-b210-493f-8c76-dafd97663e2c", validation_alias="SYMPHONY_AGDG_AGENT_ID"
+    )
+    symphony_degen_agent_id: str | None = Field(
+        default="01b8c2b7-b210-493f-8c76-dafd97663e2c", validation_alias="SYMPHONY_DEGEN_AGENT_ID"
+    )
+    symphony_mit_agent_id: str | None = Field(
+        default="ee5bcfda-0919-469c-ac8f-d665a5dd444e", validation_alias="SYMPHONY_MIT_AGENT_ID"
+    )
     symphony_api_key: str | None = Field(default=None, validation_alias="SYMPHONY_API_KEY")
     symphony_strategy_id: str = Field(default="default", validation_alias="SYMPHONY_STRATEGY_ID")
 
@@ -179,7 +188,9 @@ class Settings(BaseSettings):
     )
     mit_auto_subscribe: bool = Field(default=True, validation_alias="MIT_AUTO_SUBSCRIBE")
     mit_default_leverage: int = Field(default=3, validation_alias="MIT_DEFAULT_LEVERAGE")
-    mit_max_position_size_usdc: float = Field(default=100.0, validation_alias="MIT_MAX_POSITION_SIZE_USDC")
+    mit_max_position_size_usdc: float = Field(
+        default=100.0, validation_alias="MIT_MAX_POSITION_SIZE_USDC"
+    )
     mit_enable_stop_loss: bool = Field(default=True, validation_alias="MIT_ENABLE_STOP_LOSS")
     mit_enable_take_profit: bool = Field(default=True, validation_alias="MIT_ENABLE_TAKE_PROFIT")
     mit_default_sl_percent: float = Field(default=0.03, validation_alias="MIT_DEFAULT_SL_PERCENT")

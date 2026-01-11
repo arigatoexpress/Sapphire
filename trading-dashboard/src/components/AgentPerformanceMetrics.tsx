@@ -29,8 +29,10 @@ import {
   ExpandLess,
   Refresh,
 } from '@mui/icons-material';
-// API base URL - should match the backend service URL
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.sapphiretrade.xyz';
+import { getApiUrl } from '../utils/apiConfig';
+
+// API base URL - resolved via centralized config
+const API_BASE_URL = getApiUrl();
 
 interface AgentMetrics {
   agent_id: string;

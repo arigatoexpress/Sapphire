@@ -22,10 +22,9 @@ class SymphonyFundManager:
         # Target Weights (The "Vanguard" Thesis)
         # Context: Monad is a HFT EVM. We want high exposure to native velocity.
         self.target_portfolio = {
-            "MON": 0.40,  # Native Gas/Stake for HFT eco
-            "EMO": 0.20,  # High Conviction Meme
-            "MONCOCK": 0.20,  # High Conviction Meme
-            "USDC": 0.20,  # Dry Powder for Dip Buying
+            "MON": 0.50,  # Native Gas/Stake for HFT eco
+            "EMO": 0.25,  # High Conviction Meme
+            "USDC": 0.25,  # Dry Powder for Dip Buying
         }
 
     async def run_rebalance_cycle(self, market_regime: str = "NEUTRAL"):
@@ -42,7 +41,7 @@ class SymphonyFundManager:
         # 2. Adjust Strategy based on Regime
         if market_regime == "BULL_TRENDING":
             # Risk On: Heavy Crypto/AI + MEMES
-            logger.info("   Strategy: AGGRESSIVE GROWTH 🚀 (Long EMO/MONCOCK)")
+            logger.info("   Strategy: AGGRESSIVE GROWTH 🚀 (Long EMO/MON)")
             # Logic: Overweight High Beta
             # self.symphony.execute_spot_trade(symbol="EMO-USDC", side="BUY", ...)
 

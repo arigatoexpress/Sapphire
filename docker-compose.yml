@@ -1,0 +1,114 @@
+version: '3.8'
+
+services:
+  # ============ EMULATORS ============
+  pubsub-emulator:
+    image: gcr.io/google.com/cloudsdktool/cloud-sdk:emulators
+    command: gcloud beta emulators pubsub start --host-port=0.0.0.0:8085
+    ports:
+      - "8085:8085"
+
+  firestore-emulator:
+    image: gcr.io/google.com/cloudsdktool/cloud-sdk:emulators
+    command: gcloud emulators firestore start --host-port=0.0.0.0:8086
+    ports:
+      - "8086:8086"
+
+  # ============ INFRASTRUCTURE ============
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  # ============ CORE SERVICES ============
+  api-gateway:
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - PUBSUB_EMULATOR_HOST=pubsub-emulator:8085
+      - FIRESTORE_EMULATOR_HOST=firestore-emulator:8086
+      - REDIS_URL=redis://redis:6379
+      - SERVICE_NAME=api-gateway
+    depends_on:
+      - pubsub-emulator
+      - redis
+    env_file:
+      - .env
+
+  market-scanner:
+    build:
+      context: .
+      dockerfile: services/market-scanner/Dockerfile
+    environment:
+      - PUBSUB_EMULATOR_HOST=pubsub-emulator:8085
+      - SERVICE_NAME=market-scanner
+      - TRADING_ENABLED=true
+    depends_on:
+      - pubsub-emulator
+    env_file:
+      - .env
+
+  # ============ TRADING BOTS ============
+  bot-symphony:
+    build:
+      context: .
+      dockerfile: services/bot-symphony/Dockerfile
+    environment:
+      - PUBSUB_EMULATOR_HOST=pubsub-emulator:8085
+      - SERVICE_NAME=bot-symphony
+      - TRADING_ENABLED=true
+    depends_on:
+      - pubsub-emulator
+      - api-gateway
+    env_file:
+      - .env
+
+  bot-drift:
+    build:
+      context: .
+      dockerfile: services/bot-drift/Dockerfile
+    environment:
+      - PUBSUB_EMULATOR_HOST=pubsub-emulator:8085
+      - SERVICE_NAME=bot-drift
+      - TRADING_ENABLED=true
+    depends_on:
+      - pubsub-emulator
+      - api-gateway
+    env_file:
+      - .env
+
+  bot-hyperliquid:
+    build:
+      context: .
+      dockerfile: services/bot-hyperliquid/Dockerfile
+    environment:
+      - PUBSUB_EMULATOR_HOST=pubsub-emulator:8085
+      - SERVICE_NAME=bot-hyperliquid
+      - TRADING_ENABLED=true
+    depends_on:
+      - pubsub-emulator
+      - api-gateway
+    env_file:
+      - .env
+
+  bot-aster:
+    build:
+      context: .
+      dockerfile: services/bot-aster/Dockerfile
+    environment:
+      - PUBSUB_EMULATOR_HOST=pubsub-emulator:8085
+      - SERVICE_NAME=bot-aster
+      - TRADING_ENABLED=true
+    depends_on:
+      - pubsub-emulator
+      - api-gateway
+    env_file:
+      - .env
+
+volumes:
+  redis_data:

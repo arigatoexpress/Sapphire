@@ -9,35 +9,24 @@ from typing import List
 from .autonomous_agent import AutonomousAgent
 from .data_store import DataStore
 from .market_scanner import MarketScanner
-from .platform_router import AsterAdapter, PlatformRouter, SymphonyAdapter
 from .symphony_config import AGENTS_CONFIG
 
 logger = logging.getLogger(__name__)
 
 
 def init_autonomous_components(
-    feature_pipeline, exchange_client, symphony_client, settings
+    feature_pipeline, exchange_client, symphony_client, settings, hl_client=None, drift_client=None
 ) -> tuple:
     """
     Initialize all autonomous trading components.
 
     Returns:
-        tuple: (data_store, autonomous_agents, platform_router, market_scanner)
+        tuple: (data_store, autonomous_agents, market_scanner, vpin_agent)
     """
     # 1. Initialize DataStore (unified data access layer)
     data_store = DataStore(feature_pipeline=feature_pipeline)
 
-    # 2. Initialize Platform Router with adapters
-    symphony_adapter = SymphonyAdapter(symphony_client=symphony_client, agents_config=AGENTS_CONFIG)
-    aster_adapter = AsterAdapter(aster_client=exchange_client)
-    platform_router = PlatformRouter(
-        adapters={
-            "symphony": symphony_adapter,
-            "symphony_swap": symphony_adapter,
-            "symphony_perp": symphony_adapter,
-            "aster": aster_adapter,
-        }
-    )
+    # 2. (Deleted) PlatformRouter initialization removed
 
     # 3. Initialize MarketScanner
     # Pass None for market_data if not available (will use feature_pipeline)
@@ -47,20 +36,20 @@ def init_autonomous_components(
 
     # 4. Initialize Autonomous Agents (Dynamic based on settings)
     autonomous_agents = []
-    
+
     enabled_agents = getattr(settings, "enabled_agents", [])
     if not enabled_agents:
         logger.warning("No agents enabled in settings, falling back to defaults")
         enabled_agents = [
-            "trend-momentum-agent", 
-            "strategy-optimization-agent", 
-            "financial-sentiment-agent"
+            "trend-momentum-agent",
+            "strategy-optimization-agent",
+            "financial-sentiment-agent",
         ]
 
     for agent_id in enabled_agents:
         # Map IDs to human-readable names or just use ID
         name = agent_id.replace("-", " ").title()
-        
+
         # Determine specialization based on ID keywords
         specialization = "technical"
         if "sentiment" in agent_id.lower():
@@ -80,4 +69,21 @@ def init_autonomous_components(
         )
         autonomous_agents.append(agent)
 
-    return data_store, autonomous_agents, platform_router, market_scanner
+    # 5. Initialize VPIN HFT Agent (Phase 6 Enhancement)
+    # This agent uses volume-synchronized probability of informed trading for HFT signals
+    vpin_agent = None
+    try:
+        from .agents.vpin_hft_agent import VpinHFTAgent
+
+        vpin_agent = VpinHFTAgent(
+            exchange_client=exchange_client,
+            pubsub_client=None,  # Can be connected to GCP PubSub if available
+            risk_manager_topic="sapphire-hft-risk",
+        )
+        logger.info("✅ VpinHFTAgent initialized (HFT microstructure agent)")
+    except ImportError:
+        logger.warning("⚠️ VpinHFTAgent not available (missing dependency)")
+    except Exception as e:
+        logger.warning(f"⚠️ VpinHFTAgent initialization failed: {e}")
+
+    return data_store, autonomous_agents, market_scanner, vpin_agent

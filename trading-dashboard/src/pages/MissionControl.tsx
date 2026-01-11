@@ -15,7 +15,7 @@ const MissionControl: React.FC = () => {
     try {
       const baseUrl = getApiUrl();
 
-      await fetch(`${baseUrl}/positions/${symbol}/tpsl`, {
+      await fetch(`${baseUrl}/api/positions/${symbol}/tpsl`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -66,8 +66,8 @@ const MissionControl: React.FC = () => {
                 label={tab.label}
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`cursor-pointer transition-all ${activeTab === tab.id
-                    ? 'bg-blue-600/30 text-blue-400 border border-blue-500/50'
-                    : 'bg-slate-800 text-slate-500 border border-slate-700'
+                  ? 'bg-blue-600/30 text-blue-400 border border-blue-500/50'
+                  : 'bg-slate-800 text-slate-500 border border-slate-700'
                   }`}
               />
             ))}

@@ -1,20 +1,28 @@
 fastapi==0.121.1
 uvicorn[standard]==0.38.0
-httpx==0.28.1
+httpx==0.23.1
 pydantic==2.12.4
 pydantic-settings==2.1.0
 python-dotenv==1.2.1
 prometheus-fastapi-instrumentator==7.1.0
-aiohttp==3.13.2
-python-telegram-bot==22.5
+aiohttp==3.8.3
+aiosignal>=1.3.1
+
+# Performance optimizations
+uvloop>=0.19.0
+httptools>=0.6.0
+
+# Gemini AI (stable SDK, compatible with driftpy/httpx constraints)
+google-generativeai>=0.8.0
+
 redis==7.0.1
 structlog==25.5.0
 orjson==3.11.4
-numpy==2.3.4
+numpy==1.26.4
 pandas==2.3.3
 pandas-ta-openbb==0.4.22
 google-cloud-secret-manager==2.25.0
-google-cloud-bigquery==3.38.0
+google-cloud-bigquery==3.25.0
 google-cloud-pubsub==2.33.0
 google-cloud-firestore>=2.19.0
 python-json-logger==2.0.7
@@ -23,15 +31,15 @@ sqlalchemy==2.0.44
 firebase-admin==6.6.0
 tenacity==9.1.2
 wsproto==1.2.0
-websockets==14.1
+
 lz4==4.3.3
 google-cloud-bigquery-storage==2.24.0
 
 # Solana/Jupiter Integration
-solders>=0.21.0
-solana>=0.34.0
-httpx>=0.27.0
-cryptography>=42.0.0
-hyperliquid-python-sdk>=0.4.0
+
+driftpy>=0.7.0
 eth-account>=0.8.0
 base58>=2.1.1
+google-cloud-aiplatform>=1.70.0
+psutil>=5.9.0
+packaging==22.0

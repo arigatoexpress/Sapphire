@@ -95,13 +95,14 @@ const AgentModelCard: React.FC<AgentModelCardProps> = ({ agent, onAgentClick }) 
   };
 
   const getSpecializationIcon = () => {
-    if (agent.specialization.includes('Momentum')) return <TrendingUp sx={{ fontSize: 14 }} />;
-    if (agent.specialization.includes('Risk')) return <Shield sx={{ fontSize: 14 }} />;
-    if (agent.specialization.includes('Financial')) return <Assessment sx={{ fontSize: 14 }} />;
-    if (agent.specialization.includes('Time Series')) return <Analytics sx={{ fontSize: 14 }} />;
-    if (agent.specialization.includes('VPIN')) return <Memory sx={{ fontSize: 14 }} />;
-    if (agent.specialization.includes('Algorithmic')) return <Speed sx={{ fontSize: 14 }} />;
-    if (agent.specialization.includes('Market Making')) return <Psychology sx={{ fontSize: 14 }} />;
+    const spec = agent.specialization || '';
+    if (spec.includes('Momentum')) return <TrendingUp sx={{ fontSize: 14 }} />;
+    if (spec.includes('Risk')) return <Shield sx={{ fontSize: 14 }} />;
+    if (spec.includes('Financial')) return <Assessment sx={{ fontSize: 14 }} />;
+    if (spec.includes('Time Series')) return <Analytics sx={{ fontSize: 14 }} />;
+    if (spec.includes('VPIN')) return <Memory sx={{ fontSize: 14 }} />;
+    if (spec.includes('Algorithmic')) return <Speed sx={{ fontSize: 14 }} />;
+    if (spec.includes('Market Making')) return <Psychology sx={{ fontSize: 14 }} />;
     return <SmartToy sx={{ fontSize: 14 }} />;
   };
 

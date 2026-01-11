@@ -31,7 +31,7 @@ class MessageType(Enum):
     MEMORY_UPDATE = "memory_update"
     ALERT = "alert"
     MARKET_REGIME = "market_regime"
-    PLATFORM_ROUTER_STATUS = "platform_router_status"  # NEW: Real-time platform router updates
+    LOG = "log"  # NEW: General log stream
 
 
 class SubscriptionType(Enum):
@@ -46,7 +46,7 @@ class SubscriptionType(Enum):
     SYSTEM_ALERTS = "system_alerts"
     AGENT_MEMORY = "agent_memory"
     MARKET_REGIME = "market_regime"
-    PLATFORM_ROUTER = "platform_router"  # NEW: Platform router health/metrics updates
+    LOGS = "logs"  # NEW: Log stream subscription
 
 
 @dataclass
@@ -504,17 +504,25 @@ async def broadcast_market_regime(regime_data: Dict[str, Any]) -> None:
     except Exception as e:
         print(f"❌ Failed to broadcast market regime: {e}")
 
+    except Exception as e:
+        print(f"❌ Failed to broadcast market regime: {e}")
 
-async def broadcast_platform_router_status(status_data: Dict[str, Any]) -> None:
-    """Broadcast platform router status update (health, metrics, circuit breaker)."""
+
+async def broadcast_log(log_entry: Dict[str, Any]) -> None:
+    """Broadcast a log entry to subscribed clients."""
+    # Filter out health/heartbeat logs to reduce noise
+    if "GET /health" in str(log_entry.get("message", "")):
+        return
+
     try:
         manager = await get_websocket_manager()
         message = WebSocketMessage(
-            message_type=MessageType.PLATFORM_ROUTER_STATUS,
-            subscription_type=SubscriptionType.PLATFORM_ROUTER,
-            data=status_data,
-            priority=3,  # High priority for platform health updates
+            message_type=MessageType.LOG,
+            subscription_type=SubscriptionType.LOGS,
+            data=log_entry,
+            priority=1,  # Low priority for logs
         )
         await manager.broadcast_message(message)
-    except Exception as e:
-        print(f"❌ Failed to broadcast platform router status: {e}")
+    except Exception:
+        # Fail silently to avoid infinite recursion in logging
+        pass

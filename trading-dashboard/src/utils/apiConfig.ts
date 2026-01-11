@@ -1,10 +1,15 @@
 /**
  * Centralized API URL resolution for the Sapphire AI Trading system.
- * Eliminates hardcoded legacy URLs and ensures consistency across components.
+ * Supports both monolith (legacy) and microservices API Gateway.
  */
 
-// Production Cloud Run URL (northamerica-northeast1 deployment)
-const CLOUD_RUN_URL = 'https://sapphire-cloud-trader-s77j6bxyra-nn.a.run.app';
+// Production URLs
+const CLOUD_RUN_URL_LEGACY = 'https://sapphire-alpha-s77j6bxyra-uc.a.run.app';
+const API_GATEWAY_URL = 'https://sapphire-api-gateway-s77j6bxyra-uc.a.run.app';
+
+// Toggle: Microservices API Gateway is now deployed and active
+const USE_MICROSERVICES = true;
+
 
 export const getApiUrl = (): string => {
     // 1. Priority: Vite Environment Variable (Local Dev / Explicit Override)
@@ -22,15 +27,16 @@ export const getApiUrl = (): string => {
             return window.location.origin;
         }
 
-        // Firebase Hosting or custom domain - use Cloud Run backend
+        // Production environments (Firebase Hosting / Custom Domain)
         if (hostname.includes('web.app') || hostname.includes('sapphiretrade') || hostname.includes('xyz') || hostname.includes('firebaseapp.com')) {
-            return CLOUD_RUN_URL;
+            return USE_MICROSERVICES ? API_GATEWAY_URL : CLOUD_RUN_URL_LEGACY;
         }
     }
 
-    // 3. Absolute Fallback: Production Cloud Run Service
-    return CLOUD_RUN_URL;
+    // 3. Fallback: Use configured backend
+    return USE_MICROSERVICES ? API_GATEWAY_URL : CLOUD_RUN_URL_LEGACY;
 };
+
 
 export const getWebSocketUrl = (path: string = '/ws/dashboard'): string => {
     const apiBase = getApiUrl();

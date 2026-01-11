@@ -1,6 +1,7 @@
-import os
-import uvicorn
 import logging
+import os
+
+import uvicorn
 
 # Configure Logging
 logging.basicConfig(
@@ -13,17 +14,17 @@ if __name__ == "__main__":
     try:
         port = int(os.getenv("PORT", 8080))
         logger.info(f"🚀 Starting Cloud Trader on port {port}...")
-        
+
         # Start Uvicorn
         # This will trigger api.lifespan which starts the TradingService
         uvicorn.run(
             "cloud_trader.api:app",
-            host="0.0.0.0", 
+            host="0.0.0.0",
             port=port,
             log_level="info",
             proxy_headers=True,
             forwarded_allow_ips="*",
-            ws="wsproto"  # Use wsproto instead of websockets for WebSocket handling
+            ws="wsproto",  # Use wsproto instead of websockets for WebSocket handling
         )
     except KeyboardInterrupt:
         logger.info("👋 User stopped server.")

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { MessageSquare, Bot, Brain, Zap, Clock, User } from 'lucide-react';
+import { MessageSquare, Bot, Brain, Zap } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface ChatMessage {
@@ -66,7 +66,7 @@ export const LiveAgentChat: React.FC<Props> = ({ messages }) => {
 
 const MessageBubble = ({ message }: { message: ChatMessage }) => {
   const isSystem = message.agentId === 'system';
-  const isGrok = message.agentId.includes('grok');
+  const isGrok = (message.agentId || '').includes('grok');
 
   // Determine color scheme based on agent type
   let roleColor = "text-slate-400 border-slate-700 bg-slate-800";
@@ -119,11 +119,11 @@ const MessageBubble = ({ message }: { message: ChatMessage }) => {
         </div>
 
         {!isSystem && message.relatedSymbol && (
-           <div className="flex gap-1 mt-1">
-              <span className="px-1.5 py-0.5 rounded-md bg-white/5 border border-white/10 text-[9px] text-slate-400 font-mono">
-                ${message.relatedSymbol}
-              </span>
-           </div>
+          <div className="flex gap-1 mt-1">
+            <span className="px-1.5 py-0.5 rounded-md bg-white/5 border border-white/10 text-[9px] text-slate-400 font-mono">
+              ${message.relatedSymbol}
+            </span>
+          </div>
         )}
       </div>
     </div>
@@ -131,10 +131,11 @@ const MessageBubble = ({ message }: { message: ChatMessage }) => {
 };
 
 function getAgentIcon(agentId: string) {
-  if (agentId.includes('grok')) return <Brain size={14} className="text-purple-400" />;
-  if (agentId.includes('trend') || agentId.includes('momentum')) return <Zap size={14} className="text-blue-400" />;
-  if (agentId.includes('sentiment')) return <MessageSquare size={14} className="text-amber-400" />;
-  if (agentId.includes('risk')) return <ShieldIcon className="w-3.5 h-3.5 text-rose-400" />;
+  const id = agentId || '';
+  if (id.includes('grok')) return <Brain size={14} className="text-purple-400" />;
+  if (id.includes('trend') || id.includes('momentum')) return <Zap size={14} className="text-blue-400" />;
+  if (id.includes('sentiment')) return <MessageSquare size={14} className="text-amber-400" />;
+  if (id.includes('risk')) return <ShieldIcon className="w-3.5 h-3.5 text-rose-400" />;
   return <Bot size={14} className="text-slate-400" />;
 }
 

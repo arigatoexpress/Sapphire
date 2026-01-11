@@ -85,6 +85,27 @@ export const MasterLayout: React.FC<MasterLayoutProps> = ({ children }) => {
                                 System
                             </Link>
                             <Link
+                                to="/platforms"
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${isActive('/platforms')
+                                    ? 'bg-orange-500/20 text-orange-400'
+                                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                                    }`}
+                            >
+                                <Zap className="w-4 h-4" />
+                                Platforms
+                            </Link>
+
+                            <Link
+                                to="/monitor"
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${isActive('/monitor')
+                                    ? 'bg-emerald-500/20 text-emerald-400'
+                                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                                    }`}
+                            >
+                                <Terminal className="w-4 h-4" />
+                                Monitor
+                            </Link>
+                            <Link
                                 to="/agent-performance"
                                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${isActive('/agent-performance')
                                     ? 'bg-purple-500/20 text-purple-400'

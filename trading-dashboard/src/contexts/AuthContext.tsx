@@ -5,7 +5,8 @@ import {
     createUserWithEmailAndPassword,
     signOut,
     onAuthStateChanged,
-    sendPasswordResetEmail
+    sendPasswordResetEmail,
+    signInAnonymously
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
@@ -17,6 +18,7 @@ interface AuthContextType {
     signUp: (email: string, password: string) => Promise<void>;
     logout: () => Promise<void>;
     resetPassword: (email: string) => Promise<void>;
+    enterAsGuest: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -30,10 +32,36 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-    const [user, setUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState(true);
+    // DEV MODE: Mock User for seamless access
+    const [user, setUser] = useState<User | null>({
+        uid: 'dev-bypass',
+        email: 'developer@sapphire.ai',
+        emailVerified: true,
+        isAnonymous: false,
+        metadata: {},
+        providerData: [],
+        refreshToken: '',
+        tenantId: null,
+        delete: async () => { },
+        getIdToken: async () => 'mock-dev-token',
+        getIdTokenResult: async () => ({} as any),
+        reload: async () => { },
+        toJSON: () => ({}),
+        displayName: 'Dev User',
+        phoneNumber: null,
+        photoURL: null,
+    } as unknown as User);
+
+    // DEV MODE: Loading is always false
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
+        // DEV MODE: Skip Firebase Auth subscription
+        console.warn("Auth Bypass Active: Skipping Firebase Auth");
+        return;
+
+        /* 
+        // Original Auth Logic Preserved below for easy restoration
         // If auth is a mock object (no onAuthStateChanged), skip subscription
         if (typeof onAuthStateChanged !== 'function' || !auth.app) {
             console.warn("Skipping onAuthStateChanged (Demo Mode)");
@@ -70,6 +98,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
 
         return unsubscribe;
+        */
     }, []);
 
     const signIn = async (email: string, password: string) => {
@@ -88,13 +117,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await sendPasswordResetEmail(auth, email);
     };
 
+    const enterAsGuest = async () => {
+        await signInAnonymously(auth);
+    };
+
     const value = {
         user,
         loading,
         signIn,
         signUp,
         logout,
-        resetPassword
+        resetPassword,
+        enterAsGuest
     };
 
     console.log('[AuthProvider] Rendering. loading:', loading, 'hasValue:', !!value);

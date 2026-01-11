@@ -19,7 +19,7 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
     {
         "id": "trend-momentum-agent",
         "name": "Momentum Trader",
-        "model": "gemini-2.0-flash-exp",
+        "model": "gemini-3.0-flash-001",
         "system": "aster",
         "emoji": "📈",
         "type": "momentum",
@@ -35,7 +35,7 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         # Self-tuning: agent can modify these based on performance
         "self_tuning_enabled": True,
         "adaptive_params": {
-            "confidence_threshold": 0.75,
+            "confidence_threshold": 0.35,
             "leverage": 20.0,
             "position_size_pct": 0.15,
         },
@@ -51,7 +51,7 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
     {
         "id": "market-maker-agent",
         "name": "Market Maker",
-        "model": "gemini-2.0-flash-exp",
+        "model": "gemini-3.0-flash-001",
         "system": "aster",
         "emoji": "⚡",
         "type": "market_maker",
@@ -67,7 +67,7 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         # Self-tuning: agent can modify these based on performance
         "self_tuning_enabled": True,
         "adaptive_params": {
-            "confidence_threshold": 0.70,
+            "confidence_threshold": 0.35,
             "leverage": 25.0,
             "position_size_pct": 0.10,
         },
@@ -83,7 +83,7 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
     {
         "id": "swing-trader-agent",
         "name": "Swing Trader",
-        "model": "gemini-2.0-flash-exp",
+        "model": "gemini-3.0-flash-001",
         "system": "aster",
         "emoji": "🧠",
         "type": "swing",
@@ -99,7 +99,7 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         # Self-tuning: agent can modify these based on performance
         "self_tuning_enabled": True,
         "adaptive_params": {
-            "confidence_threshold": 0.80,
+            "confidence_threshold": 0.35,
             "leverage": 10.0,
             "position_size_pct": 0.20,
         },
@@ -111,6 +111,117 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         "atr_sl_multiplier": 1.5,
         # Regime preferences (boost/reduce activity)
         "preferred_regimes": ["trending_up", "trending_down"],
+    },
+    # ============ SYMPHONY AGENTS ============
+    # These agents route to Symphony for Monad/Base chain execution
+    {
+        "id": "monad-treasury-agent",  # Formerly MILF
+        "name": "Monad Implementation Treasury Agent",
+        "model": "gemini-3.0-flash-001",
+        "system": "symphony",
+        "emoji": "🏛️",
+        "type": "swap",
+        "symbols": ["MON-USDC", "CHOG-USDC", "DAC-USDC"],
+        "description": "Monad Treasury Agent focusing on top-market cap projects and whale tracking.",
+        "personality": "Strategic Monad whale follower and smart money tracker.",
+        "baseline_win_rate": 0.60,
+        "risk_multiplier": 1.0,
+        "profit_target": 0.03,
+        "stop_loss": 0.015,
+        "margin_allocation": 333.0,
+        "specialization": "SWAP",
+        "self_tuning_enabled": True,
+        "adaptive_params": {
+            "confidence_threshold": 0.35,
+            "leverage": 20.0,
+            "position_size_pct": 0.15,
+        },
+        "max_leverage_limit": 50.0,
+        "risk_tolerance": "medium",
+        "time_horizon": "short",
+        "preferred_regimes": ["trending_up", "trending_down"],
+    },
+    {
+        "id": "ari-gold-fund",  # Formerly AGDG
+        "name": "The Ari Gold Fund",
+        "model": "gemini-3.0-flash-001",
+        "system": "symphony",
+        "emoji": "🚁",
+        "type": "perps",
+        "symbols": ["ETH-USDC", "BTC-USDC", "DEGEN-USDC", "BRETT-USDC", "VIRTUAL-USDC"],
+        "description": "The Ari Gold Fund: The Risk-On Choice. Asymmetric bets on Base Perps, AI, Privacy, and Virtuals.",
+        "personality": "Aggressive, risk-on asymmetric bettor investing in AI/Privacy/Virtuals.",
+        "baseline_win_rate": 0.60,
+        "risk_multiplier": 1.5,
+        "profit_target": 0.05,
+        "stop_loss": 0.02,
+        "margin_allocation": 1000.0,  # Increased allocation for the fund
+        "specialization": "PERPS",
+        "self_tuning_enabled": True,
+        "adaptive_params": {
+            "confidence_threshold": 0.35,
+            "leverage": 25.0,
+            "position_size_pct": 0.20,
+        },
+        "max_leverage_limit": 50.0,
+        "risk_tolerance": "high",
+        "time_horizon": "short",
+        "preferred_regimes": ["trending_up", "volatile"],
+    },
+    # Degen agent removed - consolidated into "The Ari Gold Fund"
+    {
+        "id": "drift-solana-agent",
+        "name": "Drift Trader",
+        "model": "gemini-3.0-flash-001",
+        "system": "drift",
+        "emoji": "🌀",
+        "type": "perps",
+        "symbols": ["JUP-USDC", "PYTH-USDC", "BONK-USDC"],
+        "description": "Drift Protocol specialist for Solana ecosystem perpetuals.",
+        "personality": "Fast-acting Solana trader capturing ecosystem momentum.",
+        "baseline_win_rate": 0.62,
+        "risk_multiplier": 1.1,
+        "profit_target": 0.03,
+        "stop_loss": 0.015,
+        "margin_allocation": 500.0,
+        "specialization": "PERPS",
+        "self_tuning_enabled": True,
+        "adaptive_params": {
+            "confidence_threshold": 0.35,
+            "leverage": 10.0,
+            "position_size_pct": 0.15,
+        },
+        "max_leverage_limit": 20.0,
+        "risk_tolerance": "medium",
+        "time_horizon": "short",
+        "preferred_regimes": ["trending_up", "trending_down"],
+    },
+    {
+        "id": "hyperliquid-l1-agent",
+        "name": "HyperTrader",
+        "model": "gemini-3.0-flash-001",
+        "system": "hyperliquid",
+        "emoji": "🌊",
+        "type": "perps",
+        "symbols": ["BTC-USDC", "ETH-USDC", "SOL-USDC", "HYPE-USDC"],
+        "description": "Hyperliquid L1 specialist for high-frequency perpetuals.",
+        "personality": "Low-latency trader executing on Hyperliquid L1.",
+        "baseline_win_rate": 0.65,
+        "risk_multiplier": 1.2,
+        "profit_target": 0.02,
+        "stop_loss": 0.01,
+        "margin_allocation": 500.0,
+        "specialization": "PERPS",
+        "self_tuning_enabled": True,
+        "adaptive_params": {
+            "confidence_threshold": 0.35,
+            "leverage": 20.0,
+            "position_size_pct": 0.10,
+        },
+        "max_leverage_limit": 50.0,
+        "risk_tolerance": "medium",
+        "time_horizon": "very_short",
+        "preferred_regimes": ["trending_up", "trending_down", "ranging"],
     },
 ]
 
@@ -134,8 +245,21 @@ SYMBOL_CONFIG = {
     "TRUMPUSDC": {"qty": 1.0, "precision": 1},
 }
 
-# Assets supported by Symphony Agents
-SYMPHONY_SYMBOLS = ["MON-USDC", "CHOG-USDC", "DAC-USDC", "ASTER-USDC", "BRETT-USDC", "DEGEN-USDC", "TOSHI-USDC"]
+# Assets supported by Symphony Agents (Monad chain priority)
+# Assets supported by Symphony Agents (Monad chain priority)
+SYMPHONY_SYMBOLS = [
+    # Monad Ecosystem - Priority for chain launch incentives
+    "ETH-USDC",  # Native ETH on Monad
+    "MON-USDC",  # Monad native token
+    # Base/Cross-chain
+    "DAC-USDC",
+    "ASTER-USDC",
+    "BRETT-USDC",
+    "DEGEN-USDC",
+    "EMO-USDC",
+    "CHOG-USDC",
+    "VIRTUAL-USDC",
+]
 
 # Assets supported by Hyperliquid
 HYPERLIQUID_SYMBOLS = ["BTC-USDC", "ETH-USDC", "SOL-USDC", "HYPE-USDC", "PURR-USDC"]
@@ -196,7 +320,7 @@ class MinimalAgentState:
     def __post_init__(self):
         if self.adaptive_params is None:
             self.adaptive_params = {
-                "confidence_threshold": 0.75,
+                "confidence_threshold": 0.35,
                 "leverage": 20.0,
                 "position_size_pct": 0.15,
             }

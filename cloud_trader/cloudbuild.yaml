@@ -1,0 +1,54 @@
+# Sapphire V2 - Optimized Cloud Build Configuration
+# Hardware: E2_HIGHCPU_32 for fast builds
+# Features: Kaniko caching, parallel builds
+
+steps:
+  # Build using Kaniko with aggressive caching
+  - name: 'gcr.io/kaniko-project/executor:latest'
+    args:
+      - --destination=gcr.io/$PROJECT_ID/$_SERVICE_NAME:$COMMIT_SHA
+      - --destination=gcr.io/$PROJECT_ID/$_SERVICE_NAME:latest
+      - --cache=true
+      - --cache-ttl=336h  # 14 days cache
+      - --context=dir:///workspace
+      - --dockerfile=Dockerfile
+      - --compressed-caching=false
+      - --use-new-run
+      - --snapshot-mode=redo
+      - --single-snapshot
+
+  # Deploy to Cloud Run (2nd gen with optimized hardware)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - '$_SERVICE_NAME'
+      - '--image=gcr.io/$PROJECT_ID/$_SERVICE_NAME:latest'
+      - '--region=$_REGION'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--cpu=2'
+      - '--memory=2Gi'
+      - '--min-instances=1'
+      - '--max-instances=10'
+      - '--concurrency=100'
+      - '--timeout=300s'
+      - '--execution-environment=gen2'
+      - '--cpu-boost'
+      - '--set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest,ASTER_API_KEY=ASTER_API_KEY:latest,ASTER_SECRET_KEY=ASTER_SECRET_KEY:latest'
+
+# Build timeout (5 minutes should be plenty with multi-stage + caching)
+timeout: '600s'
+
+# Options for maximum build performance
+options:
+  machineType: 'E2_HIGHCPU_32'  # 32 vCPUs for fast pip installs
+  diskSizeGb: 100
+  logging: CLOUD_LOGGING_ONLY
+  dynamic_substitutions: true
+
+# Substitutions
+substitutions:
+  _REGION: 'us-central1'
+  _SERVICE_NAME: 'sapphire-v2'

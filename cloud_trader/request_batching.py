@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 class BatchStrategy(Enum):
     """Strategies for batch processing."""
+
     TIME_WINDOW = "time_window"  # Batch by time intervals
     SIZE_THRESHOLD = "size_threshold"  # Batch when size limit reached
     HYBRID = "hybrid"  # Combine time and size
@@ -25,6 +26,7 @@ class BatchStrategy(Enum):
 
 class RequestPriority(Enum):
     """Request priority levels."""
+
     LOW = 1
     NORMAL = 2
     HIGH = 3
@@ -34,6 +36,7 @@ class RequestPriority(Enum):
 @dataclass
 class BatchedRequest:
     """A request that can be batched with others."""
+
     request_id: str
     endpoint: str
     method: str
@@ -50,6 +53,7 @@ class BatchedRequest:
 @dataclass
 class RequestBatch:
     """A batch of requests to be processed together."""
+
     batch_id: str
     endpoint: str
     method: str
@@ -72,8 +76,10 @@ class RequestBatch:
         """Check if batch should be processed."""
         if self.processing_started:
             return False
-        return self.is_full() or self.is_expired(current_time) or any(
-            req.priority == RequestPriority.CRITICAL for req in self.requests
+        return (
+            self.is_full()
+            or self.is_expired(current_time)
+            or any(req.priority == RequestPriority.CRITICAL for req in self.requests)
         )
 
     def add_request(self, request: BatchedRequest) -> bool:
@@ -90,6 +96,7 @@ class RequestBatch:
 @dataclass
 class BatchProcessor:
     """Processes batches of requests."""
+
     name: str
     endpoint: str
     method: str
@@ -99,16 +106,18 @@ class BatchProcessor:
     strategy: BatchStrategy = BatchStrategy.HYBRID
     active_batches: Dict[str, RequestBatch] = field(default_factory=dict)
     processing_queue: asyncio.Queue = field(default_factory=lambda: asyncio.Queue(maxsize=1000))
-    stats: Dict[str, Any] = field(default_factory=lambda: {
-        "batches_processed": 0,
-        "requests_processed": 0,
-        "avg_batch_size": 0,
-        "avg_processing_time_ms": 0,
-        "errors": 0
-    })
+    stats: Dict[str, Any] = field(
+        default_factory=lambda: {
+            "batches_processed": 0,
+            "requests_processed": 0,
+            "avg_batch_size": 0,
+            "avg_processing_time_ms": 0,
+            "errors": 0,
+        }
+    )
 
     def __post_init__(self):
-        if not hasattr(self, '_processing_task'):
+        if not hasattr(self, "_processing_task"):
             self._processing_task: Optional[asyncio.Task[None]] = None
             self._shutdown_event = asyncio.Event()
 
@@ -157,7 +166,7 @@ class BatchProcessor:
             method=request.method,
             strategy=self.strategy,
             max_size=self.max_batch_size,
-            max_wait_ms=self.max_wait_ms
+            max_wait_ms=self.max_wait_ms,
         )
 
         if batch.add_request(request):
@@ -166,12 +175,11 @@ class BatchProcessor:
             # Try to put in queue for immediate processing if critical
             if request.priority == RequestPriority.CRITICAL:
                 try:
-                    await asyncio.wait_for(
-                        self.processing_queue.put(batch),
-                        timeout=0.1
-                    )
+                    await asyncio.wait_for(self.processing_queue.put(batch), timeout=0.1)
                 except asyncio.TimeoutError:
-                    logger.warning(f"Processing queue full for {self.name}, batch will be processed on next cycle")
+                    logger.warning(
+                        f"Processing queue full for {self.name}, batch will be processed on next cycle"
+                    )
 
             return batch_id
 
@@ -230,13 +238,12 @@ class BatchProcessor:
             self.stats["batches_processed"] += 1
             self.stats["requests_processed"] += batch_size
             self.stats["avg_batch_size"] = (
-                (self.stats["avg_batch_size"] * (self.stats["batches_processed"] - 1) + batch_size) /
-                self.stats["batches_processed"]
-            )
+                self.stats["avg_batch_size"] * (self.stats["batches_processed"] - 1) + batch_size
+            ) / self.stats["batches_processed"]
             self.stats["avg_processing_time_ms"] = (
-                (self.stats["avg_processing_time_ms"] * (self.stats["batches_processed"] - 1) + processing_time) /
-                self.stats["batches_processed"]
-            )
+                self.stats["avg_processing_time_ms"] * (self.stats["batches_processed"] - 1)
+                + processing_time
+            ) / self.stats["batches_processed"]
 
             # Call individual request callbacks
             for i, request in enumerate(batch.requests):
@@ -246,7 +253,9 @@ class BatchProcessor:
                     except Exception as e:
                         logger.error(f"Error in callback for request {request.request_id}: {e}")
 
-            logger.debug(f"Processed batch {batch.batch_id} with {batch_size} requests in {processing_time:.1f}ms")
+            logger.debug(
+                f"Processed batch {batch.batch_id} with {batch_size} requests in {processing_time:.1f}ms"
+            )
 
         except Exception as e:
             logger.error(f"Failed to process batch {batch.batch_id}: {e}")
@@ -267,7 +276,9 @@ class BatchProcessor:
                         try:
                             await request.callback({"error": str(e), "status": "failed"})
                         except Exception as callback_e:
-                            logger.error(f"Error in failure callback for request {request.request_id}: {callback_e}")
+                            logger.error(
+                                f"Error in failure callback for request {request.request_id}: {callback_e}"
+                            )
 
 
 class RequestBatchManager:
@@ -289,13 +300,18 @@ class RequestBatchManager:
             "total_batches": 0,
             "avg_latency_ms": 0,
             "throughput_req_per_sec": 0,
-            "error_rate": 0
+            "error_rate": 0,
         }
         self._shutdown_event = asyncio.Event()
 
-    async def register_endpoint(self, name: str, endpoint: str, method: str,
-                              batch_function: Callable[[List[BatchedRequest]], Awaitable[List[Dict[str, Any]]]],
-                              config: Optional[Dict[str, Any]] = None) -> None:
+    async def register_endpoint(
+        self,
+        name: str,
+        endpoint: str,
+        method: str,
+        batch_function: Callable[[List[BatchedRequest]], Awaitable[List[Dict[str, Any]]]],
+        config: Optional[Dict[str, Any]] = None,
+    ) -> None:
         """Register an endpoint for batch processing."""
         if config is None:
             config = {}
@@ -307,7 +323,7 @@ class RequestBatchManager:
             batch_function=batch_function,
             max_batch_size=config.get("max_batch_size", 50),
             max_wait_ms=config.get("max_wait_ms", 1000),
-            strategy=config.get("strategy", BatchStrategy.HYBRID)
+            strategy=config.get("strategy", BatchStrategy.HYBRID),
         )
 
         self.processors[name] = processor
@@ -325,10 +341,14 @@ class RequestBatchManager:
         self.global_stats["total_requests"] += 1
         return await self.processors[processor_name].submit_request(request)
 
-    async def submit_batch_request(self, endpoint: str, method: str = "POST",
-                                 requests_data: List[Dict[str, Any]],
-                                 priority: RequestPriority = RequestPriority.NORMAL,
-                                 callbacks: Optional[List[Callable]] = None) -> List[str]:
+    async def submit_batch_request(
+        self,
+        endpoint: str,
+        requests_data: List[Dict[str, Any]],
+        method: str = "POST",
+        priority: RequestPriority = RequestPriority.NORMAL,
+        callbacks: Optional[List[Callable]] = None,
+    ) -> List[str]:
         """Submit multiple requests for batching."""
         # Find appropriate processor
         processor_name = None
@@ -341,8 +361,7 @@ class RequestBatchManager:
             # Create ad-hoc processor
             processor_name = f"adhoc_{endpoint}_{method}_{get_timestamp_us()}"
             await self.register_endpoint(
-                processor_name, endpoint, method,
-                self._default_batch_function
+                processor_name, endpoint, method, self._default_batch_function
             )
 
         # Submit requests
@@ -354,7 +373,7 @@ class RequestBatchManager:
                 method=method,
                 data=request_data,
                 priority=priority,
-                callback=callbacks[i] if callbacks and i < len(callbacks) else None
+                callback=callbacks[i] if callbacks and i < len(callbacks) else None,
             )
 
             batch_id = await self.submit_request(processor_name, request)
@@ -369,12 +388,14 @@ class RequestBatchManager:
         # For now, just return mock responses
         results = []
         for request in requests:
-            results.append({
-                "request_id": request.request_id,
-                "status": "processed",
-                "data": request.data,
-                "timestamp_us": get_timestamp_us()
-            })
+            results.append(
+                {
+                    "request_id": request.request_id,
+                    "status": "processed",
+                    "data": request.data,
+                    "timestamp_us": get_timestamp_us(),
+                }
+            )
         return results
 
     def get_stats(self) -> Dict[str, Any]:
@@ -389,14 +410,14 @@ class RequestBatchManager:
                 "avg_batch_size": processor.stats["avg_batch_size"],
                 "avg_processing_time_ms": processor.stats["avg_processing_time_ms"],
                 "errors": processor.stats["errors"],
-                "active_batches": len(processor.active_batches)
+                "active_batches": len(processor.active_batches),
             }
 
         return {
             "global_stats": self.global_stats.copy(),
             "processor_stats": processor_stats,
             "total_processors": len(self.processors),
-            "timestamp_us": get_timestamp_us()
+            "timestamp_us": get_timestamp_us(),
         }
 
     async def shutdown(self) -> None:
@@ -427,7 +448,10 @@ async def get_request_batch_manager() -> RequestBatchManager:
 
 # Utility functions for common batching patterns
 
-async def batch_market_data_requests(symbols: List[str], data_type: str = "ticker") -> Dict[str, Any]:
+
+async def batch_market_data_requests(
+    symbols: List[str], data_type: str = "ticker"
+) -> Dict[str, Any]:
     """
     Batch market data requests for multiple symbols.
     This is a utility function that can be used by various parts of the system.
@@ -442,13 +466,13 @@ async def batch_market_data_requests(symbols: List[str], data_type: str = "ticke
         endpoint="/api/market/batch",
         method="POST",
         requests_data=requests_data,
-        priority=RequestPriority.HIGH
+        priority=RequestPriority.HIGH,
     )
 
     return {
         "batch_ids": batch_ids,
         "symbol_count": len(symbols),
-        "expected_responses": len(symbols)
+        "expected_responses": len(symbols),
     }
 
 
@@ -463,11 +487,7 @@ async def batch_order_submissions(orders: List[Dict[str, Any]]) -> Dict[str, Any
         endpoint="/api/orders/batch",
         method="POST",
         requests_data=orders,
-        priority=RequestPriority.CRITICAL
+        priority=RequestPriority.CRITICAL,
     )
 
-    return {
-        "batch_ids": batch_ids,
-        "order_count": len(orders),
-        "expected_responses": len(orders)
-    }
+    return {"batch_ids": batch_ids, "order_count": len(orders), "expected_responses": len(orders)}

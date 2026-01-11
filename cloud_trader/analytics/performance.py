@@ -47,6 +47,8 @@ class AgentMetrics:
     sharpe_ratio: float = 0.0
     sortino_ratio: float = 0.0
     calmar_ratio: float = 0.0  # Return / Max Drawdown
+    recovery_factor: float = 0.0  # Total PnL / Max Drawdown
+    expectancy: float = 0.0  # (Win% * AvgWin) - (Loss% * AvgLoss)
     alpha: float = 0.0  # Excess return vs benchmark
     beta: float = 0.0  # Correlation with benchmark
     profit_factor: float = 0.0
@@ -201,6 +203,26 @@ class PerformanceTracker:
             m.calmar_ratio = annualized_return / m.max_drawdown
         else:
             m.calmar_ratio = 0.0
+
+        # Recovery Factor
+        if m.max_drawdown > 0:
+            m.recovery_factor = m.total_pnl / m.max_drawdown
+        else:
+            m.recovery_factor = 0.0
+
+        # Expectancy
+        total_pnl_history = self._get_pnl_history(m)
+        wins = [x for x in total_pnl_history if x > 0]
+        losses = [abs(x) for x in total_pnl_history if x < 0]
+
+        m.average_win = sum(wins) / len(wins) if wins else 0.0
+        m.average_loss = sum(losses) / len(losses) if losses else 0.0
+
+        if m.total_trades > 0:
+            # (Win Rate * Avg Win) - (Loss Rate * Avg Loss)
+            win_rate = m.wins / m.total_trades
+            loss_rate = m.losses / m.total_trades
+            m.expectancy = (win_rate * m.average_win) - (loss_rate * m.average_loss)
 
         # Alpha/Beta (simplified - assumes SOL benchmark ~0.1% daily return, 2% std dev)
         # In production, this would fetch actual SOL price history

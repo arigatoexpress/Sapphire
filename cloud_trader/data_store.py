@@ -75,7 +75,7 @@ class TechnicalIndicatorProvider(DataProvider):
             "fib_levels",
             "vsop",
             "price",
-            "volatility_state"
+            "volatility_state",
         }
 
     def supports(self, indicator: str) -> bool:
@@ -95,7 +95,7 @@ class TechnicalIndicatorProvider(DataProvider):
 
         elif indicator == "macd":
             return {
-                "macd": analysis.get("macd_val", 0.0), # Updated key to avoid confusion
+                "macd": analysis.get("macd_val", 0.0),  # Updated key to avoid confusion
                 "signal": analysis.get("macd_signal", 0.0),
                 "histogram": analysis.get("macd_hist", 0.0),
                 "trend": analysis.get("trend", "NEUTRAL"),
@@ -110,39 +110,34 @@ class TechnicalIndicatorProvider(DataProvider):
 
         elif indicator == "atr":
             return analysis.get("atr", 0.0)
-            
+
         elif indicator == "bollinger_bands":
             return {
                 "upper": analysis.get("bb_upper", 0.0),
                 "mid": analysis.get("bb_mid", 0.0),
                 "lower": analysis.get("bb_lower", 0.0),
-                "bandwidth": (analysis.get("bb_upper", 0) - analysis.get("bb_lower", 0)) / analysis.get("bb_mid", 1.0)
+                "bandwidth": (analysis.get("bb_upper", 0) - analysis.get("bb_lower", 0))
+                / analysis.get("bb_mid", 1.0),
             }
-            
+
         elif indicator == "stochastic":
-            return {
-                "k": analysis.get("stoch_k", 0.0),
-                "d": analysis.get("stoch_d", 0.0)
-            }
-            
+            return {"k": analysis.get("stoch_k", 0.0), "d": analysis.get("stoch_d", 0.0)}
+
         elif indicator == "cci":
             return analysis.get("cci", 0.0)
-            
+
         elif indicator == "adx":
             return analysis.get("adx", 0.0)
-            
+
         elif indicator == "obv":
             return analysis.get("obv", 0.0)
-            
+
         elif indicator == "wyckoff":
             return analysis.get("wyckoff_phase", "NEUTRAL")
-            
+
         elif indicator == "fib_levels":
-            return {
-                "0.5": analysis.get("fib_0_5", 0.0),
-                "0.618": analysis.get("fib_0_618", 0.0)
-            }
-            
+            return {"0.5": analysis.get("fib_0_5", 0.0), "0.618": analysis.get("fib_0_618", 0.0)}
+
         elif indicator == "vsop":
             return analysis.get("vsop", 50.0)
 
@@ -335,22 +330,38 @@ async def get_bigquery_streamer():
     """Get the optimized BigQuery streamer instance for production."""
     try:
         from .optimized_bigquery import get_optimized_bigquery_streamer
+
         return await get_optimized_bigquery_streamer()
     except Exception as e:
         logger.error(f"Failed to load BigQuery streamer: {e}")
         return None
 
+
 async def close_bigquery_streamer():
     """Close the optimized BigQuery streamer."""
     try:
         from .optimized_bigquery import close_optimized_bigquery_streamer
+
         await close_optimized_bigquery_streamer()
     except Exception:
         pass
 
-async def get_cache(): return None
-async def get_storage(): return None
-async def get_feature_store(): return None
 
-async def close_cache(): pass
-async def close_storage(): pass
+async def get_cache():
+    return None
+
+
+async def get_storage():
+    return None
+
+
+async def get_feature_store():
+    return None
+
+
+async def close_cache():
+    pass
+
+
+async def close_storage():
+    pass

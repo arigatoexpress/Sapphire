@@ -79,15 +79,29 @@ class VertexAIClient:
 
         # Model mapping for Direct API Mode
         self._model_map = {
-            "trend-momentum-agent": "gemini-2.0-flash-exp",
-            "strategy-optimization-agent": "gemini-2.0-flash-exp",
-            "financial-sentiment-agent": "gemini-2.0-flash-exp",
-            "market-prediction-agent": "gemini-2.0-flash-exp",
-            "volume-microstructure-agent": "gemini-2.0-flash-exp",
-            "vpin-hft": "gemini-2.0-flash-exp",
-            "deep-logic-special-ops": "gemini-2.0-flash-exp",
-            "market-analysis": "gemini-2.0-flash-exp",
+            "trend-momentum-agent": "gemini-2.5-flash",
+            "strategy-optimization-agent": "gemini-2.5-flash",
+            "financial-sentiment-agent": "gemini-2.5-flash",
+            "market-prediction-agent": "gemini-2.5-flash",
+            "volume-microstructure-agent": "gemini-2.5-flash",
+            "vpin-hft": "gemini-2.5-flash",
+            "deep-logic-special-ops": "gemini-2.5-flash",
+            "market-analysis": "gemini-2.5-flash",
         }
+
+        # Dynamic model override map: agent_id -> "gemini-3.0-flash-001"
+        self._dynamic_model_overrides = {}
+
+        # Prediction Cache (Elite Optimization)
+        # Key: hash(agent_id + prompt), Value: (timestamp, result_dict)
+        self._prediction_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+        self._cache_ttl = 60.0  # 60 seconds
+
+    def set_agent_model_override(self, agent_id: str, model_name: str) -> None:
+        """Dynamically override an agent's model (e.g. from definitions.py)."""
+        self._dynamic_model_overrides[agent_id] = model_name
+        # Also update legacy map for fallback compatibility
+        self._model_map[agent_id] = model_name
 
     async def initialize(self) -> None:
         """Initialize Vertex AI connection asynchronously."""
@@ -130,12 +144,33 @@ class VertexAIClient:
         if self._is_circuit_open(agent_id):
             raise RuntimeError(f"Circuit breaker open for {agent_id} - too many failures")
 
+        # Elite Optimization: Check Cache
+        import hashlib
+
+        cache_key = hashlib.md5(f"{agent_id}:{prompt}".encode()).hexdigest()
+
+        if cache_key in self._prediction_cache:
+            timestamp, cached_result = self._prediction_cache[cache_key]
+            if time.time() - timestamp < self._cache_ttl:
+                # Add cache metadata
+                cached_result["metadata"]["cached"] = True
+                cached_result["metadata"]["cache_age"] = time.time() - timestamp
+                return cached_result
+
+        # Dispatch based on mode
         # Dispatch based on mode
         try:
+            result = None
             if self._use_api_key:
-                return await self._predict_with_api_key(agent_id, prompt, **kwargs)
+                result = await self._predict_with_api_key(agent_id, prompt, **kwargs)
             else:
-                return await self._predict_with_vertex(agent_id, prompt, **kwargs)
+                result = await self._predict_with_vertex(agent_id, prompt, **kwargs)
+
+            # Elite Optimization: Save to Cache
+            if result and result.get("confidence", 0) > 0:
+                self._prediction_cache[cache_key] = (time.time(), result)
+
+            return result
 
         except Exception as e:
             # Detailed error logging
@@ -201,7 +236,8 @@ class VertexAIClient:
         start_time = time.time()
 
         # 1. Check if it's a Generative Model (Gemini)
-        model_name = self._model_map.get(agent_id)
+        # Check for dynamic override first, then static map
+        model_name = self._dynamic_model_overrides.get(agent_id) or self._model_map.get(agent_id)
         if model_name:
             try:
                 # Initialize model
@@ -252,6 +288,49 @@ class VertexAIClient:
                     },
                 }
             except Exception as e:
+                # FALLBACK LOGIC: Gemini 3 -> Gemini 2.5
+                if "404" in str(e) and "gemini-3" in model_name:
+                    logger.warning(
+                        f"⚠️ {model_name} not found for {agent_id}. Fallback to gemini-2.5-flash-001..."
+                    )
+                    fallback_model = "gemini-2.5-flash-001"
+                    try:
+                        # Retry with fallback model
+                        model = GenerativeModel(fallback_model)
+                        response = await asyncio.get_event_loop().run_in_executor(
+                            None,
+                            lambda: model.generate_content(
+                                prompt, generation_config=generation_config
+                            ),
+                        )
+
+                        # ... (Process response same as above) ...
+                        inference_time = time.time() - start_time
+                        try:
+                            text_response = response.text
+                        except Exception:
+                            if response.candidates and response.candidates[0].content.parts:
+                                text_response = response.candidates[0].content.parts[0].text
+                            else:
+                                raise ValueError("Fallback empty response")
+
+                        self._record_success(agent_id)
+                        return {
+                            "response": text_response,
+                            "confidence": 0.9,
+                            "metadata": {
+                                "inference_time": inference_time,
+                                "model": fallback_model,
+                                "mode": "vertex_generative_fallback",
+                                "circuit_breaker": "healthy",
+                            },
+                        }
+
+                    except Exception as fallback_error:
+                        logger.error(f"Fallback failed too: {fallback_error}")
+                        # Continue to existing error handling
+                        pass
+
                 # If it fails, we log it.
                 # We ONLY fall back to endpoint if one is explicitly configured.
                 logger.error(

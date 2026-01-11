@@ -240,7 +240,7 @@ api_cache = TTLCache()
 trading_service = None
 
 
-def get_service_instance():
+async def get_service_instance():
     """Helper to get the trading service instance safely."""
     global trading_service
     if trading_service is None:
@@ -248,8 +248,8 @@ def get_service_instance():
         try:
             from .trading_service import get_trading_service
 
-            trading_service = get_trading_service()
-        except ImportError:
+            trading_service = await get_trading_service()
+        except Exception:
             pass
     return trading_service
 
@@ -263,7 +263,7 @@ async def lifespan(app: FastAPI):
         logger.info("🔧 STARTUP: Importing and initializing trading service...")
         from .trading_service import get_trading_service
 
-        trading_service = get_trading_service()
+        trading_service = await get_trading_service()
 
         logger.info("🔧 STARTUP: Calling trading_service.start()...")
         await trading_service.start()
@@ -490,7 +490,7 @@ async def root():
 async def get_portfolio_status() -> Dict[str, Any]:
     """Get current portfolio status."""
     try:
-        service = get_service_instance()
+        service = await get_service_instance()
         if not service:
             raise HTTPException(status_code=503, detail="Trading service not initialized")
         return service.get_portfolio_status()
@@ -513,7 +513,7 @@ async def get_dashboard_data() -> Dict[str, Any]:
         - history: Portfolio value history for sparklines (last 24 points)
     """
     try:
-        service = get_service_instance()
+        service = await get_service_instance()
         if not service:
             return {
                 "portfolio": {"balance": 0, "equity": 0, "pnl_percent": 0},
@@ -815,7 +815,7 @@ async def get_platform_router_status() -> Dict[str, Any]:
         - recent_executions: Count of recent executions in history
     """
     try:
-        service = get_service_instance()
+        service = await get_service_instance()
         if not service or not hasattr(service, "platform_router"):
             return {
                 "error": "Platform router not initialized",
@@ -845,7 +845,7 @@ async def get_platform_router_metrics(platform: Optional[str] = Query(None)) -> 
         Metrics including total_executions, success_rate, avg_latency_ms, etc.
     """
     try:
-        service = get_service_instance()
+        service = await get_service_instance()
         if not service or not hasattr(service, "platform_router"):
             return {"error": "Platform router not initialized", "metrics": {}}
 
@@ -869,7 +869,7 @@ async def get_platform_router_health(platform: Optional[str] = Query(None)) -> D
         Health status including is_healthy, consecutive_failures, error_message
     """
     try:
-        service = get_service_instance()
+        service = await get_service_instance()
         if not service or not hasattr(service, "platform_router"):
             return {"error": "Platform router not initialized", "health": {}}
 
@@ -893,7 +893,7 @@ async def get_platform_router_history(limit: int = Query(20, ge=1, le=100)) -> D
         List of recent executions with details (timestamp, platform, symbol, success, latency)
     """
     try:
-        service = get_service_instance()
+        service = await get_service_instance()
         if not service or not hasattr(service, "platform_router"):
             return {"error": "Platform router not initialized", "history": []}
 
@@ -1489,7 +1489,7 @@ async def healthz() -> Dict[str, object]:
     }
 
     try:
-        service = get_service_instance()
+        service = await get_service_instance()
 
         if service:
             # Core service health
@@ -1596,7 +1596,7 @@ async def health_detailed() -> Dict[str, Any]:
     from .cache import get_cache
     from .websocket_manager import get_websocket_manager
 
-    service = get_service_instance()
+    service = await get_service_instance()
     result: Dict[str, Any] = {"status": "healthy", "timestamp": time.time(), "components": {}}
 
     # Cache health
@@ -1664,9 +1664,9 @@ async def health_detailed() -> Dict[str, Any]:
     return result
 
 
-def get_admin_token() -> str | None:
+async def get_admin_token() -> str | None:
     """Get admin token dynamically."""
-    service = get_service_instance()
+    service = await get_service_instance()
     if service and hasattr(service, "settings"):
         return service.settings.admin_api_token
     return None
@@ -1675,8 +1675,8 @@ def get_admin_token() -> str | None:
 admin_guard_disabled = False  # Will be checked dynamically
 
 
-def require_admin(request: Request) -> None:
-    admin_token = get_admin_token()
+async def require_admin(request: Request) -> None:
+    admin_token = await get_admin_token()
 
     if admin_token is None:
         if not hasattr(require_admin, "_warned"):
@@ -1742,7 +1742,7 @@ async def inject_test_trade(request: Request) -> Dict[str, Any]:
         import time
         import uuid
 
-        service = get_service_instance()
+        service = await get_service_instance()
         if not service:
             raise HTTPException(status_code=503, detail="Trading service not initialized")
 
@@ -1841,7 +1841,7 @@ async def cancel_all_orders(request: Request, _: None = Depends(require_admin)) 
         raise HTTPException(status_code=429, detail="Too many requests")
 
     try:
-        service = get_service_instance()
+        service = await get_service_instance()
         if not service or not service._exchange_client:
             raise HTTPException(status_code=503, detail="Trading service not initialized")
 
@@ -1905,7 +1905,7 @@ async def cancel_all_orders(request: Request, _: None = Depends(require_admin)) 
 async def get_all_open_orders(request: Request, _: None = Depends(require_admin)) -> Dict[str, Any]:
     """Get all open orders to see what's consuming capital."""
     try:
-        service = get_service_instance()
+        service = await get_service_instance()
         if not service or not service._exchange_client:
             raise HTTPException(status_code=503, detail="Trading service not initialized")
 
@@ -2240,7 +2240,7 @@ async def get_position_status(symbol: str) -> Dict[str, Any]:
 async def update_position_tpsl(symbol: str, request: Dict[str, Any]) -> Dict[str, Any]:
     """Update Take Profit and Stop Loss for a position."""
     try:
-        service = get_service_instance()
+        service = await get_service_instance()
         if not service:
             raise HTTPException(status_code=503, detail="Trading service not initialized")
 
@@ -2320,7 +2320,7 @@ async def get_exit_performance_stats() -> Dict[str, Any]:
 async def get_performance_stats() -> Dict[str, Any]:
     """Get granular agent performance statistics."""
     try:
-        service = get_service_instance()
+        service = await get_service_instance()
         if not service:
             return {"status": "error", "message": "Service not initialized"}
 
@@ -2432,7 +2432,7 @@ async def get_consensus_state() -> Dict[str, Any]:
 
         # Get engine via wrapper if available, or direct from service
         engine = None
-        service = get_service_instance()
+        service = await get_service_instance()
         if service and hasattr(service, "_consensus_engine"):
             engine = service._consensus_engine
 
@@ -4809,6 +4809,226 @@ async def get_bot_stats() -> Dict[str, Any]:
         return {"error": str(e)}
 
     return app
+
+
+# =============================================================================
+# ACTS (AI Cognitive Trading System) Endpoints
+# Novel endpoints for UMEP market encoding and Episodic Memory
+# =============================================================================
+
+
+@app.get("/api/acts/stats")
+async def get_acts_stats() -> Dict[str, Any]:
+    """Get ACTS system statistics (memory, encoding, reflection)."""
+    try:
+        from .acts_integration import get_acts_integration
+
+        integration = get_acts_integration()
+        stats = integration.get_stats()
+
+        return {
+            "success": True,
+            "stats": stats,
+            "modules": {
+                "umep": "active",
+                "episodic_memory": "active",
+                "reflection_agent": "active",
+            },
+        }
+    except Exception as e:
+        logger.error(f"ACTS stats error: {e}")
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/api/acts/memory/recent")
+async def get_recent_episodes(limit: int = 10) -> Dict[str, Any]:
+    """Get recent trading episodes from memory."""
+    try:
+        from .memory import get_episodic_memory
+
+        memory = get_episodic_memory()
+        episodes = memory.get_recent(limit=limit)
+
+        return {
+            "success": True,
+            "count": len(episodes),
+            "episodes": [
+                {
+                    "id": ep.episode_id,
+                    "timestamp": ep.timestamp.isoformat(),
+                    "symbol": ep.symbol,
+                    "signal": ep.signal_type,
+                    "entry_price": ep.entry_price,
+                    "confidence": ep.confidence,
+                    "agent_id": ep.agent_id,
+                    "pnl": ep.outcome.pnl if ep.outcome else None,
+                    "success": ep.was_profitable() if ep.outcome else None,
+                    "lesson": ep.lesson or None,
+                }
+                for ep in episodes
+            ],
+        }
+    except Exception as e:
+        logger.error(f"Recent episodes error: {e}")
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/api/acts/lessons")
+async def get_agent_lessons(symbol: Optional[str] = None, limit: int = 20) -> Dict[str, Any]:
+    """Get lessons learned from past trades."""
+    try:
+        from .memory import get_episodic_memory
+
+        memory = get_episodic_memory()
+        stats = memory.get_stats()
+
+        # Get all episodes and extract lessons
+        all_lessons = []
+
+        for symbol_key in stats.get("symbols_tracked", []):
+            if symbol and symbol_key != symbol:
+                continue
+
+            # Get episodes for this symbol using recall
+            episodes = await memory.recall_similar(
+                current_state_text=symbol_key,
+                symbol=symbol_key,
+                limit=10,
+            )
+
+            for ep in episodes:
+                if ep.lesson:
+                    all_lessons.append(
+                        {
+                            "symbol": ep.symbol,
+                            "timestamp": ep.timestamp.isoformat(),
+                            "signal": ep.signal_type,
+                            "pnl": ep.outcome.pnl if ep.outcome else 0,
+                            "success": ep.was_profitable() if ep.outcome else False,
+                            "what_worked": ep.what_worked,
+                            "what_failed": ep.what_failed,
+                            "lesson": ep.lesson,
+                        }
+                    )
+
+        # Sort by timestamp descending
+        all_lessons.sort(key=lambda x: x["timestamp"], reverse=True)
+
+        return {
+            "success": True,
+            "count": len(all_lessons[:limit]),
+            "lessons": all_lessons[:limit],
+        }
+    except Exception as e:
+        logger.error(f"Lessons error: {e}")
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/api/acts/market-state")
+async def get_current_market_state() -> Dict[str, Any]:
+    """Get current market state encoded via UMEP."""
+    try:
+        from .acts_integration import get_acts_integration
+
+        integration = get_acts_integration()
+        service = await get_service_instance()
+
+        if not service:
+            return {"success": False, "error": "Trading service not available"}
+
+        # Gather market data
+        prices = {}
+        changes = {}
+
+        # Try to get data from tracked symbols
+        for symbol in list(getattr(service, "_open_positions", {}).keys())[:10]:
+            try:
+                ticker = await service._exchange_client.get_ticker(symbol)
+                if ticker:
+                    prices[symbol] = float(ticker.get("lastPrice", 0))
+                    changes[symbol] = float(ticker.get("priceChangePercent", 0))
+            except:
+                pass
+
+        # If no positions, use defaults
+        if not prices:
+            prices = {"BTC-USDC": 95000, "ETH-USDC": 3500, "SOL-USDC": 180}
+            changes = {"BTC-USDC": 0, "ETH-USDC": 0, "SOL-USDC": 0}
+
+        # Encode
+        mst = await integration.encode_current_market(prices, changes)
+
+        return {
+            "success": True,
+            "timestamp": mst.timestamp.isoformat(),
+            "regime": mst.macro.regime.value,
+            "risk_appetite": mst.macro.risk_appetite.value,
+            "text_encoding": mst.to_text(max_assets=5),
+            "assets": {
+                symbol: {
+                    "price": state.price,
+                    "momentum_1h": state.momentum_1h,
+                    "trend": state.trend_direction,
+                    "trend_strength": state.trend_strength.value,
+                }
+                for symbol, state in list(mst.assets.items())[:10]
+            },
+        }
+    except Exception as e:
+        logger.error(f"Market state error: {e}")
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/api/acts/agent/{agent_id}/context")
+async def get_agent_decision_context(
+    agent_id: str,
+    symbol: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Get decision context for an agent including lessons and market state."""
+    try:
+        from .acts_integration import get_acts_integration
+        from .memory import get_episodic_memory
+
+        integration = get_acts_integration()
+        memory = get_episodic_memory()
+
+        # Get lessons relevant to this agent/symbol
+        lessons = await memory.get_lessons_for_context(
+            symbol=symbol or "BTC",
+            signal_type="LONG",
+            limit=5,
+        )
+
+        # Get agent's historical win rate
+        similar = await memory.recall_similar(
+            current_state_text=f"{agent_id} {symbol or 'BTC'}",
+            symbol=symbol,
+            limit=20,
+        )
+
+        agent_episodes = [ep for ep in similar if ep.agent_id == agent_id]
+        if agent_episodes:
+            wins = sum(1 for ep in agent_episodes if ep.was_profitable())
+            win_rate = wins / len(agent_episodes)
+            avg_pnl = sum(ep.outcome.pnl for ep in agent_episodes if ep.outcome) / len(
+                agent_episodes
+            )
+        else:
+            win_rate = 0.5
+            avg_pnl = 0
+
+        return {
+            "success": True,
+            "agent_id": agent_id,
+            "symbol": symbol,
+            "historical_trades": len(agent_episodes),
+            "win_rate": win_rate,
+            "avg_pnl": avg_pnl,
+            "lessons": lessons,
+        }
+    except Exception as e:
+        logger.error(f"Agent context error: {e}")
+        return {"success": False, "error": str(e)}
 
 
 # Full root static file serving (at the end to avoid shadowing API routes)

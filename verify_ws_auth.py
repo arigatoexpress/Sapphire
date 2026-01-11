@@ -1,9 +1,11 @@
 import asyncio
-import websockets
-import sys
 import json
+import sys
+
+import websockets
 
 URI = "wss://sapphire-cloud-trader-s77j6bxyra-nn.a.run.app/ws/dashboard"
+
 
 async def test_no_token():
     print(f"Testing connection to {URI} WITHOUT token...")
@@ -17,6 +19,7 @@ async def test_no_token():
     except Exception as e:
         print(f"✅ Connection Failed (Expected): {e}")
 
+
 async def test_fake_token():
     uri_with_token = f"{URI}?token=invalid-token"
     print(f"Testing connection to {uri_with_token} with FAKE token...")
@@ -28,9 +31,11 @@ async def test_fake_token():
     except Exception as e:
         print(f"✅ Connection Failed (Expected): {e}")
 
+
 async def main():
     await test_no_token()
     await test_fake_token()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

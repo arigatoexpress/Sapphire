@@ -54,6 +54,19 @@ const AgentDetailModal: React.FC<AgentDetailModalProps> = ({ open, onClose, agen
                                     border: `1px solid ${agent.status === 'active' ? '#00ff00' : '#ffa500'}`
                                 }}
                             />
+                            {agent.system && (
+                                <Chip
+                                    label={agent.system.toUpperCase()}
+                                    size="small"
+                                    sx={{
+                                        height: 20,
+                                        fontSize: '0.7rem',
+                                        bgcolor: agent.system === 'hyperliquid' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                                        color: agent.system === 'hyperliquid' ? '#10b981' : '#3b82f6',
+                                        border: `1px solid ${agent.system === 'hyperliquid' ? '#10b981' : '#3b82f6'}`
+                                    }}
+                                />
+                            )}
                             <Typography variant="caption" sx={{ color: '#666', fontFamily: 'Monospace' }}>
                                 ID: {agent.name.substring(0, 3).toUpperCase()}_001
                             </Typography>

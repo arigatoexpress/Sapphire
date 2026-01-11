@@ -22,19 +22,21 @@ class DriftClient:
 
     def __init__(self, rpc_url: Optional[str] = None):
         from .config import get_settings
+
         settings = get_settings()
         self.rpc_url = rpc_url or settings.solana_rpc_url
         self.private_key = settings.solana_private_key
         self.subaccount_id = int(os.getenv("DRIFT_SUBACCOUNT_ID", "0"))
-        
+
         self.drift_user = None
         self.connection = None
         self.kp = None
         self.is_initialized = False
-        
+
         # Check for optional dependency
         try:
             import driftpy
+
             self.has_driftpy = True
         except ImportError:
             self.has_driftpy = False
@@ -54,40 +56,48 @@ class DriftClient:
 
         try:
             logger.info(f"Initializing Drift Protocol Client (RPC: {self.rpc_url})...")
-            
+
             # Imports inside method to avoid crash if missing
-            from driftpy.drift_client import DriftClient as SDKDriftClient
+            import base58
             from driftpy.account_subscription_config import AccountSubscriptionConfig
+            from driftpy.drift_client import DriftClient as SDKDriftClient
+            from solana.rpc.async_api import AsyncClient
             from solders.keypair import Keypair
             from solders.pubkey import Pubkey
-            from solana.rpc.async_api import AsyncClient
-            import base58
 
             # Setup Connection
             self.connection = AsyncClient(self.rpc_url)
-            
+
             # Setup Keypair
             # Handle both base58 string and raw bytes (list of ints)
-            if "[" in self.private_key:
-                import json
-                raw_key = json.loads(self.private_key)
-                self.kp = Keypair.from_bytes(bytes(raw_key))
-            else:
-                self.kp = Keypair.from_base58_string(self.private_key)
+            try:
+                clean_key = self.private_key.strip()
+                if "[" in clean_key:
+                    import json
+
+                    raw_key = json.loads(clean_key)
+                    if len(raw_key) != 64:
+                        raise ValueError(f"Invalid key length: {len(raw_key)} (expected 64)")
+                    self.kp = Keypair.from_bytes(bytes(raw_key))
+                else:
+                    self.kp = Keypair.from_base58_string(clean_key)
+            except Exception as k_err:
+                logger.error(f"Failed to load keypair: {k_err}")
+                raise k_err
 
             # Initialize SDK Client
             self.sdk_client = SDKDriftClient(
                 self.connection,
                 self.kp,
-                env='mainnet',
-                account_subscription=AccountSubscriptionConfig("websocket")
+                env="mainnet",
+                account_subscription=AccountSubscriptionConfig("websocket"),
             )
-            
+
             await self.sdk_client.subscribe()
             self.drift_user = self.sdk_client.get_user(self.subaccount_id)
-            # User subscription handling might vary by SDK version, 
+            # User subscription handling might vary by SDK version,
             # simplified here assuming client subscription covers it or it's fetched on demand
-            
+
             self.is_initialized = True
             logger.info(f"✅ Drift Client Initialized. Pubkey: {self.kp.pubkey()}")
 
@@ -121,7 +131,7 @@ class DriftClient:
 
     async def get_total_equity(self) -> float:
         """Get total equity in USD (SOL Balance + Perp PnL Stubs)."""
-        
+
         # 1. Try fetching real SOL balance from RPC
         real_sol_equity = 0.0
         if self.connection and self.kp:
@@ -129,17 +139,20 @@ class DriftClient:
                 # Use solders/solana to fetch balance
                 # Note: raw async client call needed
                 from solders.pubkey import Pubkey
+
                 resp = await self.connection.get_balance(self.kp.pubkey())
                 lamports = resp.value
                 sol_balance = lamports / 1e9
-                
+
                 # Get Price Stub or Real
                 # reusing mocked price logic from earlier or fetch fresh
                 market_info = await self.get_perp_market("SOL-PERP")
                 price = market_info.get("oracle_price", 150.0)
-                
+
                 real_sol_equity = sol_balance * price
-                logger.info(f"DriftClient: Real SOL Balance: {sol_balance:.4f} (~${real_sol_equity:.2f})")
+                logger.info(
+                    f"DriftClient: Real SOL Balance: {sol_balance:.4f} (~${real_sol_equity:.2f})"
+                )
             except Exception as e:
                 logger.warning(f"DriftClient: Failed to fetch real SOL balance: {e}")
 
@@ -150,7 +163,9 @@ class DriftClient:
             # Using SDK to get spot + perp value
             # This is pseudo-code for SDK usage, adjusting to likely API
             net_asset_value = self.drift_user.get_net_asset_value()
-            return float(net_asset_value) / 1e6  # Convert based on precision (usually 6 decimals for USDC)
+            return (
+                float(net_asset_value) / 1e6
+            )  # Convert based on precision (usually 6 decimals for USDC)
         except Exception:
             return max(real_sol_equity, 1500.0)
 
@@ -168,8 +183,8 @@ class DriftClient:
                 pass
             return {"symbol": symbol, "amount": 0.0, "entry_price": 0.0, "unrealized_pnl": 0.0}
         except Exception as e:
-             logger.error(f"Drift get_position error: {e}")
-             return {}
+            logger.error(f"Drift get_position error: {e}")
+            return {}
 
     async def place_perp_order(
         self,
@@ -181,8 +196,8 @@ class DriftClient:
     ):
         """Place a perp order on Drift."""
         if not self.is_initialized:
-             logger.warning("Drift not initialized. Simulating order.")
-             return {"tx_sig": "sim_drift_tx_uninit", "status": "simulated"}
+            logger.warning("Drift not initialized. Simulating order.")
+            return {"tx_sig": "sim_drift_tx_uninit", "status": "simulated"}
 
         try:
             logger.info(f"Drift Real Order: {side.upper()} {amount} {symbol}")
@@ -195,10 +210,49 @@ class DriftClient:
             raise
 
     async def close(self):
-         if self.sdk_client:
-             await self.sdk_client.unsubscribe()
-         if self.connection:
-             await self.connection.close()
+        if self.sdk_client:
+            await self.sdk_client.unsubscribe()
+        if self.connection:
+            await self.connection.close()
+
+    async def get_token_price(self, symbol: str) -> float:
+        """
+        Get current price for a token.
+        Used by ArbitrageScanner for cross-platform price comparison.
+
+        Args:
+            symbol: Symbol string (e.g. 'SOL-USD', 'SOL-PERP')
+
+        Returns:
+            Current price in USD or 0.0 on error
+        """
+        try:
+            # Extract base asset from symbol
+            base = symbol.split("-")[0].upper()
+
+            # Map to CoinGecko IDs
+            coingecko_map = {
+                "SOL": "solana",
+                "BTC": "bitcoin",
+                "ETH": "ethereum",
+            }
+
+            cg_id = coingecko_map.get(base)
+            if not cg_id:
+                logger.debug(f"No CoinGecko mapping for {base}")
+                return 0.0
+
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.get(
+                    "https://api.coingecko.com/api/v3/simple/price",
+                    params={"ids": cg_id, "vs_currencies": "usd"},
+                )
+                data = resp.json()
+                price = float(data.get(cg_id, {}).get("usd", 0))
+                return price
+        except Exception as e:
+            logger.debug(f"Drift get_token_price error for {symbol}: {e}")
+            return 0.0
 
 
 # Singleton

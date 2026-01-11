@@ -4,219 +4,166 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timedelta
+import re
 from typing import Any, Dict, List, Optional
+
+from .vertex_ai_client import get_vertex_client
 
 logger = logging.getLogger(__name__)
 
 
 class AITradingAnalyzer:
-    """AI-powered trading analysis and insights."""
+    """AI-powered trading analysis and insights using Vertex AI/Gemini."""
 
     def __init__(self):
-        self.model_name = "trading-ai-analyzer"
-        self.confidence_threshold = 0.6
+        self.model_name = "market-analysis"
+        self.client = get_vertex_client()
+
+    async def _get_prediction(self, prompt: str, system_instruction: str = "") -> str:
+        """Helper to get prediction from Vertex AI client."""
+        full_prompt = f"{system_instruction}\n\n{prompt}" if system_instruction else prompt
+        try:
+            result = await self.client.predict(self.model_name, full_prompt)
+            return result.get("response", "")
+        except Exception as e:
+            logger.error(f"AI Prediction failed: {e}")
+            return ""
 
     async def analyze_trade(
         self, symbol: str, side: str, price: float, volume: float, market_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Analyze a trade opportunity using AI."""
-        # Mock AI analysis - would integrate with actual AI model
-        analysis = {
-            "confidence": 0.85,
-            "rationale": self._generate_trade_rationale(symbol, side, price, market_data),
-            "risk_level": self._assess_trade_risk(symbol, price, volume),
-            "time_horizon": "medium",  # short, medium, long
-            "expected_move": self._calculate_expected_move(symbol, market_data),
-            "recommendations": self._generate_trade_recommendations(symbol, side),
-        }
+        prompt = f"""
+        Analyze this potential trade setup:
+        Symbol: {symbol}
+        Side: {side}
+        Price: {price}
+        Volume: {volume}
+        Market Data: {json.dumps(market_data, default=str)}
 
-        return analysis
+        Provide a JSON response with the following keys:
+        - confidence: float (0.0 to 1.0)
+        - rationale: string (concise explanation)
+        - risk_level: string (low, medium, high)
+        - time_horizon: string (short, medium, long)
+        - expected_move: dict with keys 'upside', 'downside', 'probability'
+        - recommendations: list of strings (actionable advice)
+        """
+
+        response_text = await self._get_prediction(
+            prompt, "You are an expert crypto trading analyst."
+        )
+
+        try:
+            # Attempt to parse JSON from response (handling potential markdown code blocks)
+            cleaned_text = response_text.replace("```json", "").replace("```", "").strip()
+            analysis = json.loads(cleaned_text)
+            return analysis
+        except json.JSONDecodeError:
+            logger.warning(f"Failed to parse AI response as JSON: {response_text[:100]}...")
+            # Fallback structure
+            return {
+                "confidence": 0.5,
+                "rationale": "AI Analysis returned unstructured text. Check logs for details.",
+                "risk_level": "medium",
+                "time_horizon": "short",
+                "expected_move": {
+                    "upside": price * 1.02,
+                    "downside": price * 0.98,
+                    "probability": 0.5,
+                },
+                "recommendations": ["Monitor closely"],
+                "raw_response": response_text,
+            }
 
     async def analyze_market_sentiment(
         self, symbol: str, market_data: Dict[str, Any], social_data: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Analyze market sentiment using AI."""
-        # Mock sentiment analysis
-        sentiment = {
-            "overall": "bullish",
-            "confidence": 0.78,
-            "key_drivers": [
-                "Strong institutional accumulation",
-                "Positive social sentiment",
-                "Technical breakout patterns",
-            ],
-            "risk_factors": ["High volatility", "Potential profit taking"],
-            "recommendation": "Accumulate on dips",
-        }
+        prompt = f"""
+        Analyze the market sentiment for {symbol}.
+        Market Data: {json.dumps(market_data, default=str)}
+        Social Data: {json.dumps(social_data, default=str) if social_data else 'Not available'}
 
-        return sentiment
+        Provide a JSON response with:
+        - overall: string (bullish, bearish, neutral)
+        - confidence: float
+        - key_drivers: list of strings
+        - risk_factors: list of strings
+        - recommendation: string
+        """
+
+        response_text = await self._get_prediction(prompt, "You are a sentiment analysis expert.")
+
+        try:
+            cleaned_text = response_text.replace("```json", "").replace("```", "").strip()
+            return json.loads(cleaned_text)
+        except json.JSONDecodeError:
+            return {
+                "overall": "neutral",
+                "confidence": 0.5,
+                "key_drivers": ["Analysis parsing failed"],
+                "risk_factors": ["Unknown"],
+                "recommendation": "Hold",
+                "raw_response": response_text,
+            }
 
     async def generate_performance_insights(
         self, performance_data: Dict[str, Any], period: str = "daily"
     ) -> Dict[str, Any]:
         """Generate AI-powered performance insights."""
-        insights = {
-            "overall_assessment": self._assess_performance(performance_data),
-            "key_strengths": self._identify_strengths(performance_data),
-            "areas_for_improvement": self._identify_weaknesses(performance_data),
-            "recommendations": self._generate_performance_recommendations(performance_data),
-            "risk_assessment": self._assess_performance_risk(performance_data),
-        }
+        prompt = f"""
+        Analyze trading performance for the {period} period.
+        Data: {json.dumps(performance_data, default=str)}
 
-        return insights
+        Provide a JSON response with:
+        - overall_assessment: string
+        - key_strengths: list of strings
+        - areas_for_improvement: list of strings
+        - recommendations: list of strings
+        - risk_assessment: string
+        """
+
+        response_text = await self._get_prediction(prompt, "You are a trading performance coach.")
+
+        try:
+            cleaned_text = response_text.replace("```json", "").replace("```", "").strip()
+            return json.loads(cleaned_text)
+        except json.JSONDecodeError:
+            return {
+                "overall_assessment": "Could not generate assessment",
+                "key_strengths": [],
+                "areas_for_improvement": [],
+                "recommendations": ["Check logs"],
+                "risk_assessment": "unknown",
+            }
 
     async def predict_market_movement(
         self, symbol: str, timeframe: str, market_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Predict market movement using AI."""
-        prediction = {
-            "direction": "bullish",  # bullish, bearish, sideways
-            "confidence": 0.72,
-            "time_horizon": "24h",
-            "key_levels": {
-                "support": market_data.get("support_levels", []),
-                "resistance": market_data.get("resistance_levels", []),
-            },
-            "rationale": "Based on momentum indicators and volume analysis",
-        }
+        prompt = f"""
+        Predict market movement for {symbol} over a {timeframe} timeframe.
+        Market Data: {json.dumps(market_data, default=str)}
 
-        return prediction
+        Provide a JSON response with:
+        - direction: string
+        - confidence: float
+        - time_horizon: string
+        - key_levels: dict with 'support' and 'resistance' lists
+        - rationale: string
+        """
 
-    def _generate_trade_rationale(
-        self, symbol: str, side: str, price: float, market_data: Dict[str, Any]
-    ) -> str:
-        """Generate AI rationale for a trade."""
-        if side.upper() == "BUY":
-            return (
-                f"Strong bullish momentum detected for {symbol}. "
-                f"Price breaking above key resistance level. "
-                f"Volume confirms accumulation pattern. "
-                f"Technical indicators showing convergence."
-            )
-        else:
-            return (
-                f"Profit taking opportunity identified for {symbol}. "
-                f"Price approaching resistance with weakening momentum. "
-                f"Risk management signals suggest position reduction."
-            )
+        response_text = await self._get_prediction(prompt, "You are a technical analysis expert.")
 
-    def _assess_trade_risk(self, symbol: str, price: float, volume: float) -> str:
-        """Assess risk level of a trade."""
-        # Simple risk assessment logic
-        if volume > 10000:  # Large volume
-            return "medium"
-        elif price > 1000:  # High value asset
-            return "medium"
-        else:
-            return "low"
-
-    def _calculate_expected_move(
-        self, symbol: str, market_data: Dict[str, Any]
-    ) -> Dict[str, float]:
-        """Calculate expected price movement."""
-        volatility = market_data.get("volatility", 0.02)
-        current_price = market_data.get("current_price", 1.0)
-
-        expected_move = {
-            "upside": current_price * (1 + volatility * 2),
-            "downside": current_price * (1 - volatility * 2),
-            "probability": 0.68,  # 68% confidence interval
-        }
-
-        return expected_move
-
-    def _generate_trade_recommendations(self, symbol: str, side: str) -> List[str]:
-        """Generate trade recommendations."""
-        if side.upper() == "BUY":
-            return [
-                f"Set stop loss at {symbol} support level",
-                f"Take profit at next resistance level",
-                f"Monitor volume for confirmation",
-            ]
-        else:
-            return [
-                f"Consider partial profit taking",
-                f"Watch for support level bounces",
-                f"Reassess position sizing",
-            ]
-
-    def _assess_performance(self, performance_data: Dict[str, Any]) -> str:
-        """Assess overall performance."""
-        pnl = performance_data.get("total_pnl", 0)
-        win_rate = performance_data.get("win_rate", 0)
-        sharpe = performance_data.get("sharpe_ratio", 0)
-
-        if pnl > 0 and win_rate > 0.7 and sharpe > 1.5:
-            return "excellent"
-        elif pnl > 0 and win_rate > 0.6:
-            return "good"
-        elif pnl > 0:
-            return "acceptable"
-        else:
-            return "needs_improvement"
-
-    def _identify_strengths(self, performance_data: Dict[str, Any]) -> List[str]:
-        """Identify performance strengths."""
-        strengths = []
-
-        if performance_data.get("win_rate", 0) > 0.7:
-            strengths.append("High win rate indicates good entry timing")
-
-        if performance_data.get("sharpe_ratio", 0) > 1.5:
-            strengths.append("Strong risk-adjusted returns")
-
-        if performance_data.get("max_drawdown", 0) < 0.05:
-            strengths.append("Excellent drawdown control")
-
-        return strengths or ["Consistent execution"]
-
-    def _identify_weaknesses(self, performance_data: Dict[str, Any]) -> List[str]:
-        """Identify performance weaknesses."""
-        weaknesses = []
-
-        if performance_data.get("win_rate", 0) < 0.6:
-            weaknesses.append("Win rate could be improved with better entry criteria")
-
-        if performance_data.get("max_drawdown", 0) > 0.1:
-            weaknesses.append("Drawdown management needs attention")
-
-        if performance_data.get("sharpe_ratio", 0) < 1.0:
-            weaknesses.append("Risk-adjusted returns could be optimized")
-
-        return weaknesses or ["Monitor for continuous improvement opportunities"]
-
-    def _generate_performance_recommendations(self, performance_data: Dict[str, Any]) -> List[str]:
-        """Generate performance improvement recommendations."""
-        recommendations = []
-
-        win_rate = performance_data.get("win_rate", 0)
-        drawdown = performance_data.get("max_drawdown", 0)
-
-        if win_rate > 0.75:
-            recommendations.append("Continue current strategy with minor optimizations")
-        elif win_rate > 0.6:
-            recommendations.append("Focus on improving entry timing")
-        else:
-            recommendations.append("Review and refine trading strategy")
-
-        if drawdown > 0.08:
-            recommendations.append("Implement stricter risk management")
-        else:
-            recommendations.append("Consider optimizing position sizing")
-
-        recommendations.append("Continue monitoring key performance metrics")
-
-        return recommendations
-
-    def _assess_performance_risk(self, performance_data: Dict[str, Any]) -> str:
-        """Assess risk level of performance."""
-        drawdown = performance_data.get("max_drawdown", 0)
-        volatility = performance_data.get("volatility", 0)
-
-        if drawdown > 0.15 or volatility > 0.05:
-            return "high"
-        elif drawdown > 0.08 or volatility > 0.03:
-            return "medium"
-        else:
-            return "low"
+        try:
+            cleaned_text = response_text.replace("```json", "").replace("```", "").strip()
+            return json.loads(cleaned_text)
+        except json.JSONDecodeError:
+            return {
+                "direction": "neutral",
+                "confidence": 0.0,
+                "time_horizon": timeframe,
+                "key_levels": {"support": [], "resistance": []},
+                "rationale": "Parsing failed",
+            }

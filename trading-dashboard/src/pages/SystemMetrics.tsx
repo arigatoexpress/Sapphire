@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Activity, Shield, Zap, Server } from 'lucide-react';
 import { getApiUrl } from '../utils/apiConfig';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { Chip, Grid, Paper } from '@mui/material';
 
 interface HealthData {
     status: string;

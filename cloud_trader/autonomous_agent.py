@@ -24,7 +24,7 @@ class Thesis:
     signal: str  # "BUY" | "SELL" | "HOLD"
     confidence: float  # 0.0 to 1.0
     reasoning: str
-    agent_id: str = "" # ID of the agent that produced this thesis
+    agent_id: str = ""  # ID of the agent that produced this thesis
     data_used: List[str] = field(default_factory=list)
     expected_profit: Optional[float] = None
 
@@ -57,6 +57,8 @@ class AutonomousAgent:
         self.performance_history = []
         self.total_trades = 0
         self.winning_trades = 0
+        self.cumulative_slippage = 0.0
+        self.cumulative_fees = 0.0
 
     def _get_default_indicators(self) -> List[str]:
         """Get default indicators based on specialization."""
@@ -77,30 +79,48 @@ class AutonomousAgent:
         """
         print(f"🤖 [{self.id}] Analyzing {symbol}...")
         import sys
+
         sys.stdout.flush()
 
         # 1. Gather data
         try:
             # Add a safety timeout for the entire analysis
             indicators = await asyncio.wait_for(self._gather_data(symbol), timeout=15.0)
-            
+
             # 2. Formulate thesis
             thesis = self._formulate_thesis(symbol, indicators)
             thesis.agent_id = self.id
-            
+
             # 3. Track what data was used
             thesis.data_used = list(indicators.keys())
-            
-            print(f"✅ [{self.id}] Thesis for {symbol}: {thesis.signal} (conf: {thesis.confidence:.2f})")
+
+            print(
+                f"✅ [{self.id}] Thesis for {symbol}: {thesis.signal} (conf: {thesis.confidence:.2f})"
+            )
             sys.stdout.flush()
-            
+
             return thesis
         except asyncio.TimeoutError:
             print(f"⏳ [{self.id}] Analysis TIMEOUT for {symbol}")
-            return Thesis(symbol=symbol, signal="HOLD", confidence=0.0, reasoning="Analysis timeout")
+            return Thesis(
+                symbol=symbol, signal="HOLD", confidence=0.0, reasoning="Analysis timeout"
+            )
         except Exception as e:
+            # Fallback for Model Not Found (Gemini 3 -> Gemini 2.5)
+            if "404" in str(e) and "gemini-3" in self.strategy_config.get("model", ""):
+                print(f"⚠️ [{self.id}] Gemini 3 not found. Falling back to Gemini 2.5...")
+                self.strategy_config["model"] = "gemini-2.5-flash"
+                # Retry logic would go here, or just fail this turn and succeeding turns will use v2.5
+                return Thesis(
+                    symbol=symbol,
+                    signal="HOLD",
+                    confidence=0.0,
+                    reasoning="Model fallback triggered",
+                )
+
             print(f"❌ [{self.id}] Analysis error for {symbol}: {e}")
             import traceback
+
             traceback.print_exc()
             return Thesis(symbol=symbol, signal="HOLD", confidence=0.0, reasoning=f"Error: {e}")
         finally:
@@ -116,6 +136,7 @@ class AutonomousAgent:
             try:
                 print(f"🔍 [{self.id}] Fetching {indicator} for {symbol}...")
                 import sys
+
                 sys.stdout.flush()
                 value = await self.data_store.get(indicator, symbol)
                 if value is not None:
@@ -226,15 +247,23 @@ class AutonomousAgent:
             )
 
         if bullish_signals > bearish_signals:
-            confidence = bullish_signals / total_signals
+            base_confidence = bullish_signals / total_signals
+            adjusted_confidence = self._apply_performance_modulation(base_confidence)
             return Thesis(
-                symbol=symbol, signal="BUY", confidence=confidence, reasoning=" + ".join(reasons)
+                symbol=symbol,
+                signal="BUY",
+                confidence=adjusted_confidence,
+                reasoning=" + ".join(reasons),
             )
 
         elif bearish_signals > bullish_signals:
-            confidence = bearish_signals / total_signals
+            base_confidence = bearish_signals / total_signals
+            adjusted_confidence = self._apply_performance_modulation(base_confidence)
             return Thesis(
-                symbol=symbol, signal="SELL", confidence=confidence, reasoning=" + ".join(reasons)
+                symbol=symbol,
+                signal="SELL",
+                confidence=adjusted_confidence,
+                reasoning=" + ".join(reasons),
             )
 
         else:
@@ -246,17 +275,55 @@ class AutonomousAgent:
                 reasoning="Mixed signals: " + " vs ".join(reasons),
             )
 
-    def learn_from_trade(self, thesis: Thesis, pnl_pct: float):
+    def _apply_performance_modulation(self, base_confidence: float) -> float:
+        """
+        Adjust confidence based on agent's historical performance.
+
+        - High win rate (>60%): Boost confidence (agent is reliable)
+        - Low win rate (<40%): Reduce confidence (agent needs to be more cautious)
+        - High slippage history: Reduce confidence (execution is costly)
+        """
+        win_rate = self.get_win_rate()
+
+        # Performance multiplier
+        if self.total_trades < 5:
+            perf_mult = 1.0  # Not enough data
+        elif win_rate > 0.6:
+            perf_mult = 1.1  # Boost for high performers
+        elif win_rate < 0.4:
+            perf_mult = 0.85  # Penalize poor performers
+        else:
+            perf_mult = 1.0
+
+        # Slippage penalty (if avg slippage > 0.5%, reduce confidence)
+        avg_slippage = self.cumulative_slippage / max(1, self.total_trades)
+        if avg_slippage > 0.005:
+            slippage_penalty = 0.9
+        else:
+            slippage_penalty = 1.0
+
+        adjusted = base_confidence * perf_mult * slippage_penalty
+        return min(0.95, max(0.1, adjusted))  # Clamp between 0.1 and 0.95
+
+    def learn_from_trade(
+        self, thesis: Thesis, pnl_pct: float, slippage_pct: float = 0.0, fee_usd: float = 0.0
+    ):
         """
         Update strategy based on trade outcome.
 
         Args:
             thesis: The thesis that led to the trade
             pnl_pct: PnL as percentage (e.g., 0.05 = 5% profit)
+            slippage_pct: Realized slippage as percentage
+            fee_usd: Fees paid in USD
         """
         self.total_trades += 1
         if pnl_pct > 0:
             self.winning_trades += 1
+
+        # Track slippage and fees for performance modulation
+        self.cumulative_slippage += slippage_pct
+        self.cumulative_fees += fee_usd
 
         # Record outcome
         self.performance_history.append(
@@ -290,6 +357,24 @@ class AutonomousAgent:
                 f"{self.name} updated preferences: "
                 f"{self.strategy_config['preferred_indicators']}"
             )
+
+        # AUTO-TUNE: Adjust confidence_threshold based on win rate
+        # High performers (>60% win) -> Lower threshold (more trades)
+        # Low performers (<40% win) -> Higher threshold (fewer trades)
+        if self.total_trades >= 10:  # Only adjust after 10 trades
+            win_rate = self.get_win_rate()
+            if win_rate > 0.6:
+                new_threshold = max(0.4, self.strategy_config["confidence_threshold"] - 0.02)
+            elif win_rate < 0.4:
+                new_threshold = min(0.8, self.strategy_config["confidence_threshold"] + 0.03)
+            else:
+                new_threshold = self.strategy_config["confidence_threshold"]
+
+            if new_threshold != self.strategy_config["confidence_threshold"]:
+                logger.info(
+                    f"🔧 {self.name} auto-tuned threshold: {self.strategy_config['confidence_threshold']:.2f} -> {new_threshold:.2f}"
+                )
+                self.strategy_config["confidence_threshold"] = new_threshold
 
     def get_win_rate(self) -> float:
         """Get current win rate."""

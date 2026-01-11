@@ -34,6 +34,8 @@ class AgentMetricsTracker:
         self.trade_execution_latencies: Dict[str, deque] = defaultdict(
             lambda: deque(maxlen=max_history)
         )
+        self.slippage: Dict[str, deque] = defaultdict(lambda: deque(maxlen=max_history))
+        self.fees: Dict[str, deque] = defaultdict(lambda: deque(maxlen=max_history))
 
     def record_inference(
         self,
@@ -103,6 +105,16 @@ class AgentMetricsTracker:
             key = f"{agent_id}:{symbol}"
             self.trade_execution_latencies[key].append(latency)
 
+    def record_slippage(self, agent_id: str, slippage_pct: float):
+        """Record trade slippage."""
+        with self.lock:
+            self.slippage[agent_id].append(slippage_pct)
+
+    def record_fee(self, agent_id: str, fee_usd: float):
+        """Record trade fee."""
+        with self.lock:
+            self.fees[agent_id].append(fee_usd)
+
     def get_metrics(self, agent_id: Optional[str] = None) -> Dict[str, Any]:
         """Get metrics for agent(s)."""
         with self.lock:
@@ -145,8 +157,12 @@ class AgentMetricsTracker:
                 )
 
                 # Calculate average confidence
-                confidences = list(self.confidences[agent])
                 avg_confidence = sum(confidences) / len(confidences) if confidences else 0.5
+
+                # Calculate avg slippage and total fees
+                slippage_list = list(self.slippage[agent])
+                avg_slippage = sum(slippage_list) / len(slippage_list) if slippage_list else 0.0
+                total_fees = sum(self.fees[agent])
 
                 result[agent] = {
                     "agent_id": agent,
@@ -167,6 +183,10 @@ class AgentMetricsTracker:
                         "success_rate": success_rate,
                         "avg_confidence": avg_confidence,
                         "error_count": self.error_count[agent],
+                    },
+                    "financials": {
+                        "avg_slippage_pct": avg_slippage,
+                        "total_fees_usd": total_fees,
                     },
                     "timestamp": time.time(),
                 }

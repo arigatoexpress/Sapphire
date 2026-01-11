@@ -6,17 +6,19 @@ interface MarketRegimeWidgetProps {
 }
 
 export const MarketRegimeWidget: React.FC<MarketRegimeWidgetProps> = ({ regime }) => {
-    if (!regime) return null;
+    if (!regime || !regime.regime) return null;
+
+    const regimeStr = regime.regime || '';
 
     const getIcon = () => {
-        if (regime.regime.includes('BULL')) return <TrendingUp className="w-5 h-5 text-emerald-400" />;
-        if (regime.regime.includes('BEAR')) return <TrendingDown className="w-5 h-5 text-rose-400" />;
+        if (regimeStr.includes('BULL')) return <TrendingUp className="w-5 h-5 text-emerald-400" />;
+        if (regimeStr.includes('BEAR')) return <TrendingDown className="w-5 h-5 text-rose-400" />;
         return <Minus className="w-5 h-5 text-blue-400" />;
     };
 
     const getColor = () => {
-        if (regime.regime.includes('BULL')) return 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10';
-        if (regime.regime.includes('BEAR')) return 'text-rose-400 border-rose-500/30 bg-rose-500/10';
+        if (regimeStr.includes('BULL')) return 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10';
+        if (regimeStr.includes('BEAR')) return 'text-rose-400 border-rose-500/30 bg-rose-500/10';
         return 'text-blue-400 border-blue-500/30 bg-blue-500/10';
     };
 
@@ -28,7 +30,7 @@ export const MarketRegimeWidget: React.FC<MarketRegimeWidgetProps> = ({ regime }
                     <span className="text-xs font-bold text-white/60 uppercase tracking-wider">Market Regime</span>
                 </div>
                 <div className="text-[10px] font-mono text-white/40">
-                    CONF: {(regime.confidence * 100).toFixed(0)}%
+                    CONF: {((regime?.confidence ?? 0) * 100).toFixed(0)}%
                 </div>
             </div>
 

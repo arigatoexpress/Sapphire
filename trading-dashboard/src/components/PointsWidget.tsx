@@ -54,7 +54,7 @@ const PointsWidget = () => {
                 </div>
                 <div>
                     <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Rank</span>
-                    <span className="text-sm font-bold text-emerald-400 font-mono">#{stats.rank}</span>
+                    <span className="text-sm font-bold text-emerald-400 font-mono">#{stats.rank ?? 0}</span>
                 </div>
             </div>
 
@@ -68,7 +68,7 @@ const PointsWidget = () => {
                 </div>
                 <div>
                     <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Points</span>
-                    <span className="text-sm font-bold text-amber-400 font-mono">{stats.total_points.toLocaleString()}</span>
+                    <span className="text-sm font-bold text-amber-400 font-mono">{(stats.total_points ?? 0).toLocaleString()}</span>
                 </div>
             </div>
 
@@ -82,17 +82,17 @@ const PointsWidget = () => {
                 </div>
                 <div>
                     <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Streak</span>
-                    <span className="text-sm font-bold text-rose-400 font-mono">{stats.streak_days} Days</span>
+                    <span className="text-sm font-bold text-rose-400 font-mono">{stats.streak_days ?? 0} Days</span>
                 </div>
             </div>
 
             {/* Accuracy Badge */}
-            {stats.accuracy > 0 && (
+            {(stats.accuracy ?? 0) > 0 && (
                 <>
                     <div className="h-6 w-px bg-white/10"></div>
                     <div className="flex items-center gap-1.5 bg-blue-500/10 px-2 py-1 rounded-lg border border-blue-500/20">
                         <TrendingUp size={12} className="text-blue-400" />
-                        <span className="text-xs font-bold text-blue-400">{stats.accuracy.toFixed(0)}% Acc</span>
+                        <span className="text-xs font-bold text-blue-400">{(stats.accuracy ?? 0).toFixed(0)}% Acc</span>
                     </div>
                 </>
             )}

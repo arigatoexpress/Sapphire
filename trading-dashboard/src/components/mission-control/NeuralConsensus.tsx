@@ -68,7 +68,7 @@ export const NeuralConsensus: React.FC = () => {
                             <span className="text-[10px] text-gray-400 uppercase tracking-wider">Confidence</span>
                         </div>
                         <div className="text-xl font-bold text-white font-mono">
-                            {(state.stats.avg_confidence * 100).toFixed(0)}%
+                            {((state.stats?.avg_confidence ?? 0) * 100).toFixed(0)}%
                         </div>
                     </div>
 
@@ -78,7 +78,7 @@ export const NeuralConsensus: React.FC = () => {
                             <span className="text-[10px] text-gray-400 uppercase tracking-wider">Agreement</span>
                         </div>
                         <div className="text-xl font-bold text-white font-mono">
-                            {(state.stats.agreement_level * 100).toFixed(0)}%
+                            {((state.stats?.agreement_level ?? 0) * 100).toFixed(0)}%
                         </div>
                     </div>
 

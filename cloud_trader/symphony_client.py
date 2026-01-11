@@ -133,7 +133,8 @@ class SymphonyClient:
                     "USDC": 250.0
                 },  # Mocked based on user input for now or fetch if endpoint found
                 "trades_count": self._activation_trades,
-                "is_activated": self._activated or (self._activation_trades >= MIT_ACTIVATION_THRESHOLD),
+                "is_activated": self._activated
+                or (self._activation_trades >= MIT_ACTIVATION_THRESHOLD),
                 "activation_threshold": MIT_ACTIVATION_THRESHOLD,
                 "agent_id": self.default_agent_id,
             }
@@ -431,7 +432,11 @@ class SymphonyClient:
         return {
             "current": min(self._activation_trades, MIT_ACTIVATION_THRESHOLD),
             "required": MIT_ACTIVATION_THRESHOLD,
-            "percentage": 100.0 if MIT_ACTIVATION_THRESHOLD == 0 else min(self._activation_trades / MIT_ACTIVATION_THRESHOLD * 100, 100),
+            "percentage": (
+                100.0
+                if MIT_ACTIVATION_THRESHOLD == 0
+                else min(self._activation_trades / MIT_ACTIVATION_THRESHOLD * 100, 100)
+            ),
             "activated": self.is_activated,
         }
 

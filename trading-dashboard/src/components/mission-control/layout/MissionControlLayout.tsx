@@ -1,60 +1,57 @@
+
 import React from 'react';
-import { Box, Container, AppBar, Toolbar, Typography, Chip, LinearProgress } from '@mui/material';
-import { useTradingData } from '../../../contexts/TradingContext';
+import { Activity, Shield, Cpu, Wifi } from 'lucide-react';
 
-// --- Assets ---
-// Logo or Icon SVG could go here
+interface MissionControlLayoutProps {
+    children: React.ReactNode;
+}
 
-export const MissionControlLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const { connected, total_pnl_percent, market_regime } = useTradingData();
-
+export const MissionControlLayout: React.FC<MissionControlLayoutProps> = ({ children }) => {
     return (
-        <Box sx={{ minHeight: '100vh', bgcolor: 'transparent', color: '#fff', display: 'flex', flexDirection: 'column' }}>
-            {/* Background Animations */}
+        <div className="flex h-screen w-full bg-[#050508] text-white overflow-hidden relative">
+            {/* Background Effects */}
             <div className="holographic-grid" />
-
-            {/* Minimal Status Bar (Ticker) */}
-            <Box sx={{
-                px: 3, py: 1.5,
-                display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 4,
-                borderBottom: '1px solid rgba(255,255,255,0.05)',
-                bgcolor: 'rgba(0,0,0,0.2)'
-            }}>
-                <Box sx={{ display: 'flex', gap: 4 }}>
-                    <Box>
-                        <Typography variant="caption" sx={{ color: '#666', fontFamily: 'JetBrains Mono', fontSize: '0.7rem' }}>MARKET REGIME</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#fff', textTransform: 'uppercase', fontSize: '0.85rem' }}>
-                            {market_regime?.current_regime || 'CALCULATING...'}
-                        </Typography>
-                    </Box>
-                    <Box>
-                        <Typography variant="caption" sx={{ color: '#666', fontFamily: 'JetBrains Mono', fontSize: '0.7rem' }}>24H PNL</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 700, color: total_pnl_percent >= 0 ? '#00ff00' : '#ff0000', fontFamily: 'JetBrains Mono', fontSize: '0.85rem' }}>
-                            {total_pnl_percent >= 0 ? '+' : ''}{total_pnl_percent.toFixed(2)}%
-                        </Typography>
-                    </Box>
-                </Box>
-                <Chip
-                    label={connected ? "CONNECTED" : "OFFLINE"}
-                    size="small"
-                    sx={{
-                        height: 20,
-                        fontSize: '0.65rem',
-                        fontWeight: 800,
-                        borderRadius: '4px',
-                        bgcolor: connected ? 'rgba(0, 255, 0, 0.1)' : 'rgba(255, 0, 0, 0.1)',
-                        color: connected ? '#00ff00' : '#ff0000',
-                        border: `1px solid ${connected ? 'rgba(0,255,0,0.3)' : 'rgba(255,0,0,0.3)'}`
-                    }}
-                />
-            </Box>
+            <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent z-50 animate-pulse-slow" />
 
             {/* Main Content Area */}
-            <Box sx={{ flex: 1, overflowY: 'auto', position: 'relative', zIndex: 1 }}>
-                <Container maxWidth="xl" sx={{ py: 3 }}>
+            <main className="flex-1 flex flex-col h-full relative z-10">
+
+                {/* HUD Header */}
+                <header className="h-14 border-b border-white/10 bg-black/40 backdrop-blur-md flex items-center justify-between px-6 flex-shrink-0">
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_10px_#22d3ee]" />
+                            <span className="font-tech text-lg tracking-widest text-white glow-text-blue">SAPPHIRE</span>
+                            <span className="text-xs text-cyan-500/80 font-mono border border-cyan-500/20 px-1 rounded">OS v2.0</span>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-6 text-xs text-slate-400 font-mono">
+                        <div className="flex items-center gap-2">
+                            <Cpu size={14} className="text-emerald-500" />
+                            <span>CPU: 12%</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Activity size={14} className="text-purple-500" />
+                            <span>MEM: 4.2GB</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Wifi size={14} className="text-cyan-500" />
+                            <span>NET: 4ms</span>
+                        </div>
+                        <div className="flex items-center gap-2 px-3 py-1 bg-white/5 rounded border border-white/10">
+                            <Shield size={14} className="text-amber-400" />
+                            <span>GUARD: ACTIVE</span>
+                        </div>
+                    </div>
+                </header>
+
+                {/* Content Viewport */}
+                <div className="flex-1 overflow-hidden p-4">
                     {children}
-                </Container>
-            </Box>
-        </Box>
+                </div>
+
+            </main>
+        </div>
     );
 };

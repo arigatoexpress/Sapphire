@@ -11,7 +11,7 @@ const Login = () => {
     const [success, setSuccess] = useState('');
     const [loading, setLoading] = useState(false);
 
-    const { signIn, signUp, resetPassword } = useAuth();
+    const { signIn, signUp, resetPassword, enterAsGuest } = useAuth();
     const navigate = useNavigate();
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -36,6 +36,18 @@ const Login = () => {
             }
         } catch (err: any) {
             setError(err.message || 'Authentication failed');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleGuestLogin = async () => {
+        setLoading(true);
+        try {
+            await enterAsGuest();
+            navigate('/');
+        } catch (err: any) {
+            setError(err.message || 'Guest login failed');
         } finally {
             setLoading(false);
         }
@@ -141,6 +153,20 @@ const Login = () => {
                                         'Send Reset Email'}
                         </Button>
                     </form>
+
+                    <Box sx={{ mt: 3, pt: 3, borderTop: '1px solid #222', textAlign: 'center' }}>
+                        <Button
+                            onClick={handleGuestLogin}
+                            disabled={loading}
+                            sx={{
+                                color: '#666',
+                                textTransform: 'none',
+                                '&:hover': { color: '#fff', bgcolor: 'transparent' }
+                            }}
+                        >
+                            Continue as Guest (No Sign Up)
+                        </Button>
+                    </Box>
 
                     {tab === 0 && (
                         <Typography variant="caption" sx={{ color: '#666', display: 'block', mt: 2, textAlign: 'center' }}>

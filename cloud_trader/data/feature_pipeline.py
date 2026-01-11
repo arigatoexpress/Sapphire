@@ -14,7 +14,7 @@ except ImportError:
     pd = None
     print("⚠️ Pandas not found. FeaturePipeline will be disabled.")
 
-from ..definitions import SYMPHONY_SYMBOLS
+from ..definitions import DRIFT_SYMBOLS, HYPERLIQUID_SYMBOLS, SYMPHONY_SYMBOLS
 from ..logger import get_logger
 
 logger = get_logger(__name__)
@@ -67,8 +67,12 @@ class FeaturePipeline:
             return df
             return df
         except Exception as e:
-            # Fallback for Symphony Symbols or missing data
-            if symbol in SYMPHONY_SYMBOLS:
+            # Fallback for known registries or missing data
+            if (
+                symbol in SYMPHONY_SYMBOLS
+                or symbol in HYPERLIQUID_SYMBOLS
+                or symbol in DRIFT_SYMBOLS
+            ):
                 # print(f"⚠️ Using synthetic data for {symbol}")
                 return self._generate_synthetic_candles(symbol, limit)
 
@@ -136,9 +140,10 @@ class FeaturePipeline:
         """Calculate comprehensive technical indicators."""
         if pd is None or not isinstance(df, pd.DataFrame) or df.empty:
             return df
-            
+
         print(f"📊 [TA] Starting {symbol} indicators...")
         import sys
+
         sys.stdout.flush()
 
         # Trend (Manual Calculation to bypass pandas-ta issue)
@@ -192,30 +197,35 @@ class FeaturePipeline:
         # If Close > Prev Close: OBV = Prev OBV + Volume
         # If Close < Prev Close: OBV = Prev OBV - Volume
         # If Close = Prev Close: OBV = Prev OBV
-        direction = np.where(df['close'] > df['close'].shift(1), 1, 
-                             np.where(df['close'] < df['close'].shift(1), -1, 0))
-        df['OBV'] = (direction * df['volume']).cumsum()
+        direction = np.where(
+            df["close"] > df["close"].shift(1),
+            1,
+            np.where(df["close"] < df["close"].shift(1), -1, 0),
+        )
+        df["OBV"] = (direction * df["volume"]).cumsum()
 
         # ADX (14) - Simplified Calculation
         # True Range is already calculated in ATR logic (ATRr_14 is SMA of TR)
         # Need Smoothed +DM and -DM
         plus_dm = df["high"] - df["high"].shift(1)
         minus_dm = df["low"].shift(1) - df["low"]
-        
+
         # Determine if +DM or -DM
         plus_dm = np.where((plus_dm > minus_dm) & (plus_dm > 0), plus_dm, 0.0)
         minus_dm = np.where((minus_dm > plus_dm) & (minus_dm > 0), minus_dm, 0.0)
-        
+
         # Smooth them (Wilder's smoothing) - using EWM as close approximation
-        df["plus_dm_smooth"] = pd.Series(plus_dm).ewm(alpha=1/14, adjust=False).mean()
-        df["minus_dm_smooth"] = pd.Series(minus_dm).ewm(alpha=1/14, adjust=False).mean()
-        df["tr_smooth"] = true_range.ewm(alpha=1/14, adjust=False).mean() # Utilizing true_range from ATR block
-        
+        df["plus_dm_smooth"] = pd.Series(plus_dm).ewm(alpha=1 / 14, adjust=False).mean()
+        df["minus_dm_smooth"] = pd.Series(minus_dm).ewm(alpha=1 / 14, adjust=False).mean()
+        df["tr_smooth"] = true_range.ewm(
+            alpha=1 / 14, adjust=False
+        ).mean()  # Utilizing true_range from ATR block
+
         df["plus_di"] = 100 * (df["plus_dm_smooth"] / df["tr_smooth"])
         df["minus_di"] = 100 * (df["minus_dm_smooth"] / df["tr_smooth"])
-        
+
         dx = 100 * abs(df["plus_di"] - df["minus_di"]) / (df["plus_di"] + df["minus_di"])
-        df["ADX"] = dx.ewm(alpha=1/14, adjust=False).mean()
+        df["ADX"] = dx.ewm(alpha=1 / 14, adjust=False).mean()
 
         # --- ADVANCED INDICATORS (User Request) ---
 
@@ -226,7 +236,7 @@ class FeaturePipeline:
         swing_high = recent_data["high"].max()
         swing_low = recent_data["low"].min()
         diff = swing_high - swing_low
-        
+
         # Calculate distance to nearest level for the latest candle
         if diff > 0:
             df["FIB_HIGH"] = swing_high
@@ -238,23 +248,27 @@ class FeaturePipeline:
             df["FIB_0.618"] = swing_low + 0.618 * diff
             df["FIB_0.786"] = swing_low + 0.786 * diff
         else:
-             df["FIB_0.5"] = df["close"] # Fallback
+            df["FIB_0.5"] = df["close"]  # Fallback
 
         # 2. Wyckoff Phase Estimator (Heuristic)
         # Accumulation: Low volatility, Low-to-Med Volume, Price < EMA50 (or crossing), RSI low
         # Markup: Price > EMA50, RSI > 50, MACD > Signal
         # Distribution: High volatility, High Volume, Price > EMA50 but stalling
         # Markdown: Price < EMA50, RSI < 50, MACD < Signal
-        
+
         # Calculate Volatility (ATR / Close)
         volatility = df["ATRr_14"] / df["close"]
         avg_volatility = volatility.rolling(window=50).mean()
-        
+
         conditions = [
-            (df["close"] > df["EMA_50"]) & (df["RSI_14"] > 50), # Markup
-            (df["close"] < df["EMA_50"]) & (df["RSI_14"] < 50), # Markdown
-            (df["close"] < df["EMA_50"]) & (df["RSI_14"] > 30) & (volatility < avg_volatility), # Accumulation
-            (df["close"] > df["EMA_50"]) & (df["RSI_14"] > 70) & (volatility > avg_volatility)  # Distribution
+            (df["close"] > df["EMA_50"]) & (df["RSI_14"] > 50),  # Markup
+            (df["close"] < df["EMA_50"]) & (df["RSI_14"] < 50),  # Markdown
+            (df["close"] < df["EMA_50"])
+            & (df["RSI_14"] > 30)
+            & (volatility < avg_volatility),  # Accumulation
+            (df["close"] > df["EMA_50"])
+            & (df["RSI_14"] > 70)
+            & (volatility > avg_volatility),  # Distribution
         ]
         choices = ["MARKUP", "MARKDOWN", "ACCUMULATION", "DISTRIBUTION"]
         df["WYCKOFF_PHASE"] = np.select(conditions, choices, default="NEUTRAL")
@@ -262,17 +276,17 @@ class FeaturePipeline:
         # 3. VSOP (Volume Sentiment Order Pressure) Index
         # Composite of Volume Trend (OBV slope), Price Trend (EMA) and basic Momentum
         # Normalized 0-100
-        
+
         # OBV Slope (5 period)
         obv_slope = df["OBV"].diff(5)
         # Normalize OBV slope roughly (using stdev over 20 period)
         obv_norm = (obv_slope - obv_slope.rolling(20).mean()) / (obv_slope.rolling(20).std() + 1e-6)
         # Cap at -2/+2 and map to 0-100
         volume_score = 50 + (np.clip(obv_norm, -2, 2) * 25)
-        
+
         # Trend Score (Price vs EMA20)
         trend_score = np.where(df["close"] > df["EMA_20"], 75, 25)
-        
+
         # Combined VSOP
         df["VSOP"] = (volume_score + trend_score + df["RSI_14"]) / 3
 
@@ -280,7 +294,7 @@ class FeaturePipeline:
 
     async def get_market_analysis(self, symbol: str) -> Dict[str, Any]:
         """Get full analysis snapshot for an agent (with caching)."""
-        
+
         # Check cache
         now = time.time()
         if symbol in self._analysis_cache:
@@ -288,26 +302,70 @@ class FeaturePipeline:
             if now - timestamp < self._cache_ttl:
                 print(f"💾 [PIPELINE] Cache HIT for {symbol}")
                 import sys
+
                 sys.stdout.flush()
                 return cached_data
-                
+
         # Cache miss - Parallel fetch for speed
+        return await self._fetch_and_analyze(symbol)
+
+    async def _fetch_and_analyze(self, symbol: str) -> Dict[str, Any]:
+        """Internal fetch and analyze for a single symbol."""
         candles_task = self.fetch_candles(symbol, interval="1h", limit=100)
         orderbook_task = self.client.get_order_book(symbol, limit=20)
-        
-        print(f"🕯️ [PIPELINE] Gathering data for {symbol}...")
-        results = await asyncio.gather(candles_task, orderbook_task, return_exceptions=True)
-        print(f"📊 [PIPELINE] Gathered data for {symbol}")
-        
-        df, orderbook = results[0], results[1] # orderbook might be an exception? No, return_exceptions=True
-        if isinstance(orderbook, Exception): orderbook = {} 
 
-        # 1. Technical Analysis
+        results = await asyncio.gather(candles_task, orderbook_task, return_exceptions=True)
+
+        df, orderbook = results[0], results[1]
+        if isinstance(orderbook, Exception):
+            orderbook = {}
+
+        return self._process_analysis(symbol, df, orderbook)
+
+    async def prefetch_data(self, symbols: List[str], interval: str = "1h", limit: int = 100):
+        """
+        PREFETCH: Parallel fetch for multiple symbols to populate cache in one go.
+        Extremely effective for the Market Scanner.
+        """
+        if not symbols:
+            return
+
+        logger.info(f"🚀 [PREFETCH] Starting parallel fetch for {len(symbols)} symbols...")
+
+        # Use a semaphore to avoid overwhelming the API
+        sem = asyncio.Semaphore(15)
+
+        async def fetch_one(symbol):
+            async with sem:
+                try:
+                    df = await self.fetch_candles(symbol, interval, limit)
+                    # We only cache the DF for now, full analysis happens on demand or next
+                    if pd is not None and isinstance(df, pd.DataFrame) and not df.empty:
+                        # Pre-calculate indicators while we are at it
+                        df = self.calculate_indicators(df, symbol)
+                        # Store in a temporary DF cache if needed, or just let get_market_analysis use it
+                        # Here we will just perform the full analysis to fully warm the cache
+                        analysis = await self.get_market_analysis(symbol)
+                        return True
+                except Exception as e:
+                    logger.warning(f"Prefetch failed for {symbol}: {e}")
+                return False
+
+        tasks = [fetch_one(s) for s in symbols]
+        results = await asyncio.gather(*tasks)
+        success_count = sum(1 for r in results if r)
+        logger.info(
+            f"✅ [PREFETCH] Completed: {success_count}/{len(symbols)} symbols warmed in cache."
+        )
+
+    def _process_analysis(self, symbol: str, df: Any, orderbook: Dict[str, Any]) -> Dict[str, Any]:
+        """Process raw data into analysis result."""
         ta_data = {}
         if pd is not None and isinstance(df, pd.DataFrame) and not df.empty:
             df = self.calculate_indicators(df, symbol)
             print(f"✅ [PIPELINE] Complete for {symbol}")
             import sys
+
             sys.stdout.flush()
             latest = df.iloc[-1]
             ta_data = {
@@ -336,7 +394,7 @@ class FeaturePipeline:
                 "fib_0_5": float(latest.get("FIB_0.5", 0)),
                 "fib_0_618": float(latest.get("FIB_0.618", 0)),
                 "wyckoff_phase": str(latest.get("WYCKOFF_PHASE", "NEUTRAL")),
-                "vsop": float(latest.get("VSOP", 50))
+                "vsop": float(latest.get("VSOP", 50)),
             }
 
         # 2. Order Book Analysis (Depth & Pressure)
@@ -369,5 +427,5 @@ class FeaturePipeline:
         # Save to cache
         self._analysis_cache[symbol] = (result, time.time())
         logger.debug(f"💾 [PIPELINE] Cached TA result for {symbol}")
-        
+
         return result

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import TradingViewChart from '../components/TradingViewChart';
 import {
     TrendingUp,
     TrendingDown,
@@ -31,6 +32,45 @@ const MarketStat: React.FC<{ label: string; value: string; trend?: 'up' | 'down'
 export const TerminalPro: React.FC = () => {
     const { connected, recent_activity, market_regime, open_positions } = useTradingData();
     const [selectedPair] = useState('ETH-USD');
+    const [chartData, setChartData] = useState<any[]>([]);
+
+    useEffect(() => {
+        // Mock data generator for 150 candles
+        const count = 150;
+        const data = [];
+        let time = Math.floor(Date.now() / 1000) - count * 60;
+        let price = 2400; // ETH price
+        for (let i = 0; i < count; i++) {
+            const open = price;
+            const close = price + (Math.random() - 0.5) * 10;
+            const high = Math.max(open, close) + Math.random() * 5;
+            const low = Math.min(open, close) - Math.random() * 5;
+            const volume = Math.random() * 1000;
+            data.push({ time, open, high, low, close, volume });
+            time += 60;
+            price = close;
+        }
+        setChartData(data);
+
+        const interval = setInterval(() => {
+            setChartData(prev => {
+                if (prev.length === 0) return prev;
+                const last = prev[prev.length - 1];
+                const newTime = last.time + 60;
+                const newPrice = last.close + (Math.random() - 0.5) * 5;
+                const newCandle = {
+                    time: newTime,
+                    open: last.close,
+                    high: Math.max(last.close, newPrice) + Math.random() * 2,
+                    low: Math.min(last.close, newPrice) - Math.random() * 2,
+                    close: newPrice,
+                    volume: Math.random() * 50
+                };
+                return [...prev.slice(1), newCandle];
+            });
+        }, 3000);
+        return () => clearInterval(interval);
+    }, []);
 
     return (
         <div className="flex flex-col gap-6 h-[calc(100vh-100px)]">
@@ -39,10 +79,10 @@ export const TerminalPro: React.FC = () => {
             <div className="flex justify-between items-start gap-6">
                 {/* Market Stats */}
                 <div className="flex-1 p-4 rounded-2xl bg-[#0a0b10] border border-white/10 grid grid-cols-4 gap-4">
-                    <MarketStat label="Regime" value={market_regime?.current_regime || 'WAITING'} trend="up" subValue={market_regime?.volatility_score.toFixed(2)} />
+                    <MarketStat label="Regime" value={market_regime?.current_regime || 'WAITING'} trend="up" subValue={(market_regime?.volatility_score ?? 0).toFixed(2)} />
                     <MarketStat label="24h High" value="$2,480.00" />
                     <MarketStat label="24h Vol" value="12.5M" />
-                    <MarketStat label="Liquidity" value={market_regime?.liquidity_score.toFixed(2) || '0.00'} trend="up" subValue="Score" />
+                    <MarketStat label="Liquidity" value={(market_regime?.liquidity_score ?? 0).toFixed(2)} trend="up" subValue="Score" />
                 </div>
 
                 {/* Social HUD */}
@@ -92,17 +132,15 @@ export const TerminalPro: React.FC = () => {
                 <div className="col-span-12 lg:col-span-6 flex flex-col gap-4 h-full min-h-0">
 
                     {/* Main Chart Area */}
-                    <div className="flex-1 rounded-2xl bg-[#0a0b10] border border-white/10 relative overflow-hidden group">
-                        <div className="absolute inset-0 bg-[url('https://upload.wikimedia.org/wikipedia/commons/e/e4/Candlestick_chart_scheme_03-en.svg')] bg-cover bg-center opacity-10" />
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="text-center">
-                                <Activity size={48} className="text-blue-500/50 mx-auto mb-4" />
-                                <h3 className="text-xl font-bold text-white mb-2">TradingView Chart</h3>
-                                <p className="text-slate-400 text-sm flex items-center justify-center gap-2">
-                                    <Wifi size={14} className={connected ? "text-emerald-500" : "text-rose-500"} />
-                                    {connected ? "Real-time Data Feed Active" : "Connecting to Data Feed..."}
-                                </p>
-                            </div>
+                    <div className="flex-1 rounded-2xl bg-[#0a0b10] border border-white/10 relative overflow-hidden group flex flex-col">
+                        <div className="flex-1 w-full h-full">
+                            <TradingViewChart data={chartData} height={500} symbol={selectedPair} />
+                        </div>
+                        <div className="absolute top-4 right-4 flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 pointer-events-none">
+                            <Wifi size={14} className={connected ? "text-emerald-500" : "text-rose-500"} />
+                            <span className="text-xs text-slate-300">
+                                {connected ? "Real-time" : "Connecting..."}
+                            </span>
                         </div>
                         {/* Timeframe Toggles */}
                         <div className="absolute top-4 left-4 flex gap-1 bg-black/40 backdrop-blur-md p-1 rounded-lg border border-white/5">
@@ -185,7 +223,7 @@ export const TerminalPro: React.FC = () => {
                                         <div className="flex justify-between mb-1">
                                             <span className="font-bold text-white">{pos.symbol}</span>
                                             <span className={`font-mono ${pos.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                                {pos.pnl >= 0 ? '+' : ''}{pos.pnl.toFixed(2)}
+                                                {(pos.pnl ?? 0) >= 0 ? '+' : ''}{(pos.pnl ?? 0).toFixed(2)}
                                             </span>
                                         </div>
                                         <div className="flex justify-between text-xs text-slate-500">

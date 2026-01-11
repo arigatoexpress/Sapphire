@@ -1,4 +1,3 @@
-
 import os
 import sys
 from unittest.mock import MagicMock
@@ -30,14 +29,17 @@ sys.modules["hyperliquid.utils"] = MagicMock()
 sys.modules["hyperliquid.utils.signing"] = MagicMock()
 
 # --- ENV VARS ---
-os.environ["DATABASE_ENABLED"] = "false" # Use in-memory or mocks where possible
+os.environ["DATABASE_ENABLED"] = "false"  # Use in-memory or mocks where possible
 os.environ["TELEGRAM_BOT_TOKEN"] = "mock_token"
 os.environ["TELEGRAM_CHAT_ID"] = "mock_chat_id"
 os.environ["ASTER_API_KEY"] = "mock_key"
 os.environ["ASTER_SECRET_KEY"] = "mock_secret"
-os.environ["FIREBASE_CREDENTIALS_JSON"] = "{}" # Minimal invalid JSON to prevent crash if not used immediately
+os.environ["FIREBASE_CREDENTIALS_JSON"] = (
+    "{}"  # Minimal invalid JSON to prevent crash if not used immediately
+)
 
 import uvicorn
+
 from cloud_trader.api import app
 
 if __name__ == "__main__":

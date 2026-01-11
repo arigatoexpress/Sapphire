@@ -1,693 +1,516 @@
-"""Platform Router - Modular Multi-Chain Execution
+"""
+Platform Router - Universal Execution Layer for Sapphire.
+Handles intelligent routing between Aster, Drift, Hyperliquid, and Symphony.
 
-Routes trades to the correct platform using the Adapter Pattern.
-Enables adding new platforms without modifying core trading logic.
-
-Design Principles:
-1. Platform Abstraction: Each platform has a standardized adapter
-2. Dependency Injection: Clients injected, not hardcoded
-3. Composability: New platforms = new adapter class
-4. Testability: Mock adapters for testing
+Optimizes for:
+1. Low latency (Fastest execution path)
+2. Fees (Cheapest platform for the asset)
+3. Liquidity (Deepest order books)
+4. Resilience (Failover to secondary platforms)
 """
 
 import asyncio
 import logging
 import time
-from abc import ABC, abstractmethod
-from collections import deque
-from dataclasses import dataclass, field
-from datetime import datetime
+from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from .resilience import with_retry, with_timeout
+from .ai_error_recovery import recover_from_error
+from .definitions import DRIFT_SYMBOLS, HYPERLIQUID_SYMBOLS, SYMPHONY_SYMBOLS
+from .logger import get_logger
 
-logger = logging.getLogger(__name__)
-
-
-@dataclass
-class ExecutionMetrics:
-    """Metrics for platform router execution."""
-
-    total_executions: int = 0
-    successful_executions: int = 0
-    failed_executions: int = 0
-    total_latency_ms: float = 0.0
-    last_execution_time: Optional[float] = None
-
-    @property
-    def success_rate(self) -> float:
-        """Calculate success rate (0-1)."""
-        if self.total_executions == 0:
-            return 0.0
-        return self.successful_executions / self.total_executions
-
-    @property
-    def avg_latency_ms(self) -> float:
-        """Calculate average execution latency in milliseconds."""
-        if self.total_executions == 0:
-            return 0.0
-        return self.total_latency_ms / self.total_executions
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for API responses."""
-        return {
-            "total_executions": self.total_executions,
-            "successful_executions": self.successful_executions,
-            "failed_executions": self.failed_executions,
-            "success_rate": self.success_rate,
-            "avg_latency_ms": self.avg_latency_ms,
-            "last_execution_time": self.last_execution_time,
-        }
+logger = get_logger(__name__)
 
 
-@dataclass
-class ExecutionHistoryItem:
-    """Single execution history entry."""
+class PlatformType(Enum):
+    ASTER = "aster"
+    DRIFT = "drift"
+    HYPERLIQUID = "hyperliquid"
+    SYMPHONY = "symphony"
 
-    timestamp: float
-    platform: str
-    symbol: str
-    side: str
-    quantity: float
-    success: bool
-    latency_ms: float
-    error_message: Optional[str] = None
-    order_id: Optional[str] = None
+
+class ExecutionResult:
+    """Standardized result for any platform execution."""
+
+    def __init__(
+        self,
+        success: bool,
+        platform: PlatformType,
+        symbol: str,
+        side: str,
+        quantity: float,
+        price: float = 0.0,
+        tx_sig: Optional[str] = None,
+        error: Optional[str] = None,
+        latency_ms: int = 0,
+        raw_response: Optional[Dict] = None,
+    ):
+        self.success = success
+        self.platform = platform
+        self.symbol = symbol
+        self.side = side
+        self.quantity = quantity
+        self.price = price
+        self.tx_sig = tx_sig
+        self.error = error
+        self.latency_ms = latency_ms
+        self.raw_response = raw_response
+        self.timestamp = time.time()
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for API responses."""
         return {
-            "timestamp": self.timestamp,
-            "platform": self.platform,
+            "success": self.success,
+            "platform": self.platform.value,
             "symbol": self.symbol,
             "side": self.side,
             "quantity": self.quantity,
-            "success": self.success,
+            "price": self.price,
+            "tx_sig": self.tx_sig,
+            "error": self.error,
             "latency_ms": self.latency_ms,
-            "error_message": self.error_message,
-            "order_id": self.order_id,
+            "timestamp": self.timestamp,
         }
-
-
-@dataclass
-class PlatformHealth:
-    """Health status for a platform adapter."""
-
-    platform: str
-    is_healthy: bool
-    last_check: float
-    error_message: Optional[str] = None
-    consecutive_failures: int = 0
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for API responses."""
-        return {
-            "platform": self.platform,
-            "is_healthy": self.is_healthy,
-            "last_check": self.last_check,
-            "error_message": self.error_message,
-            "consecutive_failures": self.consecutive_failures,
-            "status": "healthy" if self.is_healthy else "unhealthy",
-        }
-
-
-@dataclass
-class CircuitBreaker:
-    """Circuit breaker for platform resilience.
-
-    States:
-    - CLOSED: Normal operation, requests pass through
-    - OPEN: Platform unhealthy, requests rejected immediately
-    - HALF_OPEN: Testing if platform recovered
-    """
-
-    failure_threshold: int = 3  # Failures before opening
-    recovery_timeout: float = 30.0  # Seconds before trying half-open
-    half_open_max_calls: int = 1  # Calls to test in half-open state
-
-    # State tracking
-    state: str = "CLOSED"  # CLOSED, OPEN, HALF_OPEN
-    last_failure_time: Optional[float] = None
-    half_open_calls: int = 0
-
-    def should_allow_request(self) -> bool:
-        """Check if request should be allowed through."""
-        if self.state == "CLOSED":
-            return True
-
-        if self.state == "OPEN":
-            # Check if recovery timeout has passed
-            if (
-                self.last_failure_time
-                and (time.time() - self.last_failure_time) >= self.recovery_timeout
-            ):
-                self.state = "HALF_OPEN"
-                self.half_open_calls = 0
-                return True
-            return False
-
-        if self.state == "HALF_OPEN":
-            # Allow limited calls to test recovery
-            return self.half_open_calls < self.half_open_max_calls
-
-        return False
-
-    def record_success(self) -> None:
-        """Record successful execution."""
-        if self.state == "HALF_OPEN":
-            self.half_open_calls += 1
-            # Recovered - close the circuit
-            self.state = "CLOSED"
-            self.last_failure_time = None
-
-    def record_failure(self, consecutive_failures: int) -> None:
-        """Record failed execution."""
-        self.last_failure_time = time.time()
-
-        if self.state == "HALF_OPEN":
-            # Failed during recovery test - reopen
-            self.state = "OPEN"
-        elif consecutive_failures >= self.failure_threshold:
-            # Hit threshold - open the circuit
-            self.state = "OPEN"
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for API responses."""
-        return {
-            "state": self.state,
-            "failure_threshold": self.failure_threshold,
-            "recovery_timeout": self.recovery_timeout,
-            "last_failure_time": self.last_failure_time,
-            "is_open": self.state == "OPEN",
-        }
-
-
-@dataclass
-class TradeResult:
-    """Standardized trade result across all platforms."""
-
-    success: bool
-    order_id: Optional[str]
-    filled_quantity: float
-    avg_price: float
-    platform: str
-    metadata: Dict[str, Any]
-
-
-class PlatformAdapter(ABC):
-    """Abstract base class for platform-specific execution."""
-
-    @abstractmethod
-    async def execute_trade(self, symbol: str, side: str, quantity: float, **kwargs) -> TradeResult:
-        """Execute a trade on this platform."""
-        pass
-
-    @abstractmethod
-    async def get_balance(self) -> Dict[str, float]:
-        """Get account balances."""
-        pass
-
-
-class SymphonyAdapter(PlatformAdapter):
-    """Adapter for Symphony (Monad/Base) execution."""
-
-    def __init__(self, symphony_client, agents_config):
-        self.client = symphony_client
-        self.agents = agents_config
-
-    @with_retry(
-        max_attempts=3,
-        base_delay=0.5,
-        max_delay=10.0,
-        retryable_exceptions=(ConnectionError, TimeoutError, Exception),
-    )
-    @with_timeout(30.0)
-    async def execute_trade(self, symbol: str, side: str, quantity: float, **kwargs) -> TradeResult:
-        """
-        Route to appropriate Symphony agent (MILF for swaps, Degen for perps).
-        Includes automatic retry with exponential backoff on failures.
-        """
-        try:
-            # Determine if swap or perp
-            is_swap = symbol in ["MON-USDC", "CHOG-USDC", "DAC-USDC"]
-
-            # Clean symbol
-            token = symbol.split("-")[0]
-
-            if is_swap:
-                # Use MILF for swaps
-                agent_id = self.agents["MILF"]["id"]
-                token_in = "USDC" if side == "BUY" else token
-                token_out = token if side == "BUY" else "USDC"
-
-                result = await self.client.execute_swap(
-                    token_in=token_in,
-                    token_out=token_out,
-                    weight=5.0,  # 5% of balance
-                    agent_id=agent_id,
-                )
-            else:
-                # Use Degen for perps
-                agent_id = self.agents["DEGEN"]["id"]
-                action = "LONG" if side == "BUY" else "SHORT"
-
-                result = await self.client.open_perpetual_position(
-                    symbol=token, action=action, weight=5.0, leverage=2.0, agent_id=agent_id
-                )
-
-            # Standardize response
-            if result and result.get("successful", 0) > 0:
-                return TradeResult(
-                    success=True,
-                    order_id=result.get("batchId"),
-                    filled_quantity=quantity,
-                    avg_price=0.0,  # Symphony doesn't return fill price
-                    platform="symphony",
-                    metadata=result,
-                )
-            else:
-                return TradeResult(
-                    success=False,
-                    order_id=None,
-                    filled_quantity=0.0,
-                    avg_price=0.0,
-                    platform="symphony",
-                    metadata=result or {},
-                )
-
-        except Exception as e:
-            logger.error(f"Symphony execution error: {e}")
-            return TradeResult(
-                success=False,
-                order_id=None,
-                filled_quantity=0.0,
-                avg_price=0.0,
-                platform="symphony",
-                metadata={"error": str(e)},
-            )
-
-    async def get_balance(self) -> Dict[str, float]:
-        """Get Symphony balances."""
-        # TODO: Implement when Symphony API supports it
-        return {"USDC": 0.0}
-
-
-class AsterAdapter(PlatformAdapter):
-    """Adapter for Aster DEX execution."""
-
-    def __init__(self, aster_client):
-        self.client = aster_client
-
-    @with_retry(
-        max_attempts=3,
-        base_delay=0.5,
-        max_delay=10.0,
-        retryable_exceptions=(ConnectionError, TimeoutError, Exception),
-    )
-    @with_timeout(30.0)
-    async def execute_trade(self, symbol: str, side: str, quantity: float, **kwargs) -> TradeResult:
-        """Execute market order on Aster with automatic retry and precision rounding."""
-        try:
-            from .enums import OrderType
-
-            # Fetch symbol filters for precision rounding
-            filters = await self.client.get_symbol_filters(symbol)
-            precision = filters.get("quantity_precision", 0)
-            
-            # Application of world-class precision rounding
-            rounded_quantity = round(quantity, precision)
-            
-            # Floor adjustment if rounding went up (avoiding over-balance issues)
-            if rounded_quantity > quantity:
-                rounded_quantity = quantity - (10**-precision) if precision > 0 else int(quantity)
-                rounded_quantity = round(rounded_quantity, precision)
-
-            logger.info(f"⚡ [ASTER] Executing {side} {rounded_quantity} (original: {quantity}, precision: {precision})")
-
-            order = await self.client.place_order(
-                symbol=symbol, side=side, order_type=OrderType.MARKET, quantity=rounded_quantity
-            )
-
-            return TradeResult(
-                success=True,
-                order_id=order.get("orderId"),
-                filled_quantity=float(order.get("executedQty", 0)),
-                avg_price=float(order.get("avgPrice", 0)),
-                platform="aster",
-                metadata=order,
-            )
-
-        except Exception as e:
-            logger.error(f"Aster execution error: {e}")
-            return TradeResult(
-                success=False,
-                order_id=None,
-                filled_quantity=0.0,
-                avg_price=0.0,
-                platform="aster",
-                metadata={"error": str(e)},
-            )
-
-    async def get_balance(self) -> Dict[str, float]:
-        """Get Aster balances."""
-        try:
-            info = await self.client.get_account_info_v2()
-            balances = {}
-            for asset in info:
-                balances[asset["asset"]] = float(asset["balance"])
-            return balances
-        except:
-            return {}
 
 
 class PlatformRouter:
     """
-    Routes trades to appropriate platform adapter with comprehensive observability.
-
-    Design: Strategy Pattern + Dependency Injection + World-Class Observability
-    - Adapters are injected at init
-    - Router selects adapter based on symbol/platform hint
-    - Easy to add new platforms by creating new adapter
-    - Tracks execution metrics, health status, and history for monitoring
+    Orchestrates trade execution across multiple liquidity venues.
+    Part of the Sapphire "Quant Lab" architecture.
     """
 
-    def __init__(self, adapters: Dict[str, PlatformAdapter], history_size: int = 100):
-        self.adapters = adapters
-
-        # Observability infrastructure
-        self._metrics: Dict[str, ExecutionMetrics] = {
-            platform: ExecutionMetrics() for platform in adapters.keys()
-        }
-        self._health: Dict[str, PlatformHealth] = {
-            platform: PlatformHealth(platform=platform, is_healthy=True, last_check=time.time())
-            for platform in adapters.keys()
-        }
-        self._execution_history: deque = deque(maxlen=history_size)
-
-        # Circuit breakers for resilience
-        self._circuit_breakers: Dict[str, CircuitBreaker] = {
-            platform: CircuitBreaker() for platform in adapters.keys()
+    def __init__(self, service):
+        self.service = service
+        self.history: List[ExecutionResult] = []
+        self.stats = {
+            p.value: {"trades": 0, "wins": 0, "errors": 0, "avg_latency": 0.0} for p in PlatformType
         }
 
-        logger.info(
-            f"✅ PlatformRouter initialized with {len(adapters)} adapters: {list(adapters.keys())}"
-        )
+        # Initialize circuit breakers for each platform
+        from .circuit_breaker import CircuitBreakerConfig, get_circuit_breaker
 
-    async def execute(self, symbol: str, side: str, quantity: float, platform: str) -> TradeResult:
-        return await self._execute_routed_trade(symbol, side, quantity, platform)
+        self.circuit_breakers = {
+            PlatformType.ASTER: get_circuit_breaker(
+                "aster",
+                CircuitBreakerConfig(
+                    name="aster", failure_threshold=5, recovery_timeout=60.0, timeout=10.0
+                ),
+            ),
+            PlatformType.DRIFT: get_circuit_breaker(
+                "drift",
+                CircuitBreakerConfig(
+                    name="drift", failure_threshold=5, recovery_timeout=60.0, timeout=15.0
+                ),
+            ),
+            PlatformType.SYMPHONY: get_circuit_breaker(
+                "symphony",
+                CircuitBreakerConfig(
+                    name="symphony", failure_threshold=5, recovery_timeout=60.0, timeout=10.0
+                ),
+            ),
+            PlatformType.HYPERLIQUID: get_circuit_breaker(
+                "hyperliquid",
+                CircuitBreakerConfig(
+                    name="hyperliquid", failure_threshold=5, recovery_timeout=60.0, timeout=10.0
+                ),
+            ),
+        }
 
-    async def _execute_routed_trade(
-        self, symbol: str, side: str, quantity: float, platform: str
-    ) -> TradeResult:
+        logger.info("✅ PlatformRouter initialized with circuit breakers for resilient execution.")
+
+    def _determine_platform(self, agent: Any, symbol: str) -> PlatformType:
         """
-        Execute trade on specified platform with comprehensive observability.
+        Intelligently select the best platform for the given trade.
 
-        Args:
-            symbol: Trading pair (e.g., "BTC-USDC")
-            side: "BUY" or "SELL"
-            quantity: Amount to trade
-            platform: "symphony" or "aster"
-
-        Returns:
-            TradeResult with execution details
+        Priority:
+        1. Agent preference (system field)
+        2. Asset exclusivity (DRIFT_SYMBOLS, HYPERLIQUID_SYMBOLS, SYMPHONY_SYMBOLS)
+        3. Default to Aster (Main liquidity pool)
         """
-        start_time = time.time()
+        # Strategy 1: Agent Explicit System Preference
+        if hasattr(agent, "system") and agent.system:
+            if agent.system.lower() == "drift" and symbol in DRIFT_SYMBOLS:
+                return PlatformType.DRIFT
+            if agent.system.lower() == "hyperliquid" and symbol in HYPERLIQUID_SYMBOLS:
+                return PlatformType.HYPERLIQUID
+            if agent.system.lower() == "symphony" and symbol in SYMPHONY_SYMBOLS:
+                return PlatformType.SYMPHONY
 
-        # Check circuit breaker first
-        circuit_breaker = self._circuit_breakers.get(platform)
-        if circuit_breaker and not circuit_breaker.should_allow_request():
-            error_msg = f"Circuit breaker OPEN for platform: {platform}. Rejecting request."
-            logger.warning(f"⚡ {error_msg}")
+        # Strategy 2: Asset-Platform Mapping
+        if symbol in DRIFT_SYMBOLS:
+            return PlatformType.DRIFT
+        if symbol in HYPERLIQUID_SYMBOLS:
+            return PlatformType.HYPERLIQUID
+        if symbol in SYMPHONY_SYMBOLS:
+            return PlatformType.SYMPHONY
 
-            self._record_execution(
-                platform=platform,
-                symbol=symbol,
-                side=side,
-                quantity=quantity,
-                success=False,
-                latency_ms=0.0,
-                error_message=error_msg,
-            )
+        # Strategy 3: Default to Aster
+        return PlatformType.ASTER
 
-            return TradeResult(
-                success=False,
-                order_id=None,
-                filled_quantity=0.0,
-                avg_price=0.0,
-                platform=platform,
-                metadata={"error": error_msg, "circuit_breaker": "OPEN"},
-            )
+    def _get_fallback_platform(
+        self, failed_platform: PlatformType, symbol: str
+    ) -> Optional[PlatformType]:
+        """
+        Determine the best fallback platform when the primary platform fails.
 
-        adapter = self.adapters.get(platform)
+        Fallback hierarchy:
+        1. Aster (always available, highest liquidity)
+        2. Drift (Solana perps)
+        3. Symphony (if symbol supported)
+        """
+        # If Aster failed, try Drift
+        if failed_platform == PlatformType.ASTER:
+            if symbol in DRIFT_SYMBOLS:
+                return PlatformType.DRIFT
+            if symbol in SYMPHONY_SYMBOLS:
+                return PlatformType.SYMPHONY
+            return None
 
-        if not adapter:
-            error_msg = f"No adapter found for platform: {platform}"
-            logger.error(f"❌ {error_msg}")
+        # If Drift/Symphony/HL failed, fallback to Aster
+        return PlatformType.ASTER
 
-            # Record failed execution
-            self._record_execution(
-                platform=platform,
-                symbol=symbol,
-                side=side,
-                quantity=quantity,
-                success=False,
-                latency_ms=0.0,
-                error_message=error_msg,
-            )
-
-            return TradeResult(
-                success=False,
-                order_id=None,
-                filled_quantity=0.0,
-                avg_price=0.0,
-                platform=platform,
-                metadata={"error": error_msg},
-            )
-
-        logger.info(f"🚀 Routing {side} {quantity} {symbol} to {platform}")
-
-        try:
-            result = await adapter.execute_trade(symbol, side, quantity)
-
-            # Calculate latency
-            latency_ms = (time.time() - start_time) * 1000
-
-            # Record execution metrics
-            self._record_execution(
-                platform=platform,
-                symbol=symbol,
-                side=side,
-                quantity=quantity,
-                success=result.success,
-                latency_ms=latency_ms,
-                error_message=result.metadata.get("error") if not result.success else None,
-                order_id=result.order_id,
-            )
-
-            # Update health status
-            self._update_health(
-                platform, result.success, None if result.success else result.metadata.get("error")
-            )
-
-            if result.success:
-                logger.info(
-                    f"✅ Trade executed on {platform}: {result.order_id} (latency: {latency_ms:.2f}ms)"
-                )
-            else:
-                logger.error(
-                    f"❌ Trade failed on {platform}: {result.metadata} (latency: {latency_ms:.2f}ms)"
-                )
-
-            return result
-
-        except Exception as e:
-            latency_ms = (time.time() - start_time) * 1000
-            error_msg = str(e)
-
-            logger.exception(f"💥 Exception during trade execution on {platform}: {e}")
-
-            # Record failed execution
-            self._record_execution(
-                platform=platform,
-                symbol=symbol,
-                side=side,
-                quantity=quantity,
-                success=False,
-                latency_ms=latency_ms,
-                error_message=error_msg,
-            )
-
-            # Update health status
-            self._update_health(platform, False, error_msg)
-
-            return TradeResult(
-                success=False,
-                order_id=None,
-                filled_quantity=0.0,
-                avg_price=0.0,
-                platform=platform,
-                metadata={"error": error_msg, "exception_type": type(e).__name__},
-            )
-
-    def _record_execution(
+    async def execute_trade(
         self,
-        platform: str,
+        agent: Any,
         symbol: str,
         side: str,
         quantity: float,
-        success: bool,
-        latency_ms: float,
-        error_message: Optional[str] = None,
-        order_id: Optional[str] = None,
-    ) -> None:
-        """Record execution metrics and history."""
-        # Update metrics
-        if platform in self._metrics:
-            metrics = self._metrics[platform]
-            metrics.total_executions += 1
-            if success:
-                metrics.successful_executions += 1
-            else:
-                metrics.failed_executions += 1
-            metrics.total_latency_ms += latency_ms
-            metrics.last_execution_time = time.time()
+        thesis: str,
+        is_closing: bool = False,
+        attempt: int = 1,
+    ) -> ExecutionResult:
+        """
+        Main execution entry point. Handles routing, execution, and error recovery.
+        """
+        start_time = time.time()
+        platform = self._determine_platform(agent, symbol)
 
-        # Add to history
-        history_item = ExecutionHistoryItem(
-            timestamp=time.time(),
-            platform=platform,
-            symbol=symbol,
-            side=side,
-            quantity=quantity,
-            success=success,
-            latency_ms=latency_ms,
-            error_message=error_message,
-            order_id=order_id,
+        logger.info(
+            f"🚀 [ROUTER] {side} {symbol} ({quantity}) -> {platform.value} | Attempt {attempt}"
         )
-        self._execution_history.append(history_item)
 
-    def _update_health(self, platform: str, success: bool, error_message: Optional[str]) -> None:
-        """Update platform health status and circuit breaker."""
-        if platform not in self._health:
-            return
+        # --- GAME THEORY: EXECUTION OBFUSCATION ---
+        # 1. Jitter: Add random delay to avoid HFT detection
+        import random
 
-        health = self._health[platform]
-        health.last_check = time.time()
+        jitter = random.uniform(0.1, 1.5)
+        logger.debug(f"🎲 [ROUTER] Applying {jitter:.2f}s jitter for {agent.name}")
+        await asyncio.sleep(jitter)
 
-        # Update circuit breaker
-        circuit_breaker = self._circuit_breakers.get(platform)
+        # 2. Fuzzing: Slightly adjust quantity to avoid round-number patterns
+        quantity_fuzz = random.uniform(0.98, 1.02)  # +/- 2%
+        final_quantity = quantity * quantity_fuzz
 
-        if success:
-            health.is_healthy = True
-            health.consecutive_failures = 0
-            health.error_message = None
-            if circuit_breaker:
-                circuit_breaker.record_success()
-        else:
-            health.consecutive_failures += 1
-            health.error_message = error_message
-            if circuit_breaker:
-                circuit_breaker.record_failure(health.consecutive_failures)
+        # Standardize formatting via PositionManager
+        formatted_quantity = await self.service.position_manager._round_quantity(
+            symbol, final_quantity
+        )
 
-            # Mark unhealthy after 3 consecutive failures
-            if health.consecutive_failures >= 3:
-                health.is_healthy = False
-                logger.warning(
-                    f"⚠️ Platform {platform} marked UNHEALTHY after {health.consecutive_failures} failures"
+        try:
+            # Circuit breaker protection for platform execution
+            breaker = self.circuit_breakers.get(platform)
+
+            # Attempt execution with circuit breaker
+            try:
+                if platform == PlatformType.DRIFT:
+                    result = await breaker.call(
+                        self._execute_drift, symbol, side, formatted_quantity
+                    )
+                elif platform == PlatformType.HYPERLIQUID:
+                    result = await breaker.call(
+                        self._execute_hyperliquid, symbol, side, formatted_quantity
+                    )
+                elif platform == PlatformType.SYMPHONY:
+                    result = await breaker.call(
+                        self._execute_symphony, agent, symbol, side, formatted_quantity, is_closing
+                    )
+                else:
+                    result = await breaker.call(
+                        self._execute_aster, symbol, side, formatted_quantity
+                    )
+
+            except Exception as breaker_exc:
+                # Circuit breaker is OPEN or call failed - attempt failover
+                logger.warning(f"⚠️ [ROUTER] {platform.value} unavailable: {breaker_exc}")
+
+                # Attempt failover to alternative platform
+                fallback_platform = self._get_fallback_platform(platform, symbol)
+                if fallback_platform and fallback_platform != platform:
+                    logger.info(f"🔄 [ROUTER] Failing over to {fallback_platform.value}")
+                    fallback_breaker = self.circuit_breakers.get(fallback_platform)
+
+                    if fallback_platform == PlatformType.DRIFT:
+                        result = await fallback_breaker.call(
+                            self._execute_drift, symbol, side, formatted_quantity
+                        )
+                    elif fallback_platform == PlatformType.SYMPHONY:
+                        result = await fallback_breaker.call(
+                            self._execute_symphony,
+                            agent,
+                            symbol,
+                            side,
+                            formatted_quantity,
+                            is_closing,
+                        )
+                    else:
+                        result = await fallback_breaker.call(
+                            self._execute_aster, symbol, side, formatted_quantity
+                        )
+                else:
+                    # No fallback available
+                    raise breaker_exc
+
+            latency_ms = int((time.time() - start_time) * 1000)
+            result.latency_ms = latency_ms
+
+            # Log to internal history
+            self._record_result(result)
+
+            if result.success:
+                logger.info(f"✅ [ROUTER] SUCCESS on {platform.value}: {symbol} {side}")
+                return result
+            else:
+                # Execution failed at platform level - trigger AI Error Recovery
+                return await self._handle_failure(
+                    result, agent, symbol, side, quantity, thesis, is_closing, attempt
                 )
 
-        # Broadcast status update to WebSocket subscribers
-        self._broadcast_status_update(platform)
+        except Exception as e:
+            latency_ms = int((time.time() - start_time) * 1000)
+            error_result = ExecutionResult(
+                success=False,
+                platform=platform,
+                symbol=symbol,
+                side=side,
+                quantity=quantity,
+                error=str(e),
+                latency_ms=latency_ms,
+            )
+            return await self._handle_failure(
+                error_result, agent, symbol, side, quantity, thesis, is_closing, attempt
+            )
 
-    def _broadcast_status_update(self, platform: str) -> None:
-        """Broadcast platform status to WebSocket subscribers."""
+    async def _execute_drift(self, symbol: str, side: str, quantity: float) -> ExecutionResult:
+        """Execute on Drift Protocol (Solana)."""
+        if not self.service.drift or not self.service.drift.is_initialized:
+            return ExecutionResult(
+                False, PlatformType.DRIFT, symbol, side, quantity, error="Drift not initialized"
+            )
+
         try:
-            from .websocket_manager import broadcast_platform_router_status
+            res = await self.service.drift.place_perp_order(
+                symbol=symbol, side=side, amount=quantity, order_type="market"
+            )
+            success = bool(res and res.get("tx_sig"))
+            return ExecutionResult(
+                success=success,
+                platform=PlatformType.DRIFT,
+                symbol=symbol,
+                side=side,
+                quantity=quantity,
+                tx_sig=res.get("tx_sig") if success else None,
+                error=None if success else str(res),
+                raw_response=res,
+            )
+        except Exception as e:
+            return ExecutionResult(False, PlatformType.DRIFT, symbol, side, quantity, error=str(e))
 
-            status_data = {
-                "platform": platform,
-                "health": self._health[platform].to_dict() if platform in self._health else None,
-                "metrics": self._metrics[platform].to_dict() if platform in self._metrics else None,
-                "circuit_breaker": (
-                    self._circuit_breakers[platform].to_dict()
-                    if platform in self._circuit_breakers
+    async def _execute_hyperliquid(
+        self, symbol: str, side: str, quantity: float
+    ) -> ExecutionResult:
+        """Execute on Hyperliquid L1."""
+        if not self.service.hl_client or not self.service.hl_client.is_initialized:
+            return ExecutionResult(
+                False,
+                PlatformType.HYPERLIQUID,
+                symbol,
+                side,
+                quantity,
+                error="Hyperliquid not initialized",
+            )
+
+        try:
+            # Parse coin
+            coin = symbol.split("-")[0] if "-" in symbol else symbol
+            is_buy = side.upper() == "BUY"
+
+            res = await self.service.hl_client.place_order(
+                coin=coin, is_buy=is_buy, sz=quantity, order_type={"market": {}}
+            )
+            success = bool(res and res.get("status") == "ok")
+            return ExecutionResult(
+                success=success,
+                platform=PlatformType.HYPERLIQUID,
+                symbol=symbol,
+                side=side,
+                quantity=quantity,
+                tx_sig=(
+                    str(
+                        res.get("response", {})
+                        .get("data", {})
+                        .get("statuses", [{}])[0]
+                        .get("resting", "n/a")
+                    )
+                    if success
                     else None
                 ),
-            }
-
-            # Schedule async broadcast (non-blocking)
-            asyncio.create_task(broadcast_platform_router_status(status_data))
+                error=None if success else str(res),
+                raw_response=res,
+            )
         except Exception as e:
-            logger.debug(f"WebSocket broadcast skipped: {e}")
+            return ExecutionResult(
+                False, PlatformType.HYPERLIQUID, symbol, side, quantity, error=str(e)
+            )
 
-    async def get_all_balances(self) -> Dict[str, Dict[str, float]]:
-        """Get balances from all platforms."""
-        balances = {}
-        for platform_name, adapter in self.adapters.items():
-            try:
-                balances[platform_name] = await adapter.get_balance()
-            except Exception as e:
-                logger.error(f"Failed to get balance from {platform_name}: {e}")
-                balances[platform_name] = {}
-        return balances
+    async def _execute_symphony(
+        self, agent: Any, symbol: str, side: str, quantity: float, is_closing: bool
+    ) -> ExecutionResult:
+        """Execute on Symphony (Monad/Base)."""
+        if not self.service.symphony or not self.service.symphony.client:
+            return ExecutionResult(
+                False,
+                PlatformType.SYMPHONY,
+                symbol,
+                side,
+                quantity,
+                error="Symphony not initialized",
+            )
 
-    def add_platform(self, name: str, adapter: PlatformAdapter):
-        """Add a new platform adapter dynamically."""
-        self.adapters[name] = adapter
-        self._metrics[name] = ExecutionMetrics()
-        self._health[name] = PlatformHealth(platform=name, is_healthy=True, last_check=time.time())
-        logger.info(f"✅ Added platform: {name}")
+        try:
+            # Symphony uses weight/action for perps
+            action = "LONG" if side.upper() == "BUY" else "SHORT"
+            if is_closing:
+                # Should ideally close by batchId, but for router we might need a more generic 'close'
+                # If we don't have batchId, we might have to open opposite or fetch positions
+                positions = await self.service.symphony.get_perpetual_positions()
+                target = next((p for p in positions if p.get("symbol") == symbol), None)
+                if target and target.get("batchId"):
+                    res = await self.service.symphony.close_perpetual_position(target["batchId"])
+                else:
+                    return ExecutionResult(
+                        False,
+                        PlatformType.SYMPHONY,
+                        symbol,
+                        side,
+                        quantity,
+                        error="No open position found to close",
+                    )
+            else:
+                # Open with 10% weight as default if not specified
+                res = await self.service.symphony.open_perpetual_position(
+                    symbol=symbol.split("-")[0],
+                    action=action,
+                    weight=10.0,
+                    leverage=1.1,
+                    agent_id=agent.id,
+                )
 
-    # === Observability API Methods ===
+            success = bool(res and (res.get("successful", 0) > 0 or res.get("status") == "ok"))
+            return ExecutionResult(
+                success=success,
+                platform=PlatformType.SYMPHONY,
+                symbol=symbol,
+                side=side,
+                quantity=quantity,
+                tx_sig=res.get("batchId") if success else None,
+                error=None if success else str(res),
+                raw_response=res,
+            )
+        except Exception as e:
+            return ExecutionResult(
+                False, PlatformType.SYMPHONY, symbol, side, quantity, error=str(e)
+            )
 
-    def get_metrics(self, platform: Optional[str] = None) -> Dict[str, Any]:
-        """Get execution metrics for all platforms or a specific platform."""
-        if platform:
-            if platform not in self._metrics:
-                return {}
-            return {platform: self._metrics[platform].to_dict()}
+    async def _execute_aster(self, symbol: str, side: str, quantity: float) -> ExecutionResult:
+        """Execute on Aster (Main Liquidity)."""
+        try:
+            aster_symbol = self.service._normalize_for_aster(symbol)
+            res = await self.service._exchange_client.create_order(
+                symbol=aster_symbol, side=side, type="MARKET", quantity=quantity
+            )
+            success = bool(res and res.get("orderId"))
+            return ExecutionResult(
+                success=success,
+                platform=PlatformType.ASTER,
+                symbol=symbol,
+                side=side,
+                quantity=quantity,
+                price=float(res.get("price", 0.0)),
+                tx_sig=str(res.get("orderId")) if success else None,
+                error=None if success else "Order placement failed",
+                raw_response=res,
+            )
+        except Exception as e:
+            return ExecutionResult(False, PlatformType.ASTER, symbol, side, quantity, error=str(e))
 
-        return {name: metrics.to_dict() for name, metrics in self._metrics.items()}
+    async def _handle_failure(
+        self,
+        result: ExecutionResult,
+        agent: Any,
+        symbol: str,
+        side: str,
+        quantity: float,
+        thesis: str,
+        is_closing: bool,
+        attempt: int,
+    ) -> ExecutionResult:
+        """Consult AI Error Recovery and potentially retry."""
+        if attempt >= 3:
+            logger.error(f"❌ Max retries reached for {symbol} {side} on {result.platform.value}")
+            return result
 
-    def get_health_status(self, platform: Optional[str] = None) -> Dict[str, Any]:
-        """Get health status for all platforms or a specific platform."""
-        if platform:
-            if platform not in self._health:
-                return {}
-            return self._health[platform].to_dict()
-
-        return {
-            "platforms": {name: health.to_dict() for name, health in self._health.items()},
-            "overall_healthy": all(h.is_healthy for h in self._health.values()),
-            "total_platforms": len(self._health),
-            "healthy_platforms": sum(1 for h in self._health.values() if h.is_healthy),
+        # 1. Consult Recovery Agent
+        context = {
+            "platform": result.platform.value,
+            "symbol": symbol,
+            "side": side,
+            "quantity": quantity,
+            "attempt": attempt,
+            "agent_id": agent.id,
         }
 
-    def get_execution_history(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
-        """Get recent execution history."""
-        history = list(self._execution_history)
-        if limit:
-            history = history[-limit:]
-        return [item.to_dict() for item in history]
+        recovery = await recover_from_error(result.error or "Unknown platform error", context)
+
+        if recovery.recoverable and recovery.action == "retry":
+            logger.info(f"🔄 AI RECOVERY: {recovery.reason}. Retrying...")
+
+            # Apply corrections if any
+            new_quantity = recovery.corrections.get("quantity", quantity)
+            new_symbol = recovery.corrections.get("symbol", symbol)
+
+            # Wait if suggested
+            delay_ms = recovery.corrections.get("delay_ms", 500)
+            await asyncio.sleep(delay_ms / 1000.0)
+
+            return await self.execute_trade(
+                agent, new_symbol, side, new_quantity, thesis, is_closing, attempt + 1
+            )
+
+        logger.warning(f"⚠️ RECOVERY FAILED: {recovery.reason}. Aborting.")
+        return result
+
+    def _record_result(self, result: ExecutionResult):
+        """Update statistics and history."""
+        self.history.append(result)
+        if len(self.history) > 100:
+            self.history.pop(0)
+
+        p_stats = self.stats[result.platform.value]
+        p_stats["trades"] += 1
+        if result.success:
+            p_stats["wins"] += 1
+        else:
+            p_stats["errors"] += 1
+
+        # Cumulative average latency
+        if result.latency_ms > 0:
+            prev_avg = p_stats["avg_latency"]
+            count = p_stats["trades"]
+            p_stats["avg_latency"] = (prev_avg * (count - 1) + result.latency_ms) / count
 
     def get_status_summary(self) -> Dict[str, Any]:
-        """Get comprehensive status summary for monitoring dashboards."""
-        total_executions = sum(m.total_executions for m in self._metrics.values())
-        total_successful = sum(m.successful_executions for m in self._metrics.values())
-        total_failed = sum(m.failed_executions for m in self._metrics.values())
-
+        """Summary for Dashboard."""
         return {
-            "adapters": list(self.adapters.keys()),
-            "health": self.get_health_status(),
-            "metrics": {
-                "total_executions": total_executions,
-                "successful_executions": total_successful,
-                "failed_executions": total_failed,
-                "overall_success_rate": (
-                    total_successful / total_executions if total_executions > 0 else 0.0
-                ),
-                "by_platform": self.get_metrics(),
-            },
-            "recent_executions": len(self._execution_history),
-            "timestamp": time.time(),
+            "platform_stats": self.stats,
+            "recent_executions": [r.to_dict() for r in self.history[-10:]],
+            "total_executions": len(self.history),
         }

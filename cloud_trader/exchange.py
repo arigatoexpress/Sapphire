@@ -19,6 +19,7 @@ import asyncio
 import hashlib
 import hmac
 import json
+import re
 import time
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -220,10 +221,19 @@ class AsterClient:
         self._filter_cache_time: Dict[str, float] = {}
 
     def _normalize_symbol(self, symbol: str) -> str:
-        """Centralized normalization for Aster API (USDC -> USDT)."""
-        if symbol and isinstance(symbol, str) and symbol.endswith("USDC"):
-            return symbol.replace("USDC", "USDT")
-        return symbol
+        """Centralized robust normalization for Aster API (Strip non-alphanumeric + USDC -> USDT)."""
+        if not symbol or not isinstance(symbol, str):
+            return symbol
+
+        # 1. Strip all non-alphanumeric characters and uppercase
+        # This handles hyphens, underscores, and invisible characters
+        normalized = re.sub(r"[^A-Z0-9]", "", symbol.upper())
+
+        # 2. Convert USDC to USDT (Aster standard)
+        if normalized.endswith("USDC"):
+            normalized = normalized[:-4] + "USDT"
+
+        return normalized
 
     async def close(self) -> None:
         await self._client.aclose()
@@ -251,13 +261,13 @@ class AsterClient:
         signed: bool = False,
     ) -> Dict[str, Any]:
         params = params or {}
-        
+
         # ⚠️ CENTRALIZED FIX: Normalize symbols in params before sending
         if "symbol" in params:
             params["symbol"] = self._normalize_symbol(params["symbol"])
         if "pair" in params:
             params["pair"] = self._normalize_symbol(params["pair"])
-            
+
         # removed flood print
         # Send params in body for state-changing methods, query string for GET
         if method.upper() in ["POST", "PUT", "DELETE"]:
@@ -284,74 +294,119 @@ class AsterClient:
 
         # Let's rewrite the whole block to be cleaner.
 
-        if signed:
-            if not self._credentials or not self._credentials.api_key:
-                raise ValueError("API key is not configured for a signed request")
+        retries = 3
+        backoff_factor = 1.0  # Initial usage is simple backoff
 
-            if not self._credentials.api_secret:
-                raise ValueError("API secret is not configured")
+        for attempt in range(retries + 1):
+            if signed:
+                if not self._credentials or not self._credentials.api_key:
+                    raise ValueError("API key is not configured for a signed request")
 
-            params["timestamp"] = int(time.time() * 1000)
-            sorted_params = sorted(params.items())
-            query_string = urlencode(sorted_params, doseq=True)
-            signature = hmac.new(
-                self._credentials.api_secret.encode("utf-8"),
-                query_string.encode("utf-8"),
-                hashlib.sha256,
-            ).hexdigest()
+                if not self._credentials.api_secret:
+                    raise ValueError("API secret is not configured")
 
-            headers = {"X-MBX-APIKEY": self._credentials.api_key}
+                # RE-SIGN REQUEST FOR EACH ATTEMPT (Timestamp freshness)
+                params["timestamp"] = int(time.time() * 1000)
+                sorted_params = sorted(params.items())
+                query_string = urlencode(sorted_params, doseq=True)
+                signature = hmac.new(
+                    self._credentials.api_secret.encode("utf-8"),
+                    query_string.encode("utf-8"),
+                    hashlib.sha256,
+                ).hexdigest()
 
-            if method.upper() in ["POST", "PUT", "DELETE"]:
-                payload = query_string + "&signature=" + signature
-                headers["Content-Type"] = "application/x-www-form-urlencoded"
-                response = await self._client.request(
-                    method, endpoint, content=payload, headers=headers
-                )
-            else:
-                # For GET, we must also ensure the query string in the URL matches the signature.
-                # httpx might reorder params if we pass them as a dict.
-                full_query = query_string + "&signature=" + signature
-                url = f"{endpoint}?{full_query}"
-                response = await self._client.request(method, url, headers=headers)
-        else:
-            headers = {}
-            if method.upper() in ["POST", "PUT", "DELETE"]:
-                response = await self._client.request(
-                    method, endpoint, data=params, headers=headers
-                )
-            else:
-                response = await self._client.request(
-                    method, endpoint, params=params, headers=headers
-                )
+                headers = {"X-MBX-APIKEY": self._credentials.api_key}
 
-        try:
-            response.raise_for_status()
-        except HTTPStatusError as exc:
-            print(f"DEBUG: Error Response: {exc.response.text}")
-            content = exc.response.text
-            # Try to parse Aster API error format
-            try:
-                error_data = exc.response.json()
-                error_code = error_data.get("code")
-                error_msg = error_data.get("msg", content)
-
-                if error_code in ASTER_ERROR_CODES:
-                    error_name, error_class = ASTER_ERROR_CODES[error_code]
-                    raise error_class(error_code, error_msg)
+                if method.upper() in ["POST", "PUT", "DELETE"]:
+                    payload = query_string + "&signature=" + signature
+                    headers["Content-Type"] = "application/x-www-form-urlencoded"
+                    response = await self._client.request(
+                        method, endpoint, content=payload, headers=headers
+                    )
                 else:
-                    # Unknown error code, use generic handling
-                    if 400 <= exc.response.status_code < 500:
-                        raise AsterRequestError(error_code or exc.response.status_code, error_msg)
-                    elif exc.response.status_code >= 500:
-                        raise AsterServerError(error_code or exc.response.status_code, error_msg)
+                    full_query = query_string + "&signature=" + signature
+                    url = f"{endpoint}?{full_query}"
+                    response = await self._client.request(method, url, headers=headers)
+            else:
+                headers = {}
+                if method.upper() in ["POST", "PUT", "DELETE"]:
+                    response = await self._client.request(
+                        method, endpoint, data=params, headers=headers
+                    )
+                else:
+                    response = await self._client.request(
+                        method, endpoint, params=params, headers=headers
+                    )
+
+            # Check for Rate Limit (429)
+            if response.status_code == 429:
+                if attempt < retries:
+                    retry_after = backoff_factor * (2**attempt)
+                    # Respect server header if present
+                    if "Retry-After" in response.headers:
+                        try:
+                            retry_after = float(response.headers["Retry-After"])
+                        except ValueError:
+                            pass
+
+                    print(
+                        f"⚠️ Rate limit hit (429). Retrying in {retry_after}s... (Attempt {attempt + 1}/{retries})"
+                    )
+                    await asyncio.sleep(retry_after)
+                    continue
+                else:
+                    print("❌ Rate limit retries exhausted.")
+
+            try:
+                response.raise_for_status()
+                # Break loop on success
+                break
+            except HTTPStatusError as exc:
+                if response.status_code == 429:
+                    # This block is technically unreachable due to the check above, but good for safety
+                    pass
+
+                # Silence expected noise logs for invalid symbols/delivering symbols during scanning/restart
+                if response.status_code != 429:
+                    error_data = {}
+                    try:
+                        error_data = exc.response.json()
+                    except:
+                        pass
+
+                    error_code = error_data.get("code")
+                    if error_code not in [-1121, -4108]:
+                        print(
+                            f"DEBUG: Error Response from {endpoint} (params={params}): {exc.response.text}"
+                        )
+                content = exc.response.text
+                # Try to parse Aster API error format
+                try:
+                    error_data = exc.response.json()
+                    error_code = error_data.get("code")
+                    error_msg = error_data.get("msg", content)
+
+                    if error_code in ASTER_ERROR_CODES:
+                        error_name, error_class = ASTER_ERROR_CODES[error_code]
+                        raise error_class(error_code, error_msg)
                     else:
-                        raise AsterAPIError(error_code or exc.response.status_code, error_msg)
-            except (ValueError, TypeError):
-                # Not JSON response, use generic error
-                raise RuntimeError(
-                    f"Aster API error {exc.response.status_code} on {endpoint}: {content}"
-                ) from exc
+                        # Unknown error code, use generic handling
+                        if 400 <= exc.response.status_code < 500:
+                            raise AsterRequestError(
+                                error_code or exc.response.status_code, error_msg
+                            )
+                        elif exc.response.status_code >= 500:
+                            raise AsterServerError(
+                                error_code or exc.response.status_code, error_msg
+                            )
+                        else:
+                            raise AsterAPIError(error_code or exc.response.status_code, error_msg)
+                except (ValueError, TypeError):
+                    # Not JSON response, use generic error
+                    raise RuntimeError(
+                        f"Aster API error {exc.response.status_code} on {endpoint}: {content}"
+                    ) from exc
+
         return response.json()
 
     async def get_klines(
@@ -481,8 +536,14 @@ class AsterClient:
         min_notional = _to_decimal(min_notional_filter.get("notional"))
         tick_size = _to_decimal(price_filter.get("tickSize"), "0.01")
 
-        quantity_precision = max(0, -step_size.normalize().as_tuple().exponent)
-        price_precision = max(0, -tick_size.normalize().as_tuple().exponent)
+        # Prioritize top-level precision fields if available
+        quantity_precision = symbol_info.get("quantityPrecision")
+        if quantity_precision is None:
+            quantity_precision = max(0, -step_size.normalize().as_tuple().exponent)
+
+        price_precision = symbol_info.get("pricePrecision")
+        if price_precision is None:
+            price_precision = max(0, -tick_size.normalize().as_tuple().exponent)
 
         result = {
             "step_size": step_size,

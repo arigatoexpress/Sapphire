@@ -55,7 +55,7 @@ gcloud secrets versions access latest --secret=TELEGRAM_BOT_TOKEN --project sapp
 
 | Service | URL |
 |---------|-----|
-| Dashboard | https://sapphiretrade.xyz |
+| Dashboard | https://sapphire-479610.web.app |
 | Cloud Trader API | https://cloud-trader-267358751314.northamerica-northeast1.run.app |
 | GCP Console | https://console.cloud.google.com/run?project=sapphire-479610 |
 | Cloud Build | https://console.cloud.google.com/cloud-build/builds?project=sapphire-479610 |

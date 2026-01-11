@@ -229,10 +229,11 @@ class AnalysisEngine:
             # ═══════════════════════════════════════════════════════════════
             try:
                 # Get 4H klines for higher timeframe trend
-                klines_4h = await self.exchange_client.get_klines(symbol, interval="4h", limit=10)
-                if klines_4h and len(klines_4h) >= 5:
+                # OPTIMIZED: Use feature_pipeline for caching/prefetching
+                df_4h = await self.feature_pipeline.fetch_candles(symbol, interval="4h", limit=10)
+                if df_4h is not None and not df_4h.empty:
                     # Simple 4H trend: compare current close to 5-period SMA
-                    closes_4h = [float(k[4]) for k in klines_4h[-5:]]
+                    closes_4h = df_4h["close"].tail(5).tolist()
                     sma_4h = sum(closes_4h) / len(closes_4h)
                     current_4h_close = closes_4h[-1]
 

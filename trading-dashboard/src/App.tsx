@@ -17,6 +17,9 @@ import MonadMIT from './pages/MonadMIT';
 import SystemMetrics from './pages/SystemMetrics';
 import JupiterSwap from './pages/JupiterSwap';
 import FiredancerDashboard from './pages/FiredancerDashboard';
+import { LiveMonitor } from './pages/LiveMonitor';
+import PlatformMetricsPage from './pages/PlatformMetrics';
+
 
 import { SolanaWalletProvider } from './contexts/SolanaWalletContext'; // Import Wallet Provider
 import ErrorBoundary from './components/ErrorBoundary';
@@ -35,42 +38,52 @@ const App: React.FC = () => {
           element={
             <ProtectedRoute>
               <SolanaWalletProvider>
-                <MasterLayout>
-                  <Routes>
-                    {/* Main Dashboard */}
-                    <Route path="/" element={<UnifiedDashboard />} />
+                <Routes>
+                  {/* Main Dashboard (Firedancer Style) - Standalone Layout */}
+                  <Route path="/" element={<FiredancerDashboard />} />
 
-                    {/* Terminal Pro (New Social Dashboard) */}
-                    <Route path="/terminal" element={<TerminalPro />} />
+                  {/* Legacy Routes - Wrapped in MasterLayout */}
+                  <Route path="/*" element={
+                    <MasterLayout>
+                      <Routes>
+                        {/* Legacy Dashboard */}
+                        <Route path="/legacy" element={<UnifiedDashboard />} />
 
-                    {/* Monad MIT (Symphony Integration) */}
-                    <Route path="/mit" element={<MonadMIT />} />
+                        {/* Terminal Pro */}
+                        <Route path="/terminal" element={<TerminalPro />} />
 
-                    {/* System Observability */}
-                    <Route path="/system" element={<SystemMetrics />} />
+                        {/* Monad MIT */}
+                        <Route path="/mit" element={<MonadMIT />} />
 
-                    {/* Jupiter Swap */}
-                    <Route path="/jupiter" element={<JupiterSwap />} />
+                        {/* System Observability */}
+                        <Route path="/system" element={<SystemMetrics />} />
+                        <Route path="/platforms" element={<PlatformMetricsPage />} />
+                        <Route path="/monitor" element={<LiveMonitor />} />
 
-                    {/* Agents Page */}
-                    <Route path="/agents" element={<AgentLab />} />
+                        {/* Jupiter Swap */}
+                        <Route path="/jupiter" element={<JupiterSwap />} />
 
-                    {/* Agent Performance Dashboard */}
-                    <Route path="/agent-performance" element={<AgentPerformance />} />
+                        {/* Agents Page */}
+                        <Route path="/agents" element={<AgentLab />} />
 
-                    {/* Portfolio Page */}
-                    <Route path="/portfolio" element={<PortfolioPro />} />
+                        {/* Agent Performance Dashboard */}
+                        <Route path="/agent-performance" element={<AgentPerformance />} />
 
-                    {/* About Page */}
-                    <Route path="/about" element={<About />} />
+                        {/* Portfolio Page */}
+                        <Route path="/portfolio" element={<PortfolioPro />} />
 
-                    {/* Leaderboard Page */}
-                    <Route path="/leaderboard" element={<Leaderboard />} />
+                        {/* About Page */}
+                        <Route path="/about" element={<About />} />
 
-                    {/* Fallback */}
-                    <Route path="*" element={<UnifiedDashboard />} />
-                  </Routes>
-                </MasterLayout>
+                        {/* Leaderboard Page */}
+                        <Route path="/leaderboard" element={<Leaderboard />} />
+
+                        {/* Fallback */}
+                        <Route path="*" element={<UnifiedDashboard />} />
+                      </Routes>
+                    </MasterLayout>
+                  } />
+                </Routes>
               </SolanaWalletProvider>
             </ProtectedRoute>
           }

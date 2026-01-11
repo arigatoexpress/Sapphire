@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { LiveAgentChat } from '../components/LiveAgentChat';
-import { Brain, Zap, Activity, TrendingUp, Shield, Globe, Cpu, BarChart3 } from 'lucide-react';
+import { Zap, Activity, Shield, Cpu, Brain } from 'lucide-react';
 
 interface AgentsProps {
   bots: any[];
@@ -19,79 +19,92 @@ export const Agents: React.FC<AgentsProps> = ({ bots, messages }) => {
   const agentDetails = [
     {
       id: 'trend-momentum-agent',
-      name: 'Trend Momentum',
-      emoji: '⚡',
-      model: 'Gemini 2.0 Flash',
-      specialty: 'Momentum & Trend Following',
+      name: 'Momentum Trader',
+      emoji: '📈',
+      model: 'Gemini 3.0 Flash',
+      specialty: 'Trend Following',
       riskLevel: 'High',
       timeHorizon: 'Very Short',
       system: 'aster',
-      description: 'Identifies and exploits strong directional moves using advanced technical analysis and market momentum indicators.'
+      description: 'High-speed momentum analysis for rapid directional trades.'
     },
     {
-      id: 'strategy-optimization-agent',
-      name: 'Strategy Optimizer',
+      id: 'market-maker-agent',
+      name: 'Market Maker',
+      emoji: '⚡',
+      model: 'Gemini 3.0 Flash',
+      specialty: 'Spread Capture',
+      riskLevel: 'Medium',
+      timeHorizon: 'Very Short',
+      system: 'aster',
+      description: 'High-frequency market making capturing bid-ask spreads.'
+    },
+    {
+      id: 'swing-trader-agent',
+      name: 'Swing Trader',
       emoji: '🧠',
-      model: 'Gemini 2.0 Flash',
-      specialty: 'Portfolio Optimization',
-      riskLevel: 'Moderate',
-      timeHorizon: 'Short',
-      system: 'aster',
-      description: 'Continuously optimizes trading approaches using complex reasoning and market analysis to find optimal strategies.'
-    },
-    {
-      id: 'financial-sentiment-agent',
-      name: 'Sentiment Analyst',
-      emoji: '💭',
-      model: 'Gemini 2.0 Flash',
-      specialty: 'Sentiment Analysis',
-      riskLevel: 'High',
-      timeHorizon: 'Short-Medium',
-      system: 'aster',
-      description: 'Analyzes market psychology and news impact to identify sentiment-driven trading opportunities.'
-    },
-    {
-      id: 'market-prediction-agent',
-      name: 'Market Predictor',
-      emoji: '🔮',
-      model: 'Gemini 2.0 Flash',
-      specialty: 'Predictive Modeling',
-      riskLevel: 'Moderate-High',
+      model: 'Gemini 3.0 Flash',
+      specialty: 'Swing Trading',
+      riskLevel: 'Low',
       timeHorizon: 'Medium',
       system: 'aster',
-      description: 'Uses advanced models to forecast market movements and identify high-probability setups.'
+      description: 'Strategic swing trader for multi-day trending positions.'
     },
     {
-      id: 'deep-logic-special-ops',
-      name: 'Deep Logic Special Ops',
-      emoji: '🧠',
-      model: 'Gemini 2.0 Flash',
-      specialty: 'Deep Reasoning',
-      riskLevel: 'Very High',
+      id: 'monad-treasury-agent',
+      name: 'Monad Treasury',
+      emoji: '🏛️',
+      model: 'Gemini 3.0 Flash',
+      specialty: 'Whale Tracking',
+      riskLevel: 'Medium',
       timeHorizon: 'Short',
-      system: 'aster',
-      description: 'The Chief Investment Officer. Orchestrates the swarm using native Gemini 2.0 reasoning to execute high-conviction strategic bets.'
+      system: 'symphony',
+      description: 'Strategic Monad whale follower and smart money tracker.'
     },
     {
-      id: 'hype-agent',
-      name: 'Hype Bull Agent',
-      emoji: 'Zap',
-      model: 'Gemini 2.0 Flash',
-      specialty: 'Perp Scalping & Sweeping',
-      riskLevel: 'Extreme',
-      timeHorizon: 'Micro',
+      id: 'ari-gold-fund',
+      name: 'The Ari Gold Fund',
+      emoji: '🚁',
+      model: 'Gemini 3.0 Flash',
+      specialty: 'Asymmetric Bets',
+      riskLevel: 'High',
+      timeHorizon: 'Short',
+      system: 'symphony',
+      description: 'Aggressive, risk-on asymmetric bettor investing in AI/Privacy/Virtuals.'
+    },
+    {
+      id: 'drift-solana-agent',
+      name: 'Drift Trader',
+      emoji: '🌀',
+      model: 'Gemini 3.0 Flash',
+      specialty: 'Solana Perps',
+      riskLevel: 'Medium',
+      timeHorizon: 'Short',
+      system: 'drift',
+      description: 'Fast-acting Solana trader capturing ecosystem momentum.'
+    },
+    {
+      id: 'hyperliquid-l1-agent',
+      name: 'HyperTrader',
+      emoji: '🌊',
+      model: 'Gemini 3.0 Flash',
+      specialty: 'HFT Perps',
+      riskLevel: 'Medium',
+      timeHorizon: 'Very Short',
       system: 'hyperliquid',
-      description: 'Specialized Hyperliquid operative focused on high-velocity scalping and profit sweeping into HYPE/USDC.'
+      description: 'Low-latency trader executing on Hyperliquid L1.'
     }
   ];
 
   const getRiskColor = (risk: string) => {
-    switch (risk) {
-      case 'Very High': return 'text-rose-400 border-rose-500/30 bg-rose-500/10';
-      case 'Extreme': return 'text-purple-400 border-purple-500/30 bg-purple-500/10';
-      case 'High': return 'text-orange-400 border-orange-500/30 bg-orange-500/10';
-      case 'Moderate-High': return 'text-yellow-400 border-yellow-500/30 bg-yellow-500/10';
-      case 'Moderate': return 'text-blue-400 border-blue-500/30 bg-blue-500/10';
+    switch (risk.toLowerCase()) {
+      case 'extreme': return 'text-purple-400 border-purple-500/50 bg-purple-500/20 shadow-[0_0_15px_rgba(168,85,247,0.3)]';
+      case 'very high': return 'text-rose-400 border-rose-500/50 bg-rose-500/20 shadow-[0_0_15px_rgba(244,63,94,0.3)]';
+      case 'high': return 'text-orange-400 border-orange-500/50 bg-orange-500/20 shadow-[0_0_15px_rgba(251,146,60,0.3)]';
+      case 'moderate-high': return 'text-yellow-400 border-yellow-500/50 bg-yellow-500/20';
+      case 'moderate':
+      case 'medium': return 'text-cyan-400 border-cyan-500/50 bg-cyan-500/20 shadow-[0_0_15px_rgba(34,211,238,0.3)]';
+      case 'low': return 'text-emerald-400 border-emerald-500/50 bg-emerald-500/20 shadow-[0_0_15px_rgba(52,211,153,0.3)]';
       default: return 'text-slate-400 border-slate-500/30 bg-slate-500/10';
     }
   };

@@ -17,6 +17,7 @@ export interface Agent {
   allocation: number;
   emoji?: string;
   active?: boolean;
+  system?: string;
 }
 
 // Extended agent interface for activity monitoring components
@@ -32,6 +33,7 @@ export interface AgentActivity {
   specialization: string;
   color: string;
   status: 'active' | 'idle' | 'analyzing' | 'trading';
+  system?: string;
   gpu_utilization?: number;
   memory_usage?: number;
 }
@@ -128,22 +130,24 @@ const TradingContext = createContext<DashboardData | undefined>(undefined);
 
 // Agent type colors for visualization
 const AGENT_COLORS: Record<string, string> = {
-  'trend-momentum-agent': '#06b6d4',
-  'strategy-optimization-agent': '#8b5cf6',
-  'financial-sentiment-agent': '#ef4444',
-  'market-prediction-agent': '#f59e0b',
-  'volume-microstructure-agent': '#ec4899',
-  'vpin-hft': '#06b6d4',
+  'trend-momentum-agent': '#22d3ee', // Cyan
+  'market-maker-agent': '#e879f9',   // Purple
+  'swing-trader-agent': '#34d399',   // Emerald
+  'monad-treasury-agent': '#818cf8', // Indigo/Blue
+  'ari-gold-fund': '#fbbf24',        // Amber/Gold
+  'drift-solana-agent': '#f472b6',   // Pink
+  'hyperliquid-l1-agent': '#38bdf8', // Light Blue
 };
 
 // Agent specializations
 const AGENT_SPECIALIZATIONS: Record<string, string> = {
   'trend-momentum-agent': 'Momentum Analysis & Technical Trading',
-  'strategy-optimization-agent': 'Risk Management & Portfolio Optimization',
-  'financial-sentiment-agent': 'Financial News & Social Media Analysis',
-  'market-prediction-agent': 'Time Series Forecasting & ML Predictions',
-  'volume-microstructure-agent': 'Volume Analysis & Order Flow',
-  'vpin-hft': 'VPIN Calculation & HFT Signals',
+  'market-maker-agent': 'Spread Capture & Liquidity Provision',
+  'swing-trader-agent': 'Multi-day Trend Capturing',
+  'monad-treasury-agent': 'Whale Tracking & Smart Money',
+  'ari-gold-fund': 'Asymmetric Risk-On Bets',
+  'drift-solana-agent': 'Solana Ecosystem Perp Trading',
+  'hyperliquid-l1-agent': 'High-Frequency Perp Scalping',
 };
 
 // Helper to transform Agent to AgentActivity
@@ -159,6 +163,7 @@ const agentToActivity = (agent: Agent): AgentActivity => ({
   specialization: AGENT_SPECIALIZATIONS[agent.type] || 'AI Trading Agent',
   color: AGENT_COLORS[agent.type] || '#8b5cf6',
   status: agent.status === 'active' ? 'active' : agent.status === 'idle' ? 'idle' : 'idle',
+  system: agent.system || 'aster',
   gpu_utilization: Math.random() * 30 + 10,
   memory_usage: Math.random() * 2 + 1,
 });
@@ -166,14 +171,22 @@ const agentToActivity = (agent: Agent): AgentActivity => ({
 // Agent emojis mapping
 const AGENT_EMOJIS: Record<string, string> = {
   'trend-momentum-agent': '📈',
-  'market-maker-agent': '🏦',
-  'swing-trader-agent': '🔄',
+  'market-maker-agent': '⚡',
+  'swing-trader-agent': '🧠',
+  'monad-treasury-agent': '🏛️',
+  'ari-gold-fund': '🚁',
+  'drift-solana-agent': '🌀',
+  'hyperliquid-l1-agent': '🌊',
 };
 
 const AGENT_NAMES: Record<string, string> = {
   'trend-momentum-agent': 'Trend Momentum',
   'market-maker-agent': 'Market Maker',
   'swing-trader-agent': 'Swing Trader',
+  'monad-treasury-agent': 'Monad Treasury',
+  'ari-gold-fund': 'The Ari Gold Fund',
+  'drift-solana-agent': 'Drift Trader',
+  'hyperliquid-l1-agent': 'HyperTrader',
 };
 
 // --- Safe Defaults ---
@@ -253,9 +266,10 @@ export const TradingProvider: React.FC<{ children: ReactNode }> = ({ children })
   // WebSocket connection - primary data source
   const { data: wsData, connected: wsConnected } = useDashboardWebSocket(undefined, token);
 
-  // NUCLEAR OPTION: REST API Polling ALWAYS runs (even when WS connected)
-  // This ensures data is always fresh regardless of WebSocket reliability
-  const { data: apiData } = useDashboardState(3000); // Always poll every 3 seconds
+  // SMART SYNC: Adaptive polling based on WebSocket status
+  // Poll frequently (5s) if WS is down, otherwise infrequently (30s) for reconciliation
+  const pollingInterval = wsConnected ? 30000 : 5000;
+  const { data: apiData } = useDashboardState(pollingInterval);
 
   // use resolveApiUrl from apiConfig
 
@@ -338,6 +352,7 @@ export const TradingProvider: React.FC<{ children: ReactNode }> = ({ children })
         win_rate: agent.win_rate || 0,
         allocation: agent.allocation || 333,
         emoji: AGENT_EMOJIS[agent.id] || agent.emoji || '🤖',
+        system: agent.system || 'aster',
         active: true
       }));
 
@@ -396,6 +411,7 @@ export const TradingProvider: React.FC<{ children: ReactNode }> = ({ children })
       win_rate: 0,
       allocation: a.allocation || 0,
       emoji: a.emoji,
+      system: a.system || 'aster',
       active: true
     }));
 

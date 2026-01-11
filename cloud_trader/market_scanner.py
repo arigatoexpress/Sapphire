@@ -42,28 +42,78 @@ class MarketScanner:
         """
         opportunities = []
 
-        # Get all tradable symbols - with fallback if market_data is missing
+        # Get all tradable symbols - combine market_data + always include SYMPHONY_SYMBOLS
         symbols = []
-        if self.market_data and hasattr(self.market_data, 'market_structure') and self.market_data.market_structure:
-            symbols = list(self.market_data.market_structure.keys())
-            logger.debug(f"🔍 Scanner using {len(symbols)} symbols from market_structure")
+
+        # 1. Include Symphony/Monad tokens (priority for chain launch incentives)
+        from .definitions import DRIFT_SYMBOLS, HYPERLIQUID_SYMBOLS, SYMPHONY_SYMBOLS
+
+        symbols.extend(SYMPHONY_SYMBOLS)
+        logger.info(
+            f"🌟 Scanner including {len(SYMPHONY_SYMBOLS)} Symphony/Monad tokens (priority)"
+        )
+
+        # 2. Include Drift (Solana) tokens
+        symbols.extend(DRIFT_SYMBOLS)
+        logger.info(f"🌌 Scanner including {len(DRIFT_SYMBOLS)} Drift/Solana tokens")
+
+        # 3. Include Hyperliquid tokens
+        symbols.extend(HYPERLIQUID_SYMBOLS)
+        logger.info(f"🌊 Scanner including {len(HYPERLIQUID_SYMBOLS)} Hyperliquid tokens")
+
+        # Then add Aster symbols from market_data if available
+        if (
+            self.market_data
+            and hasattr(self.market_data, "market_structure")
+            and self.market_data.market_structure
+        ):
+            aster_symbols = list(self.market_data.market_structure.keys())
+            # Add only symbols not already in the list
+            for sym in aster_symbols:
+                if sym not in symbols:
+                    symbols.append(sym)
+            logger.debug(
+                f"🔍 Scanner added {len(aster_symbols)} Aster symbols from market_structure"
+            )
         else:
-            # Fallback to curated list when market_data is not available
-            from .definitions import SYMPHONY_SYMBOLS
-            symbols = [
-                "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT",
-                "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT",
-                "MATICUSDT", "UNIUSDT", "LTCUSDT", "ATOMUSDT", "NEARUSDT",
-            ] + list(SYMPHONY_SYMBOLS)
-            logger.info(f"⚠️ Scanner using {len(symbols)} fallback symbols (market_data unavailable)")
+            # Fallback Aster list when market_data is not available
+            fallback_aster = [
+                "BTCUSDT",
+                "ETHUSDT",
+                "SOLUSDT",
+                "BNBUSDT",
+                "XRPUSDT",
+                "ADAUSDT",
+                "DOGEUSDT",
+                "AVAXUSDT",
+                "LINKUSDT",
+                "DOTUSDT",
+                "MATICUSDT",
+                "UNIUSDT",
+                "LTCUSDT",
+                "ATOMUSDT",
+                "NEARUSDT",
+            ]
+            for sym in fallback_aster:
+                if sym not in symbols:
+                    symbols.append(sym)
+            logger.info(f"⚠️ Scanner using fallback Aster symbols (market_data unavailable)")
 
         if not symbols:
             logger.warning("🔍 No symbols available for scanning")
             return []
 
-        semaphore = asyncio.Semaphore(4)  # Limit concurrency to 4 symbols at once (lower for stability)
+        # PREFETCH: Warm caches for all symbols in parallel (massive speedup)
+        # Only scan first 50 to keep it responsive, but much better than 5-10
+        scan_limit = 50
+        symbols_to_prefetch = symbols[:scan_limit]
+        await self.feature_pipeline.prefetch_data(symbols_to_prefetch)
+
+        semaphore = asyncio.Semaphore(
+            20
+        )  # Limit concurrency to 20 symbols at once (optimized for pre-warmed cache)
         import sys
-        
+
         async def safe_analyze(symbol):
             async with semaphore:
                 print(f"🚀 [SCAN] Analyzing {symbol}...")
@@ -80,10 +130,10 @@ class MarketScanner:
                 finally:
                     sys.stdout.flush()
 
-        logger.info(f"🔍 [SCAN] Starting parallel scan of {len(symbols)} symbols (limit 10)...")
-        tasks = [safe_analyze(symbol) for symbol in symbols]
+        logger.info(f"🔍 [SCAN] Starting parallel scan of {len(symbols_to_prefetch)} symbols...")
+        tasks = [safe_analyze(symbol) for symbol in symbols_to_prefetch]
         results = await asyncio.gather(*tasks)
-        
+
         valid_results = [r for r in results if r]
         print(f"✅ [SCAN] Results found: {len(valid_results)} across {len(symbols)} symbols")
         sys.stdout.flush()
@@ -100,7 +150,9 @@ class MarketScanner:
 
         # Only log if there's interesting activity or every 10 mins
         if opportunities or error_count > 0:
-            logger.info(f"🔎 Scan complete: {len(opportunities)} opportunities, {success_count} valid TAs, {error_count} errors across {len(symbols)} symbols")
+            logger.info(
+                f"🔎 Scan complete: {len(opportunities)} opportunities, {success_count} valid TAs, {error_count} errors across {len(symbols)} symbols"
+            )
 
         # Sort by score and return top N
         opportunities.sort(key=lambda x: x.score, reverse=True)
@@ -112,6 +164,7 @@ class MarketScanner:
         """
         print(f"🔬 [_analyze_symbol] Starting {symbol}")
         import sys
+
         sys.stdout.flush()
         try:
             import random
@@ -137,15 +190,23 @@ class MarketScanner:
             adx = ta.get("adx", 20)  # Trend strength
 
             # Determine platform
-            from .definitions import SYMPHONY_SYMBOLS
-            platform = "symphony" if symbol in SYMPHONY_SYMBOLS else "aster"
+            from .definitions import DRIFT_SYMBOLS, HYPERLIQUID_SYMBOLS, SYMPHONY_SYMBOLS
+
+            if symbol in SYMPHONY_SYMBOLS:
+                platform = "symphony"
+            elif symbol in DRIFT_SYMBOLS:
+                platform = "drift"
+            elif symbol in HYPERLIQUID_SYMBOLS:
+                platform = "hyperliquid"
+            else:
+                platform = "aster"
 
             # ========== DYNAMIC COMPOSITE SCORING ==========
             # Each indicator contributes a score from -1 (strong sell) to +1 (strong buy)
             # Weights determine importance of each signal
-            
+
             scores = {}
-            
+
             # 1. RSI Score (weight: 0.25) - Mean reversion
             if rsi < 30:
                 scores["rsi"] = 0.8 + (30 - rsi) / 30 * 0.2  # Stronger as more oversold
@@ -157,7 +218,7 @@ class MarketScanner:
                 scores["rsi"] = -0.4  # Mild bearish
             else:
                 scores["rsi"] = 0  # Neutral
-            
+
             # 2. MACD Score (weight: 0.25) - Momentum
             if macd_hist != 0:
                 macd_strength = min(abs(macd_hist) / 10, 1.0)  # Normalize
@@ -167,7 +228,7 @@ class MarketScanner:
                     scores["macd"] = -0.5 - macd_strength * 0.5  # Bearish crossover
             else:
                 scores["macd"] = 0
-            
+
             # 3. Trend Score (weight: 0.20) - Direction
             if trend == "BULLISH":
                 scores["trend"] = 0.6
@@ -175,7 +236,7 @@ class MarketScanner:
                 scores["trend"] = -0.6
             else:
                 scores["trend"] = 0
-            
+
             # 4. Stochastic Score (weight: 0.15) - Overbought/Oversold
             if stoch_k < 20:
                 scores["stoch"] = 0.7
@@ -187,7 +248,7 @@ class MarketScanner:
                 scores["stoch"] = -0.3
             else:
                 scores["stoch"] = 0
-            
+
             # 5. Order Book Pressure Score (weight: 0.15) - Volume imbalance
             if bid_pressure > 0.6:
                 scores["orderbook"] = 0.5  # Buying pressure
@@ -195,7 +256,7 @@ class MarketScanner:
                 scores["orderbook"] = -0.5  # Selling pressure
             else:
                 scores["orderbook"] = 0
-            
+
             # ========== CALCULATE WEIGHTED COMPOSITE SCORE ==========
             weights = {
                 "rsi": 0.25,
@@ -204,49 +265,94 @@ class MarketScanner:
                 "stoch": 0.15,
                 "orderbook": 0.15,
             }
-            
+
             composite_score = sum(scores[k] * weights[k] for k in scores)
-            
+
+            # ========== MARKET REGIME AWARENESS ==========
+            # Boost scores in trending markets, penalize in volatile ranging
+            regime_mult = 1.0
+            regime_name = "unknown"
+            try:
+                from .market_regime import MarketRegime, get_market_regime_detector
+
+                regime_detector = await get_market_regime_detector()
+                if regime_detector:
+                    regime_metrics = (
+                        regime_detector._analyze_regime()
+                        if hasattr(regime_detector, "_analyze_regime")
+                        else None
+                    )
+                    if regime_metrics:
+                        regime_name = (
+                            regime_metrics.regime.value
+                            if hasattr(regime_metrics.regime, "value")
+                            else str(regime_metrics.regime)
+                        )
+                        if regime_metrics.regime in [
+                            MarketRegime.TRENDING_UP,
+                            MarketRegime.TRENDING_DOWN,
+                        ]:
+                            regime_mult = 1.15  # Boost 15% in trending markets
+                        elif regime_metrics.regime == MarketRegime.VOLATILE:
+                            regime_mult = 0.8  # Penalize 20% in volatile markets
+                        elif regime_metrics.regime == MarketRegime.RANGING:
+                            regime_mult = 0.9  # Slight penalty in ranging
+            except Exception as e:
+                logger.debug(f"Regime detection skipped: {e}")
+
+            composite_score = composite_score * regime_mult
+
             # ========== DIAGNOSTIC LOGGING (Elevated for visibility) ==========
             print(
                 f"📊 [DIAG] {symbol}: RSI={rsi:.1f} MACD_h={macd_hist:.3f} trend={trend} "
-                f"stoch={stoch_k:.0f} bid={bid_pressure:.2f} → composite={composite_score:.3f}"
+                f"stoch={stoch_k:.0f} bid={bid_pressure:.2f} regime={regime_name} → composite={composite_score:.3f}"
             )
             sys.stdout.flush()
-            
+
             # ========== GENERATE OPPORTUNITY IF THRESHOLD EXCEEDED ==========
             THRESHOLD = 0.10  # Lowered from 0.15 for more trades (Demo optimized)
-            
+
             if abs(composite_score) >= THRESHOLD:
                 # Determine signal direction
                 signal = "BUY" if composite_score > 0 else "SELL"
-                
+
                 # Build reason from contributing factors
                 contributing = [k for k, v in scores.items() if abs(v) > 0.2]
                 reason = f"Composite: {composite_score:.2f} ({', '.join(contributing)})"
-                
+
                 # Confidence scales with score strength
                 confidence = min(0.5 + abs(composite_score), 0.95)
-                
+
+                # PLATFORM PRIORITY BOOST: Encourage trading on non-Aster platforms
+                # This helps ensure we're actively using all integrated platforms
+                platform_boost = 0.0
+                if platform in ["symphony", "drift"]:
+                    platform_boost = 0.10  # 10% boost for non-Aster platforms
+
+                final_score = abs(composite_score) + platform_boost
+
                 # Log opportunity found (Keep as print for visibility)
-                print(f"🎯 [OPPORTUNITY] {symbol}: {signal} | score={composite_score:.3f} | reasons={contributing}")
+                print(
+                    f"🎯 [OPPORTUNITY] {symbol}: {signal} | score={final_score:.3f} (base={composite_score:.3f}, platform_boost={platform_boost}) | reasons={contributing}"
+                )
                 sys.stdout.flush()
-                
+
                 return Opportunity(
                     symbol=symbol,
                     signal=signal,
                     confidence=round(confidence, 2),
                     reason=reason,
                     platform=platform,
-                    score=abs(composite_score),
+                    score=final_score,
                     price=ta.get("price", 0.0),
                 )
-            
+
             return None
 
         except Exception as e:
             print(f"❌ [_analyze_symbol] Error for {symbol}: {e}")
             import traceback
+
             traceback.print_exc()
             return None
 

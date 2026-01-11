@@ -122,7 +122,13 @@ class TradingLogger:
         root_logger.setLevel(self._get_log_level(log_level))
         root_logger.addHandler(console_handler)
         root_logger.addHandler(file_handler)
+        root_logger.addHandler(file_handler)
         root_logger.addHandler(error_handler)
+
+        # Add WebSocket Handler
+        ws_handler = WebSocketLogHandler()
+        ws_handler.setFormatter(json_formatter)
+        root_logger.addHandler(ws_handler)
 
     def set_correlation_id(self, correlation_id: str):
         """Set correlation ID for current thread."""
@@ -240,6 +246,49 @@ def correlation_context(correlation_id: str):
         yield
     finally:
         logger.correlation_id.value = old_id
+
+
+class WebSocketLogHandler(logging.Handler):
+    """Log handler that streams logs to WebSocket."""
+
+    def emit(self, record):
+        try:
+            # Avoid infinite loops / recursions
+            if getattr(record, "ws_broadcast", False):
+                return
+
+            # Formatting
+            msg = self.format(record)
+
+            # Construct log entry object
+            log_entry = {
+                "id": str(record.created),
+                "timestamp": datetime.fromtimestamp(record.created).isoformat(),
+                "level": record.levelname,
+                "module": record.name,
+                "message": msg,
+                "metadata": getattr(record, "metadata", {}),
+            }
+
+            # Helper to broadcast (import inside to avoid circular deps)
+            import asyncio
+
+            try:
+                from .websocket_manager import broadcast_log
+
+                # Check for running loop
+                try:
+                    loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    return  # No loop running
+
+                if loop.is_running():
+                    loop.create_task(broadcast_log(log_entry))
+            except ImportError:
+                pass
+
+        except Exception:
+            self.handleError(record)
 
 
 @contextmanager

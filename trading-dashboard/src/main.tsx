@@ -8,7 +8,7 @@ import './index.css'
 // 🚀 FORCE UNREGISTER SERVICE WORKER TO FIX CACHING ISSUES
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then(function (registrations) {
-    for (let registration of registrations) {
+    for (const registration of registrations) {
       registration.unregister();
       console.log('Service Worker Unregistered');
     }

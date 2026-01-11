@@ -6,6 +6,8 @@ import { useTradingData } from '../contexts/TradingContext';
 import { LiveChatPanel } from '../components/LiveChatPanel';
 import { AnimatedNumber } from '../components/ui/AnimatedNumber';
 import { Sparkline } from '../components/ui/Sparkline';
+import PlatformRouterStatus from '../components/PlatformRouterStatus';
+import HFTStatusWidget from '../components/HFTStatusWidget';
 import { getApiUrl } from '../utils/apiConfig';
 
 // ============ STAT CARD ============
@@ -63,8 +65,9 @@ const AgentCard = memo<{
     trades: number;
     weight: number;
     isActive: boolean;
+    system?: string;
     delay?: number;
-}>(({ name, emoji, winRate, trades, weight, isActive, delay = 0 }) => (
+}>(({ name, emoji, winRate, trades, weight, isActive, system = 'aster', delay = 0 }) => (
     <motion.div
         initial={{ opacity: 0, x: -10 }}
         animate={{ opacity: 1, x: 0 }}
@@ -74,7 +77,15 @@ const AgentCard = memo<{
         <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
                 <span className="text-lg">{emoji}</span>
-                <span className="text-sm font-medium text-white">{name}</span>
+                <div className="flex flex-col">
+                    <span className="text-sm font-medium text-white">{name}</span>
+                    <span className={`text-[9px] uppercase tracking-tighter font-bold ${system === 'aster' ? 'text-emerald-400' :
+                        system === 'symphony' ? 'text-purple-400' :
+                            system === 'drift' ? 'text-blue-400' : 'text-cyan-400'
+                        }`}>
+                        {system}
+                    </span>
+                </div>
             </div>
             <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-emerald-400 animate-pulse shadow-lg shadow-emerald-400/50' : 'bg-slate-600'}`} />
         </div>
@@ -107,7 +118,7 @@ const SignalItem = memo<{
     isStrong: boolean;
     timestamp: number;
 }>(({ symbol, signal, confidence, agreement, isStrong }) => {
-    const isLong = signal.includes('long');
+    const isLong = (signal || '').includes('long');
 
     return (
         <motion.div
@@ -134,13 +145,13 @@ const SignalItem = memo<{
                 <div className="flex items-center gap-3">
                     <div className="text-right">
                         <div className="text-[10px] text-slate-500">Confidence</div>
-                        <div className={`text-xs font-bold ${confidence > 0.7 ? 'text-emerald-400' : confidence > 0.4 ? 'text-yellow-400' : 'text-slate-400'}`}>
-                            {(confidence * 100).toFixed(0)}%
+                        <div className={`text-xs font-bold ${(confidence ?? 0) > 0.7 ? 'text-emerald-400' : (confidence ?? 0) > 0.4 ? 'text-yellow-400' : 'text-slate-400'}`}>
+                            {((confidence ?? 0) * 100).toFixed(0)}%
                         </div>
                     </div>
                     <div className="text-right">
                         <div className="text-[10px] text-slate-500">Agreement</div>
-                        <div className="text-xs font-bold text-cyan-400">{(agreement * 100).toFixed(0)}%</div>
+                        <div className="text-xs font-bold text-cyan-400">{((agreement ?? 0) * 100).toFixed(0)}%</div>
                     </div>
                 </div>
             </div>
@@ -249,7 +260,7 @@ export const UnifiedDashboard: React.FC = () => {
     useEffect(() => {
         const fetchStats = async () => {
             try {
-                const res = await fetch(`${API_URL}/consensus/state`);
+                const res = await fetch(`${API_URL}/api/consensus/state`);
                 if (res.ok) {
                     const data = await res.json();
                     setConsensusStats(data.stats);
@@ -309,7 +320,7 @@ export const UnifiedDashboard: React.FC = () => {
                 />
                 <StatCard
                     title="Portfolio Value"
-                    value={`$${(portfolio_value ?? 0).toLocaleString()}`}
+                    value={`$${(portfolio_value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                     subtitle="Live Balance"
                     icon={<Activity size={16} />}
                 />
@@ -339,6 +350,12 @@ export const UnifiedDashboard: React.FC = () => {
                     icon={<Brain size={16} />}
                 />
             </div>
+
+            {/* Platform Router Status */}
+            <PlatformRouterStatus />
+
+            {/* HFT Engine Status - Phase 6 */}
+            <HFTStatusWidget />
 
             {/* Market Bias Bar */}
             <div className="bg-slate-900/60 backdrop-blur-xl rounded-xl border border-white/5 p-4">
@@ -376,6 +393,7 @@ export const UnifiedDashboard: React.FC = () => {
                                 trades={agent.total_trades}
                                 weight={1.0}
                                 isActive={agent.status === 'active'}
+                                system={agent.system}
                             />
                         ))}
                     </div>

@@ -4,6 +4,7 @@ Securely manages API keys and settings.
 """
 
 from typing import Optional
+
 from .config import get_settings
 
 settings = get_settings()
@@ -28,10 +29,22 @@ SYMPHONY_MIT_KEY = settings.symphony_api_key
 SYMPHONY_MIT_ID = settings.symphony_mit_agent_id
 
 AGENTS_CONFIG = {
-    "MILF": {"id": SYMPHONY_MILF_ID, "key": SYMPHONY_MILF_KEY, "type": "SWAP", "chain": "MONAD"},
-    "AGDG": {"id": SYMPHONY_AGDG_ID, "key": SYMPHONY_AGDG_KEY, "type": "PERPS", "chain": "BASE"},
-    "DEGEN": {"id": SYMPHONY_DEGEN_ID, "key": SYMPHONY_DEGEN_KEY, "type": "PERPS", "chain": "BASE"},
-    "MIT": {"id": SYMPHONY_MIT_ID, "key": SYMPHONY_MIT_KEY, "type": "PERPS", "chain": "BASE"},
+    # Active Symphony Agents
+    "MILF": {
+        "id": SYMPHONY_MILF_ID,
+        "key": SYMPHONY_MILF_KEY,
+        "type": "SWAP",
+        "chain": "MONAD",
+        "priority": True,
+        "emoji": "🦾",
+    },
+    "AGDG": {
+        "id": SYMPHONY_AGDG_ID,
+        "key": SYMPHONY_AGDG_KEY,
+        "type": "PERPS",
+        "chain": "BASE",
+        "emoji": "🦅",
+    },
 }
 
 # MIT (Monad Implementation Treasury) Settings

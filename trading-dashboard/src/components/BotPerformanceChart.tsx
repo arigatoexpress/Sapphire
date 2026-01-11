@@ -72,7 +72,7 @@ export const BotPerformanceChart: React.FC<BotPerformanceChartProps> = ({ bots }
     });
 
     // 2. Convert to array and sort
-    let result = Object.values(timeMap);
+    const result = Object.values(timeMap);
 
     // Sort by time string (HH:MM)
     result.sort((a, b) => a.time.localeCompare(b.time));
