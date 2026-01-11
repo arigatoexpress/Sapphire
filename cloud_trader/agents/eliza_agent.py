@@ -91,7 +91,12 @@ class ElizaAgent:
         from .memory_manager import MemoryManager
         from .model_router import MultiModelRouter
 
-        self.memory = memory_manager or MemoryManager(max_memories=config.memory_depth)
+        # Create memory manager with agent_id for namespaced persistence
+        self.memory = memory_manager or MemoryManager(
+            agent_id=config.agent_id,
+            max_memories=config.memory_depth,
+            persist=True,  # Enable Firestore persistence
+        )
         self.models = model_router or MultiModelRouter()
 
         # Performance tracking

@@ -38,8 +38,8 @@ steps:
       - '--cpu-boost'
       - '--set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest,ASTER_API_KEY=ASTER_API_KEY:latest,ASTER_SECRET_KEY=ASTER_SECRET_KEY:latest'
 
-# Build timeout (5 minutes should be plenty with multi-stage + caching)
-timeout: '600s'
+# Build timeout (20 minutes for cold cache builds)
+timeout: '1200s'
 
 # Options for maximum build performance
 options:
