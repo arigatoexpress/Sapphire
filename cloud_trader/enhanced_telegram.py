@@ -23,6 +23,44 @@ class NotificationPriority(Enum):
     CRITICAL = "critical"
 
 
+@dataclass
+class TradeNotification:
+    symbol: str
+    side: str
+    price: float
+    quantity: float
+    notional: float = 0.0
+    take_profit: float = 0.0
+    stop_loss: float = 0.0
+    confidence: float = 0.0
+    ai_analysis: str = ""
+
+
+@dataclass
+class MarketInsight:
+    symbol: str
+    sentiment: str
+    confidence: float
+    key_levels: Dict[str, float]
+    recommendation: str
+    analysis: str
+
+
+class AITradingAnalyzer:
+    def __init__(self, *args, **kwargs):
+        pass
+
+
+class MarketSentimentAnalyzer:
+    def __init__(self, *args, **kwargs):
+        pass
+
+
+class RiskAnalyzer:
+    def __init__(self, *args, **kwargs):
+        pass
+
+
 class EnhancedTelegramService:
     """Lightweight Telegram notification service using raw HTTP API."""
 
