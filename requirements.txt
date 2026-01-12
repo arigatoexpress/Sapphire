@@ -398,3 +398,5 @@ stable-baselines3
 gymnasium
 pylint
 black
+pytest-asyncio
+pytest-mock
