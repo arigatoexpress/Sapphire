@@ -55,7 +55,7 @@ steps:
       - '${_REGION}'
       - '--platform'
       - 'managed'
-      - '--allow-unauthenticated=false'
+      - '--no-allow-unauthenticated'
       - '--memory'
       - '2Gi'
       - '--cpu'
