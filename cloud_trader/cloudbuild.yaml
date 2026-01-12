@@ -36,7 +36,7 @@ steps:
       - '--timeout=300s'
       - '--execution-environment=gen2'
       - '--cpu-boost'
-      - '--set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest,ASTER_API_KEY=ASTER_API_KEY:latest,ASTER_SECRET_KEY=ASTER_SECRET_KEY:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest'
+      - '--set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest,ASTER_API_KEY=ASTER_API_KEY:latest,ASTER_SECRET_KEY=ASTER_SECRET_KEY:latest'
 
 # Build timeout (20 minutes for cold cache builds)
 timeout: '1200s'

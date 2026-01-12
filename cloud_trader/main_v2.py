@@ -46,6 +46,15 @@ async def lifespan(app: FastAPI):
     if credentials.api_key:
         logger.info(f"🔑 Aster API Key loaded: {credentials.api_key[:4]}...")
 
+    # Inject Credentials into Settings (Runtime Secret Hydration)
+    if credentials.telegram_bot_token and not settings.telegram_bot_token:
+        settings.telegram_bot_token = credentials.telegram_bot_token
+        logger.info("💉 Injected Telegram Bot Token from Secret Manager")
+        
+    if credentials.telegram_chat_id and not settings.telegram_chat_id:
+        settings.telegram_chat_id = credentials.telegram_chat_id
+        logger.info("💉 Injected Telegram Chat ID from Secret Manager")
+
     # Telegram Diagnostics
     masked_token = settings.telegram_bot_token[:4] + "..." if settings.telegram_bot_token else "None"
     logger.info(f"📱 Telegram Config: Enabled={settings.enable_telegram}, Token={masked_token}, ChatID={settings.telegram_chat_id}")
