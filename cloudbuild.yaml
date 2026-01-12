@@ -78,7 +78,7 @@ timeout: '1200s'
 
 # Substitutions
 substitutions:
-  _REGION: us-east1
+  _REGION: us-central1
   _TAG: latest
 
 options:
