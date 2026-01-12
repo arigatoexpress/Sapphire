@@ -367,6 +367,8 @@ wsproto==1.2.0
     # via uvicorn
 yarl==1.22.0
     # via aiohttp
+google-generativeai>=0.8.0
+    # via cloud-trader (pyproject.toml) - Google AI Studio integration
 zipp==3.23.0
     # via importlib-metadata
 python-json-logger==2.0.7

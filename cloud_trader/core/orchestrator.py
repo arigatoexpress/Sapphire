@@ -28,7 +28,7 @@ class OrchestratorConfig:
     max_concurrent_trades: int = 5
     loop_interval_seconds: float = 60.0
     paper_trading: bool = False
-    event_driven: bool = True  # New: Enable event-driven mode
+    event_driven: bool = False  # CRITICAL: Must be False to run trading_loop.run_cycle()
     market_event_subscription: str = "sapphire-market-events-sub"
     signal_topic: str = "sapphire-signals"
 
