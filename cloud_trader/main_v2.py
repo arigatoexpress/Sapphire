@@ -46,6 +46,10 @@ async def lifespan(app: FastAPI):
     if credentials.api_key:
         logger.info(f"🔑 Aster API Key loaded: {credentials.api_key[:4]}...")
 
+    # Telegram Diagnostics
+    masked_token = settings.telegram_bot_token[:4] + "..." if settings.telegram_bot_token else "None"
+    logger.info(f"📱 Telegram Config: Enabled={settings.enable_telegram}, Token={masked_token}, ChatID={settings.telegram_chat_id}")
+
     # Initialize orchestrator
     from cloud_trader.core import TradingOrchestrator
 
