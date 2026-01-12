@@ -11,6 +11,8 @@ from typing import Any, Dict, List, Optional
 
 from ..config import Settings
 from ..platform_router import ExecutionResult, PlatformRouter
+from .state_manager import StateManager
+from .event_handler import EventHandler, MarketEventTypes, create_market_event
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +28,9 @@ class OrchestratorConfig:
     max_concurrent_trades: int = 5
     loop_interval_seconds: float = 60.0
     paper_trading: bool = False
+    event_driven: bool = True  # New: Enable event-driven mode
+    market_event_subscription: str = "sapphire-market-events-sub"
+    signal_topic: str = "sapphire-signals"
 
 
 class TradingOrchestrator:
@@ -68,6 +73,10 @@ class TradingOrchestrator:
         self._task: Optional[asyncio.Task] = None
         self._start_time: Optional[float] = None
 
+        # Event-Driven Components
+        self.state_manager = StateManager(namespace="sapphire")
+        self.event_handler = EventHandler()
+
         logger.info("🚀 TradingOrchestrator initialized")
 
     def _normalize_for_aster(self, symbol: str) -> str:
@@ -89,10 +98,14 @@ class TradingOrchestrator:
         # Initialize components
         await self._initialize_components()
 
-        # Start main loop
-        self._task = asyncio.create_task(self._run())
-
-        logger.info("✅ Sapphire V2 Trading System ONLINE")
+        # Start main loop or event listener
+        if self.config.event_driven:
+            await self._setup_event_handlers()
+            self._task = asyncio.create_task(self._run_event_driven())
+            logger.info("✅ Sapphire V2 Trading System ONLINE (Event-Driven Mode)")
+        else:
+            self._task = asyncio.create_task(self._run())
+            logger.info("✅ Sapphire V2 Trading System ONLINE (Polling Mode)")
 
     async def stop(self):
         """Gracefully stop the trading system."""
@@ -111,6 +124,9 @@ class TradingOrchestrator:
 
         # Cleanup components
         await self._cleanup_components()
+        
+        # Stop event handler
+        await self.event_handler.stop_listening()
 
         logger.info("✅ Sapphire V2 stopped gracefully")
 
@@ -181,6 +197,15 @@ class TradingOrchestrator:
         )
 
         logger.info("✅ All components initialized")
+        
+        # Restore state from Redis
+        saved_state = self.state_manager.load_orchestrator_state()
+        if saved_state:
+            logger.info(f"🔄 Restored state from Redis: {len(saved_state)} keys")
+            # Rehydrate positions if available
+            if self.position_tracker and 'positions' in saved_state:
+                for symbol, pos in saved_state.get('positions', {}).items():
+                    self.position_tracker._positions[symbol] = pos
 
     async def _cleanup_components(self):
         """Cleanup all components."""
@@ -204,6 +229,100 @@ class TradingOrchestrator:
             except Exception as e:
                 logger.error(f"❌ Orchestrator error: {e}")
                 await asyncio.sleep(5)  # Brief pause before retry
+
+    async def _setup_event_handlers(self):
+        """Register event handlers for Pub/Sub."""
+        # Register market event handler
+        self.event_handler.subscribe(
+            self.config.market_event_subscription,
+            self._handle_market_event
+        )
+        
+        # Start listening
+        await self.event_handler.start_listening()
+        logger.info("📡 Event handlers registered")
+
+    async def _run_event_driven(self):
+        """Event-driven main loop (replaces polling)."""
+        logger.info("🎯 Running in event-driven mode (no polling)")
+        
+        while self._running:
+            try:
+                # Periodic state persistence (every 30s)
+                await asyncio.sleep(30)
+                await self._persist_state()
+                
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"❌ Event-driven loop error: {e}")
+                await asyncio.sleep(5)
+
+    async def _handle_market_event(self, event: Dict[str, Any]):
+        """
+        Handle incoming market events from Pub/Sub.
+        This replaces the polling loop with reactive execution.
+        """
+        event_type = event.get("type")
+        symbol = event.get("symbol")
+        data = event.get("data", {})
+        
+        logger.info(f"⚡ Received event: {event_type} for {symbol}")
+        
+        try:
+            if event_type == MarketEventTypes.PRICE_UPDATE:
+                # Price update -> Check for trading signals
+                if self.trading_loop:
+                    await self.trading_loop.handle_price_update(symbol, data)
+                    
+            elif event_type == MarketEventTypes.SIGNAL_GENERATED:
+                # AI signal -> Execute trade
+                if self.trading_loop:
+                    await self.trading_loop.execute_signal(symbol, data)
+                    
+            elif event_type == MarketEventTypes.ORDER_FILL:
+                # Order filled -> Update positions
+                if self.position_tracker:
+                    await self.position_tracker.handle_fill(data)
+                    
+            elif event_type == MarketEventTypes.LIQUIDATION_RISK:
+                # Risk alert -> Emergency action
+                logger.warning(f"🚨 Liquidation risk for {symbol}!")
+                # TODO: Implement emergency close
+                
+            # Persist state after handling event
+            await self._persist_state()
+            
+        except Exception as e:
+            logger.error(f"❌ Event handler error for {event_type}: {e}")
+
+    async def _persist_state(self):
+        """Persist current state to Redis."""
+        try:
+            state = {
+                "running": self._running,
+                "timestamp": asyncio.get_event_loop().time(),
+            }
+            
+            # Include positions if available
+            if self.position_tracker:
+                state["positions"] = {k: v.__dict__ if hasattr(v, '__dict__') else v 
+                                      for k, v in self.position_tracker._positions.items()}
+            
+            self.state_manager.save_orchestrator_state(state)
+            logger.debug("💾 State persisted to Redis")
+            
+        except Exception as e:
+            logger.warning(f"⚠️ State persistence failed: {e}")
+
+    async def publish_signal(self, symbol: str, signal: str, confidence: float):
+        """Publish a trading signal to Pub/Sub."""
+        event = create_market_event(
+            MarketEventTypes.SIGNAL_GENERATED,
+            symbol,
+            {"signal": signal, "confidence": confidence}
+        )
+        await self.event_handler.publish(self.config.signal_topic, event)
 
     def get_status(self) -> Dict[str, Any]:
         """Get current system status."""

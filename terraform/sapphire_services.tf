@@ -3,7 +3,7 @@ resource "google_cloud_run_v2_service" "sapphire_cloud_trader" {
   name     = "sapphire-cloud-trader"
   location = var.region
   project  = var.project_id
-  ingress  = "INGRESS_TRAFFIC_ALL"
+  ingress  = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"  # SECURITY: Restrict to internal + LB only
   deletion_protection = false
 
   template {
@@ -13,6 +13,9 @@ resource "google_cloud_run_v2_service" "sapphire_cloud_trader" {
       min_instance_count = 1
       max_instance_count = 10
     }
+
+    # SECURITY: Enable gVisor sandboxing for kernel hardening
+    execution_environment = "EXECUTION_ENVIRONMENT_GEN2"
 
     containers {
       image = "gcr.io/${var.project_id}/cloud-trader:backend"
@@ -86,7 +89,7 @@ resource "google_cloud_run_v2_service" "sapphire_hyperliquid_trader" {
   name                = "sapphire-hyperliquid-trader"
   location            = var.region
   project             = var.project_id
-  ingress             = "INGRESS_TRAFFIC_ALL"
+  ingress             = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"  # SECURITY: Restrict to internal + LB only
   deletion_protection = false
 
   template {
@@ -96,6 +99,9 @@ resource "google_cloud_run_v2_service" "sapphire_hyperliquid_trader" {
       min_instance_count = 1
       max_instance_count = 10
     }
+
+    # SECURITY: Enable gVisor sandboxing for kernel hardening
+    execution_environment = "EXECUTION_ENVIRONMENT_GEN2"
 
     vpc_access {
       connector = google_vpc_access_connector.sapphire_connector.id
@@ -178,11 +184,12 @@ resource "google_cloud_run_v2_service" "sapphire_hyperliquid_trader" {
 
 
 
-# Public Access for Cloud Trader
-resource "google_cloud_run_service_iam_member" "public_access_cloud_trader" {
+# SECURITY: Removed allUsers public access
+# Access is now restricted to authenticated service accounts only
+resource "google_cloud_run_service_iam_member" "sa_access_cloud_trader" {
   location = google_cloud_run_v2_service.sapphire_cloud_trader.location
   project  = google_cloud_run_v2_service.sapphire_cloud_trader.project
   service  = google_cloud_run_v2_service.sapphire_cloud_trader.name
   role     = "roles/run.invoker"
-  member   = "allUsers"
+  member   = "serviceAccount:${google_service_account.main.email}"
 }

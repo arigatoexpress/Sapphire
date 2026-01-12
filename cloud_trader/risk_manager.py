@@ -1,319 +1,248 @@
-"""Risk Management Service for HFT Trading System
-
-Provides real-time risk monitoring, position management, and emergency controls.
+"""
+Risk Manager Module
+Implements stop-loss, position sizing, and hedging for Sapphire V2.
 """
 
-from __future__ import annotations
-
-import asyncio
-import json
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Set
+import math
+from dataclasses import dataclass
+from typing import Optional, Dict, List
+from enum import Enum
 
-from .config import get_settings
-from .logger import get_logger
-from .metrics import PORTFOLIO_DRAWDOWN, PORTFOLIO_LEVERAGE, POSITION_SIZE, RISK_LIMITS_BREACHED
-from .pubsub import PubSubClient
+logger = logging.getLogger(__name__)
 
-logger = get_logger(__name__)
+
+class RiskLevel(Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
+@dataclass
+class Position:
+    symbol: str
+    side: str  # LONG or SHORT
+    size: float
+    entry_price: float
+    current_price: float = 0.0
+    stop_loss: float = 0.0
+    take_profit: float = 0.0
+    trailing_stop_pct: float = 0.0
+
+    @property
+    def unrealized_pnl(self) -> float:
+        if self.current_price == 0:
+            return 0.0
+        diff = self.current_price - self.entry_price
+        return diff * self.size if self.side == "LONG" else -diff * self.size
+
+    @property
+    def unrealized_pnl_pct(self) -> float:
+        if self.entry_price == 0:
+            return 0.0
+        return (self.current_price - self.entry_price) / self.entry_price
 
 
 class RiskManager:
-    """Centralized risk management for the trading system."""
+    """
+    Manages trading risk through position sizing, stop-losses, and hedging.
+    """
 
-    def __init__(self):
-        self.settings = get_settings()
-        self.pubsub_client: Optional[PubSubClient] = None
+    def __init__(
+        self,
+        max_position_pct: float = 0.1,  # Max 10% of portfolio per trade
+        max_drawdown_pct: float = 0.15,  # Max 15% drawdown before halt
+        default_stop_loss_pct: float = 0.02,  # 2% stop loss
+        default_take_profit_pct: float = 0.04,  # 4% take profit (2:1 R/R)
+        max_correlation: float = 0.7,  # Max correlation for hedging
+    ):
+        self.max_position_pct = max_position_pct
+        self.max_drawdown_pct = max_drawdown_pct
+        self.default_stop_loss_pct = default_stop_loss_pct
+        self.default_take_profit_pct = default_take_profit_pct
+        self.max_correlation = max_correlation
 
-        # Risk state
-        self.portfolio_value = 10000.0  # Starting value
-        self.peak_portfolio_value = 10000.0
+        self.positions: Dict[str, Position] = {}
+        self.portfolio_value = 0.0
+        self.peak_value = 0.0
         self.current_drawdown = 0.0
-        self.daily_start_value = 10000.0
-        self.daily_pnl = 0.0
+        self.is_halted = False
 
-        # Position tracking
-        self.positions: Dict[str, Dict] = {}  # symbol -> position data
-        self.total_exposure = 0.0
-        self.leverage_ratio = 0.0
+    def calculate_position_size(
+        self,
+        symbol: str,
+        side: str,
+        entry_price: float,
+        volatility: float,
+        confidence: float = 0.5,
+    ) -> float:
+        """
+        Calculate dynamic position size using Kelly Criterion + volatility adjustment.
+        
+        Args:
+            symbol: Trading pair
+            side: LONG or SHORT
+            entry_price: Entry price
+            volatility: Recent volatility (ATR %)
+            confidence: Signal confidence (0-1)
+            
+        Returns:
+            Position size as fraction of portfolio
+        """
+        if self.is_halted:
+            logger.warning("Risk manager halted, returning 0 size")
+            return 0.0
 
-        # Risk limits
-        self.max_drawdown = 0.15  # 15%
-        self.max_daily_loss = 0.05  # 5%
-        self.max_position_size_pct = 0.02  # 2%
-        self.max_leverage = 10.0
+        # Base size from max position
+        base_size = self.max_position_pct
 
-        # Circuit breakers
-        self.trading_paused = False
-        self.kill_switch_activated = False
-        self.last_kill_switch_time = None
+        # Kelly Criterion adjustment
+        # f* = (bp - q) / b where b=R/R ratio, p=win prob, q=1-p
+        win_prob = 0.5 + confidence * 0.2  # Map confidence to win prob
+        rr_ratio = self.default_take_profit_pct / self.default_stop_loss_pct
+        kelly = (rr_ratio * win_prob - (1 - win_prob)) / rr_ratio
+        kelly = max(0, min(kelly, 0.25))  # Cap at 25%
 
-        # Alert thresholds
-        self.drawdown_warning_threshold = 0.05  # 5%
-        self.drawdown_critical_threshold = 0.10  # 10%
+        # Volatility scaling (reduce size in high volatility)
+        vol_scalar = 1.0 / (1.0 + volatility * 10)
+        vol_scalar = max(0.25, min(vol_scalar, 1.0))
 
-        # Monitoring
-        self.monitoring_active = True
-        self.check_interval = 10  # seconds
+        # Drawdown scaling (reduce size when in drawdown)
+        dd_scalar = 1.0 - (self.current_drawdown / self.max_drawdown_pct)
+        dd_scalar = max(0.1, min(dd_scalar, 1.0))
 
-    async def start(self):
-        """Initialize the risk manager."""
-        if self.settings.gcp_project_id:
-            self.pubsub_client = PubSubClient(self.settings)
-            await self.pubsub_client.connect()
-
-        # Start monitoring loop
-        asyncio.create_task(self._monitoring_loop())
-
-        # Subscribe to risk-related messages
-        await self._subscribe_to_updates()
-
-        logger.info("Risk Manager started")
-
-    async def stop(self):
-        """Shutdown the risk manager."""
-        self.monitoring_active = False
-        if self.pubsub_client:
-            await self.pubsub_client.close()
-
-    async def _subscribe_to_updates(self):
-        """Subscribe to position and trade updates."""
-        if not self.pubsub_client:
-            return
-
-        # In a real implementation, this would set up subscriptions
-        # For now, we'll poll via health checks
-        pass
-
-    async def _monitoring_loop(self):
-        """Main monitoring loop."""
-        while self.monitoring_active:
-            try:
-                await self._check_risk_limits()
-                await self._update_metrics()
-                await asyncio.sleep(self.check_interval)
-            except Exception as e:
-                logger.error(f"Risk monitoring error: {e}")
-                await asyncio.sleep(self.check_interval)
-
-    async def _check_risk_limits(self):
-        """Check all risk limits and trigger actions if needed."""
-        # Update drawdown
-        self.current_drawdown = (
-            self.peak_portfolio_value - self.portfolio_value
-        ) / self.peak_portfolio_value
-
-        # Check drawdown limits
-        if self.current_drawdown > self.drawdown_critical_threshold:
-            await self._trigger_emergency_stop("Critical drawdown exceeded")
-        elif self.current_drawdown > self.drawdown_warning_threshold:
-            await self._send_alert(
-                "High drawdown warning", f"Drawdown: {self.current_drawdown:.2%}"
-            )
-
-        # Check daily loss limit
-        daily_loss_pct = (self.daily_start_value - self.portfolio_value) / self.daily_start_value
-        if daily_loss_pct > self.max_daily_loss:
-            await self._pause_trading("Daily loss limit exceeded")
-
-        # Check leverage limit
-        if self.leverage_ratio > self.max_leverage:
-            await self._reduce_leverage("Leverage limit exceeded")
-
-        # Check position sizes
-        for symbol, position in self.positions.items():
-            position_value = abs(position.get("notional", 0))
-            position_pct = position_value / self.portfolio_value
-
-            if position_pct > self.max_position_size_pct:
-                await self._reduce_position(symbol, "Position size limit exceeded")
-
-    async def _trigger_emergency_stop(self, reason: str):
-        """Trigger emergency stop of all trading."""
-        if self.kill_switch_activated:
-            return  # Already activated
-
-        self.kill_switch_activated = True
-        self.last_kill_switch_time = datetime.now()
-
-        logger.critical(f"EMERGENCY STOP ACTIVATED: {reason}")
-
-        # Publish kill switch message
-        if self.pubsub_client:
-            await self.pubsub_client.publish_reasoning(
-                {
-                    "event": "kill_switch_activated",
-                    "reason": reason,
-                    "timestamp": datetime.now().isoformat(),
-                    "portfolio_value": self.portfolio_value,
-                    "drawdown": self.current_drawdown,
-                }
-            )
-
-        # Send critical alert
-        await self._send_alert("EMERGENCY STOP", f"Trading halted: {reason}")
-
-        RISK_LIMITS_BREACHED.labels(limit_type="emergency_stop").inc()
-
-    async def _pause_trading(self, reason: str):
-        """Pause trading activities."""
-        if self.trading_paused:
-            return
-
-        self.trading_paused = True
-        logger.warning(f"Trading paused: {reason}")
-
-        if self.pubsub_client:
-            await self.pubsub_client.publish_reasoning(
-                {
-                    "event": "trading_paused",
-                    "reason": reason,
-                    "timestamp": datetime.now().isoformat(),
-                }
-            )
-
-        RISK_LIMITS_BREACHED.labels(limit_type="trading_paused").inc()
-
-    async def _reduce_leverage(self, reason: str):
-        """Reduce portfolio leverage."""
-        logger.warning(f"Reducing leverage: {reason}")
-
-        if self.pubsub_client:
-            await self.pubsub_client.publish_reasoning(
-                {
-                    "event": "leverage_reduction",
-                    "reason": reason,
-                    "current_leverage": self.leverage_ratio,
-                    "target_leverage": self.max_leverage * 0.8,  # Reduce to 80% of max
-                    "timestamp": datetime.now().isoformat(),
-                }
-            )
-
-    async def _reduce_position(self, symbol: str, reason: str):
-        """Reduce position size for a symbol."""
-        logger.warning(f"Reducing position for {symbol}: {reason}")
-
-        if self.pubsub_client:
-            await self.pubsub_client.publish_reasoning(
-                {
-                    "event": "position_reduction",
-                    "symbol": symbol,
-                    "reason": reason,
-                    "current_size_pct": self.positions[symbol].get("notional", 0)
-                    / self.portfolio_value,
-                    "target_size_pct": self.max_position_size_pct * 0.8,
-                    "timestamp": datetime.now().isoformat(),
-                }
-            )
-
-    async def _send_alert(self, title: str, message: str):
-        """Send risk alert."""
-        logger.warning(f"ALERT: {title} - {message}")
-
-        if self.pubsub_client:
-            await self.pubsub_client.publish_reasoning(
-                {
-                    "event": "risk_alert",
-                    "title": title,
-                    "message": message,
-                    "severity": "warning" if "warning" in title.lower() else "critical",
-                    "timestamp": datetime.now().isoformat(),
-                }
-            )
-
-    async def update_portfolio_value(self, new_value: float):
-        """Update portfolio value and recalculate risk metrics."""
-        old_value = self.portfolio_value
-        self.portfolio_value = new_value
-
-        # Update peak value
-        if new_value > self.peak_portfolio_value:
-            self.peak_portfolio_value = new_value
-
-        # Update daily P&L
-        self.daily_pnl = new_value - self.daily_start_value
-
-        # Recalculate exposure and leverage
-        await self._recalculate_exposure()
+        final_size = base_size * kelly * vol_scalar * dd_scalar
+        final_size = max(0.01, min(final_size, self.max_position_pct))
 
         logger.info(
-            f"Portfolio value updated: ${old_value:.2f} → ${new_value:.2f} (P&L: ${self.daily_pnl:.2f})"
+            f"Position size for {symbol}: {final_size:.2%} "
+            f"(kelly={kelly:.2f}, vol_scalar={vol_scalar:.2f}, dd_scalar={dd_scalar:.2f})"
         )
 
-    async def update_position(self, symbol: str, position_data: Dict):
-        """Update position information."""
-        self.positions[symbol] = position_data
-        await self._recalculate_exposure()
+        return final_size
 
-    async def remove_position(self, symbol: str):
-        """Remove a closed position."""
-        if symbol in self.positions:
-            del self.positions[symbol]
-            await self._recalculate_exposure()
+    def calculate_stop_loss(
+        self, entry_price: float, side: str, volatility: float
+    ) -> float:
+        """Calculate dynamic stop-loss based on volatility."""
+        # ATR-based stop loss (1.5x ATR from entry)
+        atr_stop = volatility * 1.5
 
-    async def _recalculate_exposure(self):
-        """Recalculate total exposure and leverage."""
-        total_exposure = sum(abs(pos.get("notional", 0)) for pos in self.positions.values())
-        self.total_exposure = total_exposure
-        self.leverage_ratio = (
-            total_exposure / self.portfolio_value if self.portfolio_value > 0 else 0
-        )
+        # Use larger of default stop or ATR-based
+        stop_pct = max(self.default_stop_loss_pct, atr_stop)
+        stop_pct = min(stop_pct, 0.05)  # Cap at 5%
 
-    def get_risk_status(self) -> Dict:
-        """Get current risk status."""
+        if side == "LONG":
+            return entry_price * (1 - stop_pct)
+        else:
+            return entry_price * (1 + stop_pct)
+
+    def calculate_take_profit(
+        self, entry_price: float, side: str, stop_loss: float
+    ) -> float:
+        """Calculate take-profit for 2:1 risk/reward."""
+        risk = abs(entry_price - stop_loss)
+
+        if side == "LONG":
+            return entry_price + risk * 2
+        else:
+            return entry_price - risk * 2
+
+    def add_position(self, position: Position):
+        """Add position to tracking."""
+        self.positions[position.symbol] = position
+        logger.info(f"Added position: {position.symbol} {position.side} {position.size}")
+
+    def update_position(self, symbol: str, current_price: float) -> Optional[str]:
+        """
+        Update position and check for stop/take-profit triggers.
+        
+        Returns:
+            'STOP_LOSS', 'TAKE_PROFIT', 'TRAILING_STOP', or None
+        """
+        if symbol not in self.positions:
+            return None
+
+        pos = self.positions[symbol]
+        pos.current_price = current_price
+
+        # Check stop loss
+        if pos.side == "LONG" and current_price <= pos.stop_loss:
+            return "STOP_LOSS"
+        if pos.side == "SHORT" and current_price >= pos.stop_loss:
+            return "STOP_LOSS"
+
+        # Check take profit
+        if pos.side == "LONG" and current_price >= pos.take_profit:
+            return "TAKE_PROFIT"
+        if pos.side == "SHORT" and current_price <= pos.take_profit:
+            return "TAKE_PROFIT"
+
+        # Trailing stop update
+        if pos.trailing_stop_pct > 0:
+            if pos.side == "LONG":
+                new_stop = current_price * (1 - pos.trailing_stop_pct)
+                if new_stop > pos.stop_loss:
+                    pos.stop_loss = new_stop
+            else:
+                new_stop = current_price * (1 + pos.trailing_stop_pct)
+                if new_stop < pos.stop_loss:
+                    pos.stop_loss = new_stop
+
+        return None
+
+    def remove_position(self, symbol: str):
+        """Remove closed position."""
+        self.positions.pop(symbol, None)
+
+    def update_portfolio(self, value: float):
+        """Update portfolio value and check drawdown."""
+        self.portfolio_value = value
+
+        if value > self.peak_value:
+            self.peak_value = value
+
+        if self.peak_value > 0:
+            self.current_drawdown = (self.peak_value - value) / self.peak_value
+
+        if self.current_drawdown >= self.max_drawdown_pct:
+            logger.warning(f"🚨 Max drawdown reached: {self.current_drawdown:.2%}")
+            self.is_halted = True
+
+    def get_risk_level(self) -> RiskLevel:
+        """Get current risk level."""
+        if self.is_halted:
+            return RiskLevel.CRITICAL
+        if self.current_drawdown > self.max_drawdown_pct * 0.8:
+            return RiskLevel.HIGH
+        if self.current_drawdown > self.max_drawdown_pct * 0.5:
+            return RiskLevel.MEDIUM
+        return RiskLevel.LOW
+
+    def should_hedge(self, symbol: str) -> Optional[str]:
+        """
+        Determine if hedging is needed.
+        
+        Returns:
+            Hedge symbol or None
+        """
+        # Simple hedging logic: if too concentrated, suggest inverse
+        total_exposure = sum(p.size for p in self.positions.values())
+
+        if total_exposure > self.max_position_pct * 3:
+            logger.info("Portfolio over-exposed, hedging recommended")
+            # Return a hedge suggestion (e.g., opposite ETF or short)
+            return f"{symbol}_HEDGE"
+
+        return None
+
+    def get_status(self) -> Dict:
+        """Get risk manager status."""
         return {
-            "portfolio_value": self.portfolio_value,
-            "peak_value": self.peak_portfolio_value,
+            "is_halted": self.is_halted,
             "current_drawdown": self.current_drawdown,
-            "daily_pnl": self.daily_pnl,
-            "leverage_ratio": self.leverage_ratio,
-            "total_exposure": self.total_exposure,
-            "trading_paused": self.trading_paused,
-            "kill_switch_active": self.kill_switch_activated,
-            "positions_count": len(self.positions),
-            "last_update": datetime.now().isoformat(),
+            "risk_level": self.get_risk_level().value,
+            "positions": len(self.positions),
+            "portfolio_value": self.portfolio_value,
         }
-
-    def reset_daily_values(self):
-        """Reset daily tracking values (call at market open)."""
-        self.daily_start_value = self.portfolio_value
-        self.daily_pnl = 0.0
-        logger.info("Daily risk values reset")
-
-    async def _update_metrics(self):
-        """Update Prometheus metrics."""
-        try:
-            PORTFOLIO_DRAWDOWN.set(self.current_drawdown)
-            PORTFOLIO_LEVERAGE.set(self.leverage_ratio)
-
-            # Update position sizes
-            for symbol, position in self.positions.items():
-                POSITION_SIZE.labels(symbol=symbol).set(position.get("notional", 0))
-
-        except Exception as e:
-            logger.error(f"Failed to update metrics: {e}")
-
-    async def health_check(self) -> Dict:
-        """Perform health check."""
-        return {
-            "service": "risk_manager",
-            "status": "healthy",
-            "monitoring_active": self.monitoring_active,
-            "kill_switch_active": self.kill_switch_activated,
-            "trading_paused": self.trading_paused,
-            "current_drawdown": f"{self.current_drawdown:.2%}",
-            "leverage_ratio": f"{self.leverage_ratio:.2f}",
-        }
-
-
-# Global risk manager instance
-_risk_manager: Optional[RiskManager] = None
-
-
-def get_risk_manager() -> RiskManager:
-    """Get or create global risk manager instance."""
-    global _risk_manager
-    if _risk_manager is None:
-        _risk_manager = RiskManager()
-    return _risk_manager

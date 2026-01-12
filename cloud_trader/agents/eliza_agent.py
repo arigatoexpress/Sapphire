@@ -15,6 +15,7 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger(__name__)
 
@@ -126,12 +127,16 @@ class ElizaAgent:
             # 2. Build prompt
             prompt = self._build_analysis_prompt(symbol, memories, market_data)
 
-            # 3. Query model
-            response = await self.models.query(
-                prompt=prompt,
-                primary=self.config.primary_model,
-                fallback=self.config.fallback_model,
-            )
+            # 3. Query model with retry
+            @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+            async def _query_with_retry():
+                return await self.models.query(
+                    prompt=prompt,
+                    primary=self.config.primary_model,
+                    fallback=self.config.fallback_model,
+                )
+
+            response = await _query_with_retry()
 
             # 4. Parse thesis from response
             thesis = self._parse_thesis(symbol, response)
@@ -221,6 +226,68 @@ REASONING: [Your analysis in 1-2 sentences]
 
         return prompt
 
+    def _build_analysis_prompt(
+        self, symbol: str, memories: List[Dict], market_data: Optional[Dict]
+    ) -> str:
+        """Build the analysis prompt with personality and CoT context."""
+
+        # Personality-driven system prompt
+        personality_prompts = {
+            "analytical": "You are a methodical quantitative analyst. Focus on data and statistics.",
+            "aggressive": "You are an aggressive trader seeking high-conviction opportunities.",
+            "conservative": "You are a conservative risk manager. Prioritize capital preservation.",
+            "contrarian": "You are a contrarian trader. Look for opportunities where the crowd is wrong.",
+        }
+
+        system = personality_prompts.get(self.config.personality, personality_prompts["analytical"])
+
+        # Build context from memories
+        memory_context = ""
+        if memories:
+            memory_context = "\n\nRelevant past experiences:\n"
+            for mem in memories[:5]:
+                if mem.get("type") == "trade_outcome":
+                    pnl = mem.get("pnl", 0)
+                    outcome = "profit" if pnl > 0 else "loss"
+                    memory_context += f"- {mem.get('symbol')}: {outcome} ({pnl:.2f}%) - {mem.get('lesson', 'N/A')}\n"
+                elif mem.get("type") == "analysis":
+                    memory_context += (
+                        f"- Previous analysis: {mem.get('thesis', {}).get('reasoning', 'N/A')}\n"
+                    )
+
+        # Market data context
+        data_context = ""
+        if market_data:
+            data_context = f"\n\nCurrent market data:\n"
+            for key, value in market_data.items():
+                data_context += f"- {key}: {value}\n"
+
+        prompt = f"""
+{system}
+
+Analyze {symbol} using a step-by-step Chain-of-Thought approach.
+
+{memory_context}
+{data_context}
+
+Your win rate so far: {self.get_win_rate():.1%}
+
+Format your response exactly as follows:
+OBSERVE: [List key market data points and indicators]
+REASON: [Analyze the implications of observations, risks, and alignment with your strategy]
+CONCLUDE: [Final verdict based on reasoning]
+SIGNAL: [BUY/SELL/HOLD]
+CONFIDENCE: [0.0-1.0]
+
+Example:
+OBSERVE: Price up 5% in 1h, Volume 2x avg, RSI 75 (overbought).
+REASON: Momentum is strong but overbought conditions suggest pullback risk. However, volume confirms strength.
+CONCLUDE: Bullish short-term but tight stop needed.
+SIGNAL: BUY
+CONFIDENCE: 0.75
+"""
+        return prompt
+
     def _parse_thesis(self, symbol: str, response: Dict) -> Thesis:
         """Parse the model response into a Thesis."""
         text = response.get("text", "")
@@ -232,20 +299,45 @@ REASONING: [Your analysis in 1-2 sentences]
 
         try:
             lines = text.strip().split("\n")
+            cot_parts = {"OBSERVE": "", "REASON": "", "CONCLUDE": ""}
+            current_section = None
+
             for line in lines:
                 line = line.strip()
                 if line.startswith("SIGNAL:"):
                     s = line.replace("SIGNAL:", "").strip().upper()
                     if s in ["BUY", "SELL", "HOLD"]:
                         signal = s
+                    current_section = None
                 elif line.startswith("CONFIDENCE:"):
                     try:
                         c = float(line.replace("CONFIDENCE:", "").strip())
                         confidence = max(0.0, min(1.0, c))
                     except:
                         pass
-                elif line.startswith("REASONING:"):
-                    reasoning = line.replace("REASONING:", "").strip()
+                    current_section = None
+                elif line.startswith("OBSERVE:"):
+                    cot_parts["OBSERVE"] = line.replace("OBSERVE:", "").strip()
+                    current_section = "OBSERVE"
+                elif line.startswith("REASON:"):
+                    cot_parts["REASON"] = line.replace("REASON:", "").strip()
+                    current_section = "REASON"
+                elif line.startswith("CONCLUDE:"):
+                    cot_parts["CONCLUDE"] = line.replace("CONCLUDE:", "").strip()
+                    current_section = "CONCLUDE"
+                elif current_section:
+                    # Append continuation lines to current section
+                    cot_parts[current_section] += " " + line
+            
+            # Combine CoT parts into reasoning if structured data usage failing legacy REASONING format
+            if any(cot_parts.values()):
+                reasoning = (
+                    f"OBSERVE: {cot_parts['OBSERVE']} | "
+                    f"REASON: {cot_parts['REASON']} | "
+                    f"CONCLUDE: {cot_parts['CONCLUDE']}"
+                )
+            # Fallback to old behavior if needed, or if REASONING was used (though prompt doesn't ask for it anymore)
+                
         except Exception as e:
             logger.warning(f"Parse error: {e}")
 
