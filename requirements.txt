@@ -393,3 +393,8 @@ websocket-client
 lightgbm
 pandas
 scikit-learn
+tenacity
+stable-baselines3
+gymnasium
+pylint
+black

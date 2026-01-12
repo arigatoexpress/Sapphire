@@ -19,7 +19,7 @@ steps:
     args:
       - 'build'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/sapphire-trader:$COMMIT_SHA'
+      - 'gcr.io/$PROJECT_ID/sapphire-trader:${_TAG}'
       - '-t'
       - 'gcr.io/$PROJECT_ID/sapphire-trader:latest'
       - '.'
@@ -30,7 +30,7 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - 'gcr.io/$PROJECT_ID/sapphire-trader:$COMMIT_SHA'
+      - 'gcr.io/$PROJECT_ID/sapphire-trader:${_TAG}'
     id: 'push-sha'
     waitFor: ['build']
 
@@ -49,9 +49,9 @@ steps:
       - 'deploy'
       - 'sapphire-cloud-trader'
       - '--image'
-      - 'gcr.io/$PROJECT_ID/sapphire-trader:$COMMIT_SHA'
+      - 'gcr.io/$PROJECT_ID/sapphire-trader:${_TAG}'
       - '--region'
-      - 'us-east1'
+      - '${_REGION}'
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated=false'
@@ -70,7 +70,7 @@ steps:
 
 # Store images in Container Registry
 images:
-  - 'gcr.io/$PROJECT_ID/sapphire-trader:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/sapphire-trader:${_TAG}'
   - 'gcr.io/$PROJECT_ID/sapphire-trader:latest'
 
 # Build timeout
@@ -79,6 +79,7 @@ timeout: '1200s'
 # Substitutions
 substitutions:
   _REGION: us-east1
+  _TAG: latest
 
 options:
   logging: CLOUD_LOGGING_ONLY
