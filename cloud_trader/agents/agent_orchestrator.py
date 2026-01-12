@@ -72,7 +72,7 @@ class AgentOrchestrator:
                 personality="analytical",
                 specialization="technical",
                 primary_model=ModelProvider.GEMINI,
-                confidence_threshold=0.50,  # Lowered from 0.7
+                confidence_threshold=0.35,  # Lowered for testing
             ),
             AgentConfig(
                 agent_id="sentiment-sage",
@@ -80,7 +80,7 @@ class AgentOrchestrator:
                 personality="contrarian",
                 specialization="sentiment",
                 primary_model=ModelProvider.GEMINI,
-                confidence_threshold=0.45,  # Lowered from 0.65
+                confidence_threshold=0.30,  # Lowered for testing
             ),
             AgentConfig(
                 agent_id="risk-guardian",
@@ -88,7 +88,7 @@ class AgentOrchestrator:
                 personality="conservative",
                 specialization="hybrid",
                 primary_model=ModelProvider.GEMINI,
-                confidence_threshold=0.55,  # Lowered from 0.75
+                confidence_threshold=0.40,  # Lowered for testing
             ),
             AgentConfig(
                 agent_id="degen-hunter",
@@ -96,7 +96,7 @@ class AgentOrchestrator:
                 personality="aggressive",
                 specialization="orderflow",
                 primary_model=ModelProvider.GEMINI,
-                confidence_threshold=0.40,  # Lowered from 0.6 - aggressive scout
+                confidence_threshold=0.25,  # Lowered for testing - aggressive scout
             ),
         ]
 

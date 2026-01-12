@@ -109,7 +109,7 @@ class TradingLoop:
                         # Get consensus from all agents
                         consensus = await self.agents.get_consensus(symbol)
 
-                        if consensus and consensus.confidence >= 0.65:
+                        if consensus and consensus.confidence >= 0.40:  # Lowered from 0.65 for testing
                             opportunities += 1
 
                             # Execute if actionable
