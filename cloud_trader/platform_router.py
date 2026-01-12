@@ -423,20 +423,37 @@ class PlatformRouter:
     async def _execute_aster(self, symbol: str, side: str, quantity: float) -> ExecutionResult:
         """Execute on Aster (Main Liquidity)."""
         try:
+            from .enums import OrderType
+
             aster_symbol = self.service._normalize_for_aster(symbol)
-            res = await self.service._exchange_client.create_order(
-                symbol=aster_symbol, side=side, type="MARKET", quantity=quantity
+
+            # CRITICAL FIX: Use place_order instead of create_order
+            # CRITICAL FIX: Use OrderType.MARKET enum
+            res = await self.service._exchange_client.place_order(
+                symbol=aster_symbol, side=side, order_type=OrderType.MARKET, quantity=quantity
             )
-            success = bool(res and res.get("orderId"))
+
+            # CRITICAL CHECK: Verify FILL
+            # Aster/Binance API returns 'status': 'FILLED' for immediate market fills
+            status = res.get("status", "UNKNOWN")
+            is_filled = status == "FILLED"
+            success = bool(res and res.get("orderId") and is_filled)
+
+            # Use avgPrice for market orders as 'price' is usually 0
+            avg_price = float(res.get("avgPrice", res.get("price", 0.0)))
+
+            if not success and status != "FILLED":
+                logger.warning(f"⚠️ Order placed but NOT FILLED. Status: {status}, Response: {res}")
+
             return ExecutionResult(
                 success=success,
                 platform=PlatformType.ASTER,
                 symbol=symbol,
                 side=side,
                 quantity=quantity,
-                price=float(res.get("price", 0.0)),
-                tx_sig=str(res.get("orderId")) if success else None,
-                error=None if success else "Order placement failed",
+                price=avg_price,
+                tx_sig=str(res.get("orderId")) if res.get("orderId") else None,
+                error=None if success else f"Order Status: {status} (Expected FILLED)",
                 raw_response=res,
             )
         except Exception as e:

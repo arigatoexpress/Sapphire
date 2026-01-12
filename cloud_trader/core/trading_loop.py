@@ -280,9 +280,30 @@ class TradingLoop:
         return 100.0  # $100 per position
 
     async def _get_current_price(self, symbol: str) -> float:
-        """Get current market price."""
-        # TODO: Use market data manager
-        return 0.0
+        """Get current market price from the exchange."""
+        try:
+            if not self.orchestrator or not self.orchestrator._exchange_client:
+                logger.warning(f"⚠️ Cannot fetch price for {symbol}: No exchange client")
+                return 0.0
+
+            # Normalize symbol if needed (e.g. BTC-USDC -> BTCUSDT for Aster)
+            api_symbol = self.orchestrator._normalize_for_aster(symbol.replace("-", ""))
+
+            # Fetch price
+            # get_ticker_price returns dict like {'symbol': 'BTCUSDT', 'price': '12345.67'}
+            response = await self.orchestrator._exchange_client.get_ticker_price(api_symbol)
+
+            if isinstance(response, dict):
+                price = float(response.get("price", 0.0))
+                if price > 0:
+                    return price
+
+            logger.warning(f"⚠️ Invalid price response for {symbol}: {response}")
+            return 0.0
+
+        except Exception as e:
+            logger.error(f"❌ Failed to fetch price for {symbol}: {e}")
+            return 0.0
 
     async def stop(self):
         """Stop the trading loop."""

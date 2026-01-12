@@ -1,0 +1,10 @@
+# Aster Bot Dependencies
+httpx>=0.23.0
+google-cloud-pubsub>=2.18.0
+google-cloud-firestore>=2.14.0
+aiohttp>=3.8.0
+python-dotenv>=1.0.0
+cryptography>=41.0.0
+
+websockets>=11.0.3
+pydantic>=2.0.0
