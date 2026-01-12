@@ -75,7 +75,7 @@ images:
   - 'gcr.io/$PROJECT_ID/sapphire-trader:latest'
 
 # Build timeout
-timeout: '1200s'
+timeout: '3600s'
 
 # Substitutions
 substitutions:
