@@ -379,12 +379,15 @@ class PlatformRouter:
             # Symphony uses weight/action for perps
             action = "LONG" if side.upper() == "BUY" else "SHORT"
             if is_closing:
-                # Should ideally close by batchId, but for router we might need a more generic 'close'
-                # If we don't have batchId, we might have to open opposite or fetch positions
-                positions = await self.service.symphony.get_perpetual_positions()
+                # Get positions for the specific agent (MILF or AGDG)
+                agent_symphony_id = agent.id if agent else None
+                positions = await self.service.symphony.get_perpetual_positions(agent_id=agent_symphony_id)
                 target = next((p for p in positions if p.get("symbol") == symbol), None)
                 if target and target.get("batchId"):
-                    res = await self.service.symphony.close_perpetual_position(target["batchId"])
+                    res = await self.service.symphony.close_perpetual_position(
+                        target["batchId"], 
+                        agent_id=agent_symphony_id
+                    )
                 else:
                     return ExecutionResult(
                         False,

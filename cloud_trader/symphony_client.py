@@ -242,26 +242,27 @@ class SymphonyClient:
             logger.error(f"Failed to open perpetual position: {e}")
             raise
 
-    async def close_perpetual_position(self, batch_id: str) -> Dict[str, Any]:
+    async def close_perpetual_position(self, batch_id: str, agent_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Close a perpetual position by batchId via POST /agent/batch-close.
         Per Symphony Docs.
+        
+        Args:
+            batch_id: The batch ID of the position to close
+            agent_id: Optional agent ID that owns the position (defaults to MILF if not specified)
         """
+        # Use provided agent_id or default
+        target_agent = agent_id or self.default_agent_id
+        client, eff_agent_id = self._get_client_for_request(target_agent)
+        
         payload = {
-            "agentId": self.default_agent_id,
+            "agentId": eff_agent_id,
             "batchId": batch_id,
         }
 
-        logger.info(f"📉 Closing batch: {batch_id}")
+        logger.info(f"📉 Closing batch: {batch_id} (Agent: {eff_agent_id})")
 
         try:
-            # For closing, we need to know which agent owns the batch.
-            # For closing, we need to know which agent owns the batch.
-            # Assuming self.agent_id is correct context, or we might need to look it up if batch_id was stored with agent.
-            # For now, default to current context.
-            client, eff_agent_id = self._get_client_for_request(self.default_agent_id)
-            payload["agentId"] = eff_agent_id
-
             response = await client.post(f"{self.base_url}/agent/batch-close", json=payload)
             response.raise_for_status()
             return response.json()
@@ -272,15 +273,20 @@ class SymphonyClient:
             logger.error(f"Failed to close perpetual position: {e}")
             raise
 
-    async def get_perpetual_positions(self) -> List[Dict[str, Any]]:
-        """Get all open perpetual positions via /agent/positions."""
+    async def get_perpetual_positions(self, agent_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get all open perpetual positions via /agent/positions.
+        
+        Args:
+            agent_id: Optional agent ID to fetch positions for (defaults to MILF)
+        """
         try:
-            # Docs: GET /agent/positions?agentId=...
-            params = {}
-            if self.default_agent_id:
-                params["agentId"] = self.default_agent_id
+            # Use provided agent_id or default
+            target_agent = agent_id or self.default_agent_id
+            client, eff_agent_id = self._get_client_for_request(target_agent)
+            
+            params = {"agentId": eff_agent_id} if eff_agent_id else {}
 
-            response = await self.client.get(f"{self.base_url}/agent/positions", params=params)
+            response = await client.get(f"{self.base_url}/agent/positions", params=params)
             response.raise_for_status()
             data = response.json()
             # Expecting {"positions": [], ...} or []
@@ -290,6 +296,7 @@ class SymphonyClient:
         except Exception as e:
             logger.error(f"Failed to get perpetual positions: {e}")
             raise
+
 
     # ==================== SPOT TRADING ====================
 

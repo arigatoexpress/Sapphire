@@ -121,7 +121,7 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         "system": "symphony",
         "emoji": "🏛️",
         "type": "swap",
-        "symbols": ["MON-USDC", "CHOG-USDC", "DAC-USDC"],
+        "symbols": [],  # Empty = trade all SYMPHONY_SYMBOLS dynamically
         "description": "Monad Treasury Agent focusing on top-market cap projects and whale tracking.",
         "personality": "Strategic Monad whale follower and smart money tracker.",
         "baseline_win_rate": 0.60,

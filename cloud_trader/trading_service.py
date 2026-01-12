@@ -2408,8 +2408,10 @@ class TradingService:
             print(f"🎻 SYMPHONY ROUTING: Intercepting {symbol} for {agent.name}")
             try:
                 # 1. Determine Action Type (Swap vs Perp) based on Symbol
-                # Heuristic: MON/CHOG/DAC -> Monad (Swap), Others -> Base (Perp)
-                is_swap = symbol in ["MON-USDC", "CHOG-USDC", "DAC-USDC"]
+                # Heuristic: Monad chain tokens -> Swap (MILF), Base chain tokens -> Perp (AGDG)
+                # Monad swappable tokens - expanded list
+                MONAD_SWAP_TOKENS = ["MON-USDC", "CHOG-USDC", "DAC-USDC", "EMO-USDC", "ASTER-USDC"]
+                is_swap = symbol in MONAD_SWAP_TOKENS or symbol.split("-")[0] in ["MON", "CHOG", "DAC", "EMO"]
 
                 # 2. Cleanup Symbol
                 token_symbol = symbol.split("-")[0]  # MON-USDC -> MON
@@ -2438,8 +2440,8 @@ class TradingService:
                         agent_id=target_agent_id,
                     )
                 else:
-                    # Perp Logic (Degen / Base)
-                    target_agent_id = AGENTS_CONFIG["DEGEN"]["id"]
+                    # Perp Logic (AGDG / Base)
+                    target_agent_id = AGENTS_CONFIG["AGDG"]["id"]
 
                     trade_weight = min(10.0, (quantity_float * 100 / 1000) * 100)  # Cap at 10%
                     if trade_weight < 1:
@@ -2450,7 +2452,7 @@ class TradingService:
                         perp_action = "SHORT" if side == "BUY" else "LONG"  # Invert
 
                     print(
-                        f"🎻 Executing Perp: {perp_action} {token_symbol} (Weight: {trade_weight}%) via DEGEN ({target_agent_id})"
+                        f"🎻 Executing Perp: {perp_action} {token_symbol} (Weight: {trade_weight}%) via AGDG ({target_agent_id})"
                     )
                     result = await self.symphony.open_perpetual_position(
                         symbol=token_symbol,
