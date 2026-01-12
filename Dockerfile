@@ -57,4 +57,4 @@ USER trader
 EXPOSE 8080
 
 # Start command
-CMD ["python", "-m", "cloud_trader.main"]
+CMD ["python", "-m", "cloud_trader.main_v2"]
