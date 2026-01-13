@@ -158,6 +158,27 @@ def create_app() -> FastAPI:
             ],
         }
 
+    # Emergency close all positions
+    @app.post("/emergency/close-all")
+    async def emergency_close_all(dry_run: bool = False):
+        """Emergency close all positions across all platforms."""
+        from cloud_trader.emergency_close import close_all_positions
+        return await close_all_positions(dry_run=dry_run)
+
+    # Get all open positions (dry run of emergency close)
+    @app.get("/positions/all")
+    async def get_all_positions():
+        """Get all open positions across all platforms."""
+        from cloud_trader.emergency_close import get_all_positions
+        return await get_all_positions()
+
+    # Platform-specific logs endpoint
+    @app.get("/logs/{platform}")
+    async def get_platform_logs(platform: str, limit: int = 50):
+        """Get recent logs for a specific platform."""
+        from cloud_trader.platform_logger import get_platform_logs
+        return await get_platform_logs(platform, limit)
+
     return app
 
 
