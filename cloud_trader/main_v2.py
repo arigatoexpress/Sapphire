@@ -108,7 +108,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Sapphire V2",
         description="Autonomous AI Trading System - Powered by ElizaOS Patterns",
-        version="2.0.0",
+        version="2.1.0",
         lifespan=lifespan,
     )
 
@@ -137,7 +137,7 @@ def create_app() -> FastAPI:
     async def health_check():
         return {
             "status": "healthy",
-            "version": "2.0.0",
+            "version": "2.1.0",
             "orchestrator": orchestrator.get_status() if orchestrator else None,
         }
 
