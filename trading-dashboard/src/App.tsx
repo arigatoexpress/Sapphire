@@ -19,6 +19,7 @@ import JupiterSwap from './pages/JupiterSwap';
 import FiredancerDashboard from './pages/FiredancerDashboard';
 import { LiveMonitor } from './pages/LiveMonitor';
 import PlatformMetricsPage from './pages/PlatformMetrics';
+import { PlatformLogs } from './pages/PlatformLogs';
 
 
 import { SolanaWalletProvider } from './contexts/SolanaWalletContext'; // Import Wallet Provider
@@ -59,6 +60,7 @@ const App: React.FC = () => {
                         <Route path="/system" element={<SystemMetrics />} />
                         <Route path="/platforms" element={<PlatformMetricsPage />} />
                         <Route path="/monitor" element={<LiveMonitor />} />
+                        <Route path="/logs" element={<PlatformLogs />} />
 
                         {/* Jupiter Swap */}
                         <Route path="/jupiter" element={<JupiterSwap />} />
