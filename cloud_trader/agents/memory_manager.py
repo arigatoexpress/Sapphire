@@ -116,7 +116,8 @@ class MemoryManager:
             collection_ref = client.collection(self._collection_name).document(self._agent_id).collection("memories")
             query = collection_ref.order_by("timestamp", direction="DESCENDING").limit(self.max_memories)
             
-            docs = await query.get()
+            # Add timeout to prevent blocking trading loop
+            docs = await asyncio.wait_for(query.get(), timeout=10.0)
             loaded_count = 0
             
             # Load into deque (timestamp sorted)
@@ -141,6 +142,9 @@ class MemoryManager:
             self._loaded = True
             logger.info(f"🧠 Loaded {loaded_count} memories from Firestore for agent {self._agent_id}")
             
+        except asyncio.TimeoutError:
+            logger.warning(f"🧠 Firestore load timeout (10s) - starting with empty memory")
+            self._loaded = True
         except Exception as e:
             logger.error(f"🧠 Failed to load from Firestore: {e}")
             self._loaded = True

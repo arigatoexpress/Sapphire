@@ -28,6 +28,27 @@ logger = logging.getLogger("sapphire.v2")
 orchestrator = None
 
 
+async def _keep_alive_loop():
+    """
+    Background task that keeps the Cloud Run container alive.
+    Cloud Run scales down containers with no HTTP traffic.
+    This makes periodic internal requests to prevent shutdown.
+    """
+    import httpx
+    await asyncio.sleep(10)  # Initial wait for startup
+    
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        while True:
+            try:
+                # Ping health endpoint to keep container active
+                response = await client.get("http://localhost:8080/health")
+                logger.debug(f"💓 Keep-alive ping: {response.status_code}")
+            except Exception as e:
+                logger.debug(f"💓 Keep-alive ping failed (normal during startup): {e}")
+            
+            await asyncio.sleep(30)  # Ping every 30 seconds
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager with GCloud integration."""
@@ -67,12 +88,16 @@ async def lifespan(app: FastAPI):
     # Start trading system
     await orchestrator.start()
 
+    # Start background keep-alive task to prevent Cloud Run shutdown
+    keep_alive_task = asyncio.create_task(_keep_alive_loop())
+
     logger.info("✅ Sapphire V2 is ONLINE")
 
     yield
 
     # Shutdown
     logger.info("🛑 Shutting down Sapphire V2...")
+    keep_alive_task.cancel()
     if orchestrator:
         await orchestrator.stop()
     logger.info("✅ Sapphire V2 shutdown complete")
