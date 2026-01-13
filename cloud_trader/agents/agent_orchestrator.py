@@ -33,6 +33,13 @@ class ConsensusResult:
     reasoning: str
     agent_votes: List[Dict]
     agreement_level: float  # 0.0-1.0
+    
+    # Compatibility attributes for platform_router (expects agent-like object)
+    name: str = "AI Swarm"
+    id: str = "swarm-consensus"
+    emoji: str = "🤖"
+    agent_id: str = "swarm-consensus"
+    agent_name: str = "AI Swarm"
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -42,6 +49,8 @@ class ConsensusResult:
             "reasoning": self.reasoning,
             "agent_votes": self.agent_votes,
             "agreement_level": self.agreement_level,
+            "name": self.name,
+            "agent_id": self.agent_id,
         }
 
 
