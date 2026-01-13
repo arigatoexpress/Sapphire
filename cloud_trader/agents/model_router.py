@@ -19,6 +19,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, Optional
 
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 logger = logging.getLogger(__name__)
 
 
@@ -87,8 +89,9 @@ class MultiModelRouter:
                 import google.generativeai as genai
 
                 genai.configure(api_key=gemini_key)
-                self._clients[ModelProvider.GEMINI] = genai.GenerativeModel("gemini-3.0-flash-001")
-                logger.info("✅ Gemini 3.0 Flash initialized (Google AI Studio)")
+                # Use gemini-2.5-flash (current recommended) or fallback to 2.0
+                self._clients[ModelProvider.GEMINI] = genai.GenerativeModel("gemini-2.5-flash")
+                logger.info("✅ Gemini 2.5 Flash initialized (Google AI Studio)")
             except Exception as e:
                 logger.warning(f"Gemini init failed: {e}")
 
@@ -143,6 +146,15 @@ class MultiModelRouter:
         # All failed - return fallback response
         return self._fallback_response(prompt)
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        reraise=True,
+    )
+    async def _query_gemini_with_retry(self, client, prompt: str):
+        """Query Gemini with retry logic for resilience."""
+        return await client.generate_content_async(prompt)
+
     async def _query_model(self, provider: ModelProvider, prompt: str) -> ModelResponse:
         """Query a specific model provider."""
         start_time = time.time()
@@ -159,7 +171,8 @@ class MultiModelRouter:
 
         try:
             if provider == ModelProvider.GEMINI:
-                response = await client.generate_content_async(prompt)
+                # Use generate_content_async with retry for robustness
+                response = await self._query_gemini_with_retry(client, prompt)
                 text = response.text
 
             elif provider == ModelProvider.OPENAI:

@@ -262,6 +262,19 @@ REASONING: [Your analysis in 1-2 sentences]
             for key, value in market_data.items():
                 data_context += f"- {key}: {value}\n"
 
+        # Community/Telegram signals context
+        telegram_context = ""
+        try:
+            from ..telegram_listener import _telegram_listener
+            if _telegram_listener:
+                telegram_context = _telegram_listener.format_for_agent(symbol)
+                if telegram_context and "No recent" not in telegram_context:
+                    telegram_context = f"\n\n{telegram_context}\n"
+                else:
+                    telegram_context = ""
+        except Exception:
+            pass  # Telegram listener not available
+
         prompt = f"""
 {system}
 
@@ -269,6 +282,7 @@ Analyze {symbol} using a step-by-step Chain-of-Thought approach.
 
 {memory_context}
 {data_context}
+{telegram_context}
 
 Your win rate so far: {self.get_win_rate():.1%}
 
