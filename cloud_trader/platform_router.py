@@ -200,10 +200,8 @@ class PlatformRouter:
         quantity_fuzz = random.uniform(0.98, 1.02)  # +/- 2%
         final_quantity = quantity * quantity_fuzz
 
-        # Standardize formatting via PositionManager
-        formatted_quantity = await self.service.position_manager._round_quantity(
-            symbol, final_quantity
-        )
+        # Simple quantity rounding (8 decimal places for most assets)
+        formatted_quantity = round(final_quantity, 8)
 
         try:
             # Circuit breaker protection for platform execution
