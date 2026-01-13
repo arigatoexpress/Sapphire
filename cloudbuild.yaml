@@ -48,14 +48,14 @@ steps:
     args:
       - 'run'
       - 'deploy'
-      - 'sapphire-cloud-trader'
+      - 'sapphire-v2'
       - '--image'
       - 'gcr.io/$PROJECT_ID/sapphire-trader:${_TAG}'
       - '--region'
       - '${_REGION}'
       - '--platform'
       - 'managed'
-      - '--no-allow-unauthenticated'
+      - '--allow-unauthenticated'
       - '--memory'
       - '2Gi'
       - '--cpu'
@@ -65,7 +65,7 @@ steps:
       - '--max-instances'
       - '10'
       - '--set-env-vars'
-      - 'ENVIRONMENT=production'
+      - 'ENVIRONMENT=production,LOG_LEVEL=INFO'
     id: 'deploy'
     waitFor: ['push-sha']
 
