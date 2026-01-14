@@ -10,9 +10,9 @@
 
 [![Solana](https://img.shields.io/badge/Solana-Drift-9945FF?logo=solana&logoColor=white)](#)
 [![Monad](https://img.shields.io/badge/Monad-Symphony-FF3366)](#)
-[![Status](https://img.shields.io/badge/status-Production-success)](https://sapphire-v2-267358751314.us-central1.run.app/health)
+[![Status](https://img.shields.io/badge/status-Production-success)](https://sapphire-v2-s77j6bxyra-uc.a.run.app/health)
 
-**Production URL**: `https://sapphire-v2-267358751314.us-central1.run.app`
+**Production URL**: `https://sapphire-v2-s77j6bxyra-uc.a.run.app`
 
 </div>
 
@@ -26,7 +26,8 @@ Sapphire V2 is a production-grade, autonomous trading system implementing memory
 2. **Memory-Augmented Learning**: RAG-like pattern for continuous improvement
 3. **Multi-Platform Execution**: Unified routing across Aster, Drift, Symphony
 4. **Advanced Execution**: TWAP, VWAP, Iceberg, Sniper algorithms with MEV protection
-5. **99.99% Uptime**: Circuit breaker-protected platform failover
+5. **Real-time Monitoring**: Telegram ingestion + health-checked alerting system
+6. **99.99% Uptime**: Circuit breaker-protected platform failover
 
 **Key Metrics** (Production-Verified):
 - **Zero Errors**: 0 production exceptions in 8+ hours of autonomous trading
@@ -75,10 +76,10 @@ Sapphire V2 is a production-grade, autonomous trading system implementing memory
 │                        │                                                 │
 │        ┌───────────────┼────────────────┬────────────┐                 │
 │        │               │                │            │                  │
-│   ┌────▼─────┐   ┌────▼──────┐   ┌────▼─────┐  ┌──▼──────┐           │
-│   │  Aster   │   │   Drift   │   │ Symphony │  │Hyperliq │           │
-│   │  (CEX)   │   │ (Solana)  │   │ (Monad)  │  │(Stub)   │           │
-│   └──────────┘   └───────────┘   └──────────┘  └─────────┘           │
+│   ┌────▼─────┐   ┌────▼──────┐   ┌────▼─────┐                │
+│   │  Aster   │   │   Drift   │   │ Symphony │                │
+│   │  (CEX)   │   │ (Solana)  │   │ (Monad)  │                │
+│   └──────────┘   └───────────┘   └──────────┘                │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -568,7 +569,7 @@ API Response Time:
 
 ```bash
 # Basic health check
-curl https://sapphire-v2-267358751314.us-central1.run.app/health
+curl https://sapphire-v2-s77j6bxyra-uc.a.run.app/health
 
 # Expected Response:
 {
@@ -793,8 +794,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Built with ❤️ for the Future of Autonomous Finance**
 
-[Production URL](https://sapphire-v2-267358751314.us-central1.run.app) · [Health Status](https://sapphire-v2-267358751314.us-central1.run.app/health) · [Dashboard](https://sapphire-479610.web.app)
+[Production URL](https://sapphire-v2-s77j6bxyra-uc.a.run.app) · [Health Status](https://sapphire-v2-s77j6bxyra-uc.a.run.app/health) · [Dashboard](https://sapphire-479610.web.app)
 
-**Version 2.0.0** | **Status: Production** | **Uptime: 99.99%**
+**Version 2.3.0** | **Status: Production** | **Uptime: 99.99%**
 
 </div>

@@ -1,4 +1,3 @@
-
 import asyncio
 import logging
 import math
@@ -12,11 +11,13 @@ logger = logging.getLogger(__name__)
 # Lazy import for RL agent
 _rl_agent = None
 
+
 def _get_rl_agent():
     global _rl_agent
     if _rl_agent is None:
         try:
             from ..rl.rl_agent import RLTradingAgent
+
             _rl_agent = RLTradingAgent()
         except Exception as e:
             logger.warning(f"RL agent not available: {e}")
@@ -33,13 +34,14 @@ class ConsensusResult:
     reasoning: str
     agent_votes: List[Dict]
     agreement_level: float  # 0.0-1.0
-    
+
     # Compatibility attributes for platform_router (expects agent-like object)
     name: str = "AI Swarm"
     id: str = "swarm-consensus"
     emoji: str = "🤖"
     agent_id: str = "swarm-consensus"
     agent_name: str = "AI Swarm"
+    system: str = "aster"  # Aggregated system preference
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -73,46 +75,38 @@ class AgentOrchestrator:
         logger.info(f"🎭 AgentOrchestrator initialized with {len(self.agents)} agents")
 
     def _initialize_default_agents(self):
-        """Create the default agent roster."""
-        default_agents = [
-            AgentConfig(
-                agent_id="quant-alpha",
-                name="Quant Alpha",
-                personality="analytical",
-                specialization="technical",
-                primary_model=ModelProvider.GEMINI,
-                confidence_threshold=0.35,  # Lowered for testing
-            ),
-            AgentConfig(
-                agent_id="sentiment-sage",
-                name="Sentiment Sage",
-                personality="contrarian",
-                specialization="sentiment",
-                primary_model=ModelProvider.GEMINI,
-                confidence_threshold=0.30,  # Lowered for testing
-            ),
-            AgentConfig(
-                agent_id="risk-guardian",
-                name="Risk Guardian",
-                personality="conservative",
-                specialization="hybrid",
-                primary_model=ModelProvider.GEMINI,
-                confidence_threshold=0.40,  # Lowered for testing
-            ),
-            AgentConfig(
-                agent_id="degen-hunter",
-                name="Degen Hunter",
-                personality="aggressive",
-                specialization="orderflow",
-                primary_model=ModelProvider.GEMINI,
-                confidence_threshold=0.25,  # Lowered for testing - aggressive scout
-            ),
-        ]
+        """Create the default agent roster from AGENT_DEFINITIONS."""
+        from ..definitions import AGENT_DEFINITIONS
+        from .eliza_agent import ModelProvider
 
-        for config in default_agents:
-            self.agents[config.agent_id] = ElizaAgent(config)
-            if self.monitoring:
-                self.monitoring.register_agent(config.agent_id, config.name)
+        for raw_agent in AGENT_DEFINITIONS:
+            # Map raw config to AgentConfig
+            try:
+                # Handle model string to enum mapping
+                model_str = raw_agent.get("model", "gemini")
+                model_enum = ModelProvider.GEMINI
+                if "openai" in model_str.lower():
+                    model_enum = ModelProvider.OPENAI
+
+                config = AgentConfig(
+                    agent_id=raw_agent["id"],
+                    name=raw_agent["name"],
+                    personality=raw_agent.get("personality", "analytical"),
+                    specialization=raw_agent.get("specialization", "hybrid"),
+                    confidence_threshold=raw_agent.get("adaptive_params", {}).get(
+                        "confidence_threshold", 0.35
+                    ),
+                    primary_model=model_enum,
+                    system=raw_agent.get("system", "aster"),
+                )
+
+                self.agents[config.agent_id] = ElizaAgent(config)
+                if self.monitoring:
+                    self.monitoring.register_agent(config.agent_id, config.name)
+
+                logger.info(f"✅ Loaded agent: {config.name} ({config.system})")
+            except Exception as e:
+                logger.error(f"Failed to load agent {raw_agent.get('name')}: {e}")
 
     async def get_consensus(
         self, symbol: str, context: str = "entry", market_data: Optional[Dict] = None
@@ -161,8 +155,9 @@ class AgentOrchestrator:
         try:
             # Build observation from market data
             import numpy as np
-            if market_data and 'prices' in market_data:
-                prices = market_data['prices'][-30:]
+
+            if market_data and "prices" in market_data:
+                prices = market_data["prices"][-30:]
                 obs = np.array(prices, dtype=np.float32)
                 # Pad if needed
                 if len(obs) < 63:  # Env observation size
@@ -172,17 +167,19 @@ class AgentOrchestrator:
 
             action = rl_agent.predict(obs)
             signal = rl_agent.action_to_signal(action)
-            
+
             return {
                 "signal": signal,
                 "confidence": 0.7,  # RL confidence (can be trained)
-                "source": "rl_ppo"
+                "source": "rl_ppo",
             }
         except Exception as e:
             logger.warning(f"RL prediction failed: {e}")
             return None
 
-    def _calculate_consensus(self, symbol: str, theses: List[Thesis], rl_signal: Optional[Dict] = None) -> ConsensusResult:
+    def _calculate_consensus(
+        self, symbol: str, theses: List[Thesis], rl_signal: Optional[Dict] = None
+    ) -> ConsensusResult:
         """Calculate consensus from multiple agent theses using Sigmoid weighting."""
         signal_scores = {"BUY": 0.0, "SELL": 0.0, "HOLD": 0.0}
         agent_votes = []
@@ -194,7 +191,7 @@ class AgentOrchestrator:
         for thesis in theses:
             agent = self.agents.get(thesis.agent_id)
             win_rate = agent.get_win_rate() if agent else 0.5
-            
+
             # Sigmoid Weighting: 1 / (1 + exp(-k * (confidence * win_rate - threshold)))
             # This pushes weights towards 0 or 1 based on performance x confidence
             try:
@@ -213,6 +210,7 @@ class AgentOrchestrator:
                     "confidence": thesis.confidence,
                     "weight": weight,
                     "reasoning": thesis.reasoning,
+                    "system": thesis.system,
                 }
             )
 
@@ -220,14 +218,17 @@ class AgentOrchestrator:
         if rl_signal:
             rl_weight = self.rl_weight
             signal_scores[rl_signal["signal"]] += rl_weight
-            agent_votes.append({
-                "agent_id": "rl-ppo",
-                "agent_name": "RL PPO Agent",
-                "signal": rl_signal["signal"],
-                "confidence": rl_signal["confidence"],
-                "weight": rl_weight,
-                "reasoning": "PPO model prediction",
-            })
+            agent_votes.append(
+                {
+                    "agent_id": "rl-ppo",
+                    "agent_name": "RL PPO Agent",
+                    "signal": rl_signal["signal"],
+                    "confidence": rl_signal["confidence"],
+                    "weight": rl_weight,
+                    "reasoning": "PPO model prediction",
+                    "system": "aster",  # RL usually trades Aster symbols
+                }
+            )
 
         # Determine winning signal
         total_score = sum(signal_scores.values())
@@ -239,6 +240,7 @@ class AgentOrchestrator:
                 reasoning="No valid agent votes",
                 agent_votes=agent_votes,
                 agreement_level=0.0,
+                system="aster",
             )
 
         winning_signal = max(signal_scores.keys(), key=lambda s: signal_scores[s])
@@ -246,6 +248,17 @@ class AgentOrchestrator:
 
         # Calculate agreement level
         agreement = winning_score / total_score
+
+        # Determine dominant system for the winning signal
+        system_votes = {}
+        for v in agent_votes:
+            if v["signal"] == winning_signal:
+                sys = v.get("system", "aster")
+                system_votes[sys] = system_votes.get(sys, 0.0) + v["weight"]
+
+        dominant_system = "aster"
+        if system_votes:
+            dominant_system = max(system_votes.keys(), key=lambda k: system_votes[k])
 
         # Consensus confidence (weighted average of confidence of supporters)
         supporters = [v for v in agent_votes if v["signal"] == winning_signal]
@@ -267,19 +280,20 @@ class AgentOrchestrator:
             reasoning=reasoning,
             agent_votes=agent_votes,
             agreement_level=agreement,
+            system=dominant_system,
         )
-        
+
         # Log consensus for debugging zero-trade issues
         logger.info(
             f"🎯 Consensus for {symbol}: {winning_signal} "
             f"(conf={avg_conf:.2f}, agree={agreement:.2f}, score={winning_score:.2f})"
         )
-        
+
         return result
 
     async def learn_from_trade(self, symbol: str, signal: str, pnl_pct: float):
         """Update all agents and run debrief cycle."""
-        
+
         # 1. Debrief: Generate a lesson from the trade
         lesson = "N/A"
         try:
@@ -290,20 +304,19 @@ class AgentOrchestrator:
                 Analyze this trade outcome for {symbol}.
                 Signal: {signal}
                 PnL: {pnl_pct:.2%}
-                
+
                 Provide a concise, 1-sentence strategic lesson to improve future decisions.
                 Format: "LESSON: [Your lesson here]"
                 """
                 response = await critique_agent.models.query(
-                    prompt=prompt, 
-                    primary=critique_agent.config.primary_model
+                    prompt=prompt, primary=critique_agent.config.primary_model
                 )
                 text = response.get("text", "")
                 if "LESSON:" in text:
                     lesson = text.split("LESSON:")[1].strip()
                 elif text:
                     lesson = text.strip()
-                    
+
         except Exception as e:
             logger.warning(f"Debrief failed: {e}")
 
@@ -320,11 +333,11 @@ class AgentOrchestrator:
             # We inject the lesson into the memory via the thesis reasoning or a separate field
             # ElizaAgent.learn_from_trade calls memory.store which saves the thesis reasoning and a hardcoded "lesson".
             # I should hack ElizaAgent's learn_from_trade or pass it here.
-            # ElizaAgent.learn_from_trade logic: 
+            # ElizaAgent.learn_from_trade logic:
             # lesson = "Successful strategy" if pnl_pct > 0 else "Review entry criteria"
             # It ignores the passed thesis reasoning for the 'lesson' field in memory, but stores 'reasoning'.
             # I'll rely on the 'reasoning' field of the thesis which now contains the lesson.
-            
+
             await agent.learn_from_trade(thesis, pnl_pct)
 
     def get_agent_stats(self) -> List[Dict]:
@@ -334,5 +347,3 @@ class AgentOrchestrator:
     async def stop(self):
         """Stop all agents."""
         logger.info("🎭 AgentOrchestrator stopped")
-
-

@@ -16,10 +16,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Configure logging
+# Configure logging
+from .platform_logger import PlatformLogHandler
+
+handler = logging.StreamHandler(sys.stdout)
+platform_handler = PlatformLogHandler()
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)],
+    handlers=[handler, platform_handler],
 )
 logger = logging.getLogger("sapphire.v2")
 
@@ -35,8 +41,9 @@ async def _keep_alive_loop():
     This makes periodic internal requests to prevent shutdown.
     """
     import httpx
+
     await asyncio.sleep(10)  # Initial wait for startup
-    
+
     async with httpx.AsyncClient(timeout=10.0) as client:
         while True:
             try:
@@ -45,7 +52,7 @@ async def _keep_alive_loop():
                 logger.debug(f"💓 Keep-alive ping: {response.status_code}")
             except Exception as e:
                 logger.debug(f"💓 Keep-alive ping failed (normal during startup): {e}")
-            
+
             await asyncio.sleep(30)  # Ping every 30 seconds
 
 
@@ -71,14 +78,18 @@ async def lifespan(app: FastAPI):
     if credentials.telegram_bot_token and not settings.telegram_bot_token:
         settings.telegram_bot_token = credentials.telegram_bot_token
         logger.info("💉 Injected Telegram Bot Token from Secret Manager")
-        
+
     if credentials.telegram_chat_id and not settings.telegram_chat_id:
         settings.telegram_chat_id = credentials.telegram_chat_id
         logger.info("💉 Injected Telegram Chat ID from Secret Manager")
 
     # Telegram Diagnostics
-    masked_token = settings.telegram_bot_token[:4] + "..." if settings.telegram_bot_token else "None"
-    logger.info(f"📱 Telegram Config: Enabled={settings.enable_telegram}, Token={masked_token}, ChatID={settings.telegram_chat_id}")
+    masked_token = (
+        settings.telegram_bot_token[:4] + "..." if settings.telegram_bot_token else "None"
+    )
+    logger.info(
+        f"📱 Telegram Config: Enabled={settings.enable_telegram}, Token={masked_token}, ChatID={settings.telegram_chat_id}"
+    )
 
     # Initialize orchestrator
     from cloud_trader.core import TradingOrchestrator
@@ -108,7 +119,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Sapphire V2",
         description="Autonomous AI Trading System - Powered by ElizaOS Patterns",
-        version="2.1.0",
+        version="2.2.8",
         lifespan=lifespan,
     )
 
@@ -163,6 +174,7 @@ def create_app() -> FastAPI:
     async def emergency_close_all(dry_run: bool = False):
         """Emergency close all positions across all platforms."""
         from cloud_trader.emergency_close import close_all_positions
+
         return await close_all_positions(dry_run=dry_run)
 
     # Get all open positions (dry run of emergency close)
@@ -170,6 +182,7 @@ def create_app() -> FastAPI:
     async def get_all_positions():
         """Get all open positions across all platforms."""
         from cloud_trader.emergency_close import get_all_positions
+
         return await get_all_positions()
 
     # Platform-specific logs endpoint
@@ -177,6 +190,7 @@ def create_app() -> FastAPI:
     async def get_platform_logs(platform: str, limit: int = 50):
         """Get recent logs for a specific platform."""
         from cloud_trader.platform_logger import get_platform_logs
+
         return await get_platform_logs(platform, limit)
 
     return app

@@ -40,13 +40,13 @@ class LogLevel(Enum):
 @dataclass
 class PlatformLogEntry:
     """A single log entry for a platform."""
-    
+
     timestamp: float
     level: str
     message: str
     platform: str
     context: Dict[str, Any] = field(default_factory=dict)
-    
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "timestamp": self.timestamp,
@@ -63,7 +63,7 @@ class PlatformLogger:
     Centralized logger for all trading platforms.
     Stores logs in memory with rotation for API access.
     """
-    
+
     def __init__(self, max_logs_per_platform: int = 500):
         self.max_logs = max_logs_per_platform
         self._logs: Dict[str, deque] = {
@@ -71,7 +71,7 @@ class PlatformLogger:
         }
         self._error_counts: Dict[str, int] = {p.value: 0 for p in Platform}
         self._last_activity: Dict[str, float] = {p.value: 0.0 for p in Platform}
-        
+
     def log(
         self,
         platform: str,
@@ -83,7 +83,7 @@ class PlatformLogger:
         platform_key = platform.lower()
         if platform_key not in self._logs:
             platform_key = Platform.SYSTEM.value
-            
+
         entry = PlatformLogEntry(
             timestamp=time.time(),
             level=level.upper(),
@@ -91,17 +91,17 @@ class PlatformLogger:
             platform=platform_key,
             context=context or {},
         )
-        
+
         self._logs[platform_key].append(entry)
         self._last_activity[platform_key] = time.time()
-        
+
         if level.upper() in ("ERROR", "CRITICAL"):
             self._error_counts[platform_key] += 1
-            
+
         # Also log to standard logger
         log_func = getattr(logger, level.lower(), logger.info)
         log_func(f"[{platform_key.upper()}] {message}")
-    
+
     def get_logs(
         self,
         platform: str,
@@ -112,20 +112,20 @@ class PlatformLogger:
         platform_key = platform.lower()
         if platform_key not in self._logs:
             return []
-            
+
         logs = list(self._logs[platform_key])
-        
+
         # Filter by level if specified
         if level_filter:
             level_upper = level_filter.upper()
             logs = [l for l in logs if l.level == level_upper]
-        
+
         # Return most recent first
         logs = logs[-limit:]
         logs.reverse()
-        
+
         return [l.to_dict() for l in logs]
-    
+
     def get_stats(self) -> Dict[str, Any]:
         """Get logging statistics for all platforms."""
         return {
@@ -133,13 +133,15 @@ class PlatformLogger:
                 "total_logs": len(self._logs[platform]),
                 "error_count": self._error_counts[platform],
                 "last_activity": self._last_activity[platform],
-                "last_activity_ago": time.time() - self._last_activity[platform]
-                if self._last_activity[platform] > 0
-                else None,
+                "last_activity_ago": (
+                    time.time() - self._last_activity[platform]
+                    if self._last_activity[platform] > 0
+                    else None
+                ),
             }
             for platform in self._logs
         }
-    
+
     def clear(self, platform: Optional[str] = None) -> None:
         """Clear logs for a platform or all platforms."""
         if platform:
@@ -151,6 +153,60 @@ class PlatformLogger:
             for p in self._logs:
                 self._logs[p].clear()
                 self._error_counts[p] = 0
+
+
+class PlatformLogHandler(logging.Handler):
+    """
+    Custom logging handler that routes standard Python logs to PlatformLogger.
+    Ensures all logs visible in Cloud Run console also appear in the dashboard.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.platform_logger = get_logger()
+
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+
+            # Determine platform based on logger name
+            platform = Platform.SYSTEM.value
+            if "aster" in record.name.lower():
+                platform = Platform.ASTER.value
+            elif "symphony" in record.name.lower():
+                platform = Platform.SYMPHONY.value
+            elif "drift" in record.name.lower():
+                platform = Platform.DRIFT.value
+            elif "hyperliquid" in record.name.lower():
+                platform = Platform.HYPERLIQUID.value
+            elif "agent" in record.name.lower():
+                platform = Platform.AGENTS.value
+
+            # Avoid recursion if PlatformLogger logs to standard logger
+            if "platform_logger" in record.name:
+                return
+
+            # Log directly to internal storage
+            platform_key = platform
+            if platform_key not in self.platform_logger._logs:
+                platform_key = Platform.SYSTEM.value
+
+            entry = PlatformLogEntry(
+                timestamp=record.created,
+                level=record.levelname,
+                message=msg,
+                platform=platform_key,
+                context={"logger": record.name},
+            )
+
+            self.platform_logger._logs[platform_key].append(entry)
+            self.platform_logger._last_activity[platform_key] = record.created
+
+            if record.levelname in ("ERROR", "CRITICAL"):
+                self.platform_logger._error_counts[platform_key] += 1
+
+        except Exception:
+            self.handleError(record)
 
 
 # Singleton instance
@@ -194,7 +250,7 @@ def log_system(level: str, message: str, **context):
 async def get_platform_logs(platform: str, limit: int = 50) -> Dict[str, Any]:
     """Get logs for a platform - used by API endpoint."""
     platform_logger = get_logger()
-    
+
     if platform.lower() == "all":
         # Return logs from all platforms
         all_logs = []

@@ -11,8 +11,8 @@ from typing import Any, Dict, List, Optional
 
 from ..config import Settings
 from ..platform_router import ExecutionResult, PlatformRouter
-from .state_manager import StateManager
 from .event_handler import EventHandler, MarketEventTypes, create_market_event
+from .state_manager import StateManager
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ class OrchestratorConfig:
     enable_aster: bool = True
     enable_drift: bool = True
     enable_symphony: bool = True
-    enable_hyperliquid: bool = False  # Deprecated
+
     max_concurrent_trades: int = 5
     loop_interval_seconds: float = 60.0
     paper_trading: bool = False
@@ -61,12 +61,12 @@ class TradingOrchestrator:
         self.agent_orchestrator = None
         self.position_tracker = None
         self.platform_router = None
+        self.telegram_listener = None
 
         # Platform Clients
         self._exchange_client = None  # Aster
         self.drift = None
         self.symphony = None
-        self.hl_client = None  # Hyperliquid (stub)
 
         # State
         self._running = False
@@ -124,9 +124,13 @@ class TradingOrchestrator:
 
         # Cleanup components
         await self._cleanup_components()
-        
+
         # Stop event handler
         await self.event_handler.stop_listening()
+
+        # Stop Telegram listener
+        if self.telegram_listener:
+            await self.telegram_listener.stop()
 
         logger.info("✅ Sapphire V2 stopped gracefully")
 
@@ -136,7 +140,6 @@ class TradingOrchestrator:
         from ..credentials import load_credentials
         from ..drift_client import DriftClient
         from ..exchange import AsterClient
-        from ..hyperliquid_client import HyperliquidClient
         from ..symphony_client import SymphonyClient
 
         creds = load_credentials()
@@ -166,9 +169,6 @@ class TradingOrchestrator:
             self.symphony = SymphonyClient()
             logger.info("🔌 Symphony Client Initialized")
 
-        # Initialize Hyperliquid (Stub)
-        self.hl_client = HyperliquidClient()
-
         # 1. Monitoring Service (First modular service)
         from ..agents.agent_orchestrator import AgentOrchestrator
         from ..execution.position_tracker import PositionTracker
@@ -176,9 +176,20 @@ class TradingOrchestrator:
         from .trading_loop import TradingLoop
 
         self.monitoring = MonitoringService(self.settings)
+        self.monitoring = MonitoringService(self.settings)
         await self.monitoring.start()
 
-        # 2. Platform Router
+        # 2. Telegram Listener (if enabled)
+        if self.settings.enable_telegram and self.settings.telegram_bot_token:
+            from ..telegram_listener import get_telegram_listener
+
+            # Use globally shared listener
+            self.telegram_listener = await get_telegram_listener()
+            # Start immediately
+            await self.telegram_listener.start()
+            logger.info("📡 Telegram Listener Started")
+
+        # 2a. Platform Router
         self.platform_router = PlatformRouter(self)
 
         # 3. Position Tracker
@@ -197,14 +208,14 @@ class TradingOrchestrator:
         )
 
         logger.info("✅ All components initialized")
-        
+
         # Restore state from Redis
         saved_state = self.state_manager.load_orchestrator_state()
         if saved_state:
             logger.info(f"🔄 Restored state from Redis: {len(saved_state)} keys")
             # Rehydrate positions if available
-            if self.position_tracker and 'positions' in saved_state:
-                for symbol, pos in saved_state.get('positions', {}).items():
+            if self.position_tracker and "positions" in saved_state:
+                for symbol, pos in saved_state.get("positions", {}).items():
                     self.position_tracker._positions[symbol] = pos
 
     async def _cleanup_components(self):
@@ -234,10 +245,9 @@ class TradingOrchestrator:
         """Register event handlers for Pub/Sub."""
         # Register market event handler
         self.event_handler.subscribe(
-            self.config.market_event_subscription,
-            self._handle_market_event
+            self.config.market_event_subscription, self._handle_market_event
         )
-        
+
         # Start listening
         await self.event_handler.start_listening()
         logger.info("📡 Event handlers registered")
@@ -245,13 +255,13 @@ class TradingOrchestrator:
     async def _run_event_driven(self):
         """Event-driven main loop (replaces polling)."""
         logger.info("🎯 Running in event-driven mode (no polling)")
-        
+
         while self._running:
             try:
                 # Periodic state persistence (every 30s)
                 await asyncio.sleep(30)
                 await self._persist_state()
-                
+
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -266,33 +276,33 @@ class TradingOrchestrator:
         event_type = event.get("type")
         symbol = event.get("symbol")
         data = event.get("data", {})
-        
+
         logger.info(f"⚡ Received event: {event_type} for {symbol}")
-        
+
         try:
             if event_type == MarketEventTypes.PRICE_UPDATE:
                 # Price update -> Check for trading signals
                 if self.trading_loop:
                     await self.trading_loop.handle_price_update(symbol, data)
-                    
+
             elif event_type == MarketEventTypes.SIGNAL_GENERATED:
                 # AI signal -> Execute trade
                 if self.trading_loop:
                     await self.trading_loop.execute_signal(symbol, data)
-                    
+
             elif event_type == MarketEventTypes.ORDER_FILL:
                 # Order filled -> Update positions
                 if self.position_tracker:
                     await self.position_tracker.handle_fill(data)
-                    
+
             elif event_type == MarketEventTypes.LIQUIDATION_RISK:
                 # Risk alert -> Emergency action
                 logger.warning(f"🚨 Liquidation risk for {symbol}!")
                 # TODO: Implement emergency close
-                
+
             # Persist state after handling event
             await self._persist_state()
-            
+
         except Exception as e:
             logger.error(f"❌ Event handler error for {event_type}: {e}")
 
@@ -303,24 +313,24 @@ class TradingOrchestrator:
                 "running": self._running,
                 "timestamp": asyncio.get_event_loop().time(),
             }
-            
+
             # Include positions if available
             if self.position_tracker:
-                state["positions"] = {k: v.__dict__ if hasattr(v, '__dict__') else v 
-                                      for k, v in self.position_tracker._positions.items()}
-            
+                state["positions"] = {
+                    k: v.__dict__ if hasattr(v, "__dict__") else v
+                    for k, v in self.position_tracker._positions.items()
+                }
+
             self.state_manager.save_orchestrator_state(state)
             logger.debug("💾 State persisted to Redis")
-            
+
         except Exception as e:
             logger.warning(f"⚠️ State persistence failed: {e}")
 
     async def publish_signal(self, symbol: str, signal: str, confidence: float):
         """Publish a trading signal to Pub/Sub."""
         event = create_market_event(
-            MarketEventTypes.SIGNAL_GENERATED,
-            symbol,
-            {"signal": signal, "confidence": confidence}
+            MarketEventTypes.SIGNAL_GENERATED, symbol, {"signal": signal, "confidence": confidence}
         )
         await self.event_handler.publish(self.config.signal_topic, event)
 

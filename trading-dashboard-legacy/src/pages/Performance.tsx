@@ -70,7 +70,7 @@ export const Performance: React.FC = () => {
     React.useEffect(() => {
         const fetchMetrics = async () => {
             try {
-                const response = await fetch(`${apiBaseUrl}/performance/stats`);
+                const response = await fetch(`${apiBaseUrl}/api/analytics/performance/stats`);
                 const data = await response.json();
                 if (data.status === 'success') {
                     setMetrics(data);

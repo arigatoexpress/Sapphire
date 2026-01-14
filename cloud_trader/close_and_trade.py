@@ -96,90 +96,6 @@ class PositionCloser:
         self.results["aster"] = result
         return result
 
-    async def close_hyperliquid_positions(self) -> Dict[str, Any]:
-        """Close all Hyperliquid positions."""
-        result = {"platform": "hyperliquid", "positions_closed": 0, "balance": 0.0, "errors": []}
-        print("\n" + "=" * 60)
-        print("🌊 HYPERLIQUID - Closing Positions")
-        print("=" * 60)
-
-        try:
-            if not self.settings.hl_secret_key or not self.settings.hl_account_address:
-                result["errors"].append("Credentials not configured")
-                print("   ⚠️ Hyperliquid credentials not found")
-                self.results["hyperliquid"] = result
-                return result
-
-            from cloud_trader.hyperliquid_client import HyperliquidClient
-
-            client = HyperliquidClient(
-                private_key=self.settings.hl_secret_key,
-                account_address=self.settings.hl_account_address,
-            )
-
-            await client.initialize()
-
-            # Get positions
-            print("\n📊 Fetching positions...")
-            positions = await client.get_positions()
-
-            if positions:
-                open_positions = [p for p in positions if float(p.get("szi", 0)) != 0]
-                print(f"   Found {len(open_positions)} open positions")
-
-                for pos in open_positions:
-                    coin = pos.get("coin", "UNKNOWN")
-                    szi = float(pos.get("szi", 0))
-                    is_buy = szi < 0  # To close long, sell; to close short, buy
-                    sz = abs(szi)
-
-                    print(f"\n   📉 Closing {coin}: {szi:.6f}")
-                    try:
-                        # Get current price
-                        mids = await client.get_all_mids()
-                        mid_price = float(mids.get(coin, 0)) if mids else 0
-
-                        if mid_price > 0:
-                            # Close with limit at market price
-                            limit_px = mid_price * (
-                                1.01 if is_buy else 0.99
-                            )  # Slight slippage tolerance
-                            close_result = await client.place_order(
-                                coin=coin,
-                                is_buy=is_buy,
-                                sz=sz,
-                                limit_px=round(limit_px, 1),
-                                reduce_only=True,
-                            )
-                            if close_result and close_result.get("status") == "ok":
-                                result["positions_closed"] += 1
-                                print(f"      ✅ Closed!")
-                            else:
-                                print(f"      ⚠️ Close response: {close_result}")
-                    except Exception as e:
-                        result["errors"].append(f"Close {coin}: {str(e)}")
-                        print(f"      ❌ Error closing: {e}")
-            else:
-                print("   ✅ No open positions")
-
-            # Get balance
-            print("\n💰 Fetching balance...")
-            account = await client.get_account_summary()
-            if account:
-                margin_summary = account.get("marginSummary", {})
-                result["balance"] = float(margin_summary.get("accountValue", 0))
-                print(f"   Account Value: ${result['balance']:.2f}")
-
-        except ImportError as e:
-            result["errors"].append(f"Import error: {str(e)}")
-            print(f"   ⚠️ Hyperliquid client unavailable locally")
-        except Exception as e:
-            result["errors"].append(str(e))
-            print(f"❌ Hyperliquid error: {e}")
-
-        self.results["hyperliquid"] = result
-        return result
-
     async def close_drift_positions(self) -> Dict[str, Any]:
         """Close all Drift positions."""
         result = {"platform": "drift", "positions_closed": 0, "balance": 0.0, "errors": []}
@@ -336,7 +252,7 @@ class PositionCloser:
         print("🚀" * 30)
 
         await self.close_aster_positions()
-        await self.close_hyperliquid_positions()
+
         await self.close_drift_positions()
         await self.close_symphony_positions()
 

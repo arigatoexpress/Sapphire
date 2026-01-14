@@ -48,7 +48,7 @@ steps:
     args:
       - 'run'
       - 'deploy'
-      - 'sapphire-v2'
+      - '${_SERVICE_NAME}'
       - '--image'
       - 'gcr.io/$PROJECT_ID/sapphire-trader:${_TAG}'
       - '--region'
@@ -57,13 +57,17 @@ steps:
       - 'managed'
       - '--allow-unauthenticated'
       - '--memory'
-      - '2Gi'
+      - '8Gi'
       - '--cpu'
-      - '2'
+      - '4'
       - '--min-instances'
       - '1'
       - '--max-instances'
       - '10'
+      - '--vpc-connector'
+      - 'sapphire-conn-us'
+      - '--vpc-egress'
+      - 'all-traffic'
       - '--set-env-vars'
       - 'ENVIRONMENT=production,LOG_LEVEL=INFO'
     id: 'deploy'
@@ -81,6 +85,7 @@ timeout: '3600s'
 substitutions:
   _REGION: us-central1
   _TAG: latest
+  _SERVICE_NAME: sapphire-v2
 
 options:
   logging: CLOUD_LOGGING_ONLY

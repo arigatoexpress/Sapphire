@@ -196,33 +196,7 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         "time_horizon": "short",
         "preferred_regimes": ["trending_up", "trending_down"],
     },
-    {
-        "id": "hyperliquid-l1-agent",
-        "name": "HyperTrader",
-        "model": "gemini-3.0-flash-001",
-        "system": "hyperliquid",
-        "emoji": "🌊",
-        "type": "perps",
-        "symbols": ["BTC-USDC", "ETH-USDC", "SOL-USDC", "HYPE-USDC"],
-        "description": "Hyperliquid L1 specialist for high-frequency perpetuals.",
-        "personality": "Low-latency trader executing on Hyperliquid L1.",
-        "baseline_win_rate": 0.65,
-        "risk_multiplier": 1.2,
-        "profit_target": 0.02,
-        "stop_loss": 0.01,
-        "margin_allocation": 500.0,
-        "specialization": "PERPS",
-        "self_tuning_enabled": True,
-        "adaptive_params": {
-            "confidence_threshold": 0.35,
-            "leverage": 20.0,
-            "position_size_pct": 0.10,
-        },
-        "max_leverage_limit": 50.0,
-        "risk_tolerance": "medium",
-        "time_horizon": "very_short",
-        "preferred_regimes": ["trending_up", "trending_down", "ranging"],
-    },
+    # Hyperliquid Agent Removed (Deprecated) - Coverage moved to Aster/Drift
 ]
 
 # Agents trade all available symbols dynamically

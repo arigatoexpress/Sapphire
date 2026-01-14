@@ -13,15 +13,22 @@ router = APIRouter(prefix="/api/agents", tags=["Agents"])
 @router.get("/list")
 async def list_agents():
     """List all registered agents."""
-    # Will be wired to AgentOrchestrator
-    return {
-        "agents": [
-            {"id": "quant-alpha", "name": "Quant Alpha", "status": "active"},
-            {"id": "sentiment-sage", "name": "Sentiment Sage", "status": "active"},
-            {"id": "risk-guardian", "name": "Risk Guardian", "status": "active"},
-            {"id": "degen-hunter", "name": "Degen Hunter", "status": "active"},
-        ]
-    }
+    from ...main_v2 import orchestrator
+
+    agents_list = []
+    if orchestrator and orchestrator.agent_orchestrator:
+        for agent_id, agent in orchestrator.agent_orchestrator.agents.items():
+            agents_list.append(
+                {
+                    "id": agent_id,
+                    "name": agent.name,
+                    "status": "active",  # Assuming active if loaded
+                    "type": agent.config.type,
+                    "system": agent.config.system,
+                }
+            )
+
+    return {"agents": agents_list}
 
 
 @router.get("/performance")

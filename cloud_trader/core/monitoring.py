@@ -68,7 +68,8 @@ class MonitoringService:
 
         self._running = True
         if self._telegram:
-            await self._telegram.send_startup_notification()
+            # await self._telegram.send_startup_notification()
+            pass
 
         # Start the Sentinel (heartbeat and health check)
         self._sentinel_task = asyncio.create_task(self._sentinel_loop())

@@ -15,6 +15,7 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
+
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger(__name__)
@@ -42,6 +43,7 @@ class AgentConfig:
     confidence_threshold: float = 0.65
     memory_depth: int = 100  # Number of memories to retain
     exploration_rate: float = 0.1
+    system: str = "aster"  # Default to aster platform
 
 
 @dataclass
@@ -53,6 +55,7 @@ class Thesis:
     confidence: float
     reasoning: str
     agent_id: str = ""
+    system: str = "aster"
     model_used: str = ""
     memories_referenced: int = 0
     processing_time_ms: int = 0
@@ -99,6 +102,7 @@ class ElizaAgent:
             persist=True,  # Enable Firestore persistence
         )
         self.models = model_router or MultiModelRouter()
+        self.system = config.system
 
         # Performance tracking
         self.total_trades = 0
@@ -134,6 +138,7 @@ class ElizaAgent:
                     prompt=prompt,
                     primary=self.config.primary_model,
                     fallback=self.config.fallback_model,
+                    agent_id=self.id,
                 )
 
             response = await _query_with_retry()
@@ -141,6 +146,7 @@ class ElizaAgent:
             # 4. Parse thesis from response
             thesis = self._parse_thesis(symbol, response)
             thesis.agent_id = self.id
+            thesis.system = self.system
             thesis.model_used = response.get("model", "unknown")
             thesis.memories_referenced = len(memories)
             thesis.processing_time_ms = int((time.time() - start_time) * 1000)
@@ -266,6 +272,7 @@ REASONING: [Your analysis in 1-2 sentences]
         telegram_context = ""
         try:
             from ..telegram_listener import _telegram_listener
+
             if _telegram_listener:
                 telegram_context = _telegram_listener.format_for_agent(symbol)
                 if telegram_context and "No recent" not in telegram_context:
@@ -342,7 +349,7 @@ CONFIDENCE: 0.75
                 elif current_section:
                     # Append continuation lines to current section
                     cot_parts[current_section] += " " + line
-            
+
             # Combine CoT parts into reasoning if structured data usage failing legacy REASONING format
             if any(cot_parts.values()):
                 reasoning = (
@@ -351,7 +358,7 @@ CONFIDENCE: 0.75
                     f"CONCLUDE: {cot_parts['CONCLUDE']}"
                 )
             # Fallback to old behavior if needed, or if REASONING was used (though prompt doesn't ask for it anymore)
-                
+
         except Exception as e:
             logger.warning(f"Parse error: {e}")
 

@@ -3,7 +3,7 @@
 Integration Test Suite for Multi-Platform Trading System.
 Tests connectivity, balance fetching, and order placement across:
 - Aster DEX
-- Hyperliquid
+
 - Drift (Solana)
 - Symphony (Monad/Base)
 
@@ -158,119 +158,6 @@ class PlatformIntegrationTester:
             print(f"❌ Aster test failed: {e}")
 
         self.results["aster"] = result
-        return result
-
-    async def test_hyperliquid(self) -> IntegrationTestResult:
-        """Test Hyperliquid integration."""
-        result = IntegrationTestResult("hyperliquid")
-        print("\n" + "=" * 60)
-        print("🌊 TESTING HYPERLIQUID")
-        print("=" * 60)
-
-        try:
-            # Check if credentials exist
-            if not self.settings.hl_secret_key or not self.settings.hl_account_address:
-                result.warnings.append("Hyperliquid credentials not configured")
-                print("   ⚠️ Hyperliquid credentials not found in environment")
-                self.results["hyperliquid"] = result
-                return result
-
-            from cloud_trader.hyperliquid_client import HyperliquidClient
-
-            client = HyperliquidClient(
-                private_key=self.settings.hl_secret_key,
-                account_address=self.settings.hl_account_address,
-            )
-
-            # Test 1: Initialize and connect
-            print("\n1️⃣ Testing connection...")
-            try:
-                init_result = await client.initialize()
-                if init_result:
-                    result.connection_ok = True
-                    print("   ✅ Connected to Hyperliquid!")
-                else:
-                    result.errors.append("Initialization returned False")
-                    print("   ❌ Connection failed")
-            except Exception as e:
-                result.errors.append(f"Connection error: {str(e)}")
-                print(f"   ❌ Connection failed: {e}")
-
-            # Test 2: Fetch account summary
-            if result.connection_ok:
-                print("\n2️⃣ Fetching account balance...")
-                try:
-                    account = await client.get_account_summary()
-                    if account:
-                        margin_summary = account.get("marginSummary", {})
-                        balance = float(margin_summary.get("accountValue", 0))
-                        result.balance_ok = True
-                        result.balance_value = balance
-                        print(f"   ✅ Account Value: ${balance:.2f}")
-                    else:
-                        result.warnings.append("Account summary returned None")
-                        print("   ⚠️ Account summary returned None")
-                except Exception as e:
-                    result.errors.append(f"Balance error: {str(e)}")
-                    print(f"   ❌ Balance fetch failed: {e}")
-
-            # Test 3: Order placement (if balance sufficient)
-            if result.connection_ok and result.balance_value > 10:
-                print("\n3️⃣ Placing test order...")
-                try:
-                    # Get current price
-                    all_mids = await client.get_all_mids()
-                    btc_price = float(all_mids.get("BTC", 0)) if all_mids else 0
-
-                    if btc_price > 0:
-                        min_qty = 0.001  # Minimum BTC on HL
-                        limit_price = round(btc_price * 0.95, 1)  # 5% below market
-
-                        print(f"   📊 BTC Price: ${btc_price:.2f}, Test Qty: {min_qty}")
-
-                        order_result = await client.place_order(
-                            coin="BTC",
-                            is_buy=True,
-                            sz=min_qty,
-                            limit_px=limit_price,
-                            reduce_only=False,
-                        )
-
-                        if order_result and order_result.get("status") == "ok":
-                            result.order_ok = True
-                            statuses = (
-                                order_result.get("response", {}).get("data", {}).get("statuses", [])
-                            )
-                            if statuses:
-                                result.order_id = statuses[0].get("resting", {}).get("oid")
-                            print(f"   ✅ Order placed! Response: {order_result.get('status')}")
-
-                            # Cancel immediately
-                            if result.order_id:
-                                print("   🗑️ Cancelling test order...")
-                                await client.cancel_order("BTC", result.order_id)
-                                print("   ✅ Order cancelled")
-                        else:
-                            result.warnings.append(f"Order issue: {order_result}")
-                            print(f"   ⚠️ Order response: {order_result}")
-                    else:
-                        result.warnings.append("Could not fetch BTC price")
-                        print("   ⚠️ Could not fetch BTC price")
-                except Exception as e:
-                    result.errors.append(f"Order error: {str(e)}")
-                    print(f"   ❌ Order placement failed: {e}")
-            else:
-                result.warnings.append("Skipped order test")
-                print("\n3️⃣ ⏭️ Skipping order test (insufficient balance or connection issue)")
-
-        except ImportError as e:
-            result.errors.append(f"Import error: {str(e)}")
-            print(f"   ❌ Hyperliquid client not available: {e}")
-        except Exception as e:
-            result.errors.append(f"Hyperliquid test failed: {str(e)}")
-            print(f"❌ Hyperliquid test failed: {e}")
-
-        self.results["hyperliquid"] = result
         return result
 
     async def test_drift(self) -> IntegrationTestResult:
@@ -467,7 +354,7 @@ class PlatformIntegrationTester:
         print("🚀" * 30)
 
         await self.test_aster()
-        await self.test_hyperliquid()
+
         await self.test_drift()
         await self.test_symphony()
 

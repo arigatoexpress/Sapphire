@@ -128,11 +128,14 @@ class PlatformRouter:
         """
         # Strategy 1: Agent Explicit System Preference
         if hasattr(agent, "system") and agent.system:
-            if agent.system.lower() == "drift" and symbol in DRIFT_SYMBOLS:
+            target_sys = agent.system.lower()
+            if target_sys == "aster":
+                return PlatformType.ASTER
+            if target_sys == "drift" and symbol in DRIFT_SYMBOLS:
                 return PlatformType.DRIFT
-            if agent.system.lower() == "hyperliquid" and symbol in HYPERLIQUID_SYMBOLS:
+            if target_sys == "hyperliquid" and symbol in HYPERLIQUID_SYMBOLS:
                 return PlatformType.HYPERLIQUID
-            if agent.system.lower() == "symphony" and symbol in SYMPHONY_SYMBOLS:
+            if target_sys == "symphony" and symbol in SYMPHONY_SYMBOLS:
                 return PlatformType.SYMPHONY
 
         # Strategy 2: Asset-Platform Mapping
@@ -379,12 +382,13 @@ class PlatformRouter:
             if is_closing:
                 # Get positions for the specific agent (MILF or AGDG)
                 agent_symphony_id = agent.id if agent else None
-                positions = await self.service.symphony.get_perpetual_positions(agent_id=agent_symphony_id)
+                positions = await self.service.symphony.get_perpetual_positions(
+                    agent_id=agent_symphony_id
+                )
                 target = next((p for p in positions if p.get("symbol") == symbol), None)
                 if target and target.get("batchId"):
                     res = await self.service.symphony.close_perpetual_position(
-                        target["batchId"], 
-                        agent_id=agent_symphony_id
+                        target["batchId"], agent_id=agent_symphony_id
                     )
                 else:
                     return ExecutionResult(
@@ -434,27 +438,50 @@ class PlatformRouter:
                 symbol=aster_symbol, side=side, order_type=OrderType.MARKET, quantity=quantity
             )
 
-            # CRITICAL CHECK: Verify FILL
-            # Aster/Binance API returns 'status': 'FILLED' for immediate market fills
-            status = res.get("status", "UNKNOWN")
-            is_filled = status == "FILLED"
-            success = bool(res and res.get("orderId") and is_filled)
+            # CRITICAL CHECK: Verify FILL with Polling
+            # Aster/Binance API might return NEW if not immediately filled
+            order_id = res.get("orderId")
+            if not order_id:
+                raise ValueError(f"No Order ID returned: {res}")
 
-            # Use avgPrice for market orders as 'price' is usually 0
+            # Polling Verification (Max 5 seconds)
+            final_status = res.get("status", "UNKNOWN")
+            filled_qty = float(res.get("executedQty", 0.0))
+            attempts = 0
+
+            while (
+                final_status not in ["FILLED", "CANCELED", "REJECTED", "EXPIRED"] and attempts < 10
+            ):
+                await asyncio.sleep(0.5)
+                # Check order status
+                check_res = await self.service._exchange_client.get_order(
+                    symbol=aster_symbol, orderId=order_id
+                )
+                final_status = check_res.get("status", final_status)
+                filled_qty = float(check_res.get("executedQty", filled_qty))
+                attempts += 1
+                logger.debug(f"🕵️ Verifying order {order_id}: {final_status}")
+
+            is_filled = final_status == "FILLED"
+
+            # If still not filled after 5s, we might consider it a partial success or failure depending on strictness
+            # User asked for "100% verified completed", so if not FILLED, we treat as incomplete.
+
+            success = is_filled
             avg_price = float(res.get("avgPrice", res.get("price", 0.0)))
 
-            if not success and status != "FILLED":
-                logger.warning(f"⚠️ Order placed but NOT FILLED. Status: {status}, Response: {res}")
+            if not success:
+                logger.warning(f"⚠️ Order {order_id} verification failed. Status: {final_status}")
 
             return ExecutionResult(
                 success=success,
                 platform=PlatformType.ASTER,
                 symbol=symbol,
                 side=side,
-                quantity=quantity,
+                quantity=quantity,  # TODO: Should report filled_qty
                 price=avg_price,
-                tx_sig=str(res.get("orderId")) if res.get("orderId") else None,
-                error=None if success else f"Order Status: {status} (Expected FILLED)",
+                tx_sig=str(order_id),
+                error=None if success else f"Verification Failed: Status {final_status}",
                 raw_response=res,
             )
         except Exception as e:

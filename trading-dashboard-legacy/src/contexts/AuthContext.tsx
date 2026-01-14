@@ -60,7 +60,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.warn("Auth Bypass Active: Skipping Firebase Auth");
         return;
 
-        /* 
+        /*
         // Original Auth Logic Preserved below for easy restoration
         // If auth is a mock object (no onAuthStateChanged), skip subscription
         if (typeof onAuthStateChanged !== 'function' || !auth.app) {

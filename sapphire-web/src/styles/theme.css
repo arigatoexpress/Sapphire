@@ -1,0 +1,90 @@
+:root {
+    /* Core Colors */
+    --bg-app: #050505;
+    --bg-panel: #0A0A0A;
+    --bg-card: rgba(20, 20, 20, 0.6);
+    --bg-hover: rgba(255, 255, 255, 0.05);
+
+    /* Typography */
+    --text-primary: #EDEDED;
+    --text-secondary: #A1A1AA;
+    --text-tertiary: #52525B;
+    --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+    /* Accents (Neon) */
+    --color-brand: #00F0FF;
+    /* Electric Cyan */
+    --color-success: #39FF14;
+    /* Neon Green */
+    --color-warning: #FFD700;
+    /* Gold */
+    --color-error: #FF003C;
+    /* Cyber Red */
+    --color-purple: #B026FF;
+
+    /* Borders & Effects */
+    --border-subtle: rgba(255, 255, 255, 0.08);
+    --border-focus: rgba(0, 240, 255, 0.5);
+    --glass-bg: rgba(10, 10, 10, 0.7);
+    --glass-border: 1px solid rgba(255, 255, 255, 0.05);
+    --shadow-glow: 0 0 20px rgba(0, 240, 255, 0.15);
+
+    /* Layout */
+    --header-height: 64px;
+    --sidebar-width: 280px;
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+}
+
+body {
+    background-color: var(--bg-app);
+    color: var(--text-primary);
+    font-family: var(--font-ui);
+    margin: 0;
+    overflow: hidden;
+    /* App-like feel */
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #333;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Utility Utilities */
+.glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: var(--glass-border);
+}
+
+.text-gradient {
+    background: linear-gradient(135deg, #fff 0%, #A1A1AA 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.neon-text {
+    text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+}
+
+.font-mono {
+    font-family: var(--font-mono);
+}

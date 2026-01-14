@@ -104,6 +104,7 @@ class MultiModelRouter:
         primary: ModelProvider = ModelProvider.GEMINI,
         fallback: ModelProvider = ModelProvider.OPENAI,
         timeout: float = 10.0,
+        agent_id: str = "market-analysis",
     ) -> Dict[str, Any]:
         """
         Query an AI model with fallback.
@@ -115,7 +116,7 @@ class MultiModelRouter:
         if primary in self._clients:
             try:
                 response = await asyncio.wait_for(
-                    self._query_model(primary, prompt), timeout=timeout
+                    self._query_model(primary, prompt, agent_id), timeout=timeout
                 )
                 if response.success:
                     return {
@@ -132,7 +133,7 @@ class MultiModelRouter:
         if fallback in self._clients and fallback != primary:
             try:
                 response = await asyncio.wait_for(
-                    self._query_model(fallback, prompt), timeout=timeout
+                    self._query_model(fallback, prompt, agent_id), timeout=timeout
                 )
                 if response.success:
                     return {
@@ -155,7 +156,9 @@ class MultiModelRouter:
         """Query Gemini with retry logic for resilience."""
         return await client.generate_content_async(prompt)
 
-    async def _query_model(self, provider: ModelProvider, prompt: str) -> ModelResponse:
+    async def _query_model(
+        self, provider: ModelProvider, prompt: str, agent_id: str = "market-analysis"
+    ) -> ModelResponse:
         """Query a specific model provider."""
         start_time = time.time()
         client = self._clients.get(provider)
@@ -171,6 +174,39 @@ class MultiModelRouter:
 
         try:
             if provider == ModelProvider.GEMINI:
+                # Vertex AI Integration
+                from ..config import get_settings
+                from ..vertex_ai_client import get_vertex_client
+
+                settings = get_settings()
+
+                # Prioritize Vertex AI if enabled (User Request)
+                if settings.enable_vertex_ai:
+                    try:
+                        vertex = get_vertex_client()
+                        # Use agent_id passed via arguments
+                        target_agent = agent_id
+
+                        result = await vertex.predict(target_agent, prompt)
+                        text = result.get("response", "")
+
+                        # Vertex returns success/failure implicitly via result
+                        if not text and "error" in result.get("metadata", {}):
+                            raise Exception(result["metadata"]["error"])
+
+                        # Update stats and return
+                        latency_ms = int((time.time() - start_time) * 1000)
+                        self._update_stats(provider, latency_ms, success=True)
+                        return ModelResponse(
+                            text=text,
+                            model=result.get("metadata", {}).get("model", "vertex-ai"),
+                            latency_ms=latency_ms,
+                            success=True,
+                        )
+                    except Exception as ve:
+                        logger.warning(f"Vertex AI failed, falling back to Gemini API: {ve}")
+                        # Fallthrough into standard Gemini API logic below
+
                 # Use generate_content_async with retry for robustness
                 response = await self._query_gemini_with_retry(client, prompt)
                 text = response.text
@@ -213,7 +249,7 @@ class MultiModelRouter:
         # For testing: generate actionable signals instead of always HOLD
         # This allows the system to trade even when AI is unavailable
         import random
-        
+
         # Bias towards BUY for testing (60% BUY, 20% SELL, 20% HOLD)
         roll = random.random()
         if roll < 0.60:
@@ -228,15 +264,14 @@ class MultiModelRouter:
             signal = "HOLD"
             confidence = 0.30
             reasoning = "Fallback: No clear signal - holding position"
-        
+
         logger.warning(f"⚠️ Using fallback response: {signal} (AI models unavailable)")
-        
+
         return {
             "text": f"SIGNAL: {signal}\nCONFIDENCE: {confidence}\nREASONING: {reasoning}",
             "model": "fallback",
             "latency_ms": 0,
         }
-
 
     def _update_stats(self, provider: ModelProvider, latency_ms: int, success: bool):
         """Update usage statistics."""
