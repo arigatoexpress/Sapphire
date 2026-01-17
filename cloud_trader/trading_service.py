@@ -721,8 +721,37 @@ class TradingService:
         )
         await self._initialize_basic_agents()
 
-        # Hyperliquid logic removed (Pivot to Drift)
-        self.hl_client = None
+        # Hyperliquid Initialization (Restored)
+        if credentials.hl_private_key and credentials.hl_account_address:
+            try:
+                from .v2.hyperliquid_client import HyperliquidClient
+                logger.info("💧 Initializing Hyperliquid Client...")
+                self.hl_client = HyperliquidClient(
+                    private_key=credentials.hl_private_key,
+                    wallet_address=credentials.hl_account_address,
+                )
+                await self.hl_client.initialize()
+                logger.info("✅ Hyperliquid Client Initialized")
+            except Exception as e:
+                logger.error(f"❌ Hyperliquid initialization failed: {e}")
+                
+                # Try fallback to env vars if not in credentials object (Legacy Support)
+                try:
+                    import os
+                    pk = os.environ.get("HL_SECRET_KEY")
+                    addr = os.environ.get("HL_ACCOUNT_ADDRESS")
+                    if pk and addr:
+                        logger.info("💧 Hyperliquid: Retrying with env vars...")
+                        self.hl_client = HyperliquidClient(private_key=pk, wallet_address=addr)
+                        await self.hl_client.initialize()
+                        logger.info("✅ Hyperliquid Client Initialized (Env Fallback)")
+                    else:
+                        self.hl_client = None
+                except Exception as e2:
+                    logger.error(f"❌ Hyperliquid env fallback failed: {e2}")
+                    self.hl_client = None
+        else:
+            logger.warning("⚠️ Hyperliquid credentials missing, skipping initialization")
 
         # Initialize Drift BEFORE autonomous components (required for adapter registration)
         if hasattr(self, "drift") and self.drift:

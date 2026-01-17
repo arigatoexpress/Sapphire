@@ -466,6 +466,12 @@ from starlette.middleware.gzip import GZipMiddleware
 
 app.add_middleware(GZipMiddleware, minimum_size=500)  # Compress responses > 500 bytes
 
+# Add V2 Router
+from .v2.v2_integration import router as v2_router
+
+app.include_router(v2_router)
+logger.info("✅ V2 Router included")
+
 # Static file serving relocated to end of file to ensure all API routes are registered first
 
 
