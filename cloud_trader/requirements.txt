@@ -37,6 +37,7 @@ google-cloud-bigquery-storage==2.24.0
 
 # Solana/Jupiter Integration
 ccxt>=4.0.0
+websocket-client>=1.6.0
 
 driftpy>=0.7.0
 eth-account>=0.8.0
