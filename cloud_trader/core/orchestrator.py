@@ -67,6 +67,7 @@ class TradingOrchestrator:
         self._exchange_client = None  # Aster
         self.drift = None
         self.symphony = None
+        self.hl_client = None  # Hyperliquid
 
         # State
         self._running = False
@@ -144,15 +145,21 @@ class TradingOrchestrator:
 
         creds = load_credentials()
 
-        # Inject secrets into settings for global reuse
+        # Inject ALL secrets into settings for global reuse
         if creds.telegram_bot_token:
             self.settings.telegram_bot_token = creds.telegram_bot_token
         if creds.telegram_chat_id:
             self.settings.telegram_chat_id = creds.telegram_chat_id
         if creds.solana_private_key:
             self.settings.solana_private_key = creds.solana_private_key
-        # Note: Symphony API key is handled by symphony_config.py usually,
-        # but we'll store it here for consistency if needed.
+        if creds.gemini_api_key:
+            self.settings.gemini_api_key = creds.gemini_api_key
+        if creds.grok_api_key:
+            self.settings.grok_api_key = creds.grok_api_key
+        if creds.symphony_api_key:
+            self.settings.symphony_api_key = creds.symphony_api_key
+
+        logger.info("🔑 All API credentials loaded from GCP Secret Manager")
 
         # Initialize Aster
         self._exchange_client = AsterClient(credentials=creds, base_url=self.settings.rest_base_url)
@@ -168,6 +175,22 @@ class TradingOrchestrator:
         if self.config.enable_symphony:
             self.symphony = SymphonyClient()
             logger.info("🔌 Symphony Client Initialized")
+
+        # Initialize Hyperliquid
+        if creds.hl_private_key and creds.hl_account_address:
+            try:
+                from ..v2.hyperliquid_client import HyperliquidClient
+                self.hl_client = HyperliquidClient(
+                    private_key=creds.hl_private_key,
+                    wallet_address=creds.hl_account_address,
+                )
+                await self.hl_client.initialize()
+                logger.info("🔌 Hyperliquid Client Initialized")
+            except Exception as e:
+                logger.warning(f"⚠️ Hyperliquid initialization failed: {e}")
+                self.hl_client = None
+        else:
+            logger.info("ℹ️ Hyperliquid credentials not found, skipping initialization")
 
         # 1. Monitoring Service (First modular service)
         from ..agents.agent_orchestrator import AgentOrchestrator
