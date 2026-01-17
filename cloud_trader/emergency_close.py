@@ -68,13 +68,12 @@ class EmergencyClose:
 
         try:
             from .config import get_settings
+            from .credentials import load_credentials
             from .exchange import AsterClient
 
             settings = get_settings()
-            client = AsterClient(
-                api_key=settings.aster_api_key or "",
-                api_secret=settings.aster_api_secret or "",
-            )
+            creds = load_credentials()
+            client = AsterClient(credentials=creds, base_url=settings.rest_base_url)
 
             # Get all open positions
             positions = await client.get_account_positions()
@@ -177,9 +176,10 @@ class EmergencyClose:
             from .drift_client import DriftClient
 
             client = DriftClient()
+            await client.initialize()
 
             if not client.is_initialized:
-                result["error"] = "Drift client not initialized"
+                result["error"] = "Drift client not initialized (missing key or driftpy)"
                 return result
 
             # Get open positions
