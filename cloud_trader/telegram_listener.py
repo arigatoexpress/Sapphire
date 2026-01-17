@@ -543,6 +543,11 @@ async def get_telegram_listener(
             if chat_env:
                 chats = [cid.strip() for cid in chat_env.split(",") if cid.strip()]
 
+        # If still no listen chats, but we have a notification chat_id, use that
+        if not chats and settings.telegram_chat_id:
+            chats = [settings.telegram_chat_id]
+            logger.info(f"ℹ️ Defaulting Telegram listener to notification chat: {settings.telegram_chat_id}")
+
         _telegram_listener = TelegramListener(token, chats)
 
     return _telegram_listener
