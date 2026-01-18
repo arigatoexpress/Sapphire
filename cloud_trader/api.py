@@ -19,6 +19,8 @@ from fastapi.staticfiles import StaticFiles
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from .logger import get_logger
+from .v2.v2_integration import initialize_v2_components, shutdown_v2_components
+from .credentials import load_credentials
 
 logger = get_logger(__name__)
 
@@ -273,7 +275,29 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.exception("❌ STARTUP: Failed to start trading service: %s", exc)
 
+    # V2 Startup
+    try:
+        logger.info("🚀 STARTUP: Initializing V2 Components...")
+        creds = load_credentials()
+        
+        # Pass clients from trading service if available to share connections
+        ts = trading_service
+        
+        await initialize_v2_components(
+            hyperliquid_private_key=creds.hl_private_key,
+            hyperliquid_wallet=creds.hl_account_address,
+            drift_private_key=creds.solana_private_key,
+            symphony_client=ts.symphony if ts else None,
+            aster_client=ts._exchange_client if ts else None,
+            drift_client=ts.drift if ts else None,
+        )
+    except Exception as exc:
+        logger.exception("❌ STARTUP: Failed to initialize V2 components: %s", exc)
+
     yield
+
+    logger.info("🛑 SHUTDOWN: Stopping V2 components...")
+    await shutdown_v2_components()
 
     logger.info("🛑 SHUTDOWN: Stopping trading service...")
     try:
