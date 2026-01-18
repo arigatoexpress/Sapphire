@@ -123,30 +123,46 @@ class PlatformRouter:
 
         Priority:
         1. Agent preference (system field)
-        2. Asset exclusivity (DRIFT_SYMBOLS, HYPERLIQUID_SYMBOLS, SYMPHONY_SYMBOLS)
-        3. Default to Aster (Main liquidity pool)
+        2. Hyperliquid/Drift for US-compatible trading (Aster blocked in US)
+        3. Symphony for exclusive symbols
+        4. Fallback to Aster (if region allows)
         """
         # Strategy 1: Agent Explicit System Preference
         if hasattr(agent, "system") and agent.system:
             target_sys = agent.system.lower()
-            if target_sys == "aster":
-                return PlatformType.ASTER
             if target_sys == "drift" and symbol in DRIFT_SYMBOLS:
                 return PlatformType.DRIFT
             if target_sys == "hyperliquid" and symbol in HYPERLIQUID_SYMBOLS:
                 return PlatformType.HYPERLIQUID
             if target_sys == "symphony" and symbol in SYMPHONY_SYMBOLS:
                 return PlatformType.SYMPHONY
+            # CHANGED: Only use Aster if explicitly requested (blocked in US)
+            if target_sys == "aster":
+                logger.warning(f"⚠️ Aster requested but may be blocked in US region")
+                return PlatformType.ASTER
 
-        # Strategy 2: Asset-Platform Mapping
-        if symbol in DRIFT_SYMBOLS:
-            return PlatformType.DRIFT
+        # Strategy 2: Prefer US-compatible exchanges (Hyperliquid/Drift)
+        # Check if symbol is available on Hyperliquid (highest liquidity for majors)
         if symbol in HYPERLIQUID_SYMBOLS:
             return PlatformType.HYPERLIQUID
+
+        # Check if symbol is available on Drift (Solana perps)
+        if symbol in DRIFT_SYMBOLS:
+            return PlatformType.DRIFT
+
+        # Symphony for exclusive Monad ecosystem tokens
         if symbol in SYMPHONY_SYMBOLS:
             return PlatformType.SYMPHONY
 
-        # Strategy 3: Default to Aster
+        # Strategy 3: Fallback to Hyperliquid for major pairs (BTC, ETH, SOL)
+        # This avoids Aster's US region block
+        major_symbols = ["BTC-USDC", "ETH-USDC", "SOL-USDC", "BTCUSDT", "ETHUSDT", "SOLUSDT"]
+        if any(major in symbol.upper() for major in major_symbols):
+            logger.info(f"🔄 Routing {symbol} to Hyperliquid (Aster blocked in US)")
+            return PlatformType.HYPERLIQUID
+
+        # Last resort: Try Aster (will fail with -5019 in US)
+        logger.warning(f"⚠️ Defaulting to Aster for {symbol} (may fail in US region)")
         return PlatformType.ASTER
 
     def _get_fallback_platform(
@@ -155,21 +171,53 @@ class PlatformRouter:
         """
         Determine the best fallback platform when the primary platform fails.
 
-        Fallback hierarchy:
-        1. Aster (always available, highest liquidity)
-        2. Drift (Solana perps)
+        NEW Fallback hierarchy (US-compatible):
+        1. Hyperliquid (US-compatible, high liquidity)
+        2. Drift (US-compatible, Solana perps)
         3. Symphony (if symbol supported)
+        4. Aster (blocked in US, last resort)
         """
-        # If Aster failed, try Drift
+        # If Aster failed (likely US region block), try US-compatible exchanges
         if failed_platform == PlatformType.ASTER:
+            if symbol in HYPERLIQUID_SYMBOLS:
+                logger.info(f"🔄 Aster failed, falling back to Hyperliquid for {symbol}")
+                return PlatformType.HYPERLIQUID
             if symbol in DRIFT_SYMBOLS:
+                logger.info(f"🔄 Aster failed, falling back to Drift for {symbol}")
                 return PlatformType.DRIFT
             if symbol in SYMPHONY_SYMBOLS:
                 return PlatformType.SYMPHONY
             return None
 
-        # If Drift/Symphony/HL failed, fallback to Aster
-        return PlatformType.ASTER
+        # If Hyperliquid failed, try Drift
+        if failed_platform == PlatformType.HYPERLIQUID:
+            if symbol in DRIFT_SYMBOLS:
+                logger.info(f"🔄 Hyperliquid failed, falling back to Drift for {symbol}")
+                return PlatformType.DRIFT
+            if symbol in SYMPHONY_SYMBOLS:
+                return PlatformType.SYMPHONY
+            # DO NOT fallback to Aster in US region
+            return None
+
+        # If Drift failed, try Hyperliquid
+        if failed_platform == PlatformType.DRIFT:
+            if symbol in HYPERLIQUID_SYMBOLS:
+                logger.info(f"🔄 Drift failed, falling back to Hyperliquid for {symbol}")
+                return PlatformType.HYPERLIQUID
+            if symbol in SYMPHONY_SYMBOLS:
+                return PlatformType.SYMPHONY
+            # DO NOT fallback to Aster in US region
+            return None
+
+        # If Symphony failed, try Hyperliquid or Drift
+        if failed_platform == PlatformType.SYMPHONY:
+            if symbol in HYPERLIQUID_SYMBOLS:
+                return PlatformType.HYPERLIQUID
+            if symbol in DRIFT_SYMBOLS:
+                return PlatformType.DRIFT
+            return None
+
+        return None
 
     async def execute_trade(
         self,

@@ -235,11 +235,29 @@ SYMPHONY_SYMBOLS = [
     "VIRTUAL-USDC",
 ]
 
-# Assets supported by Hyperliquid
-HYPERLIQUID_SYMBOLS = ["BTC-USDC", "ETH-USDC", "SOL-USDC", "HYPE-USDC", "PURR-USDC"]
+# Assets supported by Hyperliquid (US-compatible exchange)
+# Expanded to cover major trading pairs - bypasses Aster's US region block
+HYPERLIQUID_SYMBOLS = [
+    # Major pairs (highest liquidity)
+    "BTC-USDC", "BTCUSDT", "BTCUSD",
+    "ETH-USDC", "ETHUSDT", "ETHUSD",
+    "SOL-USDC", "SOLUSDT", "SOLUSD",
+    # Altcoins available on Hyperliquid
+    "HYPE-USDC", "PURR-USDC",
+    "BNB-USDC", "BNBUSDT",
+    "AVAX-USDC", "AVAXUSDT",
+    "MATIC-USDC", "MATICUSDT",
+    "XRP-USDC", "XRPUSDT",
+    "DOGE-USDC", "DOGEUSDT",
+]
 
-# Assets supported by Drift
-DRIFT_SYMBOLS = ["JUP-USDC", "PYTH-USDC", "BONK-USDC"]
+# Assets supported by Drift (Solana perps - US-compatible)
+DRIFT_SYMBOLS = [
+    "JUP-USDC", "JUPUSDT",
+    "PYTH-USDC", "PYTHUSDT",
+    "BONK-USDC", "BONKUSDT",
+    "SOL-USDC", "SOLUSDT",  # Also on Drift
+]
 
 
 @dataclass

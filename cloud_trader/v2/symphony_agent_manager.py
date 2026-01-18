@@ -756,7 +756,9 @@ if __name__ == "__main__":
         
         for i, trade in enumerate(activation_trades):
             result = await manager.execute_mit_activation_trade(**trade)
-            print(f"  Trade {i+1}: {result['activation_progress']}/5 - {'🎉 ACTIVATED!' if result.get('is_activated') else f'{result.get(\"trades_remaining\", 0)} remaining'}")
+            # Fixed f-string syntax error - cannot nest f-strings with backslashes
+            status_msg = "🎉 ACTIVATED!" if result.get('is_activated') else f"{result.get('trades_remaining', 0)} remaining"
+            print(f"  Trade {i+1}: {result['activation_progress']}/5 - {status_msg}")
         
         # Final status
         print("\n")
