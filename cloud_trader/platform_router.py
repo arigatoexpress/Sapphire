@@ -127,7 +127,7 @@ class PlatformRouter:
         3. Symphony for exclusive symbols
         4. Fallback to Aster (if region allows)
         """
-        # Strategy 1: Agent Explicit System Preference
+        # Strategy 1: Agent Explicit System Preference (EXCEPT Aster - US blocked)
         if hasattr(agent, "system") and agent.system:
             target_sys = agent.system.lower()
             if target_sys == "drift" and symbol in DRIFT_SYMBOLS:
@@ -136,10 +136,11 @@ class PlatformRouter:
                 return PlatformType.HYPERLIQUID
             if target_sys == "symphony" and symbol in SYMPHONY_SYMBOLS:
                 return PlatformType.SYMPHONY
-            # CHANGED: Only use Aster if explicitly requested (blocked in US)
+            # CRITICAL FIX: Ignore agent.system="aster" - blocked in US region
+            # Fall through to Strategy 2 for smart US-compatible routing
             if target_sys == "aster":
-                logger.warning(f"⚠️ Aster requested but may be blocked in US region")
-                return PlatformType.ASTER
+                logger.info(f"🔄 Agent requested Aster for {symbol}, routing to US-compatible exchange instead")
+                # Don't return - fall through to Strategy 2
 
         # Strategy 2: Prefer US-compatible exchanges (Hyperliquid/Drift)
         # Check if symbol is available on Hyperliquid (highest liquidity for majors)
