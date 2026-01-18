@@ -49,8 +49,6 @@ from .dual_platform_router import (
 )
 from .hyperliquid_client import (
     HyperliquidClient,
-    HyperliquidConfig,
-    create_hyperliquid_client,
 )
 
 logger = logging.getLogger(__name__)
@@ -179,11 +177,12 @@ async def initialize_v2_components(
     if hyperliquid_private_key and hyperliquid_wallet:
         logger.info("  🔷 Initializing Hyperliquid Client...")
         try:
-            state.hyperliquid_client = await create_hyperliquid_client(
+            state.hyperliquid_client = HyperliquidClient(
                 private_key=hyperliquid_private_key,
                 wallet_address=hyperliquid_wallet,
                 testnet=hyperliquid_testnet,
             )
+            await state.hyperliquid_client.initialize()
             logger.info("  ✅ Hyperliquid Client ready")
         except Exception as e:
             logger.error(f"  ❌ Hyperliquid Client failed: {e}")

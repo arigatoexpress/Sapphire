@@ -14,10 +14,8 @@ Version: 2.2.0
 
 from .hyperliquid_client import (
     HyperliquidClient,
-    HyperliquidConfig,
     HyperliquidOrder,
     HyperliquidPosition,
-    create_hyperliquid_client,
 )
 
 from .dual_platform_router import (
@@ -78,10 +76,8 @@ from .v2_integration import (
 __all__ = [
     # Hyperliquid Client
     "HyperliquidClient",
-    "HyperliquidConfig",
     "HyperliquidOrder",
     "HyperliquidPosition",
-    "create_hyperliquid_client",
     
     # Dual Platform Router
     "DualPlatformRouter",
