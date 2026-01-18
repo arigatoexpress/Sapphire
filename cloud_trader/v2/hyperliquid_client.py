@@ -455,31 +455,57 @@ class HyperliquidClient:
         if not self._initialized:
             await self.initialize()
         
-        # Normalize symbol
-        symbol = symbol.upper().replace("_", "-").replace("-PERP", "")
+        # Normalize symbol - remove suffixes to get coin name (e.g., "BTC-USDC" -> "BTC")
+        coin = symbol.upper().replace("_", "-").replace("-PERP", "").replace("-USDC", "").replace("-USD", "")
         
         # Convert side
         hl_side = HyperliquidSide.BUY if side.upper() == "BUY" else HyperliquidSide.SELL
         
+        # Get asset index from market info
+        asset_index = 0
+        for idx, (sym, info) in enumerate(self._market_info.items()):
+            if sym.upper() == coin.upper():
+                asset_index = idx
+                break
+        
         # Get market info for decimals
-        market = self._market_info.get(symbol, {})
+        market = self._market_info.get(coin, {})
         sz_decimals = market.get("sz_decimals", 4)
         
         # Round quantity
         quantity = round(quantity, sz_decimals)
         
-        # Build order
+        # For MARKET orders, use IOC limit at aggressive price
+        # This is the standard way to execute market orders on Hyperliquid
+        if order_type.upper() == "MARKET":
+            # Get current price
+            ticker = await self.get_ticker(coin)
+            current_price = ticker.get("mid_price", 0)
+            
+            if current_price <= 0:
+                raise Exception(f"Could not get current price for {coin}")
+            
+            # Apply slippage for market order (5% for safety)
+            slippage = 0.05
+            if side.upper() == "BUY":
+                price = round(current_price * (1 + slippage), 2)
+            else:
+                price = round(current_price * (1 - slippage), 2)
+            
+            time_in_force = "Ioc"  # IOC for market-like execution
+        
+        # Build order with proper structure
         order_spec = {
-            "a": 0,  # Asset index (simplified)
+            "a": asset_index,  # Asset index from market info
             "b": hl_side.value == "B",
             "p": str(price) if price else "0",
             "s": str(quantity),
             "r": reduce_only,
             "t": {
                 "limit": {
-                    "tif": time_in_force,
+                    "tif": time_in_force if time_in_force in ["Gtc", "Ioc", "Alo"] else "Gtc",
                 }
-            } if order_type.upper() == "LIMIT" else {"trigger": {"isMarket": True}},
+            },
         }
         
         if client_order_id:
@@ -487,7 +513,7 @@ class HyperliquidClient:
         
         logger.info(
             f"📤 [Hyperliquid] Placing {order_type} {side} order | "
-            f"Symbol: {symbol} | Qty: {quantity}"
+            f"Symbol: {coin} | Qty: {quantity} | Price: {price}"
         )
         
         # Place order
