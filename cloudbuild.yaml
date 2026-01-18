@@ -65,7 +65,7 @@ steps:
       - '--max-instances'
       - '10'
       - '--vpc-connector'
-      - 'sapphire-conn-us'
+      - '${_VPC_CONNECTOR}'
       - '--vpc-egress'
       - 'all-traffic'
       - '--set-env-vars'
@@ -86,6 +86,7 @@ substitutions:
   _REGION: us-central1
   _TAG: latest
   _SERVICE_NAME: sapphire-v2
+  _VPC_CONNECTOR: sapphire-conn-us
 
 options:
   logging: CLOUD_LOGGING_ONLY
