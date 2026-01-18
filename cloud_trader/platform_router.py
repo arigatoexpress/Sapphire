@@ -421,12 +421,13 @@ class PlatformRouter:
             )
 
         try:
-            # Parse coin
-            coin = symbol.split("-")[0] if "-" in symbol else symbol
-            is_buy = side.upper() == "BUY"
-
+            # Hyperliquid uses symbol directly (no parsing needed)
+            # The client will handle symbol normalization
             res = await self.service.hl_client.place_order(
-                coin=coin, is_buy=is_buy, sz=quantity, order_type={"market": {}}
+                symbol=symbol,
+                side=side,
+                quantity=quantity,
+                order_type="MARKET"
             )
             success = bool(res and res.get("status") == "ok")
             return ExecutionResult(
