@@ -152,10 +152,13 @@ class TradingOrchestrator:
             self.settings.telegram_chat_id = creds.telegram_chat_id
         if creds.solana_private_key:
             self.settings.solana_private_key = creds.solana_private_key
-        if creds.gemini_api_key:
+        # Use Vertex AI API key (Gemini API) - prioritize vertex_api_key, fallback to gemini_api_key
+        if creds.vertex_api_key:
+            self.settings.gemini_api_key = creds.vertex_api_key
+            logger.info("🤖 Using Vertex AI API key for Gemini models")
+        elif creds.gemini_api_key:
             self.settings.gemini_api_key = creds.gemini_api_key
-        if creds.grok_api_key:
-            self.settings.grok_api_key = creds.grok_api_key
+            logger.info("🤖 Using Gemini API key")
         if creds.symphony_api_key:
             self.settings.symphony_api_key = creds.symphony_api_key
 
@@ -202,15 +205,14 @@ class TradingOrchestrator:
         self.monitoring = MonitoringService(self.settings)
         await self.monitoring.start()
 
-        # 2. Telegram Listener (if enabled)
-        if self.settings.enable_telegram and self.settings.telegram_bot_token:
-            from ..telegram_listener import get_telegram_listener
-
-            # Use globally shared listener
-            self.telegram_listener = await get_telegram_listener()
-            # Start immediately
-            await self.telegram_listener.start()
-            logger.info("📡 Telegram Listener Started")
+        # 2. Telegram Listener (DISABLED - Using MonitoringService for notifications only)
+        # Prevents HTTP 409 conflict with Telegram Bot API (can't have multiple polling instances)
+        # if self.settings.enable_telegram and self.settings.telegram_bot_token:
+        #     from ..telegram_listener import get_telegram_listener
+        #     self.telegram_listener = await get_telegram_listener()
+        #     await self.telegram_listener.start()
+        #     logger.info("📡 Telegram Listener Started")
+        logger.info("ℹ️ Telegram Listener disabled - using MonitoringService for notifications only")
 
         # 2a. Platform Router
         self.platform_router = PlatformRouter(self)
@@ -231,6 +233,23 @@ class TradingOrchestrator:
         )
 
         logger.info("✅ All components initialized")
+
+        # Warm up precision cache for all platforms (prevents runtime errors)
+        try:
+            from ..precision_normalizer import get_precision_normalizer
+            normalizer = get_precision_normalizer()
+
+            # Get all symbols being traded
+            symbols_to_warm = set(self.settings.symbols)  # Default symbols
+
+            # Warm cache for all platforms
+            logger.info(f"🔥 Warming precision cache for {len(symbols_to_warm)} symbols...")
+            await normalizer.warm_cache(list(symbols_to_warm), "aster")
+            if self.config.enable_hyperliquid and self.hl_client:
+                await normalizer.warm_cache(list(symbols_to_warm), "hyperliquid")
+            logger.info("✅ Precision cache warmed")
+        except Exception as e:
+            logger.warning(f"⚠️ Precision cache warmup failed (non-critical): {e}")
 
         # Restore state from Redis
         saved_state = self.state_manager.load_orchestrator_state()

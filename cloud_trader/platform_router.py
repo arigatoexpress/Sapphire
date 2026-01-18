@@ -191,20 +191,63 @@ class PlatformRouter:
             f"🚀 [ROUTER] {side} {symbol} ({quantity}) -> {platform.value} | Attempt {attempt}"
         )
 
-        # --- GAME THEORY: EXECUTION OBFUSCATION ---
-        # 1. Jitter: Add random delay to avoid HFT detection
+        # --- PRECISION NORMALIZATION & OBFUSCATION ---
+        # Import precision normalizer
+        from .precision_normalizer import get_precision_normalizer
         import random
 
+        # 1. Jitter: Add random delay to avoid HFT detection
         jitter = random.uniform(0.1, 1.5)
         logger.debug(f"🎲 [ROUTER] Applying {jitter:.2f}s jitter for {agent.name}")
         await asyncio.sleep(jitter)
 
         # 2. Fuzzing: Slightly adjust quantity to avoid round-number patterns
         quantity_fuzz = random.uniform(0.98, 1.02)  # +/- 2%
-        final_quantity = quantity * quantity_fuzz
+        fuzzed_quantity = quantity * quantity_fuzz
 
-        # Simple quantity rounding (8 decimal places for most assets)
-        formatted_quantity = round(final_quantity, 8)
+        # 3. CRITICAL FIX: Get current market price and normalize order
+        normalizer = get_precision_normalizer()
+
+        # Get market price (estimate if not available)
+        try:
+            if platform == PlatformType.ASTER and hasattr(self.service, '_exchange_client'):
+                aster_symbol = self.service._normalize_for_aster(symbol)
+                ticker = await self.service._exchange_client.get_ticker(aster_symbol)
+                market_price = float(ticker.get("lastPrice", 0)) if ticker else 0
+            else:
+                # Fallback: use a nominal price for normalization
+                market_price = 50000.0  # Default for normalization
+        except Exception as e:
+            logger.warning(f"Could not fetch market price for {symbol}: {e}")
+            market_price = 50000.0  # Fallback
+
+        # Normalize the order to meet exchange precision requirements
+        normalized = await normalizer.normalize_order(
+            symbol=symbol,
+            platform=platform.value,
+            price=market_price,
+            quantity=fuzzed_quantity,
+            side=side
+        )
+
+        if not normalized["valid"]:
+            error_msg = f"Order normalization failed: {', '.join(normalized['warnings'])}"
+            logger.error(f"❌ {error_msg}")
+            return ExecutionResult(
+                success=False,
+                platform=platform,
+                symbol=symbol,
+                side=side,
+                quantity=quantity,
+                error=error_msg,
+                latency_ms=0,
+            )
+
+        # Use the normalized quantity
+        formatted_quantity = normalized["quantity"]
+
+        if normalized["warnings"]:
+            logger.info(f"📐 [PRECISION] {symbol}: {normalized['warnings']}")
 
         try:
             # Circuit breaker protection for platform execution

@@ -51,10 +51,16 @@ class PrecisionNormalizer:
         self._lock = asyncio.Lock()
 
         # Common symbol constants for instant performance (zero network latency)
+        # Updated with Aster-compatible precision (smaller lot sizes for flexibility)
         self._fast_path = {
-            "BTC": {"tick": Decimal("0.1"), "lot": Decimal("0.001"), "min": Decimal("10")},
-            "ETH": {"tick": Decimal("0.01"), "lot": Decimal("0.01"), "min": Decimal("10")},
-            "SOL": {"tick": Decimal("0.01"), "lot": Decimal("0.1"), "min": Decimal("10")},
+            "BTC": {"tick": Decimal("0.1"), "lot": Decimal("0.00001"), "min": Decimal("5")},
+            "ETH": {"tick": Decimal("0.01"), "lot": Decimal("0.0001"), "min": Decimal("5")},
+            "SOL": {"tick": Decimal("0.001"), "lot": Decimal("0.001"), "min": Decimal("5")},
+            "BNB": {"tick": Decimal("0.01"), "lot": Decimal("0.001"), "min": Decimal("5")},
+            "XRP": {"tick": Decimal("0.0001"), "lot": Decimal("0.1"), "min": Decimal("5")},
+            "DOGE": {"tick": Decimal("0.000001"), "lot": Decimal("1"), "min": Decimal("5")},
+            "AVAX": {"tick": Decimal("0.001"), "lot": Decimal("0.01"), "min": Decimal("5")},
+            "MATIC": {"tick": Decimal("0.0001"), "lot": Decimal("0.1"), "min": Decimal("5")},
         }
 
         # Default fallbacks when exchange info unavailable
@@ -65,8 +71,8 @@ class PrecisionNormalizer:
                 "min_notional": Decimal("10"),
             },
             "aster": {
-                "tick_size": Decimal("0.01"),
-                "lot_size": Decimal("0.001"),
+                "tick_size": Decimal("0.0001"),  # Smaller tick for better price precision
+                "lot_size": Decimal("0.00001"),  # Much smaller lot size to avoid precision errors
                 "min_notional": Decimal("5"),
             },
             "symphony": {
