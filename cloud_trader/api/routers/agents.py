@@ -21,10 +21,10 @@ async def list_agents():
             agents_list.append(
                 {
                     "id": agent_id,
-                    "name": agent.name,
+                    "name": getattr(agent, "name", agent_id),
                     "status": "active",  # Assuming active if loaded
-                    "type": agent.config.type,
-                    "system": agent.config.system,
+                    "type": getattr(agent.config, "type", None) if hasattr(agent, "config") else None,
+                    "system": getattr(agent.config, "system", None) if hasattr(agent, "config") else None,
                 }
             )
 
