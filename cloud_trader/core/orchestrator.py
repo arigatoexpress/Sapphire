@@ -68,6 +68,7 @@ class TradingOrchestrator:
         self.drift = None
         self.symphony = None
         self.hl_client = None  # Hyperliquid
+        self.lighter_client = None  # Lighter
 
         # State
         self._running = False
@@ -194,6 +195,22 @@ class TradingOrchestrator:
                 self.hl_client = None
         else:
             logger.info("ℹ️ Hyperliquid credentials not found, skipping initialization")
+
+        # Initialize Lighter
+        if creds.lighter_pub_key and creds.lighter_priv_key:
+            try:
+                from ..v2.lighter_client import LighterClient
+                self.lighter_client = LighterClient(
+                    pub_key=creds.lighter_pub_key,
+                    priv_key=creds.lighter_priv_key,
+                )
+                await self.lighter_client.initialize()
+                logger.info("🔌 Lighter Client Initialized")
+            except Exception as e:
+                logger.warning(f"⚠️ Lighter initialization failed: {e}")
+                self.lighter_client = None
+        else:
+            logger.info("ℹ️ Lighter credentials not found, skipping initialization")
 
         # 1. Monitoring Service (First modular service)
         from ..agents.agent_orchestrator import AgentOrchestrator

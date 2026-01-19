@@ -37,6 +37,10 @@ class Credentials:
     # Hyperliquid
     hl_private_key: Optional[str] = None
     hl_account_address: Optional[str] = None
+    
+    # Lighter
+    lighter_pub_key: Optional[str] = None
+    lighter_priv_key: Optional[str] = None
 
 
 class CredentialManager:
@@ -189,6 +193,27 @@ def load_credentials(gcp_secret_project: Optional[str] = None) -> Credentials:
         print(f"DEBUG: Loaded Hyperliquid Account: {hl_account_address[:10]}...")
 
     # ==========================================================================
+    # LIGHTER
+    # ==========================================================================
+    lighter_pub_key = os.environ.get("LIGHTER_PUB_KEY")
+    lighter_priv_key = os.environ.get("LIGHTER_PRIV_KEY")
+    
+    if not lighter_pub_key and gcp_secret_project:
+        print(f"DEBUG: Fetching LIGHTER_PUB_KEY from Secret Manager...")
+        lighter_pub_key = _secret_manager.get_secret("LIGHTER_PUB_KEY", gcp_secret_project)
+    
+    if not lighter_priv_key and gcp_secret_project:
+        print(f"DEBUG: Fetching LIGHTER_PRIV_KEY from Secret Manager...")
+        lighter_priv_key = _secret_manager.get_secret("LIGHTER_PRIV_KEY", gcp_secret_project)
+    
+    if lighter_pub_key:
+        lighter_pub_key = lighter_pub_key.strip()
+        print(f"DEBUG: Loaded Lighter Pub Key (len={len(lighter_pub_key)})")
+    if lighter_priv_key:
+        lighter_priv_key = lighter_priv_key.strip()
+        print(f"DEBUG: Loaded Lighter Priv Key (len={len(lighter_priv_key)})")
+
+    # ==========================================================================
     # RETURN CREDENTIALS
     # ==========================================================================
     return Credentials(
@@ -203,4 +228,6 @@ def load_credentials(gcp_secret_project: Optional[str] = None) -> Credentials:
         symphony_api_key=symphony_key,
         hl_private_key=hl_private_key,
         hl_account_address=hl_account_address,
+        lighter_pub_key=lighter_pub_key,
+        lighter_priv_key=lighter_priv_key,
     )

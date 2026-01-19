@@ -59,3 +59,6 @@ solders>=0.20.0
 
 # Hyperliquid SDK (official, handles EIP-712 signing)
 hyperliquid-python-sdk>=0.6.0
+
+# Lighter SDK (decentralized perps on Ethereum L2)
+lighter-sdk>=1.0.0

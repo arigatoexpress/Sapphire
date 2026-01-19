@@ -1,6 +1,6 @@
 """
 Platform Router - Universal Execution Layer for Sapphire.
-Handles intelligent routing between Aster, Drift, Hyperliquid, and Symphony.
+Handles intelligent routing between Aster, Drift, Hyperliquid, Symphony, and Lighter.
 
 Optimizes for:
 1. Low latency (Fastest execution path)
@@ -27,6 +27,7 @@ class PlatformType(Enum):
     DRIFT = "drift"
     HYPERLIQUID = "hyperliquid"
     SYMPHONY = "symphony"
+    LIGHTER = "lighter"
 
 
 class ExecutionResult:
@@ -476,6 +477,55 @@ class PlatformRouter:
         except Exception as e:
             return ExecutionResult(
                 False, PlatformType.HYPERLIQUID, symbol, side, quantity, error=str(e)
+            )
+
+    async def _execute_lighter(
+        self, symbol: str, side: str, quantity: float
+    ) -> ExecutionResult:
+        """Execute on Lighter (decentralized perps on Ethereum L2)."""
+        if not self.service.lighter_client or not self.service.lighter_client.is_initialized:
+            return ExecutionResult(
+                False,
+                PlatformType.LIGHTER,
+                symbol,
+                side,
+                quantity,
+                error="Lighter not initialized",
+            )
+
+        try:
+            res = await self.service.lighter_client.place_order(
+                symbol=symbol,
+                side=side,
+                quantity=quantity,
+                order_type="MARKET"
+            )
+            success = bool(res and res.get("status") == "ok")
+            
+            # Extract fill price from Lighter response
+            fill_price = 0.0
+            if success and res:
+                try:
+                    data = res.get("data", {})
+                    if data:
+                        fill_price = float(data.get("avgPx", 0))
+                except (ValueError, TypeError, KeyError):
+                    pass
+                    
+            return ExecutionResult(
+                success=success,
+                platform=PlatformType.LIGHTER,
+                symbol=symbol,
+                side=side,
+                quantity=quantity,
+                price=fill_price,
+                tx_sig=str(res.get("data", {}).get("orderId", "n/a")) if success else None,
+                error=None if success else str(res),
+                raw_response=res,
+            )
+        except Exception as e:
+            return ExecutionResult(
+                False, PlatformType.LIGHTER, symbol, side, quantity, error=str(e)
             )
 
     async def _execute_symphony(
