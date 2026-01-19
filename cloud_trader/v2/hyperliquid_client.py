@@ -134,14 +134,17 @@ class HyperliquidClient:
             # Info client for readonly operations
             self._info = Info(base_url, skip_ws=True)
             
+            # Create wallet Account object from private key
+            # The SDK expects an eth_account.Account object, not a raw key string
+            from eth_account import Account
+            wallet = Account.from_key(self._private_key)
+            
             # Exchange client for trading (handles EIP-712 signing)
             self._exchange = Exchange(
-                wallet=None,  # Will use private key
+                wallet=wallet,
                 base_url=base_url,
                 account_address=self._wallet_address,
             )
-            # Configure with private key
-            self._exchange.wallet = self._private_key
             
             # Load market metadata
             await self._load_market_info()
