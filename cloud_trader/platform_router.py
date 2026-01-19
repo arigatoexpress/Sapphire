@@ -431,12 +431,35 @@ class PlatformRouter:
                 order_type="MARKET"
             )
             success = bool(res and res.get("status") == "ok")
+            
+            # Extract fill price from SDK response
+            # SDK returns price in: data.fills[0].avgPx or data.statuses[0].filled.avgPx
+            fill_price = 0.0
+            if success and res:
+                try:
+                    data = res.get("data", {})
+                    if data:
+                        # Try filled order format
+                        filled = data.get("filled", {})
+                        if filled:
+                            fill_price = float(filled.get("avgPx", 0))
+                        # Or try statuses format
+                        elif "statuses" in res.get("response", {}):
+                            statuses = res.get("response", {}).get("data", {}).get("statuses", [])
+                            if statuses:
+                                filled_info = statuses[0].get("filled", {})
+                                if filled_info:
+                                    fill_price = float(filled_info.get("avgPx", 0))
+                except (ValueError, TypeError, KeyError):
+                    pass
+                    
             return ExecutionResult(
                 success=success,
                 platform=PlatformType.HYPERLIQUID,
                 symbol=symbol,
                 side=side,
                 quantity=quantity,
+                price=fill_price,
                 tx_sig=(
                     str(
                         res.get("response", {})
