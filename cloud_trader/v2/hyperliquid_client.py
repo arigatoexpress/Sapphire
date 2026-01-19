@@ -266,14 +266,14 @@ class HyperliquidClient:
             
             if order_type.upper() == "MARKET":
                 # Market order - SDK handles slippage internally
+                # SDK docs: market_open(name, is_buy, sz, px=None, slippage=0.05, cloid=None)
                 result = await loop.run_in_executor(
                     None,
                     lambda: self._exchange.market_open(
-                        coin=coin,
+                        name=coin,  # SDK uses 'name' not 'coin'
                         is_buy=is_buy,
                         sz=quantity,
                         slippage=0.05,  # 5% slippage
-                        reduce_only=reduce_only,
                     )
                 )
             else:
@@ -284,7 +284,7 @@ class HyperliquidClient:
                 result = await loop.run_in_executor(
                     None,
                     lambda: self._exchange.order(
-                        coin=coin,
+                        name=coin,  # SDK uses 'name' not 'coin'
                         is_buy=is_buy,
                         sz=quantity,
                         limit_px=price,
