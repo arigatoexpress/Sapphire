@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { fetchPerformanceStats, fetchAgents } from '../api/client'
+import { WebSocketClient } from '../api/websocket'
 
 export const useMarketStore = defineStore('market', () => {
     const totalPnl = ref(0.0)
@@ -9,32 +10,53 @@ export const useMarketStore = defineStore('market', () => {
     const systemStatus = ref('OFFLINE')
     const activeAgents = ref(0)
 
+
+
+    const wsClient = new WebSocketClient('/ws/dashboard')
+
     async function fetchStats() {
         const data = await fetchPerformanceStats()
         if (data && data.status === 'success') {
-            const metrics = data.metrics?.system || {}
+            updateFromData(data)
+        }
+    }
+
+    function updateFromData(data: any) {
+        // Backend returns: { portfolio: {...}, agents: [...], stats: {...}, ... }
+        // Or via API endpoint: { status: 'success', metrics: { system: {...} } }
+
+        // Handle WS Dashboard payload
+        if (data.portfolio) {
+            totalPnl.value = data.portfolio.pnl_percent || 0.0
+            // win_rate might be in stats
+            if (data.stats) {
+                winRate.value = data.stats.win_rate || 0
+            }
+            if (data.agents) {
+                activeAgents.value = data.agents.length
+            }
+            systemStatus.value = 'ONLINE'
+        }
+        // Handle Legacy API payload (fallback)
+        else if (data.metrics?.system) {
+            const metrics = data.metrics.system
             totalPnl.value = metrics.total_pnl || 0.0
             winRate.value = metrics.total_trades > 0
                 ? Math.round((metrics.wins / metrics.total_trades) * 100)
                 : 0
-
             systemStatus.value = 'ONLINE'
-
-            // Fetch real agent count
-            const agents = await fetchAgents()
-            if (agents && Array.isArray(agents)) {
-                activeAgents.value = agents.length
-            } else {
-                // Fallback to active system components or known default
-                activeAgents.value = 7
-            }
         }
     }
 
-    // Poll every 10s
-    function startPolling() {
+    function startStreaming() {
+        // Initial fetch
         fetchStats()
-        setInterval(fetchStats, 10000)
+
+        // Connect WS
+        wsClient.connect()
+        wsClient.subscribe((data) => {
+            updateFromData(data)
+        })
     }
 
     return {
@@ -43,6 +65,6 @@ export const useMarketStore = defineStore('market', () => {
         winRate,
         systemStatus,
         activeAgents,
-        startPolling
+        startStreaming
     }
 })
