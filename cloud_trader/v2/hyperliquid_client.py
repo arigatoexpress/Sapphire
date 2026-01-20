@@ -323,6 +323,91 @@ class HyperliquidClient:
         except Exception as e:
             logger.error(f"❌ [Hyperliquid] Order exception: {e}")
             return {"status": "error", "error": str(e)}
+
+    async def place_trigger_order(
+        self,
+        symbol: str,
+        side: str,
+        quantity: float,
+        trigger_price: float,
+        is_tp: bool = True,
+        reduce_only: bool = True,
+    ) -> dict:
+        """
+        Place a trigger order (Take Profit or Stop Loss).
+        
+        Args:
+            symbol: Trading pair
+            side: Order side ("BUY" or "SELL")
+            quantity: Order size
+            trigger_price: Trigger price
+            is_tp: True for Take Profit, False for Stop Loss
+            reduce_only: Should be True for TP/SL closing orders
+        """
+        if not self._initialized:
+            await self.initialize()
+
+        if not self._exchange:
+            return {"status": "error", "error": "Exchange not initialized"}
+            
+        # Normalize symbol
+        coin = symbol.upper().replace("_", "-").replace("-PERP", "").replace("-USDC", "").replace("-USD", "")
+        
+        # Get market info for precision
+        market = self._market_info.get(coin, {})
+        sz_decimals = market.get("sz_decimals", 4)
+        quantity = round(quantity, sz_decimals)
+        
+        is_buy = side.upper() == "BUY"
+        trigger_type = "tp" if is_tp else "sl"
+        
+        logger.info(
+            f"📤 [Hyperliquid] Placing {trigger_type.upper()} {side} trigger | "
+            f"Coin: {coin} | Qty: {quantity} | Price: ${trigger_price}"
+        )
+        
+        try:
+            loop = asyncio.get_event_loop()
+            
+            # Use SDK's order method with trigger configuration
+            result = await loop.run_in_executor(
+                None,
+                lambda: self._exchange.order(
+                    name=coin,
+                    is_buy=is_buy,
+                    sz=quantity,
+                    limit_px=trigger_price,  # Trigger orders use limit_px as the price
+                    order_type={
+                        "trigger": {
+                            "triggerPx": trigger_price,
+                            "isMarket": True,  # Usually market order when triggered
+                            "tpsl": trigger_type
+                        }
+                    },
+                    reduce_only=reduce_only,
+                )
+            )
+            
+            if result and result.get("status") == "ok":
+                statuses = result.get("response", {}).get("data", {}).get("statuses", [])
+                if statuses:
+                    status = statuses[0]
+                    if "resting" in status:
+                        logger.info(f"✅ [Hyperliquid] {trigger_type.upper()} Set | Coin: {coin}")
+                        return {"status": "ok", "resting": True, "data": status["resting"]}
+                    elif "error" in status:
+                        logger.error(f"❌ [Hyperliquid] {trigger_type.upper()} error: {status['error']}")
+                        return {"status": "error", "error": status["error"]}
+                        
+                return {"status": "ok", "response": result}
+            else:
+                error = result.get("response", {}).get("data", {}).get("statuses", [{}])[0].get("error", "Unknown")
+                logger.error(f"❌ [Hyperliquid] {trigger_type.upper()} failed: {error}")
+                return {"status": "error", "error": error}
+                
+        except Exception as e:
+            logger.error(f"❌ [Hyperliquid] {trigger_type.upper()} exception: {e}")
+            return {"status": "error", "error": str(e)}
     
     async def get_ticker(self, symbol: str) -> dict:
         """Get current price for a symbol."""

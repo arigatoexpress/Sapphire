@@ -191,6 +191,27 @@ class TradingLoop:
             # Calculate position size
             size = await self._calculate_position_size(symbol)
 
+            # Calculate TP/SL prices
+            current_price = await self._get_current_price(symbol)
+            tp_price = None
+            sl_price = None
+            
+            if current_price > 0:
+                # Default strategy: 5% TP, 3% SL
+                tp_pct = 0.05
+                sl_pct = 0.03
+                
+                if consensus.signal == "BUY":
+                    tp_price = current_price * (1 + tp_pct)
+                    sl_price = current_price * (1 - sl_pct)
+                elif consensus.signal == "SELL":
+                    tp_price = current_price * (1 - tp_pct)
+                    sl_price = current_price * (1 + sl_pct)
+                    
+                # Round to 2 decimals for now (precision normalizer in router will handle strict precision)
+                tp_price = round(tp_price, 2)
+                sl_price = round(sl_price, 2)
+
             # Execute via platform router
             result = await self.router.execute_trade(
                 agent=consensus,  # Pass consensus as agent for tracking
@@ -199,6 +220,8 @@ class TradingLoop:
                 quantity=size,
                 thesis=consensus.reasoning,
                 is_closing=False,
+                tp_price=tp_price,
+                sl_price=sl_price,
             )
 
             if result.success:

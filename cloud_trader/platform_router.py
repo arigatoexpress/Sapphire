@@ -230,6 +230,8 @@ class PlatformRouter:
         thesis: str,
         is_closing: bool = False,
         attempt: int = 1,
+        tp_price: Optional[float] = None,
+        sl_price: Optional[float] = None,
     ) -> ExecutionResult:
         """
         Main execution entry point. Handles routing, execution, and error recovery.
@@ -311,7 +313,7 @@ class PlatformRouter:
                     )
                 elif platform == PlatformType.HYPERLIQUID:
                     result = await breaker.call(
-                        self._execute_hyperliquid, symbol, side, formatted_quantity
+                        self._execute_hyperliquid, symbol, side, formatted_quantity, tp_price, sl_price
                     )
                 elif platform == PlatformType.SYMPHONY:
                     result = await breaker.call(
@@ -409,7 +411,12 @@ class PlatformRouter:
             return ExecutionResult(False, PlatformType.DRIFT, symbol, side, quantity, error=str(e))
 
     async def _execute_hyperliquid(
-        self, symbol: str, side: str, quantity: float
+        self, 
+        symbol: str, 
+        side: str, 
+        quantity: float,
+        tp_price: Optional[float] = None,
+        sl_price: Optional[float] = None,
     ) -> ExecutionResult:
         """Execute on Hyperliquid L1."""
         if not self.service.hl_client or not self.service.hl_client.is_initialized:
@@ -454,6 +461,43 @@ class PlatformRouter:
                 except (ValueError, TypeError, KeyError):
                     pass
                     
+                    pass
+                    
+            # ---------------------------------------------------------
+            # RISK MANAGEMENT: Place Take Profit & Stop Loss if ordered
+            # ---------------------------------------------------------
+            if success and (tp_price or sl_price):
+                # We need to reverse the side for TP/SL (if we bought, we need to sell)
+                close_side = "SELL" if side.upper() == "BUY" else "BUY"
+                
+                # Place Take Profit
+                if tp_price:
+                    try:
+                        await self.service.hl_client.place_trigger_order(
+                            symbol=symbol,
+                            side=close_side,
+                            quantity=quantity,
+                            trigger_price=tp_price,
+                            is_tp=True,
+                            reduce_only=True
+                        )
+                    except Exception as tp_err:
+                        logger.error(f"⚠️ [ROUTER] Failed to place TP for {symbol}: {tp_err}")
+                
+                # Place Stop Loss
+                if sl_price:
+                    try:
+                        await self.service.hl_client.place_trigger_order(
+                            symbol=symbol,
+                            side=close_side,
+                            quantity=quantity,
+                            trigger_price=sl_price,
+                            is_tp=False,
+                            reduce_only=True
+                        )
+                    except Exception as sl_err:
+                        logger.error(f"⚠️ [ROUTER] Failed to place SL for {symbol}: {sl_err}")
+            
             return ExecutionResult(
                 success=success,
                 platform=PlatformType.HYPERLIQUID,
