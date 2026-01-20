@@ -402,3 +402,6 @@ pylint
 black
 pytest-asyncio
 pytest-mock
+
+# Lighter SDK
+lighter-sdk>=1.0.0
