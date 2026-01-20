@@ -188,8 +188,16 @@ class TradingLoop:
     async def _execute_entry(self, symbol: str, consensus) -> bool:
         """Execute an entry trade."""
         try:
-            # Calculate position size
-            size = await self._calculate_position_size(symbol)
+            # Calculate position size (Dynamic)
+            # Use confidence from consensus if available, else default 0.5
+            confidence = getattr(consensus, "confidence", 0.5)
+            # Ensure confidence is float
+            try:
+                confidence = float(confidence)
+            except (ValueError, TypeError):
+                confidence = 0.5
+                
+            size = await self._calculate_position_size(symbol, confidence)
 
             # Calculate TP/SL prices
             current_price = await self._get_current_price(symbol)
@@ -300,11 +308,28 @@ class TradingLoop:
             logger.error(f"❌ Exit error {symbol}: {e}")
             return False
 
-    async def _calculate_position_size(self, symbol: str) -> float:
-        """Calculate position size based on risk parameters."""
-        # TODO: Integrate with risk manager
-        # For now, use fixed size
-        return 100.0  # $100 per position
+    async def _calculate_position_size(self, symbol: str, confidence: float = 0.5) -> float:
+        """
+        Calculate position size based on risk parameters and confidence.
+        
+        Formula: Base Size ($100) * (0.5 + Confidence * 1.5)
+        Range: $50 (low confidence) to $200 (max confidence)
+        """
+        base_size = 100.0
+        
+        # Optimize size based on AI confidence
+        # Conf 0.0 -> Multiplier 0.5 -> $50
+        # Conf 0.5 -> Multiplier 1.25 -> $125
+        # Conf 1.0 -> Multiplier 2.0 -> $200
+        multiplier = 0.5 + (confidence * 1.5)
+        
+        dynamic_size = base_size * multiplier
+        
+        # Cap limits
+        dynamic_size = max(50.0, min(dynamic_size, 500.0))
+        
+        logger.info(f"💰 Sizing {symbol}: Base ${base_size} * {multiplier:.2f} (Conf {confidence:.2f}) = ${dynamic_size:.2f}")
+        return dynamic_size
 
     async def _get_current_price(self, symbol: str) -> float:
         """Get current market price from the exchange."""

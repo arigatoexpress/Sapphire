@@ -260,6 +260,13 @@ DRIFT_SYMBOLS = [
 ]
 
 
+# Assets supported by Lighter (L2 Order Book)
+LIGHTER_SYMBOLS = [
+    "WBTC-USDC",
+    "WETH-USDC",
+]
+
+
 @dataclass
 class MinimalAgentState:
     """State tracking for a trading agent with self-tuning capabilities."""

@@ -16,7 +16,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from .ai_error_recovery import recover_from_error
-from .definitions import DRIFT_SYMBOLS, HYPERLIQUID_SYMBOLS, SYMPHONY_SYMBOLS
+from .definitions import DRIFT_SYMBOLS, HYPERLIQUID_SYMBOLS, SYMPHONY_SYMBOLS, LIGHTER_SYMBOLS
 from .logger import get_logger
 
 logger = get_logger(__name__)
@@ -156,7 +156,11 @@ class PlatformRouter:
         if symbol in SYMPHONY_SYMBOLS:
             return PlatformType.SYMPHONY
 
-        # Strategy 3: Fallback to Hyperliquid for major pairs (BTC, ETH, SOL)
+        # Strategy 3: Try Lighter for supported pairs (L2 execution)
+        if symbol in LIGHTER_SYMBOLS or symbol.replace("BTC", "WBTC").replace("ETH", "WETH") in LIGHTER_SYMBOLS:
+            return PlatformType.LIGHTER
+
+        # Strategy 4: Fallback to Hyperliquid for major pairs (BTC, ETH, SOL)
         # This avoids Aster's US region block
         major_symbols = ["BTC-USDC", "ETH-USDC", "SOL-USDC", "BTCUSDT", "ETHUSDT", "SOLUSDT"]
         if any(major in symbol.upper() for major in major_symbols):
@@ -248,9 +252,9 @@ class PlatformRouter:
         from .precision_normalizer import get_precision_normalizer
         import random
 
-        # 1. Jitter: Add random delay to avoid HFT detection
-        jitter = random.uniform(0.1, 1.5)
-        logger.debug(f"🎲 [ROUTER] Applying {jitter:.2f}s jitter for {agent.name}")
+        # 1. Jitter: Reduced random delay for higher efficiency (was 0.1-1.5s)
+        jitter = random.uniform(0.05, 0.2)
+        logger.debug(f"⚡ [ROUTER] Speed optimized: {jitter:.3f}s jitter")
         await asyncio.sleep(jitter)
 
         # 2. Fuzzing: Slightly adjust quantity to avoid round-number patterns
