@@ -761,6 +761,20 @@ class TradingService:
             except Exception as e:
                 logger.error(f"❌ Drift initialization error: {e}")
 
+        # Initialize Lighter Client (Phase 3 Integration)
+        try:
+            from .v2.lighter_client import LighterClient
+            self.lighter_client = LighterClient(
+                private_key=credentials.hl_private_key,  # Uses same key as HL
+                public_key=credentials.hl_account_address # Uses same address
+            )
+            logger.info("⚡ Initializing Lighter Client...")
+            await self.lighter_client.initialize()
+            logger.info("✅ Lighter Client Initialized")
+        except Exception as e:
+            logger.error(f"⚠️ Lighter Client initialization failed: {e}")
+            self.lighter_client = None
+
         # NEW: Initialize Autonomous Trading Components
         logger.info("🤖 Initializing autonomous trading components...")
         from .autonomous_components_init import init_autonomous_components
@@ -776,6 +790,7 @@ class TradingService:
             symphony_client=self.symphony,
             hl_client=self.hl_client,
             drift_client=self.drift,
+            lighter_client=getattr(self, "lighter_client", None),
             settings=self._settings,
         )
 
@@ -2494,14 +2509,22 @@ class TradingService:
                 # 4. Handle Result
                 if result and result.get("successful", 0) > 0:
                     print(f"✅ Symphony Trade Success: {result}")
+                    
+                    # Fetch estimated price if not returned
+                    est_price = 0.0
+                    try:
+                        est_price = await self.get_token_price(token_symbol)
+                    except:
+                        pass
+
                     # Fire Notification
                     await self._send_trade_notification(
                         agent,
                         symbol,
                         side,
                         quantity_float,
-                        0.0,
-                        0.0,
+                        est_price,  # Use estimated price instead of 0.0
+                        est_price * quantity_float,
                         True,
                         status="FILLED",
                         thesis=thesis + " (Symphony Execution)",
@@ -2698,6 +2721,14 @@ class TradingService:
                     order_result.get("executedQty", 0) or order_result.get("quantity", 0)
                 )
                 avg_price = float(order_result.get("avgPrice", 0) or order_result.get("price", 0))
+
+                # ESTIMATE PRICE IF MISSING (Market Orders sometimes return 0 initially)
+                if avg_price == 0:
+                    try:
+                        print(f"⚠️ Avg Price missing for {symbol}, fetching estimation...")
+                        avg_price = await self.get_token_price(symbol.split("-")[0])
+                    except:
+                        pass
 
                 print(
                     f"📋 Order Placed: ID {order_id} | Status: {status} | Exec: {executed_qty} | Price: {avg_price}"
