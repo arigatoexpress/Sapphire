@@ -1,7 +1,25 @@
 # ==============================================================================
 # Sapphire V2 Trading System - Production Dockerfile
+# Full Stack: Node.js Builder (Frontend) + Python Runtime (Backend)
 # ==============================================================================
 
+# --------------------------
+# Stage 1: Build Frontend
+# --------------------------
+FROM node:18-alpine as frontend-builder
+WORKDIR /app/web
+
+# Copy frontend source
+COPY sapphire-web/package*.json ./
+RUN npm install
+
+COPY sapphire-web/ .
+# Build for production (output to /app/web/dist)
+RUN npm run build
+
+# --------------------------
+# Stage 2: Build Backend & Serve
+# --------------------------
 FROM python:3.11-slim
 
 # Set environment variables
@@ -41,6 +59,10 @@ RUN pip install --no-cache-dir \
 
 # Copy application code
 COPY . .
+
+# Copy built frontend assets from Stage 1 to /app/static
+# Ensure api.py looks for /app/static/index.html
+COPY --from=frontend-builder /app/web/dist /app/static
 
 # Create models directory
 RUN mkdir -p models
