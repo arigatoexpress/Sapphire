@@ -738,6 +738,20 @@ async def get_trades_alias():
         return {"success": True, "trades": [], "count": 0}
 
 
+# --- Frontend Compatibility Aliases ---
+
+@app.get("/api/agents/list")
+async def get_agents_list_alias():
+    """Alias for /api/agents/metrics to match frontend client.ts."""
+    return await get_agent_metrics_endpoint()
+
+
+@app.get("/positions/all")
+async def get_all_positions_alias():
+    """Alias for /api/positions to match frontend client.ts."""
+    return await get_positions_alias()
+
+
 @app.get("/api/agents/evolution/{agent_id}")
 async def get_agent_evolution_endpoint(agent_id: str):
     """
@@ -765,39 +779,6 @@ async def get_agent_evolution_endpoint(agent_id: str):
     except Exception as e:
         logger.error(f"Error fetching agent evolution: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-        # =============================================================================
-        # Get recent signals from consensus engine
-        signals = []
-        if hasattr(service, "_consensus_engine"):
-            recent = getattr(service._consensus_engine, "consensus_history", [])
-            for result in list(recent)[-20:]:
-                signals.append(
-                    {
-                        "symbol": getattr(result, "symbol", ""),
-                        "winning_signal": (
-                            result.winning_signal.value if result.winning_signal else "hold"
-                        ),
-                        "confidence": getattr(result, "consensus_confidence", 0),
-                        "agreement": getattr(result, "agreement_level", 0),
-                        "is_strong": getattr(result, "consensus_confidence", 0) > 0.7,
-                        "timestamp_us": getattr(result, "timestamp_us", int(time.time() * 1000000)),
-                    }
-                )
-
-        # Get portfolio history for sparkline (simulated if not available)
-        history = []
-        if hasattr(service, "_portfolio_history"):
-            history = list(service._portfolio_history)[-24:]
-        else:
-            # Generate mock history based on current value
-            base = portfolio_data.get("balance", 1000)
-            import random
-
-            history = [base * (1 + random.uniform(-0.02, 0.02)) for _ in range(24)]
-
-        # Aggregated stats
-        stats = {
             "total_pnl_percent": portfolio_data.get("total_pnl_percent", 0),
             "open_positions_count": len(portfolio_data.get("positions", [])),
             "active_agents_count": len([a for a in agents_data if a["status"] == "active"]),
