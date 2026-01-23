@@ -276,23 +276,28 @@ async def lifespan(app: FastAPI):
         logger.exception("❌ STARTUP: Failed to start trading service: %s", exc)
 
     # V2 Startup
-    try:
-        logger.info("🚀 STARTUP: Initializing V2 Components...")
-        creds = load_credentials()
-        
-        # Pass clients from trading service if available to share connections
-        ts = trading_service
-        
-        await initialize_v2_components(
-            hyperliquid_private_key=creds.hl_private_key,
-            hyperliquid_wallet=creds.hl_account_address,
-            drift_private_key=creds.solana_private_key,
-            symphony_client=ts.symphony if ts else None,
-            aster_client=ts._exchange_client if ts else None,
-            drift_client=ts.drift if ts else None,
-        )
-    except Exception as exc:
-        logger.exception("❌ STARTUP: Failed to initialize V2 components: %s", exc)
+    # MICROSERVICES: Skip V2 initialization if this is the web-only service
+    serve_frontend = os.getenv("SERVE_FRONTEND", "false").lower() == "true"
+    if not serve_frontend:
+        try:
+            logger.info("🚀 STARTUP: Initializing V2 Components...")
+            creds = load_credentials()
+
+            # Pass clients from trading service if available to share connections
+            ts = trading_service
+
+            await initialize_v2_components(
+                hyperliquid_private_key=creds.hl_private_key,
+                hyperliquid_wallet=creds.hl_account_address,
+                drift_private_key=creds.solana_private_key,
+                symphony_client=ts.symphony if ts else None,
+                aster_client=ts._exchange_client if ts else None,
+                drift_client=ts.drift if ts else None,
+            )
+        except Exception as exc:
+            logger.exception("❌ STARTUP: Failed to initialize V2 components: %s", exc)
+    else:
+        logger.info("🌐 STARTUP: Skipping V2 components (web-only mode)")
 
     yield
 
@@ -496,6 +501,15 @@ from .v2.v2_integration import router as v2_router
 app.include_router(v2_router)
 logger.info("✅ V2 Router included")
 
+# Add Microservices Fleet Endpoints (sapphire-web only)
+try:
+    from .api.microservices_endpoints import router as fleet_router
+
+    app.include_router(fleet_router)
+    logger.info("✅ Fleet endpoints included (sapphire-web aggregation)")
+except Exception as e:
+    logger.warning(f"⚠️ Fleet endpoints not loaded: {e}")
+
 # Static file serving relocated to end of file to ensure all API routes are registered first
 
 
@@ -535,12 +549,16 @@ async def get_dashboard_data() -> Dict[str, Any]:
     Batch endpoint that combines multiple data sources into a single response.
     Reduces network calls from 4+ to 1 for the main dashboard.
 
+    MICROSERVICES MODE: If running on sapphire-web, returns aggregated fleet data.
+    TRADING MODE: Returns local service data.
+
     Returns:
         - portfolio: Balance, equity, P&L
         - agents: Active agents with performance metrics
         - signals: Recent consensus signals
         - stats: Aggregated trading statistics
         - history: Portfolio value history for sparklines (last 24 points)
+        - fleet: (web only) Cross-service aggregation
     """
     try:
         service = await get_service_instance()
@@ -553,6 +571,46 @@ async def get_dashboard_data() -> Dict[str, Any]:
                 "history": [],
             }
 
+        # MICROSERVICES: Check if this is the web service with aggregator
+        if hasattr(service, "_state_aggregator") and service._state_aggregator:
+            # WEB SERVICE MODE: Return aggregated fleet data
+            aggregator = service._state_aggregator
+            fleet_summary = aggregator.get_fleet_summary()
+
+            portfolio_data = {
+                "balance": fleet_summary["total_equity"],
+                "equity": fleet_summary["total_equity"],
+                "pnl_percent": 0,  # Could calculate from historical data
+                "systems": {
+                    svc_name: {
+                        "balance": svc_data["balance"],
+                        "positions": svc_data["positions"],
+                        "health": svc_data["health"]["status"],
+                    }
+                    for svc_name, svc_data in fleet_summary["services"].items()
+                },
+            }
+
+            # Aggregate positions across fleet
+            all_positions = aggregator.get_all_positions()
+
+            stats_data = {
+                "total_trades": 0,  # Could aggregate from events
+                "total_services": len(fleet_summary["services"]),
+                "total_positions": len(all_positions),
+                "fleet_health": aggregator.get_service_health(),
+            }
+
+            return {
+                "portfolio": portfolio_data,
+                "agents": [],  # Could aggregate agent data
+                "signals": [],  # Could aggregate from events
+                "stats": stats_data,
+                "history": [],
+                "fleet": fleet_summary,  # Include raw fleet summary
+            }
+
+        # TRADING SERVICE MODE: Return local data
         # REAL DATA: Consensus signals from history
         signals_data = list(service._consensus_history)
 
@@ -713,15 +771,36 @@ async def get_history_portfolio_alias(hours: int = 24):
 
 @app.get("/api/positions")
 async def get_positions_alias():
-    """Alias for /api/symphony/positions to match frontend expectations."""
-    # Try to find a symphony positions function or implement directly
+    """Get positions - aggregated fleet view on sapphire-web, local on trading services."""
     try:
         service = trading_service
+
+        # MICROSERVICES: Check if this is the web service with aggregator
+        if hasattr(service, "_state_aggregator") and service._state_aggregator:
+            # WEB SERVICE MODE: Return aggregated fleet positions
+            aggregator = service._state_aggregator
+            all_positions = aggregator.get_all_positions()
+
+            return {
+                "success": True,
+                "positions": all_positions,
+                "count": len(all_positions),
+                "mode": "fleet",
+            }
+
+        # TRADING SERVICE MODE: Return local positions
         if hasattr(service, "_open_positions"):
-            return {"success": True, "positions": list(service._open_positions.values())}
+            return {
+                "success": True,
+                "positions": list(service._open_positions.values()),
+                "count": len(service._open_positions),
+                "mode": "local",
+            }
+
         # Fallback to symphony route logic if needed
         return await get_symphony_positions()
-    except Exception:
+    except Exception as e:
+        logger.error(f"Failed to get positions: {e}")
         return {"success": True, "positions": []}
 
 

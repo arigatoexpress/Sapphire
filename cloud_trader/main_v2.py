@@ -96,8 +96,13 @@ async def lifespan(app: FastAPI):
 
     orchestrator = TradingOrchestrator(settings)
 
-    # Start trading system
-    await orchestrator.start()
+    # MICROSERVICES: Skip trading system if this is the web-only service
+    serve_frontend = os.getenv("SERVE_FRONTEND", "false").lower() == "true"
+    if serve_frontend:
+        logger.info("🌐 Running in web-only mode (SERVE_FRONTEND=true) - skipping trading orchestrator")
+    else:
+        # Start trading system
+        await orchestrator.start()
 
     # Start background keep-alive task to prevent Cloud Run shutdown
     keep_alive_task = asyncio.create_task(_keep_alive_loop())

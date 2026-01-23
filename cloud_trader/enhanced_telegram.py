@@ -141,17 +141,32 @@ class EnhancedTelegramService:
         self, trade=None, priority=NotificationPriority.MEDIUM, **kwargs
     ):
         """Send trade notification with rich formatting."""
-        symbol = trade.symbol if trade else kwargs.get("symbol", "N/A")
-        side = trade.side if trade else kwargs.get("side", "HOLD")
-        price = trade.price if trade else kwargs.get("price", 0.0)
-        quantity = trade.quantity if trade else kwargs.get("quantity", 0.0)
-        platform = trade.platform if trade else kwargs.get("platform", "Unknown")
+        # Check if trade is an object with attributes or a dict
+        if trade and hasattr(trade, 'symbol'):
+            # Trade is an object with attributes
+            symbol = trade.symbol
+            side = trade.side
+            price = trade.price
+            quantity = trade.quantity
+            platform = trade.platform
+        else:
+            # Trade is None or a dict, use kwargs
+            symbol = kwargs.get("symbol", "N/A")
+            side = kwargs.get("side", "HOLD")
+            price = kwargs.get("price", 0.0)
+            quantity = kwargs.get("quantity", 0.0)
+            platform = kwargs.get("platform", "Unknown")
 
         # Determine emoji based on side
         side_emoji = "🟢" if side in ["BUY", "LONG"] else "🔴"
-        platform_emoji = {"drift": "🌊", "hyperliquid": "💧", "aster": "⭐", "symphony": "🎵"}.get(
-            platform.lower(), "🤖"
-        )
+        platform_emoji = {
+            "drift": "🌊",
+            "hyperliquid": "💧",
+            "aster": "⭐",
+            "symphony": "🎵",
+            "lighter": "⚡",
+            "jupiter": "🪐"
+        }.get(platform.lower(), "🤖")
 
         msg = (
             f"{side_emoji} **{side} {symbol}**\n"
@@ -160,6 +175,47 @@ class EnhancedTelegramService:
             f"📦 Size: `{quantity}`\n"
             f"{platform_emoji} Venue: `{platform.title()}`\n"
             f"🕒 Time: `{time.strftime('%H:%M:%S UTC')}`"
+        )
+
+        await self.send_message(msg, priority=priority)
+
+    async def send_jupiter_swap_notification(
+        self,
+        symbol: str,
+        side: str,
+        price: float,
+        quantity: float,
+        input_amount: float,
+        output_amount: float,
+        tx_signature: str,
+        latency_ms: int = 0,
+        priority: NotificationPriority = NotificationPriority.HIGH,
+    ):
+        """Send detailed Jupiter swap notification with blockchain verification."""
+        side_emoji = "🟢" if side == "BUY" else "🔴"
+
+        # Calculate value
+        notional = price * quantity if price > 0 else 0
+
+        # Format transaction signature
+        tx_short = f"{tx_signature[:8]}...{tx_signature[-8:]}" if len(tx_signature) > 16 else tx_signature
+
+        msg = (
+            f"{side_emoji} **JUPITER SWAP EXECUTED**\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"🪐 **Pair**: `{symbol}`\n"
+            f"📊 **Action**: `{side}`\n"
+            f"💵 **Price**: `${price:,.6f}`\n"
+            f"📦 **Quantity**: `{quantity:.6f}`\n"
+            f"💰 **Value**: `${notional:.2f}`\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"📥 **Input**: `{input_amount:.6f}`\n"
+            f"📤 **Output**: `{output_amount:.6f}`\n"
+            f"⚡ **Latency**: `{latency_ms}ms`\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"🔗 **Tx**: `{tx_short}`\n"
+            f"🔍 [View on Solscan](https://solscan.io/tx/{tx_signature})\n"
+            f"🕒 **Time**: `{time.strftime('%H:%M:%S UTC')}`"
         )
 
         await self.send_message(msg, priority=priority)

@@ -321,6 +321,33 @@ class Settings(BaseSettings):
     enable_telegram: bool = Field(default=True, validation_alias="ENABLE_TELEGRAM")
     enable_pubsub: bool = Field(default=False, validation_alias="ENABLE_PUBSUB")
     enable_aster: bool = Field(default=True, validation_alias="ENABLE_ASTER")
+    
+    # Microservices Platform Flags (Platform Isolation)
+    enable_hyperliquid: bool = Field(
+        default=True, 
+        validation_alias="ENABLE_HYPERLIQUID",
+        description="Enable Hyperliquid integration"
+    )
+    enable_lighter: bool = Field(
+        default=True, 
+        validation_alias="ENABLE_LIGHTER",
+        description="Enable Lighter.xyz integration"
+    )
+    enable_drift: bool = Field(
+        default=True, 
+        validation_alias="ENABLE_DRIFT",
+        description="Enable Drift Protocol integration"
+    )
+    enable_symphony: bool = Field(
+        default=True,
+        validation_alias="ENABLE_SYMPHONY",
+        description="Enable Symphony Agent integration"
+    )
+    enable_jupiter: bool = Field(
+        default=True,
+        validation_alias="ENABLE_JUPITER",
+        description="Enable Jupiter DEX aggregator integration"
+    )
 
     # Paper trading testnet configuration
     aster_testnet_api_key: str | None = Field(

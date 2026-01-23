@@ -1,0 +1,50 @@
+# Sapphire V2 Production Environment Variables for Cloud Run
+# Use with: gcloud run services update sapphire-v2 --env-vars-file env-vars-production.yaml
+
+# ============================================================================
+# Platform Configuration
+# ============================================================================
+ENABLE_JUPITER: "true"
+ENABLE_DRIFT: "false"
+ENABLE_ASTER: "true"
+ENABLE_HYPERLIQUID: "true"
+ENABLE_LIGHTER: "true"
+ENABLE_SYMPHONY: "true"
+
+# ============================================================================
+# Solana / Jupiter Configuration
+# ============================================================================
+SOLANA_RPC_URL: "https://api.mainnet-beta.solana.com"
+
+# ============================================================================
+# Environment & Logging
+# ============================================================================
+ENVIRONMENT: "production"
+LOG_LEVEL: "INFO"
+
+# ============================================================================
+# Trading Configuration
+# ============================================================================
+MAX_POSITIONS: "25"
+MAX_SLIPPAGE_BPS: "50"
+RISK_THRESHOLD: "0.3"
+MAX_POSITION_PCT: "0.02"
+
+# ============================================================================
+# Telegram Configuration
+# ============================================================================
+ENABLE_TELEGRAM: "true"
+
+# ============================================================================
+# Database Configuration
+# ============================================================================
+DATABASE_ENABLED: "true"
+
+# ============================================================================
+# Agent Configuration
+# ============================================================================
+AGENT_PARALLEL_EXECUTION: "true"
+ENABLE_PROFIT_MAXIMIZATION: "true"
+
+# Note: Secrets (API keys, private keys) are loaded from GCP Secret Manager automatically
+# Do not add sensitive values here!

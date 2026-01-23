@@ -18,26 +18,27 @@ class Credentials:
     # Aster (CEX)
     api_key: Optional[str] = None
     api_secret: Optional[str] = None
-    
+
     # AI Models
     vertex_api_key: Optional[str] = None
     gemini_api_key: Optional[str] = None
     grok_api_key: Optional[str] = None
-    
+
     # Notifications
     telegram_bot_token: Optional[str] = None
     telegram_chat_id: Optional[str] = None
-    
-    # Solana / Drift
+
+    # Solana / Drift / Jupiter
     solana_private_key: Optional[str] = None
-    
+    jupiter_api_key: Optional[str] = None
+
     # Symphony (Monad)
     symphony_api_key: Optional[str] = None
-    
+
     # Hyperliquid
     hl_private_key: Optional[str] = None
     hl_account_address: Optional[str] = None
-    
+
     # Lighter
     lighter_pub_key: Optional[str] = None
     lighter_priv_key: Optional[str] = None
@@ -197,21 +198,34 @@ def load_credentials(gcp_secret_project: Optional[str] = None) -> Credentials:
     # ==========================================================================
     lighter_pub_key = os.environ.get("LIGHTER_PUB_KEY")
     lighter_priv_key = os.environ.get("LIGHTER_PRIV_KEY")
-    
+
     if not lighter_pub_key and gcp_secret_project:
         print(f"DEBUG: Fetching LIGHTER_PUB_KEY from Secret Manager...")
         lighter_pub_key = _secret_manager.get_secret("LIGHTER_PUB_KEY", gcp_secret_project)
-    
+
     if not lighter_priv_key and gcp_secret_project:
         print(f"DEBUG: Fetching LIGHTER_PRIV_KEY from Secret Manager...")
         lighter_priv_key = _secret_manager.get_secret("LIGHTER_PRIV_KEY", gcp_secret_project)
-    
+
     if lighter_pub_key:
         lighter_pub_key = lighter_pub_key.strip()
         print(f"DEBUG: Loaded Lighter Pub Key (len={len(lighter_pub_key)})")
     if lighter_priv_key:
         lighter_priv_key = lighter_priv_key.strip()
         print(f"DEBUG: Loaded Lighter Priv Key (len={len(lighter_priv_key)})")
+
+    # ==========================================================================
+    # JUPITER
+    # ==========================================================================
+    jupiter_api_key = os.environ.get("JUPITER_API_KEY", "d1302809-3996-4ceb-aad0-7da8a71d6149")
+
+    if not jupiter_api_key and gcp_secret_project:
+        print(f"DEBUG: Fetching JUPITER_API_KEY from Secret Manager...")
+        jupiter_api_key = _secret_manager.get_secret("JUPITER_API_KEY", gcp_secret_project)
+
+    if jupiter_api_key:
+        jupiter_api_key = jupiter_api_key.strip()
+        print(f"DEBUG: Loaded Jupiter API Key: {jupiter_api_key[:8]}... (len={len(jupiter_api_key)})")
 
     # ==========================================================================
     # RETURN CREDENTIALS
@@ -225,6 +239,7 @@ def load_credentials(gcp_secret_project: Optional[str] = None) -> Credentials:
         telegram_bot_token=tg_token,
         telegram_chat_id=tg_chat,
         solana_private_key=solana_key,
+        jupiter_api_key=jupiter_api_key,
         symphony_api_key=symphony_key,
         hl_private_key=hl_private_key,
         hl_account_address=hl_account_address,

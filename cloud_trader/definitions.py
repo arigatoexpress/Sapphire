@@ -266,6 +266,47 @@ LIGHTER_SYMBOLS = [
     "WETH-USDC",
 ]
 
+# Assets supported by Jupiter (Solana DEX Aggregator - SPOT ONLY)
+# Jupiter aggregates best prices across all Solana DEXs for spot swaps
+JUPITER_SPOT_SYMBOLS = [
+    # Major Solana pairs
+    "SOL-USDC", "SOLUSDT", "SOLUSD",
+    # Solana ecosystem tokens
+    "JUP-USDC", "JUPUSDT",  # Jupiter's own token
+    "PYTH-USDC", "PYTHUSDT",
+    "BONK-USDC", "BONKUSDT",
+    "RAY-USDC",  # Raydium
+    "ORCA-USDC",  # Orca
+    "MNGO-USDC",  # Mango Markets
+    # Wrapped major assets on Solana
+    "ETH-USDC", "WETH-USDC",
+    "BTC-USDC", "WBTC-USDC",
+    "USDT-USDC",
+]
+
+# Legacy alias for backward compatibility
+JUPITER_SYMBOLS = JUPITER_SPOT_SYMBOLS
+
+# Assets supported by Drift (Solana Perpetuals - PERPS ONLY)
+# Drift Protocol for leveraged perpetual futures trading
+DRIFT_PERP_SYMBOLS = [
+    "SOL-PERP",
+    "BTC-PERP",
+    "ETH-PERP",
+    "APT-PERP",
+    "ARB-PERP",
+    "AVAX-PERP",
+    "BNB-PERP",
+    "DOGE-PERP",
+    "JTO-PERP",
+    "MATIC-PERP",
+    "OP-PERP",
+    "PYTH-PERP",
+    "SUI-PERP",
+    "WIF-PERP",
+    "JUP-PERP",
+]
+
 
 @dataclass
 class MinimalAgentState:

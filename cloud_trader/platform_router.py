@@ -16,7 +16,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from .ai_error_recovery import recover_from_error
-from .definitions import DRIFT_SYMBOLS, HYPERLIQUID_SYMBOLS, SYMPHONY_SYMBOLS, LIGHTER_SYMBOLS
+from .definitions import DRIFT_SYMBOLS, HYPERLIQUID_SYMBOLS, SYMPHONY_SYMBOLS, LIGHTER_SYMBOLS, JUPITER_SYMBOLS
 from .logger import get_logger
 
 logger = get_logger(__name__)
@@ -28,6 +28,7 @@ class PlatformType(Enum):
     HYPERLIQUID = "hyperliquid"
     SYMPHONY = "symphony"
     LIGHTER = "lighter"
+    JUPITER = "jupiter"
 
 
 class ExecutionResult:
@@ -114,6 +115,12 @@ class PlatformRouter:
                     name="hyperliquid", failure_threshold=5, recovery_timeout=60.0, timeout=10.0
                 ),
             ),
+            PlatformType.JUPITER: get_circuit_breaker(
+                "jupiter",
+                CircuitBreakerConfig(
+                    name="jupiter", failure_threshold=5, recovery_timeout=60.0, timeout=10.0
+                ),
+            ),
         }
 
         logger.info("✅ PlatformRouter initialized with circuit breakers for resilient execution.")
@@ -123,20 +130,58 @@ class PlatformRouter:
         Intelligently select the best platform for the given trade.
 
         Priority:
+        0. Microservice platform isolation (check enabled platforms in config)
         1. Agent preference (system field)
         2. Hyperliquid/Drift for US-compatible trading (Aster blocked in US)
         3. Symphony for exclusive symbols
         4. Fallback to Aster (if region allows)
         """
+        # Strategy 0: MICROSERVICE PLATFORM ISOLATION
+        # In microservices mode, each service only routes to its designated platform
+        enabled_platforms = []
+        if hasattr(self.service, 'config'):
+            config = self.service.config
+            logger.debug(f"🔍 [ROUTER] Checking config for enabled platforms...")
+            if getattr(config, 'enable_hyperliquid', False):
+                enabled_platforms.append(PlatformType.HYPERLIQUID)
+                logger.debug(f"  ✓ Hyperliquid enabled")
+            if getattr(config, 'enable_lighter', False):
+                enabled_platforms.append(PlatformType.LIGHTER)
+                logger.debug(f"  ✓ Lighter enabled")
+            if getattr(config, 'enable_drift', False):
+                enabled_platforms.append(PlatformType.DRIFT)
+                logger.debug(f"  ✓ Drift enabled")
+            if getattr(config, 'enable_aster', False):
+                enabled_platforms.append(PlatformType.ASTER)
+                logger.debug(f"  ✓ Aster enabled")
+            if getattr(config, 'enable_symphony', False):
+                enabled_platforms.append(PlatformType.SYMPHONY)
+                logger.debug(f"  ✓ Symphony enabled")
+
+            logger.info(f"🔍 [ROUTER] Enabled platforms: {[p.value for p in enabled_platforms]} (count={len(enabled_platforms)})")
+
+            # If ONLY ONE platform is enabled, route to that platform EXCLUSIVELY
+            if len(enabled_platforms) == 1:
+                logger.info(f"🎯 [MICROSERVICE MODE] Routing {symbol} to {enabled_platforms[0].value} (only enabled platform)")
+                return enabled_platforms[0]
+
+            # If NO platforms enabled, log warning and continue with normal routing
+            if len(enabled_platforms) == 0:
+                logger.warning(f"⚠️ No platforms enabled in config, using default routing logic")
+
         # Strategy 1: Agent Explicit System Preference (EXCEPT Aster - US blocked)
         if hasattr(agent, "system") and agent.system:
             target_sys = agent.system.lower()
             if target_sys == "drift" and symbol in DRIFT_SYMBOLS:
-                return PlatformType.DRIFT
+                # Only return if drift is enabled (or no platform restrictions)
+                if not enabled_platforms or PlatformType.DRIFT in enabled_platforms:
+                    return PlatformType.DRIFT
             if target_sys == "hyperliquid" and symbol in HYPERLIQUID_SYMBOLS:
-                return PlatformType.HYPERLIQUID
+                if not enabled_platforms or PlatformType.HYPERLIQUID in enabled_platforms:
+                    return PlatformType.HYPERLIQUID
             if target_sys == "symphony" and symbol in SYMPHONY_SYMBOLS:
-                return PlatformType.SYMPHONY
+                if not enabled_platforms or PlatformType.SYMPHONY in enabled_platforms:
+                    return PlatformType.SYMPHONY
             # CRITICAL FIX: Ignore agent.system="aster" - blocked in US region
             # Fall through to Strategy 2 for smart US-compatible routing
             if target_sys == "aster":
@@ -146,30 +191,64 @@ class PlatformRouter:
         # Strategy 2: Prefer US-compatible exchanges (Hyperliquid/Drift)
         # Check if symbol is available on Hyperliquid (highest liquidity for majors)
         if symbol in HYPERLIQUID_SYMBOLS:
-            return PlatformType.HYPERLIQUID
+            if not enabled_platforms or PlatformType.HYPERLIQUID in enabled_platforms:
+                return PlatformType.HYPERLIQUID
 
         # Check if symbol is available on Drift (Solana perps)
         if symbol in DRIFT_SYMBOLS:
-            return PlatformType.DRIFT
+            if not enabled_platforms or PlatformType.DRIFT in enabled_platforms:
+                return PlatformType.DRIFT
 
         # Symphony for exclusive Monad ecosystem tokens
         if symbol in SYMPHONY_SYMBOLS:
-            return PlatformType.SYMPHONY
+            if not enabled_platforms or PlatformType.SYMPHONY in enabled_platforms:
+                return PlatformType.SYMPHONY
 
-        # Strategy 3: Try Lighter for supported pairs (L2 execution)
+        # Strategy 3A: Route perpetual futures to Drift (Solana native perps)
+        from .definitions import DRIFT_PERP_SYMBOLS
+        if symbol in DRIFT_PERP_SYMBOLS:
+            if not enabled_platforms or PlatformType.DRIFT in enabled_platforms:
+                logger.info(f"🎯 Routing {symbol} to Drift (Solana perpetuals)")
+                return PlatformType.DRIFT
+
+        # Strategy 3B: Route spot swaps to Jupiter (Solana DEX aggregator)
+        from .definitions import JUPITER_SPOT_SYMBOLS
+        if symbol in JUPITER_SPOT_SYMBOLS:
+            if not enabled_platforms or PlatformType.JUPITER in enabled_platforms:
+                logger.info(f"🔄 Routing {symbol} to Jupiter (best Solana DEX prices)")
+                return PlatformType.JUPITER
+
+        # Strategy 4: Try Lighter for supported pairs (L2 execution)
         if symbol in LIGHTER_SYMBOLS or symbol.replace("BTC", "WBTC").replace("ETH", "WETH") in LIGHTER_SYMBOLS:
-            return PlatformType.LIGHTER
+            if not enabled_platforms or PlatformType.LIGHTER in enabled_platforms:
+                return PlatformType.LIGHTER
 
-        # Strategy 4: Fallback to Hyperliquid for major pairs (BTC, ETH, SOL)
+        # Strategy 5: Fallback to Hyperliquid for major pairs (BTC, ETH, SOL)
         # This avoids Aster's US region block
         major_symbols = ["BTC-USDC", "ETH-USDC", "SOL-USDC", "BTCUSDT", "ETHUSDT", "SOLUSDT"]
         if any(major in symbol.upper() for major in major_symbols):
-            logger.info(f"🔄 Routing {symbol} to Hyperliquid (Aster blocked in US)")
-            return PlatformType.HYPERLIQUID
+            # Prefer Jupiter for SOL pairs (best Solana DEX aggregation)
+            if "SOL" in symbol.upper():
+                if not enabled_platforms or PlatformType.JUPITER in enabled_platforms:
+                    logger.info(f"🔄 Routing {symbol} to Jupiter (optimal for SOL)")
+                    return PlatformType.JUPITER
+            # Otherwise use Hyperliquid
+            if not enabled_platforms or PlatformType.HYPERLIQUID in enabled_platforms:
+                logger.info(f"🔄 Routing {symbol} to Hyperliquid (Aster blocked in US)")
+                return PlatformType.HYPERLIQUID
 
-        # Last resort: Try Aster (will fail with -5019 in US)
-        logger.warning(f"⚠️ Defaulting to Aster for {symbol} (may fail in US region)")
-        return PlatformType.ASTER
+        # Last resort: Try Aster (will fail with -5019 in US) - only if enabled
+        if not enabled_platforms or PlatformType.ASTER in enabled_platforms:
+            logger.warning(f"⚠️ Defaulting to Aster for {symbol} (may fail in US region)")
+            return PlatformType.ASTER
+
+        # If we get here, no suitable platform found - return first enabled platform
+        if enabled_platforms:
+            logger.warning(f"⚠️ No ideal platform for {symbol}, using {enabled_platforms[0].value}")
+            return enabled_platforms[0]
+
+        # Absolute fallback
+        return PlatformType.HYPERLIQUID
 
     def _get_fallback_platform(
         self, failed_platform: PlatformType, symbol: str
@@ -185,6 +264,10 @@ class PlatformRouter:
         """
         # If Aster failed (likely US region block), try US-compatible exchanges
         if failed_platform == PlatformType.ASTER:
+            # Prefer Jupiter for Solana tokens
+            if symbol in JUPITER_SYMBOLS:
+                logger.info(f"🔄 Aster failed, falling back to Jupiter for {symbol}")
+                return PlatformType.JUPITER
             if symbol in HYPERLIQUID_SYMBOLS:
                 logger.info(f"🔄 Aster failed, falling back to Hyperliquid for {symbol}")
                 return PlatformType.HYPERLIQUID
@@ -323,6 +406,10 @@ class PlatformRouter:
                     result = await breaker.call(
                         self._execute_symphony, agent, symbol, side, formatted_quantity, is_closing
                     )
+                elif platform == PlatformType.JUPITER:
+                    result = await breaker.call(
+                        self._execute_jupiter, symbol, side, formatted_quantity
+                    )
                 else:
                     result = await breaker.call(
                         self._execute_aster, symbol, side, formatted_quantity
@@ -350,6 +437,18 @@ class PlatformRouter:
                             side,
                             formatted_quantity,
                             is_closing,
+                        )
+                    elif fallback_platform == PlatformType.JUPITER:
+                        result = await fallback_breaker.call(
+                            self._execute_jupiter, symbol, side, formatted_quantity
+                        )
+                    elif fallback_platform == PlatformType.HYPERLIQUID:
+                        result = await fallback_breaker.call(
+                            self._execute_hyperliquid, symbol, side, formatted_quantity
+                        )
+                    elif fallback_platform == PlatformType.LIGHTER:
+                        result = await fallback_breaker.call(
+                            self._execute_lighter, symbol, side, formatted_quantity
                         )
                     else:
                         result = await fallback_breaker.call(
@@ -389,30 +488,80 @@ class PlatformRouter:
                 error_result, agent, symbol, side, quantity, thesis, is_closing, attempt
             )
 
-    async def _execute_drift(self, symbol: str, side: str, quantity: float) -> ExecutionResult:
-        """Execute on Drift Protocol (Solana)."""
+    async def _execute_drift(
+        self,
+        symbol: str,
+        side: str,
+        quantity: float,
+        tp_price: Optional[float] = None,
+        sl_price: Optional[float] = None,
+    ) -> ExecutionResult:
+        """
+        Execute on Drift Protocol (Solana Perpetuals).
+
+        Uses Drift's native perpetual futures for leveraged trading.
+        Supports stop-loss and take-profit orders.
+        """
         if not self.service.drift or not self.service.drift.is_initialized:
             return ExecutionResult(
                 False, PlatformType.DRIFT, symbol, side, quantity, error="Drift not initialized"
             )
 
         try:
-            res = await self.service.drift.place_perp_order(
-                symbol=symbol, side=side, amount=quantity, order_type="market"
-            )
-            success = bool(res and res.get("tx_sig"))
+            # Determine if this is opening or closing a position
+            direction = "long" if side.upper() == "BUY" else "short"
+
+            # Check for existing position
+            existing_position = await self.service.drift.get_position(symbol)
+            is_closing = existing_position and existing_position.get("amount", 0) != 0
+
+            if is_closing:
+                # Close existing position
+                logger.info(f"🔒 Closing Drift position: {symbol}")
+                res = await self.service.drift.close_perp_position(
+                    market=symbol,
+                    size=quantity,
+                )
+            else:
+                # Open new position with leverage
+                logger.info(f"🚀 Opening Drift {direction} position: {quantity} {symbol}")
+                res = await self.service.drift.open_perp_position(
+                    market=symbol,
+                    direction=direction,
+                    size=quantity,
+                    leverage=2.0,  # Conservative 2x leverage by default
+                    stop_loss=sl_price,
+                    take_profit=tp_price,
+                )
+
+            success = bool(res and res.get("success"))
+
+            # Extract fill price
+            fill_price = 0.0
+            if success:
+                if is_closing:
+                    fill_price = res.get("entry_price", 0)
+                else:
+                    # For market orders, get current price
+                    market_info = await self.service.drift.get_perp_market(symbol)
+                    fill_price = market_info.get("oracle_price", 0)
+
             return ExecutionResult(
                 success=success,
                 platform=PlatformType.DRIFT,
                 symbol=symbol,
                 side=side,
                 quantity=quantity,
+                price=fill_price,
                 tx_sig=res.get("tx_sig") if success else None,
-                error=None if success else str(res),
+                error=None if success else res.get("error", "Unknown error"),
                 raw_response=res,
             )
         except Exception as e:
-            return ExecutionResult(False, PlatformType.DRIFT, symbol, side, quantity, error=str(e))
+            logger.error(f"❌ Drift execution error: {e}")
+            return ExecutionResult(
+                False, PlatformType.DRIFT, symbol, side, quantity, error=str(e)
+            )
 
     async def _execute_hyperliquid(
         self, 
@@ -574,6 +723,53 @@ class PlatformRouter:
         except Exception as e:
             return ExecutionResult(
                 False, PlatformType.LIGHTER, symbol, side, quantity, error=str(e)
+            )
+
+    async def _execute_jupiter(
+        self, symbol: str, side: str, quantity: float
+    ) -> ExecutionResult:
+        """Execute on Jupiter DEX aggregator (Solana)."""
+        if not self.service.jupiter_client:
+            return ExecutionResult(
+                False,
+                PlatformType.JUPITER,
+                symbol,
+                side,
+                quantity,
+                error="Jupiter not initialized",
+            )
+
+        try:
+            res = await self.service.jupiter_client.execute_trade(
+                symbol=symbol,
+                side=side,
+                quantity=quantity,
+            )
+
+            success = bool(res and res.get("success"))
+
+            # Extract fill price from Jupiter response
+            fill_price = 0.0
+            if success and res:
+                try:
+                    fill_price = float(res.get("price", 0))
+                except (ValueError, TypeError, KeyError):
+                    pass
+
+            return ExecutionResult(
+                success=success,
+                platform=PlatformType.JUPITER,
+                symbol=symbol,
+                side=side,
+                quantity=float(res.get("quantity", quantity)) if success else quantity,
+                price=fill_price,
+                tx_sig=str(res.get("tx_sig", "n/a")) if success else None,
+                error=None if success else res.get("error", str(res)),
+                raw_response=res,
+            )
+        except Exception as e:
+            return ExecutionResult(
+                False, PlatformType.JUPITER, symbol, side, quantity, error=str(e)
             )
 
     async def _execute_symphony(

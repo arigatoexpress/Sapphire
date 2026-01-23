@@ -1,0 +1,92 @@
+# Sapphire V2 Microservices - Alert Policies
+# Deploy with: gcloud alpha monitoring policies create --policy-from-file=monitoring_alerts.yaml
+
+alertPolicies:
+  - displayName: "Sapphire - High Error Rate"
+    conditions:
+      - displayName: "Error rate > 5% for 5 minutes"
+        conditionThreshold:
+          filter: 'resource.type="cloud_run_revision" AND resource.labels.service_name=~"sapphire-.*" AND metric.type="run.googleapis.com/request_count" AND metric.labels.response_code_class="5xx"'
+          comparison: COMPARISON_GT
+          thresholdValue: 0.05
+          duration: 300s
+          aggregations:
+            - alignmentPeriod: 60s
+              perSeriesAligner: ALIGN_RATE
+              crossSeriesReducer: REDUCE_SUM
+              groupByFields:
+                - resource.labels.service_name
+    notificationChannels: []
+    alertStrategy:
+      autoClose: 604800s
+    enabled: true
+
+  - displayName: "Sapphire - High Latency"
+    conditions:
+      - displayName: "P95 latency > 1000ms for 5 minutes"
+        conditionThreshold:
+          filter: 'resource.type="cloud_run_revision" AND resource.labels.service_name=~"sapphire-.*" AND metric.type="run.googleapis.com/request_latencies"'
+          comparison: COMPARISON_GT
+          thresholdValue: 1000
+          duration: 300s
+          aggregations:
+            - alignmentPeriod: 60s
+              perSeriesAligner: ALIGN_PERCENTILE_95
+              crossSeriesReducer: REDUCE_MEAN
+              groupByFields:
+                - resource.labels.service_name
+    notificationChannels: []
+    alertStrategy:
+      autoClose: 604800s
+    enabled: true
+
+  - displayName: "Sapphire - High Memory Usage"
+    conditions:
+      - displayName: "Memory > 90% for 10 minutes"
+        conditionThreshold:
+          filter: 'resource.type="cloud_run_revision" AND resource.labels.service_name=~"sapphire-.*" AND metric.type="run.googleapis.com/container/memory/utilizations"'
+          comparison: COMPARISON_GT
+          thresholdValue: 0.9
+          duration: 600s
+          aggregations:
+            - alignmentPeriod: 60s
+              perSeriesAligner: ALIGN_MEAN
+              crossSeriesReducer: REDUCE_MAX
+              groupByFields:
+                - resource.labels.service_name
+    notificationChannels: []
+    alertStrategy:
+      autoClose: 604800s
+    enabled: true
+
+  - displayName: "Sapphire - Pub/Sub Message Backlog"
+    conditions:
+      - displayName: "Unacked messages > 100 for 5 minutes"
+        conditionThreshold:
+          filter: 'resource.type="pubsub_subscription" AND metric.type="pubsub.googleapis.com/subscription/num_undelivered_messages"'
+          comparison: COMPARISON_GT
+          thresholdValue: 100
+          duration: 300s
+          aggregations:
+            - alignmentPeriod: 60s
+              perSeriesAligner: ALIGN_MEAN
+    notificationChannels: []
+    alertStrategy:
+      autoClose: 604800s
+    enabled: true
+
+  - displayName: "Sapphire - Service Down"
+    conditions:
+      - displayName: "No requests for 10 minutes"
+        conditionThreshold:
+          filter: 'resource.type="cloud_run_revision" AND resource.labels.service_name=~"sapphire-.*" AND metric.type="run.googleapis.com/request_count"'
+          comparison: COMPARISON_LT
+          thresholdValue: 0.01
+          duration: 600s
+          aggregations:
+            - alignmentPeriod: 60s
+              perSeriesAligner: ALIGN_RATE
+    notificationChannels: []
+    alertStrategy:
+      autoClose: 604800s
+    enabled: true

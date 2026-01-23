@@ -24,6 +24,9 @@ class OrchestratorConfig:
     enable_aster: bool = True
     enable_drift: bool = True
     enable_symphony: bool = True
+    enable_hyperliquid: bool = True
+    enable_lighter: bool = True
+    enable_jupiter: bool = True
 
     max_concurrent_trades: int = 5
     loop_interval_seconds: float = 60.0
@@ -53,6 +56,11 @@ class TradingOrchestrator:
         self.settings = settings or Settings()
         self.config = OrchestratorConfig(
             enable_aster=self.settings.enable_aster,
+            enable_drift=self.settings.enable_drift,
+            enable_symphony=self.settings.enable_symphony,
+            enable_hyperliquid=self.settings.enable_hyperliquid,
+            enable_lighter=self.settings.enable_lighter,
+            enable_jupiter=getattr(self.settings, "enable_jupiter", True),
             paper_trading=getattr(self.settings, "paper_trading", False),
         )
 
@@ -69,6 +77,10 @@ class TradingOrchestrator:
         self.symphony = None
         self.hl_client = None  # Hyperliquid
         self.lighter_client = None  # Lighter
+        self.jupiter_client = None  # Jupiter
+
+        # Trade Verification
+        self.trade_verification = None
 
         # State
         self._running = False
@@ -165,23 +177,30 @@ class TradingOrchestrator:
 
         logger.info("🔑 All API credentials loaded from GCP Secret Manager")
 
-        # Initialize Aster
-        self._exchange_client = AsterClient(credentials=creds, base_url=self.settings.rest_base_url)
-        logger.info("🔌 Aster Client Initialized")
+        # Initialize Aster (only if enabled)
+        if self.config.enable_aster:
+            self._exchange_client = AsterClient(credentials=creds, base_url=self.settings.rest_base_url)
+            logger.info("🔌 Aster Client Initialized")
+        else:
+            logger.info("ℹ️ Aster disabled, skipping initialization")
 
         # Initialize Drift
         if self.config.enable_drift:
             self.drift = DriftClient(rpc_url=self.settings.solana_rpc_url)
             await self.drift.initialize()
             logger.info("🔌 Drift Client Initialized")
+        else:
+            logger.info("ℹ️ Drift disabled, skipping initialization")
 
         # Initialize Symphony
         if self.config.enable_symphony:
             self.symphony = SymphonyClient()
             logger.info("🔌 Symphony Client Initialized")
+        else:
+            logger.info("ℹ️ Symphony disabled, skipping initialization")
 
-        # Initialize Hyperliquid
-        if creds.hl_private_key and creds.hl_account_address:
+        # Initialize Hyperliquid (only if enabled AND credentials exist)
+        if self.config.enable_hyperliquid and creds.hl_private_key and creds.hl_account_address:
             try:
                 from ..v2.hyperliquid_client import HyperliquidClient
                 self.hl_client = HyperliquidClient(
@@ -194,10 +213,13 @@ class TradingOrchestrator:
                 logger.warning(f"⚠️ Hyperliquid initialization failed: {e}")
                 self.hl_client = None
         else:
-            logger.info("ℹ️ Hyperliquid credentials not found, skipping initialization")
+            if not self.config.enable_hyperliquid:
+                logger.info("ℹ️ Hyperliquid disabled, skipping initialization")
+            else:
+                logger.info("ℹ️ Hyperliquid credentials not found, skipping initialization")
 
-        # Initialize Lighter
-        if creds.lighter_pub_key and creds.lighter_priv_key:
+        # Initialize Lighter (only if enabled AND credentials exist)
+        if self.config.enable_lighter and creds.lighter_pub_key and creds.lighter_priv_key:
             try:
                 from ..v2.lighter_client import LighterClient
                 self.lighter_client = LighterClient(
@@ -210,7 +232,45 @@ class TradingOrchestrator:
                 logger.warning(f"⚠️ Lighter initialization failed: {e}")
                 self.lighter_client = None
         else:
-            logger.info("ℹ️ Lighter credentials not found, skipping initialization")
+            if not self.config.enable_lighter:
+                logger.info("ℹ️ Lighter disabled, skipping initialization")
+            else:
+                logger.info("ℹ️ Lighter credentials not found, skipping initialization")
+
+        # Initialize Jupiter (only if enabled AND credentials exist)
+        if self.config.enable_jupiter and creds.jupiter_api_key and creds.solana_private_key:
+            try:
+                from ..jupiter_trader_unified import JupiterTraderUnified
+                self.jupiter_client = JupiterTraderUnified(
+                    api_key=creds.jupiter_api_key,
+                    private_key_b58=creds.solana_private_key,
+                    telegram_bot_token=creds.telegram_bot_token,
+                    telegram_chat_id=creds.telegram_chat_id,
+                    capital_usd=self.settings.total_capital_usd if hasattr(self.settings, 'total_capital_usd') else 50.0,
+                    enable_hft_strategy=False,  # Enable later when ready
+                )
+                await self.jupiter_client.start()
+                logger.info("🔌 Jupiter Client Initialized")
+            except Exception as e:
+                logger.warning(f"⚠️ Jupiter initialization failed: {e}")
+                self.jupiter_client = None
+        else:
+            if not self.config.enable_jupiter:
+                logger.info("ℹ️ Jupiter disabled, skipping initialization")
+            else:
+                logger.info("ℹ️ Jupiter credentials not found, skipping initialization")
+
+        # Initialize Trade Verification Service (for blockchain trades)
+        try:
+            from ..trade_verification import TradeVerificationService
+            self.trade_verification = TradeVerificationService(
+                solana_rpc_url=self.settings.solana_rpc_url,
+                verification_timeout=30,
+            )
+            logger.info("🔌 Trade Verification Service Initialized")
+        except Exception as e:
+            logger.warning(f"⚠️ Trade Verification initialization failed: {e}")
+            self.trade_verification = None
 
         # 1. Monitoring Service (First modular service)
         from ..agents.agent_orchestrator import AgentOrchestrator
@@ -286,18 +346,27 @@ class TradingOrchestrator:
 
     async def _run(self):
         """Main orchestration loop."""
+        logger.info(f"🔄 [ORCHESTRATOR] Starting main loop (interval={self.config.loop_interval_seconds}s)")
+        cycle_count = 0
         while self._running:
             try:
+                cycle_count += 1
+                logger.info(f"🔄 [ORCHESTRATOR] Cycle {cycle_count} starting...")
+
                 # Delegate to trading loop
                 await self.trading_loop.run_cycle()
 
+                logger.info(f"✅ [ORCHESTRATOR] Cycle {cycle_count} complete, sleeping {self.config.loop_interval_seconds}s")
                 # Wait for next cycle
                 await asyncio.sleep(self.config.loop_interval_seconds)
 
             except asyncio.CancelledError:
+                logger.warning(f"⚠️ [ORCHESTRATOR] Loop cancelled")
                 break
             except Exception as e:
                 logger.error(f"❌ Orchestrator error: {e}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
                 await asyncio.sleep(5)  # Brief pause before retry
 
     async def _setup_event_handlers(self):
@@ -406,6 +475,8 @@ class TradingOrchestrator:
                 "enable_aster": self.config.enable_aster,
                 "enable_drift": self.config.enable_drift,
                 "enable_symphony": self.config.enable_symphony,
+                "enable_hyperliquid": self.config.enable_hyperliquid,
+                "enable_lighter": self.config.enable_lighter,
                 "paper_trading": self.config.paper_trading,
             },
             "components": {

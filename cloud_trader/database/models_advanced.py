@@ -55,7 +55,7 @@ class TradeHistory(Base):
     __tablename__ = "trade_history_detailed"
 
     id = Column(Integer, primary_key=True)
-    exchange_trade_id = Column(String, nullable=True)
+    exchange_trade_id = Column(String, nullable=True)  # Transaction signature for blockchain trades
     symbol = Column(String, nullable=False)
     side = Column(String, nullable=False)
     price = Column(Float, nullable=False)
@@ -65,6 +65,15 @@ class TradeHistory(Base):
     agent_id = Column(String, nullable=False)
     strategy_name = Column(String, nullable=True)
     timestamp = Column(BigInteger, nullable=False)
+
+    # Platform identification
+    platform = Column(String, nullable=True)  # jupiter, drift, hyperliquid, aster, symphony, lighter
+
+    # Blockchain verification (for Solana-based platforms like Jupiter, Drift)
+    blockchain = Column(String, nullable=True)  # solana, ethereum, etc.
+    tx_verified = Column(String, nullable=True)  # "pending", "confirmed", "failed", null for CEX
+    verification_timestamp = Column(BigInteger, nullable=True)  # When verification was last checked
+    block_number = Column(BigInteger, nullable=True)  # Block number where tx was included
 
     # Context at time of trade
     market_context = Column(JSON, nullable=True)  # Price, Volatility, etc.

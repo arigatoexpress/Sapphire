@@ -177,6 +177,28 @@ The following secrets should exist in `sapphire-479610`:
 - [ ] AI models responding (no "fallback response" warnings)
 - [ ] Trades executing (check for trade notifications)
 
+## Release Notes (Commit 888aca4)
+
+### Hyperliquid Take Profit / Stop Loss
+- **Feature**: TP/SL trigger orders are now placed automatically upon successful trade entry.
+    - Take Profit: +5%
+    - Stop Loss: -3%
+- **Logic**: Implemented in `PlatformRouter` to trigger immediately after entry fill.
+
+### Lighter Integration (Partial)
+- **Status**: SDK wrapper implemented (`LighterClient`), credentials stored, `LIGHTER` added to `PlatformRouter`.
+- **Note**: Trigger orders for Lighter are currently deferred.
+
+### Dependency Fix
+- **Fix**: Downgraded `urllib3<2.1.0` to resolve conflict with `lighter-sdk` and `requests`.
+
+## Verification Steps
+1.  **Deploy**: `gcloud builds submit ...` (or check build logs for `5c34bf58`)
+2.  **Verify Lighter**: Check logs for `🔌 Lighter Client Initialized`
+3.  **Verify TP/SL**:
+    - Monitor logs for `✅ [Hyperliquid] TP Set` or `✅ [Hyperliquid] SL Set`
+    - Check Hyperliquid UI for open Trigger orders attached to positions.
+
 ## Support
 
 If issues persist:

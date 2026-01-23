@@ -32,8 +32,9 @@ def _get_firestore_client():
     if _firestore_client is None:
         try:
             from google.cloud import firestore
-            _firestore_client = firestore.AsyncClient(project="sapphire-479610")
-            logger.info("🔥 Firestore client initialized")
+            # Increase timeout to 30 seconds to avoid 504 Deadline Exceeded
+            _firestore_client = firestore.AsyncClient(project="sapphire-479610", timeout=30.0)
+            logger.info("🔥 Firestore client initialized (timeout=30s)")
         except Exception as e:
             logger.warning(f"⚠️ Firestore unavailable: {e}")
             _firestore_client = False  # Mark as failed
@@ -182,32 +183,46 @@ class MemoryManager:
             logger.warning(f"Failed to index memory: {e}")
 
     async def _persist_memory(self, memory: Dict[str, Any]):
-        """Persist a single memory to Firestore."""
+        """Persist a single memory to Firestore with retry logic."""
         if not self._persist:
             return
-            
+
         client = _get_firestore_client()
         if not client:
             return
-            
-        try:
-            memory_id = memory.get("_id") or str(uuid.uuid4())
-            doc_ref = (
-                client.collection(self._collection_name)
-                .document(self._agent_id)
-                .collection("memories")
-                .document(str(memory_id))
-            )
-            
-            data = {k: v for k, v in memory.items() if not k.startswith("_")}
-            data["timestamp"] = memory.get("timestamp", time.time())
-            
-            await doc_ref.set(data)
-            memory["_persisted"] = True
-            
-        except Exception as e:
-            logger.warning(f"🧠 Failed to persist memory: {e}")
-            self._pending_writes.append(memory)
+
+        # Retry with exponential backoff
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                memory_id = memory.get("_id") or str(uuid.uuid4())
+                doc_ref = (
+                    client.collection(self._collection_name)
+                    .document(self._agent_id)
+                    .collection("memories")
+                    .document(str(memory_id))
+                )
+
+                data = {k: v for k, v in memory.items() if not k.startswith("_")}
+                data["timestamp"] = memory.get("timestamp", time.time())
+
+                # Use timeout wrapper
+                await asyncio.wait_for(doc_ref.set(data), timeout=25.0)
+                memory["_persisted"] = True
+                return  # Success - exit retry loop
+
+            except asyncio.TimeoutError:
+                if attempt < max_retries - 1:
+                    wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                    logger.debug(f"🧠 Firestore timeout, retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.warning(f"🧠 Failed to persist memory after {max_retries} attempts: Timeout")
+                    self._pending_writes.append(memory)
+            except Exception as e:
+                logger.warning(f"🧠 Failed to persist memory: {e}")
+                self._pending_writes.append(memory)
+                break  # Don't retry on non-timeout errors
 
     async def store(self, memory: Dict[str, Any]) -> bool:
         """Store memory in buffer, vector DB, and persistence."""

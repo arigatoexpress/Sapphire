@@ -315,7 +315,7 @@ class TradingLoop:
         Formula: Base Size ($100) * (0.5 + Confidence * 1.5)
         Range: $50 (low confidence) to $200 (max confidence)
         """
-        base_size = 100.0
+        base_size = 10.0  # Reduced from 100 to avoid margin issues
         
         # Optimize size based on AI confidence
         # Conf 0.0 -> Multiplier 0.5 -> $50

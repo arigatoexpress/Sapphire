@@ -1,8 +1,9 @@
 # Drift Bot Dependencies (Solana)
-driftpy>=0.7.0
-solana>=0.30.0
-solders>=0.18.0
-anchorpy>=0.18.0
+# Aligned versions to resolve dependency conflicts
+driftpy==0.7.0
+solana==0.34.2
+solders==0.21.0
+anchorpy==0.17.1
 httpx>=0.23.0
 google-cloud-pubsub>=2.18.0
 google-cloud-firestore>=2.14.0

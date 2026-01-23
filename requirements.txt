@@ -359,7 +359,7 @@ vertexai==1.71.1
     # via cloud-trader (pyproject.toml)
 watchfiles==1.1.1
     # via uvicorn
-websockets==15.0.1
+websockets==11.0.3
     # via
     #   google-genai
     #   uvicorn
@@ -380,12 +380,11 @@ bandit
 google-cloud-pubsub>=2.18.0
 google-cloud-firestore>=2.14.0
 firebase-admin>=6.5.0
-solders>=0.18.0
+solders==0.21.0
 base58>=2.1.0
 eth-account>=0.11.0
-solana>=0.34.0
+solana==0.34.2
 hyperliquid-python-sdk>=0.21.0
-solana>=0.30.0
 
 faiss-cpu
 sentence-transformers
@@ -404,4 +403,5 @@ pytest-asyncio
 pytest-mock
 
 # Lighter SDK
-lighter-sdk>=1.0.0
+# lighter-sdk>=1.0.0  # DISABLED: Requires websockets>=12.0 which conflicts with solana (<12.0) and Jupiter integration
+loguru>=0.7.0

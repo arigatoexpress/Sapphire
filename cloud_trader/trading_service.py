@@ -446,6 +446,15 @@ class TradingService:
     async def start(self):
         """Start the trading service."""
         try:
+            # MICROSERVICES: Skip trading loop if this is the web service
+            serve_frontend = os.getenv("SERVE_FRONTEND", "false").lower() == "true"
+            if serve_frontend:
+                logger.info("🌐 Starting in web-only mode (SERVE_FRONTEND=true) - skipping trading components")
+                # Initialize minimal components needed for API endpoints
+                await self._init_online_components()
+                logger.info("✅ Web service started successfully")
+                return True
+
             logger.info("🚀 Starting Aster Bull Agents (Minimal Service)...")
 
             # 1. Auth Diagnostics
@@ -722,7 +731,7 @@ class TradingService:
         await self._initialize_basic_agents()
 
         # Hyperliquid Initialization (Restored)
-        if credentials.hl_private_key and credentials.hl_account_address:
+        if self._settings.enable_hyperliquid and credentials.hl_private_key and credentials.hl_account_address:
             try:
                 from .v2.hyperliquid_client import HyperliquidClient
                 logger.info("💧 Initializing Hyperliquid Client...")
@@ -751,28 +760,39 @@ class TradingService:
                     logger.error(f"❌ Hyperliquid env fallback failed: {e2}")
                     self.hl_client = None
         else:
-            logger.warning("⚠️ Hyperliquid credentials missing, skipping initialization")
+            if not self._settings.enable_hyperliquid:
+                logger.info("🚫 Hyperliquid disabled by config")
+            else:
+                logger.warning("⚠️ Hyperliquid credentials missing, skipping initialization")
+            self.hl_client = None
 
-        # Initialize Drift BEFORE autonomous components (required for adapter registration)
-        if hasattr(self, "drift") and self.drift:
+        # Initialize Drift
+        if self._settings.enable_drift and hasattr(self, "drift") and self.drift:
             logger.info("🌀 Initializing Drift Client...")
             try:
                 await asyncio.wait_for(self.drift.initialize(), timeout=15.0)
             except Exception as e:
                 logger.error(f"❌ Drift initialization error: {e}")
+        elif not self._settings.enable_drift:
+            logger.info("🚫 Drift disabled by config")
+            self.drift = None
 
         # Initialize Lighter Client (Phase 3 Integration)
-        try:
-            from .v2.lighter_client import LighterClient
-            self.lighter_client = LighterClient(
-                private_key=credentials.hl_private_key,  # Uses same key as HL
-                public_key=credentials.hl_account_address # Uses same address
-            )
-            logger.info("⚡ Initializing Lighter Client...")
-            await self.lighter_client.initialize()
-            logger.info("✅ Lighter Client Initialized")
-        except Exception as e:
-            logger.error(f"⚠️ Lighter Client initialization failed: {e}")
+        if self._settings.enable_lighter:
+            try:
+                from .v2.lighter_client import LighterClient
+                self.lighter_client = LighterClient(
+                    private_key=credentials.hl_private_key,  # Uses same key as HL
+                    public_key=credentials.hl_account_address # Uses same address
+                )
+                logger.info("⚡ Initializing Lighter Client...")
+                await self.lighter_client.initialize()
+                logger.info("✅ Lighter Client Initialized")
+            except Exception as e:
+                logger.error(f"⚠️ Lighter Client initialization failed: {e}")
+                self.lighter_client = None
+        else:
+            logger.info("🚫 Lighter disabled by config")
             self.lighter_client = None
 
         # NEW: Initialize Autonomous Trading Components
@@ -863,6 +883,29 @@ class TradingService:
         # Health Update
         self._health.running = True
         self._health.paper_trading = self._settings.enable_paper_trading
+
+        # MICROSERVICES: Initialize event publishing for distributed architecture
+        try:
+            from .microservices.integration import add_microservices_support
+            from .microservices.identity import get_service_identity
+
+            # Determine if this is the web service
+            identity = get_service_identity()
+
+            if identity.is_web_service:
+                # Web service: Initialize aggregator to subscribe to events
+                logger.info("🌐 Detected web service - initializing state aggregator...")
+                from .microservices.web_aggregator import initialize_web_aggregator
+
+                await initialize_web_aggregator(self)
+                logger.info("✅ Web aggregator initialized - subscribed to fleet events")
+            else:
+                # Trading service: Initialize event publisher
+                add_microservices_support(self)
+                logger.info(f"✅ Microservices event publishing initialized for {identity}")
+
+        except Exception as ms_err:
+            logger.warning(f"⚠️ Microservices integration skipped: {ms_err}")
 
     # _run_redis_listener removed Phase 25 (Pure Aster Pivot)
 

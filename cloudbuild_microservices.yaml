@@ -1,0 +1,200 @@
+steps:
+  # 1. Build the Unified Image (One image for all services)
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/sapphire-unified:latest', '.']
+    id: 'build'
+
+  # 2. Push Image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/sapphire-unified:latest']
+    id: 'push'
+    waitFor: ['build']
+
+  # 3. Deploy: Hyperliquid Service (Europe)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'sapphire-hl'
+      - '--project'
+      - '$PROJECT_ID'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/sapphire-unified:latest'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '2Gi'
+      - '--cpu'
+      - '2'
+      - '--timeout'
+      - '300'
+      - '--max-instances'
+      - '10'
+      - '--min-instances'
+      - '0'
+      - '--set-env-vars'
+      - 'ENABLE_HYPERLIQUID=true,ENABLE_LIGHTER=false,ENABLE_DRIFT=false,ENABLE_SYMPHONY=false,ENABLE_ASTER=false,SERVE_FRONTEND=false,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,LOG_LEVEL=INFO'
+    id: 'deploy-hl'
+    waitFor: ['push']
+
+  # 4. Deploy: Lighter Service (Europe)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'sapphire-lighter'
+      - '--project'
+      - '$PROJECT_ID'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/sapphire-unified:latest'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '2Gi'
+      - '--cpu'
+      - '2'
+      - '--timeout'
+      - '300'
+      - '--max-instances'
+      - '10'
+      - '--min-instances'
+      - '0'
+      - '--set-env-vars'
+      - 'ENABLE_HYPERLIQUID=false,ENABLE_LIGHTER=true,ENABLE_DRIFT=false,ENABLE_SYMPHONY=false,ENABLE_ASTER=false,SERVE_FRONTEND=false,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,LOG_LEVEL=INFO'
+    id: 'deploy-lighter'
+    waitFor: ['push']
+
+  # 5. Deploy: Drift Service (Europe)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'sapphire-drift'
+      - '--project'
+      - '$PROJECT_ID'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/sapphire-unified:latest'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '2Gi'
+      - '--cpu'
+      - '2'
+      - '--timeout'
+      - '300'
+      - '--max-instances'
+      - '10'
+      - '--min-instances'
+      - '0'
+      - '--set-env-vars'
+      - 'ENABLE_HYPERLIQUID=false,ENABLE_LIGHTER=false,ENABLE_DRIFT=true,ENABLE_SYMPHONY=false,ENABLE_ASTER=false,SERVE_FRONTEND=false,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,LOG_LEVEL=INFO'
+    id: 'deploy-drift'
+    waitFor: ['push']
+
+  # 6. Deploy: Aster Service (Europe)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'sapphire-aster'
+      - '--project'
+      - '$PROJECT_ID'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/sapphire-unified:latest'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '2Gi'
+      - '--cpu'
+      - '2'
+      - '--timeout'
+      - '300'
+      - '--max-instances'
+      - '10'
+      - '--min-instances'
+      - '0'
+      - '--set-env-vars'
+      - 'ENABLE_HYPERLIQUID=false,ENABLE_LIGHTER=false,ENABLE_DRIFT=false,ENABLE_SYMPHONY=false,ENABLE_ASTER=true,SERVE_FRONTEND=false,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,LOG_LEVEL=INFO'
+    id: 'deploy-aster'
+    waitFor: ['push']
+
+  # 7. Deploy: Symphony Service (Europe)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'sapphire-symphony'
+      - '--project'
+      - '$PROJECT_ID'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/sapphire-unified:latest'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '2Gi'
+      - '--cpu'
+      - '2'
+      - '--timeout'
+      - '300'
+      - '--max-instances'
+      - '10'
+      - '--min-instances'
+      - '0'
+      - '--set-env-vars'
+      - 'ENABLE_HYPERLIQUID=false,ENABLE_LIGHTER=false,ENABLE_DRIFT=false,ENABLE_SYMPHONY=true,ENABLE_ASTER=false,SERVE_FRONTEND=false,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,LOG_LEVEL=INFO'
+    id: 'deploy-symphony'
+    waitFor: ['push']
+
+  # 8. Deploy: Dashboard/Web Service (Europe)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'sapphire-web'
+      - '--project'
+      - '$PROJECT_ID'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/sapphire-unified:latest'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '2Gi'
+      - '--cpu'
+      - '2'
+      - '--timeout'
+      - '300'
+      - '--max-instances'
+      - '10'
+      - '--min-instances'
+      - '0'
+      - '--set-env-vars'
+      - 'ENABLE_HYPERLIQUID=false,ENABLE_LIGHTER=false,ENABLE_DRIFT=false,ENABLE_SYMPHONY=false,ENABLE_ASTER=false,SERVE_FRONTEND=true,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID'
+    id: 'deploy-web'
+    waitFor: ['push']
+substitutions:
+  _REGION: europe-west1
+timeout: 3600s
