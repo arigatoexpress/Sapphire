@@ -1,537 +1,150 @@
-# 💎 Sapphire V2: Autonomous AI Trading System
+# Sapphire
 
-**Claude V1.0 Multi-Platform Trading Orchestrator**
+**Autonomous AI Trading System**
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](/.github/LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.121-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![Cloud Run](https://img.shields.io/badge/Cloud%20Run-Production-4285F4?logo=google-cloud&logoColor=white)](https://cloud.google.com/run)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Cloud Run](https://img.shields.io/badge/Cloud%20Run-4285F4?logo=google-cloud&logoColor=white)](https://cloud.google.com/run)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-[![Solana](https://img.shields.io/badge/Solana-Drift-9945FF?logo=solana&logoColor=white)](#)
-[![Hyperliquid](https://img.shields.io/badge/Hyperliquid-Active-00D4AA)](#)
-[![Monad](https://img.shields.io/badge/Monad-Symphony-FF3366)](#)
-[![Status](https://img.shields.io/badge/status-Production-success)](https://sapphire-v2-267358751314.us-central1.run.app/health)
+Production-grade trading system with multi-platform DeFi execution, AI agent consensus, and memory-augmented learning.
 
----
+## Platforms
 
-## 📖 Abstract
+| Platform | Type | Status |
+|----------|------|--------|
+| **Hyperliquid** | DeFi Perpetuals | Active |
+| **Drift** | Solana Perpetuals | Active |
+| **Aster** | CEX | Active |
+| **Symphony** | Monad Treasury | Active |
 
-Sapphire V2 is a **production-grade, autonomous AI trading system** implementing memory-augmented agents with multi-platform DeFi execution. Built with the Claude V1.0 architecture, it features intelligent trade routing, circuit breaker protection, and Symphony treasury management.
-
-### Core Capabilities
-
-| Feature | Description |
-|---------|-------------|
-| **Multi-Platform Execution** | Hyperliquid + Drift + Aster with smart failover |
-| **AI Agent Swarm** | 4 specialized agents with weighted consensus |
-| **Memory-Augmented Learning** | RAG-based pattern recognition with persistence |
-| **Symphony Treasury** | Multi-agent management on Monad ($MILF, $AGDG, $MIT) |
-| **Circuit Breaker Protection** | 99.99% uptime with platform failover |
-
----
-
-## 🏗️ System Architecture
+## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                        💎 SAPPHIRE V2 - CLAUDE V1.0 ARCHITECTURE                    │
-├─────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                     │
-│  ┌─────────────────────────────────────────────────────────────────────────────┐   │
-│  │                           🌐 FastAPI Entry (main_v2.py)                     │   │
-│  │                          Port 8080 | Cloud Run Production                   │   │
-│  └──────────────────────────────────────┬──────────────────────────────────────┘   │
-│                                         │                                           │
-│  ┌──────────────────────────────────────┴──────────────────────────────────────┐   │
-│  │                         🎯 Trading Orchestrator                              │   │
-│  │                    60-second autonomous trading cycles                       │   │
-│  └─────────────┬────────────────────────┬────────────────────────┬─────────────┘   │
-│                │                        │                        │                  │
-│  ┌─────────────▼─────────────┐ ┌────────▼────────┐ ┌────────────▼────────────┐    │
-│  │    🤖 Agent Swarm         │ │  📊 Monitoring  │ │   🧠 Memory Manager     │    │
-│  │                           │ │                 │ │                         │    │
-│  │  ┌─────────┬──────────┐   │ │  ┌───────────┐  │ │  ┌─────────────────┐    │    │
-│  │  │ Quant   │   Risk   │   │ │  │ Telegram  │  │ │  │ FAISS Vector DB │    │    │
-│  │  │ Alpha   │   Guard  │   │ │  │  Alerts   │  │ │  │ + Firestore     │    │    │
-│  │  │ (0.35)  │  (0.25)  │   │ │  └───────────┘  │ │  │ Persistence     │    │    │
-│  │  ├─────────┼──────────┤   │ │  ┌───────────┐  │ │  └─────────────────┘    │    │
-│  │  │Sentiment│  Degen   │   │ │  │  Health   │  │ │  ┌─────────────────┐    │    │
-│  │  │  Sage   │  Hunter  │   │ │  │  Checks   │  │ │  │ Write-Ahead Log │    │    │
-│  │  │ (0.20)  │  (0.20)  │   │ │  └───────────┘  │ │  │ Crash Recovery  │    │    │
-│  │  └─────────┴──────────┘   │ │                 │ │  └─────────────────┘    │    │
-│  └─────────────┬─────────────┘ └─────────────────┘ └────────────────────────┘    │
-│                │                                                                    │
-│  ┌─────────────▼─────────────────────────────────────────────────────────────────┐ │
-│  │                      🔀 DUAL PLATFORM ROUTER (v2/)                            │ │
-│  │                                                                               │ │
-│  │   Symbol-Based Routing │ Game Theory Obfuscation │ Automatic Failover        │ │
-│  │   ──────────────────── │ ─────────────────────── │ ─────────────────          │ │
-│  │   BTC, ETH → HL        │ Jitter: 50-500ms       │ HL → Drift → Aster         │ │
-│  │   SOL, BONK → Drift    │ Fuzzing: ±2%           │ Drift → HL → Aster         │ │
-│  │                        │ Dynamic Slippage       │                             │ │
-│  └───────────┬────────────┴────────────┬───────────┴───────────┬────────────────┘ │
-│              │                         │                       │                   │
-│  ┌───────────▼───────────┐ ┌───────────▼───────────┐ ┌────────▼────────────────┐  │
-│  │ 🔴 HYPERLIQUID        │ │ 🟣 DRIFT              │ │ 🟢 ASTER               │  │
-│  │ ──────────────────    │ │ ──────────────────    │ │ ──────────────────     │  │
-│  │ Status: ACTIVE ✅     │ │ Status: ACTIVE ✅     │ │ Status: ACTIVE ✅      │  │
-│  │ Type: DeFi Perps      │ │ Type: Solana Perps    │ │ Type: CEX              │  │
-│  │                       │ │                       │ │                         │  │
-│  │ Primary Symbols:      │ │ Primary Symbols:      │ │ All spot pairs         │  │
-│  │ • BTC-PERP           │ │ • SOL-PERP           │ │                         │  │
-│  │ • ETH-PERP           │ │ • JTO-PERP           │ └────────────────────────┘  │
-│  │ • ARB-PERP           │ │ • PYTH-PERP          │                              │
-│  │ • OP-PERP            │ │ • BONK-PERP          │ ┌────────────────────────┐  │
-│  │ • MATIC-PERP         │ │ • WIF-PERP           │ │ 🟡 SYMPHONY            │  │
-│  │ • AVAX-PERP          │ │ • JUP-PERP           │ │ ──────────────────     │  │
-│  │ • LINK-PERP          │ │ • RNDR-PERP          │ │ Status: ACTIVE ✅      │  │
-│  │ • DOGE-PERP          │ │ • HNT-PERP           │ │ Type: Monad Treasury   │  │
-│  └───────────────────────┘ └───────────────────────┘ └────────────────────────┘  │
-│                                                                                    │
-│  ┌────────────────────────────────────────────────────────────────────────────┐   │
-│  │                         🛡️ CIRCUIT BREAKER LAYER                          │   │
-│  │                                                                             │   │
-│  │   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐    │   │
-│  │   │ Hyperliquid │   │   Drift     │   │   Aster     │   │  Symphony   │    │   │
-│  │   │  Breaker    │   │  Breaker    │   │  Breaker    │   │  Breaker    │    │   │
-│  │   ├─────────────┤   ├─────────────┤   ├─────────────┤   ├─────────────┤    │   │
-│  │   │ Fail: 3     │   │ Fail: 3     │   │ Fail: 5     │   │ Fail: 5     │    │   │
-│  │   │ Recovery:30s│   │ Recovery:30s│   │ Recovery:60s│   │ Recovery:60s│    │   │
-│  │   │ State: ✅   │   │ State: ✅   │   │ State: ✅   │   │ State: ✅   │    │   │
-│  │   └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘    │   │
-│  └────────────────────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│                    FastAPI Gateway                       │
+│                     (Cloud Run)                          │
+└────────────────────────┬────────────────────────────────┘
+                         │
+         ┌───────────────┼───────────────┐
+         │               │               │
+    ┌────▼────┐    ┌─────▼─────┐   ┌─────▼─────┐
+    │  Agent  │    │  Memory   │   │  Circuit  │
+    │  Swarm  │    │  Manager  │   │  Breaker  │
+    └────┬────┘    └───────────┘   └───────────┘
+         │
+    ┌────▼────────────────────────────────────┐
+    │          Dual Platform Router            │
+    │   (Symbol-based routing + Failover)      │
+    └────┬─────────────┬─────────────┬────────┘
+         │             │             │
+    ┌────▼────┐   ┌────▼────┐   ┌────▼────┐
+    │Hyperliquid│   │  Drift  │   │  Aster  │
+    └─────────┘   └─────────┘   └─────────┘
 ```
 
----
+## Core Components
 
-## 🤖 AI Agent Consensus System
+### Agent Swarm
+Four specialized AI agents with weighted consensus:
+- **Quant Alpha** (35%) - Technical analysis, momentum, volatility
+- **Risk Guard** (25%) - Position sizing, drawdown protection
+- **Sentiment Sage** (20%) - Social signals, news impact
+- **Degen Hunter** (20%) - High-conviction momentum plays
 
-```
-┌────────────────────────────────────────────────────────────────────────────────────┐
-│                          🧠 AI AGENT CONSENSUS ENGINE                              │
-├────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                    │
-│  ┌──────────────────────────────────────────────────────────────────────────────┐ │
-│  │                            Market Data Input                                 │ │
-│  │         Price Action | Volume | Order Book | Social Sentiment                │ │
-│  └────────────────────────────────────┬─────────────────────────────────────────┘ │
-│                                       │                                           │
-│           ┌───────────────────────────┼───────────────────────────┐               │
-│           │                           │                           │               │
-│  ┌────────▼────────┐         ┌────────▼────────┐         ┌────────▼────────┐      │
-│  │  📊 QUANT ALPHA │         │  🛡️ RISK GUARD  │         │  💬 SENTIMENT   │      │
-│  │  ──────────────  │         │  ─────────────  │         │  ──────────────  │      │
-│  │  Weight: 35%    │         │  Weight: 25%    │         │  Weight: 20%    │      │
-│  │                 │         │                 │         │                 │      │
-│  │  • Technical    │         │  • DD Analysis  │         │  • Social Feeds │      │
-│  │  • Momentum     │         │  • Position     │         │  • News Impact  │      │
-│  │  • Volatility   │         │    Sizing       │         │  • Trend Score  │      │
-│  │  • Mean Revert  │         │  • Stop Loss    │         │  • Fear/Greed   │      │
-│  └────────┬────────┘         └────────┬────────┘         └────────┬────────┘      │
-│           │                           │                           │               │
-│           │      ┌────────────────────┼────────────────────┐      │               │
-│           │      │                    │                    │      │               │
-│           │      │    ┌───────────────▼───────────────┐    │      │               │
-│           │      │    │      🔥 DEGEN HUNTER          │    │      │               │
-│           │      │    │      ──────────────           │    │      │               │
-│           │      │    │      Weight: 20%              │    │      │               │
-│           │      │    │                               │    │      │               │
-│           │      │    │      • High-Conviction Plays  │    │      │               │
-│           │      │    │      • Momentum Breakouts     │    │      │               │
-│           │      │    │      • Meme Coin Signals      │    │      │               │
-│           │      │    └───────────────┬───────────────┘    │      │               │
-│           │      │                    │                    │      │               │
-│           └──────┴────────────────────┴────────────────────┴──────┘               │
-│                                       │                                           │
-│                        ┌──────────────▼──────────────┐                            │
-│                        │    ⚖️ WEIGHTED CONSENSUS    │                            │
-│                        │    ─────────────────────    │                            │
-│                        │                             │                            │
-│                        │  Confidence = Σ(weight×vote) │                            │
-│                        │  Threshold = 0.65            │                            │
-│                        │                             │                            │
-│                        │  ┌─────────────────────┐    │                            │
-│                        │  │ LONG │ SHORT │ HOLD │    │                            │
-│                        │  └─────────────────────┘    │                            │
-│                        └─────────────┬───────────────┘                            │
-│                                      │                                            │
-│                       ┌──────────────▼───────────────┐                            │
-│                       │                              │                            │
-│                       │    🎯 TRADE EXECUTION        │                            │
-│                       │    via DualPlatformRouter    │                            │
-│                       │                              │                            │
-│                       └──────────────────────────────┘                            │
-└────────────────────────────────────────────────────────────────────────────────────┘
-```
+### Smart Routing
+- Symbol-based platform assignment (BTC/ETH → Hyperliquid, SOL/JTO → Drift)
+- Automatic failover chain with circuit breaker protection
+- Game theory obfuscation (jitter, fuzzing, dynamic slippage)
 
----
+### Memory System
+RAG-based learning with FAISS vector search and Firestore persistence:
+- Trade outcomes and patterns
+- Thesis templates per market condition
+- Risk events and lessons learned
 
-## 🎭 Symphony Multi-Agent Treasury
+### Symphony Treasury
+Multi-agent treasury management on Monad:
+- **$MILF** - Conservative treasury management
+- **$AGDG** - High-conviction momentum plays
+- **$MIT** - Pending activation (5-trade requirement)
 
-```
-┌────────────────────────────────────────────────────────────────────────────────────┐
-│                        🎭 SYMPHONY AGENT ECOSYSTEM (Monad)                         │
-├────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                    │
-│  ┌─────────────────────────────────────────────────────────────────────────────┐  │
-│  │                         Symphony Agent Manager                               │  │
-│  │                   Firestore Persistence | Trade Tracking                    │  │
-│  └─────────────────────────────────┬───────────────────────────────────────────┘  │
-│                                    │                                              │
-│        ┌───────────────────────────┼───────────────────────────┐                  │
-│        │                           │                           │                  │
-│  ┌─────▼────────────────────┐ ┌────▼───────────────────┐ ┌─────▼─────────────────┐│
-│  │    💰 $MILF              │ │    🔥 $AGDG            │ │    🏦 $MIT            ││
-│  │    ─────────────         │ │    ─────────           │ │    ────────           ││
-│  │                          │ │                        │ │                       ││
-│  │ Monad Implementation     │ │ Ari Gold Degen Agent  │ │ Monad Implementation  ││
-│  │ Treasury Agent           │ │                        │ │ Treasury              ││
-│  │                          │ │                        │ │                       ││
-│  │ Status: ACTIVE ✅        │ │ Status: ACTIVE ✅      │ │ Status: PENDING ⏳    ││
-│  │                          │ │                        │ │                       ││
-│  │ Strategy:                │ │ Strategy:              │ │ Activation:           ││
-│  │ • Treasury Management    │ │ • High-Conviction      │ │ 0/5 trades            ││
-│  │ • Conservative Sizing    │ │ • Momentum Plays       │ │ ░░░░░ 0%              ││
-│  │ • Risk-Adjusted Returns  │ │ • Quick Entries/Exits  │ │                       ││
-│  └──────────────────────────┘ └────────────────────────┘ └───────────────────────┘│
-│                                                                                    │
-│  ┌─────────────────────────────────────────────────────────────────────────────┐  │
-│  │  MIT Activation Flow:                                                       │  │
-│  │  ──────────────────────                                                     │  │
-│  │                                                                             │  │
-│  │    Trade 1    Trade 2    Trade 3    Trade 4    Trade 5                      │  │
-│  │    ░░░░░──────░░░░░──────░░░░░──────░░░░░──────░░░░░ ──► ACTIVATED!         │  │
-│  │                                                                             │  │
-│  │  POST /api/v2/symphony/mit/activate → {"symbol":"BTC-USDC","quantity":0.001}│  │
-│  └─────────────────────────────────────────────────────────────────────────────┘  │
-└────────────────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 🧠 Memory-Augmented Learning System
-
-```
-┌────────────────────────────────────────────────────────────────────────────────────┐
-│                     🧠 HARDENED MEMORY MANAGER (RAG Architecture)                  │
-├────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                    │
-│                              ┌─────────────────────┐                               │
-│                              │   Trade Outcome     │                               │
-│                              │     Lesson          │                               │
-│                              │     Pattern         │                               │
-│                              └──────────┬──────────┘                               │
-│                                         │                                          │
-│  ┌──────────────────────────────────────▼──────────────────────────────────────┐  │
-│  │                          Memory Generation                                  │  │
-│  │                                                                             │  │
-│  │   ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐        │  │
-│  │   │  Content Hash   │───▶│  Embedding      │───▶│  Metadata       │        │  │
-│  │   │  (SHA-256)      │    │  Vector (768d)  │    │  Tagging        │        │  │
-│  │   └─────────────────┘    └─────────────────┘    └─────────────────┘        │  │
-│  └──────────────────────────────────────┬──────────────────────────────────────┘  │
-│                                         │                                          │
-│           ┌─────────────────────────────┼─────────────────────────────┐            │
-│           │                             │                             │            │
-│  ┌────────▼────────┐           ┌────────▼────────┐           ┌────────▼────────┐  │
-│  │  Write-Ahead    │           │   FAISS Index   │           │   Firestore     │  │
-│  │  Log (WAL)      │           │   (Vector DB)   │           │  (Persistence)  │  │
-│  │  ─────────────  │           │  ─────────────  │           │  ────────────   │  │
-│  │                 │           │                 │           │                 │  │
-│  │  • Crash        │           │  • Semantic     │           │  • Durable      │  │
-│  │    Recovery     │           │    Search       │           │    Storage      │  │
-│  │  • Atomic       │           │  • Top-K        │           │  • Checksum     │  │
-│  │    Writes       │           │    Recall       │           │    Verify       │  │
-│  │  • Temp Files   │           │  • O(log n)     │           │  • Async Sync   │  │
-│  └─────────────────┘           └─────────────────┘           └─────────────────┘  │
-│                                                                                    │
-│  ┌─────────────────────────────────────────────────────────────────────────────┐  │
-│  │  Memory Types:                                                              │  │
-│  │  ─────────────                                                              │  │
-│  │  • TRADE_OUTCOME   - Win/loss patterns, exit strategies                    │  │
-│  │  • THESIS_TEMPLATE - Entry thesis templates per market condition           │  │
-│  │  • LESSON_LEARNED  - Mistakes and corrections                              │  │
-│  │  • MARKET_PATTERN  - Recurring market structures                           │  │
-│  │  • RISK_EVENT      - Drawdowns, circuit breaker triggers                   │  │
-│  └─────────────────────────────────────────────────────────────────────────────┘  │
-└────────────────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 🔀 Smart Routing & Execution
-
-```
-┌────────────────────────────────────────────────────────────────────────────────────┐
-│                          🔀 DUAL PLATFORM ROUTER                                   │
-├────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                    │
-│  ┌─────────────────────────────────────────────────────────────────────────────┐  │
-│  │  SYMBOL ROUTING MAP                                                         │  │
-│  │  ──────────────────                                                         │  │
-│  │                                                                             │  │
-│  │  ┌──────────────────────────┐    ┌──────────────────────────┐              │  │
-│  │  │ HYPERLIQUID PRIMARY      │    │ DRIFT PRIMARY            │              │  │
-│  │  │ ────────────────────     │    │ ────────────────         │              │  │
-│  │  │ BTC-PERP  ──► HL         │    │ SOL-PERP  ──► DRIFT      │              │  │
-│  │  │ ETH-PERP  ──► HL         │    │ JTO-PERP  ──► DRIFT      │              │  │
-│  │  │ ARB-PERP  ──► HL         │    │ PYTH-PERP ──► DRIFT      │              │  │
-│  │  │ OP-PERP   ──► HL         │    │ BONK-PERP ──► DRIFT      │              │  │
-│  │  │ MATIC-PERP──► HL         │    │ WIF-PERP  ──► DRIFT      │              │  │
-│  │  │ AVAX-PERP ──► HL         │    │ JUP-PERP  ──► DRIFT      │              │  │
-│  │  │ LINK-PERP ──► HL         │    │ RNDR-PERP ──► DRIFT      │              │  │
-│  │  │ DOGE-PERP ──► HL         │    │ HNT-PERP  ──► DRIFT      │              │  │
-│  │  └──────────────────────────┘    └──────────────────────────┘              │  │
-│  └─────────────────────────────────────────────────────────────────────────────┘  │
-│                                                                                    │
-│  ┌─────────────────────────────────────────────────────────────────────────────┐  │
-│  │  FAILOVER CHAIN                                                             │  │
-│  │  ──────────────                                                             │  │
-│  │                                                                             │  │
-│  │   Hyperliquid Trade:   HL ────[fail]────▶ Drift ────[fail]────▶ Aster      │  │
-│  │                                                                             │  │
-│  │   Drift Trade:         Drift ────[fail]────▶ HL ────[fail]────▶ Aster      │  │
-│  │                                                                             │  │
-│  └─────────────────────────────────────────────────────────────────────────────┘  │
-│                                                                                    │
-│  ┌─────────────────────────────────────────────────────────────────────────────┐  │
-│  │  GAME THEORY OBFUSCATION                                                    │  │
-│  │  ───────────────────────                                                    │  │
-│  │                                                                             │  │
-│  │   ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                    │  │
-│  │   │   JITTER    │    │   FUZZING   │    │  SLIPPAGE   │                    │  │
-│  │   │  50-500ms   │    │    ±2%      │    │  Dynamic    │                    │  │
-│  │   │  random     │    │  quantity   │    │  volatility │                    │  │
-│  │   │  delay      │    │  variance   │    │  based      │                    │  │
-│  │   └─────────────┘    └─────────────┘    └─────────────┘                    │  │
-│  └─────────────────────────────────────────────────────────────────────────────┘  │
-└────────────────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 📁 V2 Module Structure
-
-```
-cloud_trader/v2/
-├── __init__.py                    # Package exports (2.2.0)
-├── hyperliquid_client.py          # Full Hyperliquid trading client [760 LOC]
-│   ├── HyperliquidClient          - Rate-limited API client
-│   ├── HyperliquidPosition        - Position tracking
-│   ├── HyperliquidOrder           - Order management
-│   └── HyperliquidConfig          - Client configuration
-│
-├── dual_platform_router.py        # HL + Drift smart routing [668 LOC]
-│   ├── DualPlatformRouter         - Primary routing engine
-│   ├── RoutingConfig              - Symbol assignments
-│   ├── RoutingDecision            - Route selection result
-│   └── ExecutionResult            - Trade execution result
-│
-├── enhanced_circuit_breaker.py    # Multi-platform protection [391 LOC]
-│   ├── CircuitBreaker             - Individual breaker
-│   ├── PlatformCircuitManager     - All-platform management
-│   ├── CircuitState               - CLOSED/OPEN/HALF_OPEN
-│   └── CircuitOpenError           - Failover trigger
-│
-├── hardened_memory_manager.py     # Persistence-verified RAG [891 LOC]
-│   ├── HardenedMemoryManager      - Main memory interface
-│   ├── Memory                     - Individual memory unit
-│   ├── WriteAheadLog              - Crash recovery
-│   └── MemoryHealth               - Health metrics
-│
-├── symphony_agent_manager.py      # Multi-agent tracking [766 LOC]
-│   ├── SymphonyAgentManager       - Centralized management
-│   ├── SymphonyAgent              - Individual agent state
-│   ├── AgentTrade                 - Trade record
-│   └── AgentStatus                - Activation states
-│
-├── symphony_mit_tracker.py        # MIT 5-trade activation [507 LOC]
-│   ├── SymphonyMITTracker         - Activation tracking
-│   └── MITActivationProgress      - Progress monitoring
-│
-└── v2_integration.py              # FastAPI integration [589 LOC]
-    ├── initialize_v2_components   - Startup initialization
-    ├── SapphireV2State            - App state container
-    └── router                     - V2 API endpoints
-```
-
----
-
-## 🔐 Secrets Management
-
-All credentials are stored in **Google Cloud Secret Manager** - never in code or environment variables.
-
-| Secret Name | Description | Platform |
-|-------------|-------------|----------|
-| `HYPERLIQUID_PRIVATE_KEY` | Ethereum wallet private key | Hyperliquid |
-| `HYPERLIQUID_WALLET_ADDRESS` | Wallet address | Hyperliquid |
-| `DRIFT_PRIVATE_KEY` | Solana wallet private key | Drift |
-| `ASTER_API_KEY` | API key | Aster |
-| `ASTER_API_SECRET` | API secret | Aster |
-| `SYMPHONY_API_KEY` | API key | Symphony |
-| `TELEGRAM_BOT_TOKEN` | Bot token | Notifications |
-| `TELEGRAM_CHAT_ID` | Chat ID | Notifications |
-| `GEMINI_API_KEY` | Gemini AI key | Agent LLM |
+## Quick Start
 
 ```bash
-# List secrets
-gcloud secrets list --project=sapphire-479610
-
-# Create secret
-echo -n "your-secret" | gcloud secrets create SECRET_NAME \
-  --data-file=- --project=sapphire-479610
-
-# Access secret
-gcloud secrets versions access latest --secret=SECRET_NAME
-```
-
----
-
-## 📊 API Reference
-
-### Trading Endpoints
-
-```bash
-# Execute trade with auto-routing
-POST /api/v2/trade
-{
-  "symbol": "BTC-PERP",
-  "side": "BUY",
-  "quantity": 0.01,
-  "order_type": "MARKET"
-}
-
-# Force specific platform
-POST /api/v2/trade
-{
-  "symbol": "BTC-PERP",
-  "platform": "hyperliquid"  # or "drift"
-}
-
-# Get routing map
-GET /api/v2/trade/routing
-```
-
-### Platform Endpoints
-
-```bash
-GET /api/v2/platforms/status           # All platform status
-GET /api/v2/platforms/hyperliquid/positions
-GET /api/v2/platforms/drift/positions
-GET /api/v2/platforms/all/positions    # Combined
-```
-
-### Symphony Endpoints
-
-```bash
-GET /api/v2/symphony/status            # All agents
-GET /api/v2/symphony/mit/status        # MIT activation progress
-POST /api/v2/symphony/mit/activate     # Execute MIT trade
-```
-
-### Memory Endpoints
-
-```bash
-GET /api/v2/memory/health              # Memory system health
-POST /api/v2/memory/store              # Store new memory
-POST /api/v2/memory/recall             # Semantic search
-```
-
-### Health
-
-```bash
-GET /api/v2/health                     # V2 component health
-GET /health                            # Overall system health
-```
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- Python 3.11+
-- Google Cloud SDK
-- Hyperliquid wallet (EVM)
-- Drift/Solana wallet
-
-### Installation
-
-```bash
+# Clone
 git clone https://github.com/arigatoexpress/Sapphire.git
-cd Sapphire/cloud_trader
+cd Sapphire
+
+# Setup
 python3.11 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-```
 
-### Local Development
-
-```bash
-# Set environment
+# Configure
 export GOOGLE_CLOUD_PROJECT=sapphire-479610
 
-# Run locally
-python main_v2.py
+# Run
+python cloud_trader/main_v2.py
 ```
 
-### Deploy to Cloud Run
+## Deploy
 
 ```bash
 gcloud builds submit --config=cloudbuild.yaml .
 ```
 
+## API
+
+```bash
+# Trade execution
+POST /api/v2/trade
+{"symbol": "BTC-PERP", "side": "BUY", "quantity": 0.01}
+
+# Platform status
+GET /api/v2/platforms/status
+
+# Memory health
+GET /api/v2/memory/health
+
+# System health
+GET /health
+```
+
+## Project Structure
+
+```
+Sapphire/
+├── cloud_trader/
+│   ├── v2/                    # Core V2 modules
+│   │   ├── dual_platform_router.py
+│   │   ├── hyperliquid_client.py
+│   │   ├── hardened_memory_manager.py
+│   │   ├── symphony_agent_manager.py
+│   │   └── enhanced_circuit_breaker.py
+│   ├── agents/                # AI agent implementations
+│   ├── api/                   # API routes
+│   └── main_v2.py             # Application entry
+├── services/                  # Microservices
+│   ├── bot-hyperliquid/
+│   ├── bot-drift/
+│   ├── bot-aster/
+│   └── bot-symphony/
+├── sapphire-web/              # Frontend
+└── docs/                      # Documentation
+```
+
+## Security
+
+- All secrets stored in Google Cloud Secret Manager
+- Circuit breakers prevent cascade failures
+- Rate limiting on all platform connections
+- Write-ahead logging for crash recovery
+
+## License
+
+MIT
+
 ---
 
-## 📈 Performance Metrics
-
-| Metric | Value |
-|--------|-------|
-| **Uptime** | 99.99% |
-| **Platforms** | 4 (2 DeFi Perps, 1 CEX, 1 Treasury) |
-| **Agent Latency** | <500ms |
-| **Memory Recall** | <100ms (FAISS) |
-| **Circuit Recovery** | 30s (DeFi), 60s (CEX) |
-| **Symphony Agents** | 3 (2 active, 1 pending) |
-| **Total V2 LOC** | 4,600+ |
-
----
-
-## 🛡️ Security
-
-1. **All secrets in GCP Secret Manager**
-2. **No hardcoded credentials**
-3. **Circuit breakers prevent cascade failures**
-4. **Rate limiting on all platforms**
-5. **Audit logging to Firestore**
-6. **Write-ahead logging for crash recovery**
-7. **Checksum verification for memory integrity**
-
----
-
-## 📈 Roadmap
-
-- [x] V2 Architecture Migration
-- [x] Hyperliquid Reinstatement
-- [x] Dual Platform Router
-- [x] Hardened Memory Manager
-- [x] Symphony Agent Manager
-- [ ] MIT Activation (5 trades)
-- [ ] Multi-model AI (GPT-4, Claude)
-- [ ] Dashboard & Analytics
-- [ ] 20+ symbol expansion
-
----
-
-## 📄 License
-
-MIT License - see [LICENSE](/.github/LICENSE)
-
----
-
-**Built with ❤️ for Autonomous Finance**
-
-[Production](https://sapphire-v2-267358751314.us-central1.run.app) · [Health](https://sapphire-v2-267358751314.us-central1.run.app/health) · [Dashboard](https://sapphire-479610.web.app)
-
-**Version 2.2.0** | **Claude V1.0 Architecture** | **Hyperliquid: ACTIVE ✅** | **Drift: ACTIVE ✅**
+**Version 2.2.0**
