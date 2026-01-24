@@ -15,6 +15,8 @@ Production-grade trading system with multi-platform DeFi execution, AI agent con
 |----------|------|--------|
 | **Hyperliquid** | DeFi Perpetuals | Active |
 | **Drift** | Solana Perpetuals | Active |
+| **Jupiter** | Solana DEX Aggregator | Active |
+| **Lighter** | Ethereum L2 Perpetuals | Active |
 | **Aster** | CEX | Active |
 | **Symphony** | Monad Treasury | Active |
 
@@ -34,13 +36,13 @@ Production-grade trading system with multi-platform DeFi execution, AI agent con
     └────┬────┘    └───────────┘   └───────────┘
          │
     ┌────▼────────────────────────────────────┐
-    │          Dual Platform Router            │
+    │          Multi-Platform Router           │
     │   (Symbol-based routing + Failover)      │
-    └────┬─────────────┬─────────────┬────────┘
-         │             │             │
-    ┌────▼────┐   ┌────▼────┐   ┌────▼────┐
-    │Hyperliquid│   │  Drift  │   │  Aster  │
-    └─────────┘   └─────────┘   └─────────┘
+    └──┬───────┬───────┬───────┬───────┬──────┘
+       │       │       │       │       │
+    ┌──▼──┐ ┌──▼──┐ ┌──▼──┐ ┌──▼──┐ ┌──▼──┐
+    │ HL  │ │Drift│ │ Jup │ │Light│ │Aster│
+    └─────┘ └─────┘ └─────┘ └─────┘ └─────┘
 ```
 
 ## Core Components
@@ -119,6 +121,7 @@ Sapphire/
 │   ├── v2/                    # Core V2 modules
 │   │   ├── dual_platform_router.py
 │   │   ├── hyperliquid_client.py
+│   │   ├── lighter_client.py
 │   │   ├── hardened_memory_manager.py
 │   │   ├── symphony_agent_manager.py
 │   │   └── enhanced_circuit_breaker.py
@@ -128,6 +131,7 @@ Sapphire/
 ├── services/                  # Microservices
 │   ├── bot-hyperliquid/
 │   ├── bot-drift/
+│   ├── bot-jupiter/
 │   ├── bot-aster/
 │   └── bot-symphony/
 ├── sapphire-web/              # Frontend
