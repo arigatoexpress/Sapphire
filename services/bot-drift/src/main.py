@@ -463,6 +463,24 @@ class DriftBot:
 
             self.trades_executed += 1
 
+            # Place native SL/TP trigger orders on Drift
+            if signal.stop_loss:
+                await self._place_drift_trigger_order(
+                    market_index=market_index,
+                    trigger_price=signal.stop_loss,
+                    base_amount=base_asset_quantity,
+                    is_tp=False,
+                    entry_direction=direction,
+                )
+            if signal.take_profit:
+                await self._place_drift_trigger_order(
+                    market_index=market_index,
+                    trigger_price=signal.take_profit,
+                    base_amount=base_asset_quantity,
+                    is_tp=True,
+                    entry_direction=direction,
+                )
+
             return TradeResult(
                 trade_id=str(tx_sig),
                 signal_id=signal.signal_id,
@@ -490,6 +508,72 @@ class DriftBot:
                 error_message=str(e),
                 execution_time_ms=execution_time,
             )
+
+    async def _place_drift_trigger_order(
+        self,
+        market_index: int,
+        trigger_price: float,
+        base_amount: float,
+        is_tp: bool,
+        entry_direction,
+    ):
+        """
+        Place a native trigger order (TP/SL) on Drift Protocol.
+
+        Drift supports trigger orders that execute automatically when price is reached.
+        """
+        try:
+            from driftpy.types import (
+                MarketType,
+                OrderParams,
+                OrderTriggerCondition,
+                OrderType,
+                PositionDirection,
+            )
+
+            # Reverse direction for closing
+            # If entry was Long, close with Short direction
+            if entry_direction.index == 0:  # Long
+                close_direction = PositionDirection.Short()
+                # TP triggers above for long, SL triggers below
+                trigger_condition = (
+                    OrderTriggerCondition.Above() if is_tp else OrderTriggerCondition.Below()
+                )
+            else:  # Short
+                close_direction = PositionDirection.Long()
+                # TP triggers below for short, SL triggers above
+                trigger_condition = (
+                    OrderTriggerCondition.Below() if is_tp else OrderTriggerCondition.Above()
+                )
+
+            trigger_type = "TP" if is_tp else "SL"
+
+            # Convert trigger price to Drift's 6 decimal format
+            trigger_price_int = int(trigger_price * 1e6)
+
+            order_params = OrderParams(
+                order_type=OrderType.TriggerMarket(),
+                market_type=MarketType.Perp(),
+                market_index=market_index,
+                base_asset_amount=int(base_amount * 1e9),
+                direction=close_direction,
+                trigger_price=trigger_price_int,
+                trigger_condition=trigger_condition,
+                reduce_only=True,
+            )
+
+            tx_sig = await self.sdk_client.place_perp_order(order_params)
+            await self.connection.confirm_transaction(tx_sig)
+
+            logger.info(
+                f"✅ [DRIFT] Native {trigger_type} placed @ ${trigger_price:.2f} | TxSig: {str(tx_sig)[:20]}..."
+            )
+            return tx_sig
+
+        except Exception as e:
+            trigger_type = "TP" if is_tp else "SL"
+            logger.error(f"❌ [DRIFT] Failed to place {trigger_type} trigger order: {e}")
+            return None
 
     async def place_oracle_order(self, signal: TradeSignal, offset_format: str = "PRICE"):
         """

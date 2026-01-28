@@ -1,0 +1,25 @@
+# docker-compose.local.yml
+# Minimal local development infrastructure for Sapphire V2
+# Usage: docker-compose -f docker-compose.local.yml up -d
+
+version: '3.8'
+
+services:
+  # Redis for state management and caching
+  redis:
+    image: redis:7-alpine
+    container_name: sapphire-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  redis_data:
+    driver: local

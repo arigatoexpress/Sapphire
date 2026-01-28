@@ -537,30 +537,80 @@ class AsterBot:
             )
 
     async def _place_stop_loss(self, symbol: str, price: float, quantity: float, entry_side: str):
-        """Place stop-loss order (Native)."""
+        """Place native STOP_MARKET order on Aster for risk management."""
         try:
+            from aster_client import OrderType, WorkingType
+
             exit_side = "SELL" if entry_side == "BUY" else "BUY"
 
-            # Use native TRAILING_STOP_MARKET if dynamic
-            # For now, using standard STOP_MARKET for reliability as per audit
-            await self.client.place_stop_order(
+            # Use native STOP_MARKET for reliable execution
+            result = await self.client.place_order(
                 symbol=symbol,
                 side=exit_side,
+                order_type=OrderType.STOP_MARKET,
                 quantity=quantity,
                 stop_price=price,
+                reduce_only=True,
+                working_type=WorkingType.MARK_PRICE,
             )
+            order_id = result.get("orderId", "unknown")
+            logger.info(f"✅ [ASTER] Native SL placed @ ${price:.2f} | OrderId: {order_id}")
+            return result
         except Exception as e:
-            logger.error(f"Failed to place stop-loss: {e}")
+            logger.error(f"❌ Failed to place stop-loss: {e}")
+            return None
 
     async def _place_take_profit(self, symbol: str, price: float, quantity: float, entry_side: str):
-        """Place take-profit order."""
+        """Place native TAKE_PROFIT_MARKET order on Aster for profit capture."""
         try:
+            from aster_client import OrderType, WorkingType
+
             exit_side = "SELL" if entry_side == "BUY" else "BUY"
-            await self.client.place_limit_order(
-                symbol=symbol, side=exit_side, quantity=quantity, price=price
+
+            # Use TAKE_PROFIT_MARKET for guaranteed execution at TP
+            result = await self.client.place_order(
+                symbol=symbol,
+                side=exit_side,
+                order_type=OrderType.TAKE_PROFIT_MARKET,
+                quantity=quantity,
+                stop_price=price,
+                reduce_only=True,
+                working_type=WorkingType.MARK_PRICE,
             )
+            order_id = result.get("orderId", "unknown")
+            logger.info(f"✅ [ASTER] Native TP placed @ ${price:.2f} | OrderId: {order_id}")
+            return result
         except Exception as e:
-            logger.error(f"Failed to place take-profit: {e}")
+            logger.error(f"❌ Failed to place take-profit: {e}")
+            return None
+
+    async def _place_trailing_stop(
+        self, symbol: str, callback_rate: float, quantity: float, entry_side: str
+    ):
+        """Place native TRAILING_STOP_MARKET order on Aster for dynamic profit protection."""
+        try:
+            from aster_client import OrderType, WorkingType
+
+            exit_side = "SELL" if entry_side == "BUY" else "BUY"
+
+            # Use native TRAILING_STOP_MARKET - Aster supports this
+            result = await self.client.place_order(
+                symbol=symbol,
+                side=exit_side,
+                order_type=OrderType.TRAILING_STOP_MARKET,
+                quantity=quantity,
+                callback_rate=callback_rate,  # e.g., 1.0 = 1% trail
+                reduce_only=True,
+                working_type=WorkingType.MARK_PRICE,
+            )
+            order_id = result.get("orderId", "unknown")
+            logger.info(
+                f"✅ [ASTER] Native Trailing Stop placed @ {callback_rate}% | OrderId: {order_id}"
+            )
+            return result
+        except Exception as e:
+            logger.error(f"❌ Failed to place trailing stop: {e}")
+            return None
 
     def _calculate_position_size(self, signal: TradeSignal) -> float:
         """

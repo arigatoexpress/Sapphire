@@ -1,0 +1,9 @@
+# Lighter Bot Dependencies (L2 Order Book)
+lighter-sdk>=1.0.0
+httpx>=0.23.0
+google-cloud-pubsub>=2.18.0
+google-cloud-firestore>=2.14.0
+aiohttp>=3.8.0
+python-dotenv>=1.0.0
+eth-account>=0.8.0
+web3>=6.0.0

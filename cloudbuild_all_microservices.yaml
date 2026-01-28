@@ -218,43 +218,42 @@ steps:
     waitFor: ['push-latest']
 
   # ═══════════════════════════════════════════════════════════
-  # STEP 8: Deploy Lighter Service (Ethereum L2) - DISABLED
-  # Note: Lighter disabled due to websockets dependency conflict
-  # Will be deployed as separate microservice with its own image
+  # STEP 8: Deploy Lighter Service (Ethereum L2)
+  # ZK-rollup based L2 order book exchange
   # ═══════════════════════════════════════════════════════════
-  # - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-  #   entrypoint: gcloud
-  #   args:
-  #     - 'run'
-  #     - 'deploy'
-  #     - 'sapphire-lighter'
-  #     - '--image'
-  #     - 'gcr.io/$PROJECT_ID/sapphire-microservice:latest'
-  #     - '--region'
-  #     - 'us-central1'
-  #     - '--platform'
-  #     - 'managed'
-  #     - '--allow-unauthenticated'
-  #     - '--memory'
-  #     - '2Gi'
-  #     - '--cpu'
-  #     - '2'
-  #     - '--timeout'
-  #     - '300'
-  #     - '--max-instances'
-  #     - '5'
-  #     - '--min-instances'
-  #     - '0'
-  #     - '--vpc-connector'
-  #     - 'sapphire-conn-us'
-  #     - '--vpc-egress'
-  #     - 'all-traffic'
-  #     - '--set-env-vars'
-  #     - 'ENABLE_JUPITER=false,ENABLE_DRIFT=false,ENABLE_ASTER=false,ENABLE_HYPERLIQUID=false,ENABLE_LIGHTER=true,ENABLE_SYMPHONY=false,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,ENVIRONMENT=production,LOG_LEVEL=INFO'
-  #     - '--set-secrets'
-  #     - 'LIGHTER_PUBLIC_KEY=LIGHTER_PUBLIC_KEY:latest,LIGHTER_PRIVATE_KEY=LIGHTER_PRIVATE_KEY:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest'
-  #   id: 'deploy-lighter'
-  #   waitFor: ['push-latest']
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'sapphire-lighter'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/sapphire-microservice:latest'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '2Gi'
+      - '--cpu'
+      - '2'
+      - '--timeout'
+      - '300'
+      - '--max-instances'
+      - '5'
+      - '--min-instances'
+      - '1'
+      - '--vpc-connector'
+      - 'sapphire-conn-us'
+      - '--vpc-egress'
+      - 'all-traffic'
+      - '--set-env-vars'
+      - 'ENABLE_JUPITER=false,ENABLE_DRIFT=false,ENABLE_ASTER=false,ENABLE_HYPERLIQUID=false,ENABLE_LIGHTER=true,ENABLE_SYMPHONY=false,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,ENVIRONMENT=production,LOG_LEVEL=INFO'
+      - '--set-secrets'
+      - 'LIGHTER_PUB_KEY=LIGHTER_PUB_KEY:latest,LIGHTER_PRIV_KEY=LIGHTER_PRIV_KEY:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest'
+    id: 'deploy-lighter'
+    waitFor: ['push-latest']
 
 # Images to store in GCR
 images:

@@ -1,0 +1,11 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.13.3, pytest-8.4.2, pluggy-1.6.0
+rootdir: C:\Users\aribs\SAPPHIRE\Sapphire
+configfile: pyproject.toml
+plugins: anyio-4.7.0, asyncio-1.2.0, cov-7.0.0, html-4.1.1, metadata-3.1.1, mock-3.15.1, timeout-2.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 4 items
+
+tests\test_agent_consensus.py ....                                       [100%]
+
+============================== 4 passed in 2.61s ==============================

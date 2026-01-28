@@ -396,7 +396,7 @@ class PlatformRouter:
             try:
                 if platform == PlatformType.DRIFT:
                     result = await breaker.call(
-                        self._execute_drift, symbol, side, formatted_quantity
+                        self._execute_drift, symbol, side, formatted_quantity, tp_price, sl_price
                     )
                 elif platform == PlatformType.HYPERLIQUID:
                     result = await breaker.call(
@@ -412,7 +412,7 @@ class PlatformRouter:
                     )
                 else:
                     result = await breaker.call(
-                        self._execute_aster, symbol, side, formatted_quantity
+                        self._execute_aster, symbol, side, formatted_quantity, tp_price, sl_price
                     )
 
             except Exception as breaker_exc:
@@ -427,7 +427,7 @@ class PlatformRouter:
 
                     if fallback_platform == PlatformType.DRIFT:
                         result = await fallback_breaker.call(
-                            self._execute_drift, symbol, side, formatted_quantity
+                            self._execute_drift, symbol, side, formatted_quantity, tp_price, sl_price
                         )
                     elif fallback_platform == PlatformType.SYMPHONY:
                         result = await fallback_breaker.call(
@@ -444,7 +444,7 @@ class PlatformRouter:
                         )
                     elif fallback_platform == PlatformType.HYPERLIQUID:
                         result = await fallback_breaker.call(
-                            self._execute_hyperliquid, symbol, side, formatted_quantity
+                            self._execute_hyperliquid, symbol, side, formatted_quantity, tp_price, sl_price
                         )
                     elif fallback_platform == PlatformType.LIGHTER:
                         result = await fallback_breaker.call(
@@ -452,7 +452,7 @@ class PlatformRouter:
                         )
                     else:
                         result = await fallback_breaker.call(
-                            self._execute_aster, symbol, side, formatted_quantity
+                            self._execute_aster, symbol, side, formatted_quantity, tp_price, sl_price
                         )
                 else:
                     # No fallback available
@@ -835,10 +835,22 @@ class PlatformRouter:
                 False, PlatformType.SYMPHONY, symbol, side, quantity, error=str(e)
             )
 
-    async def _execute_aster(self, symbol: str, side: str, quantity: float) -> ExecutionResult:
-        """Execute on Aster (Main Liquidity)."""
+    async def _execute_aster(
+        self,
+        symbol: str,
+        side: str,
+        quantity: float,
+        tp_price: Optional[float] = None,
+        sl_price: Optional[float] = None,
+    ) -> ExecutionResult:
+        """
+        Execute on Aster (Main Liquidity) with native SL/TP orders.
+
+        Places market order first, then sets STOP_MARKET and TAKE_PROFIT_MARKET
+        orders for risk management (positions close automatically on exchange).
+        """
         try:
-            from .enums import OrderType
+            from .enums import OrderType, WorkingType
 
             aster_symbol = self.service._normalize_for_aster(symbol)
 
@@ -883,12 +895,54 @@ class PlatformRouter:
             if not success:
                 logger.warning(f"⚠️ Order {order_id} verification failed. Status: {final_status}")
 
+            # ---------------------------------------------------------
+            # RISK MANAGEMENT: Place Native SL/TP Orders on Aster
+            # ---------------------------------------------------------
+            if success and (tp_price or sl_price):
+                # For closing orders, we reverse the side
+                close_side = "SELL" if side.upper() == "BUY" else "BUY"
+
+                # Use actual filled quantity for SL/TP orders
+                sl_tp_qty = filled_qty if filled_qty > 0 else quantity
+
+                # Place Take Profit order (TAKE_PROFIT_MARKET)
+                if tp_price:
+                    try:
+                        tp_res = await self.service._exchange_client.place_order(
+                            symbol=aster_symbol,
+                            side=close_side,
+                            order_type=OrderType.TAKE_PROFIT_MARKET,
+                            quantity=sl_tp_qty,
+                            stop_price=tp_price,
+                            reduce_only=True,
+                            working_type=WorkingType.MARK_PRICE,
+                        )
+                        logger.info(f"✅ [ASTER] TP order placed @ ${tp_price:.2f} | OrderId: {tp_res.get('orderId')}")
+                    except Exception as tp_err:
+                        logger.error(f"⚠️ [ASTER] Failed to place TP for {symbol}: {tp_err}")
+
+                # Place Stop Loss order (STOP_MARKET)
+                if sl_price:
+                    try:
+                        sl_res = await self.service._exchange_client.place_order(
+                            symbol=aster_symbol,
+                            side=close_side,
+                            order_type=OrderType.STOP_MARKET,
+                            quantity=sl_tp_qty,
+                            stop_price=sl_price,
+                            reduce_only=True,
+                            working_type=WorkingType.MARK_PRICE,
+                        )
+                        logger.info(f"✅ [ASTER] SL order placed @ ${sl_price:.2f} | OrderId: {sl_res.get('orderId')}")
+                    except Exception as sl_err:
+                        logger.error(f"⚠️ [ASTER] Failed to place SL for {symbol}: {sl_err}")
+
             return ExecutionResult(
                 success=success,
                 platform=PlatformType.ASTER,
                 symbol=symbol,
                 side=side,
-                quantity=quantity,  # TODO: Should report filled_qty
+                quantity=filled_qty if filled_qty > 0 else quantity,
                 price=avg_price,
                 tx_sig=str(order_id),
                 error=None if success else f"Verification Failed: Status {final_status}",

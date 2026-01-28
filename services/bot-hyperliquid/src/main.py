@@ -519,6 +519,24 @@ class HyperliquidBot:
                     take_profit=signal.take_profit,
                 )
 
+                # Place native SL/TP trigger orders on Hyperliquid
+                if signal.stop_loss:
+                    await self._place_trigger_order(
+                        coin=coin,
+                        trigger_price=signal.stop_loss,
+                        quantity=quantity,
+                        is_tp=False,
+                        entry_side=signal.side,
+                    )
+                if signal.take_profit:
+                    await self._place_trigger_order(
+                        coin=coin,
+                        trigger_price=signal.take_profit,
+                        quantity=quantity,
+                        is_tp=True,
+                        entry_side=signal.side,
+                    )
+
                 return TradeResult(
                     trade_id=str(oid),
                     signal_id=signal.signal_id,
@@ -618,6 +636,64 @@ class HyperliquidBot:
 
         except Exception as e:
             logger.error(f"Position check error: {e}")
+
+    async def _place_trigger_order(
+        self,
+        coin: str,
+        trigger_price: float,
+        quantity: float,
+        is_tp: bool,
+        entry_side: TradeSide,
+    ):
+        """
+        Place a native trigger order (TP/SL) on Hyperliquid.
+
+        Uses Hyperliquid's native trigger order support for reliable execution.
+        """
+        try:
+            if not self.exchange:
+                logger.error("❌ Exchange not initialized for trigger order")
+                return None
+
+            # Reverse the side for closing orders
+            is_buy = entry_side not in (TradeSide.BUY, TradeSide.LONG)
+            trigger_type = "tp" if is_tp else "sl"
+
+            # Place trigger order using Hyperliquid SDK
+            result = await asyncio.to_thread(
+                self.exchange.order,
+                coin,
+                is_buy,
+                quantity,
+                trigger_price,
+                {
+                    "trigger": {
+                        "triggerPx": trigger_price,
+                        "isMarket": True,  # Execute as market when triggered
+                        "tpsl": trigger_type,
+                    }
+                },
+                True,  # reduce_only=True
+            )
+
+            if result.get("status") == "ok":
+                statuses = result.get("response", {}).get("data", {}).get("statuses", [])
+                if statuses and "resting" in statuses[0]:
+                    oid = statuses[0]["resting"].get("oid", "unknown")
+                    logger.info(
+                        f"✅ [HL] Native {trigger_type.upper()} placed @ ${trigger_price:.2f} | OrderId: {oid}"
+                    )
+                    return result
+                elif statuses and "error" in statuses[0]:
+                    logger.error(f"❌ [HL] {trigger_type.upper()} rejected: {statuses[0]['error']}")
+            else:
+                logger.error(f"❌ [HL] {trigger_type.upper()} failed: {result}")
+
+            return result
+
+        except Exception as e:
+            logger.error(f"❌ [HL] Failed to place {trigger_type} trigger order: {e}")
+            return None
 
     async def _close_all_positions(self):
         """Close all positions on HL."""

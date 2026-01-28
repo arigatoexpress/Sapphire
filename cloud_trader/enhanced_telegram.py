@@ -140,15 +140,26 @@ class EnhancedTelegramService:
     async def send_trade_notification(
         self, trade=None, priority=NotificationPriority.MEDIUM, **kwargs
     ):
-        """Send trade notification with rich formatting."""
+        """
+        Send comprehensive trade notification with all execution details.
+
+        Supports both entry and exit trades with full position information.
+        """
         # Check if trade is an object with attributes or a dict
         if trade and hasattr(trade, 'symbol'):
             # Trade is an object with attributes
-            symbol = trade.symbol
-            side = trade.side
-            price = trade.price
-            quantity = trade.quantity
-            platform = trade.platform
+            symbol = getattr(trade, 'symbol', 'N/A')
+            side = getattr(trade, 'side', 'HOLD')
+            price = getattr(trade, 'price', 0.0)
+            quantity = getattr(trade, 'quantity', 0.0)
+            platform = getattr(trade, 'platform', 'Unknown')
+            leverage = getattr(trade, 'leverage', 1)
+            entry_price = getattr(trade, 'entry_price', 0.0)
+            take_profit = getattr(trade, 'take_profit', 0.0)
+            stop_loss = getattr(trade, 'stop_loss', 0.0)
+            pnl = getattr(trade, 'pnl', 0.0)
+            is_closing = getattr(trade, 'is_closing', False)
+            thesis = getattr(trade, 'thesis', '')
         else:
             # Trade is None or a dict, use kwargs
             symbol = kwargs.get("symbol", "N/A")
@@ -156,9 +167,31 @@ class EnhancedTelegramService:
             price = kwargs.get("price", 0.0)
             quantity = kwargs.get("quantity", 0.0)
             platform = kwargs.get("platform", "Unknown")
+            leverage = kwargs.get("leverage", 1)
+            entry_price = kwargs.get("entry_price", 0.0)
+            take_profit = kwargs.get("take_profit", kwargs.get("tp_price", 0.0))
+            stop_loss = kwargs.get("stop_loss", kwargs.get("sl_price", 0.0))
+            pnl = kwargs.get("pnl", 0.0)
+            is_closing = kwargs.get("is_closing", False)
+            thesis = kwargs.get("thesis", kwargs.get("status", ""))
 
-        # Determine emoji based on side
-        side_emoji = "🟢" if side in ["BUY", "LONG"] else "🔴"
+        # Validate critical fields - log warning if 0
+        if price == 0.0:
+            logger.warning(f"⚠️ Trade notification for {symbol} received with price=0.0")
+        if quantity == 0.0:
+            logger.warning(f"⚠️ Trade notification for {symbol} received with quantity=0.0")
+
+        # Calculate notional value
+        notional = price * quantity if price > 0 and quantity > 0 else 0.0
+
+        # Determine emoji based on side and trade type
+        if is_closing:
+            side_emoji = "🏁" if pnl >= 0 else "💔"
+            action_text = f"CLOSED {side}"
+        else:
+            side_emoji = "🟢" if side in ["BUY", "LONG"] else "🔴"
+            action_text = f"{side}"
+
         platform_emoji = {
             "drift": "🌊",
             "hyperliquid": "💧",
@@ -166,18 +199,75 @@ class EnhancedTelegramService:
             "symphony": "🎵",
             "lighter": "⚡",
             "jupiter": "🪐"
-        }.get(platform.lower(), "🤖")
+        }.get(str(platform).lower(), "🤖")
 
-        msg = (
-            f"{side_emoji} **{side} {symbol}**\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"💵 Price: `${price:,.4f}`\n"
-            f"📦 Size: `{quantity}`\n"
-            f"{platform_emoji} Venue: `{platform.title()}`\n"
-            f"🕒 Time: `{time.strftime('%H:%M:%S UTC')}`"
-        )
+        # Build the message based on trade type
+        if is_closing:
+            # Exit/Close trade notification
+            pnl_emoji = "💰" if pnl >= 0 else "📉"
+            pnl_str = f"+${pnl:,.2f}" if pnl >= 0 else f"-${abs(pnl):,.2f}"
+
+            msg = (
+                f"{side_emoji} **POSITION CLOSED: {symbol}**\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"📊 **Exit Price**: `${price:,.4f}`\n"
+                f"📦 **Size**: `{quantity:,.4f}`\n"
+                f"💰 **Value**: `${notional:,.2f}`\n"
+            )
+
+            if entry_price > 0:
+                pct_change = ((price - entry_price) / entry_price) * 100
+                pct_emoji = "📈" if pct_change >= 0 else "📉"
+                msg += f"📍 **Entry**: `${entry_price:,.4f}`\n"
+                msg += f"{pct_emoji} **Move**: `{pct_change:+.2f}%`\n"
+
+            msg += (
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"{pnl_emoji} **Realized PnL**: `{pnl_str}`\n"
+                f"{platform_emoji} **Venue**: `{str(platform).title()}`\n"
+                f"🕒 **Time**: `{time.strftime('%H:%M:%S UTC')}`"
+            )
+        else:
+            # Entry trade notification
+            msg = (
+                f"{side_emoji} **{action_text} {symbol}**\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"💵 **Entry Price**: `${price:,.4f}`\n"
+                f"📦 **Size**: `{quantity:,.4f}`\n"
+                f"💰 **Value**: `${notional:,.2f}`\n"
+            )
+
+            # Add leverage if > 1
+            if leverage and leverage > 1:
+                msg += f"⚙️ **Leverage**: `{leverage}x`\n"
+
+            # Add TP/SL if set
+            if take_profit > 0 or stop_loss > 0:
+                msg += f"━━━━━━━━━━━━━━━━━━\n"
+                if take_profit > 0:
+                    tp_pct = ((take_profit - price) / price) * 100 if price > 0 else 0
+                    msg += f"🎯 **Take Profit**: `${take_profit:,.2f}` ({tp_pct:+.1f}%)\n"
+                if stop_loss > 0:
+                    sl_pct = ((stop_loss - price) / price) * 100 if price > 0 else 0
+                    msg += f"🛡️ **Stop Loss**: `${stop_loss:,.2f}` ({sl_pct:+.1f}%)\n"
+
+            msg += (
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"{platform_emoji} **Venue**: `{str(platform).title()}`\n"
+                f"🕒 **Time**: `{time.strftime('%H:%M:%S UTC')}`"
+            )
+
+            # Add thesis/reasoning if available
+            if thesis:
+                msg += f"\n💡 _{thesis[:100]}{'...' if len(thesis) > 100 else ''}_"
 
         await self.send_message(msg, priority=priority)
+
+        # Update daily stats
+        self.daily_stats["trades"] += 1
+        self.daily_stats["volume"] += notional
+        if is_closing:
+            self.daily_stats["pnl"] += pnl
 
     async def send_jupiter_swap_notification(
         self,

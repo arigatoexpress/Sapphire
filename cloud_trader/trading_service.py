@@ -2295,13 +2295,15 @@ class TradingService:
         )
         if result.success:
             fill_price = result.price if result.price > 0 else curr_price
+            # Calculate total value for notification
+            trade_total = result.quantity * fill_price if fill_price > 0 else 0.0
             await self._send_trade_notification(
                 agent,
                 symbol,
                 side,
                 result.quantity,
                 fill_price,
-                0.0,
+                trade_total,
                 True,
                 status="FILLED",
                 thesis=f"{thesis} [{result.platform.value.upper()}]",
@@ -2365,13 +2367,14 @@ class TradingService:
                     except Exception as e_metrics:
                         print(f"⚠️ Metrics Error: {e_metrics}")
                     # --------------------------------
+                    drift_total = quantity_float * curr_price if curr_price > 0 else 0.0
                     await self._send_trade_notification(
                         agent,
                         symbol,
                         side,
                         quantity_float,
                         curr_price,
-                        0.0,
+                        drift_total,
                         True,
                         status="FILLED",
                         thesis=thesis + " (Drift Execution)",
@@ -2455,13 +2458,14 @@ class TradingService:
                     except Exception as e_metrics:
                         print(f"⚠️ HL Metrics Error: {e_metrics}")
                     # --------------------------------
+                    hl_total = quantity_float * curr_price if curr_price > 0 else 0.0
                     await self._send_trade_notification(
                         agent,
                         symbol,
                         side,
                         quantity_float,
                         curr_price,
-                        0.0,
+                        hl_total,
                         True,
                         status="FILLED",
                         thesis=thesis + " (Hyperliquid Execution)",

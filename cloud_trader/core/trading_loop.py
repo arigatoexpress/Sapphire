@@ -196,29 +196,56 @@ class TradingLoop:
                 confidence = float(confidence)
             except (ValueError, TypeError):
                 confidence = 0.5
-                
+
             size = await self._calculate_position_size(symbol, confidence)
 
-            # Calculate TP/SL prices
+            # Calculate TP/SL prices using Adaptive TP/SL Calculator (ATR-based)
             current_price = await self._get_current_price(symbol)
             tp_price = None
             sl_price = None
-            
+
             if current_price > 0:
-                # Default strategy: 5% TP, 3% SL
-                tp_pct = 0.05
-                sl_pct = 0.03
-                
-                if consensus.signal == "BUY":
-                    tp_price = current_price * (1 + tp_pct)
-                    sl_price = current_price * (1 - sl_pct)
-                elif consensus.signal == "SELL":
-                    tp_price = current_price * (1 - tp_pct)
-                    sl_price = current_price * (1 + sl_pct)
-                    
+                try:
+                    # Use adaptive ATR-based TP/SL calculator
+                    from ..adaptive_tpsl import get_adaptive_tpsl_calculator
+
+                    calculator = get_adaptive_tpsl_calculator()
+                    agent_id = getattr(consensus, "agent_id", None)
+
+                    adaptive_result = await calculator.calculate(
+                        symbol=symbol,
+                        side=consensus.signal,
+                        entry_price=current_price,
+                        agent_id=agent_id,
+                        consensus_confidence=confidence,
+                    )
+
+                    tp_price = adaptive_result.tp_price
+                    sl_price = adaptive_result.sl_price
+
+                    logger.info(
+                        f"📊 ATR-based TP/SL for {symbol}: "
+                        f"TP={adaptive_result.tp_pct:.1%} (${tp_price:.2f}) | "
+                        f"SL={adaptive_result.sl_pct:.1%} (${sl_price:.2f}) | "
+                        f"{adaptive_result.reasoning}"
+                    )
+
+                except Exception as adaptive_err:
+                    # Fallback to static TP/SL if adaptive fails
+                    logger.warning(f"⚠️ Adaptive TP/SL failed, using static: {adaptive_err}")
+                    tp_pct = 0.05
+                    sl_pct = 0.03
+
+                    if consensus.signal == "BUY":
+                        tp_price = current_price * (1 + tp_pct)
+                        sl_price = current_price * (1 - sl_pct)
+                    elif consensus.signal == "SELL":
+                        tp_price = current_price * (1 - tp_pct)
+                        sl_price = current_price * (1 + sl_pct)
+
                 # Round to 2 decimals for now (precision normalizer in router will handle strict precision)
-                tp_price = round(tp_price, 2)
-                sl_price = round(sl_price, 2)
+                tp_price = round(tp_price, 2) if tp_price else None
+                sl_price = round(sl_price, 2) if sl_price else None
 
             # Execute via platform router
             result = await self.router.execute_trade(

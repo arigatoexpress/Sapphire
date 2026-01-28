@@ -1,8 +1,11 @@
 import axios from 'axios'
 
 // Sapphire V2 Backend - Single Container Deployment
-// Use relative path to allow same-origin requests
-const API_BASE = import.meta.env.PROD ? '' : 'https://sapphire-v2-s77j6bxyra-uc.a.run.app'
+// Production: Use relative path for same-origin on sapphirealpha.xyz
+// Development: Point to Cloud Run service directly
+const API_BASE = import.meta.env.PROD
+    ? ''
+    : (import.meta.env.VITE_API_URL || 'https://sapphire-v2-s77j6bxyra-uc.a.run.app')
 
 const api = axios.create({
     baseURL: API_BASE,
