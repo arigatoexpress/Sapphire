@@ -86,7 +86,7 @@ substitutions:
   _REGION: us-central1
   _TAG: latest
   _SERVICE_NAME: sapphire-v2
-  _VPC_CONNECTOR: sapphire-conn-us
+  _VPC_CONNECTOR: projects/sapphire-479610/locations/us-central1/connectors/sapphire-connector
 
 options:
   logging: CLOUD_LOGGING_ONLY
