@@ -594,27 +594,29 @@ class PlatformRouter:
             success = bool(res and res.get("status") == "ok")
             
             # Extract fill price from SDK response
-            # SDK returns price in: data.fills[0].avgPx or data.statuses[0].filled.avgPx
+            # Hyperliquid client returns: {"status": "ok", "filled": True, "data": {...avgPx...}}
+            # Where "data" IS the filled data containing avgPx directly
             fill_price = 0.0
             if success and res:
                 try:
-                    data = res.get("data", {})
-                    if data:
-                        # Try filled order format
-                        filled = data.get("filled", {})
-                        if filled:
-                            fill_price = float(filled.get("avgPx", 0))
-                        # Or try statuses format
-                        elif "statuses" in res.get("response", {}):
-                            statuses = res.get("response", {}).get("data", {}).get("statuses", [])
-                            if statuses:
-                                filled_info = statuses[0].get("filled", {})
-                                if filled_info:
-                                    fill_price = float(filled_info.get("avgPx", 0))
-                except (ValueError, TypeError, KeyError):
-                    pass
-                    
-                    pass
+                    # Check if order was filled (client sets "filled": True)
+                    if res.get("filled"):
+                        data = res.get("data", {})
+                        if data:
+                            # avgPx is directly in data, not nested
+                            fill_price = float(data.get("avgPx", 0))
+                            logger.info(f"📊 [Hyperliquid] Extracted fill price: ${fill_price}")
+
+                    # Fallback: Try statuses format for resting orders
+                    if fill_price == 0.0 and "response" in res:
+                        statuses = res.get("response", {}).get("data", {}).get("statuses", [])
+                        if statuses:
+                            filled_info = statuses[0].get("filled", {})
+                            if filled_info:
+                                fill_price = float(filled_info.get("avgPx", 0))
+                                logger.info(f"📊 [Hyperliquid] Extracted fill price from statuses: ${fill_price}")
+                except (ValueError, TypeError, KeyError) as e:
+                    logger.warning(f"⚠️ [Hyperliquid] Failed to extract fill price: {e}")
                     
             # ---------------------------------------------------------
             # RISK MANAGEMENT: Place Take Profit & Stop Loss if ordered
@@ -789,16 +791,20 @@ class PlatformRouter:
         try:
             # Symphony uses weight/action for perps
             action = "LONG" if side.upper() == "BUY" else "SHORT"
+
+            # Use Symphony's default agent ID - the 'agent' parameter is an AI consensus object,
+            # not a Symphony agent. The Symphony client will use its default configured agent.
+            symphony_agent_id = None  # Let Symphony client use its default from config
+
             if is_closing:
-                # Get positions for the specific agent (MILF or AGDG)
-                agent_symphony_id = agent.id if agent else None
+                # Get positions for the default Symphony agent
                 positions = await self.service.symphony.get_perpetual_positions(
-                    agent_id=agent_symphony_id
+                    agent_id=symphony_agent_id
                 )
                 target = next((p for p in positions if p.get("symbol") == symbol), None)
                 if target and target.get("batchId"):
                     res = await self.service.symphony.close_perpetual_position(
-                        target["batchId"], agent_id=agent_symphony_id
+                        target["batchId"], agent_id=symphony_agent_id
                     )
                 else:
                     return ExecutionResult(
@@ -816,7 +822,7 @@ class PlatformRouter:
                     action=action,
                     weight=10.0,
                     leverage=1.1,
-                    agent_id=agent.id,
+                    agent_id=symphony_agent_id,  # Use default from Symphony client
                 )
 
             success = bool(res and (res.get("successful", 0) > 0 or res.get("status") == "ok"))

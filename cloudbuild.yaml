@@ -69,7 +69,7 @@ steps:
       - '--vpc-egress'
       - 'all-traffic'
       - '--set-env-vars'
-      - 'ENVIRONMENT=production,LOG_LEVEL=INFO,ENABLE_JUPITER=true,ENABLE_DRIFT=false,ENABLE_LIGHTER=false,SOLANA_RPC_URL=https://api.mainnet-beta.solana.com'
+      - 'ENVIRONMENT=production,LOG_LEVEL=INFO,ENABLE_JUPITER=true,ENABLE_DRIFT=true,ENABLE_LIGHTER=true,ENABLE_SYMPHONY=true,SOLANA_RPC_URL=https://api.mainnet-beta.solana.com'
     id: 'deploy'
     waitFor: ['push-sha']
 
