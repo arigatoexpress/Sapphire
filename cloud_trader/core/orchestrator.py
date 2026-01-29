@@ -196,6 +196,11 @@ class TradingOrchestrator:
         if self.config.enable_symphony:
             self.symphony = SymphonyClient()
             logger.info("🔌 Symphony Client Initialized")
+            # Ensure agents are registered on Symphony
+            try:
+                await self.symphony.ensure_agents_registered()
+            except Exception as e:
+                logger.warning(f"⚠️ Symphony agent registration check failed: {e}")
         else:
             logger.info("ℹ️ Symphony disabled, skipping initialization")
 
@@ -279,16 +284,10 @@ class TradingOrchestrator:
         from .trading_loop import TradingLoop
 
         self.monitoring = MonitoringService(self.settings)
-        self.monitoring = MonitoringService(self.settings)
         await self.monitoring.start()
 
         # 2. Telegram Listener (DISABLED - Using MonitoringService for notifications only)
         # Prevents HTTP 409 conflict with Telegram Bot API (can't have multiple polling instances)
-        # if self.settings.enable_telegram and self.settings.telegram_bot_token:
-        #     from ..telegram_listener import get_telegram_listener
-        #     self.telegram_listener = await get_telegram_listener()
-        #     await self.telegram_listener.start()
-        #     logger.info("📡 Telegram Listener Started")
         logger.info("ℹ️ Telegram Listener disabled - using MonitoringService for notifications only")
 
         # 2a. Platform Router
@@ -296,6 +295,9 @@ class TradingOrchestrator:
 
         # 3. Position Tracker
         self.position_tracker = PositionTracker(self.platform_router)
+
+        # Connect position tracker to monitoring for PnL updates
+        self.monitoring.set_position_tracker(self.position_tracker)
 
         # 4. Agent Orchestrator (manages all AI agents)
         self.agent_orchestrator = AgentOrchestrator(monitoring=self.monitoring)

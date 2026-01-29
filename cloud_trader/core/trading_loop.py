@@ -88,7 +88,36 @@ class TradingLoop:
             open_symbols = set(current_positions.keys())
 
             # 2. Check for exit signals on open positions
+            # 2a. First check trailing stops (faster check)
+            try:
+                prices = {}
+                for symbol in current_positions.keys():
+                    try:
+                        price = await self._get_current_price(symbol)
+                        if price and price > 0:
+                            prices[symbol] = price
+                    except:
+                        pass
+
+                if prices:
+                    triggered_stops = await self.positions.check_trailing_stops(prices)
+                    for stop in triggered_stops:
+                        symbol = stop["symbol"]
+                        if symbol in current_positions:
+                            await self._execute_exit(
+                                symbol,
+                                current_positions[symbol],
+                                f"Trailing stop @ ${stop['stop_price']:.2f} (PnL: {stop['pnl_pct']:.1f}%)"
+                            )
+                            trades += 1
+                            open_symbols.discard(symbol)
+            except Exception as e:
+                errors.append(f"Trailing stop check: {e}")
+
+            # 2b. Then check regular exit signals
             for symbol, position in current_positions.items():
+                if symbol not in open_symbols:  # Already closed by trailing stop
+                    continue
                 try:
                     should_exit, reason = await self._check_exit_signal(symbol, position)
                     if should_exit:
@@ -337,26 +366,140 @@ class TradingLoop:
 
     async def _calculate_position_size(self, symbol: str, confidence: float = 0.5) -> float:
         """
-        Calculate position size based on risk parameters and confidence.
-        
-        Formula: Base Size ($100) * (0.5 + Confidence * 1.5)
-        Range: $50 (low confidence) to $200 (max confidence)
+        Calculate position size based on portfolio risk management.
+
+        Risk Framework:
+        1. Base size from portfolio allocation (max 10% per position)
+        2. Confidence multiplier (0.5x to 2x)
+        3. Drawdown protection (reduce size after losses)
+        4. Exposure limits (cap total portfolio exposure)
+        5. Correlation adjustment (reduce for correlated assets)
+
+        Returns: Position size in USD
         """
-        base_size = 10.0  # Reduced from 100 to avoid margin issues
-        
-        # Optimize size based on AI confidence
-        # Conf 0.0 -> Multiplier 0.5 -> $50
-        # Conf 0.5 -> Multiplier 1.25 -> $125
-        # Conf 1.0 -> Multiplier 2.0 -> $200
-        multiplier = 0.5 + (confidence * 1.5)
-        
-        dynamic_size = base_size * multiplier
-        
-        # Cap limits
-        dynamic_size = max(50.0, min(dynamic_size, 500.0))
-        
-        logger.info(f"💰 Sizing {symbol}: Base ${base_size} * {multiplier:.2f} (Conf {confidence:.2f}) = ${dynamic_size:.2f}")
-        return dynamic_size
+        # === Risk Configuration ===
+        base_portfolio_value = 1000.0  # Starting portfolio (configurable)
+        max_position_pct = 0.10  # Max 10% per position
+        max_total_exposure_pct = 0.50  # Max 50% total exposure
+        drawdown_threshold = 0.05  # Start reducing at 5% drawdown
+        max_drawdown_reduction = 0.50  # Reduce size up to 50% at max drawdown
+
+        # Min/Max absolute limits
+        min_position_size = 50.0
+        max_position_size = 500.0
+
+        # === Step 1: Calculate base size from portfolio allocation ===
+        base_size = base_portfolio_value * max_position_pct  # $100 base
+
+        # === Step 2: Apply confidence multiplier ===
+        # Confidence 0.0 -> 0.5x, 0.5 -> 1.25x, 1.0 -> 2.0x
+        confidence_multiplier = 0.5 + (confidence * 1.5)
+        sized_amount = base_size * confidence_multiplier
+
+        # === Step 3: Drawdown protection ===
+        drawdown_multiplier = 1.0
+        try:
+            stats = self.positions.get_stats()
+            total_pnl = stats.get("total_pnl", 0) + stats.get("unrealized_pnl", 0)
+
+            if total_pnl < 0:
+                # Calculate drawdown as percentage of portfolio
+                drawdown_pct = abs(total_pnl) / base_portfolio_value
+
+                if drawdown_pct > drawdown_threshold:
+                    # Linear reduction: 5% DD = 0% reduction, 15% DD = 50% reduction
+                    reduction_factor = min(
+                        (drawdown_pct - drawdown_threshold) / 0.10,
+                        max_drawdown_reduction
+                    )
+                    drawdown_multiplier = 1.0 - reduction_factor
+                    logger.info(
+                        f"📉 Drawdown protection: {drawdown_pct:.1%} DD -> "
+                        f"{drawdown_multiplier:.1%} size multiplier"
+                    )
+        except Exception as e:
+            logger.warning(f"⚠️ Could not calculate drawdown: {e}")
+
+        sized_amount *= drawdown_multiplier
+
+        # === Step 4: Portfolio exposure limit ===
+        exposure_multiplier = 1.0
+        try:
+            current_exposure = self.positions.get_total_exposure()
+            max_exposure = base_portfolio_value * max_total_exposure_pct
+
+            if current_exposure > 0:
+                remaining_capacity = max(0, max_exposure - current_exposure)
+                if remaining_capacity < sized_amount:
+                    exposure_multiplier = remaining_capacity / sized_amount
+                    logger.info(
+                        f"📊 Exposure limit: ${current_exposure:.0f} of ${max_exposure:.0f} used -> "
+                        f"{exposure_multiplier:.1%} size allowed"
+                    )
+        except Exception as e:
+            logger.warning(f"⚠️ Could not calculate exposure: {e}")
+
+        sized_amount *= exposure_multiplier
+
+        # === Step 5: Correlation adjustment ===
+        # Reduce size for correlated assets (same base asset family)
+        correlation_multiplier = 1.0
+        try:
+            current_positions = await self.positions.get_all()
+            base_asset = symbol.split("-")[0] if "-" in symbol else symbol[:3]
+
+            # Group similar assets (BTC, ETH, SOL are uncorrelated; meme coins correlated)
+            high_correlation_groups = {
+                "MEME": ["DEGEN", "BRETT", "PEPE", "WIF", "BONK"],
+                "DEFI": ["JUP", "AAVE", "UNI", "SUSHI"],
+                "L1": ["SOL", "AVAX", "NEAR", "APT"],
+            }
+
+            # Find which group our symbol belongs to
+            symbol_group = None
+            for group, members in high_correlation_groups.items():
+                if base_asset in members:
+                    symbol_group = group
+                    break
+
+            if symbol_group:
+                # Count existing positions in same correlation group
+                correlated_count = 0
+                for pos_symbol in current_positions.keys():
+                    pos_base = pos_symbol.split("-")[0] if "-" in pos_symbol else pos_symbol[:3]
+                    if pos_base in high_correlation_groups.get(symbol_group, []):
+                        correlated_count += 1
+
+                if correlated_count > 0:
+                    # Reduce size by 25% per existing correlated position
+                    correlation_multiplier = max(0.25, 1.0 - (correlated_count * 0.25))
+                    logger.info(
+                        f"🔗 Correlation adjustment: {correlated_count} correlated {symbol_group} positions -> "
+                        f"{correlation_multiplier:.0%} size"
+                    )
+        except Exception as e:
+            logger.warning(f"⚠️ Could not calculate correlation: {e}")
+
+        sized_amount *= correlation_multiplier
+
+        # === Final: Apply absolute limits ===
+        final_size = max(min_position_size, min(sized_amount, max_position_size))
+
+        # Skip if size is too small after all adjustments
+        if sized_amount < min_position_size * 0.5:
+            logger.warning(
+                f"⚠️ Position size too small after risk adjustments: ${sized_amount:.2f} -> "
+                f"Using minimum ${min_position_size:.0f}"
+            )
+
+        logger.info(
+            f"💰 Risk-based sizing for {symbol}: "
+            f"Base ${base_size:.0f} × Conf {confidence_multiplier:.2f} × "
+            f"DD {drawdown_multiplier:.2f} × Exp {exposure_multiplier:.2f} × "
+            f"Corr {correlation_multiplier:.2f} = ${final_size:.2f}"
+        )
+
+        return final_size
 
     async def _get_current_price(self, symbol: str) -> float:
         """Get current market price from the exchange."""

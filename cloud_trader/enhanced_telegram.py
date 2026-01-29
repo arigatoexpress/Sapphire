@@ -310,6 +310,95 @@ class EnhancedTelegramService:
 
         await self.send_message(msg, priority=priority)
 
+    async def send_position_pnl_update(
+        self,
+        positions: List[Dict[str, Any]],
+        total_unrealized_pnl: float = 0.0,
+        total_realized_pnl: float = 0.0,
+        priority: NotificationPriority = NotificationPriority.LOW,
+    ):
+        """
+        Send real-time PnL update for all open positions.
+
+        Args:
+            positions: List of position dicts with symbol, side, entry_price, current_price, pnl_pct, etc.
+            total_unrealized_pnl: Total unrealized P&L across all positions
+            total_realized_pnl: Total realized P&L (session)
+        """
+        if not positions:
+            return
+
+        total_emoji = "📈" if total_unrealized_pnl >= 0 else "📉"
+        total_pnl_str = f"+${total_unrealized_pnl:,.2f}" if total_unrealized_pnl >= 0 else f"-${abs(total_unrealized_pnl):,.2f}"
+
+        msg = (
+            f"{total_emoji} **PORTFOLIO UPDATE**\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+        )
+
+        for pos in positions[:5]:  # Limit to top 5 positions
+            symbol = pos.get("symbol", "???")
+            side = pos.get("side", "???")
+            entry = pos.get("entry_price", 0)
+            current = pos.get("current_price", 0)
+            pnl_pct = pos.get("pnl_pct", 0)
+            trailing_active = pos.get("trailing_stop_active", False)
+
+            # Position emoji
+            pos_emoji = "🟢" if side in ["BUY", "LONG"] else "🔴"
+            pnl_emoji = "📈" if pnl_pct >= 0 else "📉"
+            trail_indicator = "🛡️" if trailing_active else ""
+
+            msg += (
+                f"{pos_emoji} **{symbol}** {trail_indicator}\n"
+                f"   Entry: `${entry:,.2f}` → `${current:,.2f}`\n"
+                f"   {pnl_emoji} PnL: `{pnl_pct:+.2f}%`\n"
+            )
+
+        msg += (
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"💼 **Total Unrealized**: `{total_pnl_str}`\n"
+        )
+
+        if total_realized_pnl != 0:
+            realized_emoji = "💰" if total_realized_pnl >= 0 else "💸"
+            realized_str = f"+${total_realized_pnl:,.2f}" if total_realized_pnl >= 0 else f"-${abs(total_realized_pnl):,.2f}"
+            msg += f"{realized_emoji} **Session Realized**: `{realized_str}`\n"
+
+        msg += f"🕒 `{time.strftime('%H:%M:%S UTC')}`"
+
+        await self.send_message(msg, priority=priority)
+
+    async def send_trailing_stop_alert(
+        self,
+        symbol: str,
+        side: str,
+        entry_price: float,
+        current_price: float,
+        stop_price: float,
+        highest_price: float,
+        pnl_pct: float,
+        priority: NotificationPriority = NotificationPriority.HIGH,
+    ):
+        """Send alert when trailing stop is triggered."""
+        side_emoji = "🟢" if side in ["BUY", "LONG"] else "🔴"
+        pnl_emoji = "💰" if pnl_pct >= 0 else "💔"
+
+        msg = (
+            f"🛑 **TRAILING STOP TRIGGERED**\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"{side_emoji} **{symbol}** ({side})\n"
+            f"📍 **Entry**: `${entry_price:,.4f}`\n"
+            f"🏔️ **Peak**: `${highest_price:,.4f}`\n"
+            f"🛑 **Stop**: `${stop_price:,.4f}`\n"
+            f"📊 **Exit**: `${current_price:,.4f}`\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"{pnl_emoji} **Locked PnL**: `{pnl_pct:+.2f}%`\n"
+            f"🕒 `{time.strftime('%H:%M:%S UTC')}`"
+        )
+
+        await self.send_message(msg, priority=priority)
+
     async def send_risk_alert(self, alert_type, severity, message, recommendations=None):
         msg = f"⚠️ **RISK ALERT: {alert_type}**\n{message}"
         await self.send_message(msg, priority=NotificationPriority.HIGH)

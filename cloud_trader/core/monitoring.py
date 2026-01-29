@@ -44,13 +44,14 @@ class MonitoringService:
     - Prometheus metrics gateway
     """
 
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, position_tracker=None):
         self.settings = settings
         self._telegram = None
         self._agent_kpis: Dict[str, AgentKPI] = {}
         self._start_time = time.time()
         self._running = False
         self._sentinel_task: Optional[asyncio.Task] = None
+        self._position_tracker = position_tracker  # For PnL updates
 
         # Initialize Telegram if enabled
         if self.settings.telegram_bot_token and self.settings.telegram_chat_id:
@@ -60,6 +61,10 @@ class MonitoringService:
             logger.info("📢 Telegram notifications configured")
         else:
             logger.warning("⚠️ Telegram notifications DISABLED (missing credentials)")
+
+    def set_position_tracker(self, tracker):
+        """Set the position tracker for PnL updates."""
+        self._position_tracker = tracker
 
     async def start(self):
         """Start monitoring background tasks."""
@@ -85,6 +90,8 @@ class MonitoringService:
     async def _sentinel_loop(self):
         """Background loop for heartbeats and periodic summaries."""
         last_summary_time = time.time()
+        last_pnl_update_time = time.time()
+        pnl_update_interval = 1800  # 30 minutes for PnL updates
 
         while self._running:
             try:
@@ -98,6 +105,11 @@ class MonitoringService:
                 # Send heartbeat log
                 logger.info(f"💓 Sentinel Heartbeat | Uptime: {uptime/3600:.1f}h")
 
+                # Send PnL update every 30 minutes if we have positions
+                if (current_time - last_pnl_update_time) >= pnl_update_interval:
+                    await self._send_pnl_update()
+                    last_pnl_update_time = current_time
+
                 # Send periodic summary if interval elapsed
                 if (current_time - last_summary_time) >= interval:
                     await self._send_periodic_summary()
@@ -108,6 +120,57 @@ class MonitoringService:
             except Exception as e:
                 logger.error(f"❌ Sentinel error: {e}")
                 await asyncio.sleep(60)
+
+    async def _send_pnl_update(self):
+        """Send real-time PnL update for open positions."""
+        if not self._telegram or not self._position_tracker:
+            return
+
+        try:
+            positions = await self._position_tracker.get_all()
+            if not positions:
+                return
+
+            # Build position list with PnL info
+            pos_list = []
+            total_unrealized = 0.0
+
+            for symbol, pos in positions.items():
+                entry_price = pos.get("entry_price", 0)
+                current_price = pos.get("current_price", 0)
+                side = pos.get("side", "BUY")
+
+                if entry_price > 0 and current_price > 0:
+                    if side in ["BUY", "LONG"]:
+                        pnl_pct = ((current_price - entry_price) / entry_price) * 100
+                    else:
+                        pnl_pct = ((entry_price - current_price) / entry_price) * 100
+                else:
+                    pnl_pct = 0
+
+                unrealized = pos.get("unrealized_pnl", 0)
+                total_unrealized += unrealized
+
+                pos_list.append({
+                    "symbol": symbol,
+                    "side": side,
+                    "entry_price": entry_price,
+                    "current_price": current_price,
+                    "pnl_pct": pnl_pct,
+                    "trailing_stop_active": pos.get("trailing_stop_active", False),
+                })
+
+            # Sort by absolute PnL (most significant first)
+            pos_list.sort(key=lambda x: abs(x["pnl_pct"]), reverse=True)
+
+            await self._telegram.send_position_pnl_update(
+                positions=pos_list,
+                total_unrealized_pnl=total_unrealized,
+            )
+            logger.info(f"📊 Sent PnL update for {len(pos_list)} positions")
+
+        except Exception as e:
+            logger.warning(f"Failed to send PnL update: {e}")
 
     async def _send_periodic_summary(self):
         """Send hourly/periodic performance summary via Telegram."""

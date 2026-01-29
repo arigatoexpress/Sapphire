@@ -54,8 +54,8 @@ class VertexAIClient:
 
         # Circuit breaker state for each agent
         self._circuit_breakers: Dict[str, Dict[str, Any]] = {}
-        self._failure_threshold = 3  # Failures before opening circuit
-        self._recovery_timeout = 300  # 5 minutes before trying again
+        self._failure_threshold = 5  # Failures before opening circuit (increased for resilience)
+        self._recovery_timeout = 60  # 1 minute before trying again (reduced for faster recovery)
 
         # Performance metrics
         self._performance_metrics: Dict[str, List[float]] = {}

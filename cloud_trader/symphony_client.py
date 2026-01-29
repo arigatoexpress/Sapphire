@@ -70,6 +70,47 @@ class SymphonyClient:
         # Track activation status (per agent if needed, simplistic for now)
         self._activation_trades = 0
         self._activated = False
+        self._agents_registered = False
+
+    async def ensure_agents_registered(self) -> bool:
+        """
+        Ensure all configured agents are registered on Symphony.
+        Should be called at startup.
+        """
+        if self._agents_registered:
+            return True
+
+        logger.info("🔧 Checking/registering Symphony agents...")
+
+        for name, config in self.agent_map.items():
+            agent_id = config.get("id")
+            agent_type = "SWAP" if config.get("type") == "spot" else "PERPETUAL"
+            chain = config.get("chain", "base")
+
+            if not agent_id:
+                continue
+
+            # Try to register the agent (will succeed or tell us if already exists)
+            result = await self.register_agent(
+                agent_id=agent_id,
+                name=f"Sapphire {name.upper()} Agent",
+                description=f"Automated {config.get('type', 'perps')} trading agent on {chain}",
+                agent_type=agent_type,
+                is_public=False,
+            )
+
+            if result.get("status") == "error":
+                error_msg = result.get("message", "")
+                # "already exists" is fine
+                if "already" in error_msg.lower() or "exists" in error_msg.lower():
+                    logger.info(f"✅ Agent {name} already registered")
+                else:
+                    logger.warning(f"⚠️ Failed to register {name}: {error_msg}")
+            else:
+                logger.info(f"✅ Agent {name} registration complete")
+
+        self._agents_registered = True
+        return True
 
     @property
     def client(self) -> httpx.AsyncClient:
@@ -154,6 +195,77 @@ class SymphonyClient:
 
     # ==================== AGENTIC FUND MANAGEMENT ====================
 
+    async def register_agent(
+        self,
+        agent_id: str,
+        name: str,
+        description: str = "",
+        agent_type: str = "PERPETUAL",  # "PERPETUAL" or "SWAP"
+        is_public: bool = False,
+        image_url: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Register a new agent on Symphony.
+
+        Per Symphony API docs, this creates a 2/2 threshold quorum signing policy.
+
+        Args:
+            agent_id: UUID format identifier for the agent
+            name: Display name for the agent
+            description: Agent description
+            agent_type: "PERPETUAL" for perps, "SWAP" for spot
+            is_public: Whether the agent is publicly visible
+            image_url: Optional image URL
+
+        Returns:
+            Registration response with agentId, quorumId, etc.
+        """
+        payload = {
+            "agentId": agent_id,
+            "name": name,
+            "description": description,
+            "agentType": agent_type,
+            "isPublic": is_public,
+        }
+
+        if image_url:
+            payload["imageUrl"] = image_url
+
+        logger.info(f"🔧 Registering Symphony agent: {name} ({agent_id[:8]}...) as {agent_type}")
+
+        try:
+            response = await self.client.post(
+                f"{self.base_url}/agent/register",
+                json=payload
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            logger.info(f"✅ Agent registered successfully: {data.get('agentId', agent_id)}")
+            return data
+
+        except httpx.HTTPStatusError as e:
+            error_text = e.response.text
+            logger.error(f"❌ Agent registration failed ({e.response.status_code}): {error_text}")
+            return {
+                "status": "error",
+                "code": e.response.status_code,
+                "message": error_text,
+            }
+        except Exception as e:
+            logger.error(f"❌ Agent registration exception: {e}")
+            return {"status": "error", "message": str(e)}
+
+    async def get_my_agents(self) -> List[Dict[str, Any]]:
+        """Get all agents registered by this user."""
+        try:
+            response = await self.client.get(f"{self.base_url}/user/agents")
+            response.raise_for_status()
+            return response.json().get("agents", [])
+        except Exception as e:
+            logger.warning(f"Failed to get agents: {e}")
+            return []
+
     async def create_agentic_fund(
         self,
         name: str,
@@ -164,13 +276,24 @@ class SymphonyClient:
     ) -> Dict[str, Any]:
         """
         Register a new Agentic Fund on Symphony.
+        This is an alias for register_agent with appropriate defaults.
         """
-        # ... (Implementation kept simple or skipped if not needed for activation)
-        return {"id": "mock_id", "status": "simulated"}
+        import uuid
+        agent_id = str(uuid.uuid4())
+        agent_type = "PERPETUAL" if fund_type == "perpetuals" else "SWAP"
+
+        return await self.register_agent(
+            agent_id=agent_id,
+            name=name,
+            description=description,
+            agent_type=agent_type,
+            is_public=autosubscribe,
+            image_url=profile_image,
+        )
 
     async def get_my_funds(self) -> List[Dict[str, Any]]:
         """Get all agentic funds created by this user."""
-        return []
+        return await self.get_my_agents()
 
     # ==================== PERPETUAL TRADING ====================
 
@@ -212,10 +335,11 @@ class SymphonyClient:
         if order_options:
             payload["orderOptions"] = order_options
 
-        logger.info(f"📈 Opening Perp: {action} {symbol} @ {weight}% weight, {leverage}x leverage")
+        logger.info(f"📈 Opening Perp: {action} {symbol} @ {weight}% weight, {leverage}x leverage (agentId={eff_agent_id[:8]}...)")
 
         try:
             # client and eff_agent_id already determined above
+            logger.debug(f"🔧 Symphony batch-open payload: {payload}")
 
             response = await client.post(f"{self.base_url}/agent/batch-open", json=payload)
             response.raise_for_status()

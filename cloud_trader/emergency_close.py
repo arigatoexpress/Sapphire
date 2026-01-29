@@ -75,8 +75,8 @@ class EmergencyClose:
             creds = load_credentials()
             client = AsterClient(credentials=creds, base_url=settings.rest_base_url)
 
-            # Get all open positions
-            positions = await client.get_account_positions()
+            # Get all open positions (using get_position_risk for futures)
+            positions = await client.get_position_risk()
 
             for pos in positions:
                 symbol = pos.get("symbol", "")

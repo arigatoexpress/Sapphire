@@ -58,9 +58,12 @@ class PrecisionNormalizer:
             "SOL": {"tick": Decimal("0.001"), "lot": Decimal("0.001"), "min": Decimal("5")},
             "BNB": {"tick": Decimal("0.01"), "lot": Decimal("0.001"), "min": Decimal("5")},
             "XRP": {"tick": Decimal("0.0001"), "lot": Decimal("0.1"), "min": Decimal("5")},
-            "DOGE": {"tick": Decimal("0.000001"), "lot": Decimal("1"), "min": Decimal("5")},
+            "DOGE": {"tick": Decimal("0.00001"), "lot": Decimal("1"), "min": Decimal("5")},  # DOGE requires integer qty on Aster
             "AVAX": {"tick": Decimal("0.001"), "lot": Decimal("0.01"), "min": Decimal("5")},
             "MATIC": {"tick": Decimal("0.0001"), "lot": Decimal("0.1"), "min": Decimal("5")},
+            "WIF": {"tick": Decimal("0.0001"), "lot": Decimal("0.1"), "min": Decimal("5")},  # Dogwifhat
+            "PEPE": {"tick": Decimal("0.00000001"), "lot": Decimal("100"), "min": Decimal("5")},  # 1000PEPE contract
+            "SHIB": {"tick": Decimal("0.000000001"), "lot": Decimal("100"), "min": Decimal("5")},  # 1000SHIB contract
         }
 
         # Default fallbacks when exchange info unavailable
@@ -94,7 +97,13 @@ class PrecisionNormalizer:
         warnings = []
 
         # FAST PATH: Check for high-volume symbols to avoid network/cache-lock latency
+        # Handle various symbol formats: DOGEUSDT, DOGE-USDC, DOGE/USDT, etc.
         base_symbol = symbol.split("-")[0].split("/")[0].upper()
+        # Strip common quote currencies for Aster format (DOGEUSDT -> DOGE)
+        for quote in ["USDT", "USDC", "USD", "BTC", "ETH"]:
+            if base_symbol.endswith(quote) and len(base_symbol) > len(quote):
+                base_symbol = base_symbol[:-len(quote)]
+                break
         if base_symbol in self._fast_path:
             fp = self._fast_path[base_symbol]
             info = ExchangeInfo(
@@ -268,7 +277,7 @@ class PrecisionNormalizer:
         try:
             async with httpx.AsyncClient() as client:
                 resp = await client.get(
-                    "https://fapi.aster.finance/fapi/v1/exchangeInfo", timeout=10
+                    "https://fapi.asterdex.com/fapi/v1/exchangeInfo", timeout=10
                 )
                 data = resp.json()
 

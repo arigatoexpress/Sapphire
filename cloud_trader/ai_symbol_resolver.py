@@ -308,7 +308,7 @@ class AISymbolResolver:
         try:
             async with httpx.AsyncClient() as client:
                 resp = await client.get(
-                    "https://fapi.aster.finance/fapi/v1/exchangeInfo", timeout=10
+                    "https://fapi.asterdex.com/fapi/v1/exchangeInfo", timeout=10
                 )
                 data = resp.json()
                 return {s.get("symbol") for s in data.get("symbols", []) if s.get("symbol")}

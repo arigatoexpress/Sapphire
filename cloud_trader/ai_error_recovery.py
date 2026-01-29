@@ -361,11 +361,17 @@ Respond in this JSON format:
 Only respond with valid JSON, no other text.
 """
 
-            response = await client.generate_content(prompt)
+            # Use the predict method from VertexAIClient
+            response = await client.predict(
+                agent_id="error-recovery-agent",
+                prompt=prompt
+            )
 
             import json
 
-            result = json.loads(response.text.strip())
+            # Response is a dict with 'response' key containing the text
+            response_text = response.get("response", "{}")
+            result = json.loads(response_text.strip())
 
             return RecoveryAction(
                 error_type=result.get("error_type", "unknown"),

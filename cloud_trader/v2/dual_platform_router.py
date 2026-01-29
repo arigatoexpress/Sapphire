@@ -490,15 +490,37 @@ class DualPlatformRouter:
                 reduce_only=reduce_only,
             )
             
+            # Extract price from order result
+            # For Hyperliquid: order is a dict with {"status": "ok", "filled": True, "data": {...}}
+            # For Drift: order may be an object or dict
+            fill_price = price or 0
+            fill_qty = quantity
+            order_id = None
+
+            if isinstance(order, dict):
+                # Hyperliquid returns dict
+                if order.get("filled") and order.get("data"):
+                    fill_data = order["data"]
+                    fill_price = float(fill_data.get("avgPx", 0)) or price or 0
+                    fill_qty = float(fill_data.get("totalSz", quantity))
+                    order_id = fill_data.get("oid", str(order))
+                else:
+                    order_id = str(order)
+            else:
+                # Object-based response (Drift)
+                fill_price = getattr(order, 'price', price or 0)
+                fill_qty = getattr(order, 'filled_quantity', quantity)
+                order_id = getattr(order, 'order_id', str(order))
+
             return ExecutionResult(
                 success=True,
                 platform=platform,
-                order_id=getattr(order, 'order_id', str(order)),
+                order_id=order_id,
                 symbol=symbol,
                 side=side,
                 quantity=quantity,
-                filled_quantity=getattr(order, 'filled_quantity', quantity),
-                price=getattr(order, 'price', price or 0),
+                filled_quantity=fill_qty,
+                price=fill_price,
             )
             
         except CircuitOpenError as e:

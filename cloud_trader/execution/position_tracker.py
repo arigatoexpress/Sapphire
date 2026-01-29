@@ -29,6 +29,63 @@ class Position:
     unrealized_pnl: float = 0.0
     current_price: float = 0.0
     metadata: Dict[str, Any] = field(default_factory=dict)
+    # Trailing stop-loss fields
+    highest_price: float = 0.0  # For long positions
+    lowest_price: float = float("inf")  # For short positions
+    trailing_stop_pct: float = 0.03  # 3% default trailing stop
+    trailing_stop_active: bool = False  # Activate after reaching profit threshold
+    profit_threshold_pct: float = 0.02  # Activate trailing stop after 2% profit
+
+    def update_trailing_stop(self, current_price: float) -> Optional[float]:
+        """
+        Update trailing stop levels based on current price.
+        Returns stop price if triggered, None otherwise.
+        """
+        self.current_price = current_price
+
+        if self.side == "BUY":  # Long position
+            pnl_pct = (current_price - self.entry_price) / self.entry_price if self.entry_price > 0 else 0
+
+            # Activate trailing stop after reaching profit threshold
+            if pnl_pct >= self.profit_threshold_pct and not self.trailing_stop_active:
+                self.trailing_stop_active = True
+                self.highest_price = current_price
+                logger.info(f"📈 Trailing stop ACTIVATED for {self.symbol} at {pnl_pct:.1%} profit")
+
+            if self.trailing_stop_active:
+                # Update highest price
+                if current_price > self.highest_price:
+                    self.highest_price = current_price
+
+                # Calculate trailing stop price
+                stop_price = self.highest_price * (1 - self.trailing_stop_pct)
+
+                # Check if stop is triggered
+                if current_price <= stop_price:
+                    return stop_price
+
+        else:  # Short position
+            pnl_pct = (self.entry_price - current_price) / self.entry_price if self.entry_price > 0 else 0
+
+            # Activate trailing stop after reaching profit threshold
+            if pnl_pct >= self.profit_threshold_pct and not self.trailing_stop_active:
+                self.trailing_stop_active = True
+                self.lowest_price = current_price
+                logger.info(f"📉 Trailing stop ACTIVATED for {self.symbol} short at {pnl_pct:.1%} profit")
+
+            if self.trailing_stop_active:
+                # Update lowest price
+                if current_price < self.lowest_price:
+                    self.lowest_price = current_price
+
+                # Calculate trailing stop price
+                stop_price = self.lowest_price * (1 + self.trailing_stop_pct)
+
+                # Check if stop is triggered
+                if current_price >= stop_price:
+                    return stop_price
+
+        return None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -42,6 +99,10 @@ class Position:
             "unrealized_pnl": self.unrealized_pnl,
             "current_price": self.current_price,
             "metadata": self.metadata,
+            "highest_price": self.highest_price,
+            "lowest_price": self.lowest_price if self.lowest_price != float("inf") else 0,
+            "trailing_stop_active": self.trailing_stop_active,
+            "trailing_stop_pct": self.trailing_stop_pct,
         }
 
     @classmethod
@@ -166,6 +227,78 @@ class PositionTracker:
                     position.unrealized_pnl = (
                         position.entry_price - prices[symbol]
                     ) * position.quantity
+
+    async def check_trailing_stops(self, prices: Dict[str, float]) -> List[Dict[str, Any]]:
+        """
+        Check all positions for trailing stop triggers.
+
+        Args:
+            prices: Dict of symbol -> current price
+
+        Returns:
+            List of triggered stops with symbol, stop_price, and reason
+        """
+        triggered = []
+
+        for symbol, position in self._positions.items():
+            if symbol not in prices:
+                continue
+
+            current_price = prices[symbol]
+            stop_price = position.update_trailing_stop(current_price)
+
+            if stop_price is not None:
+                pnl_pct = 0
+                if position.side == "BUY":
+                    pnl_pct = (current_price - position.entry_price) / position.entry_price * 100
+                else:
+                    pnl_pct = (position.entry_price - current_price) / position.entry_price * 100
+
+                triggered.append({
+                    "symbol": symbol,
+                    "side": position.side,
+                    "entry_price": position.entry_price,
+                    "current_price": current_price,
+                    "stop_price": stop_price,
+                    "highest_price": position.highest_price,
+                    "lowest_price": position.lowest_price if position.lowest_price != float("inf") else 0,
+                    "pnl_pct": pnl_pct,
+                    "platform": position.platform,
+                    "reason": "trailing_stop_triggered",
+                })
+
+                logger.info(
+                    f"🛑 Trailing stop TRIGGERED for {symbol}: "
+                    f"Stop @ ${stop_price:.2f}, Current @ ${current_price:.2f}, "
+                    f"PnL: {pnl_pct:.1f}%"
+                )
+
+        return triggered
+
+    async def set_trailing_stop_params(
+        self,
+        symbol: str,
+        trailing_stop_pct: float = None,
+        profit_threshold_pct: float = None,
+    ) -> bool:
+        """Configure trailing stop parameters for a position."""
+        if symbol not in self._positions:
+            return False
+
+        position = self._positions[symbol]
+
+        if trailing_stop_pct is not None:
+            position.trailing_stop_pct = trailing_stop_pct
+
+        if profit_threshold_pct is not None:
+            position.profit_threshold_pct = profit_threshold_pct
+
+        self._save_positions()
+        logger.info(
+            f"⚙️ Updated trailing stop for {symbol}: "
+            f"Stop={position.trailing_stop_pct:.1%}, Threshold={position.profit_threshold_pct:.1%}"
+        )
+        return True
 
     def get_total_exposure(self) -> float:
         """Get total exposure across all positions."""

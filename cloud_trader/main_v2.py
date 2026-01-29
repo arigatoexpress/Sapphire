@@ -157,13 +157,31 @@ def create_app() -> FastAPI:
             "orchestrator": orchestrator.get_status() if orchestrator else None,
         }
 
-    # System status
+    # System status - serves frontend if available, otherwise returns JSON status
     @app.get("/")
     async def root():
+        import os
+        from fastapi.responses import FileResponse
+
+        # Try to serve the Vue.js frontend if it exists
+        index_path = "/app/static/index.html"
+        if os.path.exists(index_path):
+            return FileResponse(index_path, media_type="text/html")
+
+        # Fallback to JSON status if frontend not built
         return {
             "name": "Sapphire V2",
             "status": "running",
             "architecture": "ElizaOS-inspired modular design",
+            "platforms": [
+                "Aster (CEX)",
+                "Drift (Solana Perps)",
+                "Hyperliquid (L1 Perps)",
+                "Jupiter (Solana DEX)",
+                "Lighter (Ethereum L2)",
+                "Symphony Monad (Spot Swaps)",
+                "Symphony Base (Perps)",
+            ],
             "components": [
                 "TradingOrchestrator",
                 "AgentOrchestrator",
@@ -172,6 +190,8 @@ def create_app() -> FastAPI:
                 "PositionTracker",
                 "DegenIntel",
             ],
+            "frontend": "not_built",
+            "dashboard_url": "https://sapphirealpha.xyz",
         }
 
     # Emergency close all positions
@@ -197,6 +217,50 @@ def create_app() -> FastAPI:
         from cloud_trader.platform_logger import get_platform_logs
 
         return await get_platform_logs(platform, limit)
+
+    # AI Circuit Breaker Management
+    @app.get("/ai/circuit-breakers")
+    async def get_circuit_breakers():
+        """Get circuit breaker status for all AI agents."""
+        from cloud_trader.vertex_ai_client import get_vertex_client
+
+        try:
+            client = get_vertex_client()
+            return {
+                "status": "ok",
+                "circuit_breakers": client.get_all_circuit_breakers(),
+            }
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    @app.post("/ai/circuit-breakers/reset")
+    async def reset_circuit_breakers(agent_id: str = None):
+        """Reset circuit breakers for AI agents."""
+        from cloud_trader.vertex_ai_client import get_vertex_client
+
+        try:
+            client = get_vertex_client()
+            if agent_id:
+                success = client.reset_circuit_breaker(agent_id)
+                return {
+                    "status": "ok" if success else "not_found",
+                    "agent_id": agent_id,
+                    "reset": success,
+                }
+            else:
+                # Reset all circuit breakers
+                breakers = client.get_all_circuit_breakers()
+                reset_count = 0
+                for aid in breakers.keys():
+                    if client.reset_circuit_breaker(aid):
+                        reset_count += 1
+                return {
+                    "status": "ok",
+                    "reset_count": reset_count,
+                    "message": f"Reset {reset_count} circuit breakers",
+                }
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
 
     return app
 
