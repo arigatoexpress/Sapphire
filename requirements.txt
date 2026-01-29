@@ -387,8 +387,8 @@ solana==0.34.2
 hyperliquid-python-sdk>=0.21.0
 
 # Drift Protocol (Solana Perpetuals)
-driftpy>=0.7.0
-anchorpy>=0.17.1
+driftpy>=0.8.88
+anchorpy>=0.18.0
 
 faiss-cpu
 sentence-transformers
