@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     gemini_api_key: str | None = Field(default=None, validation_alias="GEMINI_API_KEY")
     hl_secret_key: str | None = Field(default=None, validation_alias="HL_SECRET_KEY")
     hl_account_address: str | None = Field(default=None, validation_alias="HL_ACCOUNT_ADDRESS")
-    solana_private_key: str | None = Field(default=None, validation_alias="SOLANA_PRIVATE_KEY")
+    solana_private_key: str | None = Field(default=None, validation_alias="DRIFT_SOLANA_PRIVATE_KEY")
     solana_rpc_url: str = Field(
         default="https://api.mainnet-beta.solana.com", validation_alias="SOLANA_RPC_URL"
     )

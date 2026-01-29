@@ -149,13 +149,13 @@ def load_credentials(gcp_secret_project: Optional[str] = None) -> Credentials:
         print(f"DEBUG: Loaded Telegram Chat ID: {tg_chat}")
 
     # ==========================================================================
-    # SOLANA / DRIFT
+    # SOLANA / DRIFT (Using DRIFT_SOLANA_PRIVATE_KEY - original key compromised)
     # ==========================================================================
     solana_key = settings.solana_private_key
     if not solana_key and gcp_secret_project:
-        print(f"DEBUG: Fetching SOLANA_PRIVATE_KEY from Secret Manager...")
-        solana_key = _secret_manager.get_secret("SOLANA_PRIVATE_KEY", gcp_secret_project)
-    
+        print(f"DEBUG: Fetching DRIFT_SOLANA_PRIVATE_KEY from Secret Manager...")
+        solana_key = _secret_manager.get_secret("DRIFT_SOLANA_PRIVATE_KEY", gcp_secret_project)
+
     if solana_key:
         solana_key = solana_key.strip()
         print(f"DEBUG: Loaded Solana Private Key (len={len(solana_key)})")
