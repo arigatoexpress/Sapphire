@@ -1,0 +1,74 @@
+# Sapphire Drift Microservice - Standalone Deployment
+# This builds a separate Docker image with driftpy isolated dependencies
+# to avoid conflicts with the main application
+
+steps:
+  # Build Drift-specific Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/sapphire-drift:latest'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/sapphire-drift:${_TAG}'
+      - '-f'
+      - 'services/bot-drift/Dockerfile'
+      - 'services/bot-drift'
+    id: 'build-drift'
+    timeout: 900s
+
+  # Push to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/sapphire-drift:latest']
+    id: 'push-drift'
+    waitFor: ['build-drift']
+
+  # Deploy to Cloud Run (europe-west1 for non-US IP)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'sapphire-drift'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/sapphire-drift:latest'
+      - '--region'
+      - 'europe-west1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '4Gi'
+      - '--cpu'
+      - '2'
+      - '--timeout'
+      - '300'
+      - '--max-instances'
+      - '5'
+      - '--min-instances'
+      - '1'
+      - '--vpc-connector'
+      - 'sapphire-conn-eu'
+      - '--vpc-egress'
+      - 'all-traffic'
+      - '--set-env-vars'
+      - 'SERVICE_NAME=bot-drift,PLATFORM=drift,GCP_PROJECT_ID=$PROJECT_ID,ENVIRONMENT=production,LOG_LEVEL=INFO,SOLANA_RPC_URL=https://api.mainnet-beta.solana.com'
+      - '--set-secrets'
+      - 'SOLANA_PRIVATE_KEY=DRIFT_SOLANA_PRIVATE_KEY:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest'
+    id: 'deploy-drift'
+    waitFor: ['push-drift']
+
+# Images
+images:
+  - 'gcr.io/$PROJECT_ID/sapphire-drift:latest'
+
+# Build timeout
+timeout: 1800s
+
+# Substitutions
+substitutions:
+  _TAG: 'latest'
+
+options:
+  machineType: 'E2_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
