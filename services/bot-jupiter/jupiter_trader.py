@@ -156,9 +156,12 @@ class JupiterTrader:
         # Current positions (simplified - track bought tokens)
         self.positions: Dict[str, Decimal] = {}  # token -> amount
 
+        # Mask wallet address for security
+        wallet_addr = str(self.keypair.pubkey())
+        masked_wallet = f"{wallet_addr[:4]}...{wallet_addr[-4:]}"
         logger.info(
             f"Jupiter Trader initialized - Capital: ${config.total_capital_usd}, "
-            f"Risk: {config.risk_level.value}, Wallet: {self.keypair.pubkey()}"
+            f"Risk: {config.risk_level.value}, Wallet: {masked_wallet}"
         )
 
     async def close(self):

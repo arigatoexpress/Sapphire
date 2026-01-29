@@ -152,7 +152,10 @@ class JupiterClient:
         # Solana RPC client (for transaction signing/submission if needed)
         self.solana_client = AsyncClient(solana_rpc_url)
 
-        logger.info(f"Jupiter client initialized - Wallet: {self.keypair.pubkey()}")
+        # Mask wallet address for security (only show first 4 and last 4 chars)
+        wallet_addr = str(self.keypair.pubkey())
+        masked_wallet = f"{wallet_addr[:4]}...{wallet_addr[-4:]}"
+        logger.info(f"Jupiter client initialized - Wallet: {masked_wallet}")
 
     async def close(self):
         """Close HTTP clients"""

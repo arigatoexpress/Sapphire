@@ -77,8 +77,8 @@ if [ $? -eq 0 ]; then
     echo "5. Test health endpoint:"
     echo "   curl \$(gcloud run services describe sapphire-v2 --region us-central1 --format='value(status.url)')/health"
     echo ""
-    echo "Your Jupiter wallet: 4jnvRT5uk7MzXp1swJpbcXStKVecnuDCLjxe6ccsVTik"
-    echo "Explorer: https://solscan.io/account/4jnvRT5uk7MzXp1swJpbcXStKVecnuDCLjxe6ccsVTik"
+    echo "Your wallet address is configured via DRIFT_SOLANA_PRIVATE_KEY secret"
+    echo "Check logs for wallet initialization confirmation"
     echo ""
 else
     echo ""

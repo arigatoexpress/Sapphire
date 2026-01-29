@@ -101,9 +101,12 @@ class JupiterSapphireIntegration:
         """Start the integration services"""
         if self.telegram:
             await self.telegram.start()
+            # Mask wallet address for security
+            wallet_addr = str(self.jupiter_client.keypair.pubkey())
+            masked_wallet = f"{wallet_addr[:4]}...{wallet_addr[-4:]}"
             await self.send_telegram(
                 "🚀 Jupiter Integration Started\n"
-                f"Wallet: {self.jupiter_client.keypair.pubkey()}\n"
+                f"Wallet: {masked_wallet}\n"
                 "Real-time price monitoring active",
                 priority=NotificationPriority.HIGH,
             )

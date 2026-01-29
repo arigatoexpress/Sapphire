@@ -112,7 +112,10 @@ class JupiterTraderUnified:
         self.open_positions: Dict[str, Dict] = {}
         self.capital = capital_usd
 
-        logger.info(f"✅ Jupiter Trader initialized - Wallet: {self.keypair.pubkey()}")
+        # Mask wallet address for security (only show first 4 and last 4 chars)
+        wallet_addr = str(self.keypair.pubkey())
+        masked_wallet = f"{wallet_addr[:4]}...{wallet_addr[-4:]}"
+        logger.info(f"✅ Jupiter Trader initialized - Wallet: {masked_wallet}")
 
     async def start(self):
         """Start the trader and integration services"""
