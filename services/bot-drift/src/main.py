@@ -180,9 +180,10 @@ class DriftBot:
 
         self.command_queue = await start_gateway_server()
 
-        if not await self.initialize():
-            logger.error("Failed to initialize, exiting")
-            return
+        initialized = await self.initialize()
+        if not initialized:
+            logger.warning("⚠️ Running in degraded mode - SDK not fully initialized")
+            # Continue running to accept gateway commands even without full SDK
 
         self.running = True
         logger.info(f"Bot {SERVICE_NAME} is now running in HYBRID MODE")
