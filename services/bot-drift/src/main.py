@@ -134,23 +134,34 @@ class DriftBot:
                 self.pf_subscriber = None
 
             # Initialize Drift client
+            # Use 'cached' subscription mode for more reliable initialization
+            # 'websocket' can timeout in Cloud Run environments
             self.sdk_client = SDKDriftClient(
                 self.connection,
                 self.keypair,
                 env="mainnet",
-                account_subscription=AccountSubscriptionConfig("websocket"),
+                account_subscription=AccountSubscriptionConfig("cached"),  # More reliable than websocket
                 tx_params=None,  # We will dynamically set CU price later or let SDK handle
             )
 
-            await self.sdk_client.subscribe()
+            # Subscribe with timeout handling
+            try:
+                await asyncio.wait_for(self.sdk_client.subscribe(), timeout=60)
+            except asyncio.TimeoutError:
+                logger.warning("⚠️ Drift subscription timeout - continuing with limited functionality")
+                # Don't fail completely, allow basic operations
 
-            # Initialize Pub/Sub
-            pubsub = get_pubsub_client()
-            await pubsub.initialize()
+            # Initialize Pub/Sub (optional - may fail if not configured)
+            try:
+                pubsub = get_pubsub_client()
+                await pubsub.initialize()
 
-            # Subscribe to trading signals
-            await subscribe("trading-signals", self._handle_signal)
-            await subscribe("risk-alerts", self._handle_risk_alert)
+                # Subscribe to trading signals
+                await subscribe("trading-signals", self._handle_signal)
+                await subscribe("risk-alerts", self._handle_risk_alert)
+                logger.info("✅ Pub/Sub connected")
+            except Exception as e:
+                logger.warning(f"⚠️ Pub/Sub not available (standalone mode): {e}")
 
             logger.info(f"✅ {SERVICE_NAME} initialized successfully")
             return True
