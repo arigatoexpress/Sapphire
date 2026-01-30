@@ -36,6 +36,18 @@ class VerificationResult:
 class TradeVerificationService:
     """Verifies trades on blockchain networks"""
 
+    # Platform-specific max retries for optimal speed vs reliability
+    # HFT platforms (Aster shield) need minimal retries for speed
+    # DEX platforms need moderate retries due to mempool delays
+    PLATFORM_MAX_RETRIES = {
+        "aster": 1,  # HFT shield strategy - fire and forget
+        "drift": 3,  # Solana perps - balance speed and confirmation
+        "jupiter": 5,  # DEX - higher retries for mempool delays
+        "hyperliquid": 3,  # L1 perps - moderate confirmation time
+        "symphony": 5,  # EVM chains - longer confirmation times
+        "lighter": 5,  # L2 DEX - variable confirmation times
+    }
+
     def __init__(
         self,
         solana_rpc_url: str = "https://api.mainnet-beta.solana.com",
@@ -54,19 +66,35 @@ class TradeVerificationService:
 
         if HAS_SOLANA:
             self.solana_client = AsyncClient(solana_rpc_url)
-            logger.info(f"✅ Trade Verification initialized - Solana RPC: {solana_rpc_url}")
+            logger.info(
+                f"✅ Trade Verification initialized - Solana RPC: {solana_rpc_url} | "
+                f"Platform-specific retries: {self.PLATFORM_MAX_RETRIES}"
+            )
         else:
             logger.warning("⚠️ Trade Verification limited - Solana SDK not available")
 
+    def get_platform_max_retries(self, platform: str) -> int:
+        """
+        Get platform-specific max retries for optimal speed vs reliability.
+
+        Args:
+            platform: Platform name (aster, drift, jupiter, etc.)
+
+        Returns:
+            Max retries for the platform (defaults to 3 if platform unknown)
+        """
+        return self.PLATFORM_MAX_RETRIES.get(platform.lower(), 3)
+
     async def verify_jupiter_swap(
-        self, tx_signature: str, max_retries: int = 3
+        self, tx_signature: str, max_retries: Optional[int] = None, platform: str = "jupiter"
     ) -> VerificationResult:
         """
         Verify a Jupiter swap transaction on Solana
 
         Args:
             tx_signature: Solana transaction signature
-            max_retries: Number of verification attempts
+            max_retries: Number of verification attempts (overrides platform default if provided)
+            platform: Platform name for retry optimization (default: jupiter)
 
         Returns:
             VerificationResult with verification status
@@ -77,6 +105,12 @@ class TradeVerificationService:
                 status="unavailable",
                 error="Solana RPC not available",
             )
+
+        # Use platform-specific retries if max_retries not explicitly provided
+        if max_retries is None:
+            max_retries = self.get_platform_max_retries(platform)
+
+        logger.debug(f"Verifying {platform} transaction with max_retries={max_retries}")
 
         for attempt in range(max_retries):
             try:

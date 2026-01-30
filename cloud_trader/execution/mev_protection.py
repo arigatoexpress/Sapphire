@@ -54,6 +54,16 @@ class MEVProtector:
     4. Order splitting across venues
     """
 
+    # Platform-specific protection levels for optimal speed vs. security
+    PLATFORM_PROTECTION_LEVELS = {
+        "aster": MEVProtectionLevel.NONE,  # HFT shield strategy - speed critical
+        "drift": MEVProtectionLevel.BASIC,  # Solana perps - moderate protection
+        "jupiter": MEVProtectionLevel.MODERATE,  # DEX - front-running prevention
+        "hyperliquid": MEVProtectionLevel.BASIC,  # L1 perps - moderate protection
+        "symphony": MEVProtectionLevel.BASIC,  # EVM chains - moderate protection
+        "lighter": MEVProtectionLevel.MODERATE,  # L2 DEX - front-running prevention
+    }
+
     def __init__(self):
         self._nonce_counter = 0
         self._protection_stats = {
@@ -62,7 +72,7 @@ class MEVProtector:
             "avg_jitter_ms": 0.0,
         }
 
-        logger.info("🛡️ MEVProtector initialized")
+        logger.info(f"🛡️ MEVProtector initialized with platform-specific levels: {self.PLATFORM_PROTECTION_LEVELS}")
 
     def protect_order(
         self,
@@ -168,12 +178,53 @@ class MEVProtector:
             "confidence": min(0.9, 1 - volume_ratio),  # Less confident for large orders
         }
 
-    def recommend_protection_level(
-        self, order_value_usd: float, is_meme_coin: bool = False, is_low_liquidity: bool = False
-    ) -> MEVProtectionLevel:
-        """Recommend appropriate protection level."""
+    def get_platform_protection_level(self, platform: str) -> MEVProtectionLevel:
+        """
+        Get recommended protection level for a specific platform.
 
-        # Meme coins and low liquidity = maximum protection
+        Platform-specific optimization:
+        - Aster: NONE (HFT shield needs maximum speed)
+        - Drift/Hyperliquid/Symphony: BASIC (balance speed and protection)
+        - Jupiter/Lighter: MODERATE (DEX front-running prevention)
+        """
+        return self.PLATFORM_PROTECTION_LEVELS.get(
+            platform.lower(),
+            MEVProtectionLevel.MODERATE  # Default to moderate if platform unknown
+        )
+
+    def recommend_protection_level(
+        self,
+        order_value_usd: float,
+        is_meme_coin: bool = False,
+        is_low_liquidity: bool = False,
+        platform: Optional[str] = None
+    ) -> MEVProtectionLevel:
+        """
+        Recommend appropriate protection level.
+
+        Priority:
+        1. Platform-specific optimization (if platform provided)
+        2. Asset characteristics (meme coin, liquidity)
+        3. Order size
+        """
+        # If platform specified, use platform-specific level unless overridden by risk factors
+        if platform:
+            platform_level = self.get_platform_protection_level(platform)
+
+            # Override only for extreme risk scenarios
+            if is_meme_coin or is_low_liquidity:
+                if order_value_usd > 10000:
+                    return MEVProtectionLevel.MAXIMUM
+                else:
+                    # Use max of platform level and MODERATE for risky assets
+                    levels_order = [MEVProtectionLevel.NONE, MEVProtectionLevel.BASIC,
+                                   MEVProtectionLevel.MODERATE, MEVProtectionLevel.MAXIMUM]
+                    return max(platform_level, MEVProtectionLevel.MODERATE,
+                             key=lambda x: levels_order.index(x))
+
+            return platform_level
+
+        # Legacy behavior: order size and asset characteristics only
         if is_meme_coin or is_low_liquidity:
             return MEVProtectionLevel.MAXIMUM
 

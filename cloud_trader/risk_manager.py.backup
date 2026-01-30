@@ -1,9 +1,6 @@
 """
 Risk Manager Module
 Implements stop-loss, position sizing, and hedging for Sapphire V2.
-
-Note: Enhanced features available in cloud_trader.execution.risk_manager
-This module maintains backward compatibility while exposing enhanced classes.
 """
 
 import logging
@@ -13,21 +10,6 @@ from typing import Optional, Dict, List
 from enum import Enum
 
 logger = logging.getLogger(__name__)
-
-# Import enhanced classes from execution module for forward compatibility
-# These provide additional features like SizingMethod, RiskLimits, PositionSize, RiskAssessment
-try:
-    from cloud_trader.execution.risk_manager import (
-        SizingMethod,
-        RiskLimits,
-        PositionSize,
-        RiskAssessment,
-        RiskManager as EnhancedRiskManager
-    )
-    __all__ = ['Position', 'RiskLevel', 'RiskManager', 'SizingMethod', 'RiskLimits',
-               'PositionSize', 'RiskAssessment', 'EnhancedRiskManager']
-except ImportError:
-    __all__ = ['Position', 'RiskLevel', 'RiskManager']
 
 
 class RiskLevel(Enum):
