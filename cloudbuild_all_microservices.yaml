@@ -14,7 +14,7 @@ steps:
       - '-t'
       - 'gcr.io/$PROJECT_ID/sapphire-microservice:${_TAG}'
       - '-f'
-      - 'Dockerfile'
+      - 'Dockerfile.microservices'
       - '.'
     id: 'build-image'
     timeout: 1200s
