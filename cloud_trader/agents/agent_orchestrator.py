@@ -291,6 +291,79 @@ class AgentOrchestrator:
 
         return result
 
+    async def get_independent_decision(
+        self,
+        platform: str,
+        symbol: str,
+        context: str = "entry",
+        market_data: Optional[Dict] = None
+    ) -> Optional[ConsensusResult]:
+        """
+        Get decision from platform-specific agent WITHOUT consensus (Phase 4 optimization).
+
+        This bypasses the slow consensus mechanism for single-platform trades,
+        enabling sub-second decision latency for HFT strategies.
+
+        Args:
+            platform: Platform name (aster, drift, jupiter, etc.)
+            symbol: Trading pair to analyze
+            context: "entry" or "exit_check"
+            market_data: Optional market data
+
+        Returns:
+            ConsensusResult-compatible decision from single agent
+        """
+        # Find agents specialized for this platform
+        platform_agents = [
+            agent for agent in self.agents.values()
+            if agent.config.system.lower() == platform.lower()
+        ]
+
+        if not platform_agents:
+            logger.warning(f"No agents found for platform: {platform}, falling back to consensus")
+            return await self.get_consensus(symbol, context, market_data)
+
+        # Use first platform-specific agent (or could use best performing)
+        agent = platform_agents[0]
+
+        logger.debug(f"⚡ [INDEPENDENT] Using {agent.name} for {platform}/{symbol} (bypassing consensus)")
+
+        try:
+            # Get single agent decision (fast path)
+            thesis = await agent.analyze(symbol, market_data)
+
+            if not thesis:
+                return None
+
+            # Convert thesis to ConsensusResult format for compatibility
+            result = ConsensusResult(
+                symbol=symbol,
+                signal=thesis.signal,
+                confidence=thesis.confidence,
+                reasoning=f"[Independent {platform}] {thesis.reasoning}",
+                agent_votes=[{
+                    "agent": agent.name,
+                    "signal": thesis.signal,
+                    "confidence": thesis.confidence,
+                    "reasoning": thesis.reasoning,
+                    "weight": 1.0,
+                    "system": platform
+                }],
+                agreement_level=1.0,  # Single agent = 100% agreement
+                system=platform,
+            )
+
+            logger.info(
+                f"⚡ [INDEPENDENT] {platform}/{symbol}: {thesis.signal} "
+                f"(conf={thesis.confidence:.2f}, agent={agent.name})"
+            )
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Independent decision failed for {platform}/{symbol}: {e}")
+            return None
+
     async def learn_from_trade(self, symbol: str, signal: str, pnl_pct: float):
         """Update all agents and run debrief cycle."""
 

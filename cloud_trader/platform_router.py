@@ -330,19 +330,35 @@ class PlatformRouter:
             f"🚀 [ROUTER] {side} {symbol} ({quantity}) -> {platform.value} | Attempt {attempt}"
         )
 
-        # --- PRECISION NORMALIZATION & OBFUSCATION ---
-        # Import precision normalizer
+        # --- PRECISION NORMALIZATION & PLATFORM-AWARE MEV PROTECTION ---
+        # Import precision normalizer and MEV protector
         from .precision_normalizer import get_precision_normalizer
+        from .execution.mev_protection import MEVProtector
         import random
 
-        # 1. Jitter: Reduced random delay for higher efficiency (was 0.1-1.5s)
-        jitter = random.uniform(0.05, 0.2)
-        logger.debug(f"⚡ [ROUTER] Speed optimized: {jitter:.3f}s jitter")
-        await asyncio.sleep(jitter)
+        # Platform-aware MEV protection (Phase 1 optimization)
+        mev_protector = MEVProtector()
+        protection_level = mev_protector.get_platform_protection_level(platform.value)
 
-        # 2. Fuzzing: Slightly adjust quantity to avoid round-number patterns
-        quantity_fuzz = random.uniform(0.98, 1.02)  # +/- 2%
-        fuzzed_quantity = quantity * quantity_fuzz
+        # Protect order (includes jitter and fuzzing based on platform)
+        protected_order = mev_protector.protect_order(
+            symbol=symbol,
+            side=side,
+            quantity=quantity,
+            level=protection_level
+        )
+
+        # Apply timing protection (jitter) if needed
+        await mev_protector.apply_timing_protection(protected_order)
+
+        # Use protected quantity (includes fuzzing if applicable)
+        fuzzed_quantity = protected_order.protected_quantity
+
+        logger.debug(
+            f"⚡ [MEV] {platform.value}: {protection_level.value} | "
+            f"Jitter: {protected_order.protected_timing*1000:.1f}ms | "
+            f"Qty: {quantity:.4f} → {fuzzed_quantity:.4f}"
+        )
 
         # 3. CRITICAL FIX: Get current market price and normalize order
         normalizer = get_precision_normalizer()
