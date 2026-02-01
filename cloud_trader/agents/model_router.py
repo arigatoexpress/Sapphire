@@ -91,19 +91,31 @@ class MultiModelRouter:
                 genai.configure(api_key=gemini_key)
 
                 # Try multiple model names (gemini-1.5-flash is most reliable)
-                model_names = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-pro"]
+                model_names = ["gemini-1.5-flash", "gemini-2.0-flash-exp", "gemini-pro"]
 
                 for model_name in model_names:
                     try:
-                        self._clients[ModelProvider.GEMINI] = genai.GenerativeModel(model_name)
-                        logger.info(f"✅ Gemini initialized: {model_name}")
-                        break
+                        model = genai.GenerativeModel(model_name)
+
+                        # Test the model with a simple query to verify it works
+                        try:
+                            test_response = model.generate_content("Test: respond with OK")
+                            if test_response and test_response.text:
+                                self._clients[ModelProvider.GEMINI] = model
+                                logger.info(f"✅ Gemini initialized and tested: {model_name}")
+                                logger.info(f"✅ Test response: {test_response.text[:50]}")
+                                break
+                        except Exception as test_error:
+                            logger.warning(f"⚠️ Model {model_name} initialized but test failed: {test_error}")
+                            continue
+
                     except Exception as model_error:
                         logger.warning(f"⚠️ Failed to initialize {model_name}: {model_error}")
                         continue
 
                 if ModelProvider.GEMINI not in self._clients:
                     logger.error("❌ All Gemini model names failed to initialize")
+                    logger.error(f"❌ API Key present: {bool(gemini_key)}, Key length: {len(gemini_key) if gemini_key else 0}")
 
             except Exception as e:
                 logger.error(f"❌ Gemini init failed: {e}", exc_info=True)
