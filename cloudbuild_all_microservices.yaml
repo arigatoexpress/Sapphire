@@ -63,7 +63,7 @@ steps:
       - '--vpc-egress'
       - 'all-traffic'
       - '--set-env-vars'
-      - 'ENABLE_JUPITER=true,ENABLE_DRIFT=false,ENABLE_ASTER=false,ENABLE_HYPERLIQUID=false,ENABLE_LIGHTER=false,ENABLE_SYMPHONY=false,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,ENVIRONMENT=production,LOG_LEVEL=INFO,SOLANA_RPC_URL=https://api.mainnet-beta.solana.com'
+      - 'ENABLE_JUPITER=true,ENABLE_DRIFT=false,ENABLE_ASTER=false,ENABLE_HYPERLIQUID=false,ENABLE_LIGHTER=false,ENABLE_SYMPHONY=false,ENABLE_TELEGRAM_LISTENER=true,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,ENVIRONMENT=production,LOG_LEVEL=INFO,SOLANA_RPC_URL=https://api.mainnet-beta.solana.com'
       - '--set-secrets'
       - 'JUPITER_API_KEY=JUPITER_API_KEY:latest,SOLANA_PRIVATE_KEY=SOLANA_PRIVATE_KEY:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest'
     id: 'deploy-jupiter'

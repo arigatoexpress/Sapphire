@@ -95,8 +95,17 @@ class EnhancedTelegramService:
 
     async def start(self):
         """Start Telegram service with interactive command listener."""
+        import os
+
         logger.info("✅ Telegram Service (Enhanced with Interactive Commands) Initialized")
         await self.send_startup_notification()
+
+        # Only start listener if explicitly enabled (prevents conflicts in multi-instance deployments)
+        enable_listener = os.getenv("ENABLE_TELEGRAM_LISTENER", "false").lower() == "true"
+
+        if not enable_listener:
+            logger.info("ℹ️ Telegram command listener disabled via ENABLE_TELEGRAM_LISTENER=false (notification-only mode)")
+            return
 
         # Start command listener if bot token is available
         if self.bot_token and self.chat_id:
