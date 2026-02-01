@@ -43,6 +43,7 @@ class TradingLoop:
         positions: "PositionTracker",
         router: "PlatformRouter",
         monitoring: "MonitoringService",
+        watchlist: Optional[List[str]] = None,
     ):
         self.orchestrator = orchestrator
         self.agents = agents
@@ -50,22 +51,16 @@ class TradingLoop:
         self.router = router
         self.monitoring = monitoring
 
-        # Configuration - Use symbols from settings (respects TRADING_SYMBOLS env var)
-        from ..config import get_settings
-        settings = get_settings()
-
-        # Get symbols from environment variable or platform-specific defaults
-        raw_symbols = settings.symbols
-
-        # Normalize symbols to match platform format (add -USDC suffix if needed)
-        self.watchlist: List[str] = []
-        for symbol in raw_symbols:
-            # If symbol doesn't have a quote currency, add -USDC
-            if "-" not in symbol and "USDT" not in symbol and "USDC" not in symbol:
-                self.watchlist.append(f"{symbol}-USDC")
-            else:
-                self.watchlist.append(symbol)
-
+        # Configuration - Use provided watchlist or fallback to default
+        if watchlist:
+            self.watchlist = watchlist
+        else:
+            # Default watchlist (used if no symbols provided)
+            self.watchlist = [
+                "BTC-USDC",
+                "ETH-USDC",
+                "SOL-USDC",
+            ]
         self.max_positions = 5
 
         # State

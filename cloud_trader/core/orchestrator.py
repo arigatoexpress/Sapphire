@@ -93,6 +93,23 @@ class TradingOrchestrator:
 
         logger.info("🚀 TradingOrchestrator initialized")
 
+    def _build_watchlist(self) -> List[str]:
+        """Build trading watchlist from settings symbols."""
+        # Get symbols from environment variable or platform-specific defaults
+        raw_symbols = self.settings.symbols
+
+        # Normalize symbols to match platform format (add -USDC suffix if needed)
+        watchlist = []
+        for symbol in raw_symbols:
+            # If symbol doesn't have a quote currency, add -USDC
+            if "-" not in symbol and "USDT" not in symbol and "USDC" not in symbol:
+                watchlist.append(f"{symbol}-USDC")
+            else:
+                watchlist.append(symbol)
+
+        logger.info(f"📋 Watchlist built from settings: {watchlist}")
+        return watchlist
+
     def _normalize_for_aster(self, symbol: str) -> str:
         """Utility for platform router."""
         if not self._exchange_client:
@@ -302,13 +319,17 @@ class TradingOrchestrator:
         # 4. Agent Orchestrator (manages all AI agents)
         self.agent_orchestrator = AgentOrchestrator(monitoring=self.monitoring)
 
-        # 5. Trading Loop
+        # 5. Prepare watchlist from settings (respects TRADING_SYMBOLS env var)
+        watchlist = self._build_watchlist()
+
+        # 6. Trading Loop
         self.trading_loop = TradingLoop(
             orchestrator=self,
             agents=self.agent_orchestrator,
             positions=self.position_tracker,
             router=self.platform_router,
             monitoring=self.monitoring,
+            watchlist=watchlist,
         )
 
         logger.info("✅ All components initialized")
