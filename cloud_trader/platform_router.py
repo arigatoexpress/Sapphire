@@ -214,12 +214,14 @@ class PlatformRouter:
                 logger.info(f"🎯 Routing {symbol} to Drift (Solana perpetuals)")
                 return PlatformType.DRIFT
 
-        # Strategy 3B: Route spot swaps to Jupiter (Solana DEX aggregator)
-        from .definitions import JUPITER_SPOT_SYMBOLS
-        if symbol in JUPITER_SPOT_SYMBOLS:
-            if not enabled_platforms or PlatformType.JUPITER in enabled_platforms:
-                logger.info(f"🔄 Routing {symbol} to Jupiter (best Solana DEX prices)")
-                return PlatformType.JUPITER
+        # Strategy 3B: JUPITER DISABLED FOR TRADING (API key issues)
+        # Jupiter is available for price data only, not for executing trades
+        # Use Hyperliquid or Drift for actual trading instead
+        # from .definitions import JUPITER_SPOT_SYMBOLS
+        # if symbol in JUPITER_SPOT_SYMBOLS:
+        #     if not enabled_platforms or PlatformType.JUPITER in enabled_platforms:
+        #         logger.info(f"🔄 Routing {symbol} to Jupiter (best Solana DEX prices)")
+        #         return PlatformType.JUPITER
 
         # Strategy 4: Try Lighter for supported pairs (L2 execution)
         if symbol in LIGHTER_SYMBOLS or symbol.replace("BTC", "WBTC").replace("ETH", "WETH") in LIGHTER_SYMBOLS:

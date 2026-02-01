@@ -89,34 +89,41 @@
 
           <!-- Trading Platforms -->
           <g class="trading-platforms">
-            <circle cx="700" cy="80" r="25" class="node pulse-fast" />
-            <text x="700" y="120" text-anchor="middle" class="node-label">Jupiter</text>
+            <circle cx="700" cy="60" r="25" class="node pulse-fast" />
+            <text x="700" y="100" text-anchor="middle" class="node-label">Drift</text>
 
-            <circle cx="700" cy="180" r="25" class="node pulse-fast" />
-            <text x="700" y="220" text-anchor="middle" class="node-label">Drift</text>
+            <circle cx="700" cy="140" r="25" class="node pulse-fast" />
+            <text x="700" y="180" text-anchor="middle" class="node-label">Hyperliquid</text>
 
-            <circle cx="700" cy="280" r="25" class="node pulse-fast" />
-            <text x="700" y="320" text-anchor="middle" class="node-label">Hyperliquid</text>
+            <circle cx="700" cy="220" r="25" class="node pulse-fast" />
+            <text x="700" y="260" text-anchor="middle" class="node-label">Aster</text>
+
+            <circle cx="700" cy="300" r="25" class="node pulse-fast" />
+            <text x="700" y="340" text-anchor="middle" class="node-label">Symphony</text>
           </g>
 
           <!-- Animated Connections -->
           <path d="M 130 100 Q 225 100 320 100" class="connection" />
-          <path d="M 480 100 L 675 80" class="connection" />
-          <path d="M 480 100 L 675 180" class="connection" />
-          <path d="M 480 100 L 675 280" class="connection" />
+          <path d="M 480 100 L 675 60" class="connection" />
+          <path d="M 480 100 L 675 140" class="connection" />
+          <path d="M 480 100 L 675 220" class="connection" />
+          <path d="M 480 100 L 675 300" class="connection" />
 
           <!-- Data Flow Particles -->
           <circle r="4" class="particle">
             <animateMotion dur="3s" repeatCount="indefinite" path="M 130 100 Q 225 100 320 100" />
           </circle>
           <circle r="4" class="particle">
-            <animateMotion dur="2s" repeatCount="indefinite" path="M 480 100 L 675 80" />
+            <animateMotion dur="2s" repeatCount="indefinite" path="M 480 100 L 675 60" />
           </circle>
           <circle r="4" class="particle">
-            <animateMotion dur="2.5s" repeatCount="indefinite" path="M 480 100 L 675 180" />
+            <animateMotion dur="2.5s" repeatCount="indefinite" path="M 480 100 L 675 140" />
           </circle>
           <circle r="4" class="particle">
-            <animateMotion dur="2.2s" repeatCount="indefinite" path="M 480 100 L 675 280" />
+            <animateMotion dur="2.2s" repeatCount="indefinite" path="M 480 100 L 675 220" />
+          </circle>
+          <circle r="4" class="particle">
+            <animateMotion dur="2.8s" repeatCount="indefinite" path="M 480 100 L 675 300" />
           </circle>
         </svg>
       </div>
@@ -159,11 +166,10 @@ const coreComponents = reactive([
 ])
 
 const platforms = reactive([
-  { id: 'jupiter', name: 'Jupiter', status: 'trading', trades: 12, volume: 1250.50 },
   { id: 'drift', name: 'Drift', status: 'offline', trades: 0, volume: 0 },
   { id: 'hyperliquid', name: 'Hyperliquid', status: 'offline', trades: 0, volume: 0 },
-  { id: 'symphony', name: 'Symphony', status: 'offline', trades: 0, volume: 0 },
   { id: 'aster', name: 'Aster', status: 'offline', trades: 0, volume: 0 },
+  { id: 'symphony', name: 'Symphony', status: 'offline', trades: 0, volume: 0 },
   { id: 'lighter', name: 'Lighter', status: 'offline', trades: 0, volume: 0 },
 ])
 
@@ -183,11 +189,11 @@ const metrics = reactive({
 })
 
 const recentActivity = reactive([
-  { timestamp: new Date(), type: 'trade', message: 'Jupiter: BUY SOL-USDC @ $142.35 (0.5 SOL)' },
+  { timestamp: new Date(), type: 'info', message: 'System initialized: 5 platforms ready' },
   { timestamp: new Date(Date.now() - 15000), type: 'signal', message: 'AI Signal: BUY confidence 0.78' },
-  { timestamp: new Date(Date.now() - 32000), type: 'info', message: 'Position opened: SOL-USDC' },
-  { timestamp: new Date(Date.now() - 58000), type: 'success', message: 'Trade executed successfully' },
-  { timestamp: new Date(Date.now() - 92000), type: 'warn', message: 'High volatility detected' },
+  { timestamp: new Date(Date.now() - 32000), type: 'info', message: 'Hyperliquid connection established' },
+  { timestamp: new Date(Date.now() - 58000), type: 'success', message: 'Configuration loaded successfully' },
+  { timestamp: new Date(Date.now() - 92000), type: 'info', message: 'Monitoring services started' },
 ])
 
 const updateTime = () => {
@@ -226,10 +232,12 @@ const simulateUpdates = () => {
       metrics.winRate = metrics.winRate * 0.95 + (Math.random() > 0.4 ? 0.05 : 0)
 
       // Add activity
+      const platformNames = ['Drift', 'Hyperliquid', 'Aster', 'Symphony', 'Lighter']
+      const randomPlatform = platformNames[Math.floor(Math.random() * platformNames.length)]
       const activities = [
-        { type: 'trade', message: `Jupiter: ${Math.random() > 0.5 ? 'BUY' : 'SELL'} SOL-USDC @ $${(140 + Math.random() * 10).toFixed(2)}` },
         { type: 'signal', message: `AI Signal: ${Math.random() > 0.5 ? 'BUY' : 'SELL'} confidence ${(0.5 + Math.random() * 0.5).toFixed(2)}` },
-        { type: 'success', message: 'Trade executed successfully' },
+        { type: 'info', message: `${randomPlatform}: Monitoring market conditions` },
+        { type: 'success', message: `${randomPlatform}: Connection healthy` },
       ]
       const newActivity = activities[Math.floor(Math.random() * activities.length)]
       recentActivity.unshift({ ...newActivity, timestamp: new Date() })

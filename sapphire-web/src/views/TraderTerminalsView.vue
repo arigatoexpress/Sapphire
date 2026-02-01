@@ -16,12 +16,6 @@
     </div>
 
     <div class="terminals-grid">
-      <!-- Jupiter Terminal -->
-      <TraderTerminal
-        :trader="traders.jupiter"
-        @send-command="sendCommand"
-      />
-
       <!-- Drift Terminal -->
       <TraderTerminal
         :trader="traders.drift"
@@ -34,15 +28,15 @@
         @send-command="sendCommand"
       />
 
-      <!-- Symphony Terminal -->
-      <TraderTerminal
-        :trader="traders.symphony"
-        @send-command="sendCommand"
-      />
-
       <!-- Aster Terminal -->
       <TraderTerminal
         :trader="traders.aster"
+        @send-command="sendCommand"
+      />
+
+      <!-- Symphony Terminal -->
+      <TraderTerminal
+        :trader="traders.symphony"
         @send-command="sendCommand"
       />
 
@@ -82,13 +76,6 @@ const connectionStatus = ref<'connected' | 'disconnected' | 'connecting'>('conne
 const logsPaused = ref(false)
 
 const traders = reactive({
-  jupiter: {
-    id: 'jupiter',
-    name: 'Jupiter (Solana DEX)',
-    status: 'online',
-    logs: [] as LogEntry[],
-    stats: { trades: 0, pnl: 0, winRate: 0, volume: 0 }
-  },
   drift: {
     id: 'drift',
     name: 'Drift (Solana Perps)',
@@ -103,16 +90,16 @@ const traders = reactive({
     logs: [] as LogEntry[],
     stats: { trades: 0, pnl: 0, winRate: 0, volume: 0 }
   },
-  symphony: {
-    id: 'symphony',
-    name: 'Symphony (Monad)',
+  aster: {
+    id: 'aster',
+    name: 'Aster',
     status: 'offline',
     logs: [] as LogEntry[],
     stats: { trades: 0, pnl: 0, winRate: 0, volume: 0 }
   },
-  aster: {
-    id: 'aster',
-    name: 'Aster',
+  symphony: {
+    id: 'symphony',
+    name: 'Symphony (Monad)',
     status: 'offline',
     logs: [] as LogEntry[],
     stats: { trades: 0, pnl: 0, winRate: 0, volume: 0 }
@@ -242,11 +229,14 @@ const clearAllLogs = () => {
 // Simulate logs for demo (remove when WebSocket is connected)
 const simulateLogs = () => {
   const messages = [
-    { trader: 'jupiter', level: 'info', message: '🔍 Scanning SOL-USDC market...' },
-    { trader: 'jupiter', level: 'success', message: '✅ Price fetched: $142.35' },
-    { trader: 'jupiter', level: 'trade', message: '🧠 [Momentum Trader] SOL-USDC: BUY (conf: 0.75)' },
     { trader: 'drift', level: 'info', message: '📊 Analyzing SOL-PERP trends...' },
+    { trader: 'drift', level: 'success', message: '✅ VPIN signal detected: SOL-PERP (conf: 0.85)' },
+    { trader: 'hyperliquid', level: 'info', message: '🔍 Scanning BTC-USDC market...' },
     { trader: 'hyperliquid', level: 'warn', message: '⚠️ High volatility detected on BTC-USDC' },
+    { trader: 'hyperliquid', level: 'trade', message: '🧠 [Momentum] BTC-USDC: LONG (conf: 0.72)' },
+    { trader: 'aster', level: 'info', message: '⚡ Shield strategy active, monitoring BTC-PERP...' },
+    { trader: 'symphony', level: 'info', message: '🎵 Monitoring MON-USDC liquidity...' },
+    { trader: 'lighter', level: 'info', message: '💡 Lighter orderbook analysis running...' },
   ]
 
   setInterval(() => {
