@@ -157,28 +157,28 @@ import DataFeed from '../components/DataFeed.vue'
 const currentTime = ref('')
 
 const coreComponents = reactive([
-  { id: 'orchestrator', name: 'Trading Orchestrator', status: 'online', health: 100 },
-  { id: 'router', name: 'Platform Router', status: 'online', health: 100 },
-  { id: 'agents', name: 'AI Agents', status: 'online', health: 95 },
-  { id: 'monitoring', name: 'Monitoring', status: 'online', health: 100 },
-  { id: 'positions', name: 'Position Tracker', status: 'online', health: 100 },
-  { id: 'mev', name: 'MEV Protection', status: 'online', health: 98 },
+  { id: 'orchestrator', name: 'Trading Orchestrator', status: 'online' as const, health: 100 },
+  { id: 'router', name: 'Platform Router', status: 'online' as const, health: 100 },
+  { id: 'agents', name: 'AI Agents', status: 'online' as const, health: 95 },
+  { id: 'monitoring', name: 'Monitoring', status: 'online' as const, health: 100 },
+  { id: 'positions', name: 'Position Tracker', status: 'online' as const, health: 100 },
+  { id: 'mev', name: 'MEV Protection', status: 'online' as const, health: 98 },
 ])
 
 const platforms = reactive([
-  { id: 'drift', name: 'Drift', status: 'offline', trades: 0, volume: 0 },
-  { id: 'hyperliquid', name: 'Hyperliquid', status: 'offline', trades: 0, volume: 0 },
-  { id: 'aster', name: 'Aster', status: 'offline', trades: 0, volume: 0 },
-  { id: 'symphony', name: 'Symphony', status: 'offline', trades: 0, volume: 0 },
-  { id: 'lighter', name: 'Lighter', status: 'offline', trades: 0, volume: 0 },
+  { id: 'drift', name: 'Drift', status: 'offline' as const, trades: 0, volume: 0 },
+  { id: 'hyperliquid', name: 'Hyperliquid', status: 'offline' as const, trades: 0, volume: 0 },
+  { id: 'aster', name: 'Aster', status: 'offline' as const, trades: 0, volume: 0 },
+  { id: 'symphony', name: 'Symphony', status: 'offline' as const, trades: 0, volume: 0 },
+  { id: 'lighter', name: 'Lighter', status: 'offline' as const, trades: 0, volume: 0 },
 ])
 
 const dataFeeds = reactive([
-  { id: 'solana-rpc', name: 'Solana RPC', status: 'active', latency: 120, rate: 450 },
-  { id: 'jupiter-api', name: 'Jupiter API', status: 'active', latency: 85, rate: 320 },
-  { id: 'gemini-ai', name: 'Gemini AI', status: 'degraded', latency: 650, rate: 15 },
-  { id: 'telegram', name: 'Telegram Bot', status: 'active', latency: 200, rate: 5 },
-  { id: 'firestore', name: 'Firestore', status: 'active', latency: 150, rate: 80 },
+  { id: 'solana-rpc', name: 'Solana RPC', status: 'active' as const, latency: 120, rate: 450 },
+  { id: 'jupiter-api', name: 'Jupiter API', status: 'active' as const, latency: 85, rate: 320 },
+  { id: 'gemini-ai', name: 'Gemini AI', status: 'degraded' as const, latency: 650, rate: 15 },
+  { id: 'telegram', name: 'Telegram Bot', status: 'active' as const, latency: 200, rate: 5 },
+  { id: 'firestore', name: 'Firestore', status: 'active' as const, latency: 150, rate: 80 },
 ])
 
 const metrics = reactive({

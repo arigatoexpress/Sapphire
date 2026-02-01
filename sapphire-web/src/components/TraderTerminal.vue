@@ -75,7 +75,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, defineProps, defineEmits } from 'vue'
+import { ref, watch, nextTick } from 'vue'
 
 interface Trader {
   id: string
