@@ -51,15 +51,24 @@ class TradingLoop:
         self.monitoring = monitoring
 
         # Configuration
+        # Watchlist includes tokens for all platforms
+        # Jupiter (Solana DEX): SOL, BONK, WIF, JUP, JTO
+        # Drift (Solana Perps): SOL-PERP, BTC-PERP
+        # Aster/Hyperliquid (Perps): BTC-USDC, ETH-USDC, SOL-USDC
+        # Symphony (Monad/Base): ETH-USDC, MON-USDC, DEGEN-USDC
         self.watchlist: List[str] = [
-            "BTC-USDC",  # Hyperliquid / Aster
-            "ETH-USDC",  # Hyperliquid / Symphony / Aster
-            "SOL-USDC",  # Hyperliquid / Aster
-            "HYPE-USDC",  # Hyperliquid / Aster
-            "JUP-USDC",  # Drift
-            "MON-USDC",  # Symphony / Aster
-            "DEGEN-USDC",  # Symphony
-            "BRETT-USDC",  # Symphony
+            # Solana tokens for Jupiter DEX swaps
+            "SOL-USDC",
+            "BONK-USDC",
+            "WIF-USDC",
+            "JUP-USDC",
+            "JTO-USDC",
+            # Major pairs for Aster/Hyperliquid perps
+            "BTC-USDC",
+            "ETH-USDC",
+            # Monad/Base tokens for Symphony
+            "MON-USDC",
+            "DEGEN-USDC",
         ]
         self.max_positions = 5
 
