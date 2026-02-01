@@ -89,11 +89,24 @@ class MultiModelRouter:
                 import google.generativeai as genai
 
                 genai.configure(api_key=gemini_key)
-                # Use gemini-2.5-flash (current recommended) or fallback to 2.0
-                self._clients[ModelProvider.GEMINI] = genai.GenerativeModel("gemini-2.5-flash")
-                logger.info("✅ Gemini 2.5 Flash initialized (Google AI Studio)")
+
+                # Try multiple model names (gemini-1.5-flash is most reliable)
+                model_names = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-pro"]
+
+                for model_name in model_names:
+                    try:
+                        self._clients[ModelProvider.GEMINI] = genai.GenerativeModel(model_name)
+                        logger.info(f"✅ Gemini initialized: {model_name}")
+                        break
+                    except Exception as model_error:
+                        logger.warning(f"⚠️ Failed to initialize {model_name}: {model_error}")
+                        continue
+
+                if ModelProvider.GEMINI not in self._clients:
+                    logger.error("❌ All Gemini model names failed to initialize")
+
             except Exception as e:
-                logger.warning(f"Gemini init failed: {e}")
+                logger.error(f"❌ Gemini init failed: {e}", exc_info=True)
 
         if not self._clients:
             logger.warning("⚠️ No AI models available - using fallback responses")

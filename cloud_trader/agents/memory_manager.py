@@ -32,9 +32,9 @@ def _get_firestore_client():
     if _firestore_client is None:
         try:
             from google.cloud import firestore
-            # Increase timeout to 30 seconds to avoid 504 Deadline Exceeded
-            _firestore_client = firestore.AsyncClient(project="sapphire-479610", timeout=30.0)
-            logger.info("🔥 Firestore client initialized (timeout=30s)")
+            # Create async Firestore client (timeout is set per-operation, not on init)
+            _firestore_client = firestore.AsyncClient(project="sapphire-479610")
+            logger.info("🔥 Firestore client initialized")
         except Exception as e:
             logger.warning(f"⚠️ Firestore unavailable: {e}")
             _firestore_client = False  # Mark as failed
