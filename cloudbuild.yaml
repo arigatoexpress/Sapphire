@@ -69,7 +69,9 @@ steps:
       - '--vpc-egress'
       - 'all-traffic'
       - '--set-env-vars'
-      - 'ENVIRONMENT=production,LOG_LEVEL=INFO,ENABLE_JUPITER=true,ENABLE_DRIFT=true,ENABLE_LIGHTER=true,ENABLE_SYMPHONY=true,SOLANA_RPC_URL=https://api.mainnet-beta.solana.com'
+      - 'ENVIRONMENT=production,LOG_LEVEL=INFO,ENABLE_JUPITER=false,ENABLE_DRIFT=true,ENABLE_HYPERLIQUID=true,ENABLE_ASTER=true,ENABLE_LIGHTER=true,ENABLE_SYMPHONY=true,GEMINI_MODEL=gemini-2.0-flash-exp,SOLANA_RPC_URL=https://api.mainnet-beta.solana.com'
+      - '--set-secrets'
+      - 'HTTP_PROXY=aster-proxy-url:latest,HTTPS_PROXY=aster-proxy-url:latest'
     id: 'deploy'
     waitFor: ['push-sha']
 
