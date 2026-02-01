@@ -43,7 +43,6 @@ class TradingLoop:
         positions: "PositionTracker",
         router: "PlatformRouter",
         monitoring: "MonitoringService",
-        watchlist: Optional[List[str]] = None,
     ):
         self.orchestrator = orchestrator
         self.agents = agents
@@ -51,16 +50,17 @@ class TradingLoop:
         self.router = router
         self.monitoring = monitoring
 
-        # Configuration - Use provided watchlist or fallback to default
-        if watchlist:
-            self.watchlist = watchlist
-        else:
-            # Default watchlist (used if no symbols provided)
-            self.watchlist = [
-                "BTC-USDC",
-                "ETH-USDC",
-                "SOL-USDC",
-            ]
+        # Configuration
+        self.watchlist: List[str] = [
+            "BTC-USDC",  # Hyperliquid / Aster
+            "ETH-USDC",  # Hyperliquid / Symphony / Aster
+            "SOL-USDC",  # Hyperliquid / Aster
+            "HYPE-USDC",  # Hyperliquid / Aster
+            "JUP-USDC",  # Drift
+            "MON-USDC",  # Symphony / Aster
+            "DEGEN-USDC",  # Symphony
+            "BRETT-USDC",  # Symphony
+        ]
         self.max_positions = 5
 
         # State
