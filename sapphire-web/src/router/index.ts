@@ -24,7 +24,16 @@ const router = createRouter({
             name: 'settings',
             component: () => import('../views/SettingsView.vue')
         },
-        // Add more routes here
+        {
+            path: '/terminals',
+            name: 'terminals',
+            component: () => import('../views/TraderTerminalsView.vue')
+        },
+        {
+            path: '/system',
+            name: 'system',
+            component: () => import('../views/SystemOverviewView.vue')
+        },
     ]
 })
 
