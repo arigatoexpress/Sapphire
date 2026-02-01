@@ -502,25 +502,78 @@ class TradingLoop:
         return final_size
 
     async def _get_current_price(self, symbol: str) -> float:
-        """Get current market price from the exchange."""
+        """Get current market price from any available platform client."""
         try:
-            if not self.orchestrator or not self.orchestrator._exchange_client:
-                logger.warning(f"⚠️ Cannot fetch price for {symbol}: No exchange client")
+            if not self.orchestrator:
+                logger.warning(f"⚠️ Cannot fetch price for {symbol}: No orchestrator")
                 return 0.0
 
-            # Normalize symbol if needed (e.g. BTC-USDC -> BTCUSDT for Aster)
-            api_symbol = self.orchestrator._normalize_for_aster(symbol.replace("-", ""))
+            # Try Jupiter first (for Solana tokens like SOL, BONK, etc.)
+            if self.orchestrator.jupiter_client:
+                try:
+                    # Jupiter has get_current_price() method
+                    price_decimal = await self.orchestrator.jupiter_client.get_current_price(symbol)
+                    if price_decimal and price_decimal > 0:
+                        price = float(price_decimal)
+                        logger.info(f"📊 Jupiter price for {symbol}: ${price:,.4f}")
+                        return price
+                except Exception as e:
+                    logger.debug(f"Jupiter price fetch failed for {symbol}: {e}")
 
-            # Fetch price
-            # get_ticker_price returns dict like {'symbol': 'BTCUSDT', 'price': '12345.67'}
-            response = await self.orchestrator._exchange_client.get_ticker_price(api_symbol)
+            # Try Drift (for perps like SOL-PERP)
+            if self.orchestrator.drift and symbol.endswith("-PERP"):
+                try:
+                    # Drift has market data access
+                    logger.info(f"📊 Drift price fetch for {symbol}")
+                    # TODO: Implement Drift.get_oracle_price()
+                    return 0.0  # Temporary
+                except Exception as e:
+                    logger.debug(f"Drift price fetch failed for {symbol}: {e}")
 
-            if isinstance(response, dict):
-                price = float(response.get("price", 0.0))
-                if price > 0:
-                    return price
+            # Try Aster (for CEX-style pairs like BTCUSDT)
+            if self.orchestrator._exchange_client:
+                try:
+                    # Normalize symbol for Aster (e.g. BTC-USDC -> BTCUSDT)
+                    api_symbol = self.orchestrator._normalize_for_aster(symbol.replace("-", ""))
+                    response = await self.orchestrator._exchange_client.get_ticker_price(api_symbol)
 
-            logger.warning(f"⚠️ Invalid price response for {symbol}: {response}")
+                    if isinstance(response, dict):
+                        price = float(response.get("price", 0.0))
+                        if price > 0:
+                            logger.info(f"📊 Aster price for {symbol}: ${price:,.2f}")
+                            return price
+                except Exception as e:
+                    logger.debug(f"Aster price fetch failed for {symbol}: {e}")
+
+            # Try Hyperliquid
+            if self.orchestrator.hl_client:
+                try:
+                    # Hyperliquid has its own price API
+                    logger.info(f"📊 Hyperliquid price fetch for {symbol}")
+                    # TODO: Implement Hyperliquid.get_mark_price()
+                    return 0.0  # Temporary
+                except Exception as e:
+                    logger.debug(f"Hyperliquid price fetch failed for {symbol}: {e}")
+
+            # Try Symphony
+            if self.orchestrator.symphony:
+                try:
+                    logger.info(f"📊 Symphony price fetch for {symbol}")
+                    # TODO: Implement Symphony.get_price()
+                    return 0.0  # Temporary
+                except Exception as e:
+                    logger.debug(f"Symphony price fetch failed for {symbol}: {e}")
+
+            # Try Lighter
+            if self.orchestrator.lighter_client:
+                try:
+                    logger.info(f"📊 Lighter price fetch for {symbol}")
+                    # TODO: Implement Lighter.get_price()
+                    return 0.0  # Temporary
+                except Exception as e:
+                    logger.debug(f"Lighter price fetch failed for {symbol}: {e}")
+
+            logger.warning(f"⚠️ Cannot fetch price for {symbol}: No platform client available or all failed")
             return 0.0
 
         except Exception as e:
