@@ -1,18 +1,16 @@
-"""Enhanced AI-powered Telegram notification service (Lightweight)."""
+"""Enhanced AI-powered Telegram notification service with Interactive Commands."""
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import aiohttp
-
-# Remove telegram library imports to resolve dependency conflicts with Drift
-# from telegram import ...
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +61,7 @@ class RiskAnalyzer:
 
 
 class EnhancedTelegramService:
-    """Lightweight Telegram notification service using raw HTTP API."""
+    """Enhanced Telegram notification service with interactive commands using raw HTTP API."""
 
     def __init__(
         self,
@@ -73,6 +71,7 @@ class EnhancedTelegramService:
         sentiment_analyzer: Optional[Any] = None,
         risk_analyzer: Optional[Any] = None,
         performance_analyzer: Optional[Any] = None,
+        command_callback: Optional[Callable[[str, str, str, float], Any]] = None,
     ):
         self.bot_token = bot_token.strip() if bot_token else bot_token
         self.chat_id = chat_id
@@ -88,10 +87,24 @@ class EnhancedTelegramService:
         self.last_send_time = 0
         self.daily_stats = {"trades": 0, "volume": 0.0, "pnl": 0.0}
 
+        # Command listener
+        self.command_callback = command_callback
+        self.last_update_id = 0
+        self.running = False
+        self._listener_task: Optional[asyncio.Task] = None
+
     async def start(self):
-        """No-op start for compatibility."""
-        logger.info("✅ Telegram Service (Lightweight) Initialized")
+        """Start Telegram service with interactive command listener."""
+        logger.info("✅ Telegram Service (Enhanced with Interactive Commands) Initialized")
         await self.send_startup_notification()
+
+        # Start command listener if bot token is available
+        if self.bot_token and self.chat_id:
+            self.running = True
+            self._listener_task = asyncio.create_task(self._command_listener())
+            logger.info("📡 Telegram Command Listener Started")
+        else:
+            logger.warning("⚠️ Telegram command listener disabled (missing token or chat_id)")
 
     async def send_message(
         self, text: str, priority: NotificationPriority = NotificationPriority.MEDIUM, **kwargs
@@ -131,9 +144,21 @@ class EnhancedTelegramService:
 
     async def send_startup_notification(self):
         await self.send_message(
-            "🤖 *Sapphire Trading AI Bot Online*\n\n"
-            "💎 Lightweight Notification Service Active\n"
-            "⚠️ Interactive commands disabled for system stability",
+            "🚨 🤖 *Sapphire Trading AI Bot Online* 💎\n\n"
+            "✅ Enhanced Notification Service Active\n"
+            "🎮 Interactive Commands: **ENABLED**\n\n"
+            "*Available Commands:*\n"
+            "`@drift status` - Check Drift positions\n"
+            "`@jupiter status` - Check Jupiter routes\n"
+            "`@aster status` - Check Aster HFT positions\n"
+            "`@hyperliquid status` - Check Hyperliquid\n"
+            "`@symphony status` - Check Symphony agents\n"
+            "`@all status` - Check all platforms\n\n"
+            "*Manual Trading:*\n"
+            "`@[platform] buy [amount] [symbol]`\n"
+            "`@[platform] sell [amount] [symbol]`\n"
+            "`@[platform] close [amount] [symbol]`\n\n"
+            "Example: `@drift buy 0.5 sol`",
             priority=NotificationPriority.HIGH,
         )
 
@@ -448,3 +473,113 @@ class EnhancedTelegramService:
             f"💡 **AI Insight**:\n_{ai_commentary or 'Market conditions appear normal. Continuing standard strategy.'}_"
         )
         await self.send_message(msg, priority=NotificationPriority.HIGH)
+
+    async def stop(self):
+        """Stop the Telegram service and command listener."""
+        self.running = False
+        if self._listener_task:
+            self._listener_task.cancel()
+            try:
+                await self._listener_task
+            except asyncio.CancelledError:
+                pass
+        logger.info("📡 Telegram service stopped")
+
+    async def _command_listener(self):
+        """Listen for interactive commands via Telegram long polling."""
+        logger.info("📡 Starting Telegram command listener...")
+
+        while self.running:
+            try:
+                url = f"{self.base_url}/getUpdates"
+                params = {"offset": self.last_update_id + 1, "timeout": 30}
+
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=35)) as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            if data.get("ok"):
+                                for update in data.get("result", []):
+                                    self.last_update_id = update["update_id"]
+                                    await self._process_command(update)
+                        elif resp.status == 409:
+                            # Conflict - another instance is polling
+                            import random
+                            jitter = random.uniform(5, 30)
+                            logger.warning(f"Telegram conflict (another instance listening), retrying in {jitter:.1f}s...")
+                            await asyncio.sleep(jitter)
+                        else:
+                            logger.error(f"Telegram listener error: {resp.status}")
+                            await asyncio.sleep(10)
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Telegram listener crashed: {e}")
+                await asyncio.sleep(10)
+
+    async def _process_command(self, update: Dict[str, Any]):
+        """Process incoming Telegram command."""
+        message = update.get("message", {})
+        text = message.get("text", "")
+        chat_id = str(message.get("chat", {}).get("id", ""))
+
+        # Security: Only respond to messages from authorized chat
+        if self.chat_id and chat_id != self.chat_id:
+            return
+
+        # Pattern 1: @platform action quantity symbol (e.g., @hyperliquid buy 0.1 sol)
+        cmd_match = re.search(r"@(\w+)\s+(buy|sell|close)\s+([\d.]+)\s+(\w+)", text.lower())
+
+        # Pattern 2: Status commands (e.g., @drift status, @all status)
+        status_match = re.search(r"@(\w+)\s+(status|positions|health)", text.lower())
+
+        if status_match:
+            platform = status_match.group(1)
+            action = status_match.group(2).upper()
+
+            await self.send_message(
+                f"⚡ **Status Request**\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"🎯 **Platform**: `{platform.upper()}`\n"
+                f"📝 **Command**: `{action}`\n"
+                f"⏳ **Processing**...",
+                priority=NotificationPriority.MEDIUM,
+            )
+
+            if self.command_callback:
+                try:
+                    await self.command_callback(platform, "STATUS", action, 0.0)
+                except Exception as e:
+                    await self.send_message(f"❌ Error executing status command: {e}", priority=NotificationPriority.HIGH)
+            else:
+                logger.warning("No command callback registered for status commands")
+
+        elif cmd_match:
+            platform = cmd_match.group(1)
+            action = cmd_match.group(2).upper()
+            quantity = float(cmd_match.group(3))
+            symbol = cmd_match.group(4).upper()
+
+            # Special case for "all"
+            platforms = ["drift", "hyperliquid", "aster", "symphony", "jupiter"] if platform == "all" else [platform]
+
+            await self.send_message(
+                f"⚡ **MANUAL OVERRIDE DETECTED**\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"🎯 **Platform**: `{platform.upper()}`\n"
+                f"📝 **Action**: `{action} {quantity} {symbol}`\n"
+                f"⏳ **Verification**: Dispatching to execution layer...",
+                priority=NotificationPriority.HIGH,
+            )
+
+            if self.command_callback:
+                for p in platforms:
+                    try:
+                        await self.command_callback(p, symbol, action, quantity)
+                    except Exception as e:
+                        await self.send_message(
+                            f"❌ Error dispatching to {p}: {e}",
+                            priority=NotificationPriority.HIGH
+                        )
+            else:
+                logger.warning("No command callback registered for Telegram commands")
