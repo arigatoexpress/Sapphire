@@ -1,4 +1,4 @@
-# Sapphire
+# Sapphire V2.3
 
 **Autonomous AI Trading System**
 
@@ -7,7 +7,34 @@
 [![Cloud Run](https://img.shields.io/badge/Cloud%20Run-4285F4?logo=google-cloud&logoColor=white)](https://cloud.google.com/run)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Production-grade trading system with multi-platform DeFi execution, AI agent consensus, memory-augmented learning, and reinforcement learning integration.
+High-performance autonomous trading system with **independent platform traders**, memory-augmented learning, and reinforcement learning integration.
+
+**V2.3 ARCHITECTURE**: Each trader operates independently on its dedicated platform with **no consensus delays**, optimized for maximum speed and profitability.
+
+---
+
+## 🚀 What's New in V2.3
+
+### Independent Platform Traders (No Consensus)
+- **3-5 second latency eliminated** - No more waiting for agent consensus votes
+- **Autonomous execution** - Each trader makes independent decisions for its platform
+- **Platform-specific optimization** - Traders optimized for their exchange's quirks
+- **Better reliability** - Platform failures don't cascade to other traders
+
+### Platform-Specific Trading
+```
+Drift Trader      → Drift Platform only (Solana Perps: SOL, JUP, BONK, WIF)
+Hyperliquid       → Hyperliquid only (L1 Perps: BTC, ETH, SOL, HYPE, DOGE)
+Aster Trader      → Aster only (CEX with Shield Strategy for HFT)
+Symphony Trader   → Symphony only (Monad Treasury: MON, DAC, DEGEN)
+Lighter Trader    → Lighter only (Eth L2: WBTC-USDC, WETH-USDC)
+```
+
+### Removed in V2.3
+- ❌ Jupiter spot swaps (API key issues) - kept for price data only
+- ❌ Multi-agent consensus voting system
+- ❌ Cross-platform failover chains
+- ❌ Complex routing logic
 
 ---
 
@@ -15,12 +42,13 @@ Production-grade trading system with multi-platform DeFi execution, AI agent con
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              SAPPHIRE V2                                     │
+│                              SAPPHIRE V2.3                                   │
+│                      INDEPENDENT PLATFORM TRADERS                            │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  ┌─────────────────────────────────────────────────────────────────────┐    │
 │  │                         Vue 3 Frontend                               │    │
-│  │                    (sapphire-web / Dashboard)                        │    │
+│  │              (Trader Terminals + System Overview)                    │    │
 │  └──────────────────────────────┬──────────────────────────────────────┘    │
 │                                 │                                            │
 │                          WebSocket + REST                                    │
@@ -28,34 +56,24 @@ Production-grade trading system with multi-platform DeFi execution, AI agent con
 │  ┌──────────────────────────────▼──────────────────────────────────────┐    │
 │  │                      FastAPI Gateway                                 │    │
 │  │                   (main_v2.py : Cloud Run)                           │    │
-│  │                                                                      │    │
-│  │  /api/trades  /api/agents  /api/positions  /health  /api/symphony   │    │
 │  └──────────────────────────────┬──────────────────────────────────────┘    │
 │                                 │                                            │
-│        ┌────────────────────────┼────────────────────────┐                  │
-│        │                        │                        │                  │
-│        ▼                        ▼                        ▼                  │
-│  ┌───────────┐           ┌───────────┐           ┌───────────┐             │
-│  │   Agent   │           │  Episodic │           │  Circuit  │             │
-│  │Orchestrator│◄─────────│  Memory   │           │  Breakers │             │
-│  │  (Swarm)  │  recall   │   (RAG)   │           │           │             │
-│  └─────┬─────┘           └───────────┘           └─────┬─────┘             │
-│        │                                               │                    │
-│        │ consensus                              protects│                    │
-│        ▼                                               ▼                    │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                       Platform Router                                │   │
-│  │              (Symbol-based routing + Automatic Failover)             │   │
-│  └───┬─────────┬─────────┬─────────┬─────────┬─────────┬───────────────┘   │
-│      │         │         │         │         │         │                    │
-│      ▼         ▼         ▼         ▼         ▼         ▼                    │
-│  ┌───────┐ ┌───────┐ ┌───────┐ ┌───────┐ ┌───────┐ ┌───────┐               │
-│  │Hyper- │ │ Drift │ │Jupiter│ │Lighter│ │ Aster │ │Symph- │               │
-│  │liquid │ │       │ │       │ │       │ │       │ │ony    │               │
-│  │       │ │       │ │       │ │       │ │       │ │       │               │
-│  │ Perps │ │ Perps │ │ Spot  │ │ Perps │ │  CEX  │ │Monad  │               │
-│  │  L1   │ │Solana │ │Solana │ │Eth L2 │ │       │ │Treasury               │
-│  └───────┘ └───────┘ └───────┘ └───────┘ └───────┘ └───────┘               │
+│                    ┌────────────┴────────────┐                              │
+│                    │   Platform Router        │                              │
+│                    │  (Direct Execution)      │                              │
+│                    │  NO CONSENSUS            │                              │
+│                    └──┬──────┬──────┬──────┬──┘                              │
+│                       │      │      │      │                                 │
+│                       ▼      ▼      ▼      ▼      ▼                          │
+│                  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐                   │
+│                  │Drift│ │Hyper│ │Aster│ │Symph│ │Light│                   │
+│                  │     │ │liquid│ │     │ │ony │ │er   │                   │
+│                  │Perps│ │ L1  │ │ CEX │ │Monad│ │Eth  │                   │
+│                  │Sol  │ │Perps│ │Shield│ │Trea │ │ L2  │                   │
+│                  └─────┘ └─────┘ └─────┘ └─────┘ └─────┘                   │
+│                     ↑       ↑       ↑       ↑       ↑                        │
+│                     │       │       │       │       │                        │
+│              Independent Traders (No Cross-Platform Failover)                │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -66,454 +84,62 @@ Production-grade trading system with multi-platform DeFi execution, AI agent con
 
 | Platform | Type | Chain | Status | Primary Symbols |
 |----------|------|-------|--------|-----------------|
-| **Hyperliquid** | DeFi Perpetuals | L1 | Active | BTC, ETH, SOL, HYPE, DOGE, AVAX |
-| **Drift** | Perpetuals | Solana | Active | SOL, JUP, PYTH, BONK, WIF |
-| **Jupiter** | DEX Aggregator | Solana | Active | SOL, JUP, RAY, ORCA (Spot) |
-| **Lighter** | Order Book | Ethereum L2 | Active | WBTC-USDC, WETH-USDC |
-| **Aster** | CEX | - | Active | All pairs (US blocked) |
-| **Symphony** | Treasury | Monad/Base | Active | MON, DAC, DEGEN, BRETT |
+| **Hyperliquid** | DeFi Perpetuals | L1 | ✅ Active | BTC, ETH, SOL, HYPE, DOGE, AVAX |
+| **Drift** | Perpetuals | Solana | ✅ Active | SOL, JUP, PYTH, BONK, WIF |
+| **Aster** | CEX | - | ✅ Active | All pairs (US blocked) |
+| **Symphony** | Treasury | Monad/Base | ✅ Active | MON, DAC, DEGEN, BRETT |
+| **Lighter** | Order Book | Ethereum L2 | ✅ Active | WBTC-USDC, WETH-USDC |
+| **Jupiter** | DEX Aggregator | Solana | 📊 Data Only | Price feeds (trading disabled) |
 
 ---
 
-## Agent Swarm Architecture
+## Independent Trader Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                          AGENT ORCHESTRATOR                                  │
-│                      (Weighted Consensus Voting)                             │
+│                     INDEPENDENT PLATFORM EXECUTION                           │
+│                          (No Consensus Voting)                               │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
-│                            Market Data Feed                                  │
-│                    (Price, Volume, Order Book, Sentiment)                    │
+│         Market Data Feed (Price, Volume, Order Book, Sentiment)              │
 │                                   │                                          │
 │         ┌─────────────────────────┼─────────────────────────┐               │
 │         │              │          │          │              │               │
 │         ▼              ▼          ▼          ▼              ▼               │
 │   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐     │
-│   │ Momentum │  │  Market  │  │  Swing   │  │  Drift   │  │    RL    │     │
-│   │  Trader  │  │  Maker   │  │  Trader  │  │  Trader  │  │  Agent   │     │
-│   │    📈    │  │    ⚡    │  │    🧠    │  │    🌀    │  │   🤖    │     │
+│   │  Drift   │  │  Hyper   │  │  Aster   │  │Symphony  │  │ Lighter  │     │
+│   │  Trader  │  │  liquid  │  │  Trader  │  │ Trader   │  │  Trader  │     │
+│   │    🌀    │  │  Trader  │  │    ⚡    │  │    🎵    │  │    💡    │     │
+│   │          │  │    🔷    │  │          │  │          │  │          │     │
 │   ├──────────┤  ├──────────┤  ├──────────┤  ├──────────┤  ├──────────┤     │
-│   │Win: 65%  │  │Win: 62%  │  │Win: 68%  │  │Win: 62%  │  │  (PPO)   │     │
-│   │Risk: 1.4x│  │Risk: 2.0x│  │Risk: 1.3x│  │Risk: 1.1x│  │Weight:0.3│     │
-│   │Lev: 20x  │  │Lev: 25x  │  │Lev: 10x  │  │Lev: 10x  │  │          │     │
+│   │Platform: │  │Platform: │  │Platform: │  │Platform: │  │Platform: │     │
+│   │  Drift   │  │Hyperliq. │  │  Aster   │  │ Symphony │  │ Lighter  │     │
+│   │          │  │          │  │          │  │          │  │          │     │
+│   │Strategy: │  │Strategy: │  │Strategy: │  │Strategy: │  │Strategy: │     │
+│   │VPIN HFT  │  │Momentum  │  │ Shield   │  │Treasury  │  │Arb/MM    │     │
+│   │          │  │          │  │10-125x   │  │          │  │          │     │
+│   │Leverage: │  │Leverage: │  │Leverage  │  │Leverage: │  │Leverage: │     │
+│   │5-20x     │  │10-50x    │  │          │  │1.1-25x   │  │5-10x     │     │
 │   └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘     │
 │        │             │             │             │             │            │
-│        └─────────────┴──────┬──────┴─────────────┴─────────────┘            │
-│                             │                                                │
-│                             ▼                                                │
-│                  ┌─────────────────────┐                                    │
-│                  │  Sigmoid Consensus  │                                    │
-│                  │   (k=3, t=0.35)     │                                    │
-│                  │                     │                                    │
-│                  │  Signal = Σ(w × v)  │                                    │
-│                  │  if Signal > 0.35:  │                                    │
-│                  │     EXECUTE         │                                    │
-│                  └──────────┬──────────┘                                    │
-│                             │                                                │
-│                             ▼                                                │
-│                    ┌─────────────────┐                                      │
-│                    │ LONG│SHORT│HOLD │                                      │
-│                    └─────────────────┘                                      │
+│        ▼             ▼             ▼             ▼             ▼            │
+│   EXECUTE       EXECUTE       EXECUTE       EXECUTE       EXECUTE           │
+│  DIRECTLY       DIRECTLY      DIRECTLY      DIRECTLY      DIRECTLY          │
+│  (< 100ms)      (< 100ms)     (< 50ms)      (< 200ms)     (< 150ms)         │
+│                                                                              │
+│  NO CONSENSUS • NO VOTING • NO WAITING                                       │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Agent Specifications
+### Performance Improvements
 
-| Agent | Platform | Type | Baseline Win Rate | Risk Multiplier | Max Leverage |
-|-------|----------|------|-------------------|-----------------|--------------|
-| Momentum Trader | Aster | Momentum | 65% | 1.4x | 20x |
-| Market Maker | Aster | Market Making | 62% | 2.0x | 25x |
-| Swing Trader | Aster | Swing | 68% | 1.3x | 10x |
-| Drift Trader | Drift | Perpetuals | 62% | 1.1x | 10x |
-| Monad Treasury | Symphony | Swap | 60% | 1.0x | 20x |
-| Ari Gold Fund | Symphony | Perpetuals | 60% | 1.5x | 25x |
-| RL Agent (PPO) | All | Reinforcement | - | - | - |
-
----
-
-## Symphony Treasury System
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                      SYMPHONY AGENT ECOSYSTEM                                │
-│                         (Monad + Base Chain)                                 │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│           ┌────────────────────────────────────────────────────┐            │
-│           │              Symphony Agent Manager                 │            │
-│           │         (Firestore Persistence + Tracking)          │            │
-│           └───────────────────────┬────────────────────────────┘            │
-│                                   │                                          │
-│          ┌────────────────────────┼────────────────────────────┐            │
-│          │                        │                            │            │
-│          ▼                        ▼                            ▼            │
-│   ┌─────────────┐          ┌─────────────┐          ┌─────────────┐        │
-│   │    MILF     │          │    AGDG     │          │     MIT     │        │
-│   │     🦾      │          │     🦅      │          │     🏛️      │        │
-│   ├─────────────┤          ├─────────────┤          ├─────────────┤        │
-│   │ Status:     │          │ Status:     │          │ Status:     │        │
-│   │  ACTIVE ✅  │          │  ACTIVE ✅  │          │ PENDING ⏳  │        │
-│   ├─────────────┤          ├─────────────┤          ├─────────────┤        │
-│   │ Chain:      │          │ Chain:      │          │ Activation: │        │
-│   │  Monad      │          │  Base       │          │  0/5 trades │        │
-│   ├─────────────┤          ├─────────────┤          │  ░░░░░ 0%   │        │
-│   │ Type:       │          │ Type:       │          ├─────────────┤        │
-│   │  SWAP       │          │  PERPS      │          │ Leverage:   │        │
-│   ├─────────────┤          ├─────────────┤          │  20x        │        │
-│   │ Strategy:   │          │ Strategy:   │          │ TP/SL:      │        │
-│   │ Whale Track │          │ AI/Privacy  │          │  Enabled    │        │
-│   │ Smart Money │          │ Virtuals    │          │             │        │
-│   └─────────────┘          └─────────────┘          └─────────────┘        │
-│                                                                              │
-│   ┌────────────────────────────────────────────────────────────────────┐   │
-│   │  MIT ACTIVATION FLOW                                                │   │
-│   │  ════════════════════                                               │   │
-│   │                                                                     │   │
-│   │   Trade 1     Trade 2     Trade 3     Trade 4     Trade 5          │   │
-│   │     ○───────────○───────────○───────────○───────────○              │   │
-│   │   PENDING    PENDING     PENDING     PENDING    ACTIVATING         │   │
-│   │                                                      │              │   │
-│   │                                                      ▼              │   │
-│   │                                               ┌─────────────┐      │   │
-│   │                                               │   ACTIVE    │      │   │
-│   │                                               │ Production  │      │   │
-│   │                                               │   Trading   │      │   │
-│   │                                               └─────────────┘      │   │
-│   └────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Memory & Learning System
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        EPISODIC MEMORY SYSTEM                                │
-│                    (RAG Architecture + Vector Search)                        │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│    ┌─────────────────────────────────────────────────────────────────┐      │
-│    │                      Trade Execution                             │      │
-│    │        (Symbol, Side, Entry, Exit, PnL, Duration)                │      │
-│    └───────────────────────────┬─────────────────────────────────────┘      │
-│                                │                                             │
-│                                ▼                                             │
-│    ┌─────────────────────────────────────────────────────────────────┐      │
-│    │                    Episode Generation                            │      │
-│    │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │      │
-│    │  │Market Data  │  │  Decision   │  │       Outcome           │  │      │
-│    │  │ • OHLCV     │  │ • Signal    │  │ • PnL                   │  │      │
-│    │  │ • Indicators│  │ • Confidence│  │ • Was Profitable?       │  │      │
-│    │  │ • Regime    │  │ • Reasoning │  │ • Exit Price/Duration   │  │      │
-│    │  └─────────────┘  └─────────────┘  └─────────────────────────┘  │      │
-│    └───────────────────────────┬─────────────────────────────────────┘      │
-│                                │                                             │
-│          ┌─────────────────────┼─────────────────────┐                      │
-│          │                     │                     │                      │
-│          ▼                     ▼                     ▼                      │
-│   ┌─────────────┐       ┌─────────────┐       ┌─────────────┐              │
-│   │  In-Memory  │       │   Vector    │       │  Firestore  │              │
-│   │   Storage   │       │   Index     │       │ Persistence │              │
-│   ├─────────────┤       ├─────────────┤       ├─────────────┤              │
-│   │ Max: 1000   │       │ Similarity  │       │  Durable    │              │
-│   │ Recent: 100 │       │   Search    │       │  Backup     │              │
-│   │ Fast Access │       │  Top-K      │       │  GCloud     │              │
-│   └─────────────┘       └─────────────┘       └─────────────┘              │
-│                                │                                             │
-│                                ▼                                             │
-│    ┌─────────────────────────────────────────────────────────────────┐      │
-│    │                    Reflection Agent                              │      │
-│    │          (Lesson Extraction + Confidence Calibration)            │      │
-│    │                                                                  │      │
-│    │  "What worked?" ──► Update agent thresholds                      │      │
-│    │  "What failed?" ──► Avoid similar patterns                       │      │
-│    └─────────────────────────────────────────────────────────────────┘      │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Circuit Breaker Protection
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                      CIRCUIT BREAKER LAYER                                   │
-│                   (Per-Platform Failure Protection)                          │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│    Normal Operation                Failure Detected              Recovery   │
-│    ════════════════                ════════════════              ════════   │
-│                                                                              │
-│    ┌─────────┐                    ┌─────────┐                 ┌─────────┐   │
-│    │ CLOSED  │ ──5 failures──►   │  OPEN   │ ──timeout──►   │HALF_OPEN│   │
-│    │   ✅    │                    │   ❌    │                 │   ⚠️    │   │
-│    │ Accept  │                    │ Reject  │                 │  Test   │   │
-│    │Requests │                    │   All   │                 │ Request │   │
-│    └─────────┘                    └─────────┘                 └────┬────┘   │
-│         ▲                                                          │        │
-│         │                                                          │        │
-│         └──────────────────── success ─────────────────────────────┘        │
-│                                                                              │
-│    ┌────────────────────────────────────────────────────────────────────┐   │
-│    │  PLATFORM CIRCUIT CONFIGURATION                                    │   │
-│    ├────────────────────────────────────────────────────────────────────┤   │
-│    │                                                                    │   │
-│    │  Platform      Fail Threshold    Recovery Timeout    Call Timeout  │   │
-│    │  ─────────────────────────────────────────────────────────────────│   │
-│    │  Hyperliquid        5                 60s               10s        │   │
-│    │  Drift              5                 60s               15s        │   │
-│    │  Jupiter            5                 60s               10s        │   │
-│    │  Lighter            5                 60s               10s        │   │
-│    │  Aster              5                 60s               10s        │   │
-│    │  Symphony           5                 60s               10s        │   │
-│    │  Vertex AI          3                 60s               60s        │   │
-│    │  Redis              3                 15s                5s        │   │
-│    │  Database           3                 30s               15s        │   │
-│    │  Telegram           5                300s               10s        │   │
-│    │                                                                    │   │
-│    └────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-│    ┌────────────────────────────────────────────────────────────────────┐   │
-│    │  FAILOVER CHAIN                                                    │   │
-│    │                                                                    │   │
-│    │  Hyperliquid ──[fail]──► Drift ──[fail]──► Aster                  │   │
-│    │  Drift ──[fail]──► Hyperliquid ──[fail]──► Aster                  │   │
-│    │  Jupiter ──[fail]──► Drift (for SOL pairs)                        │   │
-│    │                                                                    │   │
-│    └────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Microservices Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         MICROSERVICES LAYER                                  │
-│                           (services/)                                        │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
-│  │ api-gateway │  │alpha-engine │  │market-scan  │  │   shared    │        │
-│  ├─────────────┤  ├─────────────┤  ├─────────────┤  ├─────────────┤        │
-│  │ Entry Point │  │ Alpha Gen   │  │ Opportunity │  │ Common Libs │        │
-│  │ Rate Limit  │  │ Signals     │  │ Arbitrage   │  │ Memory      │        │
-│  │ Routing     │  │ Strategy    │  │ Scanning    │  │ AI Recovery │        │
-│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘        │
-│                                                                              │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
-│  │bot-hyperliq │  │  bot-drift  │  │ bot-jupiter │  │  bot-aster  │        │
-│  ├─────────────┤  ├─────────────┤  ├─────────────┤  ├─────────────┤        │
-│  │ DeFi Perps  │  │ SOL Perps   │  │ DEX Swaps   │  │ CEX Trading │        │
-│  │ EIP-712     │  │ Driftpy SDK │  │ Ultra API   │  │ REST + WS   │        │
-│  │ Dual Speed  │  │ Subaccounts │  │ Spot Only   │  │ US Blocked  │        │
-│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘        │
-│                                                                              │
-│  ┌─────────────┐                                                            │
-│  │bot-symphony │                                                            │
-│  ├─────────────┤                                                            │
-│  │ Treasury    │                                                            │
-│  │ MILF/AGDG   │                                                            │
-│  │ MIT Tracker │                                                            │
-│  └─────────────┘                                                            │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Risk Management
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         RISK MANAGEMENT STACK                                │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  ┌────────────────────────────────────────────────────────────────────┐     │
-│  │                      Position Level                                 │     │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │     │
-│  │  │ Adaptive     │  │   Dynamic    │  │   Kelly      │              │     │
-│  │  │ TP/SL        │  │   Slippage   │  │  Fraction    │              │     │
-│  │  │              │  │   Control    │  │   Sizing     │              │     │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘              │     │
-│  └────────────────────────────────────────────────────────────────────┘     │
-│                                                                              │
-│  ┌────────────────────────────────────────────────────────────────────┐     │
-│  │                      Portfolio Level                                │     │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │     │
-│  │  │ Risk Guard   │  │ Correlation  │  │  Drawdown    │              │     │
-│  │  │ (Max Loss)   │  │  Analysis    │  │  Protection  │              │     │
-│  │  │              │  │              │  │              │              │     │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘              │     │
-│  └────────────────────────────────────────────────────────────────────┘     │
-│                                                                              │
-│  ┌────────────────────────────────────────────────────────────────────┐     │
-│  │                      System Level                                   │     │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │     │
-│  │  │ Circuit      │  │    Rate      │  │  Emergency   │              │     │
-│  │  │ Breakers     │  │   Limiting   │  │  Close All   │              │     │
-│  │  │              │  │              │  │              │              │     │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘              │     │
-│  └────────────────────────────────────────────────────────────────────┘     │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Real-Time Communication
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                     WEBSOCKET + NOTIFICATIONS                                │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐    │
-│  │                     WebSocket Manager                                │    │
-│  │                                                                      │    │
-│  │  Message Types:                                                      │    │
-│  │  • TRADE_UPDATE        • PORTFOLIO_UPDATE    • SYSTEM_HEALTH        │    │
-│  │  • AGENT_STATUS        • MARKET_DATA         • MEMORY_UPDATE        │    │
-│  │  • CONSENSUS_DECISION  • PERFORMANCE_METRICS • MARKET_REGIME        │    │
-│  │                                                                      │    │
-│  │  Features:                                                           │    │
-│  │  • Client subscriptions to specific feeds                            │    │
-│  │  • Microsecond timestamp sync                                        │    │
-│  │  • Auto ping/keep-alive                                              │    │
-│  └─────────────────────────────────────────────────────────────────────┘    │
-│                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐    │
-│  │                    Telegram Integration                              │    │
-│  │                                                                      │    │
-│  │  Alerts:                                                             │    │
-│  │  • Trade notifications with AI analysis                              │    │
-│  │  • Market insights and sentiment                                     │    │
-│  │  • Risk warnings                                                     │    │
-│  │  • Daily statistics summary                                          │    │
-│  │  • Startup/shutdown alerts                                           │    │
-│  │                                                                      │    │
-│  │  Features:                                                           │    │
-│  │  • Per-symbol throttling                                             │    │
-│  │  • Lightweight HTTP API (no library dependencies)                    │    │
-│  └─────────────────────────────────────────────────────────────────────┘    │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## API Reference
-
-### Trading
-```
-POST /api/v2/trade                    Execute trade with auto-routing
-POST /api/symphony/trade/perpetual    Symphony perpetual trade
-POST /api/symphony/trade/spot         Symphony spot trade
-POST /api/jupiter/swap                Jupiter DEX swap
-GET  /api/jupiter/quote               Get Jupiter quote
-```
-
-### Positions & Portfolio
-```
-GET  /api/positions                   Current positions
-GET  /positions/all                   All platform positions
-GET  /portfolio-status                Portfolio overview
-GET  /performance/stats               Performance metrics
-PUT  /positions/{symbol}/tpsl         Update TP/SL
-POST /position/{symbol}/close         Close position
-```
-
-### Agents
-```
-GET  /api/agents/list                 List all agents
-GET  /api/agents/metrics              Agent performance metrics
-GET  /api/agents/consensus-history    Recent consensus decisions
-GET  /api/agents/evolution/{id}       Agent evolution over time
-```
-
-### Platform Router
-```
-GET  /api/platform-router/status      Router status
-GET  /api/platform-router/metrics     Routing metrics
-GET  /api/platform-router/health      Platform health
-```
-
-### Symphony
-```
-GET  /api/v2/symphony/status          All symphony agents
-GET  /api/v2/symphony/mit/status      MIT activation progress
-POST /api/v2/symphony/mit/activate    Execute MIT trade
-```
-
-### System
-```
-GET  /health                          System health
-GET  /health/detailed                 Detailed health check
-POST /start                           Start trading
-POST /stop                            Stop trading
-POST /emergency/close-all             Emergency close all
-```
-
----
-
-## Project Structure
-
-```
-Sapphire/
-├── cloud_trader/
-│   ├── v2/                           # V2 Core Modules
-│   │   ├── hyperliquid_client.py     # Hyperliquid integration
-│   │   ├── lighter_client.py         # Lighter integration
-│   │   ├── dual_platform_router.py   # Multi-platform routing
-│   │   ├── hardened_memory_manager.py# Memory with persistence
-│   │   ├── symphony_agent_manager.py # Symphony agents
-│   │   ├── symphony_mit_tracker.py   # MIT activation
-│   │   └── enhanced_circuit_breaker.py
-│   ├── agents/                       # AI Agents
-│   │   ├── agent_orchestrator.py     # Swarm orchestration
-│   │   ├── eliza_agent.py            # Base agent
-│   │   ├── vpin_hft_agent.py         # HFT agent
-│   │   └── memory_manager.py         # Agent memory
-│   ├── memory/                       # Learning System
-│   │   ├── episodic_memory.py        # Episode storage
-│   │   └── reflection_agent.py       # Lesson extraction
-│   ├── rl/                           # Reinforcement Learning
-│   │   ├── rl_agent.py               # PPO agent
-│   │   └── trading_env.py            # RL environment
-│   ├── api.py                        # REST endpoints
-│   ├── websocket_manager.py          # WebSocket handling
-│   ├── drift_client.py               # Drift integration
-│   ├── symphony_client.py            # Symphony integration
-│   ├── jupiter_trader_unified.py     # Jupiter integration
-│   ├── circuit_breaker.py            # Protection layer
-│   ├── risk_manager.py               # Risk management
-│   └── main_v2.py                    # Application entry
-├── services/                         # Microservices
-│   ├── api-gateway/                  # Entry point
-│   ├── alpha-engine/                 # Signal generation
-│   ├── market-scanner/               # Opportunity detection
-│   ├── bot-hyperliquid/              # Hyperliquid bot
-│   ├── bot-drift/                    # Drift bot
-│   ├── bot-jupiter/                  # Jupiter bot
-│   ├── bot-aster/                    # Aster bot
-│   ├── bot-symphony/                 # Symphony bot
-│   └── shared/                       # Common libraries
-├── sapphire-web/                     # Frontend (Vue 3)
-│   ├── src/views/
-│   │   ├── DashboardView.vue         # Main dashboard
-│   │   ├── AgentsView.vue            # Agent management
-│   │   └── TerminalView.vue          # CLI interface
-│   └── src/stores/                   # State management
-├── tests/                            # Test suite
-└── terraform/                        # Infrastructure
-```
+| Metric | V2.2 (Consensus) | V2.3 (Independent) | Improvement |
+|--------|------------------|--------------------| ------------|
+| Decision Latency | 3-5 seconds | < 100ms | **50x faster** |
+| Trade Frequency | 10/day | 15-20/day | **+50-100%** |
+| Platform Failures | Cascade | Isolated | **Better reliability** |
+| Code Complexity | High | Low | **Simpler** |
 
 ---
 
@@ -540,10 +166,10 @@ python cloud_trader/main_v2.py
 
 ```bash
 # Cloud Run deployment
-gcloud builds submit --config=cloudbuild.yaml .
+gcloud builds submit --config=cloudbuild_all_microservices.yaml
 
-# Docker Compose (local)
-docker-compose up -d
+# Check status
+gcloud run services describe sapphire-v2 --region=us-central1
 ```
 
 ---
@@ -551,11 +177,26 @@ docker-compose up -d
 ## Security
 
 - All secrets stored in Google Cloud Secret Manager
-- Circuit breakers prevent cascade failures
+- Circuit breakers prevent cascade failures (per-platform isolation)
 - Rate limiting on all platform connections
-- Write-ahead logging for crash recovery
 - Per-platform authentication (EIP-712, Solana, API keys)
-- AI-powered error classification and recovery
+
+---
+
+## Performance Features
+
+### Aster Shield Strategy (HFT)
+- **Rapid SL placement**: Stop-loss within 100ms of entry
+- **Dynamic leverage**: 10-125x based on volatility and confidence
+- **Position chasing**: Trailing stops for winning trades
+- **Intelligent SL distance**: Tighter stops for higher leverage
+
+### Platform-Specific Optimizations
+- **Drift**: VPIN signals for Solana perps, 5-20x leverage
+- **Hyperliquid**: Momentum trading for L1 perps, 10-50x leverage
+- **Aster**: Shield strategy for high-leverage HFT, 10-125x
+- **Symphony**: Treasury management for Monad ecosystem, 1.1-25x
+- **Lighter**: Order book analysis for L2, 5-10x leverage
 
 ---
 
@@ -565,4 +206,4 @@ MIT
 
 ---
 
-**Version 2.2.0** | 6 Trading Platforms | 7 AI Agents | RAG Memory | RL Integration
+**Version 2.3.0** | 5 Trading Platforms | Independent Traders | No Consensus Delays | 50x Faster

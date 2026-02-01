@@ -1,12 +1,22 @@
 """
-Platform Router - Universal Execution Layer for Sapphire.
-Handles intelligent routing between Aster, Drift, Hyperliquid, Symphony, and Lighter.
+Platform Router - Direct Execution Layer for Sapphire V2.3
 
-Optimizes for:
-1. Low latency (Fastest execution path)
-2. Fees (Cheapest platform for the asset)
-3. Liquidity (Deepest order books)
-4. Resilience (Failover to secondary platforms)
+ARCHITECTURE: Independent Platform Traders (No Consensus)
+============================================================
+Each trader operates autonomously on its dedicated platform:
+- Drift Trader    → Drift Platform only (Solana Perps)
+- Hyperliquid     → Hyperliquid only (L1 Perps)
+- Aster Trader    → Aster only (CEX with Shield Strategy)
+- Symphony Trader → Symphony only (Monad Treasury)
+- Lighter Trader  → Lighter only (Eth L2)
+
+Benefits:
+1. SPEED: No consensus delays (3-5s eliminated)
+2. AUTONOMY: Each trader makes independent decisions
+3. PLATFORM EXPERTISE: Optimized for specific platform quirks
+4. RESILIENCE: Platform failures don't affect others
+
+Removed: Multi-platform failover, consensus voting, complex routing logic
 """
 
 import asyncio
@@ -86,6 +96,10 @@ class PlatformRouter:
         self.stats = {
             p.value: {"trades": 0, "wins": 0, "errors": 0, "avg_latency": 0.0} for p in PlatformType
         }
+
+        # INDEPENDENT MODE: Each trader executes directly on its platform (no consensus)
+        self.independent_mode = True
+        logger.info("⚡ INDEPENDENT MODE ENABLED: Traders operate autonomously (no consensus)")
 
         # Initialize circuit breakers for each platform
         from .circuit_breaker import CircuitBreakerConfig, get_circuit_breaker
@@ -437,10 +451,25 @@ class PlatformRouter:
                     )
 
             except Exception as breaker_exc:
-                # Circuit breaker is OPEN or call failed - attempt failover
+                # Circuit breaker is OPEN or call failed
                 logger.warning(f"⚠️ [ROUTER] {platform.value} unavailable: {breaker_exc}")
 
-                # Attempt failover to alternative platform
+                # INDEPENDENT MODE: No cross-platform failover
+                # Each trader is responsible for its own platform only
+                if self.independent_mode:
+                    logger.info(f"🚫 [INDEPENDENT] No failover - {platform.value} trader handles its own platform")
+                    return ExecutionResult(
+                        success=False,
+                        platform=platform,
+                        symbol=symbol,
+                        side=side,
+                        quantity=quantity,
+                        error=f"Platform {platform.value} unavailable (independent mode)",
+                        latency_ms=int((time.time() - start_time) * 1000),
+                    )
+
+                # Legacy mode: Attempt failover to alternative platform (disabled in V2.3)
+                # Keeping code for reference, but independent_mode=True disables this
                 fallback_platform = self._get_fallback_platform(platform, symbol)
                 if fallback_platform and fallback_platform != platform:
                     logger.info(f"🔄 [ROUTER] Failing over to {fallback_platform.value}")

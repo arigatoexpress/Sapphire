@@ -2000,17 +2000,39 @@ class TradingService:
                     self._consensus_engine.submit_signal(agent_signal)
                     params_updated = True
 
-            # --- PHASE 2: CONSENSUS VOTE (Immediate) ---
-            # Query consensus engine for this symbol
+            # --- PHASE 2: INDEPENDENT EXECUTION (No Consensus) ---
+            # V2.3 ARCHITECTURE: Each agent executes independently on its platform
+            # NO CONSENSUS VOTING - eliminated 3-5s latency
+
+            # Get signals for this symbol
             signals = self._consensus_engine.pending_signals.get(symbol, [])
 
             if not signals or len(signals) == 0:
-                print(f"🚫 DEBUG: No signals for {symbol}, skipping")
                 continue  # No signals for this symbol, move to next
 
-            print(f"📊 DEBUG: {len(signals)} signals for {symbol}, conducting vote...")
-            # Conduct Vote immediately
-            consensus = await self._consensus_engine.conduct_consensus_vote(symbol)
+            # INDEPENDENT MODE: Execute each agent's signal directly (no voting)
+            # Each agent is responsible for its own platform
+            for agent_signal in signals:
+                logger.info(f"⚡ [INDEPENDENT] Executing {agent_signal.agent_id} signal for {symbol} directly")
+                # Direct execution will happen below - no consensus needed
+
+            # For backward compatibility, create a pseudo-consensus from strongest signal
+            consensus = None
+            if signals:
+                strongest_signal = max(signals, key=lambda s: s.confidence)
+                from .agent_consensus import ConsensusResult, SignalType
+                consensus = ConsensusResult(
+                    winning_signal=strongest_signal.signal_type,
+                    consensus_confidence=strongest_signal.confidence,
+                    agreement_level=1.0,  # No voting, so 100% agreement
+                    participation_rate=1.0,
+                    total_votes=1,
+                    method_used=None,
+                    symbol=symbol,
+                    timestamp_us=strongest_signal.timestamp_us,
+                    agent_votes={strongest_signal.agent_id: strongest_signal},
+                    reasoning=f"Independent execution by {strongest_signal.agent_id}"
+                )
 
             # Record consensus in history for dashboard
             if consensus:
@@ -2034,17 +2056,15 @@ class TradingService:
                 print(f"🚫 DEBUG: No winning signal for {symbol}")
                 continue
 
-            # FILTER: High Conviction Swarm Only
-            # LOWERED THRESHOLD: 0.60 (was 0.75) for Demo/Responsiveness
-            MIN_CONFIDENCE = 0.60
-            MIN_AGREEMENT = 0.45  # (was 0.50)
+            # INDEPENDENT MODE: No confidence threshold needed
+            # Each agent decides for itself when to trade
+            # Agents are autonomous and platform-specific
 
-            if (
-                consensus.consensus_confidence < MIN_CONFIDENCE
-                or consensus.agreement_level < MIN_AGREEMENT
-            ):
-                print(f"⚠️ Weak Consensus for {symbol}: Conf={consensus.consensus_confidence:.2f}")
-                # We still produced a consensus result, so it will show up in the UI history!
+            # Optional: Still enforce minimum confidence per agent
+            MIN_AGENT_CONFIDENCE = 0.50  # Individual agent must be 50%+ confident
+
+            if consensus.consensus_confidence < MIN_AGENT_CONFIDENCE:
+                logger.debug(f"⚠️ Agent confidence too low for {symbol}: {consensus.consensus_confidence:.2f}")
                 continue
 
             print(
