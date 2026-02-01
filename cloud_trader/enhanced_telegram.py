@@ -98,7 +98,8 @@ class EnhancedTelegramService:
         import os
 
         logger.info("✅ Telegram Service (Enhanced with Interactive Commands) Initialized")
-        await self.send_startup_notification()
+        # Send startup notification in background (don't block initialization)
+        asyncio.create_task(self.send_startup_notification())
 
         # Only start listener if explicitly enabled (prevents conflicts in multi-instance deployments)
         enable_listener = os.getenv("ENABLE_TELEGRAM_LISTENER", "false").lower() == "true"

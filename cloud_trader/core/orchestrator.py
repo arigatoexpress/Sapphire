@@ -150,13 +150,20 @@ class TradingOrchestrator:
 
     async def _initialize_components(self):
         """Initialize all trading components."""
+        import time
+
+        start_time = time.time()
+        logger.info("⏱️ [INIT] Starting component initialization...")
+
         # 0. API Credentials & Platform Clients
         from ..credentials import load_credentials
         from ..drift_client import DriftClient
         from ..exchange import AsterClient
         from ..symphony_client import SymphonyClient
 
+        step_start = time.time()
         creds = load_credentials()
+        logger.info(f"⏱️ [INIT] Credentials loaded in {time.time() - step_start:.2f}s")
 
         # Inject ALL secrets into settings for global reuse
         if creds.telegram_bot_token:
@@ -178,33 +185,35 @@ class TradingOrchestrator:
         logger.info("🔑 All API credentials loaded from GCP Secret Manager")
 
         # Initialize Aster (only if enabled)
+        step_start = time.time()
         if self.config.enable_aster:
             self._exchange_client = AsterClient(credentials=creds, base_url=self.settings.rest_base_url)
-            logger.info("🔌 Aster Client Initialized")
+            logger.info(f"🔌 Aster Client Initialized in {time.time() - step_start:.2f}s")
         else:
             logger.info("ℹ️ Aster disabled, skipping initialization")
 
         # Initialize Drift
+        step_start = time.time()
         if self.config.enable_drift:
             self.drift = DriftClient(rpc_url=self.settings.solana_rpc_url)
             await self.drift.initialize()
-            logger.info("🔌 Drift Client Initialized")
+            logger.info(f"🔌 Drift Client Initialized in {time.time() - step_start:.2f}s")
         else:
             logger.info("ℹ️ Drift disabled, skipping initialization")
 
         # Initialize Symphony
+        step_start = time.time()
         if self.config.enable_symphony:
             self.symphony = SymphonyClient()
-            logger.info("🔌 Symphony Client Initialized")
-            # Ensure agents are registered on Symphony
-            try:
-                await self.symphony.ensure_agents_registered()
-            except Exception as e:
-                logger.warning(f"⚠️ Symphony agent registration check failed: {e}")
+            logger.info(f"🔌 Symphony Client Initialized in {time.time() - step_start:.2f}s")
+            # Ensure agents are registered on Symphony (skip during startup - do lazy)
+            # This can be slow, so we'll do it on first trade attempt instead
+            logger.info("ℹ️ Symphony agent registration deferred to first trade (lazy init)")
         else:
             logger.info("ℹ️ Symphony disabled, skipping initialization")
 
         # Initialize Hyperliquid (only if enabled AND credentials exist)
+        step_start = time.time()
         if self.config.enable_hyperliquid and creds.hl_private_key and creds.hl_account_address:
             try:
                 from ..v2.hyperliquid_client import HyperliquidClient
@@ -213,9 +222,9 @@ class TradingOrchestrator:
                     wallet_address=creds.hl_account_address,
                 )
                 await self.hl_client.initialize()
-                logger.info("🔌 Hyperliquid Client Initialized")
+                logger.info(f"🔌 Hyperliquid Client Initialized in {time.time() - step_start:.2f}s")
             except Exception as e:
-                logger.warning(f"⚠️ Hyperliquid initialization failed: {e}")
+                logger.warning(f"⚠️ Hyperliquid initialization failed in {time.time() - step_start:.2f}s: {e}")
                 self.hl_client = None
         else:
             if not self.config.enable_hyperliquid:
@@ -224,6 +233,7 @@ class TradingOrchestrator:
                 logger.info("ℹ️ Hyperliquid credentials not found, skipping initialization")
 
         # Initialize Lighter (only if enabled AND credentials exist)
+        step_start = time.time()
         if self.config.enable_lighter and creds.lighter_pub_key and creds.lighter_priv_key:
             try:
                 from ..v2.lighter_client import LighterClient
@@ -232,9 +242,9 @@ class TradingOrchestrator:
                     priv_key=creds.lighter_priv_key,
                 )
                 await self.lighter_client.initialize()
-                logger.info("🔌 Lighter Client Initialized")
+                logger.info(f"🔌 Lighter Client Initialized in {time.time() - step_start:.2f}s")
             except Exception as e:
-                logger.warning(f"⚠️ Lighter initialization failed: {e}")
+                logger.warning(f"⚠️ Lighter initialization failed in {time.time() - step_start:.2f}s: {e}")
                 self.lighter_client = None
         else:
             if not self.config.enable_lighter:
@@ -243,9 +253,11 @@ class TradingOrchestrator:
                 logger.info("ℹ️ Lighter credentials not found, skipping initialization")
 
         # Initialize Jupiter (only if enabled AND credentials exist)
+        step_start = time.time()
         if self.config.enable_jupiter and creds.jupiter_api_key and creds.solana_private_key:
             try:
                 from ..jupiter_trader_unified import JupiterTraderUnified
+                logger.info("⏱️ [INIT] Starting Jupiter client initialization...")
                 self.jupiter_client = JupiterTraderUnified(
                     api_key=creds.jupiter_api_key,
                     private_key_b58=creds.solana_private_key,
@@ -255,9 +267,9 @@ class TradingOrchestrator:
                     enable_hft_strategy=False,  # Enable later when ready
                 )
                 await self.jupiter_client.start()
-                logger.info("🔌 Jupiter Client Initialized")
+                logger.info(f"🔌 Jupiter Client Initialized in {time.time() - step_start:.2f}s")
             except Exception as e:
-                logger.warning(f"⚠️ Jupiter initialization failed: {e}")
+                logger.warning(f"⚠️ Jupiter initialization failed in {time.time() - step_start:.2f}s: {e}")
                 self.jupiter_client = None
         else:
             if not self.config.enable_jupiter:
@@ -266,18 +278,20 @@ class TradingOrchestrator:
                 logger.info("ℹ️ Jupiter credentials not found, skipping initialization")
 
         # Initialize Trade Verification Service (for blockchain trades)
+        step_start = time.time()
         try:
             from ..trade_verification import TradeVerificationService
             self.trade_verification = TradeVerificationService(
                 solana_rpc_url=self.settings.solana_rpc_url,
                 verification_timeout=30,
             )
-            logger.info("🔌 Trade Verification Service Initialized")
+            logger.info(f"🔌 Trade Verification Service Initialized in {time.time() - step_start:.2f}s")
         except Exception as e:
-            logger.warning(f"⚠️ Trade Verification initialization failed: {e}")
+            logger.warning(f"⚠️ Trade Verification initialization failed in {time.time() - step_start:.2f}s: {e}")
             self.trade_verification = None
 
         # 1. Monitoring Service (First modular service)
+        step_start = time.time()
         from ..agents.agent_orchestrator import AgentOrchestrator
         from ..execution.position_tracker import PositionTracker
         from .monitoring import MonitoringService
@@ -285,24 +299,30 @@ class TradingOrchestrator:
 
         self.monitoring = MonitoringService(self.settings)
         await self.monitoring.start()
+        logger.info(f"⏱️ [INIT] Monitoring Service started in {time.time() - step_start:.2f}s")
 
         # 2. Telegram Listener (DISABLED - Using MonitoringService for notifications only)
         # Prevents HTTP 409 conflict with Telegram Bot API (can't have multiple polling instances)
         logger.info("ℹ️ Telegram Listener disabled - using MonitoringService for notifications only")
 
         # 2a. Platform Router
+        step_start = time.time()
         self.platform_router = PlatformRouter(self)
+        logger.info(f"⏱️ [INIT] Platform Router created in {time.time() - step_start:.2f}s")
 
         # 3. Position Tracker
+        step_start = time.time()
         self.position_tracker = PositionTracker(self.platform_router)
-
-        # Connect position tracker to monitoring for PnL updates
         self.monitoring.set_position_tracker(self.position_tracker)
+        logger.info(f"⏱️ [INIT] Position Tracker created in {time.time() - step_start:.2f}s")
 
         # 4. Agent Orchestrator (manages all AI agents)
+        step_start = time.time()
         self.agent_orchestrator = AgentOrchestrator(monitoring=self.monitoring)
+        logger.info(f"⏱️ [INIT] Agent Orchestrator created in {time.time() - step_start:.2f}s")
 
         # 5. Trading Loop
+        step_start = time.time()
         self.trading_loop = TradingLoop(
             orchestrator=self,
             agents=self.agent_orchestrator,
@@ -310,8 +330,10 @@ class TradingOrchestrator:
             router=self.platform_router,
             monitoring=self.monitoring,
         )
+        logger.info(f"⏱️ [INIT] Trading Loop created in {time.time() - step_start:.2f}s")
 
-        logger.info("✅ All components initialized")
+        total_time = time.time() - start_time
+        logger.info(f"✅ All components initialized in {total_time:.2f}s total")
 
         # Warm up precision cache for all platforms (prevents runtime errors)
         try:
