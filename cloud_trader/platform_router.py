@@ -142,6 +142,9 @@ class PlatformRouter:
         if hasattr(self.service, 'config'):
             config = self.service.config
             logger.debug(f"🔍 [ROUTER] Checking config for enabled platforms...")
+            if getattr(config, 'enable_jupiter', False):
+                enabled_platforms.append(PlatformType.JUPITER)
+                logger.debug(f"  ✓ Jupiter enabled")
             if getattr(config, 'enable_hyperliquid', False):
                 enabled_platforms.append(PlatformType.HYPERLIQUID)
                 logger.debug(f"  ✓ Hyperliquid enabled")
