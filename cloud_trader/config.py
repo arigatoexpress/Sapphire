@@ -96,7 +96,9 @@ class Settings(BaseSettings):
     def symbols(self) -> List[str]:
         """Get trading symbols from env var or use platform-appropriate defaults."""
         if self.trading_symbols:
-            return [s.strip().upper() for s in self.trading_symbols.split(",") if s.strip()]
+            # Support both comma and semicolon separators (semicolon for gcloud compatibility)
+            separator = ";" if ";" in self.trading_symbols else ","
+            return [s.strip().upper() for s in self.trading_symbols.split(separator) if s.strip()]
 
         # Platform-specific defaults based on enabled platforms
         if getattr(self, 'enable_jupiter', False):
