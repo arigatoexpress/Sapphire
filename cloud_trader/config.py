@@ -57,6 +57,14 @@ class Settings(BaseSettings):
     # Administrative API security
     admin_api_token: str | None = Field(default=None, validation_alias="ADMIN_API_TOKEN")
 
+    # Platform enable flags (for platform-specific symbol defaults)
+    enable_jupiter: bool = Field(default=False, validation_alias="ENABLE_JUPITER")
+    enable_drift: bool = Field(default=False, validation_alias="ENABLE_DRIFT")
+    enable_aster: bool = Field(default=False, validation_alias="ENABLE_ASTER")
+    enable_hyperliquid: bool = Field(default=False, validation_alias="ENABLE_HYPERLIQUID")
+    enable_symphony: bool = Field(default=False, validation_alias="ENABLE_SYMPHONY")
+    enable_lighter: bool = Field(default=False, validation_alias="ENABLE_LIGHTER")
+
     # Database configuration
     database_enabled: bool = Field(default=True, validation_alias="DATABASE_ENABLED")
 
@@ -80,15 +88,32 @@ class Settings(BaseSettings):
             raise ValueError(f"Invalid URL: {v}")
 
     # Trading configuration
-    symbols: List[str] = Field(
-        default_factory=lambda: [
-            "BTCUSDT",
-            "ETHUSDT",
-            "BNBUSDT",
-            "SOLUSDT",
-            "XRPUSDT",
-        ]  # Default popular symbols
-    )
+    # Platform-specific symbol configuration via environment variable
+    # Format: Comma-separated list, e.g., "SOL,BONK,WIF" for Jupiter
+    trading_symbols: str | None = Field(default=None, validation_alias="TRADING_SYMBOLS")
+
+    @property
+    def symbols(self) -> List[str]:
+        """Get trading symbols from env var or use platform-appropriate defaults."""
+        if self.trading_symbols:
+            return [s.strip().upper() for s in self.trading_symbols.split(",") if s.strip()]
+
+        # Platform-specific defaults based on enabled platforms
+        if getattr(self, 'enable_jupiter', False):
+            return ["SOL", "BONK", "WIF", "JUP", "JTO"]  # Solana tokens
+        elif getattr(self, 'enable_drift', False):
+            return ["SOL-PERP", "BTC-PERP", "ETH-PERP"]  # Drift perps
+        elif getattr(self, 'enable_aster', False):
+            return ["BTCUSDT", "ETHUSDT", "SOLUSDT"]  # CEX-style
+        elif getattr(self, 'enable_hyperliquid', False):
+            return ["BTC", "ETH", "SOL"]  # Hyperliquid perps
+        elif getattr(self, 'enable_symphony', False):
+            return ["ETH", "MON", "USDC"]  # Monad/Base tokens
+        elif getattr(self, 'enable_lighter', False):
+            return ["SOL", "ETH", "BTC"]  # L2 tokens
+        else:
+            # Fallback to conservative defaults
+            return ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
     decision_interval_seconds: int = Field(
         default=10, ge=5, le=300
     )  # Faster decisions for PvP trading
