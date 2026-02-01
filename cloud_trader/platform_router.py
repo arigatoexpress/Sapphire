@@ -511,11 +511,24 @@ class PlatformRouter:
             latency_ms = int((time.time() - start_time) * 1000)
             result.latency_ms = latency_ms
 
+            # V2.3: Record execution speed for performance monitoring
+            from .execution_monitor import get_execution_monitor
+            monitor = get_execution_monitor()
+            monitor.record_execution(
+                platform=platform.value,
+                symbol=symbol,
+                total_latency_ms=latency_ms,
+                success=result.success
+            )
+
             # Log to internal history
             self._record_result(result)
 
             if result.success:
-                logger.info(f"✅ [ROUTER] SUCCESS on {platform.value}: {symbol} {side}")
+                logger.info(
+                    f"✅ [ROUTER] SUCCESS on {platform.value}: {symbol} {side} "
+                    f"({latency_ms}ms)"
+                )
                 return result
             else:
                 # Execution failed at platform level - trigger AI Error Recovery
