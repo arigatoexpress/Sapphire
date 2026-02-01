@@ -16,37 +16,41 @@ class HealthStatus:
 
 
 AGENT_DEFINITIONS: List[Dict[str, Any]] = [
+    # V2.3: AUTONOMOUS LEARNING AGENTS
+    # Agents discover their own strategies through experience
+    # NO hardcoded methods (no VPIN, Momentum, etc.)
+    # Each platform trader learns what works best on its exchange
     {
-        "id": "trend-momentum-agent",
-        "name": "Momentum Trader",
+        "id": "aster-autonomous-trader",
+        "name": "Aster Autonomous Trader",
         "model": "gemini-3.0-flash-001",
         "system": "aster",
-        "emoji": "📈",
-        "type": "momentum",
-        "symbols": [],
-        "description": "High-speed momentum analysis for rapid directional trades.",
-        "personality": "Aggressive momentum trader chasing breakouts.",
-        "baseline_win_rate": 0.65,
-        "risk_multiplier": 1.4,
-        "profit_target": 0.025,  # 2.5% TP
-        "stop_loss": 0.012,  # 1.2% SL
+        "emoji": "⚡",
+        "type": "adaptive_learning",  # Self-improving agent
+        "symbols": [],  # Trades all available symbols
+        "description": "Autonomous learning agent that discovers optimal trading strategies for Aster CEX through experience.",
+        "personality": "Curious, adaptive trader that learns from every trade and evolves strategies organically.",
+        "baseline_win_rate": 0.50,  # Starts neutral, improves through learning
+        "risk_multiplier": 1.5,
+        "profit_target": 0.025,  # Initial target, will adapt
+        "stop_loss": 0.012,  # Initial stop, will adapt
         "margin_allocation": 1000.0,
-        "specialization": "momentum_trading",
-        # Self-tuning: agent can modify these based on performance
+        "specialization": "autonomous_learning",  # No fixed strategy
+        # Self-tuning: agent modifies ALL parameters based on what works
         "self_tuning_enabled": True,
         "adaptive_params": {
-            "confidence_threshold": 0.35,
-            "leverage": 20.0,
+            "confidence_threshold": 0.40,  # Will adapt based on success
+            "leverage": 20.0,  # Will discover optimal leverage
             "position_size_pct": 0.15,
         },
-        "max_leverage_limit": 50.0,
-        "risk_tolerance": "high",
-        "time_horizon": "very_short",
-        # ATR-based dynamic TP/SL (multipliers of ATR)
-        "atr_tp_multiplier": 3.0,
-        "atr_sl_multiplier": 1.0,
-        # Regime preferences (boost/reduce activity)
-        "preferred_regimes": ["trending_up", "trending_down"],
+        "max_leverage_limit": 125.0,  # Shield strategy can use high leverage when learned
+        "risk_tolerance": "adaptive",  # Learns optimal risk level
+        "time_horizon": "adaptive",  # Discovers best holding periods
+        # NO preferred regimes - agent learns when to trade
+        "preferred_regimes": [],
+        # Learning enabled
+        "enable_episodic_memory": True,
+        "enable_pattern_discovery": True,
     },
     {
         "id": "market-maker-agent",
@@ -170,31 +174,33 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
     },
     # Degen agent removed - consolidated into "The Ari Gold Fund"
     {
-        "id": "drift-solana-agent",
-        "name": "Drift Trader",
+        "id": "drift-autonomous-trader",
+        "name": "Drift Autonomous Trader",
         "model": "gemini-3.0-flash-001",
         "system": "drift",
         "emoji": "🌀",
-        "type": "perps",
-        "symbols": ["JUP-USDC", "PYTH-USDC", "BONK-USDC"],
-        "description": "Drift Protocol specialist for Solana ecosystem perpetuals.",
-        "personality": "Fast-acting Solana trader capturing ecosystem momentum.",
-        "baseline_win_rate": 0.62,
-        "risk_multiplier": 1.1,
-        "profit_target": 0.03,
-        "stop_loss": 0.015,
+        "type": "adaptive_learning",
+        "symbols": [],  # Learns which Solana tokens trade best
+        "description": "Autonomous learning agent mastering Drift Protocol through experience and pattern discovery.",
+        "personality": "Intelligent Solana trader that evolves strategies based on platform-specific insights.",
+        "baseline_win_rate": 0.50,  # Improves through learning
+        "risk_multiplier": 1.2,
+        "profit_target": 0.03,  # Will adapt
+        "stop_loss": 0.015,  # Will adapt
         "margin_allocation": 500.0,
-        "specialization": "PERPS",
+        "specialization": "autonomous_learning",
         "self_tuning_enabled": True,
         "adaptive_params": {
-            "confidence_threshold": 0.35,
-            "leverage": 10.0,
+            "confidence_threshold": 0.40,
+            "leverage": 10.0,  # Will discover optimal leverage for Drift
             "position_size_pct": 0.15,
         },
         "max_leverage_limit": 20.0,
-        "risk_tolerance": "medium",
-        "time_horizon": "short",
-        "preferred_regimes": ["trending_up", "trending_down"],
+        "risk_tolerance": "adaptive",
+        "time_horizon": "adaptive",
+        "preferred_regimes": [],  # Learns when to trade
+        "enable_episodic_memory": True,
+        "enable_pattern_discovery": True,
     },
     # Hyperliquid Agent Removed (Deprecated) - Coverage moved to Aster/Drift
 ]

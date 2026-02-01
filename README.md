@@ -191,12 +191,18 @@ gcloud run services describe sapphire-v2 --region=us-central1
 - **Position chasing**: Trailing stops for winning trades
 - **Intelligent SL distance**: Tighter stops for higher leverage
 
-### Platform-Specific Optimizations
-- **Drift**: VPIN signals for Solana perps, 5-20x leverage
-- **Hyperliquid**: Momentum trading for L1 perps, 10-50x leverage
-- **Aster**: Shield strategy for high-leverage HFT, 10-125x
-- **Symphony**: Treasury management for Monad ecosystem, 1.1-25x
-- **Lighter**: Order book analysis for L2, 5-10x leverage
+### Autonomous Learning System
+- **Drift**: Self-learning Solana perps trader, discovers optimal patterns through experience
+- **Hyperliquid**: Autonomous L1 trader, evolves strategies based on what works
+- **Aster**: Adaptive HFT learner, masters high-leverage execution organically
+- **Symphony**: Self-improving Monad trader, learns profitable ecosystem patterns
+- **Lighter**: Intelligent L2 trader, discovers arbitrage and market-making opportunities
+
+**NO hardcoded strategies** - Each agent develops its own methodology through:
+- Pattern discovery from successful trades
+- Continuous adaptation to market conditions
+- Platform-specific optimization through experience
+- Frequent trading with self-evolved approaches
 
 ---
 
