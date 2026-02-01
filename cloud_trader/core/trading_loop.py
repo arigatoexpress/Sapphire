@@ -50,17 +50,22 @@ class TradingLoop:
         self.router = router
         self.monitoring = monitoring
 
-        # Configuration
-        self.watchlist: List[str] = [
-            "BTC-USDC",  # Hyperliquid / Aster
-            "ETH-USDC",  # Hyperliquid / Symphony / Aster
-            "SOL-USDC",  # Hyperliquid / Aster
-            "HYPE-USDC",  # Hyperliquid / Aster
-            "JUP-USDC",  # Drift
-            "MON-USDC",  # Symphony / Aster
-            "DEGEN-USDC",  # Symphony
-            "BRETT-USDC",  # Symphony
-        ]
+        # Configuration - Use symbols from settings (respects TRADING_SYMBOLS env var)
+        from ..config import get_settings
+        settings = get_settings()
+
+        # Get symbols from environment variable or platform-specific defaults
+        raw_symbols = settings.symbols
+
+        # Normalize symbols to match platform format (add -USDC suffix if needed)
+        self.watchlist: List[str] = []
+        for symbol in raw_symbols:
+            # If symbol doesn't have a quote currency, add -USDC
+            if "-" not in symbol and "USDT" not in symbol and "USDC" not in symbol:
+                self.watchlist.append(f"{symbol}-USDC")
+            else:
+                self.watchlist.append(symbol)
+
         self.max_positions = 5
 
         # State
