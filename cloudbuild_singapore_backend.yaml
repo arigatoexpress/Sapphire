@@ -34,7 +34,7 @@ steps:
       - '--image'
       - 'gcr.io/$PROJECT_ID/sapphire-backend:${_TAG}'
       - '--region'
-      - 'asia-southeast1'
+      - 'us-central1'
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
@@ -52,7 +52,7 @@ steps:
       - '--execution-environment'
       - 'gen2'
       - '--set-env-vars'
-      - 'ENVIRONMENT=production,LOG_LEVEL=INFO,ENABLE_JUPITER=false,ENABLE_DRIFT=true,ENABLE_HYPERLIQUID=true,ENABLE_ASTER=true,ENABLE_LIGHTER=true,ENABLE_SYMPHONY=true,ENABLE_TELEGRAM_LISTENER=true,GEMINI_MODEL=gemini-2.0-flash-exp,GCP_PROJECT_ID=$PROJECT_ID,DEPLOYMENT_REGION=asia-southeast1,SOLANA_RPC_URL=https://api.mainnet-beta.solana.com'
+      - 'ENVIRONMENT=production,LOG_LEVEL=INFO,ENABLE_JUPITER=false,ENABLE_DRIFT=true,ENABLE_HYPERLIQUID=true,ENABLE_ASTER=true,ENABLE_LIGHTER=true,ENABLE_SYMPHONY=true,ENABLE_TELEGRAM_LISTENER=true,GEMINI_MODEL=gemini-2.0-flash-exp,GCP_PROJECT_ID=$PROJECT_ID,DEPLOYMENT_REGION=us-central1,SOLANA_RPC_URL=https://api.mainnet-beta.solana.com'
     id: 'deploy-backend'
     waitFor: ['push-backend']
 

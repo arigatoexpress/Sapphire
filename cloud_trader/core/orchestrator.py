@@ -6,6 +6,7 @@ Replaces the monolithic TradingService with clean separation of concerns.
 
 import asyncio
 import logging
+import os
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
@@ -70,6 +71,7 @@ class TradingOrchestrator:
         self.position_tracker = None
         self.platform_router = None
         self.telegram_listener = None
+        self.news_monitor = None  # Telegram news/alpha monitor
 
         # Platform Clients
         self._exchange_client = None  # Aster
@@ -145,6 +147,10 @@ class TradingOrchestrator:
         # Stop Telegram listener
         if self.telegram_listener:
             await self.telegram_listener.stop()
+
+        # Stop News Monitor
+        if self.news_monitor:
+            await self.news_monitor.stop()
 
         logger.info("✅ Sapphire V2 stopped gracefully")
 
@@ -331,6 +337,33 @@ class TradingOrchestrator:
             monitoring=self.monitoring,
         )
         logger.info(f"⏱️ [INIT] Trading Loop created in {time.time() - step_start:.2f}s")
+
+        # 6. Telegram News Monitor (optional - only if configured)
+        step_start = time.time()
+        enable_news_monitor = os.getenv("ENABLE_NEWS_MONITOR", "false").lower() == "true"
+        if enable_news_monitor:
+            try:
+                from ..news_trading_integration import create_news_trading_integration
+
+                # Create callback to forward news insights to trading agents
+                async def on_news_insight(insight):
+                    """Forward news insight to trading agents"""
+                    logger.info(
+                        f"📰 NEWS ALERT: {insight.affected_tokens} | "
+                        f"{insight.sentiment} | {insight.suggested_action} | "
+                        f"urgency={insight.urgency} | confidence={insight.confidence:.0%}"
+                    )
+                    # TODO: Forward to agent_orchestrator for trading decisions
+                    # For now, just log the insight
+
+                self.news_monitor = create_news_trading_integration(trading_callback=on_news_insight)
+                await self.news_monitor.start()
+                logger.info(f"⏱️ [INIT] News Monitor started in {time.time() - step_start:.2f}s")
+            except Exception as e:
+                logger.warning(f"⚠️ News Monitor initialization failed: {e}")
+                self.news_monitor = None
+        else:
+            logger.info("ℹ️ News Monitor disabled (set ENABLE_NEWS_MONITOR=true to enable)")
 
         total_time = time.time() - start_time
         logger.info(f"✅ All components initialized in {total_time:.2f}s total")

@@ -411,3 +411,6 @@ pytest-mock
 # Lighter SDK
 # lighter-sdk>=1.0.0  # DISABLED: Requires websockets>=12.0 which conflicts with solana (<12.0) and Jupiter integration
 loguru>=0.7.0
+
+# Telegram User Client for News Monitoring
+Telethon>=1.34.0
