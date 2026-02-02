@@ -264,17 +264,36 @@ class EnhancedTelegramService:
             )
         else:
             # Entry trade notification
+            # Get verified position data from kwargs
+            account_equity = kwargs.get("account_equity")
+            liquidation_price = kwargs.get("liquidation_price")
+            position_size = kwargs.get("position_size")
+            actual_usd_value = kwargs.get("actual_usd_value")
+            notional_value = kwargs.get("notional_value")
+
             msg = (
                 f"{side_emoji} **{action_text} {symbol}**\n"
                 f"━━━━━━━━━━━━━━━━━━\n"
                 f"💵 **Entry Price**: `${price:,.4f}`\n"
-                f"📦 **Size**: `{quantity:,.4f}`\n"
-                f"💰 **Value**: `${notional:,.2f}`\n"
+                f"📦 **Position Size**: `{quantity:,.4f}`\n"
             )
 
-            # Add leverage if > 1
-            if leverage and leverage > 1:
+            # Show both notional and actual USD value if leverage is used
+            if actual_usd_value and notional_value and leverage and leverage > 1:
+                msg += f"💰 **Notional Value**: `${notional_value:,.2f}`\n"
+                msg += f"💵 **USD at Risk**: `${actual_usd_value:,.2f}`\n"
                 msg += f"⚙️ **Leverage**: `{leverage}x`\n"
+            else:
+                msg += f"💰 **Value**: `${notional:,.2f}`\n"
+                if leverage and leverage > 1:
+                    msg += f"⚙️ **Leverage**: `{leverage}x`\n"
+
+            # Add account info if available
+            if account_equity:
+                msg += f"━━━━━━━━━━━━━━━━━━\n"
+                msg += f"💼 **Account Equity**: `${account_equity:,.2f}`\n"
+                if liquidation_price and liquidation_price > 0:
+                    msg += f"⚠️ **Liquidation**: `${liquidation_price:,.2f}`\n"
 
             # Add TP/SL if set
             if take_profit > 0 or stop_loss > 0:

@@ -297,36 +297,60 @@ class TradingLoop:
                 sl_price=sl_price,
             )
 
-            if result.success:
+            # CRITICAL: Verify trade actually executed before notifying
+            from .trade_verification import TradeVerificationService
+
+            verifier = TradeVerificationService(self.orchestrator)
+            verified_trade = await verifier.verify_trade(
+                execution_result=result,
+                symbol=symbol,
+                side=consensus.signal,
+                quantity=result.quantity,
+            )
+
+            if verified_trade:
                 # Track position
                 await self.positions.open(
                     symbol=symbol,
                     side=consensus.signal,
-                    quantity=result.quantity,
-                    entry_price=result.price,
-                    platform=result.platform.value,
+                    quantity=verified_trade.quantity,
+                    entry_price=verified_trade.fill_price,
+                    platform=verified_trade.platform,
                 )
-                # Notify monitoring
+
+                # Notify monitoring with VERIFIED trade data
                 await self.monitoring.notify_trade(
                     {
-                        "symbol": symbol,
-                        "side": consensus.signal,
-                        "price": result.price,
-                        "quantity": result.quantity,
-                        "platform": result.platform.value,
+                        "symbol": verified_trade.symbol,
+                        "side": verified_trade.side,
+                        "price": verified_trade.fill_price,
+                        "quantity": verified_trade.quantity,
+                        "platform": verified_trade.platform,
                         "agent_id": (
                             consensus.agent_id if hasattr(consensus, "agent_id") else "swarm"
                         ),
                         "agent_name": (
                             consensus.agent_name if hasattr(consensus, "agent_name") else "AI Swarm"
                         ),
+                        # Account & position data
+                        "account_equity": verified_trade.account_equity,
+                        "account_margin": verified_trade.account_margin,
+                        "position_size": verified_trade.position_size,
+                        "position_unrealized_pnl": verified_trade.position_unrealized_pnl,
+                        "liquidation_price": verified_trade.liquidation_price,
+                        "leverage": verified_trade.position_leverage,
+                        "notional_value": verified_trade.notional_value,
+                        "actual_usd_value": verified_trade.actual_usd_value,
                     }
                 )
 
-                logger.info(f"✅ Opened {consensus.signal} {symbol} @ {result.price}")
+                logger.info(
+                    f"✅ Opened {consensus.signal} {symbol} @ {verified_trade.fill_price} "
+                    f"(equity=${verified_trade.account_equity:.2f})"
+                )
                 return True
             else:
-                logger.warning(f"❌ Entry failed: {result.error}")
+                logger.warning(f"❌ Entry verification FAILED: {result.error or 'Trade could not be verified'}")
                 return False
 
         except Exception as e:
