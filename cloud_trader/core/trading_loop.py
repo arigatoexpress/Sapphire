@@ -226,7 +226,7 @@ class TradingLoop:
     async def _execute_entry(self, symbol: str, consensus) -> bool:
         """Execute an entry trade."""
         try:
-            # Calculate position size (Dynamic)
+            # Calculate position size (Dynamic) based on REAL platform balance
             # Use confidence from consensus if available, else default 0.5
             confidence = getattr(consensus, "confidence", 0.5)
             # Ensure confidence is float
@@ -235,7 +235,10 @@ class TradingLoop:
             except (ValueError, TypeError):
                 confidence = 0.5
 
-            size = await self._calculate_position_size(symbol, confidence)
+            # Determine platform from agent/consensus
+            platform = getattr(consensus, "platform", None) or getattr(consensus, "agent_id", "").split("-")[0] if hasattr(consensus, "agent_id") else None
+
+            size = await self._calculate_position_size(symbol, confidence, platform=platform)
 
             # Calculate TP/SL prices using Adaptive TP/SL Calculator (ATR-based)
             current_price = await self._get_current_price(symbol)
@@ -397,12 +400,14 @@ class TradingLoop:
             logger.error(f"❌ Exit error {symbol}: {e}")
             return False
 
-    async def _calculate_position_size(self, symbol: str, confidence: float = 0.5) -> float:
+    async def _calculate_position_size(self, symbol: str, confidence: float = 0.5, platform: str = None) -> float:
         """
-        Calculate position size based on portfolio risk management.
+        Calculate position size based on REAL account balance and portfolio risk management.
+
+        CRITICAL: Uses actual platform account balance, not hardcoded values
 
         Risk Framework:
-        1. Base size from portfolio allocation (max 10% per position)
+        1. Base size from REAL portfolio allocation (max 10% per position)
         2. Confidence multiplier (0.5x to 2x)
         3. Drawdown protection (reduce size after losses)
         4. Exposure limits (cap total portfolio exposure)
@@ -410,19 +415,38 @@ class TradingLoop:
 
         Returns: Position size in USD
         """
+        # === Get REAL Account Balance ===
+        from .account_balance_manager import AccountBalanceManager
+
+        balance_manager = AccountBalanceManager(self.orchestrator)
+
+        # Get real balance for the platform
+        if platform:
+            real_balance = await balance_manager.get_platform_balance(platform)
+        else:
+            # If no platform specified, use total balance
+            real_balance = await balance_manager.get_total_balance()
+
+        # Fallback to conservative estimate if balance unavailable
+        if not real_balance or real_balance <= 0:
+            logger.warning(f"⚠️ Could not fetch real balance for {platform}, using fallback $50")
+            real_balance = 50.0
+
+        base_portfolio_value = real_balance
+        logger.info(f"💰 Using REAL balance: ${base_portfolio_value:.2f} for {platform or 'total'}")
+
         # === Risk Configuration ===
-        base_portfolio_value = 1000.0  # Starting portfolio (configurable)
         max_position_pct = 0.10  # Max 10% per position
         max_total_exposure_pct = 0.50  # Max 50% total exposure
         drawdown_threshold = 0.05  # Start reducing at 5% drawdown
         max_drawdown_reduction = 0.50  # Reduce size up to 50% at max drawdown
 
         # Min/Max absolute limits
-        min_position_size = 50.0
-        max_position_size = 500.0
+        min_position_size = 5.0  # Reduced minimum to support small accounts
+        max_position_size = base_portfolio_value * max_total_exposure_pct  # Max 50% of balance
 
-        # === Step 1: Calculate base size from portfolio allocation ===
-        base_size = base_portfolio_value * max_position_pct  # $100 base
+        # === Step 1: Calculate base size from REAL portfolio allocation ===
+        base_size = base_portfolio_value * max_position_pct  # 10% of REAL balance
 
         # === Step 2: Apply confidence multiplier ===
         # Confidence 0.0 -> 0.5x, 0.5 -> 1.25x, 1.0 -> 2.0x
