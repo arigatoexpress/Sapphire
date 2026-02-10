@@ -41,15 +41,20 @@ class SapphireApp:
         """Start the trading system."""
         logger.info("🚀 Starting Sapphire V2 Trading System...")
 
+        # Start health check server FIRST so Cloud Run sees port 8080 open
+        await self._start_health_server()
+
         # Import here to avoid circular imports
         from cloud_trader.core.orchestrator import TradingOrchestrator
 
         # Initialize orchestrator
-        self.orchestrator = TradingOrchestrator()
-        await self.orchestrator.start()
-
-        # Start health check server
-        await self._start_health_server()
+        try:
+            self.orchestrator = TradingOrchestrator()
+            await self.orchestrator.start()
+        except Exception as e:
+            logger.error(f"Orchestrator startup failed: {e}")
+            # Keep health server running so Cloud Run doesn't kill the container
+            # The /health endpoint will report running=False
 
         logger.info("✅ Sapphire V2 is running!")
 
