@@ -42,6 +42,7 @@ class TimeInForce(str, Enum):
     IOC = "IOC"  # Immediate or Cancel
     FOK = "FOK"  # Fill or Kill
     GTX = "GTX"  # Good Till Crossing (Post Only)
+    HIDDEN = "HIDDEN"  # Hidden order (not visible in order book)
 
 
 class WorkingType(str, Enum):
