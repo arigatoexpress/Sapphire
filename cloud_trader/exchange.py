@@ -1,16 +1,17 @@
 """
 Aster exchange client.
 
-API Testing Results (Verified 2024):
+API Testing Results (Verified 2026):
 ====================================
 - Base URL: https://fapi.asterdex.com
-- Trading Symbols: 231 available
+- Trading Symbols: 231+ available
 - Order Types: ['LIMIT', 'MARKET', 'STOP', 'STOP_MARKET', 'TAKE_PROFIT', 'TAKE_PROFIT_MARKET', 'TRAILING_STOP_MARKET']
 - Field Names: Uses 'orderTypes' (not 'OrderType' as in some docs)
-- Hidden Orders: NOT supported via API (UI-only feature)
+- Hidden Orders: Supported via timeInForce=HIDDEN on LIMIT orders (verified via /fapi/v1/order/test)
 - Iceberg Orders: NOT supported via API (UI-only feature)
+- Aster Code: builder + feeRate params supported on /fapi/v1/order for builder attribution
 
-All trading logic uses only verified, documented API capabilities.
+All trading logic uses verified API capabilities.
 """
 
 from __future__ import annotations
@@ -625,6 +626,128 @@ class AsterClient:
         # Remove None values that the API will reject
         params = {k: v for k, v in params.items() if v is not None}
         return await self._make_request("POST", "/fapi/v1/order", params=params, signed=True)
+
+    async def place_hidden_limit_order(
+        self,
+        symbol: str,
+        side: str,
+        quantity: float,
+        price: float,
+        fill_timeout_seconds: float = 3.0,
+        poll_interval_seconds: float = 0.25,
+        market_fallback: bool = True,
+        builder: Optional[str] = None,
+        fee_rate: Optional[str] = None,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Place a hidden limit order with fill-wait and optional market fallback.
+
+        Uses timeInForce=HIDDEN so the order is not visible in the public order book.
+        Waits up to fill_timeout_seconds for fills, then cancels any remainder and
+        optionally falls back to a market order to complete the fill.
+
+        Args:
+            symbol: Trading pair (e.g. BTCUSDT)
+            side: BUY or SELL
+            quantity: Order quantity
+            price: Limit price (should be near market for quick fills)
+            fill_timeout_seconds: How long to wait for the hidden limit to fill
+            poll_interval_seconds: How often to poll order status
+            market_fallback: If True, send a market order for unfilled remainder
+            builder: Aster Code builder address for attribution
+            fee_rate: Aster Code fee rate (e.g. "0")
+
+        Returns:
+            Dict with order result, including filled qty and any fallback info.
+        """
+        import logging
+        log = logging.getLogger(__name__)
+
+        # Build hidden limit order params
+        params: Dict[str, Any] = {
+            "symbol": symbol,
+            "side": side,
+            "type": OrderType.LIMIT.value,
+            "quantity": quantity,
+            "price": price,
+            "timeInForce": TimeInForce.HIDDEN.value,
+        }
+        if builder:
+            params["builder"] = builder
+        if fee_rate is not None:
+            params["feeRate"] = str(fee_rate)
+
+        # Place the hidden limit order
+        try:
+            result = await self._make_request("POST", "/fapi/v1/order", params=params, signed=True)
+        except Exception as e:
+            log.warning(f"Hidden limit order failed for {symbol}, falling back to market: {e}")
+            if market_fallback:
+                return await self.place_order(
+                    symbol=symbol,
+                    side=side,
+                    order_type=OrderType.MARKET,
+                    quantity=quantity,
+                )
+            raise
+
+        order_id = result.get("orderId")
+        if not order_id:
+            return result
+
+        # Poll for fills
+        filled_qty = float(result.get("executedQty", 0))
+        total_qty = float(result.get("origQty", quantity))
+        elapsed = 0.0
+
+        while elapsed < fill_timeout_seconds and filled_qty < total_qty:
+            await asyncio.sleep(poll_interval_seconds)
+            elapsed += poll_interval_seconds
+            try:
+                status = await self.get_order(symbol=symbol, order_id=str(order_id))
+                filled_qty = float(status.get("executedQty", filled_qty))
+                order_status = status.get("status", "")
+                if order_status in ("FILLED", "CANCELED", "EXPIRED", "REJECTED"):
+                    break
+            except Exception:
+                break
+
+        remainder = total_qty - filled_qty
+
+        # Cancel unfilled remainder
+        if remainder > 0:
+            try:
+                await self.cancel_order(symbol=symbol, order_id=str(order_id))
+                log.info(f"Cancelled hidden limit remainder {remainder} for {symbol}")
+            except Exception as cancel_err:
+                log.warning(f"Failed to cancel hidden order {order_id}: {cancel_err}")
+
+        # Market fallback for remainder
+        fallback_result = None
+        if remainder > 0 and market_fallback:
+            try:
+                fallback_result = await self.place_order(
+                    symbol=symbol,
+                    side=side,
+                    order_type=OrderType.MARKET,
+                    quantity=remainder,
+                )
+                fallback_filled = float(fallback_result.get("executedQty", 0))
+                filled_qty += fallback_filled
+                log.info(f"Market fallback filled {fallback_filled} for {symbol}")
+            except Exception as fb_err:
+                log.warning(f"Market fallback failed for {symbol}: {fb_err}")
+
+        return {
+            "orderId": order_id,
+            "symbol": symbol,
+            "side": side,
+            "origQty": total_qty,
+            "executedQty": filled_qty,
+            "status": "FILLED" if filled_qty >= total_qty else "PARTIALLY_FILLED",
+            "hidden_limit_result": result,
+            "fallback_result": fallback_result,
+        }
 
     async def get_order(
         self,

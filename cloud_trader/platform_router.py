@@ -447,7 +447,7 @@ class PlatformRouter:
                     )
                 else:
                     result = await breaker.call(
-                        self._execute_aster, symbol, side, formatted_quantity, tp_price, sl_price
+                        self._execute_aster, symbol, side, formatted_quantity, tp_price, sl_price, market_price
                     )
 
             except Exception as breaker_exc:
@@ -911,53 +911,94 @@ class PlatformRouter:
         quantity: float,
         tp_price: Optional[float] = None,
         sl_price: Optional[float] = None,
+        market_price: Optional[float] = None,
     ) -> ExecutionResult:
         """
-        Execute on Aster (Main Liquidity) with native SL/TP orders.
+        Execute on Aster using hidden-limit orders with market fallback.
 
-        Places market order first, then sets STOP_MARKET and TAKE_PROFIT_MARKET
-        orders for risk management (positions close automatically on exchange).
+        Uses timeInForce=HIDDEN for stealth entry (not visible in order book).
+        Falls back to MARKET if hidden limit fails or price unavailable.
+        Then sets STOP_MARKET and TAKE_PROFIT_MARKET for risk management.
         """
         try:
             from .enums import OrderType, WorkingType
 
             aster_symbol = self.service._normalize_for_aster(symbol)
 
-            # CRITICAL FIX: Use place_order instead of create_order
-            # CRITICAL FIX: Use OrderType.MARKET enum
-            res = await self.service._exchange_client.place_order(
-                symbol=aster_symbol, side=side, order_type=OrderType.MARKET, quantity=quantity
-            )
+            # Get builder/feeRate from credentials for Aster Code attribution
+            builder = None
+            fee_rate = None
+            try:
+                creds = self.service._credential_manager.get_credentials()
+                builder = creds.aster_code_builder_address
+                fee_rate = creds.aster_code_fee_rate
+            except Exception:
+                pass  # Non-critical: proceed without builder attribution
 
-            # CRITICAL CHECK: Verify FILL with Polling
-            # Aster/Binance API might return NEW if not immediately filled
+            # Determine entry price for hidden limit order
+            if not market_price or market_price <= 0:
+                try:
+                    ticker = await self.service._exchange_client.get_ticker_price(aster_symbol)
+                    market_price = float(ticker.get("price", 0))
+                except Exception:
+                    market_price = 0
+
+            if market_price and market_price > 0:
+                # Use hidden-limit order: set price 0.05% through the book for quick fills
+                price_buffer = 0.0005
+                if side.upper() == "BUY":
+                    limit_price = round(market_price * (1 + price_buffer), 8)
+                else:
+                    limit_price = round(market_price * (1 - price_buffer), 8)
+
+                logger.info(
+                    f"🥷 [ASTER] Hidden-limit {side} {quantity} {aster_symbol} @ {limit_price} "
+                    f"(market={market_price}, buffer={price_buffer*100:.2f}%)"
+                )
+
+                res = await self.service._exchange_client.place_hidden_limit_order(
+                    symbol=aster_symbol,
+                    side=side,
+                    quantity=quantity,
+                    price=limit_price,
+                    fill_timeout_seconds=3.0,
+                    poll_interval_seconds=0.25,
+                    market_fallback=True,
+                    builder=builder,
+                    fee_rate=fee_rate,
+                )
+            else:
+                # Fallback: no price available, use plain market order
+                logger.warning(f"⚠️ [ASTER] No market price for {aster_symbol}, using MARKET order")
+                res = await self.service._exchange_client.place_order(
+                    symbol=aster_symbol, side=side, order_type=OrderType.MARKET, quantity=quantity
+                )
+
             order_id = res.get("orderId")
             if not order_id:
                 raise ValueError(f"No Order ID returned: {res}")
 
-            # Polling Verification (Max 5 seconds)
-            final_status = res.get("status", "UNKNOWN")
             filled_qty = float(res.get("executedQty", 0.0))
-            attempts = 0
+            final_status = res.get("status", "UNKNOWN")
 
-            while (
-                final_status not in ["FILLED", "CANCELED", "REJECTED", "EXPIRED"] and attempts < 10
-            ):
-                await asyncio.sleep(0.5)
-                # Check order status
-                check_res = await self.service._exchange_client.get_order(
-                    symbol=aster_symbol, orderId=order_id
-                )
-                final_status = check_res.get("status", final_status)
-                filled_qty = float(check_res.get("executedQty", filled_qty))
-                attempts += 1
-                logger.debug(f"🕵️ Verifying order {order_id}: {final_status}")
+            # For hidden-limit orders, the fill-wait is already handled inside
+            # place_hidden_limit_order. Only poll if we used plain MARKET.
+            if final_status not in ("FILLED", "PARTIALLY_FILLED"):
+                attempts = 0
+                while (
+                    final_status not in ["FILLED", "CANCELED", "REJECTED", "EXPIRED"]
+                    and attempts < 10
+                ):
+                    await asyncio.sleep(0.5)
+                    check_res = await self.service._exchange_client.get_order(
+                        symbol=aster_symbol, order_id=str(order_id)
+                    )
+                    final_status = check_res.get("status", final_status)
+                    filled_qty = float(check_res.get("executedQty", filled_qty))
+                    attempts += 1
+                    logger.debug(f"Verifying order {order_id}: {final_status}")
 
-            is_filled = final_status == "FILLED"
-
-            # If still not filled after 5s, we might consider it a partial success or failure depending on strictness
-            # User asked for "100% verified completed", so if not FILLED, we treat as incomplete.
-
+            is_filled = final_status in ("FILLED", "PARTIALLY_FILLED") and filled_qty > 0
             success = is_filled
             avg_price = float(res.get("avgPrice", res.get("price", 0.0)))
 

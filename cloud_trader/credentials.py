@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 import os
 from dataclasses import dataclass
-from typing import Optional
+from typing import Dict, Optional
 
 from .api_secrets import GcpSecretManager
 from .config import get_settings
@@ -42,6 +42,13 @@ class Credentials:
     # Lighter
     lighter_pub_key: Optional[str] = None
     lighter_priv_key: Optional[str] = None
+    lighter_account_index: int = 699444
+    lighter_api_key_index: int = 0
+    lighter_api_keys: Optional[Dict[int, str]] = None  # {api_key_index: private_key}
+
+    # Aster Code (builder incentive)
+    aster_code_builder_address: Optional[str] = None
+    aster_code_fee_rate: Optional[str] = None
 
 
 class CredentialManager:
@@ -194,7 +201,7 @@ def load_credentials(gcp_secret_project: Optional[str] = None) -> Credentials:
         print(f"DEBUG: Loaded Hyperliquid Account: {hl_account_address[:10]}...")
 
     # ==========================================================================
-    # LIGHTER
+    # LIGHTER (supports separate account_index and api_key_index)
     # ==========================================================================
     lighter_pub_key = os.environ.get("LIGHTER_PUB_KEY")
     lighter_priv_key = os.environ.get("LIGHTER_PRIV_KEY")
@@ -213,6 +220,21 @@ def load_credentials(gcp_secret_project: Optional[str] = None) -> Credentials:
     if lighter_priv_key:
         lighter_priv_key = lighter_priv_key.strip()
         print(f"DEBUG: Loaded Lighter Priv Key (len={len(lighter_priv_key)})")
+
+    # Lighter account_index / api_key_index from env
+    lighter_account_index = int(os.environ.get("LIGHTER_ACCOUNT_INDEX", "699444"))
+    lighter_api_key_index = int(os.environ.get("LIGHTER_API_KEY_INDEX", "0"))
+
+    # Build api_keys dict: {api_key_index: private_key}
+    lighter_api_keys: Optional[Dict[int, str]] = None
+    if lighter_priv_key:
+        lighter_api_keys = {lighter_api_key_index: lighter_priv_key}
+
+    # ==========================================================================
+    # ASTER CODE (Builder Incentive)
+    # ==========================================================================
+    aster_code_builder_address = os.environ.get("ASTER_CODE_BUILDER_ADDRESS")
+    aster_code_fee_rate = os.environ.get("ASTER_CODE_FEE_RATE", "0")
 
     # ==========================================================================
     # JUPITER
@@ -245,4 +267,9 @@ def load_credentials(gcp_secret_project: Optional[str] = None) -> Credentials:
         hl_account_address=hl_account_address,
         lighter_pub_key=lighter_pub_key,
         lighter_priv_key=lighter_priv_key,
+        lighter_account_index=lighter_account_index,
+        lighter_api_key_index=lighter_api_key_index,
+        lighter_api_keys=lighter_api_keys,
+        aster_code_builder_address=aster_code_builder_address,
+        aster_code_fee_rate=aster_code_fee_rate,
     )

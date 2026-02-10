@@ -46,5 +46,19 @@ DATABASE_ENABLED: "true"
 AGENT_PARALLEL_EXECUTION: "true"
 ENABLE_PROFIT_MAXIMIZATION: "true"
 
+# ============================================================================
+# Lighter Configuration
+# ============================================================================
+LIGHTER_ACCOUNT_INDEX: "699444"
+LIGHTER_API_KEY_INDEX: "0"
+LIGHTER_INIT_TIMEOUT_SECONDS: "30"
+LIGHTER_CHECK_CLIENT_TIMEOUT_SECONDS: "15"
+
+# ============================================================================
+# Aster Code (Builder Incentive)
+# ============================================================================
+ASTER_CODE_BUILDER_ADDRESS: "0xAf72Ae447aD3dcdcDfBAA01bB9c7b3C37a031aAf"
+ASTER_CODE_FEE_RATE: "0"
+
 # Note: Secrets (API keys, private keys) are loaded from GCP Secret Manager automatically
 # Do not add sensitive values here!

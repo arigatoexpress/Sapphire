@@ -1,0 +1,63 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cloud_trader/**'
+      - 'requirements.txt'
+      - 'Dockerfile'
+      - 'Dockerfile.microservices'
+      - 'cloudbuild.yaml'
+      - 'cloudbuild_microservices.yaml'
+
+jobs:
+  deploy-aster:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy Aster Trader
+        run: |
+          gcloud builds submit \
+            --config=cloudbuild_microservices.yaml \
+            --project=sapphire-479610 \
+            --substitutions=_REGION=europe-west1
+
+  deploy-lighter:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy Lighter Trader
+        run: |
+          gcloud builds submit \
+            --config=cloudbuild_microservices.yaml \
+            --project=sapphire-479610 \
+            --substitutions=_REGION=europe-west1
