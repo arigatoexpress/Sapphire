@@ -114,7 +114,7 @@ class LighterClient:
 
     def __init__(
         self,
-        account_index: int = 1,
+        account_index: int = 699444,
         api_private_keys: Optional[Dict[int, str]] = None,
         testnet: bool = False,
         auto_detect: bool = True,
@@ -125,7 +125,7 @@ class LighterClient:
         """Initialize Lighter client.
 
         Args:
-            account_index: The Lighter account index to trade on (default 1).
+            account_index: The Lighter account index to trade on.
             api_private_keys: Dict mapping api_key_index -> private_key_hex.
                 e.g. {0: "0xabc..."} means api_key_index=0 uses that private key.
             testnet: Use testnet URL.
@@ -221,7 +221,7 @@ class LighterClient:
 
     async def _auto_detect_indices(self, base_url: str) -> bool:
         """Try multiple (account_index, api_key_index) combinations."""
-        account_candidates = [self._account_index, 699444, 0, 1, 2, 3]
+        account_candidates = [self._account_index, 699444]
         # De-duplicate while preserving order
         seen = set()
         unique_accounts = []

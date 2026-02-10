@@ -33,7 +33,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 BASE_URL = os.environ.get("LIGHTER_BASE_URL", "https://mainnet.zklighter.elliot.ai")
-ACCOUNT_INDEX = int(os.environ.get("LIGHTER_ACCOUNT_INDEX", "1"))
+ACCOUNT_INDEX = int(os.environ.get("LIGHTER_ACCOUNT_INDEX", "699444"))
 API_KEY_INDEX = int(os.environ.get("LIGHTER_API_KEY_INDEX", "0"))
 
 

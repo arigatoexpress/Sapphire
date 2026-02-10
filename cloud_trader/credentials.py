@@ -209,14 +209,10 @@ def load_credentials(gcp_secret_project: Optional[str] = None) -> Credentials:
     if not lighter_pub_key and gcp_secret_project:
         print(f"DEBUG: Fetching LIGHTER_PUB_KEY from Secret Manager...")
         lighter_pub_key = _secret_manager.get_secret("LIGHTER_PUB_KEY", gcp_secret_project)
-        if not lighter_pub_key:
-            lighter_pub_key = _secret_manager.get_secret("LIGHTER_API_PUBLIC_KEY_0", gcp_secret_project)
 
     if not lighter_priv_key and gcp_secret_project:
         print(f"DEBUG: Fetching LIGHTER_PRIV_KEY from Secret Manager...")
         lighter_priv_key = _secret_manager.get_secret("LIGHTER_PRIV_KEY", gcp_secret_project)
-        if not lighter_priv_key:
-            lighter_priv_key = _secret_manager.get_secret("LIGHTER_API_KEY_0", gcp_secret_project)
 
     if lighter_pub_key:
         lighter_pub_key = lighter_pub_key.strip()
