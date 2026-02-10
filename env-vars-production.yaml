@@ -49,7 +49,7 @@ ENABLE_PROFIT_MAXIMIZATION: "true"
 # ============================================================================
 # Lighter Configuration
 # ============================================================================
-LIGHTER_ACCOUNT_INDEX: "1"
+LIGHTER_ACCOUNT_INDEX: "699444"
 LIGHTER_API_KEY_INDEX: "0"
 LIGHTER_INIT_TIMEOUT_SECONDS: "30"
 LIGHTER_CHECK_CLIENT_TIMEOUT_SECONDS: "15"

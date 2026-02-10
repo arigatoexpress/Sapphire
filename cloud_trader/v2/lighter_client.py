@@ -221,7 +221,7 @@ class LighterClient:
 
     async def _auto_detect_indices(self, base_url: str) -> bool:
         """Try multiple (account_index, api_key_index) combinations."""
-        account_candidates = [self._account_index, 0, 1, 2, 3]
+        account_candidates = [self._account_index, 699444, 0, 1, 2, 3]
         # De-duplicate while preserving order
         seen = set()
         unique_accounts = []
@@ -230,16 +230,21 @@ class LighterClient:
                 seen.add(a)
                 unique_accounts.append(a)
 
-        for key_index, key_value in self._api_private_keys.items():
-            for acct_idx in unique_accounts:
-                ok = await self._try_init_signer(base_url, acct_idx, key_index, key_value)
-                if ok:
-                    logger.info(
-                        f"[Lighter] Auto-detect found working pair: "
-                        f"account_index={acct_idx} api_key_index={key_index}"
-                    )
-                    self._account_index = acct_idx
-                    return True
+        # Try each private key at multiple api_key_index slots (0, 1, 2)
+        # since the same key may be registered at different indices
+        key_index_candidates = set(self._api_private_keys.keys()) | {0, 1, 2}
+
+        for acct_idx in unique_accounts:
+            for key_index in sorted(key_index_candidates):
+                for _, key_value in self._api_private_keys.items():
+                    ok = await self._try_init_signer(base_url, acct_idx, key_index, key_value)
+                    if ok:
+                        logger.info(
+                            f"[Lighter] Auto-detect found working pair: "
+                            f"account_index={acct_idx} api_key_index={key_index}"
+                        )
+                        self._account_index = acct_idx
+                        return True
 
         return False
 

@@ -42,7 +42,7 @@ class Credentials:
     # Lighter
     lighter_pub_key: Optional[str] = None
     lighter_priv_key: Optional[str] = None
-    lighter_account_index: int = 1
+    lighter_account_index: int = 699444
     lighter_api_key_index: int = 0
     lighter_api_keys: Optional[Dict[int, str]] = None  # {api_key_index: private_key}
 
@@ -226,7 +226,7 @@ def load_credentials(gcp_secret_project: Optional[str] = None) -> Credentials:
         print(f"DEBUG: Loaded Lighter Priv Key (len={len(lighter_priv_key)})")
 
     # Lighter account_index / api_key_index from env
-    lighter_account_index = int(os.environ.get("LIGHTER_ACCOUNT_INDEX", "1"))
+    lighter_account_index = int(os.environ.get("LIGHTER_ACCOUNT_INDEX", "699444"))
     lighter_api_key_index = int(os.environ.get("LIGHTER_API_KEY_INDEX", "0"))
 
     # Build api_keys dict: {api_key_index: private_key}

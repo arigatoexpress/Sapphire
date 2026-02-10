@@ -89,7 +89,9 @@ async def main():
         if response.sub_accounts:
             for sa in response.sub_accounts:
                 print(f"  Found account index: {sa.index}")
-            account_index = ACCOUNT_INDEX
+            # Use the discovered master account index (lowest index)
+            discovered = min(response.sub_accounts, key=lambda x: int(x.index))
+            account_index = int(discovered.index)
             print(f"  Using account index: {account_index}")
         else:
             print("  ERROR: No accounts found for this address.")
