@@ -57,6 +57,9 @@ RUN pip install --no-cache-dir \
     faiss-cpu \
     sentence-transformers
 
+# Install Lighter SDK (--no-deps to avoid websockets>=12 conflict with Solana)
+RUN pip install --no-cache-dir --no-deps lighter-sdk || echo "lighter-sdk install skipped"
+
 # Copy application code
 COPY . .
 
