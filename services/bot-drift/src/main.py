@@ -381,6 +381,8 @@ class DriftBot:
             await self._close_all_positions()
         elif action == "halt_trading":
             self.config.trading_enabled = False
+        elif action == "resume_trading":
+            self.config.trading_enabled = True
 
     async def _execute_trade(self, signal: TradeSignal) -> TradeResult:
         """Execute trade on Drift with Solana-optimized confirmation."""

@@ -274,18 +274,98 @@ class TelegramPlatformBot:
 
     async def _process_update(self, update: Dict[str, Any]):
         message = update.get("message", {})
-        text = message.get("text", "")
+        text = message.get("text", "").strip()
         chat_id = str(message.get("chat", {}).get("id", ""))
 
         # Security: Only respond to messages from the authorized group/chat
         if self.chat_id and chat_id != self.chat_id:
             return
 
+        if not text:
+            return
+
+        text_lower = text.lower()
+
+        # Slash control commands: /kill /resume /status /heartbeat [optional-target]
+        slash_control_match = re.search(
+            r"^/(kill|halt|resume|status|heartbeat)(?:\s+(\w+))?$",
+            text_lower,
+        )
+        slash_allocation_match = re.search(
+            r"^/(deallocate|allocate)\s+(\w+)(?:\s+([\d.]+))?$",
+            text_lower,
+        )
+
+        # Mention control commands: @alpha kill, @all resume, @control status
+        mention_control_match = re.search(
+            r"@(alpha|all|control)\s+(kill|halt|resume|status|heartbeat)(?:\s+(\w+))?$",
+            text_lower,
+        )
+        mention_allocation_match = re.search(
+            r"@(alpha|all|control)\s+(deallocate|allocate)\s+(\w+)(?:\s+([\d.]+))?$",
+            text_lower,
+        )
+
+        if slash_control_match or mention_control_match:
+            if slash_control_match:
+                raw_action = slash_control_match.group(1)
+                target = (slash_control_match.group(2) or "all").upper()
+            else:
+                raw_action = mention_control_match.group(2)
+                target = (mention_control_match.group(3) or "all").upper()
+
+            action_map = {
+                "kill": "HALT_TRADING",
+                "halt": "HALT_TRADING",
+                "resume": "RESUME_TRADING",
+                "status": "CONTROL_STATUS",
+                "heartbeat": "HEARTBEAT",
+            }
+            mapped_action = action_map[raw_action]
+
+            await self.send_message(
+                f"🧭 Control command accepted: `{raw_action.upper()}` target `{target}`",
+                priority=NotificationPriority.HIGH,
+            )
+
+            if self.command_callback:
+                await self.command_callback("control", target, mapped_action, 0.0)
+            else:
+                logger.warning("No command callback registered for Telegram Bot")
+            return
+
+        if slash_allocation_match or mention_allocation_match:
+            if slash_allocation_match:
+                raw_action = slash_allocation_match.group(1)
+                target = slash_allocation_match.group(2).upper()
+                raw_percent = slash_allocation_match.group(3)
+            else:
+                raw_action = mention_allocation_match.group(2)
+                target = mention_allocation_match.group(3).upper()
+                raw_percent = mention_allocation_match.group(4)
+
+            if raw_action == "deallocate":
+                allocation = 0.0
+            else:
+                pct = float(raw_percent) if raw_percent is not None else 100.0
+                allocation = max(0.0, min(1.0, pct / 100.0))
+
+            await self.send_message(
+                f"🧭 Allocation command accepted: `{raw_action.upper()}` `{target}` -> `{allocation*100:.0f}%`",
+                priority=NotificationPriority.HIGH,
+            )
+
+            if self.command_callback:
+                await self.command_callback("control", target, "SET_ALLOCATION", allocation)
+            else:
+                logger.warning("No command callback registered for Telegram Bot")
+            return
+
         # Pattern 1: @platform action quantity symbol (e.g. @hyperliquid buy 0.1 sol)
-        cmd_match = re.search(r"@(\w+)\s+(buy|sell|close)\s+([\d.]+)\s+(\w+)", text.lower())
+        cmd_match = re.search(r"@(\w+)\s+(buy|sell|close)\s+([\d.]+)\s+(\w+)", text_lower)
 
         # Pattern 2: AI Commands (e.g. @alpha recap)
-        ai_match = re.search(r"@(\w+)\s+(recap|analyze|report)", text.lower())
+        ai_match = re.search(r"@(\w+)\s+(recap|analyze|report)", text_lower)
 
         if ai_match:
             platform = ai_match.group(1)

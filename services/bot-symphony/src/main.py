@@ -268,6 +268,9 @@ class SymphonyBot:
         elif action == "halt_trading":
             self.config.trading_enabled = False
             logger.warning("🚨 Trading halted due to risk alert")
+        elif action == "resume_trading":
+            self.config.trading_enabled = True
+            logger.warning("✅ Trading resumed due to control alert")
 
     async def _verify_state(self):
         """Perform deep verification of account state."""

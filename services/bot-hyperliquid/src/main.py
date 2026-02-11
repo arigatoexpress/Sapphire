@@ -346,6 +346,8 @@ class HyperliquidBot:
             await self._close_all_positions()
         elif action == "halt_trading":
             self.config.trading_enabled = False
+        elif action == "resume_trading":
+            self.config.trading_enabled = True
 
     async def _verify_state(self):
         """Perform deep verification of account state."""
