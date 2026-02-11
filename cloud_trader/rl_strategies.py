@@ -6,7 +6,6 @@ import asyncio
 import json
 import logging
 import os
-import pickle
 from collections import deque
 from dataclasses import dataclass
 from datetime import datetime
@@ -54,6 +53,8 @@ class ReplayBuffer:
 
 class NeuralNetwork:
     """Simple neural network for Q-function approximation."""
+
+    _WEIGHT_KEYS = ("W1", "b1", "W2", "b2", "W3", "b3")
 
     def __init__(self, input_size: int, hidden_size: int, output_size: int):
         self.input_size = input_size
@@ -124,27 +125,45 @@ class NeuralNetwork:
 
     def save(self, path: str) -> None:
         """Save network weights."""
-        weights = {
-            "W1": self.W1,
-            "b1": self.b1,
-            "W2": self.W2,
-            "b2": self.b2,
-            "W3": self.W3,
-            "b3": self.b3,
-        }
-        with open(path, "wb") as f:
-            pickle.dump(weights, f)
+        np.savez_compressed(
+            path,
+            W1=self.W1,
+            b1=self.b1,
+            W2=self.W2,
+            b2=self.b2,
+            W3=self.W3,
+            b3=self.b3,
+        )
 
     def load(self, path: str) -> None:
-        """Load network weights."""
-        with open(path, "rb") as f:
-            weights = pickle.load(f)
-        self.W1 = weights["W1"]
-        self.b1 = weights["b1"]
-        self.W2 = weights["W2"]
-        self.b2 = weights["b2"]
-        self.W3 = weights["W3"]
-        self.b3 = weights["b3"]
+        """Load network weights from a safe numpy archive."""
+        with np.load(path, allow_pickle=False) as weights:
+            missing_keys = [key for key in self._WEIGHT_KEYS if key not in weights]
+            if missing_keys:
+                missing = ", ".join(sorted(missing_keys))
+                raise ValueError(f"Missing network weight keys: {missing}")
+
+            expected_shapes = {
+                "W1": (self.input_size, self.hidden_size),
+                "b1": (1, self.hidden_size),
+                "W2": (self.hidden_size, self.hidden_size),
+                "b2": (1, self.hidden_size),
+                "W3": (self.hidden_size, self.output_size),
+                "b3": (1, self.output_size),
+            }
+            for key, expected_shape in expected_shapes.items():
+                actual_shape = weights[key].shape
+                if actual_shape != expected_shape:
+                    raise ValueError(
+                        f"Invalid shape for {key}: expected {expected_shape}, got {actual_shape}"
+                    )
+
+            self.W1 = weights["W1"]
+            self.b1 = weights["b1"]
+            self.W2 = weights["W2"]
+            self.b2 = weights["b2"]
+            self.W3 = weights["W3"]
+            self.b3 = weights["b3"]
 
 
 class DQNAgent:
@@ -415,13 +434,20 @@ class RLStrategyManager:
 
     def _load_models(self) -> None:
         """Load pre-trained models if available."""
-        dqn_path = self.models_dir / "dqn_model.pkl"
-        ppo_path = self.models_dir / "ppo_model.pkl"
+        dqn_path = self.models_dir / "dqn_model.npz"
+        ppo_path = self.models_dir / "ppo_model.npz"
+        dqn_legacy_path = self.models_dir / "dqn_model.pkl"
+        ppo_legacy_path = self.models_dir / "ppo_model.pkl"
 
         try:
             if dqn_path.exists():
                 self.dqn_agent.q_network.load(str(dqn_path))
                 logger.info("Loaded DQN model")
+            elif dqn_legacy_path.exists():
+                logger.warning(
+                    "Legacy DQN pickle model found at %s. Convert to .npz before loading.",
+                    dqn_legacy_path,
+                )
         except Exception as e:
             logger.warning(f"Failed to load DQN model: {e}")
 
@@ -429,14 +455,19 @@ class RLStrategyManager:
             if ppo_path.exists():
                 self.ppo_agent.actor.load(str(ppo_path))
                 logger.info("Loaded PPO model")
+            elif ppo_legacy_path.exists():
+                logger.warning(
+                    "Legacy PPO pickle model found at %s. Convert to .npz before loading.",
+                    ppo_legacy_path,
+                )
         except Exception as e:
             logger.warning(f"Failed to load PPO model: {e}")
 
     def save_models(self) -> None:
         """Save trained models."""
         try:
-            self.dqn_agent.q_network.save(str(self.models_dir / "dqn_model.pkl"))
-            self.ppo_agent.actor.save(str(self.models_dir / "ppo_model.pkl"))
+            self.dqn_agent.q_network.save(str(self.models_dir / "dqn_model.npz"))
+            self.ppo_agent.actor.save(str(self.models_dir / "ppo_model.npz"))
             logger.info("Saved RL models")
         except Exception as e:
             logger.error(f"Failed to save models: {e}")

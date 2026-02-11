@@ -93,7 +93,7 @@ resource "google_sql_database" "trading_db" {
 resource "google_sql_user" "trading_user" {
   name     = "trading_user"
   instance = google_sql_database_instance.sapphire_db.name
-  password = "changeme123" # User should change this
+  password = var.db_password
 }
 
 # Redis
@@ -144,12 +144,12 @@ resource "google_dns_managed_zone" "sapphire_zone" {
 
 # Enable APIs
 resource "google_project_service" "firebase" {
-  service = "firebase.googleapis.com"
+  service            = "firebase.googleapis.com"
   disable_on_destroy = false
 }
 
 resource "google_project_service" "firebase_hosting" {
-  service = "firebasehosting.googleapis.com"
+  service            = "firebasehosting.googleapis.com"
   disable_on_destroy = false
 }
 

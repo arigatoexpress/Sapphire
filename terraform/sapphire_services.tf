@@ -1,9 +1,9 @@
 # Cloud Trader
 resource "google_cloud_run_v2_service" "sapphire_cloud_trader" {
-  name     = "sapphire-cloud-trader"
-  location = var.region
-  project  = var.project_id
-  ingress  = "INGRESS_TRAFFIC_ALL"
+  name                = "sapphire-cloud-trader"
+  location            = var.region
+  project             = var.project_id
+  ingress             = "INGRESS_TRAFFIC_ALL"
   deletion_protection = false
 
   template {
@@ -19,7 +19,7 @@ resource "google_cloud_run_v2_service" "sapphire_cloud_trader" {
 
       env {
         name  = "DATABASE_URL"
-        value = "postgresql://trading_user:changeme123@${google_sql_database_instance.sapphire_db.private_ip_address}:5432/trading_db"
+        value = "postgresql://trading_user:${urlencode(var.db_password)}@${google_sql_database_instance.sapphire_db.private_ip_address}:5432/trading_db"
       }
       env {
         name  = "REDIS_URL"
@@ -30,7 +30,7 @@ resource "google_cloud_run_v2_service" "sapphire_cloud_trader" {
         name = "GROK_API_KEY"
         value_source {
           secret_key_ref {
-            secret = google_secret_manager_secret.secrets["GROK_API_KEY"].secret_id
+            secret  = google_secret_manager_secret.secrets["GROK_API_KEY"].secret_id
             version = "latest"
           }
         }
@@ -39,7 +39,7 @@ resource "google_cloud_run_v2_service" "sapphire_cloud_trader" {
         name = "ASTER_API_KEY"
         value_source {
           secret_key_ref {
-            secret = google_secret_manager_secret.secrets["ASTER_API_KEY"].secret_id
+            secret  = google_secret_manager_secret.secrets["ASTER_API_KEY"].secret_id
             version = "latest"
           }
         }
@@ -48,7 +48,7 @@ resource "google_cloud_run_v2_service" "sapphire_cloud_trader" {
         name = "ASTER_SECRET_KEY"
         value_source {
           secret_key_ref {
-            secret = google_secret_manager_secret.secrets["ASTER_SECRET_KEY"].secret_id
+            secret  = google_secret_manager_secret.secrets["ASTER_SECRET_KEY"].secret_id
             version = "latest"
           }
         }
@@ -57,7 +57,7 @@ resource "google_cloud_run_v2_service" "sapphire_cloud_trader" {
         name = "TELEGRAM_BOT_TOKEN"
         value_source {
           secret_key_ref {
-            secret = "TELEGRAM_BOT_TOKEN"
+            secret  = "TELEGRAM_BOT_TOKEN"
             version = "latest"
           }
         }
@@ -66,7 +66,7 @@ resource "google_cloud_run_v2_service" "sapphire_cloud_trader" {
         name = "TELEGRAM_CHAT_ID"
         value_source {
           secret_key_ref {
-            secret = "TELEGRAM_CHAT_ID"
+            secret  = "TELEGRAM_CHAT_ID"
             version = "latest"
           }
         }
@@ -148,7 +148,7 @@ resource "google_cloud_run_v2_service" "sapphire_hyperliquid_trader" {
         name = "GROK_API_KEY"
         value_source {
           secret_key_ref {
-            secret = google_secret_manager_secret.secrets["GROK_API_KEY"].secret_id
+            secret  = google_secret_manager_secret.secrets["GROK_API_KEY"].secret_id
             version = "latest"
           }
         }
@@ -158,7 +158,7 @@ resource "google_cloud_run_v2_service" "sapphire_hyperliquid_trader" {
         name = "TELEGRAM_BOT_TOKEN"
         value_source {
           secret_key_ref {
-            secret = "TELEGRAM_BOT_TOKEN"
+            secret  = "TELEGRAM_BOT_TOKEN"
             version = "latest"
           }
         }
@@ -167,7 +167,7 @@ resource "google_cloud_run_v2_service" "sapphire_hyperliquid_trader" {
         name = "TELEGRAM_CHAT_ID"
         value_source {
           secret_key_ref {
-            secret = "TELEGRAM_CHAT_ID"
+            secret  = "TELEGRAM_CHAT_ID"
             version = "latest"
           }
         }
