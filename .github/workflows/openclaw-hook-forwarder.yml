@@ -1,0 +1,56 @@
+name: OpenClaw Hook Forwarder
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - closed
+  workflow_dispatch:
+
+jobs:
+  forward-to-openclaw:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Write event payload
+        run: |
+          cat > event.json <<'JSON'
+          ${{ toJson(github.event) }}
+          JSON
+
+      - name: Forward event to Sapphire gateway hook
+        env:
+          HOOK_URL: ${{ secrets.OPENCLAW_HOOK_URL }}
+          HOOK_TOKEN: ${{ secrets.OPENCLAW_HOOKS_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          DELIVERY_ID: ${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          # Secrets are unavailable on fork PRs; skip rather than hard-fail.
+          if [[ -z "${HOOK_URL}" || -z "${HOOK_TOKEN}" ]]; then
+            echo "OpenClaw hook secrets unavailable in this context; skipping."
+            exit 0
+          fi
+
+          http_code="$(curl -sS -o response.json -w "%{http_code}" \
+            -X POST "${HOOK_URL}" \
+            -H "Content-Type: application/json" \
+            -H "X-OpenClaw-Token: ${HOOK_TOKEN}" \
+            -H "X-GitHub-Event: ${EVENT_NAME}" \
+            -H "X-GitHub-Delivery: ${DELIVERY_ID}" \
+            --data-binary @event.json)"
+
+          echo "Hook response HTTP: ${http_code}"
+          if [[ "${http_code}" != "202" ]]; then
+            echo "OpenClaw hook forward failed. Response:"
+            cat response.json
+            exit 1
+          fi
+
+          echo "OpenClaw hook forward succeeded."
