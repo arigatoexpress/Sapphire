@@ -108,6 +108,9 @@ celerybeat.pid
 .env
 .envrc
 .env.*
+local.env
+local.env.*
+*.env.paper-backup
 .venv
 .venv311
 env/
