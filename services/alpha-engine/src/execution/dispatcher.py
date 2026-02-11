@@ -1,4 +1,5 @@
 import os
+import re
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -14,12 +15,27 @@ class ExecutionDispatcher:
 
     def __init__(self):
         self.session: Optional[aiohttp.ClientSession] = None
-        self.bot_urls = {
+        default_bot_urls = {
             "DRIFT": os.getenv("BOT_DRIFT_URL", "http://sapphire-bot-drift:8080"),
             "HYPERLIQUID": os.getenv("BOT_HYPERLIQUID_URL", "http://sapphire-bot-hyperliquid:8080"),
             "ASTER": os.getenv("BOT_ASTER_URL", "http://sapphire-bot-aster:8080"),
             "SYMPHONY": os.getenv("BOT_SYMPHONY_URL", "http://sapphire-bot-symphony:8080"),
+            "LIGHTER": os.getenv("BOT_LIGHTER_URL", "http://sapphire-bot-lighter:8080"),
         }
+        enabled_venues_raw = os.getenv("ENABLED_VENUES", "").strip()
+        if enabled_venues_raw:
+            enabled_venues = {
+                self._normalize_venue(token)
+                for token in re.split(r"[,;|\s]+", enabled_venues_raw)
+                if token.strip()
+            }
+            self.bot_urls = {
+                venue: url
+                for venue, url in default_bot_urls.items()
+                if venue in enabled_venues and str(url or "").strip()
+            }
+        else:
+            self.bot_urls = default_bot_urls
         self._token_cache: Dict[str, Tuple[str, float]] = {}
         self._venue_allocations: Dict[str, float] = {venue: 1.0 for venue in self.bot_urls}
         self._venue_paused_until: Dict[str, float] = {}
@@ -68,6 +84,8 @@ class ExecutionDispatcher:
         normalized = str(venue or "").strip().upper()
         if normalized == "HL":
             normalized = "HYPERLIQUID"
+        elif normalized in {"LIGHT", "L2"}:
+            normalized = "LIGHTER"
         return normalized
 
     def set_venue_allocation(self, venue: str, allocation: float) -> float:

@@ -38,6 +38,7 @@ class Platform(str, Enum):
     DRIFT = "drift"
     ASTER = "aster"
     HYPERLIQUID = "hyperliquid"
+    LIGHTER = "lighter"
     # Add new platforms here
 
 

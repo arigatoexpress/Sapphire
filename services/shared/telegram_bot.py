@@ -180,7 +180,9 @@ class TelegramPlatformBot:
             symbol = cmd_match.group(4).upper()
 
             platforms = (
-                ["drift", "hyperliquid", "aster", "symphony"] if platform == "all" else [platform]
+                ["drift", "hyperliquid", "aster", "symphony", "lighter"]
+                if platform == "all"
+                else [platform]
             )
 
             await self.send_message(
@@ -217,22 +219,30 @@ class TelegramPlatformBot:
         full_message = f"{priority_prefix} {text}"
         url = f"{self.base_url}/sendMessage"
         payload = {"chat_id": self.chat_id, "text": full_message, "disable_web_page_preview": True}
+        logger.info(f"📤 Posting to Telegram: {full_message[:50]}...")
 
-        try:
-            logger.info(f"📤 Posting to Telegram: {full_message[:50]}...")
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
-                async with session.post(url, json=payload) as resp:
-                    resp_data = await resp.json()
-                    if resp.status != 200:
+        attempts = 3
+        for attempt in range(1, attempts + 1):
+            try:
+                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20)) as session:
+                    async with session.post(url, json=payload) as resp:
+                        resp_data = await resp.json()
+                        if resp.status == 200:
+                            logger.info(
+                                f"✅ Telegram Message Sent Successfully (ID: {resp_data.get('result', {}).get('message_id')})"
+                            )
+                            return
+
                         logger.error(f"❌ Telegram API Error: {resp.status} - {resp_data}")
-                    else:
-                        logger.info(
-                            f"✅ Telegram Message Sent Successfully (ID: {resp_data.get('result', {}).get('message_id')})"
-                        )
-        except Exception as e:
-            import traceback
+            except Exception as e:
+                logger.warning(
+                    f"Telegram post attempt {attempt}/{attempts} failed: {e.__class__.__name__}: {e}"
+                )
 
-            logger.error(f"❌ Telegram Post Failed: {e}\n{traceback.format_exc()}")
+            if attempt < attempts:
+                await asyncio.sleep(attempt * 2)
+
+        logger.error("❌ Telegram Post Failed after retries")
 
     async def start_listener(self):
         """Starts a long-polling loop to listen for interactive commands."""
@@ -382,7 +392,9 @@ class TelegramPlatformBot:
 
             # Special case for "all"
             platforms = (
-                ["drift", "hyperliquid", "aster", "symphony"] if platform == "all" else [platform]
+                ["drift", "hyperliquid", "aster", "symphony", "lighter"]
+                if platform == "all"
+                else [platform]
             )
 
             await self.send_message(

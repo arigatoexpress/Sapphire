@@ -61,6 +61,8 @@ class AlphaEngine:
         aliases = {
             "HL": "HYPERLIQUID",
             "HYPER": "HYPERLIQUID",
+            "LIGHT": "LIGHTER",
+            "L2": "LIGHTER",
             "ALL": "ALL",
         }
         return aliases.get(value, value)
