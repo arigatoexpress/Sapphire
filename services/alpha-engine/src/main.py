@@ -53,6 +53,9 @@ class AlphaEngine:
         self._default_venue_allocation = max(
             0.0, min(1.0, float(os.getenv("DEFAULT_VENUE_ALLOCATION", "1.0")))
         )
+        self._telegram_webhook_url = os.getenv("TELEGRAM_WEBHOOK_URL", "").strip()
+        self._telegram_webhook_secret = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
+        self._telegram_webhook_mode = bool(self._telegram_webhook_url)
         self._failure_counts: Dict[str, int] = defaultdict(int)
         self._auto_deallocated: Set[str] = set()
 
@@ -383,14 +386,28 @@ class AlphaEngine:
         self.running = True
 
         # Start Health Server (Cloud Run)
-        await start_health_server()
+        if self._telegram_webhook_mode:
+            await start_health_server(
+                telegram_update_handler=self.telegram._process_update,
+                telegram_webhook_secret=self._telegram_webhook_secret,
+            )
+        else:
+            await start_health_server()
 
         # 1. Start Telegram FIRST for immediate status
         logger.info("📡 Initializing Telegram Notification Task...")
         asyncio.create_task(
             self.telegram.send_message("💎 Sapphire Alpha Hub Online & Listening", priority="high")
         )
-        asyncio.create_task(self.telegram.start_listener())
+        if self._telegram_webhook_mode:
+            logger.info("📡 Configuring Telegram webhook mode...")
+            configured = await self.telegram.configure_webhook(
+                self._telegram_webhook_url, self._telegram_webhook_secret
+            )
+            if not configured:
+                logger.error("❌ Telegram webhook setup failed; command input may be unavailable.")
+        else:
+            asyncio.create_task(self.telegram.start_listener())
         self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
 
         # 2. Start Pub/Sub Listener for Trade Results

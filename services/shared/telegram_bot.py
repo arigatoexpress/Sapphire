@@ -244,6 +244,36 @@ class TelegramPlatformBot:
 
         logger.error("❌ Telegram Post Failed after retries")
 
+    async def configure_webhook(self, webhook_url: str, secret_token: str = "") -> bool:
+        """Configure Telegram webhook mode for inbound command delivery."""
+        if not self.bot_token:
+            logger.error("Cannot configure webhook without bot token")
+            return False
+        if not webhook_url:
+            logger.error("Cannot configure webhook without TELEGRAM_WEBHOOK_URL")
+            return False
+
+        url = f"{self.base_url}/setWebhook"
+        payload = {
+            "url": webhook_url,
+            "allowed_updates": ["message"],
+            "drop_pending_updates": False,
+        }
+        if secret_token:
+            payload["secret_token"] = secret_token
+
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20)) as session:
+                async with session.post(url, json=payload) as resp:
+                    data = await resp.json()
+                    if resp.status == 200 and data.get("ok"):
+                        logger.info(f"✅ Telegram webhook configured: {webhook_url}")
+                        return True
+                    logger.error(f"❌ Failed to configure Telegram webhook: {data}")
+        except Exception as exc:
+            logger.error(f"❌ Telegram webhook setup failed: {exc}")
+        return False
+
     async def start_listener(self):
         """Starts a long-polling loop to listen for interactive commands."""
         if not self.bot_token:
