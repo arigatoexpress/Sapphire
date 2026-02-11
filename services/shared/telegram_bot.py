@@ -256,10 +256,11 @@ class TelegramPlatformBot:
         while self.running:
             try:
                 url = f"{self.base_url}/getUpdates"
-                params = {"offset": self.last_update_id + 1, "timeout": 30}
+                params = {"offset": self.last_update_id + 1, "timeout": 50}
+                timeout = aiohttp.ClientTimeout(total=70, connect=10, sock_connect=10, sock_read=65)
 
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(url, params=params, timeout=35) as resp:
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.get(url, params=params) as resp:
                         if resp.status == 200:
                             data = await resp.json()
                             if data.get("ok"):
@@ -270,7 +271,7 @@ class TelegramPlatformBot:
                             # Use randomized jitter to resolve conflicts in scaled environments
                             import random
 
-                            jitter = random.uniform(5, 30)
+                            jitter = random.uniform(5, 20)
                             logger.warning(
                                 f"Telegram conflict (another instance is listening), retrying in {jitter:.1f}s..."
                             )
@@ -278,6 +279,9 @@ class TelegramPlatformBot:
                         else:
                             logger.error(f"Telegram listener error: {resp.status}")
                             await asyncio.sleep(10)
+            except asyncio.TimeoutError:
+                # Long-poll request timed out without updates; loop and poll again.
+                continue
             except Exception as e:
                 logger.error(f"Telegram listener crashed: {e}")
                 await asyncio.sleep(10)
