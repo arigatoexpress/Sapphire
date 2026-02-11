@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import pickle
 import time
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
@@ -327,7 +326,8 @@ class RedisCache(BaseCache):
             try:
                 return json.loads(value)
             except (json.JSONDecodeError, TypeError):
-                return pickle.loads(value)
+                logger.warning("Skipping non-JSON cache entry for key %s (possible legacy pickle data)", key)
+                return None
         except Exception as exc:  # pragma: no cover - redis failure
             logger.debug("Cache get error for %s: %s", key, exc)
             return None
@@ -339,7 +339,8 @@ class RedisCache(BaseCache):
             try:
                 serialized = json.dumps(value)
             except (TypeError, ValueError):
-                serialized = pickle.dumps(value)
+                logger.warning("Cannot serialize non-JSON value for cache, skipping")
+                return False
             if ttl is not None and ttl > 0:
                 await self._redis.setex(key, ttl, serialized)
             else:

@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_DB: trading_db
       POSTGRES_USER: trading_user
-      POSTGRES_PASSWORD: password123
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
     ports:
       - "5432:5432"
     volumes:
@@ -52,7 +52,7 @@ services:
       - .env.local
     environment:
       # Database
-      DATABASE_URL: postgresql://trading_user:password123@postgres:5432/trading_db
+      DATABASE_URL: postgresql://trading_user:${POSTGRES_PASSWORD:-changeme}@postgres:5432/trading_db
     depends_on:
       postgres:
         condition: service_healthy
