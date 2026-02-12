@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 import os
 import signal
@@ -65,6 +66,27 @@ class AlphaEngine:
         self._tradingview_default_quantity = max(
             0.0, float(os.getenv("TRADINGVIEW_DEFAULT_QUANTITY", "0.0"))
         )
+        self._tradingview_allowed_symbols = self._parse_symbol_set(
+            os.getenv("TRADINGVIEW_ALLOWED_SYMBOLS", "")
+        )
+        self._tradingview_allowed_symbols_by_venue: Dict[str, Set[str]] = {
+            "ASTER": self._parse_symbol_set(os.getenv("TRADINGVIEW_ALLOWED_SYMBOLS_ASTER", "")),
+            "LIGHTER": self._parse_symbol_set(os.getenv("TRADINGVIEW_ALLOWED_SYMBOLS_LIGHTER", "")),
+        }
+        self._tradingview_max_quantity_default = max(
+            0.0, float(os.getenv("TRADINGVIEW_MAX_QUANTITY", "0.0"))
+        )
+        self._tradingview_max_quantity_by_venue: Dict[str, float] = {
+            "ASTER": max(0.0, float(os.getenv("TRADINGVIEW_MAX_QUANTITY_ASTER", "0.0"))),
+            "LIGHTER": max(0.0, float(os.getenv("TRADINGVIEW_MAX_QUANTITY_LIGHTER", "0.0"))),
+        }
+        self._tradingview_idempotency_window_seconds = max(
+            30, int(os.getenv("TRADINGVIEW_IDEMPOTENCY_WINDOW_SECONDS", "300"))
+        )
+        self._tradingview_idempotency_max_keys = max(
+            100, int(os.getenv("TRADINGVIEW_IDEMPOTENCY_MAX_KEYS", "2000"))
+        )
+        self._tradingview_signal_seen_at: Dict[str, float] = {}
         self._failure_counts: Dict[str, int] = defaultdict(int)
         self._auto_deallocated: Set[str] = set()
 
@@ -123,6 +145,88 @@ class AlphaEngine:
             if isinstance(value, str) and value.strip():
                 return value.strip()
         return default
+
+    @staticmethod
+    def _parse_symbol_set(value: str) -> Set[str]:
+        if not value:
+            return set()
+        tokens = [token.strip().upper() for token in value.replace("|", ",").replace(";", ",").split(",")]
+        return {token for token in tokens if token}
+
+    def _symbol_allowed_for_venue(self, venue: str, symbol: str) -> bool:
+        symbol = str(symbol or "").strip().upper()
+        venue = self._normalize_platform(venue)
+
+        venue_symbols = self._tradingview_allowed_symbols_by_venue.get(venue, set())
+        if venue_symbols:
+            return symbol in venue_symbols
+
+        if self._tradingview_allowed_symbols:
+            return symbol in self._tradingview_allowed_symbols
+
+        return True
+
+    def _max_quantity_for_venue(self, venue: str) -> float | None:
+        venue = self._normalize_platform(venue)
+        venue_cap = self._tradingview_max_quantity_by_venue.get(venue, 0.0)
+        if venue_cap > 0:
+            return venue_cap
+        if self._tradingview_max_quantity_default > 0:
+            return self._tradingview_max_quantity_default
+        return None
+
+    def _build_signal_key(
+        self,
+        payload: Dict[str, Any],
+        action: str,
+        targets: List[str],
+        symbol: str,
+        quantity: float,
+    ) -> str:
+        explicit_id = self._extract_text_value(
+            payload,
+            ["signal_id", "alert_id", "id", "uuid", "message_id", "tv_id"],
+        )
+        if explicit_id:
+            return explicit_id
+
+        key_material = {
+            "action": action,
+            "targets": sorted(targets),
+            "symbol": symbol,
+            "quantity": quantity,
+            "strategy": self._extract_text_value(payload, ["strategy", "strategy_name", "alert_name"]),
+            "timeframe": self._extract_text_value(payload, ["timeframe", "tf"]),
+            "timestamp": self._extract_text_value(payload, ["timestamp", "time", "bar_time", "t"]),
+        }
+        digest = hashlib.sha256(
+            json.dumps(key_material, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+        return f"auto:{digest[:32]}"
+
+    def _is_duplicate_signal(self, signal_key: str) -> bool:
+        now = time.time()
+        cutoff = now - float(self._tradingview_idempotency_window_seconds)
+
+        if self._tradingview_signal_seen_at:
+            stale_keys = [
+                key for key, seen_at in self._tradingview_signal_seen_at.items() if seen_at < cutoff
+            ]
+            for key in stale_keys:
+                self._tradingview_signal_seen_at.pop(key, None)
+
+        seen_at = self._tradingview_signal_seen_at.get(signal_key)
+        if seen_at is not None and (now - seen_at) <= self._tradingview_idempotency_window_seconds:
+            return True
+
+        self._tradingview_signal_seen_at[signal_key] = now
+        if len(self._tradingview_signal_seen_at) > self._tradingview_idempotency_max_keys:
+            oldest_keys = sorted(
+                self._tradingview_signal_seen_at.items(), key=lambda item: item[1]
+            )[: len(self._tradingview_signal_seen_at) - self._tradingview_idempotency_max_keys]
+            for old_key, _ in oldest_keys:
+                self._tradingview_signal_seen_at.pop(old_key, None)
+        return False
 
     async def _publish_risk_alert(
         self,
@@ -403,6 +507,14 @@ class AlphaEngine:
             )
             return {"accepted": "rejected", "reason": "unknown_target"}
 
+        disallowed_targets = [venue for venue in targets if not self._symbol_allowed_for_venue(venue, symbol)]
+        if disallowed_targets:
+            await self.telegram.send_message(
+                f"⚠️ TradingView alert blocked: `{symbol}` not allowed for `{', '.join(disallowed_targets)}`.",
+                priority="high",
+            )
+            return {"accepted": "blocked", "reason": "symbol_not_allowed", "targets": disallowed_targets}
+
         if self._kill_switch_active:
             await self.telegram.send_message(
                 "🛑 TradingView alert blocked because kill switch is active.",
@@ -417,32 +529,93 @@ class AlphaEngine:
             )
             return {"accepted": "ignored", "reason": "invalid_quantity"}
 
+        signal_key = self._build_signal_key(
+            merged_payload,
+            normalized_action.upper(),
+            targets,
+            symbol,
+            quantity,
+        )
+        if self._is_duplicate_signal(signal_key):
+            await self.telegram.send_message(
+                f"♻️ TradingView duplicate ignored: `{signal_key}` within {self._tradingview_idempotency_window_seconds}s window.",
+                priority="medium",
+            )
+            return {"accepted": "ignored", "reason": "duplicate_signal", "signal_key": signal_key}
+
+        per_target_quantity: Dict[str, float] = {}
+        capped_targets: List[str] = []
+        for venue in targets:
+            venue_cap = self._max_quantity_for_venue(venue)
+            venue_qty = quantity
+            if venue_cap is not None and venue_qty > venue_cap:
+                venue_qty = venue_cap
+                capped_targets.append(venue)
+            per_target_quantity[venue] = venue_qty
+
         if not self._tradingview_execution_enabled:
+            qty_parts = [f"{venue}:{per_target_quantity[venue]}" for venue in sorted(targets)]
+            cap_note = (
+                f" Caps applied on `{', '.join(sorted(set(capped_targets)))}`."
+                if capped_targets
+                else ""
+            )
             await self.telegram.send_message(
                 (
-                    f"📥 TradingView signal captured (dry-run): `{normalized_action.upper()} {quantity} {symbol}` "
-                    f"on `{', '.join(targets)}`. Set `TRADINGVIEW_EXECUTION_ENABLED=true` to execute."
+                    f"📥 TradingView signal captured (dry-run): `{normalized_action.upper()} {symbol}` "
+                    f"with quantities `{', '.join(qty_parts)}`. Set `TRADINGVIEW_EXECUTION_ENABLED=true` to execute."
+                    f"{cap_note}"
                 ),
                 priority="medium",
             )
-            return {"accepted": "dry_run", "targets": targets}
+            return {
+                "accepted": "dry_run",
+                "targets": targets,
+                "signal_key": signal_key,
+                "quantities": per_target_quantity,
+                "capped_targets": sorted(set(capped_targets)),
+            }
 
+        dispatch_results: Dict[str, bool] = {}
         for venue in targets:
-            await dispatcher.send_command(
+            dispatch_results[venue] = await dispatcher.send_command(
                 venue,
                 {
                     "action": normalized_action.upper(),
                     "symbol": symbol,
-                    "quantity": quantity,
+                    "quantity": per_target_quantity[venue],
                     "source": "tradingview_webhook",
+                    "signal_key": signal_key,
                 },
             )
 
+        failed_targets = [venue for venue, ok in dispatch_results.items() if not ok]
+        if failed_targets:
+            await self.telegram.send_message(
+                f"❌ TradingView dispatch failed for `{', '.join(failed_targets)}` (`{signal_key}`).",
+                priority="high",
+            )
+            return {
+                "accepted": "partial_failure",
+                "targets": targets,
+                "failed_targets": failed_targets,
+                "signal_key": signal_key,
+                "quantities": per_target_quantity,
+                "capped_targets": sorted(set(capped_targets)),
+            }
+
+        qty_parts = [f"{venue}:{per_target_quantity[venue]}" for venue in sorted(targets)]
         await self.telegram.send_message(
-            f"✅ TradingView executed: `{normalized_action.upper()} {quantity} {symbol}` on `{', '.join(targets)}`.",
+            f"✅ TradingView executed: `{normalized_action.upper()} {symbol}` with `{', '.join(qty_parts)}` (`{signal_key}`).",
             priority="high",
         )
-        return {"accepted": "executed", "targets": targets}
+        return {
+            "accepted": "executed",
+            "targets": targets,
+            "signal_key": signal_key,
+            "quantities": per_target_quantity,
+            "capped_targets": sorted(set(capped_targets)),
+        }
 
     async def _record_trade_outcome(self, platform: str, success: bool, error_message: str = "") -> None:
         venue = self._normalize_platform(platform)

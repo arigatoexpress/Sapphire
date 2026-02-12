@@ -77,6 +77,9 @@ Reference docs:
 - Per-venue allocation limits configured.
 - Max daily loss and consecutive-loss halts active.
 - Secret rotation policy for webhook and Telegram controls.
+- Idempotency guard active (`TRADINGVIEW_IDEMPOTENCY_WINDOW_SECONDS`).
+- Per-venue max quantity caps configured (`TRADINGVIEW_MAX_QUANTITY_*`).
+- Symbol allowlists configured for each venue (`TRADINGVIEW_ALLOWED_SYMBOLS_*`).
 
 ## Operational Checklist
 
@@ -84,6 +87,8 @@ Reference docs:
 - Alpha env has `TRADINGVIEW_EXECUTION_ENABLED=false` during validation.
 - Telegram receives every accepted TradingView signal.
 - Scheduler heartbeat remains active for independent liveness checks.
+- Duplicate alerts are ignored (same signal in idempotency window).
+- Oversized quantities are capped before dispatch.
 
 ## Next Build Items
 

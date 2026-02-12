@@ -54,6 +54,15 @@ Safety default:
 - `TRADINGVIEW_EXECUTION_ENABLED=false` means alerts are notify-only (dry-run).
 - set `TRADINGVIEW_EXECUTION_ENABLED=true` only after paper validation.
 
+Risk controls for TradingView ingress (env-configured):
+
+- `TRADINGVIEW_IDEMPOTENCY_WINDOW_SECONDS` (default `300`)
+- `TRADINGVIEW_IDEMPOTENCY_MAX_KEYS` (default `2000`)
+- `TRADINGVIEW_MAX_QUANTITY` (global cap, optional)
+- `TRADINGVIEW_MAX_QUANTITY_ASTER` / `TRADINGVIEW_MAX_QUANTITY_LIGHTER` (venue caps, optional)
+- `TRADINGVIEW_ALLOWED_SYMBOLS` (global allowlist, optional)
+- `TRADINGVIEW_ALLOWED_SYMBOLS_ASTER` / `TRADINGVIEW_ALLOWED_SYMBOLS_LIGHTER` (venue allowlists, optional)
+
 ## Cloud Scheduler Jobs
 
 Health and status jobs are configured in `us-central1`:
