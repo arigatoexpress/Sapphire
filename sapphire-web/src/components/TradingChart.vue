@@ -38,9 +38,9 @@ const seedCandles = (base: number) => {
     let prior = base
 
     for (let i = 120; i >= 1; i -= 1) {
-        const drift = (Math.random() - 0.5) * 0.8
+        const delta = (Math.random() - 0.5) * 0.8
         const open = prior
-        const close = Math.max(0.001, open + drift)
+        const close = Math.max(0.001, open + delta)
         const high = Math.max(open, close) + Math.random() * 0.5
         const low = Math.min(open, close) - Math.random() * 0.5
         const time = (now - i * 60) as UTCTimestamp

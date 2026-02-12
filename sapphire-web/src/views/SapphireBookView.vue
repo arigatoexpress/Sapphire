@@ -25,7 +25,7 @@ const threads = ref<AgentThread[]>([
     {
         id: 'OPS-154',
         lane: 'deploy',
-        title: 'Cloud Run drift baseline sync',
+        title: 'Cloud Run config baseline sync',
         state: 'queued',
         updatedAgo: '9m',
         summary: 'OBSIDIAN prepared revision-to-repo parity report before the next promotion cycle.',
