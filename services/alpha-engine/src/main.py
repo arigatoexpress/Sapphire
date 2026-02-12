@@ -889,6 +889,122 @@ class AlphaEngine:
             return "failure_pressure"
         return "scheduled_cycle"
 
+    def _autonomy_request_brief(self, trigger: str, context: Dict[str, Any]) -> Dict[str, str]:
+        trigger_key = str(trigger or "").strip().lower()
+        active_count = len(context.get("active_venues", []))
+        failure_pressure = int(context.get("total_failure_pressure", 0))
+
+        if trigger_key == "venue_shortfall":
+            return {
+                "reasoning": (
+                    f"Active venues dropped to `{active_count}` (minimum required `{self._trading_gate_min_active_venues}`)."
+                ),
+                "expected_outcome": (
+                    "Run venue diagnostics, repair route/config drift, and restore balanced multi-venue execution."
+                ),
+                "expected_benefit": (
+                    "Higher execution resilience and lower concentration risk versus current reduced venue coverage."
+                ),
+                "deferral_risk": (
+                    "Prolonged single-venue dependency increases outage impact and missed execution windows."
+                ),
+            }
+
+        if trigger_key == "failure_pressure":
+            return {
+                "reasoning": (
+                    f"Failure pressure reached `{failure_pressure}` (gate max `{self._trading_gate_max_failure_pressure}`)."
+                ),
+                "expected_outcome": (
+                    "Triage root-cause failures, tighten guardrails, and stabilize dispatch reliability."
+                ),
+                "expected_benefit": (
+                    "Lower error rate and safer autonomous throughput compared with current elevated incident pressure."
+                ),
+                "deferral_risk": (
+                    "Unresolved failures can cascade into venue deallocations or kill-switch events."
+                ),
+            }
+
+        if trigger_key == "kill_switch_active":
+            return {
+                "reasoning": "Kill switch is active and needs targeted remediation work before safe scale-up.",
+                "expected_outcome": (
+                    "Produce a recovery plan with diagnostics and staged remediations while preserving trade safety."
+                ),
+                "expected_benefit": (
+                    "Faster, evidence-based recovery versus ad-hoc manual troubleshooting from the current halted state."
+                ),
+                "deferral_risk": "Extended downtime and stale risk posture until root causes are resolved.",
+            }
+
+        if trigger_key == "startup_bootstrap":
+            return {
+                "reasoning": "Service bootstrapped and requires baseline environment verification.",
+                "expected_outcome": "Validate runtime config/state and queue fixes for any drift discovered at startup.",
+                "expected_benefit": (
+                    "Catches misconfiguration early and improves first-hour reliability versus passive warm-up."
+                ),
+                "deferral_risk": "Silent drift can persist until it surfaces as a production incident.",
+            }
+
+        if trigger_key == "manual_telegram":
+            return {
+                "reasoning": "Owner explicitly requested an autonomy cycle from Telegram.",
+                "expected_outcome": "Run a focused improvement pass across Sapphire code/runtime/cloud controls.",
+                "expected_benefit": "Shorter turnaround on reliability and performance enhancements versus manual steps.",
+                "deferral_risk": "Improvement backlog grows and operational gains are delayed.",
+            }
+
+        return {
+            "reasoning": "Scheduled autonomy cycle reached its execution window.",
+            "expected_outcome": "Perform maintenance and improvement actions inside Sapphire guardrails.",
+            "expected_benefit": "Steady reliability/performance uplift versus remaining in static baseline mode.",
+            "deferral_risk": "Known optimizations and preventive fixes remain unapplied until a later cycle.",
+        }
+
+    def _format_autonomy_decision_brief(
+        self,
+        session_key: str,
+        trigger: str,
+        context: Dict[str, Any],
+        approval_required: bool,
+    ) -> str:
+        brief = self._autonomy_request_brief(trigger, context)
+        active = context.get("active_venues", [])
+        paused = context.get("paused_venues", [])
+        active_text = ", ".join(active) if active else "none"
+        paused_text = ", ".join(paused) if paused else "none"
+        failure_pressure = int(context.get("total_failure_pressure", 0))
+        pending = int(context.get("pending_autonomy_sessions", 0))
+        dex_stage = str(context.get("dex_execution_stage", "paper"))
+        dex_live = "ON" if bool(context.get("dex_live_dispatch", False)) else "OFF"
+        key = str(session_key or "").strip() or "n/a"
+
+        lines = [
+            "🤖 **AUTONOMY DECISION BRIEF**",
+            f"Session: `{key}`",
+            f"Trigger: `{trigger}`",
+            f"Why now: {brief['reasoning']}",
+            (
+                "Current state: "
+                f"active `{active_text}` | paused `{paused_text}` | "
+                f"failure pressure `{failure_pressure}` | pending `{pending}` | "
+                f"DEX stage `{dex_stage}` | DEX live `{dex_live}`"
+            ),
+            f"Expected outcome: {brief['expected_outcome']}",
+            f"Benefit vs current state: {brief['expected_benefit']}",
+            f"Risk if deferred: {brief['deferral_risk']}",
+        ]
+        if approval_required and key != "n/a":
+            lines.append("Decision: `/approve <session_key> <note>` or `/reject <session_key> <reason>`")
+            lines.append("Bulk option: `/approve_all <note>`")
+        elif approval_required:
+            lines.append("Decision gate is ON, but no session key was returned from dispatch.")
+        else:
+            lines.append("Decision mode: `AUTO-APPROVE`")
+        return "\n".join(lines)
+
     def _record_autonomy_session(self, session_key: str, trigger: str, instruction: str) -> None:
         key = str(session_key or "").strip()
         if not key:
@@ -1061,6 +1177,7 @@ class AlphaEngine:
             f"{directive} Execute an autonomous maintenance and improvement cycle for code + cloud. "
             "Prioritize production safety first, then reliability, then performance."
         )
+        brief = self._autonomy_request_brief(trigger, context)
 
         if self._autonomy_dry_run:
             await self.telegram.send_message(
@@ -1068,7 +1185,10 @@ class AlphaEngine:
                     "🧪 Full autonomy dry-run cycle prepared.\n"
                     f"Trigger: `{trigger}`\n"
                     f"Active venues: `{', '.join(context['active_venues']) if context['active_venues'] else 'none'}`\n"
-                    f"Failure pressure: `{context['total_failure_pressure']}`"
+                    f"Failure pressure: `{context['total_failure_pressure']}`\n"
+                    f"Why now: {brief['reasoning']}\n"
+                    f"Expected outcome: {brief['expected_outcome']}\n"
+                    f"Benefit vs current state: {brief['expected_benefit']}"
                 ),
                 priority="medium",
             )
@@ -1101,12 +1221,17 @@ class AlphaEngine:
                     note="Auto-approved by Sapphire autonomy policy.",
                     source="policy_auto",
                 )
+                decision_brief = self._format_autonomy_decision_brief(
+                    session_key=session_key,
+                    trigger=trigger,
+                    context=context,
+                    approval_required=False,
+                )
                 if auto_result.get("dispatched"):
                     await self.telegram.send_message(
                         (
                             "🤖 Full autonomy cycle dispatched + auto-approved.\n"
-                            f"Trigger: `{trigger}`\n"
-                            f"Session: `{session_key}`"
+                            f"{decision_brief}"
                         ),
                         priority="high",
                     )
@@ -1115,22 +1240,22 @@ class AlphaEngine:
                         (
                             "⚠️ Full autonomy cycle dispatched and marked auto-approved locally,\n"
                             f"but decision dispatch failed for `{session_key}`.\n"
-                            f"Reason: `{auto_result.get('reason', 'unknown')}`"
+                            f"Reason: `{auto_result.get('reason', 'unknown')}`\n\n"
+                            f"{decision_brief}"
                         ),
                         priority="high",
                     )
             else:
-                approval_line = (
-                    "Decision loop: `/approve <session_key>` or `/reject <session_key> <reason>`."
-                    if self._autonomy_require_owner_approval
-                    else "Decision loop skipped (session key unavailable)."
+                decision_brief = self._format_autonomy_decision_brief(
+                    session_key=session_key,
+                    trigger=trigger,
+                    context=context,
+                    approval_required=self._autonomy_require_owner_approval,
                 )
                 await self.telegram.send_message(
                     (
                         "🤖 Full autonomy cycle dispatched.\n"
-                        f"Trigger: `{trigger}`\n"
-                        f"Session: `{hook_result.get('session_key', 'n/a')}`\n"
-                        f"{approval_line}"
+                        f"{decision_brief}"
                     ),
                     priority="high",
                 )

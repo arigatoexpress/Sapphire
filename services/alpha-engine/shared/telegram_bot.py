@@ -161,10 +161,37 @@ class TelegramPlatformBot:
                 stop_idx = min(stop_idx, idx)
         return tail[:stop_idx].strip(" `:;,.")
 
+    @staticmethod
+    def _trim_summary(text: str, limit: int = 90) -> str:
+        value = str(text or "").strip()
+        if len(value) <= limit:
+            return value
+        return value[: max(0, limit - 3)].rstrip() + "..."
+
     @classmethod
     def _summarize_digest_text(cls, text: str) -> str:
         cleaned = cls._clean_digest_text(text)
         lowered = cleaned.lower()
+
+        if "autonomy decision brief" in lowered:
+            session = cls._extract_section(cleaned, "Session:", ["Trigger:", "Why now:"])
+            trigger = cls._extract_section(cleaned, "Trigger:", ["Why now:", "Current state:"])
+            outcome = cls._extract_section(
+                cleaned,
+                "Expected outcome:",
+                ["Benefit vs current state:", "Risk if deferred:", "Decision:", "Bulk option:"],
+            )
+            benefit = cls._extract_section(
+                cleaned,
+                "Benefit vs current state:",
+                ["Risk if deferred:", "Decision:", "Bulk option:"],
+            )
+            return (
+                f"🤖 Autonomy brief `{session or 'n/a'}` "
+                f"trigger `{trigger or 'n/a'}` | "
+                f"outcome {cls._trim_summary(outcome, 72) or 'n/a'} | "
+                f"benefit {cls._trim_summary(benefit, 72) or 'n/a'}"
+            )
 
         if "gemini flash" in lowered:
             insight = cls._extract_section(cleaned, "Gemini Flash", [])
@@ -218,6 +245,12 @@ class TelegramPlatformBot:
             action_key = action_match.group(1) if action_match else "unknown"
             result_key = result_match.group(1) if result_match else "unknown"
             return f"workspace:{action_key}:{result_key}"
+        if "autonomy decision brief" in cleaned or cleaned.startswith("🤖 autonomy brief"):
+            session_match = re.search(r"session[:\s`]+([a-z0-9:._-]+)", cleaned)
+            trigger_match = re.search(r"trigger[:\s`]+([a-z0-9_:-]+)", cleaned)
+            session_key = session_match.group(1) if session_match else "latest"
+            trigger_key = trigger_match.group(1) if trigger_match else "unknown"
+            return f"autonomy_brief:{session_key}:{trigger_key}"
         return cleaned
 
     @classmethod

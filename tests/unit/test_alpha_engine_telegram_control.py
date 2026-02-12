@@ -145,6 +145,27 @@ def test_digest_builder_summarizes_and_groups_repeated_updates(telegram_module):
     assert all("Reply with /status" not in line for line in lines)
 
 
+def test_digest_builder_summarizes_autonomy_decision_brief(telegram_module):
+    message = (
+        "🚨 🤖 **AUTONOMY DECISION BRIEF**\n"
+        "Session: `hook:autonomy:12345`\n"
+        "Trigger: `failure_pressure`\n"
+        "Why now: Failure pressure reached `5` (gate max `2`).\n"
+        "Current state: active `ASTER` | paused `LIGHTER` | failure pressure `5` | pending `2` "
+        "| DEX stage `staged_live` | DEX live `ON`\n"
+        "Expected outcome: Triage root-cause failures, tighten guardrails, and stabilize dispatch reliability.\n"
+        "Benefit vs current state: Lower error rate and safer autonomous throughput compared with current elevated "
+        "incident pressure.\n"
+        "Risk if deferred: Unresolved failures can cascade into venue deallocations or kill-switch events.\n"
+        "Decision: `/approve <session_key> <note>` or `/reject <session_key> <reason>`\n"
+        "Bulk option: `/approve_all <note>`"
+    )
+    lines = telegram_module.TelegramPlatformBot._build_digest_lines([message, message])
+
+    assert any("Autonomy brief" in line and "x2" in line for line in lines)
+    assert all("Expected outcome:" not in line for line in lines)
+
+
 def test_trade_mode_command_dispatches_execution_toggle(telegram_module):
     callback = AsyncMock()
     bot = telegram_module.TelegramPlatformBot(
