@@ -108,6 +108,8 @@ class AlphaEngine:
         self._tradingview_signal_seen_at: Dict[str, float] = {}
         self._failure_counts: Dict[str, int] = defaultdict(int)
         self._auto_deallocated: Set[str] = set()
+        self._owner_directive = str(os.getenv("SAPPHIRE_OWNER_DIRECTIVE", "")).strip()
+        self._owner_directive_updated_at = int(time.time()) if self._owner_directive else 0
 
     def _normalize_platform(self, platform: str) -> str:
         value = str(platform or "").strip().upper()
@@ -480,11 +482,41 @@ class AlphaEngine:
 
         await self.telegram.send_message("\n".join(lines), priority="medium")
 
+    async def _send_focus_snapshot(self) -> None:
+        state = dispatcher.get_control_state()
+        venue_summary = ", ".join(sorted(state.keys())) if state else "none"
+
+        directive = self._owner_directive.strip() or "none"
+        if len(directive) > 180:
+            directive = directive[:177] + "..."
+        directive_updated = (
+            time.strftime("%Y-%m-%d %H:%M:%SZ", time.gmtime(self._owner_directive_updated_at))
+            if self._owner_directive_updated_at
+            else "n/a"
+        )
+
+        lines = [
+            "🎯 **SAPPHIRE FOCUS SNAPSHOT**",
+            "Scope: `arigatoexpress/Sapphire` only",
+            f"Enabled venues: `{venue_summary}`",
+            f"Kill switch: `{'ACTIVE' if self._kill_switch_active else 'OFF'}`",
+            f"TradingView autonomy: `{'ON' if self.tv_autonomy.enabled else 'OFF'}`",
+            f"Community scripts: `{'ON' if self.tv_autonomy.community_access_enabled else 'OFF'}`",
+            f"Owner directive: `{directive}`",
+            f"Directive updated: `{directive_updated}`",
+            "",
+            "Use `/steer <directive>` to update direction.",
+        ]
+        await self.telegram.send_message("\n".join(lines), priority="medium")
+
     async def _send_heartbeat(self, reason: str) -> None:
         state = dispatcher.get_control_state()
         live = [venue for venue, item in state.items() if not item["paused"] and item["allocation"] > 0]
         paused = [venue for venue, item in state.items() if item["paused"] or item["allocation"] <= 0]
         total_failures = sum(self._failure_counts.values())
+        directive = self._owner_directive.strip() or "none"
+        if len(directive) > 120:
+            directive = directive[:117] + "..."
 
         msg = (
             f"💓 **SAPPHIRE HEARTBEAT** (`{reason}`)\n"
@@ -492,7 +524,9 @@ class AlphaEngine:
             f"Paused/deallocated: `{', '.join(paused) if paused else 'none'}`\n"
             f"Kill switch: `{'ACTIVE' if self._kill_switch_active else 'OFF'}`\n"
             f"Failure pressure: `{total_failures}`\n\n"
-            "Reply with `/status`, `/heartbeat`, `/promotion`, `/kill`, `/resume`, or `@alpha deallocate <venue>`."
+            f"Owner directive: `{directive}`\n\n"
+            "Reply with `/status`, `/heartbeat`, `/focus`, `/promotion`, `/kill`, `/resume`, `/steer <directive>`, "
+            "or `@alpha deallocate <venue>`."
         )
         await self.telegram.send_message(msg, priority="medium")
 
@@ -516,8 +550,47 @@ class AlphaEngine:
             await self._send_control_status()
             return
 
+        if normalized_action in {"FOCUS", "CONTROL_FOCUS"}:
+            await self._send_focus_snapshot()
+            return
+
         if normalized_action in {"PROMOTION_GATE", "STRATEGY_GATE", "PROMOTION", "GATE"}:
             await self._send_promotion_gate_report("manual")
+            return
+
+        if normalized_action in {"OWNER_STEER", "STEER"}:
+            directive = str(target or "").strip()
+            if not directive:
+                await self.telegram.send_message(
+                    "❌ Owner steering directive is empty. Use `/steer <directive>`.",
+                    priority="high",
+                )
+                return
+
+            if len(directive) > 500:
+                directive = directive[:500]
+            self._owner_directive = directive
+            self._owner_directive_updated_at = int(time.time())
+
+            await self.telegram.send_message(
+                f"🧠 Owner directive recorded: `{directive}`",
+                priority="high",
+            )
+
+            hook_result = await self.tv_autonomy.dispatch_owner_instruction(directive)
+            if hook_result.get("dispatched"):
+                await self.telegram.send_message(
+                    f"✅ OpenClaw steering dispatch queued (`{hook_result.get('session_key', 'n/a')}`).",
+                    priority="medium",
+                )
+            else:
+                await self.telegram.send_message(
+                    (
+                        "⚠️ OpenClaw steering dispatch unavailable "
+                        f"(`{hook_result.get('reason', 'unknown')}`). Directive kept in focus context."
+                    ),
+                    priority="high",
+                )
             return
 
         if normalized_action == "SET_ALLOCATION":

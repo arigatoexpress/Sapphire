@@ -36,12 +36,15 @@ Supported operator commands in Telegram:
 
 - `/status`
 - `/heartbeat`
+- `/focus`
 - `/promotion`
 - `/kill`
 - `/resume`
 - `/deallocate <venue>`
 - `/allocate <venue> <percent>`
+- `/steer <directive>`
 - `@alpha` / `@all` command forms for manual overrides
+- `@alpha steer <directive>` for owner direction updates
 
 Web policy:
 
@@ -150,6 +153,14 @@ Deploy the SapphireBook/SapphireTrade/Sapphire Alpha frontend to Cloud Run:
 ```
 
 This builds `sapphire-web` for `linux/amd64`, pushes to Artifact Registry, and deploys `sapphirebook-web`.
+
+## Alpha Control Plane Deploy
+
+Deploy Telegram/control-plane updates for `sapphire-alpha`:
+
+```bash
+./scripts/deploy_sapphire_alpha.sh
+```
 
 Expected result for current scope:
 

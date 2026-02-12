@@ -177,7 +177,13 @@ class TradingViewAutonomyPlugin:
         rs = avg_gain / avg_loss
         return 100.0 - (100.0 / (1.0 + rs))
 
-    async def _dispatch_to_openclaw(self, action: str, payload: Dict[str, Any], note: str) -> Dict[str, Any]:
+    async def _dispatch_to_openclaw(
+        self,
+        action: str,
+        payload: Dict[str, Any],
+        note: str,
+        agent_id: str = "",
+    ) -> Dict[str, Any]:
         if not self.enabled:
             return {"dispatched": False, "reason": "autonomy_disabled"}
         if not self.hook_url:
@@ -187,10 +193,11 @@ class TradingViewAutonomyPlugin:
         if not self.autonomy_chat_id:
             return {"dispatched": False, "reason": "chat_id_missing"}
 
+        resolved_agent = str(agent_id or self.autonomy_agent_id).strip() or "sapphire"
         session_key = f"hook:tradingview:{action}:{int(time.time() * 1000)}"
         hook_payload = {
             "name": f"TradingView {action}",
-            "agentId": self.autonomy_agent_id,
+            "agentId": resolved_agent,
             "wakeMode": "now",
             "sessionKey": session_key,
             "deliver": True,
@@ -218,6 +225,23 @@ class TradingViewAutonomyPlugin:
             return {"dispatched": False, "reason": "hook_request_error", "error": str(exc)}
 
         return {"dispatched": True, "session_key": session_key}
+
+    async def dispatch_owner_instruction(self, instruction: str, agent_id: str = "") -> Dict[str, Any]:
+        instruction = str(instruction or "").strip()
+        if not instruction:
+            return {"dispatched": False, "reason": "empty_instruction"}
+
+        note = (
+            "Owner steering update for Sapphire-focused operations only. "
+            f"Directive: {instruction} "
+            "Acknowledge in Telegram, then provide the next 3 executable steps with risk controls."
+        )
+        return await self._dispatch_to_openclaw(
+            action="owner_steer",
+            payload={"instruction": instruction},
+            note=note,
+            agent_id=agent_id,
+        )
 
     def _make_openclaw_instruction(self, action: str, payload: Dict[str, Any]) -> str:
         base = [
@@ -446,4 +470,3 @@ class TradingViewAutonomyPlugin:
             "dispatch": dispatch,
             "workspace": self.status_snapshot(),
         }
-

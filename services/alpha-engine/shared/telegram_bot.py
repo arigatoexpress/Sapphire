@@ -1,14 +1,17 @@
 """
-Enhanced Telegram Bot Service for Sapphire AI.
-Supports notifications and interactive commands via @mentions.
+Focused Telegram bot service for Sapphire Alpha.
+
+Design goals:
+- Keep control flow scoped to Sapphire and enabled venues.
+- Support heartbeat/control commands and owner steering notes.
+- Operate safely in either polling mode or webhook mode.
 """
 
 import asyncio
-import logging
+import os
 import re
-import time
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Set
 
 import aiohttp
 from loguru import logger
@@ -22,9 +25,23 @@ class NotificationPriority(Enum):
 
 
 class TelegramPlatformBot:
-    """
-    Enhanced Telegram Bot that handles both notifications and command processing.
-    """
+    """Telegram bot with command parsing and notification batching."""
+
+    CONTROL_ACTION_MAP = {
+        "kill": "HALT_TRADING",
+        "halt": "HALT_TRADING",
+        "resume": "RESUME_TRADING",
+        "status": "CONTROL_STATUS",
+        "heartbeat": "HEARTBEAT",
+        "promotion": "PROMOTION_GATE",
+        "gate": "PROMOTION_GATE",
+        "focus": "CONTROL_FOCUS",
+    }
+    TARGET_ALIASES = {
+        "LIGHT": "LIGHTER",
+        "L2": "LIGHTER",
+        "LT": "LIGHTER",
+    }
 
     def __init__(
         self,
@@ -32,217 +49,160 @@ class TelegramPlatformBot:
         chat_id: str,
         command_callback: Optional[Callable[[str, str, str, float], Any]] = None,
     ):
-        self.bot_token = bot_token.strip() if bot_token else None
-        self.chat_id = str(chat_id).strip() if chat_id else None
-        logger.info(
-            f"Initializing Telegram Bot with Token: {'Exists' if self.bot_token else 'MISSING'}, Chat ID: {'Exists' if self.chat_id else 'MISSING'}"
-        )
-        self.base_url = f"https://api.telegram.org/bot{self.bot_token}"
+        self.bot_token = bot_token.strip() if bot_token else ""
+        self.chat_id = str(chat_id).strip() if chat_id else ""
+        self.base_url = f"https://api.telegram.org/bot{self.bot_token}" if self.bot_token else ""
         self.command_callback = command_callback
         self.last_update_id = 0
         self.running = False
         self.message_buffer: List[str] = []
-        self._flush_task = None
+        self._flush_task: Optional[asyncio.Task[Any]] = None
+        self._session: Optional[aiohttp.ClientSession] = None
+
+        # Restrict command targets to explicit venues for focused operations.
+        self.allowed_targets = self._parse_allowed_targets(
+            os.getenv("TELEGRAM_ALLOWED_TARGETS", "ASTER,LIGHTER,ALL")
+        )
+        self.allowed_trade_targets = {target for target in self.allowed_targets if target != "ALL"}
+
+        logger.info(
+            "Initializing Telegram Bot | token={} chat={} allowed_targets={}",
+            "set" if self.bot_token else "missing",
+            "set" if self.chat_id else "missing",
+            ",".join(sorted(self.allowed_targets)),
+        )
+
+    @staticmethod
+    def _parse_allowed_targets(value: str) -> Set[str]:
+        tokens = re.split(r"[,;|\s]+", str(value or ""))
+        parsed = {token.strip().upper() for token in tokens if token.strip()}
+        parsed.add("ALL")
+        if "LIGHT" in parsed:
+            parsed.remove("LIGHT")
+            parsed.add("LIGHTER")
+        if "L2" in parsed:
+            parsed.remove("L2")
+            parsed.add("LIGHTER")
+        if not ({"ASTER", "LIGHTER"} & parsed):
+            parsed.update({"ASTER", "LIGHTER"})
+        return parsed
+
+    @classmethod
+    def _normalize_target(cls, value: str) -> str:
+        normalized = str(value or "").strip().upper()
+        return cls.TARGET_ALIASES.get(normalized, normalized)
+
+    @staticmethod
+    def _coerce_priority(value: NotificationPriority | str | None) -> NotificationPriority:
+        if isinstance(value, NotificationPriority):
+            return value
+        as_text = str(value or "").strip().lower()
+        for candidate in NotificationPriority:
+            if candidate.value == as_text:
+                return candidate
+        return NotificationPriority.MEDIUM
 
     async def _get_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
-            self._session = aiohttp.ClientSession()
+            timeout = aiohttp.ClientTimeout(total=20, connect=10, sock_connect=10, sock_read=15)
+            self._session = aiohttp.ClientSession(timeout=timeout)
         return self._session
 
     async def close(self):
+        self.running = False
+        if self._flush_task:
+            self._flush_task.cancel()
+            self._flush_task = None
         if self._session and not self._session.closed:
             await self._session.close()
 
     async def start(self):
-        """Start the flush loop and listener."""
+        """Start buffer flush loop and long-poll listener."""
         self.running = True
         self._flush_task = asyncio.create_task(self._flush_loop())
         await self.start_listener()
 
     async def _flush_loop(self):
-        """Periodically flush buffered messages."""
         while self.running:
-            await asyncio.sleep(20)  # Batch window
+            await asyncio.sleep(20)
             if self.message_buffer:
                 await self._flush_buffer()
 
     async def _flush_buffer(self):
-        """Combine and send buffered messages."""
         if not self.message_buffer:
             return
-
-        # Combine messages
-        batch_text = "📋 **Activity Digest**\n" + "\n".join(self.message_buffer)
+        batch_text = "📋 **Sapphire Activity Digest**\n" + "\n".join(self.message_buffer)
         self.message_buffer.clear()
-
-        # Send as single update (force send)
-        await self._dispatch_message(batch_text, NotificationPriority.LOW)
+        await self._dispatch_message(batch_text, allow_markdown=True)
 
     async def send_message(
-        self, text: str, priority: NotificationPriority = NotificationPriority.MEDIUM, **kwargs
+        self,
+        text: str,
+        priority: NotificationPriority | str = NotificationPriority.MEDIUM,
+        **_: Any,
     ):
         if not self.bot_token or not self.chat_id:
-            logger.warning("Telegram configuration missing")
+            logger.warning("Telegram configuration missing; message dropped")
             return
 
-        priority_prefix = {
+        level = self._coerce_priority(priority)
+        prefix = {
             NotificationPriority.LOW: "📝",
             NotificationPriority.MEDIUM: "📢",
             NotificationPriority.HIGH: "🚨",
             NotificationPriority.CRITICAL: "🚨🚨",
-        }.get(priority, "📢")
+        }[level]
+        full_message = f"{prefix} {text}"
 
-        full_message = f"{priority_prefix} {text}"
-
-        # Batch LOW/MEDIUM messages
-        if priority in (NotificationPriority.LOW, NotificationPriority.MEDIUM):
+        if level in {NotificationPriority.LOW, NotificationPriority.MEDIUM}:
             self.message_buffer.append(full_message)
-            if len(self.message_buffer) >= 10:  # Flush if buffer gets big
+            if len(self.message_buffer) >= 10:
                 await self._flush_buffer()
             return
 
-        # Send HIGH/CRITICAL immediately
-        await self._dispatch_message(full_message, priority)
+        await self._dispatch_message(full_message, allow_markdown=True)
 
-    async def _dispatch_message(self, text: str, priority: NotificationPriority):
-        """Internal method to actually post to Telegram."""
-        url = f"{self.base_url}/sendMessage"
+    async def _dispatch_message(self, text: str, allow_markdown: bool = True) -> bool:
+        if not self.base_url:
+            return False
+
         payload = {
             "chat_id": self.chat_id,
             "text": text,
-            "parse_mode": "Markdown",  # Re-enabling Markdown for formatting
             "disable_web_page_preview": True,
         }
+        if allow_markdown:
+            payload["parse_mode"] = "Markdown"
 
-        try:
-            # logger.info(f"📤 Posting to Telegram: {text[:50]}...")
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
-                async with session.post(url, json=payload) as resp:
-                    if resp.status != 200:
-                        logger.error(f"❌ Telegram API Error: {resp.status}")
-                        # If Markdown fails (often due to unescaped chars), retry without it
-                        if resp.status == 400:
-                            payload.pop("parse_mode")
-                            await session.post(url, json=payload)
-        except Exception as e:
-            logger.error(f"❌ Telegram Post Failed: {e}")
-
-    async def start_listener(self):
-        """Starts a long-polling loop to listen for interactive commands."""
-        if not self.bot_token:
-            logger.error("Cannot start Telegram listener without token")
-            return
-
-        logger.info("📡 Telegram Command Listener Started")
-        self.running = True
-
-        while self.running:
-            try:
-                url = f"{self.base_url}/getUpdates"
-                params = {"offset": self.last_update_id + 1, "timeout": 30}
-
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(url, params=params, timeout=35) as resp:
-                        if resp.status == 200:
-                            data = await resp.json()
-                            if data.get("ok"):
-                                for update in data.get("result", []):
-                                    self.last_update_id = update["update_id"]
-                                    await self._process_update(update)
-                        elif resp.status == 409:
-                            # Use randomized jitter
-                            import random
-
-                            jitter = random.uniform(5, 30)
-                            logger.warning(f"Telegram conflict, retrying in {jitter:.1f}s...")
-                            await asyncio.sleep(jitter)
-                        else:
-                            logger.error(f"Telegram listener error: {resp.status}")
-                            await asyncio.sleep(10)
-            except Exception as e:
-                logger.error(f"Telegram listener crashed: {e}")
-                await asyncio.sleep(10)
-
-    async def _process_update(self, update: Dict[str, Any]):
-        message = update.get("message", {})
-        text = message.get("text", "")
-        chat_id = str(message.get("chat", {}).get("id", ""))
-
-        if self.chat_id and chat_id != self.chat_id:
-            return
-
-        cmd_match = re.search(r"@(\w+)\s+(buy|sell|close)\s+([\d.]+)\s+(\w+)", text.lower())
-
-        if cmd_match:
-            platform = cmd_match.group(1)
-            action = cmd_match.group(2).upper()
-            quantity = float(cmd_match.group(3))
-            symbol = cmd_match.group(4).upper()
-
-            platforms = (
-                ["aster", "lighter"]
-                if platform == "all"
-                else [platform]
-            )
-
-            await self.send_message(
-                f"⚡ **MANUAL OVERRIDE**\n"
-                f"🎯 `{platform.upper()}`: `{action} {quantity} {symbol}`",
-                priority=NotificationPriority.HIGH,
-            )
-
-            if self.command_callback:
-                for p in platforms:
-                    try:
-                        await self.command_callback(p, symbol, action, quantity)
-                    except Exception as e:
-                        await self.send_message(f"❌ Error dispatching to {p}: {e}")
-
-    async def close(self):
-        if self._session and not self._session.closed:
-            await self._session.close()
-
-    async def send_message(
-        self, text: str, priority: NotificationPriority = NotificationPriority.MEDIUM, **kwargs
-    ):
-        if not self.bot_token or not self.chat_id:
-            logger.warning("Telegram configuration missing")
-            return
-
-        priority_prefix = {
-            NotificationPriority.LOW: "📝",
-            NotificationPriority.MEDIUM: "📢",
-            NotificationPriority.HIGH: "🚨",
-            NotificationPriority.CRITICAL: "🚨🚨",
-        }.get(priority, "📢")
-
-        full_message = f"{priority_prefix} {text}"
+        session = await self._get_session()
         url = f"{self.base_url}/sendMessage"
-        payload = {"chat_id": self.chat_id, "text": full_message, "disable_web_page_preview": True}
-        logger.info(f"📤 Posting to Telegram: {full_message[:50]}...")
 
-        attempts = 3
-        for attempt in range(1, attempts + 1):
+        for attempt in range(1, 4):
             try:
-                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20)) as session:
-                    async with session.post(url, json=payload) as resp:
-                        resp_data = await resp.json()
-                        if resp.status == 200:
-                            logger.info(
-                                f"✅ Telegram Message Sent Successfully (ID: {resp_data.get('result', {}).get('message_id')})"
-                            )
-                            return
+                async with session.post(url, json=payload) as resp:
+                    if resp.status == 200:
+                        return True
 
-                        logger.error(f"❌ Telegram API Error: {resp.status} - {resp_data}")
-            except Exception as e:
-                logger.warning(
-                    f"Telegram post attempt {attempt}/{attempts} failed: {e.__class__.__name__}: {e}"
-                )
+                    body = await resp.text()
+                    logger.warning(
+                        "Telegram sendMessage failed status={} attempt={} body={}",
+                        resp.status,
+                        attempt,
+                        body[:200],
+                    )
 
-            if attempt < attempts:
+                    # Retry once without markdown if formatting fails.
+                    if resp.status == 400 and payload.get("parse_mode"):
+                        payload.pop("parse_mode", None)
+                        continue
+            except Exception as exc:
+                logger.warning("Telegram sendMessage exception attempt={} err={}", attempt, exc)
+
+            if attempt < 3:
                 await asyncio.sleep(attempt * 2)
 
-        logger.error("❌ Telegram Post Failed after retries")
+        logger.error("Telegram sendMessage failed after retries")
+        return False
 
     async def configure_webhook(self, webhook_url: str, secret_token: str = "") -> bool:
         """Configure Telegram webhook mode for inbound command delivery."""
@@ -253,8 +213,7 @@ class TelegramPlatformBot:
             logger.error("Cannot configure webhook without TELEGRAM_WEBHOOK_URL")
             return False
 
-        url = f"{self.base_url}/setWebhook"
-        payload = {
+        payload: Dict[str, Any] = {
             "url": webhook_url,
             "allowed_updates": ["message"],
             "drop_pending_updates": False,
@@ -262,191 +221,246 @@ class TelegramPlatformBot:
         if secret_token:
             payload["secret_token"] = secret_token
 
+        session = await self._get_session()
+        url = f"{self.base_url}/setWebhook"
         try:
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20)) as session:
-                async with session.post(url, json=payload) as resp:
-                    data = await resp.json()
-                    if resp.status == 200 and data.get("ok"):
-                        logger.info(f"✅ Telegram webhook configured: {webhook_url}")
-                        return True
-                    logger.error(f"❌ Failed to configure Telegram webhook: {data}")
+            async with session.post(url, json=payload) as resp:
+                data = await resp.json()
+                if resp.status == 200 and data.get("ok"):
+                    logger.info(f"Telegram webhook configured: {webhook_url}")
+                    return True
+                logger.error(f"Failed to configure Telegram webhook: {data}")
         except Exception as exc:
-            logger.error(f"❌ Telegram webhook setup failed: {exc}")
+            logger.error(f"Telegram webhook setup failed: {exc}")
         return False
 
     async def start_listener(self):
-        """Starts a long-polling loop to listen for interactive commands."""
+        """Start long-polling listener for Telegram commands."""
         if not self.bot_token:
             logger.error("Cannot start Telegram listener without token")
             return
 
-        logger.info("📡 Telegram Command Listener Started")
+        logger.info("Telegram command listener started")
         self.running = True
 
         while self.running:
             try:
-                url = f"{self.base_url}/getUpdates"
                 params = {"offset": self.last_update_id + 1, "timeout": 50}
-                timeout = aiohttp.ClientTimeout(total=70, connect=10, sock_connect=10, sock_read=65)
-
-                async with aiohttp.ClientSession(timeout=timeout) as session:
-                    async with session.get(url, params=params) as resp:
-                        if resp.status == 200:
-                            data = await resp.json()
-                            if data.get("ok"):
-                                for update in data.get("result", []):
-                                    self.last_update_id = update["update_id"]
-                                    await self._process_update(update)
-                        elif resp.status == 409:
-                            # Use randomized jitter to resolve conflicts in scaled environments
-                            import random
-
-                            jitter = random.uniform(5, 20)
-                            logger.warning(
-                                f"Telegram conflict (another instance is listening), retrying in {jitter:.1f}s..."
-                            )
-                            await asyncio.sleep(jitter)
-                        else:
-                            logger.error(f"Telegram listener error: {resp.status}")
-                            await asyncio.sleep(10)
+                session = await self._get_session()
+                async with session.get(f"{self.base_url}/getUpdates", params=params) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        if data.get("ok"):
+                            for update in data.get("result", []):
+                                self.last_update_id = update["update_id"]
+                                await self._process_update(update)
+                    elif resp.status == 409:
+                        # Another listener might be active.
+                        await asyncio.sleep(8)
+                    else:
+                        logger.warning(f"Telegram listener status={resp.status}")
+                        await asyncio.sleep(5)
             except asyncio.TimeoutError:
-                # Long-poll request timed out without updates; loop and poll again.
                 continue
-            except Exception as e:
-                logger.error(f"Telegram listener crashed: {e}")
-                await asyncio.sleep(10)
+            except Exception as exc:
+                logger.error(f"Telegram listener crashed: {exc}")
+                await asyncio.sleep(5)
+
+    def _help_text(self) -> str:
+        targets = ", ".join(sorted(self.allowed_trade_targets))
+        return (
+            "💎 **SAPPHIRE TELEGRAM CONTROL**\n"
+            f"Focused venues: `{targets}`\n\n"
+            "Control commands:\n"
+            "- `/status`\n"
+            "- `/heartbeat`\n"
+            "- `/focus`\n"
+            "- `/promotion`\n"
+            "- `/kill`\n"
+            "- `/resume`\n"
+            "- `/deallocate <venue>`\n"
+            "- `/allocate <venue> <percent>`\n\n"
+            "Owner steering:\n"
+            "- `/steer <directive>`\n"
+            "- `@alpha steer <directive>`\n\n"
+            "Manual trade override:\n"
+            "- `@aster buy 1.0 BTC`\n"
+            "- `@lighter sell 0.5 ETH`\n"
+        )
+
+    async def _dispatch_callback(self, platform: str, symbol: str, action: str, quantity: float) -> bool:
+        if not self.command_callback:
+            logger.warning("No Telegram command callback registered")
+            return False
+        try:
+            await self.command_callback(platform, symbol, action, quantity)
+            return True
+        except Exception as exc:
+            logger.error(f"Telegram command callback error: {exc}")
+            await self.send_message(f"❌ Command dispatch failed: {exc}", priority=NotificationPriority.HIGH)
+            return False
 
     async def _process_update(self, update: Dict[str, Any]):
-        message = update.get("message", {})
-        text = message.get("text", "").strip()
+        message = update.get("message", {}) or update.get("edited_message", {})
+        text = str(message.get("text", "")).strip()
         chat_id = str(message.get("chat", {}).get("id", ""))
 
-        # Security: Only respond to messages from the authorized group/chat
+        # Security: only process owner-authorized chat.
         if self.chat_id and chat_id != self.chat_id:
             return
-
         if not text:
             return
 
         text_lower = text.lower()
 
-        # Slash control commands: /kill /resume /status /heartbeat /promotion [optional-target]
+        # Help / start
+        if re.search(r"^/(start|help)\b", text_lower):
+            await self.send_message(self._help_text(), priority=NotificationPriority.MEDIUM)
+            return
+
+        # Owner steering command
+        steer_match = re.search(r"^/(steer|directive|note)\s+(.+)$", text, flags=re.IGNORECASE)
+        mention_steer_match = re.search(
+            r"@(alpha|control)\s+(steer|directive|note)\s+(.+)$", text, flags=re.IGNORECASE
+        )
+        if steer_match or mention_steer_match:
+            directive = (steer_match.group(2) if steer_match else mention_steer_match.group(3)).strip()
+            if len(directive) > 500:
+                directive = directive[:500]
+            await self.send_message(
+                "🧠 Owner directive captured and queued for Sapphire execution context.",
+                priority=NotificationPriority.HIGH,
+            )
+            await self._dispatch_callback("CONTROL", directive, "OWNER_STEER", 0.0)
+            return
+
+        # Control commands: /status, /kill, etc.
         slash_control_match = re.search(
-            r"^/(kill|halt|resume|status|heartbeat|promotion|gate)(?:\s+(\w+))?$",
+            r"^/(kill|halt|resume|status|heartbeat|promotion|gate|focus)(?:\s+(\w+))?$",
             text_lower,
         )
+        mention_control_match = re.search(
+            r"@(alpha|all|control)\s+(kill|halt|resume|status|heartbeat|promotion|gate|focus)(?:\s+(\w+))?$",
+            text_lower,
+        )
+        if slash_control_match or mention_control_match:
+            if slash_control_match:
+                raw_action = slash_control_match.group(1)
+                raw_target = slash_control_match.group(2) or "ALL"
+            else:
+                raw_action = mention_control_match.group(2)
+                raw_target = mention_control_match.group(3) or "ALL"
+
+            target = self._normalize_target(raw_target)
+            mapped_action = self.CONTROL_ACTION_MAP[raw_action]
+
+            if mapped_action != "CONTROL_FOCUS" and target not in self.allowed_targets:
+                await self.send_message(
+                    f"❌ Unsupported target `{target}`. Allowed: `{', '.join(sorted(self.allowed_targets))}`.",
+                    priority=NotificationPriority.HIGH,
+                )
+                return
+
+            await self.send_message(
+                f"🧭 Control command accepted: `{raw_action.upper()}` target `{target}`",
+                priority=NotificationPriority.HIGH,
+            )
+            await self._dispatch_callback("CONTROL", target, mapped_action, 0.0)
+            return
+
+        # Allocation commands
         slash_allocation_match = re.search(
             r"^/(deallocate|allocate)\s+(\w+)(?:\s+([\d.]+))?$",
-            text_lower,
-        )
-
-        # Mention control commands: @alpha kill, @all resume, @control status
-        mention_control_match = re.search(
-            r"@(alpha|all|control)\s+(kill|halt|resume|status|heartbeat|promotion|gate)(?:\s+(\w+))?$",
             text_lower,
         )
         mention_allocation_match = re.search(
             r"@(alpha|all|control)\s+(deallocate|allocate)\s+(\w+)(?:\s+([\d.]+))?$",
             text_lower,
         )
-
-        if slash_control_match or mention_control_match:
-            if slash_control_match:
-                raw_action = slash_control_match.group(1)
-                target = (slash_control_match.group(2) or "all").upper()
-            else:
-                raw_action = mention_control_match.group(2)
-                target = (mention_control_match.group(3) or "all").upper()
-
-            action_map = {
-                "kill": "HALT_TRADING",
-                "halt": "HALT_TRADING",
-                "resume": "RESUME_TRADING",
-                "status": "CONTROL_STATUS",
-                "heartbeat": "HEARTBEAT",
-                "promotion": "PROMOTION_GATE",
-                "gate": "PROMOTION_GATE",
-            }
-            mapped_action = action_map[raw_action]
-
-            await self.send_message(
-                f"🧭 Control command accepted: `{raw_action.upper()}` target `{target}`",
-                priority=NotificationPriority.HIGH,
-            )
-
-            if self.command_callback:
-                await self.command_callback("control", target, mapped_action, 0.0)
-            else:
-                logger.warning("No command callback registered for Telegram Bot")
-            return
-
         if slash_allocation_match or mention_allocation_match:
             if slash_allocation_match:
                 raw_action = slash_allocation_match.group(1)
-                target = slash_allocation_match.group(2).upper()
+                target = self._normalize_target(slash_allocation_match.group(2))
                 raw_percent = slash_allocation_match.group(3)
             else:
                 raw_action = mention_allocation_match.group(2)
-                target = mention_allocation_match.group(3).upper()
+                target = self._normalize_target(mention_allocation_match.group(3))
                 raw_percent = mention_allocation_match.group(4)
 
-            if raw_action == "deallocate":
-                allocation = 0.0
-            else:
-                pct = float(raw_percent) if raw_percent is not None else 100.0
+            if target not in self.allowed_targets:
+                await self.send_message(
+                    f"❌ Unsupported target `{target}`. Allowed: `{', '.join(sorted(self.allowed_targets))}`.",
+                    priority=NotificationPriority.HIGH,
+                )
+                return
+
+            allocation = 0.0
+            if raw_action == "allocate":
+                try:
+                    pct = float(raw_percent) if raw_percent is not None else 100.0
+                except ValueError:
+                    await self.send_message("❌ Allocation percent must be numeric.", priority=NotificationPriority.HIGH)
+                    return
                 allocation = max(0.0, min(1.0, pct / 100.0))
 
             await self.send_message(
                 f"🧭 Allocation command accepted: `{raw_action.upper()}` `{target}` -> `{allocation*100:.0f}%`",
                 priority=NotificationPriority.HIGH,
             )
-
-            if self.command_callback:
-                await self.command_callback("control", target, "SET_ALLOCATION", allocation)
-            else:
-                logger.warning("No command callback registered for Telegram Bot")
+            await self._dispatch_callback("CONTROL", target, "SET_ALLOCATION", allocation)
             return
 
-        # Pattern 1: @platform action quantity symbol (e.g. @lighter buy 0.1 sol)
-        cmd_match = re.search(r"@(\w+)\s+(buy|sell|close)\s+([\d.]+)\s+(\w+)", text_lower)
-
-        # Pattern 2: AI Commands (e.g. @alpha recap)
-        ai_match = re.search(r"@(\w+)\s+(recap|analyze|report)", text_lower)
-
-        if ai_match:
-            platform = ai_match.group(1)
-            action = ai_match.group(2).upper()
-            if self.command_callback:
-                asyncio.create_task(self.command_callback(platform, "AI", action, 0.0))
-            return
-
+        # Manual trade override: @aster buy 1.0 btc
+        cmd_match = re.search(r"@(\w+)\s+(buy|sell|close)\s+([\d.]+)\s+([A-Za-z0-9:_-]+)", text_lower)
         if cmd_match:
-            platform = cmd_match.group(1)
+            platform = self._normalize_target(cmd_match.group(1))
             action = cmd_match.group(2).upper()
-            quantity = float(cmd_match.group(3))
+            try:
+                quantity = float(cmd_match.group(3))
+            except ValueError:
+                await self.send_message("❌ Quantity must be numeric.", priority=NotificationPriority.HIGH)
+                return
             symbol = cmd_match.group(4).upper()
 
-            # Special case for "all"
-            platforms = (
-                ["aster", "lighter"]
-                if platform == "all"
-                else [platform]
-            )
+            if quantity <= 0:
+                await self.send_message("❌ Quantity must be greater than zero.", priority=NotificationPriority.HIGH)
+                return
+
+            if platform == "ALL":
+                targets = sorted(self.allowed_trade_targets)
+            elif platform in self.allowed_trade_targets:
+                targets = [platform]
+            else:
+                await self.send_message(
+                    f"❌ Unsupported venue `{platform}`. Allowed: `{', '.join(sorted(self.allowed_trade_targets))}`.",
+                    priority=NotificationPriority.HIGH,
+                )
+                return
 
             await self.send_message(
-                f"⚡ **MANUAL OVERRIDE DETECTED**\n"
-                f"━━━━━━━━━━━━━━━━━━\n"
-                f"🎯 **Platform**: `{platform.upper()}`\n"
-                f"📝 **Action**: `{action} {quantity} {symbol}`\n"
-                f"⏳ **Verification**: Dispatching to execution layer...",
+                f"⚡ **MANUAL OVERRIDE**\nVenue(s): `{', '.join(targets)}`\nAction: `{action} {quantity} {symbol}`",
                 priority=NotificationPriority.HIGH,
             )
+            for target in targets:
+                await self._dispatch_callback(target, symbol, action, quantity)
+            return
 
-            if self.command_callback:
-                for p in platforms:
-                    try:
-                        await self.command_callback(p, symbol, action, quantity)
-                    except Exception as e:
-                        await self.send_message(f"❌ Error dispatching to {p}: {e}")
-            else:
-                logger.warning("No command callback registered for Telegram Bot")
+        # AI assistant commands: @alpha recap|analyze|report
+        ai_match = re.search(r"@(alpha|control)\s+(recap|analyze|report)", text_lower)
+        if ai_match:
+            action = ai_match.group(2).upper()
+            await self._dispatch_callback("alpha", "AI", action, 0.0)
+            return
+
+        # Fallback: @alpha <free-text> is treated as steering context.
+        fallback_steer = re.search(r"@(alpha|control)\s+(.+)$", text, flags=re.IGNORECASE)
+        if fallback_steer:
+            directive = fallback_steer.group(2).strip()
+            if directive:
+                if len(directive) > 500:
+                    directive = directive[:500]
+                await self.send_message(
+                    "🧠 Owner note captured from @alpha command and queued.",
+                    priority=NotificationPriority.HIGH,
+                )
+                await self._dispatch_callback("CONTROL", directive, "OWNER_STEER", 0.0)

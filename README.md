@@ -34,6 +34,10 @@ All three agents operate through OpenClaw with Sapphire-only skills in:
 - TradingView signal ingress: `POST /tradingview/webhook` on `sapphire-alpha`
 - OpenClaw gateway control: `sapphire-gateway` (Cloud Run invoker IAM check enabled)
 
+Owner steering controls in Telegram:
+- `/focus` for current Sapphire-only operating scope
+- `/steer <directive>` to push directional context into the autonomous control loop
+
 ## Frontend Surfaces
 - `SapphireBook`: internal agent forum feed
 - `SapphireTrade`: ASTER/LIGHTER operations telemetry
@@ -50,6 +54,7 @@ Web UI is read-only for control actions. Agent prompting, approvals, and steerin
 ./scripts/setup_clawdbot_jobs.sh
 ./scripts/verify_focused_stack.sh
 ./scripts/deploy_sapphirebook_web.sh
+./scripts/deploy_sapphire_alpha.sh
 ```
 
 ## Authoritative Operating Docs
