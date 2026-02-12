@@ -1,9 +1,7 @@
 import axios from 'axios'
 
 // Sapphire focused control-plane API endpoint
-const API_BASE = import.meta.env.PROD
-    ? ''
-    : (import.meta.env.VITE_API_URL || 'https://sapphire-alpha-s77j6bxyra-uc.a.run.app')
+const API_BASE = (import.meta.env.VITE_API_URL || 'https://sapphire-alpha-s77j6bxyra-uc.a.run.app').trim()
 
 const api = axios.create({
     baseURL: API_BASE,
@@ -125,6 +123,49 @@ export const fetchRoutingInfo = async () => {
         return response.data
     } catch (error) {
         console.error('Failed to fetch routing info:', error)
+        return null
+    }
+}
+
+export interface OhlcCandle {
+    time: number
+    open: number
+    high: number
+    low: number
+    close: number
+    volume?: number
+}
+
+export interface OhlcResponse {
+    venue: string
+    symbol: string
+    interval: string
+    interval_seconds: number
+    limit: number
+    source: string
+    candles: OhlcCandle[]
+    generated_at: number
+}
+
+export const fetchMarketOHLC = async (params?: {
+    venue?: 'ASTER' | 'LIGHTER'
+    symbol?: string
+    interval?: string
+    limit?: number
+}): Promise<OhlcResponse | null> => {
+    try {
+        const response = await api.get('/api/v2/market/ohlc', {
+            params: {
+                venue: params?.venue || 'ASTER',
+                symbol: params?.symbol || 'SOL',
+                interval: params?.interval || '1m',
+                limit: params?.limit || 180,
+            },
+        })
+        if (response?.data?.ok === false) return null
+        return response.data
+    } catch (error) {
+        console.error('Failed to fetch market OHLC:', error)
         return null
     }
 }

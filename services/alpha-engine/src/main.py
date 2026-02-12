@@ -1202,11 +1202,13 @@ class AlphaEngine:
                 telegram_webhook_secret=self._telegram_webhook_secret,
                 tradingview_update_handler=self._handle_tradingview_signal,
                 tradingview_webhook_secret=self._tradingview_webhook_secret,
+                market_ohlc_handler=self._handle_market_ohlc_request,
             )
         else:
             await start_health_server(
                 tradingview_update_handler=self._handle_tradingview_signal,
                 tradingview_webhook_secret=self._tradingview_webhook_secret,
+                market_ohlc_handler=self._handle_market_ohlc_request,
             )
 
         # 1. Start Telegram FIRST for immediate status
@@ -1294,6 +1296,34 @@ class AlphaEngine:
                 logger.error(f"Error in trade result handler: {e}")
 
         await subscribe("trade-executed", handle_trade)
+
+    async def _handle_market_ohlc_request(self, query: Dict[str, Any]) -> Dict[str, Any]:
+        venue = self._normalize_platform(str(query.get("venue", "ASTER")))
+        if venue not in {"ASTER", "LIGHTER"}:
+            return {
+                "error": "unsupported_venue",
+                "message": "venue must be ASTER or LIGHTER",
+                "venue": venue,
+                "candles": [],
+            }
+
+        symbol = str(query.get("symbol", "SOL")).strip().upper() or "SOL"
+        interval = str(query.get("interval", "1m")).strip().lower() or "1m"
+        limit_raw = query.get("limit", "120")
+        try:
+            limit = int(limit_raw)
+        except (TypeError, ValueError):
+            limit = 120
+        limit = max(10, min(limit, 500))
+
+        ohlc = await self.market_data.fetch_ohlc(
+            venue=venue,
+            symbol=symbol,
+            interval=interval,
+            limit=limit,
+        )
+        ohlc["generated_at"] = int(time.time())
+        return ohlc
 
     async def stop(self):
         logger.info("🛑 Stopping Alpha Engine...")

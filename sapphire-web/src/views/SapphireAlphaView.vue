@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import TradingChart from '../components/TradingChart.vue'
-import { fetchPerformanceStats, fetchRoutingInfo } from '../api/client'
+import { fetchMarketOHLC, fetchPerformanceStats, fetchRoutingInfo, type OhlcCandle } from '../api/client'
 
 interface InsightCard {
     title: string
@@ -40,6 +40,8 @@ const strategyIntake = ref([
     'Cross-venue divergence monitor with confidence gating',
 ])
 
+const alphaCandles = ref<OhlcCandle[]>([])
+const chartSourceLabel = ref('Waiting for live OHLC feed')
 const lastRefreshEpoch = ref(0)
 const nowEpoch = ref(Date.now())
 let refreshTimer: ReturnType<typeof setInterval> | null = null
@@ -60,7 +62,11 @@ const riskTone = computed(() => {
 
 const loadAlphaStatus = async () => {
     try {
-        const [stats, routing] = await Promise.all([fetchPerformanceStats(), fetchRoutingInfo()])
+        const [stats, routing, ohlc] = await Promise.all([
+            fetchPerformanceStats(),
+            fetchRoutingInfo(),
+            fetchMarketOHLC({ venue: 'ASTER', symbol: 'SOL', interval: '1m', limit: 180 }),
+        ])
 
         const totalTrades = Number(stats?.metrics?.system?.total_trades || 0)
         const wins = Number(stats?.metrics?.system?.wins || 0)
@@ -89,6 +95,30 @@ const loadAlphaStatus = async () => {
                 detail: `Win-rate baseline: ${winRate}%`,
             },
         ]
+
+        const candles = (ohlc?.candles || [])
+            .map((item) => ({
+                time: Number(item.time),
+                open: Number(item.open),
+                high: Number(item.high),
+                low: Number(item.low),
+                close: Number(item.close),
+                volume: Number(item.volume || 0),
+            }))
+            .filter(
+                (item) =>
+                    Number.isFinite(item.time) &&
+                    Number.isFinite(item.open) &&
+                    Number.isFinite(item.high) &&
+                    Number.isFinite(item.low) &&
+                    Number.isFinite(item.close),
+            )
+            .sort((a, b) => a.time - b.time)
+        alphaCandles.value = candles
+        chartSourceLabel.value =
+            candles.length > 0
+                ? `Live OHLC · ${ohlc?.venue || 'ASTER'} (${ohlc?.source || 'market feed'})`
+                : 'Waiting for live OHLC feed'
         lastRefreshEpoch.value = Date.now()
     } catch (error) {
         console.error('Failed to load alpha status:', error)
@@ -140,9 +170,9 @@ onUnmounted(() => {
             <article class="chart-panel card">
                 <header>
                     <h3 class="font-mono">Strategy Canvas</h3>
-                    <small>Signal development display</small>
+                    <small>{{ chartSourceLabel }}</small>
                 </header>
-                <TradingChart :base-price="80.4" :height="290" />
+                <TradingChart :candles="alphaCandles" :height="290" />
             </article>
 
             <article class="panel card">

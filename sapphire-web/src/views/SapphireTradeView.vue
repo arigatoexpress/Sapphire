@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import TradingChart from '../components/TradingChart.vue'
-import { fetchPlatformStatus, fetchSystemLogs } from '../api/client'
+import { fetchMarketOHLC, fetchPlatformStatus, fetchSystemLogs, type OhlcCandle } from '../api/client'
 
 interface VenueCard {
     id: 'aster' | 'lighter'
@@ -32,6 +32,8 @@ const venues = ref<VenueCard[]>([
 ])
 
 const recentOps = ref<string[]>([])
+const chartCandles = ref<OhlcCandle[]>([])
+const chartSourceLabel = ref('Waiting for live OHLC feed')
 const loading = ref(true)
 const lastRefreshEpoch = ref(0)
 const nowEpoch = ref(Date.now())
@@ -53,11 +55,58 @@ const refreshAge = computed(() => {
     return `${Math.max(0, Math.round((nowEpoch.value - lastRefreshEpoch.value) / 1000))}s ago`
 })
 
-const chartBasePrice = computed(() => {
-    const valid = venues.value.map((item) => item.price).filter((price): price is number => typeof price === 'number')
-    if (valid.length === 0) return 80
-    return valid.reduce((sum, value) => sum + value, 0) / valid.length
-})
+const normalizeCandles = (candles: OhlcCandle[] | null | undefined): OhlcCandle[] =>
+    (candles || [])
+        .filter((item) => Number.isFinite(Number(item.time)))
+        .map((item) => ({
+            time: Number(item.time),
+            open: Number(item.open),
+            high: Number(item.high),
+            low: Number(item.low),
+            close: Number(item.close),
+            volume: Number.isFinite(Number(item.volume)) ? Number(item.volume) : 0,
+        }))
+        .filter(
+            (item) =>
+                Number.isFinite(item.open) &&
+                Number.isFinite(item.high) &&
+                Number.isFinite(item.low) &&
+                Number.isFinite(item.close),
+        )
+        .sort((a, b) => a.time - b.time)
+
+const mergeVenueCandles = (series: OhlcCandle[][]): OhlcCandle[] => {
+    const byTime = new Map<number, OhlcCandle[]>()
+    for (const candles of series) {
+        for (const candle of candles) {
+            const key = Math.floor(Number(candle.time))
+            const existing = byTime.get(key) || []
+            existing.push(candle)
+            byTime.set(key, existing)
+        }
+    }
+
+    return Array.from(byTime.entries())
+        .sort((a, b) => a[0] - b[0])
+        .slice(-180)
+        .map(([time, candles]) => {
+            const opens = candles.map((item) => Number(item.open))
+            const closes = candles.map((item) => Number(item.close))
+            const highs = candles.map((item) => Number(item.high))
+            const lows = candles.map((item) => Number(item.low))
+            const volume = candles.reduce((sum, item) => sum + Number(item.volume || 0), 0)
+            const avgOpen = opens.reduce((sum, value) => sum + value, 0) / opens.length
+            const avgClose = closes.reduce((sum, value) => sum + value, 0) / closes.length
+            return {
+                time,
+                open: avgOpen,
+                high: Math.max(...highs),
+                low: Math.min(...lows),
+                close: avgClose,
+                volume,
+            }
+        })
+}
 
 const normalizeVenueStatus = (value: unknown): VenueCard['status'] => {
     if (typeof value !== 'string') return 'offline'
@@ -91,7 +140,12 @@ const applyPlatformPayload = (payload: any) => {
 
 const loadOpsView = async () => {
     try {
-        const [platforms, logs] = await Promise.all([fetchPlatformStatus(), fetchSystemLogs()])
+        const [platforms, logs, asterOhlc, lighterOhlc] = await Promise.all([
+            fetchPlatformStatus(),
+            fetchSystemLogs(),
+            fetchMarketOHLC({ venue: 'ASTER', symbol: 'SOL', interval: '1m', limit: 180 }),
+            fetchMarketOHLC({ venue: 'LIGHTER', symbol: 'SOL', interval: '1m', limit: 180 }),
+        ])
 
         if (platforms) applyPlatformPayload(platforms)
         if (Array.isArray(logs)) {
@@ -102,6 +156,17 @@ const loadOpsView = async () => {
                 )
                 .slice(-8)
                 .reverse()
+        }
+
+        const asterCandles = normalizeCandles(asterOhlc?.candles)
+        const lighterCandles = normalizeCandles(lighterOhlc?.candles)
+        const merged = mergeVenueCandles([asterCandles, lighterCandles])
+        chartCandles.value = merged
+
+        if (merged.length > 0) {
+            chartSourceLabel.value = `Live OHLC merge · ASTER ${asterCandles.length} + LIGHTER ${lighterCandles.length}`
+        } else {
+            chartSourceLabel.value = 'Waiting for live OHLC feed'
         }
         lastRefreshEpoch.value = Date.now()
     } catch (error) {
@@ -150,9 +215,9 @@ onUnmounted(() => {
             <article class="chart-panel card glass-lift">
                 <header>
                     <h3 class="font-mono">Cross-Venue Price Pulse</h3>
-                    <small>Synthetic display seeded from latest venue prices</small>
+                    <small>{{ chartSourceLabel }}</small>
                 </header>
-                <TradingChart :base-price="chartBasePrice" :height="300" />
+                <TradingChart :candles="chartCandles" :height="300" />
             </article>
 
             <article class="venue-board card">

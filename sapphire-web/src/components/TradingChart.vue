@@ -7,15 +7,16 @@ import {
     ColorType,
     type UTCTimestamp,
 } from 'lightweight-charts'
-import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import type { OhlcCandle } from '../api/client'
 
 const props = withDefaults(
     defineProps<{
-        basePrice?: number
+        candles?: OhlcCandle[]
         height?: number
     }>(),
     {
-        basePrice: 80,
+        candles: () => [],
         height: 280,
     },
 )
@@ -26,42 +27,28 @@ let candleSeries: any = null
 let volumeSeries: any = null
 let resizeHandler: (() => void) | null = null
 
-const seedCandles = (base: number) => {
-    const data: Array<{
-        time: UTCTimestamp
-        open: number
-        high: number
-        low: number
-        close: number
-    }> = []
-    const now = Math.floor(Date.now() / 1000)
-    let prior = base
+const normalizedCandles = computed(() =>
+    (props.candles || [])
+        .filter(
+            (item) =>
+                Number.isFinite(Number(item.time)) &&
+                Number.isFinite(Number(item.open)) &&
+                Number.isFinite(Number(item.high)) &&
+                Number.isFinite(Number(item.low)) &&
+                Number.isFinite(Number(item.close)),
+        )
+        .map((item) => ({
+            time: Math.floor(Number(item.time)) as UTCTimestamp,
+            open: Number(item.open),
+            high: Number(item.high),
+            low: Number(item.low),
+            close: Number(item.close),
+            volume: Number.isFinite(Number(item.volume)) ? Number(item.volume) : 0,
+        }))
+        .sort((a, b) => Number(a.time) - Number(b.time)),
+)
 
-    for (let i = 120; i >= 1; i -= 1) {
-        const delta = (Math.random() - 0.5) * 0.8
-        const open = prior
-        const close = Math.max(0.001, open + delta)
-        const high = Math.max(open, close) + Math.random() * 0.5
-        const low = Math.min(open, close) - Math.random() * 0.5
-        const time = (now - i * 60) as UTCTimestamp
-        data.push({
-            time,
-            open: Number(open.toFixed(3)),
-            high: Number(high.toFixed(3)),
-            low: Number(low.toFixed(3)),
-            close: Number(close.toFixed(3)),
-        })
-        prior = close
-    }
-    return data
-}
-
-const seedVolume = (candles: Array<{ time: UTCTimestamp; open: number; close: number }>) =>
-    candles.map((item) => ({
-        time: item.time,
-        value: Math.round(120 + Math.random() * 360),
-        color: item.close >= item.open ? 'rgba(23,200,136,0.45)' : 'rgba(255,116,116,0.45)',
-    }))
+const hasData = computed(() => normalizedCandles.value.length > 0)
 
 const renderChart = async () => {
     if (!chartContainer.value) return
@@ -109,9 +96,16 @@ const renderChart = async () => {
         priceScaleId: '',
     })
 
-    const candles = seedCandles(props.basePrice)
-    if (candleSeries) candleSeries.setData(candles)
-    if (volumeSeries) volumeSeries.setData(seedVolume(candles))
+    if (candleSeries) candleSeries.setData(normalizedCandles.value)
+    if (volumeSeries) {
+        volumeSeries.setData(
+            normalizedCandles.value.map((item) => ({
+                time: item.time,
+                value: Math.max(item.volume || 0, 0),
+                color: item.close >= item.open ? 'rgba(23,200,136,0.45)' : 'rgba(255,116,116,0.45)',
+            })),
+        )
+    }
 
     chart.timeScale().fitContent()
 }
@@ -131,21 +125,53 @@ onUnmounted(() => {
 })
 
 watch(
-    () => props.basePrice,
+    () => props.height,
     () => {
         renderChart()
     },
 )
+
+watch(
+    normalizedCandles,
+    () => {
+        renderChart()
+    },
+    { deep: true },
+)
 </script>
 
 <template>
-    <div ref="chartContainer" class="chart-wrapper"></div>
+    <div class="chart-wrapper">
+        <div ref="chartContainer" class="chart-canvas"></div>
+        <div v-if="!hasData" class="empty-state">Waiting for live OHLC feed...</div>
+    </div>
 </template>
 
 <style scoped>
 .chart-wrapper {
+    position: relative;
     width: 100%;
+    min-height: 200px;
+}
+
+.chart-canvas {
+    width: 100%;
+    height: 100%;
     border-radius: 12px;
     overflow: hidden;
+}
+
+.empty-state {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: rgba(184, 214, 245, 0.78);
+    font-size: 0.8rem;
+    letter-spacing: 0.02em;
+    pointer-events: none;
+    background: linear-gradient(180deg, rgba(8, 22, 40, 0.22), rgba(8, 22, 40, 0.4));
 }
 </style>
