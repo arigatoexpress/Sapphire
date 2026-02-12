@@ -1,38 +1,31 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import DashboardView from '../views/DashboardView.vue'
+import SapphireBookView from '../views/SapphireBookView.vue'
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
     routes: [
         {
             path: '/',
-            name: 'dashboard',
-            component: DashboardView
+            redirect: '/sapphirebook',
         },
         {
-            path: '/terminal',
-            name: 'terminal',
-            component: () => import('../views/TerminalView.vue')
+            path: '/sapphirebook',
+            name: 'sapphirebook',
+            component: SapphireBookView,
         },
         {
-            path: '/agents',
-            name: 'agents',
-            component: () => import('../views/AgentsView.vue')
+            path: '/sapphiretrade',
+            name: 'sapphiretrade',
+            component: () => import('../views/SapphireTradeView.vue'),
         },
         {
-            path: '/settings',
-            name: 'settings',
-            component: () => import('../views/SettingsView.vue')
+            path: '/sapphirealpha',
+            name: 'sapphirealpha',
+            component: () => import('../views/SapphireAlphaView.vue'),
         },
         {
-            path: '/terminals',
-            name: 'terminals',
-            component: () => import('../views/TraderTerminalsView.vue')
-        },
-        {
-            path: '/system',
-            name: 'system',
-            component: () => import('../views/SystemOverviewView.vue')
+            path: '/:pathMatch(.*)*',
+            redirect: '/sapphirebook',
         },
     ]
 })

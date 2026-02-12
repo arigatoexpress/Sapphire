@@ -8,6 +8,8 @@ set -euo pipefail
 PROJECT_ID="${PROJECT_ID:-sapphire-479610}"
 LOCATION="${LOCATION:-us-central1}"
 GATEWAY_URL="${GATEWAY_URL:-https://sapphire-gateway-s77j6bxyra-uc.a.run.app}"
+SCHEDULER_SA="${SCHEDULER_SA:-sapphire-main-sa@${PROJECT_ID}.iam.gserviceaccount.com}"
+OIDC_AUDIENCE="${OIDC_AUDIENCE:-${GATEWAY_URL}}"
 
 CHAT_ID="$(gcloud secrets versions access latest --secret=TELEGRAM_CHAT_ID --project "${PROJECT_ID}")"
 OPENCLAW_TOKEN="$(
@@ -101,6 +103,8 @@ upsert_hook_job() {
       --time-zone "Etc/UTC" \
       --uri "${GATEWAY_URL}/hooks/agent" \
       --http-method POST \
+      --oidc-service-account-email "${SCHEDULER_SA}" \
+      --oidc-token-audience "${OIDC_AUDIENCE}" \
       --update-headers "Content-Type=application/json,X-OpenClaw-Token=${OPENCLAW_TOKEN}" \
       --message-body "${body}" >/dev/null
     echo "updated ${name}"
@@ -113,6 +117,8 @@ upsert_hook_job() {
       --time-zone "Etc/UTC" \
       --uri "${GATEWAY_URL}/hooks/agent" \
       --http-method POST \
+      --oidc-service-account-email "${SCHEDULER_SA}" \
+      --oidc-token-audience "${OIDC_AUDIENCE}" \
       --headers "Content-Type=application/json,X-OpenClaw-Token=${OPENCLAW_TOKEN}" \
       --message-body "${body}" >/dev/null
     echo "created ${name}"

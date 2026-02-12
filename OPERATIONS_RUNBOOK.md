@@ -20,6 +20,11 @@ Current alpha deployment only routes commands to:
 
 This is enforced by the `ENABLED_VENUES=ASTER;LIGHTER` environment variable in `sapphire-alpha`.
 
+Gateway access policy:
+
+- `sapphire-gateway` has Cloud Run invoker IAM check enabled.
+- Unauthenticated requests are denied (`403`), reducing public prompt surface.
+
 ## Telegram Control Channel
 
 Inbound commands are handled in webhook mode by:
@@ -37,6 +42,18 @@ Supported operator commands in Telegram:
 - `/deallocate <venue>`
 - `/allocate <venue> <percent>`
 - `@alpha` / `@all` command forms for manual overrides
+
+Web policy:
+
+- Public frontend surfaces are telemetry/research only.
+- Do not expose direct agent prompt or command controls in the web UI.
+- All operator steering and agent instructions must run through Telegram webhook auth.
+
+## Frontend Surfaces
+
+- `SapphireBook`: agent coordination forum surface
+- `SapphireTrade`: ASTER/LIGHTER runtime and operations telemetry
+- `Sapphire Alpha`: strategy intelligence + TradingView workbench surface
 
 ## TradingView Signal Ingress
 
@@ -87,7 +104,7 @@ Focused jobs in `us-central1`:
 - `sapphire-alpha-health-6h` -> alpha `/health` every 6 hours
 - `sapphire-aster-health-6h` -> aster `/health` every 6 hours (5 min offset)
 - `sapphire-lighter-health-6h` -> lighter `/health` every 6 hours (10 min offset)
-- `sapphire-gateway-health-6h` -> gateway `/health` every 6 hours
+- `sapphire-gateway-health-6h` -> gateway authenticated root check every 6 hours (OIDC)
 - `sapphire-alpha-heartbeat-30m` -> sends synthetic `/heartbeat` through alpha webhook every 30 minutes
 - `sapphire-alpha-status-daily` -> sends synthetic `/status` update through alpha webhook daily at `14:15 UTC`
 - `sapphire-alpha-strategy-gate-daily` -> sends `/promotion` through alpha webhook daily at `14:45 UTC`
@@ -103,6 +120,8 @@ Idempotent job setup script:
 ./scripts/setup_scheduler_jobs.sh
 ./scripts/setup_clawdbot_jobs.sh
 ```
+
+Gateway-targeting jobs now use OIDC tokens from `sapphire-main-sa@sapphire-479610.iam.gserviceaccount.com`.
 
 Scope reconciliation (dry-run then apply):
 

@@ -56,7 +56,20 @@ service_ready() {
   fi
 
   if [[ -n "$url" ]]; then
-    if curl -fsS "$url/health" >/dev/null 2>&1; then
+    if [[ "$service" == "$GATEWAY_SERVICE" ]]; then
+      local id_token
+      id_token="$(gcloud auth print-identity-token 2>/dev/null || true)"
+      if [[ -n "$id_token" ]] && curl -fsS -H "Authorization: Bearer ${id_token}" "$url/" >/dev/null 2>&1; then
+        pass "$service authenticated endpoint"
+      else
+        fail "$service authenticated endpoint unexpected response"
+      fi
+      if curl -fsS "$url/" >/dev/null 2>&1; then
+        fail "$service unexpectedly allows unauthenticated invoke"
+      else
+        pass "$service blocks unauthenticated invoke"
+      fi
+    elif curl -fsS "$url/health" >/dev/null 2>&1; then
       pass "$service health endpoint"
     else
       fail "$service health endpoint unexpected response"
@@ -153,6 +166,7 @@ required_jobs=(
   "sapphire-alpha-health-6h"
   "sapphire-aster-health-6h"
   "sapphire-lighter-health-6h"
+  "sapphire-gateway-health-6h"
   "sapphire-alpha-heartbeat-30m"
   "sapphire-alpha-status-daily"
   "sapphire-alpha-strategy-gate-daily"

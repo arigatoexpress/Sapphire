@@ -17,5 +17,6 @@ Operate Sapphire as a profitable, 24/7 autonomous trading organization with stri
 ## Tactical Queue
 1. Maintain daily readiness checks and alerting.
 2. Keep TradingView autonomy in strategy-gated mode with explicit limits.
-3. Tighten deployment scripts around current service topology and remove stale deploy paths.
-4. Publish weekly performance and stability summaries to Telegram.
+3. Keep frontend read-only for control; Telegram remains the only agent command channel.
+4. Tighten deployment scripts around current service topology and remove stale deploy paths.
+5. Publish weekly performance and stability summaries to Telegram.

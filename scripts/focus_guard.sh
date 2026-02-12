@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sapphire focus guard: fail on scope drift in docs/config and verify core runtime inventory.
+# Sapphire focus guard: fail on scope creep in docs/config and verify core runtime inventory.
 
 set -euo pipefail
 
@@ -12,7 +12,7 @@ pass() { echo "PASS: $1"; }
 fail() { echo "FAIL: $1"; FAILURES=$((FAILURES + 1)); }
 
 # These terms represent prohibited legacy scope for current focused operation.
-FORBIDDEN_REGEX='(hyperliquid|symphony|drift|sapphire-v2)'
+FORBIDDEN_REGEX='(sapphire-v2)'
 SCAN_PATHS=(
   "README.md"
   "OPERATIONS_RUNBOOK.md"

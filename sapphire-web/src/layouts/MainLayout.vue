@@ -1,31 +1,23 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { LayoutDashboard, Terminal, Bot, Settings, Activity, Zap, Database } from 'lucide-vue-next'
-import { RouterLink, RouterView } from 'vue-router'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { RouterLink, RouterView, useRoute } from 'vue-router'
+import { BookOpenText, LineChart, Radar, ShieldCheck } from 'lucide-vue-next'
 import { fetchHealth } from '../api/client'
 
+const route = useRoute()
 const systemStatus = ref<'online' | 'offline' | 'connecting'>('connecting')
-const orchestratorRunning = ref(false)
 const uptime = ref(0)
+let healthTimer: ReturnType<typeof setInterval> | null = null
 
-const checkHealth = async () => {
-    try {
-        const health = await fetchHealth()
-        if (health && health.status === 'healthy') {
-            systemStatus.value = 'online'
-            orchestratorRunning.value = health.orchestrator?.running || false
-            uptime.value = Math.round(health.orchestrator?.uptime_seconds || 0)
-        } else {
-            systemStatus.value = 'offline'
-        }
-    } catch {
-        systemStatus.value = 'offline'
-    }
-}
+const navItems = [
+    { to: '/sapphirebook', label: 'SapphireBook', icon: BookOpenText },
+    { to: '/sapphiretrade', label: 'SapphireTrade', icon: LineChart },
+    { to: '/sapphirealpha', label: 'Sapphire Alpha', icon: Radar },
+]
 
-onMounted(() => {
-    checkHealth()
-    setInterval(checkHealth, 10000)
+const activeLabel = computed(() => {
+    const active = navItems.find((item) => route.path.startsWith(item.to))
+    return active?.label ?? 'SapphireBook'
 })
 
 const formatUptime = (seconds: number) => {
@@ -33,361 +25,283 @@ const formatUptime = (seconds: number) => {
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m`
     return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`
 }
+
+const checkHealth = async () => {
+    try {
+        const health = await fetchHealth()
+        if (health?.status === 'healthy') {
+            systemStatus.value = 'online'
+            uptime.value = Math.round(health.orchestrator?.uptime_seconds || 0)
+            return
+        }
+        systemStatus.value = 'offline'
+    } catch {
+        systemStatus.value = 'offline'
+    }
+}
+
+onMounted(() => {
+    checkHealth()
+    healthTimer = setInterval(checkHealth, 15000)
+})
+
+onUnmounted(() => {
+    if (healthTimer) clearInterval(healthTimer)
+})
 </script>
 
 <template>
-    <div class="app-container">
-        <nav class="sidebar">
-            <div class="logo-section">
-                <div class="logo-mark">
-                    <Zap :size="22" class="logo-icon" />
+    <div class="layout-shell">
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-mark">
+                    <ShieldCheck :size="20" />
                 </div>
-                <div class="logo-text">
-                    <h1 class="font-mono">SAPPHIRE</h1>
-                    <span class="version">Claude V1.0</span>
-                </div>
-            </div>
-
-            <div class="nav-section">
-                <span class="nav-label font-mono">MAIN</span>
-                <div class="nav-links">
-                    <RouterLink to="/" class="nav-item" active-class="active">
-                        <LayoutDashboard :size="18" />
-                        <span>Dashboard</span>
-                    </RouterLink>
-                    <RouterLink to="/terminal" class="nav-item" active-class="active">
-                        <Terminal :size="18" />
-                        <span>Terminal</span>
-                    </RouterLink>
-                    <RouterLink to="/agents" class="nav-item" active-class="active">
-                        <Bot :size="18" />
-                        <span>AI Swarm</span>
-                    </RouterLink>
-                    <RouterLink to="/analytics" class="nav-item" active-class="active">
-                        <Activity :size="18" />
-                        <span>Analytics</span>
-                    </RouterLink>
+                <div>
+                    <h1 class="font-mono">SAPPHIRE INC</h1>
+                    <p class="brand-subtitle">Focused Autonomous Stack</p>
                 </div>
             </div>
 
-            <div class="nav-section">
-                <span class="nav-label font-mono">SYSTEM</span>
-                <div class="nav-links">
-                    <RouterLink to="/memory" class="nav-item" active-class="active">
-                        <Database :size="18" />
-                        <span>Memory</span>
-                    </RouterLink>
-                    <RouterLink to="/settings" class="nav-item" active-class="active">
-                        <Settings :size="18" />
-                        <span>Settings</span>
-                    </RouterLink>
-                </div>
+            <nav class="nav-group">
+                <RouterLink
+                    v-for="item in navItems"
+                    :key="item.to"
+                    :to="item.to"
+                    class="nav-link"
+                    active-class="active"
+                >
+                    <component :is="item.icon" :size="16" />
+                    <span>{{ item.label }}</span>
+                </RouterLink>
+            </nav>
+
+            <div class="security-note">
+                <p class="font-mono">CONTROL CHANNEL</p>
+                <span>Telegram heartbeat only</span>
+                <small>Web command entry is disabled</small>
             </div>
+        </aside>
 
-            <div class="sidebar-footer">
-                <div class="platform-status">
-                    <div class="platform-item">
-                        <span class="platform-dot lighter"></span>
-                        <span class="font-mono">HL</span>
-                    </div>
-                    <div class="platform-item">
-                        <span class="platform-dot aster"></span>
-                        <span class="font-mono">ASTER</span>
-                    </div>
-                    <div class="platform-item">
-                        <span class="platform-dot aster"></span>
-                        <span class="font-mono">ASTER</span>
-                    </div>
-                    <div class="platform-item">
-                        <span class="platform-dot aster"></span>
-                        <span class="font-mono">SYM</span>
-                    </div>
+        <main class="main-panel">
+            <header class="topbar">
+                <div class="surface-title">
+                    <span class="font-mono">{{ activeLabel }}</span>
                 </div>
-            </div>
-        </nav>
-
-        <main class="main-content">
-            <header class="top-bar">
-                <div class="status-group">
-                    <div class="status-indicator" :class="systemStatus">
-                        <div class="indicator-dot"></div>
-                        <span class="font-mono status-text">
-                            {{ systemStatus === 'online' ? 'SYSTEM ONLINE' : systemStatus === 'connecting' ? 'CONNECTING...' : 'OFFLINE' }}
-                        </span>
-                    </div>
-                    <div v-if="systemStatus === 'online'" class="uptime font-mono">
-                        ⏱ {{ formatUptime(uptime) }}
-                    </div>
-                </div>
-
-                <div class="header-right">
-                    <div class="orchestrator-status font-mono" v-if="orchestratorRunning">
-                        <span class="pulse-dot"></span>
-                        TRADING ACTIVE
-                    </div>
-                    <button class="btn-connect font-mono">
-                        <Zap :size="14" />
-                        CONNECT WALLET
-                    </button>
+                <div class="status-cluster">
+                    <span class="status-pill" :class="systemStatus">
+                        {{ systemStatus === 'online' ? 'SYSTEM ONLINE' : systemStatus === 'connecting' ? 'CONNECTING' : 'OFFLINE' }}
+                    </span>
+                    <span class="uptime font-mono">{{ formatUptime(uptime) }}</span>
                 </div>
             </header>
 
-            <div class="content-area">
+            <section class="telegram-banner">
+                <strong>Secure operations policy:</strong>
+                agent prompts, approvals, and steering run via your authenticated Telegram heartbeat channel only.
+            </section>
+
+            <section class="content">
                 <RouterView />
-            </div>
+            </section>
         </main>
     </div>
 </template>
 
 <style scoped>
-.app-container {
-    display: flex;
+.layout-shell {
+    display: grid;
+    grid-template-columns: minmax(220px, 260px) 1fr;
     height: 100vh;
     width: 100vw;
     background: var(--bg-app);
 }
 
-/* Sidebar */
 .sidebar {
-    width: var(--sidebar-width);
-    height: 100%;
     display: flex;
     flex-direction: column;
-    background: var(--glass-bg);
-    border-right: 1px solid var(--border-subtle);
+    gap: 1.5rem;
     padding: 1.25rem;
+    border-right: 1px solid var(--border-subtle);
+    background: rgba(6, 11, 22, 0.88);
+    backdrop-filter: blur(12px);
 }
 
-.logo-section {
+.brand {
     display: flex;
+    gap: 0.75rem;
     align-items: center;
-    gap: 0.875rem;
-    margin-bottom: 2rem;
-    padding-bottom: 1.5rem;
+    padding-bottom: 1rem;
     border-bottom: 1px solid var(--border-subtle);
 }
 
-.logo-mark {
-    width: 40px;
-    height: 40px;
-    background: linear-gradient(135deg, var(--color-brand) 0%, var(--color-purple) 100%);
-    border-radius: var(--radius-md);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 4px 20px rgba(0, 212, 255, 0.3);
+.brand-mark {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #38bdf8 0%, #14b8a6 100%);
+    color: #03111d;
+    display: grid;
+    place-items: center;
 }
 
-.logo-icon {
-    color: #000;
-}
-
-.logo-text h1 {
-    font-size: 1.125rem;
-    font-weight: 700;
+.brand h1 {
     margin: 0;
-    letter-spacing: -0.02em;
-    background: linear-gradient(135deg, #fff 30%, var(--color-brand) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    font-size: 0.95rem;
+    letter-spacing: 0.04em;
 }
 
-.version {
-    font-size: 0.625rem;
-    color: var(--text-tertiary);
-    font-family: var(--font-mono);
-    letter-spacing: 0.03em;
+.brand-subtitle {
+    margin: 0.15rem 0 0;
+    color: var(--text-secondary);
+    font-size: 0.72rem;
 }
 
-.nav-section {
-    margin-bottom: 1.5rem;
-}
-
-.nav-label {
-    font-size: 0.625rem;
-    color: var(--text-tertiary);
-    letter-spacing: 0.1em;
-    margin-bottom: 0.75rem;
-    display: block;
-    padding-left: 0.5rem;
-}
-
-.nav-links {
+.nav-group {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.4rem;
 }
 
-.nav-item {
+.nav-link {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.625rem 0.75rem;
-    border-radius: var(--radius-sm);
+    gap: 0.55rem;
+    padding: 0.55rem 0.65rem;
+    border-radius: 10px;
     color: var(--text-secondary);
     text-decoration: none;
-    transition: all var(--transition-fast);
-    font-size: 0.875rem;
-    font-weight: 500;
+    transition: background var(--transition-fast), color var(--transition-fast);
 }
 
-.nav-item:hover {
-    background: var(--bg-hover);
+.nav-link:hover {
+    background: rgba(255, 255, 255, 0.05);
     color: var(--text-primary);
 }
 
-.nav-item.active {
-    background: var(--color-brand-dim);
-    color: var(--color-brand);
+.nav-link.active {
+    background: rgba(56, 189, 248, 0.18);
+    color: #67e8f9;
 }
 
-.sidebar-footer {
+.security-note {
     margin-top: auto;
-    padding-top: 1rem;
-    border-top: 1px solid var(--border-subtle);
-}
-
-.platform-status {
-    display: flex;
-    justify-content: space-between;
-    gap: 0.5rem;
-}
-
-.platform-item {
+    padding: 0.85rem;
+    border-radius: 10px;
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    background: rgba(8, 20, 36, 0.8);
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 0.25rem;
-    font-size: 0.5625rem;
-    color: var(--text-tertiary);
+    gap: 0.2rem;
 }
 
-.platform-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
+.security-note p {
+    margin: 0;
+    color: #67e8f9;
+    font-size: 0.65rem;
+    letter-spacing: 0.06em;
 }
 
-.platform-dot.lighter { background: var(--platform-lighter); box-shadow: 0 0 8px var(--platform-lighter); }
-.platform-dot.aster { background: var(--platform-aster); box-shadow: 0 0 8px var(--platform-aster); }
-.platform-dot.aster { background: var(--platform-aster); box-shadow: 0 0 8px var(--platform-aster); }
-.platform-dot.aster { background: var(--platform-aster); box-shadow: 0 0 8px var(--platform-aster); }
+.security-note span {
+    font-size: 0.78rem;
+    color: var(--text-primary);
+}
 
-/* Main Content */
-.main-content {
-    flex: 1;
+.security-note small {
+    color: var(--text-secondary);
+}
+
+.main-panel {
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    min-width: 0;
 }
 
-.top-bar {
-    height: var(--header-height);
+.topbar {
+    height: 56px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 1.5rem;
-    background: var(--glass-bg);
+    padding: 0 1rem 0 1.25rem;
     border-bottom: 1px solid var(--border-subtle);
+    background: rgba(7, 13, 24, 0.82);
 }
 
-.status-group {
+.surface-title {
+    color: #cbd5e1;
+    letter-spacing: 0.06em;
+}
+
+.status-cluster {
     display: flex;
     align-items: center;
-    gap: 1.5rem;
+    gap: 0.6rem;
 }
 
-.status-indicator {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.375rem 0.75rem;
-    border-radius: 20px;
-    font-size: 0.6875rem;
+.status-pill {
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.64rem;
+    letter-spacing: 0.04em;
 }
 
-.status-indicator.online {
-    background: var(--color-success-dim);
-    color: var(--color-success);
+.status-pill.online {
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.15);
 }
 
-.status-indicator.connecting {
-    background: var(--color-warning-dim);
-    color: var(--color-warning);
+.status-pill.connecting {
+    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.2);
 }
 
-.status-indicator.offline {
-    background: var(--color-error-dim);
-    color: var(--color-error);
-}
-
-.indicator-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: currentColor;
-    box-shadow: 0 0 8px currentColor;
-    animation: pulse-glow 2s infinite;
+.status-pill.offline {
+    color: #f87171;
+    background: rgba(248, 113, 113, 0.18);
 }
 
 .uptime {
-    font-size: 0.6875rem;
-    color: var(--text-tertiary);
-}
-
-.header-right {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-}
-
-.orchestrator-status {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.6875rem;
-    color: var(--color-success);
-    padding: 0.375rem 0.75rem;
-    background: var(--color-success-dim);
-    border-radius: 20px;
-}
-
-.pulse-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--color-success);
-    animation: pulse-glow 1.5s infinite;
-}
-
-.btn-connect {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid var(--border-subtle);
+    font-size: 0.7rem;
     color: var(--text-secondary);
-    padding: 0.5rem 1rem;
-    border-radius: var(--radius-sm);
-    font-size: 0.6875rem;
-    cursor: pointer;
-    transition: all var(--transition-fast);
 }
 
-.btn-connect:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: var(--color-brand);
-    color: var(--color-brand);
+.telegram-banner {
+    margin: 1rem 1rem 0;
+    padding: 0.75rem 0.9rem;
+    border: 1px solid rgba(20, 184, 166, 0.4);
+    background: rgba(10, 31, 33, 0.72);
+    color: #99f6e4;
+    border-radius: 10px;
+    font-size: 0.86rem;
 }
 
-.content-area {
+.telegram-banner strong {
+    margin-right: 0.3rem;
+}
+
+.content {
     flex: 1;
-    overflow-y: auto;
-    padding: 1.5rem;
+    overflow: auto;
+    padding: 1rem;
 }
 
-@keyframes pulse-glow {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+@media (max-width: 980px) {
+    .layout-shell {
+        grid-template-columns: 1fr;
+    }
+
+    .sidebar {
+        border-right: none;
+        border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .nav-group {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .security-note {
+        margin-top: 0;
+    }
 }
 </style>

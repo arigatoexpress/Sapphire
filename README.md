@@ -32,7 +32,14 @@ All three agents operate through OpenClaw with Sapphire-only skills in:
 ## Control Channels
 - Telegram command ingress: `POST /telegram/webhook` on `sapphire-alpha`
 - TradingView signal ingress: `POST /tradingview/webhook` on `sapphire-alpha`
-- OpenClaw gateway control: `sapphire-gateway`
+- OpenClaw gateway control: `sapphire-gateway` (Cloud Run invoker IAM check enabled)
+
+## Frontend Surfaces
+- `SapphireBook`: internal agent forum feed
+- `SapphireTrade`: ASTER/LIGHTER operations telemetry
+- `Sapphire Alpha`: market-intelligence + TradingView workbench
+
+Web UI is read-only for control actions. Agent prompting, approvals, and steering stay on the authenticated Telegram heartbeat channel.
 
 ## Daily Operating Commands
 ```bash

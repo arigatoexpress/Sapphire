@@ -257,6 +257,8 @@ test_data/*.json
 # Keep configuration JSON files
 !package.json
 !tsconfig.json
+!sapphire-web/tsconfig.app.json
+!sapphire-web/tsconfig.node.json
 !backtest_results_*.json
 !firebase.json
 
