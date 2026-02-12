@@ -54,6 +54,7 @@ class AlphaEngine:
             default_chat_id=self._telegram_chat_id,
         )
         self._heartbeat_task = None
+        self._autonomy_task = None
         self._kill_switch_active = False
         self._heartbeat_interval_seconds = int(os.getenv("TELEGRAM_HEARTBEAT_INTERVAL_SECONDS", "900"))
         self._deallocation_failure_threshold = int(os.getenv("DEALLOCATION_FAILURE_THRESHOLD", "3"))
@@ -110,6 +111,31 @@ class AlphaEngine:
         self._auto_deallocated: Set[str] = set()
         self._owner_directive = str(os.getenv("SAPPHIRE_OWNER_DIRECTIVE", "")).strip()
         self._owner_directive_updated_at = int(time.time()) if self._owner_directive else 0
+        self._full_autonomy_enabled = self._env_flag("SAPPHIRE_FULL_AUTONOMY_ENABLED", default=False)
+        self._autonomy_allow_code_changes = self._env_flag(
+            "SAPPHIRE_AUTONOMY_ALLOW_CODE_CHANGES", default=True
+        )
+        self._autonomy_allow_gcloud_changes = self._env_flag(
+            "SAPPHIRE_AUTONOMY_ALLOW_GCLOUD_CHANGES", default=True
+        )
+        self._autonomy_dry_run = self._env_flag("SAPPHIRE_AUTONOMY_DRY_RUN", default=False)
+        self._autonomy_loop_seconds = max(
+            300, int(os.getenv("SAPPHIRE_AUTONOMY_LOOP_SECONDS", "900"))
+        )
+        self._autonomy_min_dispatch_interval_seconds = max(
+            120,
+            int(os.getenv("SAPPHIRE_AUTONOMY_MIN_DISPATCH_INTERVAL_SECONDS", "600")),
+        )
+        self._autonomy_last_dispatch_at = 0.0
+        self._autonomy_last_trigger = ""
+        self._autonomy_dispatch_count = 0
+
+    @staticmethod
+    def _env_flag(name: str, default: bool = False) -> bool:
+        value = os.getenv(name)
+        if value is None:
+            return default
+        return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
     def _normalize_platform(self, platform: str) -> str:
         value = str(platform or "").strip().upper()
@@ -296,6 +322,21 @@ class AlphaEngine:
                 self.tv_autonomy.community_access_enabled,
                 "TRADINGVIEW_COMMUNITY_ACCESS_ENABLED is not true",
             ),
+            (
+                "Full autonomy mode enabled",
+                self._full_autonomy_enabled,
+                "SAPPHIRE_FULL_AUTONOMY_ENABLED is not true",
+            ),
+            (
+                "Autonomy code mutations enabled",
+                self._autonomy_allow_code_changes,
+                "SAPPHIRE_AUTONOMY_ALLOW_CODE_CHANGES is not true",
+            ),
+            (
+                "Autonomy GCP mutations enabled",
+                self._autonomy_allow_gcloud_changes,
+                "SAPPHIRE_AUTONOMY_ALLOW_GCLOUD_CHANGES is not true",
+            ),
         ]
 
         failed_checks = [item for item in checks if not item[1]]
@@ -470,6 +511,8 @@ class AlphaEngine:
         lines = [
             "📊 **CONTROL STATUS**",
             f"Kill switch: `{'ACTIVE' if self._kill_switch_active else 'INACTIVE'}`",
+            f"Full autonomy: `{'ON' if self._full_autonomy_enabled else 'OFF'}`",
+            f"Autonomy dispatches: `{self._autonomy_dispatch_count}`",
             "",
         ]
         for venue in sorted(state.keys()):
@@ -500,6 +543,7 @@ class AlphaEngine:
             "Scope: `arigatoexpress/Sapphire` only",
             f"Enabled venues: `{venue_summary}`",
             f"Kill switch: `{'ACTIVE' if self._kill_switch_active else 'OFF'}`",
+            f"Full autonomy mode: `{'ON' if self._full_autonomy_enabled else 'OFF'}`",
             f"TradingView autonomy: `{'ON' if self.tv_autonomy.enabled else 'OFF'}`",
             f"Community scripts: `{'ON' if self.tv_autonomy.community_access_enabled else 'OFF'}`",
             f"Owner directive: `{directive}`",
@@ -523,12 +567,120 @@ class AlphaEngine:
             f"Active venues: `{', '.join(live) if live else 'none'}`\n"
             f"Paused/deallocated: `{', '.join(paused) if paused else 'none'}`\n"
             f"Kill switch: `{'ACTIVE' if self._kill_switch_active else 'OFF'}`\n"
+            f"Full autonomy: `{'ON' if self._full_autonomy_enabled else 'OFF'}`\n"
             f"Failure pressure: `{total_failures}`\n\n"
             f"Owner directive: `{directive}`\n\n"
-            "Reply with `/status`, `/heartbeat`, `/focus`, `/promotion`, `/kill`, `/resume`, `/steer <directive>`, "
+            "Reply with `/status`, `/heartbeat`, `/focus`, `/promotion`, `/autonomy`, `/kill`, `/resume`, `/steer <directive>`, "
             "or `@alpha deallocate <venue>`."
         )
         await self.telegram.send_message(msg, priority="medium")
+
+    def _autonomy_context_snapshot(self) -> Dict[str, Any]:
+        state = dispatcher.get_control_state()
+        active_venues = [
+            venue for venue, item in state.items() if not item.get("paused") and item.get("allocation", 0) > 0
+        ]
+        paused_venues = [
+            venue for venue, item in state.items() if item.get("paused") or item.get("allocation", 0) <= 0
+        ]
+        total_failures = sum(self._failure_counts.values())
+        return {
+            "kill_switch_active": self._kill_switch_active,
+            "active_venues": active_venues,
+            "paused_venues": paused_venues,
+            "failure_counts": dict(self._failure_counts),
+            "total_failure_pressure": total_failures,
+            "owner_directive": self._owner_directive or "",
+            "enabled_venues": sorted(list(dispatcher.bot_urls.keys())),
+            "autonomy_dispatch_count": self._autonomy_dispatch_count,
+        }
+
+    def _autonomy_trigger_reason(self, context: Dict[str, Any]) -> str:
+        active_count = len(context.get("active_venues", []))
+        total_failures = int(context.get("total_failure_pressure", 0))
+
+        if self._kill_switch_active:
+            return "kill_switch_active"
+        if active_count < self._trading_gate_min_active_venues:
+            return "venue_shortfall"
+        if total_failures > self._trading_gate_max_failure_pressure:
+            return "failure_pressure"
+        return "scheduled_cycle"
+
+    async def _dispatch_full_autonomy_cycle(self, trigger: str, force: bool = False) -> Dict[str, Any]:
+        if not self._full_autonomy_enabled:
+            return {"dispatched": False, "reason": "full_autonomy_disabled"}
+
+        now = time.time()
+        since_last = now - self._autonomy_last_dispatch_at
+        if not force and since_last < self._autonomy_min_dispatch_interval_seconds:
+            return {
+                "dispatched": False,
+                "reason": "rate_limited",
+                "retry_after_seconds": int(self._autonomy_min_dispatch_interval_seconds - since_last),
+            }
+
+        context = self._autonomy_context_snapshot()
+        directive = self._owner_directive.strip() or "Optimize Sapphire uptime, reliability, and execution quality."
+        instruction = (
+            f"{directive} Execute an autonomous maintenance and improvement cycle for code + cloud. "
+            "Prioritize production safety first, then reliability, then performance."
+        )
+
+        if self._autonomy_dry_run:
+            await self.telegram.send_message(
+                (
+                    "🧪 Full autonomy dry-run cycle prepared.\n"
+                    f"Trigger: `{trigger}`\n"
+                    f"Active venues: `{', '.join(context['active_venues']) if context['active_venues'] else 'none'}`\n"
+                    f"Failure pressure: `{context['total_failure_pressure']}`"
+                ),
+                priority="medium",
+            )
+            return {"dispatched": False, "reason": "dry_run", "trigger": trigger}
+
+        hook_result = await self.tv_autonomy.dispatch_environment_instruction(
+            instruction=instruction,
+            trigger=trigger,
+            context=context,
+            allow_code_changes=self._autonomy_allow_code_changes,
+            allow_gcloud_changes=self._autonomy_allow_gcloud_changes,
+        )
+
+        if hook_result.get("dispatched"):
+            self._autonomy_last_dispatch_at = now
+            self._autonomy_last_trigger = trigger
+            self._autonomy_dispatch_count += 1
+            await self.telegram.send_message(
+                (
+                    "🤖 Full autonomy cycle dispatched.\n"
+                    f"Trigger: `{trigger}`\n"
+                    f"Session: `{hook_result.get('session_key', 'n/a')}`"
+                ),
+                priority="high",
+            )
+        else:
+            await self.telegram.send_message(
+                (
+                    "⚠️ Full autonomy dispatch unavailable.\n"
+                    f"Trigger: `{trigger}`\n"
+                    f"Reason: `{hook_result.get('reason', 'unknown')}`"
+                ),
+                priority="high",
+            )
+        return hook_result
+
+    async def _autonomy_ops_loop(self) -> None:
+        while self.running:
+            try:
+                await asyncio.sleep(self._autonomy_loop_seconds)
+                context = self._autonomy_context_snapshot()
+                trigger = self._autonomy_trigger_reason(context)
+                await self._dispatch_full_autonomy_cycle(trigger=trigger, force=False)
+            except asyncio.CancelledError:
+                break
+            except Exception as exc:
+                logger.error(f"Autonomy loop error: {exc}")
 
     async def _handle_control_command(self, target: str, action: str, value: float) -> None:
         normalized_target = self._normalize_platform(target or "ALL")
@@ -556,6 +708,10 @@ class AlphaEngine:
 
         if normalized_action in {"PROMOTION_GATE", "STRATEGY_GATE", "PROMOTION", "GATE"}:
             await self._send_promotion_gate_report("manual")
+            return
+
+        if normalized_action in {"AUTONOMY", "AUTONOMY_CYCLE"}:
+            await self._dispatch_full_autonomy_cycle(trigger="manual_telegram", force=True)
             return
 
         if normalized_action in {"OWNER_STEER", "STEER"}:
@@ -1079,6 +1235,11 @@ class AlphaEngine:
         await dispatcher.start()
         await self.market_data.start()
         await self.strategy.start()
+        if self._full_autonomy_enabled:
+            self._autonomy_task = asyncio.create_task(self._autonomy_ops_loop())
+            await self._dispatch_full_autonomy_cycle(trigger="startup_bootstrap", force=True)
+        else:
+            logger.info("Full autonomy loop disabled (SAPPHIRE_FULL_AUTONOMY_ENABLED=false)")
 
         # Keep-alive loop
         while self.running:
@@ -1139,6 +1300,8 @@ class AlphaEngine:
         self.running = False
         if self._heartbeat_task:
             self._heartbeat_task.cancel()
+        if self._autonomy_task:
+            self._autonomy_task.cancel()
         await self.market_data.stop()
         await self.strategy.stop()
         await dispatcher.stop()

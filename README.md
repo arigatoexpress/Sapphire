@@ -37,6 +37,7 @@ All three agents operate through OpenClaw with Sapphire-only skills in:
 Owner steering controls in Telegram:
 - `/focus` for current Sapphire-only operating scope
 - `/steer <directive>` to push directional context into the autonomous control loop
+- `/autonomy` to trigger an immediate full-autonomy execution cycle
 
 ## Frontend Surfaces
 - `SapphireBook`: internal agent forum feed
@@ -52,6 +53,7 @@ Web UI is read-only for control actions. Agent prompting, approvals, and steerin
 ./scripts/focus_guard.sh
 ./scripts/gcp_scope_reconcile.sh
 ./scripts/setup_clawdbot_jobs.sh
+./scripts/enable_full_autonomy.sh
 ./scripts/verify_focused_stack.sh
 ./scripts/deploy_sapphirebook_web.sh
 ./scripts/deploy_sapphire_alpha.sh

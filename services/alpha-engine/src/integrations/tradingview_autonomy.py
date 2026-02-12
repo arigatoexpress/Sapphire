@@ -243,6 +243,61 @@ class TradingViewAutonomyPlugin:
             agent_id=agent_id,
         )
 
+    async def dispatch_environment_instruction(
+        self,
+        instruction: str,
+        trigger: str = "scheduled_cycle",
+        context: Optional[Dict[str, Any]] = None,
+        allow_code_changes: bool = True,
+        allow_gcloud_changes: bool = True,
+        agent_id: str = "",
+    ) -> Dict[str, Any]:
+        instruction = str(instruction or "").strip()
+        if not instruction:
+            return {"dispatched": False, "reason": "empty_instruction"}
+
+        context = dict(context or {})
+        guardrails = [
+            "Scope strictly to arigatoexpress/Sapphire and project sapphire-479610.",
+            "Do not touch non-Sapphire repos or external projects.",
+            "Post a concise changelog + risk note back to Telegram after execution.",
+        ]
+        if allow_code_changes:
+            guardrails.append(
+                "You may edit code, run tests, commit, and push directly to main when checks pass."
+            )
+        else:
+            guardrails.append("Code changes disabled: diagnostics and proposals only.")
+        if allow_gcloud_changes:
+            guardrails.append(
+                "You may run gcloud mutations for Cloud Run/Scheduler/IAM/Secrets strictly in sapphire-479610."
+            )
+        else:
+            guardrails.append("GCP mutations disabled: read-only verification only.")
+
+        context_json = json.dumps(context, sort_keys=True)
+        note = (
+            "Autonomy cycle instruction for Sapphire operations. "
+            f"Trigger: {trigger}. "
+            f"Directive: {instruction} "
+            "Operate autonomously with this policy: "
+            + " ".join(guardrails)
+            + f" Current runtime context: {context_json}."
+        )
+        payload = {
+            "instruction": instruction,
+            "trigger": trigger,
+            "context": context,
+            "allow_code_changes": bool(allow_code_changes),
+            "allow_gcloud_changes": bool(allow_gcloud_changes),
+        }
+        return await self._dispatch_to_openclaw(
+            action="environment_autonomy",
+            payload=payload,
+            note=note,
+            agent_id=agent_id,
+        )
+
     def _make_openclaw_instruction(self, action: str, payload: Dict[str, Any]) -> str:
         base = [
             "Use browser automation in TradingView with configured account/session.",

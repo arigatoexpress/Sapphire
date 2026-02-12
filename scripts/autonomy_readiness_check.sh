@@ -13,6 +13,7 @@ ASTER_REGION="${ASTER_REGION:-us-central1}"
 LIGHTER_REGION="${LIGHTER_REGION:-europe-west1}"
 GATEWAY_REGION="${GATEWAY_REGION:-us-central1}"
 SCHEDULER_REGION="${SCHEDULER_REGION:-us-central1}"
+AUTONOMY_SA="${AUTONOMY_SA:-sapphire-main-sa@${PROJECT_ID}.iam.gserviceaccount.com}"
 
 FAILURES=0
 
@@ -98,6 +99,32 @@ service_ready "$ASTER_SERVICE" "$ASTER_REGION"
 service_ready "$LIGHTER_SERVICE" "$LIGHTER_REGION"
 service_ready "$GATEWAY_SERVICE" "$GATEWAY_REGION"
 
+alpha_sa=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
+  | jq -r '.spec.template.spec.serviceAccountName // empty')
+if [[ "$alpha_sa" == "${AUTONOMY_SA}" ]]; then
+  pass "alpha service account uses sapphire-main-sa"
+else
+  fail "alpha service account mismatch: ${alpha_sa:-<empty>}"
+fi
+
+gateway_sa=$(gcloud run services describe "$GATEWAY_SERVICE" --project "$PROJECT_ID" --region "$GATEWAY_REGION" --format=json \
+  | jq -r '.spec.template.spec.serviceAccountName // empty')
+if [[ "$gateway_sa" == "${AUTONOMY_SA}" ]]; then
+  pass "gateway service account uses sapphire-main-sa"
+else
+  fail "gateway service account mismatch: ${gateway_sa:-<empty>}"
+fi
+
+pubsub_subscriber_role=$(gcloud projects get-iam-policy "$PROJECT_ID" \
+  --flatten="bindings[]" \
+  --filter="bindings.role=roles/pubsub.subscriber AND bindings.members:serviceAccount:${AUTONOMY_SA}" \
+  --format='value(bindings.role)' 2>/dev/null | head -n1)
+if [[ "$pubsub_subscriber_role" == "roles/pubsub.subscriber" ]]; then
+  pass "autonomy service account has Pub/Sub subscriber role"
+else
+  fail "autonomy service account missing Pub/Sub subscriber role"
+fi
+
 enabled_venues=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
   | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="ENABLED_VENUES") | .value // empty')
 if [[ "$enabled_venues" == "ASTER;LIGHTER" ]]; then
@@ -128,6 +155,30 @@ if [[ "$tv_autonomy_enabled" == "true" ]]; then
   pass "alpha TradingView autonomy plugin enabled"
 else
   fail "alpha TradingView autonomy plugin disabled: ${tv_autonomy_enabled:-<empty>}"
+fi
+
+full_autonomy_enabled=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
+  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="SAPPHIRE_FULL_AUTONOMY_ENABLED") | .value // empty')
+if [[ "$full_autonomy_enabled" == "true" ]]; then
+  pass "alpha full autonomy mode enabled"
+else
+  fail "alpha full autonomy mode disabled: ${full_autonomy_enabled:-<empty>}"
+fi
+
+autonomy_code_changes=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
+  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="SAPPHIRE_AUTONOMY_ALLOW_CODE_CHANGES") | .value // empty')
+if [[ "$autonomy_code_changes" == "true" ]]; then
+  pass "alpha autonomy code changes enabled"
+else
+  fail "alpha autonomy code changes disabled: ${autonomy_code_changes:-<empty>}"
+fi
+
+autonomy_gcloud_changes=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
+  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="SAPPHIRE_AUTONOMY_ALLOW_GCLOUD_CHANGES") | .value // empty')
+if [[ "$autonomy_gcloud_changes" == "true" ]]; then
+  pass "alpha autonomy gcloud changes enabled"
+else
+  fail "alpha autonomy gcloud changes disabled: ${autonomy_gcloud_changes:-<empty>}"
 fi
 
 tv_all_assets=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \

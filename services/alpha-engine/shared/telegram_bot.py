@@ -36,6 +36,7 @@ class TelegramPlatformBot:
         "promotion": "PROMOTION_GATE",
         "gate": "PROMOTION_GATE",
         "focus": "CONTROL_FOCUS",
+        "autonomy": "AUTONOMY_CYCLE",
     }
     TARGET_ALIASES = {
         "LIGHT": "LIGHTER",
@@ -276,6 +277,7 @@ class TelegramPlatformBot:
             "- `/heartbeat`\n"
             "- `/focus`\n"
             "- `/promotion`\n"
+            "- `/autonomy`\n"
             "- `/kill`\n"
             "- `/resume`\n"
             "- `/deallocate <venue>`\n"
@@ -336,11 +338,11 @@ class TelegramPlatformBot:
 
         # Control commands: /status, /kill, etc.
         slash_control_match = re.search(
-            r"^/(kill|halt|resume|status|heartbeat|promotion|gate|focus)(?:\s+(\w+))?$",
+            r"^/(kill|halt|resume|status|heartbeat|promotion|gate|focus|autonomy)(?:\s+(\w+))?$",
             text_lower,
         )
         mention_control_match = re.search(
-            r"@(alpha|all|control)\s+(kill|halt|resume|status|heartbeat|promotion|gate|focus)(?:\s+(\w+))?$",
+            r"@(alpha|all|control)\s+(kill|halt|resume|status|heartbeat|promotion|gate|focus|autonomy)(?:\s+(\w+))?$",
             text_lower,
         )
         if slash_control_match or mention_control_match:

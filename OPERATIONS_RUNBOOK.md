@@ -139,6 +139,7 @@ Run:
 
 ```bash
 ./scripts/check_required_secrets.sh
+./scripts/enable_full_autonomy.sh
 ./scripts/autonomy_readiness_check.sh
 ./scripts/focus_guard.sh
 ./scripts/verify_focused_stack.sh
@@ -161,6 +162,14 @@ Deploy Telegram/control-plane updates for `sapphire-alpha`:
 ```bash
 ./scripts/deploy_sapphire_alpha.sh
 ```
+
+Full-autonomy env controls are applied by deploy defaults:
+
+- `SAPPHIRE_FULL_AUTONOMY_ENABLED=true`
+- `SAPPHIRE_AUTONOMY_ALLOW_CODE_CHANGES=true`
+- `SAPPHIRE_AUTONOMY_ALLOW_GCLOUD_CHANGES=true`
+- `SAPPHIRE_AUTONOMY_DRY_RUN=false`
+- `SAPPHIRE_AUTONOMY_LOOP_SECONDS=900`
 
 Expected result for current scope:
 
