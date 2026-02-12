@@ -8,6 +8,8 @@ This runbook is for operating Sapphire in the current cloud setup with a strict 
 - `sapphire-aster` (venue bot): `https://sapphire-aster-267358751314.us-central1.run.app`
 - `sapphire-lighter` (venue bot): `https://sapphire-lighter-267358751314.europe-west1.run.app`
 - `sapphire-gateway` (OpenClaw gateway): `https://sapphire-gateway-267358751314.us-central1.run.app`
+- `sapphire-github-webhook-relay` (support)
+- `sapphirebook-web` (support frontend)
 
 ## Active Control Scope
 
@@ -80,19 +82,32 @@ Risk controls for TradingView ingress (env-configured):
 
 ## Cloud Scheduler Jobs
 
-Health and status jobs are configured in `us-central1`:
+Focused jobs in `us-central1`:
 
 - `sapphire-alpha-health-6h` -> alpha `/health` every 6 hours
 - `sapphire-aster-health-6h` -> aster `/health` every 6 hours (5 min offset)
 - `sapphire-lighter-health-6h` -> lighter `/health` every 6 hours (10 min offset)
+- `sapphire-gateway-health-6h` -> gateway `/health` every 6 hours
 - `sapphire-alpha-heartbeat-30m` -> sends synthetic `/heartbeat` through alpha webhook every 30 minutes
 - `sapphire-alpha-status-daily` -> sends synthetic `/status` update through alpha webhook daily at `14:15 UTC`
 - `sapphire-alpha-strategy-gate-daily` -> sends `/promotion` through alpha webhook daily at `14:45 UTC`
+- `sapphire-heartbeat-30m` -> Sapphire agent heartbeat hook
+- `obsidian-heartbeat-30m` -> Obsidian agent heartbeat hook
+- `emerald-heartbeat-30m` -> Emerald agent heartbeat hook
+- `sapphire-dep-audit-daily` -> daily dependency audit via gateway hook
+- `sapphire-security-scan-weekly` -> weekly security scan via gateway hook
 
 Idempotent job setup script:
 
 ```bash
 ./scripts/setup_scheduler_jobs.sh
+```
+
+Scope reconciliation (dry-run then apply):
+
+```bash
+./scripts/gcp_scope_reconcile.sh
+./scripts/gcp_scope_reconcile.sh --apply
 ```
 
 ## Secret Readiness Check
@@ -102,6 +117,7 @@ Run:
 ```bash
 ./scripts/check_required_secrets.sh
 ./scripts/autonomy_readiness_check.sh
+./scripts/focus_guard.sh
 ```
 
 Expected result for current scope:
@@ -126,7 +142,9 @@ Immediate safety actions:
 
 ```bash
 gcloud run services list --project sapphire-479610 --platform managed
+gcloud scheduler jobs list --project sapphire-479610 --location us-central1
 curl -sS https://sapphire-alpha-267358751314.us-central1.run.app/health
 curl -sS https://sapphire-aster-267358751314.us-central1.run.app/health
 curl -sS https://sapphire-lighter-267358751314.europe-west1.run.app/health
+./scripts/focus_guard.sh
 ```
