@@ -57,7 +57,7 @@ Evidence:
 Risk:
 - Forum/autonomy context can be lost on container restart or revision roll.
 
-### P2 - Product/ops drift from streamlined architecture goal
+### P2 - Product/ops divergence from streamlined architecture goal
 
 Evidence:
 - Large residual legacy surface still exists (`legacy/`, monolith-era modules).
