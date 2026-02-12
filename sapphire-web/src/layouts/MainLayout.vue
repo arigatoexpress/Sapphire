@@ -2,13 +2,20 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { BookOpenText, LineChart, Radar, ShieldCheck } from 'lucide-vue-next'
-import { fetchHealth } from '../api/client'
+import { fetchControlStatus, fetchHealth } from '../api/client'
 
 const route = useRoute()
 const systemStatus = ref<'online' | 'offline' | 'connecting'>('connecting')
 const uptime = ref(0)
 const lastSyncEpoch = ref(0)
 const nowEpoch = ref(Date.now())
+const controlStatus = ref<{
+    tradingview_execution_enabled: boolean
+    tradingview_default_quantity: number
+    pending_autonomy_decisions: number
+    owner_approval_required: boolean
+    venues: Record<string, { allocation: number; paused: boolean }>
+} | null>(null)
 
 let healthTimer: ReturnType<typeof setInterval> | null = null
 let clockTimer: ReturnType<typeof setInterval> | null = null
@@ -51,6 +58,32 @@ const syncAgeSeconds = computed(() => {
     return Math.max(0, Math.round((nowEpoch.value - lastSyncEpoch.value) / 1000))
 })
 
+const executionModeLabel = computed(() =>
+    controlStatus.value?.tradingview_execution_enabled ? 'Live Execution' : 'Dry-Run Guarded',
+)
+
+const defaultQuantityLabel = computed(() => {
+    const qty = Number(controlStatus.value?.tradingview_default_quantity || 0)
+    return qty > 0 ? `${qty}` : 'n/a'
+})
+
+const pendingApprovals = computed(() => Number(controlStatus.value?.pending_autonomy_decisions || 0))
+
+const ownerApprovalLabel = computed(() =>
+    controlStatus.value?.owner_approval_required ? 'Owner approval required' : 'Auto-approve policy',
+)
+
+const activeVenueSummary = computed(() => {
+    const venues = controlStatus.value?.venues || {}
+    const all = Object.keys(venues)
+    if (all.length === 0) return 'venues n/a'
+    const active = all.filter((name) => {
+        const item = venues[name]
+        return Boolean(item && !item.paused && Number(item.allocation) > 0)
+    })
+    return `${active.length}/${all.length} venues active`
+})
+
 const formatUptime = (seconds: number) => {
     if (seconds < 60) return `${seconds}s`
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m`
@@ -64,10 +97,30 @@ const formatUtcClock = () => {
 
 const checkHealth = async () => {
     try {
-        const health = await fetchHealth()
-        if (health?.status === 'healthy') {
+        const [health, control] = await Promise.all([fetchHealth(), fetchControlStatus()])
+        const healthy =
+            (typeof health === 'string' && health.toUpperCase().includes('OK')) ||
+            (typeof health === 'object' &&
+                health !== null &&
+                (String((health as Record<string, unknown>).status || '').toLowerCase() === 'healthy' ||
+                    (health as Record<string, unknown>).ok === true))
+
+        if (healthy || control?.ok) {
             systemStatus.value = 'online'
-            uptime.value = Math.round(health.orchestrator?.uptime_seconds || 0)
+            if (control?.ok) {
+                controlStatus.value = {
+                    tradingview_execution_enabled: Boolean(control.tradingview_execution_enabled),
+                    tradingview_default_quantity: Number(control.tradingview_default_quantity || 0),
+                    pending_autonomy_decisions: Number(control.pending_autonomy_decisions || 0),
+                    owner_approval_required: Boolean(control.owner_approval_required),
+                    venues: control.venues || {},
+                }
+            }
+            const uptimeRaw =
+                typeof health === 'object' && health !== null
+                    ? Number((health as Record<string, any>).orchestrator?.uptime_seconds || 0)
+                    : 0
+            if (Number.isFinite(uptimeRaw) && uptimeRaw > 0) uptime.value = Math.round(uptimeRaw)
             lastSyncEpoch.value = Date.now()
             return
         }
@@ -144,6 +197,7 @@ onUnmounted(() => {
                     <span class="status-pill" :class="systemStatus">
                         {{ statusText }}
                     </span>
+                    <span class="meta-chip font-mono">{{ activeVenueSummary }}</span>
                     <span class="meta-chip font-mono">{{ formatUptime(uptime) }}</span>
                     <span class="meta-chip font-mono">{{ formatUtcClock() }}</span>
                     <span class="meta-chip font-mono">{{ runtimeHost }}</span>
@@ -154,14 +208,17 @@ onUnmounted(() => {
                 <article class="quick-card glass-lift">
                     <p class="font-mono">Command</p>
                     <strong>Telegram Heartbeat</strong>
+                    <small>Authenticated operator channel</small>
                 </article>
                 <article class="quick-card glass-lift">
-                    <p class="font-mono">Scope</p>
-                    <strong>Sapphire Unified Runtime</strong>
+                    <p class="font-mono">Execution</p>
+                    <strong>{{ executionModeLabel }}</strong>
+                    <small>Default qty {{ defaultQuantityLabel }}</small>
                 </article>
                 <article class="quick-card glass-lift">
-                    <p class="font-mono">Policy</p>
-                    <strong>Owner-Gated Autonomy</strong>
+                    <p class="font-mono">Autonomy</p>
+                    <strong>{{ ownerApprovalLabel }}</strong>
+                    <small>{{ pendingApprovals }} pending decisions</small>
                 </article>
             </section>
 
@@ -430,6 +487,11 @@ onUnmounted(() => {
 .quick-card strong {
     font-size: 0.79rem;
     font-weight: 600;
+}
+
+.quick-card small {
+    color: var(--text-secondary);
+    font-size: 0.7rem;
 }
 
 .telegram-banner {

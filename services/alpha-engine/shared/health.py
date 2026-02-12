@@ -178,6 +178,21 @@ async def platform_status(request: web.Request) -> web.Response:
     return web.json_response({"ok": True}, status=200)
 
 
+async def control_status(request: web.Request) -> web.Response:
+    handler = request.app.get("control_status_handler")
+    if handler is None:
+        return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
+    try:
+        result = await handler({})
+    except Exception as exc:
+        logger.error(f"Control status handler error: {exc}")
+        return web.json_response({"ok": False, "error": "handler_failed"}, status=500)
+    if isinstance(result, dict):
+        status = 400 if result.get("error") else 200
+        return web.json_response({"ok": status == 200, **result}, status=status)
+    return web.json_response({"ok": True}, status=200)
+
+
 async def routing_info(request: web.Request) -> web.Response:
     handler = request.app.get("routing_info_handler")
     if handler is None:
@@ -229,6 +244,21 @@ async def system_logs(request: web.Request) -> web.Response:
     return web.json_response([], status=200)
 
 
+async def tradingview_workspace(request: web.Request) -> web.Response:
+    handler = request.app.get("tradingview_workspace_handler")
+    if handler is None:
+        return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
+    try:
+        result = await handler({})
+    except Exception as exc:
+        logger.error(f"TradingView workspace handler error: {exc}")
+        return web.json_response({"ok": False, "error": "handler_failed"}, status=500)
+    if isinstance(result, dict):
+        status = 400 if result.get("error") else 200
+        return web.json_response({"ok": status == 200, **result}, status=status)
+    return web.json_response({"ok": True}, status=200)
+
+
 async def start_health_server(
     telegram_update_handler: Optional[Callable[[dict[str, Any]], Awaitable[None]]] = None,
     telegram_webhook_secret: str = "",
@@ -238,9 +268,11 @@ async def start_health_server(
     tradingview_webhook_secret: str = "",
     market_ohlc_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
     platform_status_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
+    control_status_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
     routing_info_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
     performance_stats_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
     system_logs_handler: Optional[Callable[[dict[str, Any]], Awaitable[Any]]] = None,
+    tradingview_workspace_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
 ):
     """Start a lightweight HTTP server for Cloud Run health checks."""
     port = int(os.getenv("PORT", "8080"))
@@ -264,6 +296,9 @@ async def start_health_server(
     if platform_status_handler is not None:
         app["platform_status_handler"] = platform_status_handler
         app.router.add_get("/api/v2/platforms/status", platform_status)
+    if control_status_handler is not None:
+        app["control_status_handler"] = control_status_handler
+        app.router.add_get("/api/v2/control/status", control_status)
     if routing_info_handler is not None:
         app["routing_info_handler"] = routing_info_handler
         app.router.add_get("/api/v2/trade/routing", routing_info)
@@ -273,6 +308,9 @@ async def start_health_server(
     if system_logs_handler is not None:
         app["system_logs_handler"] = system_logs_handler
         app.router.add_get("/logs/system", system_logs)
+    if tradingview_workspace_handler is not None:
+        app["tradingview_workspace_handler"] = tradingview_workspace_handler
+        app.router.add_get("/api/v2/tradingview/workspace", tradingview_workspace)
 
     runner = web.AppRunner(app)
     await runner.setup()

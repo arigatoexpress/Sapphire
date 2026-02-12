@@ -617,31 +617,70 @@ class AlphaEngine:
         )
 
     async def _send_control_status(self) -> None:
+        snapshot = self._control_snapshot()
+        lines = [
+            "📊 **CONTROL STATUS**",
+            f"Kill switch: `{'ACTIVE' if snapshot['kill_switch_active'] else 'INACTIVE'}`",
+            f"Full autonomy: `{'ON' if snapshot['full_autonomy_enabled'] else 'OFF'}`",
+            f"TradingView execution: `{'LIVE' if snapshot['tradingview_execution_enabled'] else 'DRY-RUN'}`",
+            f"Default quantity: `{snapshot['tradingview_default_quantity']}`",
+            f"Autonomy dispatches: `{snapshot['autonomy_dispatch_count']}`",
+            f"Pending autonomy decisions: `{snapshot['pending_autonomy_decisions']}`",
+            "",
+        ]
+        for venue in sorted(snapshot["venues"].keys()):
+            item = snapshot["venues"][venue]
+            status = "PAUSED" if item["paused"] else "LIVE"
+            fail_count = item.get("failure_count", 0)
+            lines.append(
+                f"- `{venue}` | {status} | alloc `{item['allocation']*100:.0f}%` | failures `{fail_count}`"
+            )
+
+        await self.telegram.send_message("\n".join(lines), priority="medium")
+
+    def _control_snapshot(self) -> Dict[str, Any]:
         state = dispatcher.get_control_state()
         pending_sessions = [
             session
             for session in self._autonomy_sessions.values()
             if session.get("decision", "pending") == "pending"
         ]
-        lines = [
-            "📊 **CONTROL STATUS**",
-            f"Kill switch: `{'ACTIVE' if self._kill_switch_active else 'INACTIVE'}`",
-            f"Full autonomy: `{'ON' if self._full_autonomy_enabled else 'OFF'}`",
-            f"TradingView execution: `{'LIVE' if self._tradingview_execution_enabled else 'DRY-RUN'}`",
-            f"Default quantity: `{self._tradingview_default_quantity}`",
-            f"Autonomy dispatches: `{self._autonomy_dispatch_count}`",
-            f"Pending autonomy decisions: `{len(pending_sessions)}`",
-            "",
+        pending_sessions.sort(key=lambda item: int(item.get("created_at", 0)), reverse=True)
+        pending_summary = [
+            {
+                "session_key": str(item.get("session_key", "")).strip(),
+                "trigger": str(item.get("trigger", "")).strip(),
+                "created_at": int(item.get("created_at", 0)),
+                "instruction": str(item.get("instruction", "")).strip(),
+            }
+            for item in pending_sessions[:20]
+            if str(item.get("session_key", "")).strip()
         ]
-        for venue in sorted(state.keys()):
-            item = state[venue]
-            status = "PAUSED" if item["paused"] else "LIVE"
-            fail_count = self._failure_counts.get(venue, 0)
-            lines.append(
-                f"- `{venue}` | {status} | alloc `{item['allocation']*100:.0f}%` | failures `{fail_count}`"
-            )
 
-        await self.telegram.send_message("\n".join(lines), priority="medium")
+        venues: Dict[str, Dict[str, Any]] = {}
+        for venue, venue_state in state.items():
+            venues[venue] = {
+                "allocation": float(venue_state.get("allocation", 0.0)),
+                "paused": bool(venue_state.get("paused", False)),
+                "paused_until": venue_state.get("paused_until"),
+                "pause_reason": venue_state.get("pause_reason", ""),
+                "failure_count": int(self._failure_counts.get(venue, 0)),
+            }
+
+        return {
+            "kill_switch_active": self._kill_switch_active,
+            "full_autonomy_enabled": self._full_autonomy_enabled,
+            "owner_approval_required": self._autonomy_require_owner_approval,
+            "tradingview_execution_enabled": self._tradingview_execution_enabled,
+            "tradingview_default_quantity": float(self._tradingview_default_quantity),
+            "autonomy_dispatch_count": int(self._autonomy_dispatch_count),
+            "pending_autonomy_decisions": len(pending_summary),
+            "pending_sessions": pending_summary,
+            "owner_directive": self._owner_directive or "",
+            "failure_pressure": int(sum(self._failure_counts.values())),
+            "venues": venues,
+            "timestamp": int(time.time()),
+        }
 
     async def _send_focus_snapshot(self) -> None:
         state = dispatcher.get_control_state()
@@ -1727,9 +1766,11 @@ class AlphaEngine:
                 tradingview_webhook_secret=self._tradingview_webhook_secret,
                 market_ohlc_handler=self._handle_market_ohlc_request,
                 platform_status_handler=self._handle_platform_status_request,
+                control_status_handler=self._handle_control_status_request,
                 routing_info_handler=self._handle_routing_info_request,
                 performance_stats_handler=self._handle_performance_stats_request,
                 system_logs_handler=self._handle_system_logs_request,
+                tradingview_workspace_handler=self._handle_tradingview_workspace_request,
             )
         else:
             await start_health_server(
@@ -1737,9 +1778,11 @@ class AlphaEngine:
                 tradingview_webhook_secret=self._tradingview_webhook_secret,
                 market_ohlc_handler=self._handle_market_ohlc_request,
                 platform_status_handler=self._handle_platform_status_request,
+                control_status_handler=self._handle_control_status_request,
                 routing_info_handler=self._handle_routing_info_request,
                 performance_stats_handler=self._handle_performance_stats_request,
                 system_logs_handler=self._handle_system_logs_request,
+                tradingview_workspace_handler=self._handle_tradingview_workspace_request,
             )
 
         # 1. Start Telegram FIRST for immediate status
@@ -1928,6 +1971,9 @@ class AlphaEngine:
             "timestamp": int(time.time()),
         }
 
+    async def _handle_control_status_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
+        return self._control_snapshot()
+
     async def _handle_routing_info_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
         state = dispatcher.get_control_state()
         active = [venue for venue, item in state.items() if not item.get("paused") and item.get("allocation", 0) > 0]
@@ -2002,6 +2048,13 @@ class AlphaEngine:
             limit = 80
         limit = max(1, min(limit, self._system_log_max_entries))
         return list(self._system_logs)[-limit:]
+
+    async def _handle_tradingview_workspace_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
+        snapshot = self.tv_autonomy.status_snapshot()
+        return {
+            "workspace": snapshot,
+            "timestamp": int(time.time()),
+        }
 
     async def stop(self):
         logger.info("🛑 Stopping Alpha Engine...")

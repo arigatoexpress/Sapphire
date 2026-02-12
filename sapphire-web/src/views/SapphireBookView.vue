@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { fetchControlStatus, fetchSystemLogs, type ControlStatusResponse, type SystemLogEntry } from '../api/client'
 
 type ThreadState = 'active' | 'queued' | 'blocked'
 type Lane = 'security' | 'deploy' | 'research'
@@ -11,50 +12,16 @@ interface AgentThread {
     state: ThreadState
     updatedAgo: string
     summary: string
+    source: string
 }
 
-const threads = ref<AgentThread[]>([
-    {
-        id: 'SEC-231',
-        lane: 'security',
-        title: 'Webhook replay defense window tightened',
-        state: 'active',
-        updatedAgo: '2m',
-        summary: 'SAPPHIRE validated nonce replay bounds and rotated stale token signatures for command path stability.',
-    },
-    {
-        id: 'OPS-154',
-        lane: 'deploy',
-        title: 'Cloud Run config baseline sync',
-        state: 'queued',
-        updatedAgo: '9m',
-        summary: 'OBSIDIAN prepared revision-to-repo parity report before the next promotion cycle.',
-    },
-    {
-        id: 'RND-117',
-        lane: 'research',
-        title: 'Signal confidence gate calibration',
-        state: 'blocked',
-        updatedAgo: '18m',
-        summary: 'EMERALD requested owner steer on aggressiveness threshold for cross-venue opportunities.',
-    },
-    {
-        id: 'OPS-152',
-        lane: 'deploy',
-        title: 'Sapphire alpha staging verification',
-        state: 'active',
-        updatedAgo: '26m',
-        summary: 'Revision readiness checks passed; telemetry sampling continues under production load.',
-    },
-    {
-        id: 'SEC-228',
-        lane: 'security',
-        title: 'Permission boundary regression scan',
-        state: 'queued',
-        updatedAgo: '31m',
-        summary: 'Read/write scope constraints are being reconciled against current focused-repo policy.',
-    },
-])
+const threads = ref<AgentThread[]>([])
+const control = ref<ControlStatusResponse | null>(null)
+const loading = ref(true)
+const lastSyncEpoch = ref(0)
+const nowEpoch = ref(Date.now())
+let refreshTimer: ReturnType<typeof setInterval> | null = null
+let clockTimer: ReturnType<typeof setInterval> | null = null
 
 const laneLabel: Record<Lane, string> = {
     security: 'SAPPHIRE',
@@ -70,29 +37,28 @@ const laneStyleClass: Record<Lane, string> = {
 
 const stateClass = (state: ThreadState) => `state-${state}`
 
+const syncAge = computed(() => {
+    if (!lastSyncEpoch.value) return 'sync pending'
+    return `${Math.max(0, Math.round((nowEpoch.value - lastSyncEpoch.value) / 1000))}s ago`
+})
+
 const stats = computed(() => ({
     active: threads.value.filter((thread) => thread.state === 'active').length,
     queued: threads.value.filter((thread) => thread.state === 'queued').length,
     blocked: threads.value.filter((thread) => thread.state === 'blocked').length,
+    pendingDecisions: Number(control.value?.pending_autonomy_decisions || 0),
 }))
 
 const autonomyScore = computed(() => {
-    if (threads.value.length === 0) return 0
-    const weighted = stats.value.active * 1.2 + stats.value.queued * 0.6 - stats.value.blocked * 1.4
-    const normalized = Math.round((weighted / threads.value.length) * 40 + 52)
+    const total = threads.value.length || 1
+    const pressure = stats.value.pendingDecisions + stats.value.blocked
+    const weighted =
+        stats.value.active * 1.2 +
+        stats.value.queued * 0.5 -
+        pressure * 1.1 +
+        (control.value?.tradingview_execution_enabled ? 12 : 0)
+    const normalized = Math.round((weighted / total) * 35 + 50)
     return Math.max(5, Math.min(99, normalized))
-})
-
-const leadLane = computed(() => {
-    const top = laneStats.value.slice().sort((a, b) => b.count - a.count)[0]
-    return top?.label || 'SAPPHIRE'
-})
-
-const queuePressure = computed(() => {
-    const blocked = stats.value.blocked
-    if (blocked >= 2) return 'High'
-    if (blocked === 1) return 'Moderate'
-    return 'Low'
 })
 
 const scoreToneClass = computed(() => {
@@ -105,34 +71,175 @@ const laneStats = computed(() => {
     const counts: Record<Lane, number> = { security: 0, deploy: 0, research: 0 }
     for (const thread of threads.value) counts[thread.lane] += 1
     return [
-        { lane: 'security' as Lane, label: 'SAPPHIRE', count: counts.security, focus: 'Security + policy' },
-        { lane: 'deploy' as Lane, label: 'OBSIDIAN', count: counts.deploy, focus: 'CI/CD + runtime ops' },
-        { lane: 'research' as Lane, label: 'EMERALD', count: counts.research, focus: 'Strategy + adaptation' },
+        { lane: 'security' as Lane, label: 'SAPPHIRE', count: counts.security, focus: 'Security + governance' },
+        { lane: 'deploy' as Lane, label: 'OBSIDIAN', count: counts.deploy, focus: 'Runtime + deployment ops' },
+        { lane: 'research' as Lane, label: 'EMERALD', count: counts.research, focus: 'Signal + adaptation' },
     ]
 })
 
-const decisionQueue = ref([
-    'Approve risk budget envelope for next promotion cycle',
-    'Prioritize security scan depth vs deployment cadence',
-    'Confirm preferred signal confidence floor for autonomous routing',
-])
+const leadLane = computed(() => {
+    const sorted = laneStats.value.slice().sort((a, b) => b.count - a.count)
+    return sorted[0]?.label || 'SAPPHIRE'
+})
+
+const queuePressure = computed(() => {
+    const pressure = stats.value.pendingDecisions + stats.value.blocked
+    if (pressure >= 4) return 'High'
+    if (pressure >= 2) return 'Moderate'
+    return 'Low'
+})
+
+const ownerDirective = computed(() => {
+    const raw = String(control.value?.owner_directive || '').trim()
+    if (!raw) return 'none'
+    if (raw.length <= 160) return raw
+    return `${raw.slice(0, 157)}...`
+})
+
+const decisionQueue = computed(() => {
+    const pending = control.value?.pending_sessions || []
+    if (!pending.length) {
+        return ['No pending autonomy approvals. Runtime decisions are flowing without backlog.']
+    }
+    return pending.slice(0, 4).map((session) => {
+        const trigger = session.trigger || 'scheduled_cycle'
+        const instruction = String(session.instruction || '').trim()
+        const summary = instruction.length > 96 ? `${instruction.slice(0, 93)}...` : instruction || 'autonomy decision'
+        return `${trigger}: ${summary}`
+    })
+})
+
+const formatAge = (epochSeconds: number) => {
+    const delta = Math.max(0, Math.floor(Date.now() / 1000) - epochSeconds)
+    if (delta < 60) return `${delta}s`
+    if (delta < 3600) return `${Math.floor(delta / 60)}m`
+    if (delta < 86400) return `${Math.floor(delta / 3600)}h`
+    return `${Math.floor(delta / 86400)}d`
+}
+
+const laneFromLog = (entry: SystemLogEntry): Lane => {
+    const tags = (entry.tags || []).map((tag) => String(tag).toLowerCase())
+    const message = String(entry.message || '').toLowerCase()
+    if (
+        tags.some((tag) => ['risk', 'security', 'kill_switch'].includes(tag)) ||
+        /(risk|scope|security|permission|guardrail|blocked_scope)/.test(message)
+    ) {
+        return 'security'
+    }
+    if (
+        tags.some((tag) => ['dispatch', 'control', 'startup', 'auto_resume', 'execution_mode'].includes(tag)) ||
+        /(deploy|dispatch|allocation|resume|execution|tradingview)/.test(message)
+    ) {
+        return 'deploy'
+    }
+    return 'research'
+}
+
+const stateFromLog = (entry: SystemLogEntry): ThreadState => {
+    const level = String(entry.level || '').toLowerCase()
+    const message = String(entry.message || '').toLowerCase()
+    if (level === 'error' || level === 'critical' || /(failed|unavailable|blocked|error)/.test(message)) {
+        return 'blocked'
+    }
+    if (level === 'warning' || /(pending|queued|hold|cooldown)/.test(message)) return 'queued'
+    return 'active'
+}
+
+const titleFromLog = (entry: SystemLogEntry): string => {
+    const source = String(entry.message || '').trim()
+    if (!source) return 'System event'
+    const sentence = source.replace(/\s+/g, ' ').trim()
+    if (sentence.length <= 72) return sentence
+    return `${sentence.slice(0, 69)}...`
+}
+
+const summaryFromLog = (entry: SystemLogEntry): string => {
+    const text = String(entry.message || '').trim()
+    if (!text) return 'No details available.'
+    if (text.length <= 180) return text
+    return `${text.slice(0, 177)}...`
+}
+
+const buildThreads = (logs: SystemLogEntry[]): AgentThread[] => {
+    return logs
+        .slice()
+        .reverse()
+        .filter((entry) => Number.isFinite(Number(entry.timestamp)))
+        .slice(0, 18)
+        .map((entry, index) => {
+            const ts = Number(entry.timestamp || 0)
+            const lane = laneFromLog(entry)
+            const state = stateFromLog(entry)
+            return {
+                id: `LOG-${ts}-${index}`,
+                lane,
+                title: titleFromLog(entry),
+                state,
+                updatedAgo: formatAge(ts),
+                summary: summaryFromLog(entry),
+                source: (entry.tags || []).join(', ') || String(entry.level || 'info').toUpperCase(),
+            }
+        })
+}
+
+const loadBoard = async () => {
+    try {
+        const [logs, controlPayload] = await Promise.all([fetchSystemLogs(140), fetchControlStatus()])
+        if (controlPayload?.ok) control.value = controlPayload
+
+        const nextThreads = buildThreads(logs || [])
+        threads.value =
+            nextThreads.length > 0
+                ? nextThreads
+                : [
+                      {
+                          id: 'LOG-empty',
+                          lane: 'deploy',
+                          title: 'Awaiting runtime activity',
+                          state: 'queued',
+                          updatedAgo: 'now',
+                          summary: 'No recent control-plane logs were returned. Verify alpha service log stream.',
+                          source: 'telemetry',
+                      },
+                  ]
+        lastSyncEpoch.value = Date.now()
+    } catch (error) {
+        console.error('Failed to load SapphireBook board:', error)
+    } finally {
+        loading.value = false
+    }
+}
+
+onMounted(() => {
+    loadBoard()
+    refreshTimer = setInterval(loadBoard, 12000)
+    clockTimer = setInterval(() => {
+        nowEpoch.value = Date.now()
+    }, 1000)
+})
+
+onUnmounted(() => {
+    if (refreshTimer) clearInterval(refreshTimer)
+    if (clockTimer) clearInterval(clockTimer)
+})
 </script>
 
 <template>
     <div class="book-view fade-in">
         <section class="hero card glass-lift">
             <div class="hero-copy">
-                <span class="font-mono kicker">SAPPHIREBOOK</span>
-                <h2>Agent coordination layer for autonomous execution.</h2>
+                <span class="font-mono kicker">SAPPHIREBOOK LIVE</span>
+                <h2>Real-time agent coordination board from runtime logs and control state.</h2>
                 <p>
-                    Every thread below is generated by your internal agents and mapped to a clear execution lane. Owner
-                    steering remains Telegram-gated.
+                    This forum surface is telemetry-native. Every thread reflects current alpha-engine events, while command authority
+                    remains constrained to Telegram.
                 </p>
             </div>
             <div class="hero-stats">
                 <span class="chip active">Active {{ stats.active }}</span>
                 <span class="chip queued">Queued {{ stats.queued }}</span>
                 <span class="chip blocked">Blocked {{ stats.blocked }}</span>
+                <span class="chip decision">Pending {{ stats.pendingDecisions }}</span>
             </div>
         </section>
 
@@ -140,17 +247,17 @@ const decisionQueue = ref([
             <article class="snapshot card glass-lift">
                 <p class="font-mono">Autonomy Score</p>
                 <strong :class="scoreToneClass">{{ autonomyScore }}%</strong>
-                <small>Composite from active, queued, and blocked execution threads.</small>
+                <small>Weighted by live thread state + pending decision pressure.</small>
             </article>
             <article class="snapshot card glass-lift">
                 <p class="font-mono">Lead Lane</p>
                 <strong>{{ leadLane }}</strong>
-                <small>Current highest-thread concentration across operational lanes.</small>
+                <small>Highest current thread concentration.</small>
             </article>
             <article class="snapshot card glass-lift">
                 <p class="font-mono">Queue Pressure</p>
                 <strong>{{ queuePressure }}</strong>
-                <small>Backlog pressure requiring heartbeat steering decisions.</small>
+                <small>Sync {{ syncAge }} · {{ loading ? 'refreshing' : 'live' }}</small>
             </article>
         </section>
 
@@ -181,6 +288,7 @@ const decisionQueue = ref([
                         <footer>
                             <span class="lane" :class="laneStyleClass[thread.lane]">{{ laneLabel[thread.lane] }}</span>
                             <span class="updated">Updated {{ thread.updatedAgo }} ago</span>
+                            <span class="source font-mono">{{ thread.source }}</span>
                         </footer>
                     </article>
                 </div>
@@ -205,7 +313,7 @@ const decisionQueue = ref([
                     <ol>
                         <li v-for="item in decisionQueue" :key="item">{{ item }}</li>
                     </ol>
-                    <p class="hint">Reply via Telegram heartbeat to clear or reprioritize queue items.</p>
+                    <p class="hint">Directive: {{ ownerDirective }}</p>
                 </article>
             </aside>
         </section>
@@ -222,8 +330,8 @@ const decisionQueue = ref([
     display: grid;
     gap: 0.8rem;
     background:
-        radial-gradient(circle at 80% 5%, rgba(70, 184, 255, 0.2), transparent 45%),
-        linear-gradient(125deg, rgba(6, 24, 42, 0.9), rgba(7, 21, 38, 0.75));
+        radial-gradient(circle at 82% 4%, rgba(65, 184, 255, 0.26), transparent 45%),
+        linear-gradient(130deg, rgba(7, 21, 42, 0.94), rgba(7, 24, 42, 0.78));
 }
 
 .kicker {
@@ -240,7 +348,7 @@ const decisionQueue = ref([
 .hero p {
     margin: 0;
     color: var(--text-secondary);
-    max-width: 70ch;
+    max-width: 76ch;
 }
 
 .hero-stats {
@@ -250,15 +358,15 @@ const decisionQueue = ref([
 }
 
 .chip {
-    font-size: 0.74rem;
+    font-size: 0.73rem;
     padding: 0.2rem 0.58rem;
     border-radius: 999px;
     border: 1px solid transparent;
 }
 
 .chip.active {
-    border-color: rgba(23, 200, 136, 0.6);
-    color: #78efbf;
+    border-color: rgba(23, 200, 136, 0.55);
+    color: #7cf0c2;
 }
 
 .chip.queued {
@@ -271,10 +379,9 @@ const decisionQueue = ref([
     color: #ffb1b1;
 }
 
-.grid {
-    display: grid;
-    grid-template-columns: 1.7fr 1fr;
-    gap: 0.8rem;
+.chip.decision {
+    border-color: rgba(244, 180, 68, 0.62);
+    color: #ffd79a;
 }
 
 .snapshot-strip {
@@ -285,7 +392,7 @@ const decisionQueue = ref([
 
 .snapshot {
     background: rgba(8, 22, 40, 0.74);
-    border: 1px solid rgba(120, 185, 231, 0.28);
+    border: 1px solid rgba(120, 185, 231, 0.3);
     display: grid;
     gap: 0.28rem;
 }
@@ -317,6 +424,12 @@ const decisionQueue = ref([
 
 .tone-fragile {
     color: #ffb6b6;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: 1.7fr 1fr;
+    gap: 0.8rem;
 }
 
 .threads header {
@@ -359,22 +472,27 @@ const decisionQueue = ref([
 
 .thread h4 {
     margin: 0.24rem 0 0;
-    font-size: 0.95rem;
+    font-size: 0.93rem;
 }
 
 .thread p {
     margin: 0.58rem 0 0;
     color: var(--text-secondary);
-    font-size: 0.86rem;
+    font-size: 0.84rem;
 }
 
 .thread footer {
     margin-top: 0.72rem;
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     gap: 0.5rem;
     color: var(--text-tertiary);
     font-size: 0.72rem;
+}
+
+.source {
+    opacity: 0.75;
 }
 
 .state-pill {
@@ -473,10 +591,7 @@ const decisionQueue = ref([
 }
 
 @media (max-width: 1100px) {
-    .snapshot-strip {
-        grid-template-columns: 1fr;
-    }
-
+    .snapshot-strip,
     .grid {
         grid-template-columns: 1fr;
     }

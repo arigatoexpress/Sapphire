@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import TradingChart from '../components/TradingChart.vue'
-import { fetchMarketOHLC, fetchPlatformStatus, fetchSystemLogs, type OhlcCandle } from '../api/client'
+import {
+    fetchControlStatus,
+    fetchMarketOHLC,
+    fetchPlatformStatus,
+    fetchSystemLogs,
+    type OhlcCandle,
+} from '../api/client'
 
 interface VenueCard {
     id: 'aster' | 'lighter'
@@ -37,6 +43,11 @@ const chartSourceLabel = ref('Waiting for live OHLC feed')
 const loading = ref(true)
 const lastRefreshEpoch = ref(0)
 const nowEpoch = ref(Date.now())
+const controlState = ref<{
+    tradingview_execution_enabled: boolean
+    tradingview_default_quantity: number
+    pending_autonomy_decisions: number
+} | null>(null)
 let refreshTimer: ReturnType<typeof setInterval> | null = null
 let clockTimer: ReturnType<typeof setInterval> | null = null
 
@@ -59,6 +70,17 @@ const latestMergedClose = computed(() => {
     const tail = chartCandles.value[chartCandles.value.length - 1]
     return tail ? Number(tail.close) : null
 })
+
+const executionModeLabel = computed(() =>
+    controlState.value?.tradingview_execution_enabled ? 'Live execution' : 'Dry-run guarded',
+)
+
+const defaultQtyLabel = computed(() => {
+    const qty = Number(controlState.value?.tradingview_default_quantity || 0)
+    return qty > 0 ? qty.toString() : 'n/a'
+})
+
+const pendingDecisionCount = computed(() => Number(controlState.value?.pending_autonomy_decisions || 0))
 
 const mergedRangePct = computed(() => {
     if (chartCandles.value.length < 2) return null
@@ -173,11 +195,12 @@ const applyPlatformPayload = (payload: any) => {
 
 const loadOpsView = async () => {
     try {
-        const [platforms, logs, asterOhlc, lighterOhlc] = await Promise.all([
+        const [platforms, logs, asterOhlc, lighterOhlc, controlPayload] = await Promise.all([
             fetchPlatformStatus(),
             fetchSystemLogs(),
             fetchMarketOHLC({ venue: 'ASTER', symbol: 'SOL', interval: '1m', limit: 180 }),
             fetchMarketOHLC({ venue: 'LIGHTER', symbol: 'SOL', interval: '1m', limit: 180 }),
+            fetchControlStatus(),
         ])
 
         if (platforms) applyPlatformPayload(platforms)
@@ -195,6 +218,14 @@ const loadOpsView = async () => {
         const lighterCandles = normalizeCandles(lighterOhlc?.candles)
         const merged = mergeVenueCandles([asterCandles, lighterCandles])
         chartCandles.value = merged
+
+        if (controlPayload?.ok) {
+            controlState.value = {
+                tradingview_execution_enabled: Boolean(controlPayload.tradingview_execution_enabled),
+                tradingview_default_quantity: Number(controlPayload.tradingview_default_quantity || 0),
+                pending_autonomy_decisions: Number(controlPayload.pending_autonomy_decisions || 0),
+            }
+        }
 
         if (merged.length > 0) {
             chartSourceLabel.value = `Live OHLC merge · ASTER ${asterCandles.length} + LIGHTER ${lighterCandles.length}`
@@ -240,6 +271,12 @@ onUnmounted(() => {
                 </span>
                 <span class="chip muted">
                     Sync: {{ refreshAge }}
+                </span>
+                <span class="chip muted">
+                    {{ executionModeLabel }} · qty {{ defaultQtyLabel }}
+                </span>
+                <span class="chip muted">
+                    Pending decisions: {{ pendingDecisionCount }}
                 </span>
             </div>
         </section>

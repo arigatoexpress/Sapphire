@@ -1,130 +1,113 @@
 import axios from 'axios'
 
-// Sapphire focused control-plane API endpoint
-const API_BASE = (import.meta.env.VITE_API_URL || 'https://sapphire-alpha-s77j6bxyra-uc.a.run.app').trim()
+const API_BASE = (
+    import.meta.env.VITE_API_URL || 'https://sapphire-alpha-s77j6bxyra-uc.a.run.app'
+).trim()
 
 const api = axios.create({
     baseURL: API_BASE,
     timeout: 15000,
     headers: {
-        'Content-Type': 'application/json'
-    }
+        'Content-Type': 'application/json',
+    },
 })
 
-// ============================================================================
-// System Health & Status
-// ============================================================================
-
-export const fetchHealth = async () => {
+const safeGet = async <T>(path: string, params?: Record<string, unknown>): Promise<T | null> => {
     try {
-        const response = await api.get('/health')
-        return response.data
+        const response = await api.get(path, { params })
+        return response.data as T
     } catch (error) {
-        console.error('Failed to fetch health:', error)
+        console.error(`Failed API request: ${path}`, error)
         return null
     }
 }
 
-export const fetchSystemStatus = async () => {
-    try {
-        const response = await api.get('/')
-        return response.data
-    } catch (error) {
-        console.error('Failed to fetch system status:', error)
-        return null
-    }
+export interface HealthResponse {
+    status?: string
+    [key: string]: unknown
 }
 
-// ============================================================================
-// Performance & Analytics
-// ============================================================================
-
-export const fetchPerformanceStats = async () => {
-    try {
-        const response = await api.get('/api/analytics/performance/stats')
-        return response.data
-    } catch (error) {
-        console.error('Failed to fetch performance stats:', error)
-        return null
-    }
+export interface ControlStatusResponse {
+    ok: boolean
+    kill_switch_active: boolean
+    full_autonomy_enabled: boolean
+    owner_approval_required: boolean
+    tradingview_execution_enabled: boolean
+    tradingview_default_quantity: number
+    autonomy_dispatch_count: number
+    pending_autonomy_decisions: number
+    pending_sessions: Array<{
+        session_key: string
+        trigger: string
+        created_at: number
+        instruction: string
+    }>
+    owner_directive: string
+    failure_pressure: number
+    venues: Record<
+        string,
+        {
+            allocation: number
+            paused: boolean
+            paused_until: number | null
+            pause_reason: string
+            failure_count: number
+        }
+    >
+    timestamp: number
 }
 
-// ============================================================================
-// AI Agents
-// ============================================================================
-
-export const fetchAgents = async () => {
-    try {
-        const response = await api.get('/api/agents/list')
-        return response.data?.agents
-    } catch (error) {
-        console.error('Failed to fetch agents:', error)
-        return null
-    }
+export interface PlatformStatusResponse {
+    ok: boolean
+    platforms: Record<
+        string,
+        {
+            status: string
+            health: string
+            mode: string
+            routing: string
+            note: string
+            price: number
+            last_tick_ts: number | null
+            age_seconds: number | null
+            allocation: number
+            paused: boolean
+        }
+    >
+    kill_switch_active: boolean
+    timestamp: number
 }
 
-export const fetchAgentStatus = async (agentId: string) => {
-    try {
-        const response = await api.get(`/api/agents/${agentId}/status`)
-        return response.data
-    } catch (error) {
-        console.error(`Failed to fetch agent ${agentId}:`, error)
-        return null
+export interface RoutingInfoResponse {
+    ok: boolean
+    mode: string
+    strategy: string
+    confidence: number
+    routing: {
+        confidence: number
+        active_venues: string[]
+        paused_venues: string[]
+        failure_pressure: number
+        kill_switch_active: boolean
     }
+    timestamp: number
 }
 
-// ============================================================================
-// Positions & Trading
-// ============================================================================
-
-export const fetchAllPositions = async () => {
-    try {
-        const response = await api.get('/positions/all')
-        return response.data
-    } catch (error) {
-        console.error('Failed to fetch positions:', error)
-        return null
+export interface PerformanceStatsResponse {
+    ok: boolean
+    metrics: {
+        system: {
+            total_trades: number
+            wins: number
+            losses: number
+            win_rate: number
+            realized_pnl: number
+            uptime_seconds: number
+            failure_pressure: number
+            autonomy_dispatch_count: number
+        }
     }
-}
-
-export const executeTrade = async (tradeRequest: {
-    symbol: string
-    side: 'BUY' | 'SELL'
-    quantity: number
-    order_type?: string
-    platform?: string
-}) => {
-    try {
-        const response = await api.post('/api/v2/trade', tradeRequest)
-        return response.data
-    } catch (error) {
-        console.error('Failed to execute trade:', error)
-        throw error
-    }
-}
-
-// ============================================================================
-// V2 Platform Routes
-// ============================================================================
-
-export const fetchPlatformStatus = async () => {
-    try {
-        const response = await api.get('/api/v2/platforms/status')
-        return response.data
-    } catch (error) {
-        console.error('Failed to fetch platform status:', error)
-        return null
-    }
-}
-
-export const fetchRoutingInfo = async () => {
-    try {
-        const response = await api.get('/api/v2/trade/routing')
-        return response.data
-    } catch (error) {
-        console.error('Failed to fetch routing info:', error)
-        return null
-    }
+    timestamp: number
 }
 
 export interface OhlcCandle {
@@ -137,6 +120,7 @@ export interface OhlcCandle {
 }
 
 export interface OhlcResponse {
+    ok: boolean
     venue: string
     symbol: string
     interval: string
@@ -147,87 +131,77 @@ export interface OhlcResponse {
     generated_at: number
 }
 
+export interface TradingViewWorkspaceResponse {
+    ok: boolean
+    workspace: {
+        enabled: boolean
+        allow_mutations: boolean
+        allow_all_assets: boolean
+        community_access_enabled: boolean
+        hook_url_set: boolean
+        hook_token_set: boolean
+        agent_id: string
+        workspace_label: string
+        allowed_repo_scope: string[]
+        allowed_project_scope: string[]
+        state: {
+            active_watchlist: string
+            watchlists: Record<string, string[]>
+            selected_symbol: string
+            selected_timeframe: string
+            indicators: string[]
+            strategies: string[]
+            community_scripts: string[]
+            assets_scope: string
+            last_action: string | null
+            last_updated_at: number
+        }
+    }
+    timestamp: number
+}
+
+export interface SystemLogEntry {
+    timestamp: number
+    level: string
+    message: string
+    tags: string[]
+    metadata: Record<string, unknown>
+}
+
+export const fetchHealth = async (): Promise<HealthResponse | string | null> =>
+    safeGet<HealthResponse | string>('/health')
+
+export const fetchPlatformStatus = async (): Promise<PlatformStatusResponse | null> =>
+    safeGet<PlatformStatusResponse>('/api/v2/platforms/status')
+
+export const fetchControlStatus = async (): Promise<ControlStatusResponse | null> =>
+    safeGet<ControlStatusResponse>('/api/v2/control/status')
+
+export const fetchRoutingInfo = async (): Promise<RoutingInfoResponse | null> =>
+    safeGet<RoutingInfoResponse>('/api/v2/trade/routing')
+
+export const fetchPerformanceStats = async (): Promise<PerformanceStatsResponse | null> =>
+    safeGet<PerformanceStatsResponse>('/api/analytics/performance/stats')
+
+export const fetchTradingViewWorkspace = async (): Promise<TradingViewWorkspaceResponse | null> =>
+    safeGet<TradingViewWorkspaceResponse>('/api/v2/tradingview/workspace')
+
 export const fetchMarketOHLC = async (params?: {
     venue?: 'ASTER' | 'LIGHTER'
     symbol?: string
     interval?: string
     limit?: number
-}): Promise<OhlcResponse | null> => {
-    try {
-        const response = await api.get('/api/v2/market/ohlc', {
-            params: {
-                venue: params?.venue || 'ASTER',
-                symbol: params?.symbol || 'SOL',
-                interval: params?.interval || '1m',
-                limit: params?.limit || 180,
-            },
-        })
-        if (response?.data?.ok === false) return null
-        return response.data
-    } catch (error) {
-        console.error('Failed to fetch market OHLC:', error)
-        return null
-    }
-}
+}): Promise<OhlcResponse | null> =>
+    safeGet<OhlcResponse>('/api/v2/market/ohlc', {
+        venue: params?.venue || 'ASTER',
+        symbol: params?.symbol || 'SOL',
+        interval: params?.interval || '1m',
+        limit: params?.limit || 180,
+    })
 
-// ============================================================================
-// Aster Agents (Monad Treasury)
-// ============================================================================
-
-export const fetchAsterStatus = async () => {
-    try {
-        const response = await api.get('/api/v2/aster/status')
-        return response.data
-    } catch (error) {
-        console.error('Failed to fetch Aster status:', error)
-        return null
-    }
-}
-
-export const fetchMITStatus = async () => {
-    try {
-        const response = await api.get('/api/v2/aster/mit/status')
-        return response.data
-    } catch (error) {
-        console.error('Failed to fetch MIT status:', error)
-        return null
-    }
-}
-
-// ============================================================================
-// Memory System
-// ============================================================================
-
-export const fetchMemoryHealth = async () => {
-    try {
-        const response = await api.get('/api/v2/memory/health')
-        return response.data
-    } catch (error) {
-        console.error('Failed to fetch memory health:', error)
-        return null
-    }
-}
-
-// ============================================================================
-// Logs
-// ============================================================================
-
-export const fetchSystemLogs = async () => {
-    try {
-        const response = await api.get('/logs/system')
-        return response.data
-    } catch (error) {
-        return []
-    }
-}
-
-export const fetchPlatformLogs = async (platform: string, limit: number = 50) => {
-    try {
-        const response = await api.get(`/logs/${platform}?limit=${limit}`)
-        return response.data
-    } catch (error) {
-        return []
-    }
+export const fetchSystemLogs = async (limit = 80): Promise<SystemLogEntry[]> => {
+    const result = await safeGet<SystemLogEntry[]>('/logs/system', { limit })
+    return Array.isArray(result) ? result : []
 }
 
 export default api
