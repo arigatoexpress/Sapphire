@@ -101,7 +101,7 @@ jobs:
           http_code="$(curl -sS -o response.json -w "%{http_code}" \
             -X POST "${HOOK_URL}" \
             -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${OIDC_TOKEN}" \
+            -H "X-Serverless-Authorization: Bearer ${OIDC_TOKEN}" \
             -H "X-OpenClaw-Token: ${HOOK_TOKEN}" \
             -H "X-GitHub-Event: ${EVENT_NAME}" \
             -H "X-GitHub-Delivery: ${DELIVERY_ID}" \

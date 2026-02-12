@@ -51,7 +51,7 @@ jobs:
       - name: Detect GCP auth availability
         id: gcp-auth
         run: |
-          if [[ -n "${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}" && -n "${{ secrets.GCP_SERVICE_ACCOUNT }}" ]]; then
+          if [[ -n "${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}" && -n "${{ secrets.GCP_SERVICE_ACCOUNT }}" && -n "${{ secrets.OPENCLAW_HOOK_AUDIENCE }}" ]]; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
@@ -59,10 +59,13 @@ jobs:
 
       - name: Authenticate to Google Cloud
         if: ${{ steps.gcp-auth.outputs.enabled == 'true' }}
+        id: gcp-oidc
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          token_format: id_token
+          id_token_audience: ${{ secrets.OPENCLAW_HOOK_AUDIENCE }}
 
       - name: Set up Cloud SDK
         if: ${{ steps.gcp-auth.outputs.enabled == 'true' }}
@@ -76,6 +79,8 @@ jobs:
 
       - name: Run holistic ops check
         if: ${{ steps.gcp-auth.outputs.enabled == 'true' }}
+        env:
+          SAPPHIRE_GATEWAY_OIDC_TOKEN: ${{ steps.gcp-oidc.outputs.id_token }}
         run: ./scripts/holistic_ops_check.sh
 
       - name: Skip cloud check when GCP secrets are unavailable

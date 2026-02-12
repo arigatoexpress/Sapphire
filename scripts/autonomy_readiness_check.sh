@@ -59,8 +59,14 @@ service_ready() {
   if [[ -n "$url" ]]; then
     if [[ "$service" == "$GATEWAY_SERVICE" ]]; then
       local id_token
-      id_token="$(gcloud auth print-identity-token 2>/dev/null || true)"
-      if [[ -n "$id_token" ]] && curl -fsS -H "Authorization: Bearer ${id_token}" "$url/" >/dev/null 2>&1; then
+      id_token="${SAPPHIRE_GATEWAY_OIDC_TOKEN:-}"
+      if [[ -z "$id_token" ]]; then
+        id_token="$(gcloud auth print-identity-token --audiences="$url" 2>/dev/null || true)"
+      fi
+      if [[ -z "$id_token" ]]; then
+        id_token="$(gcloud auth print-identity-token 2>/dev/null || true)"
+      fi
+      if [[ -n "$id_token" ]] && curl -fsS -H "X-Serverless-Authorization: Bearer ${id_token}" "$url/" >/dev/null 2>&1; then
         pass "$service authenticated endpoint"
       else
         fail "$service authenticated endpoint unexpected response"
