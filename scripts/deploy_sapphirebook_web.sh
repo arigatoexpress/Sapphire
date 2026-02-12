@@ -20,21 +20,28 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WEB_DIR="${ROOT_DIR}/sapphire-web"
 IMAGE_URI="${AR_REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${IMAGE_NAME}:${IMAGE_TAG}"
 IMAGE_LATEST="${AR_REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${IMAGE_NAME}:latest"
+GIT_SHA="$(git -C "${ROOT_DIR}" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+BUILD_ID="${BUILD_ID:-web-${IMAGE_TAG}-${GIT_SHA}}"
+BUILD_TIME_UTC="${BUILD_TIME_UTC:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 
 echo "== Sapphirebook Web Deploy =="
 echo "Project: ${PROJECT_ID}"
 echo "Region: ${REGION}"
 echo "Image: ${IMAGE_URI}"
+echo "Build ID: ${BUILD_ID}"
+echo "Build time (UTC): ${BUILD_TIME_UTC}"
 echo
 
 cd "${WEB_DIR}"
 npm ci --no-audit --no-fund
-npm run build
+VITE_BUILD_ID="${BUILD_ID}" VITE_BUILD_TIME_UTC="${BUILD_TIME_UTC}" npm run build
 
 docker buildx build \
   --platform "${PLATFORM}" \
   -t "${IMAGE_URI}" \
   -t "${IMAGE_LATEST}" \
+  --build-arg "VITE_BUILD_ID=${BUILD_ID}" \
+  --build-arg "VITE_BUILD_TIME_UTC=${BUILD_TIME_UTC}" \
   -f Dockerfile \
   --push .
 
@@ -55,5 +62,7 @@ echo
 echo "Service URL: ${SERVICE_URL}"
 echo "Health:"
 curl -fsS "${SERVICE_URL}/health" || true
+echo "Index cache headers:"
+curl -fsSI "${SERVICE_URL}/index.html" | grep -iE 'cache-control|pragma|expires' || true
 echo
 echo "Deployed image: ${IMAGE_URI}"

@@ -6,8 +6,10 @@ import {
     fetchMarketOHLC,
     fetchPerformanceStats,
     fetchRoutingInfo,
+    fetchSecuritySkillsStatus,
     fetchTradingViewWorkspace,
     type OhlcCandle,
+    type SecuritySkillsStatusResponse,
 } from '../api/client'
 
 interface InsightCard {
@@ -25,6 +27,7 @@ const realizedPnl = ref(0)
 const routingMode = ref('guarded')
 const control = ref<any>(null)
 const workspace = ref<any>(null)
+const security = ref<SecuritySkillsStatusResponse | null>(null)
 const lastRefreshEpoch = ref(0)
 const nowEpoch = ref(Date.now())
 let refreshTimer: ReturnType<typeof setInterval> | null = null
@@ -79,6 +82,17 @@ const insightCards = computed<InsightCard[]>(() => [
         value: executionMode.value,
         detail: `Pending decisions: ${pendingDecisions.value}`,
     },
+    {
+        title: 'Skill Security',
+        value: security.value?.enabled
+            ? security.value?.api_key_configured
+                ? `VT ${security.value.enforcement_mode}`
+                : 'VT key missing'
+            : 'VT disabled',
+        detail: security.value?.enabled
+            ? `Skills dir ${security.value.skills_dir_exists ? 'ready' : 'missing'} · upload-on-miss ${security.value.upload_if_missing_default ? 'on' : 'off'}`
+            : 'Enable VT guardrail for ClawHub/OpenClaw skill scanning.',
+    },
 ])
 
 const riskTone = computed(() => {
@@ -126,15 +140,17 @@ const strategyRail = computed(() => [
 
 const loadAlphaStatus = async () => {
     try {
-        const [stats, routing, workspacePayload, controlPayload] = await Promise.all([
+        const [stats, routing, workspacePayload, controlPayload, securityPayload] = await Promise.all([
             fetchPerformanceStats(),
             fetchRoutingInfo(),
             fetchTradingViewWorkspace(),
             fetchControlStatus(),
+            fetchSecuritySkillsStatus(),
         ])
 
         if (workspacePayload?.ok) workspace.value = workspacePayload
         if (controlPayload?.ok) control.value = controlPayload
+        if (securityPayload?.ok) security.value = securityPayload
 
         totalTrades.value = Number(stats?.metrics?.system?.total_trades || 0)
         winRate.value = Number(stats?.metrics?.system?.win_rate || 0)

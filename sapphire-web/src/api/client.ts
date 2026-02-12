@@ -61,6 +61,9 @@ export interface ControlStatusResponse {
     }>
     owner_directive: string
     failure_pressure: number
+    vt_security_enabled?: boolean
+    vt_api_key_configured?: boolean
+    vt_enforcement_mode?: string
     venues: Record<
         string,
         {
@@ -71,6 +74,27 @@ export interface ControlStatusResponse {
             failure_count: number
         }
     >
+    timestamp: number
+}
+
+export interface SecuritySkillsStatusResponse {
+    ok: boolean
+    enabled: boolean
+    api_key_configured: boolean
+    api_base: string
+    skills_dir: string
+    skills_dir_exists: boolean
+    upload_if_missing_default: boolean
+    enforcement_mode: 'off' | 'warn' | 'block_malicious' | 'block_suspicious' | string
+    max_poll_attempts: number
+    poll_interval_seconds: number
+    last_scan: {
+        type?: string
+        timestamp?: number
+        verdict?: string
+        skills_scanned?: number
+        blocked_count?: number
+    }
     timestamp: number
 }
 
@@ -415,5 +439,17 @@ export const publishForumScoutNote = async (payload: {
         '/api/v2/forum/scout/publish',
         payload as Record<string, unknown>,
     )
+
+export const fetchSecuritySkillsStatus = async (): Promise<SecuritySkillsStatusResponse | null> =>
+    safeGet<SecuritySkillsStatusResponse>('/api/v2/security/skills/status')
+
+export const runSecuritySkillsScan = async (params?: {
+    skill?: string
+    upload_if_missing?: boolean
+}): Promise<Record<string, unknown> | null> =>
+    safeGet<Record<string, unknown>>('/api/v2/security/skills/scan', {
+        skill: params?.skill || 'all',
+        upload_if_missing: params?.upload_if_missing ?? true,
+    })
 
 export default api

@@ -179,6 +179,12 @@ Deploy the SapphireBook/SapphireTrade/Sapphire Alpha frontend to Cloud Run:
 
 This builds `sapphire-web` for `linux/amd64`, pushes to Artifact Registry, and deploys `sapphirebook-web`.
 
+Release freshness controls now included:
+
+- Build stamp injection (`VITE_BUILD_ID`, `VITE_BUILD_TIME_UTC`) shown in UI.
+- Browser force-refresh control in top bar.
+- Nginx cache policy: `index.html` served with `no-store` headers; hashed assets remain immutable.
+
 ## Alpha Control Plane Deploy
 
 Deploy Telegram/control-plane updates for `sapphire-alpha`:

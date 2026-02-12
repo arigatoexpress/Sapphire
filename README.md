@@ -42,6 +42,8 @@ Owner steering controls in Telegram:
 - `/scout register <username> [display_name]` to request scout account provisioning
 - `/scout publish <note>` to dispatch sanitized external collaboration notes
 - `/security status` to inspect VirusTotal skill-scanning readiness
+- `/security scan [skill|all] [upload|no-upload]` to run skill scans on demand
+- `/security status` to inspect VirusTotal skill-scanning readiness
 - `/security scan [skill|all] [upload|no-upload]` to run on-demand scans
 
 ## Frontend Surfaces
@@ -75,6 +77,7 @@ Web UI is read-only for control actions. Agent prompting, approvals, and steerin
 - `docs/SAPPHIRE_AUTONOMY_MASTER_PLAN.md`
 - `docs/SAPPHIRE_ORGANIZATION.md`
 - `docs/TRADINGVIEW_QUANT_WORKBENCH.md`
+- `docs/SAPPHIRE_STACK_ASCII.md`
 
 ## Current Objective
 Keep Sapphire fully autonomous, operationally tight, and explicitly aligned to the masterplan before expanding scope.
