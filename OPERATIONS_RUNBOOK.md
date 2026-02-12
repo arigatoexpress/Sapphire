@@ -179,6 +179,17 @@ Deploy the SapphireBook/SapphireTrade/Sapphire Alpha frontend to Cloud Run:
 
 This builds `sapphire-web` for `linux/amd64`, pushes to Artifact Registry, and deploys `sapphirebook-web`.
 
+If your primary domain is `sapphirealpha.xyz`, also deploy Firebase Hosting to keep domain delivery in lock-step with Cloud Run:
+
+```bash
+./scripts/deploy_sapphirebook_firebase.sh
+```
+
+Why both:
+- `sapphirebook-web` serves `*.run.app`.
+- `sapphirealpha.xyz` is currently routed through Firebase Hosting/CDN.
+- Skipping Firebase deploy can make the domain look stale even when Cloud Run is updated.
+
 Release freshness controls now included:
 
 - Build stamp injection (`VITE_BUILD_ID`, `VITE_BUILD_TIME_UTC`) shown in UI.

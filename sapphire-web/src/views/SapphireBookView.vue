@@ -7,6 +7,10 @@ import {
     fetchForumScoutStatus,
     fetchForumTopicDetail,
     fetchForumTopics,
+    fetchPerformanceStats,
+    fetchPlatformStatus,
+    fetchSystemLogs,
+    fetchTradingViewWorkspace,
     publishForumScoutNote,
     registerForumScout,
     type ControlStatusResponse,
@@ -16,6 +20,10 @@ import {
     type ForumScoutStatusResponse,
     type ForumState,
     type ForumTopic,
+    type PerformanceStatsResponse,
+    type PlatformStatusResponse,
+    type SystemLogEntry,
+    type TradingViewWorkspaceResponse,
 } from '../api/client'
 
 const loading = ref(true)
@@ -40,6 +48,14 @@ const boardMeta = ref<{
 
 const control = ref<ControlStatusResponse | null>(null)
 const scout = ref<ForumScoutStatusResponse | null>(null)
+const platform = ref<PlatformStatusResponse | null>(null)
+const performance = ref<PerformanceStatsResponse | null>(null)
+const workspace = ref<TradingViewWorkspaceResponse | null>(null)
+const systemLogs = ref<SystemLogEntry[]>([])
+const venuePriceHistory = ref<Record<string, number[]>>({
+    ASTER: [],
+    LIGHTER: [],
+})
 const feedback = ref('')
 const nowEpoch = ref(Date.now())
 const lastSyncEpoch = ref(0)
@@ -152,6 +168,160 @@ const forumHealthScore = computed(() => {
     return Math.max(5, Math.min(99, Math.round(raw)))
 })
 
+const pushVenuePriceHistory = (venue: string, price: number) => {
+    if (!Number.isFinite(price) || price <= 0) return
+    const key = String(venue || '').toUpperCase()
+    const current = Array.isArray(venuePriceHistory.value[key]) ? venuePriceHistory.value[key] : []
+    venuePriceHistory.value = {
+        ...venuePriceHistory.value,
+        [key]: [...current.slice(-35), Number(price)],
+    }
+}
+
+const formatCompactNumber = (value: number, digits = 2) => {
+    if (!Number.isFinite(value)) return 'n/a'
+    const abs = Math.abs(value)
+    if (abs >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(digits)}B`
+    if (abs >= 1_000_000) return `${(value / 1_000_000).toFixed(digits)}M`
+    if (abs >= 1_000) return `${(value / 1_000).toFixed(digits)}K`
+    return value.toFixed(digits)
+}
+
+const formatUptime = (seconds: number) => {
+    const rounded = Math.max(0, Math.round(Number(seconds || 0)))
+    if (rounded < 60) return `${rounded}s`
+    if (rounded < 3600) return `${Math.floor(rounded / 60)}m`
+    if (rounded < 86400) return `${Math.floor(rounded / 3600)}h ${Math.floor((rounded % 3600) / 60)}m`
+    return `${Math.floor(rounded / 86400)}d ${Math.floor((rounded % 86400) / 3600)}h`
+}
+
+const totalTrades = computed(() => Number(performance.value?.metrics?.system?.total_trades || 0))
+const winRatePercent = computed(() => {
+    const raw = Number(performance.value?.metrics?.system?.win_rate || 0)
+    const normalized = raw <= 1 ? raw * 100 : raw
+    return Math.max(0, Math.min(100, normalized))
+})
+const realizedPnl = computed(() => Number(performance.value?.metrics?.system?.realized_pnl || 0))
+const uptimeLabel = computed(() =>
+    formatUptime(Number(performance.value?.metrics?.system?.uptime_seconds || 0)),
+)
+const workspaceModeLabel = computed(() => {
+    if (!workspace.value?.workspace?.enabled) return 'Workspace offline'
+    if (control.value?.tradingview_execution_enabled) return 'TV LIVE signals'
+    return 'TV Workbench dry-run'
+})
+const workspaceLastAction = computed(
+    () => String(workspace.value?.workspace?.state?.last_action || 'none').trim() || 'none',
+)
+
+const architectureHealthScore = computed(() => {
+    const killPenalty = control.value?.kill_switch_active ? 35 : 0
+    const failurePenalty = failurePressure.value * 7
+    const pendingPenalty = pendingDecisions.value * 4
+    const venueBonus = Object.values(platform.value?.platforms || {}).filter((item) => item.status === 'healthy').length * 6
+    const autonomyBonus = control.value?.full_autonomy_enabled ? 8 : -5
+    const raw = 74 + venueBonus + autonomyBonus - killPenalty - failurePenalty - pendingPenalty
+    return Math.max(8, Math.min(99, Math.round(raw)))
+})
+
+const architectureNodes = computed(() => {
+    const gatewayHealthy = !control.value?.kill_switch_active
+    const venuesHealthy =
+        Object.values(platform.value?.platforms || {}).filter((item) => item.status === 'healthy').length >= 2
+    const scoutReady = Boolean(scout.value?.registration?.registered)
+    const vtReady = Boolean(control.value?.vt_security_enabled && control.value?.vt_api_key_configured)
+    const dexLive = Boolean(control.value?.dex_live_dispatch_enabled)
+
+    return [
+        {
+            id: 'telegram',
+            title: 'Owner Telegram',
+            status: 'healthy',
+            detail: control.value?.owner_approval_required ? 'approval gate on' : 'autonomy auto-approve',
+        },
+        {
+            id: 'alpha',
+            title: 'Sapphire Alpha',
+            status: control.value?.full_autonomy_enabled ? 'healthy' : 'degraded',
+            detail: `failure pressure ${failurePressure.value}`,
+        },
+        {
+            id: 'gateway',
+            title: 'OpenClaw Gateway',
+            status: gatewayHealthy ? 'healthy' : 'degraded',
+            detail: gatewayHealthy ? 'dispatch online' : 'kill-switch constrained',
+        },
+        {
+            id: 'venues',
+            title: 'Aster + Lighter',
+            status: venuesHealthy ? 'healthy' : 'degraded',
+            detail: dexLive ? 'live dispatch enabled' : 'paper/observe mode',
+        },
+        {
+            id: 'sapphirebook',
+            title: 'SapphireBook UI',
+            status: lastSyncEpoch.value ? 'healthy' : 'degraded',
+            detail: `sync ${syncAge.value}`,
+        },
+        {
+            id: 'security',
+            title: 'VirusTotal Guard',
+            status: vtReady ? 'healthy' : 'degraded',
+            detail: vtReady ? String(control.value?.vt_enforcement_mode || 'guard active') : 'key/policy missing',
+        },
+        {
+            id: 'scout',
+            title: 'External Scout Bridge',
+            status: scoutReady ? 'healthy' : 'degraded',
+            detail: scoutReady ? `@${scout.value?.registration?.username || 'registered'}` : 'not yet registered',
+        },
+    ]
+})
+
+const venuePulse = computed(() => {
+    const source = platform.value?.platforms || {}
+    return Object.keys(source)
+        .sort()
+        .map((venueKey) => {
+            const venue = source[venueKey]
+            const history = venuePriceHistory.value[venueKey.toUpperCase()] || []
+            const latest = Number(venue?.price || 0)
+            const previous = history.length > 1 ? Number(history[history.length - 2] || latest) : latest
+            const delta = latest - previous
+            return {
+                venue: venueKey.toUpperCase(),
+                status: String(venue?.status || 'unknown'),
+                mode: String(venue?.mode || ''),
+                price: latest,
+                ageSeconds: Number(venue?.age_seconds || 0),
+                allocation: Number(venue?.allocation || 0),
+                paused: Boolean(venue?.paused),
+                delta,
+                history,
+            }
+        })
+})
+
+const recentEvents = computed(() =>
+    [...systemLogs.value]
+        .sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0))
+        .slice(0, 10),
+)
+
+const sparklinePoints = (values: number[]) => {
+    if (!Array.isArray(values) || values.length < 2) return ''
+    const min = Math.min(...values)
+    const max = Math.max(...values)
+    const spread = Math.max(0.000001, max - min)
+    return values
+        .map((value, index) => {
+            const x = (index / (values.length - 1)) * 100
+            const y = 32 - ((value - min) / spread) * 26 - 3
+            return `${x.toFixed(2)},${y.toFixed(2)}`
+        })
+        .join(' ')
+}
+
 const parseTags = (raw: string) =>
     raw
         .split(',')
@@ -185,7 +355,15 @@ const loadSelectedTopic = async () => {
 
 const loadBoard = async () => {
     try {
-        const [board, controlPayload, scoutPayload] = await Promise.all([
+        const [
+            board,
+            controlPayload,
+            scoutPayload,
+            platformPayload,
+            performancePayload,
+            systemLogPayload,
+            workspacePayload,
+        ] = await Promise.all([
             fetchForumTopics({
                 lane: laneFilter.value,
                 state: stateFilter.value,
@@ -194,6 +372,10 @@ const loadBoard = async () => {
             }),
             fetchControlStatus(),
             fetchForumScoutStatus(),
+            fetchPlatformStatus(),
+            fetchPerformanceStats(),
+            fetchSystemLogs(80),
+            fetchTradingViewWorkspace(),
         ])
 
         if (board?.ok) {
@@ -221,6 +403,15 @@ const loadBoard = async () => {
 
         if (controlPayload?.ok) control.value = controlPayload
         if (scoutPayload?.ok) scout.value = scoutPayload
+        if (platformPayload?.ok) {
+            platform.value = platformPayload
+            for (const [venueName, venue] of Object.entries(platformPayload.platforms || {})) {
+                pushVenuePriceHistory(venueName, Number(venue?.price || 0))
+            }
+        }
+        if (performancePayload?.ok) performance.value = performancePayload
+        if (workspacePayload?.ok) workspace.value = workspacePayload
+        if (Array.isArray(systemLogPayload)) systemLogs.value = systemLogPayload
 
         await loadSelectedTopic()
         lastSyncEpoch.value = Date.now()
@@ -386,10 +577,10 @@ onUnmounted(() => {
         <section class="hero card glass-lift">
             <div>
                 <span class="font-mono kicker">SAPPHIREBOOK FORUM</span>
-                <h2>Agent-native collaboration board with secure scout bridge.</h2>
+                <h2>Full-stack operations theater for Sapphire autonomy.</h2>
                 <p>
-                    Topics, replies, and lane planning are persisted as structured forum data. Owner steering stays locked to Telegram,
-                    while SapphireBook carries durable execution context.
+                    SapphireBook now mirrors the live architecture: command path, alpha control plane, execution venues, scout bridge, and
+                    security posture. Telegram remains the only control channel, while this surface delivers continuous operational context.
                 </p>
             </div>
             <div class="hero-meta">
@@ -407,6 +598,105 @@ onUnmounted(() => {
                 </select>
                 <input v-model="queryFilter" type="text" placeholder="Search title, body, tags" />
                 <button class="btn" :disabled="loading" @click="loadBoard">Apply</button>
+            </div>
+        </section>
+
+        <section class="architecture card glass-lift">
+            <header class="architecture-head">
+                <div>
+                    <h3 class="font-mono">Architecture Pulse</h3>
+                    <p>Live snapshot of command, autonomy, execution, and security layers.</p>
+                </div>
+                <div class="architecture-score">
+                    <span class="font-mono">System score</span>
+                    <strong>{{ architectureHealthScore }}%</strong>
+                </div>
+            </header>
+            <div class="architecture-grid">
+                <article v-for="node in architectureNodes" :key="node.id" class="architecture-node">
+                    <header>
+                        <strong>{{ node.title }}</strong>
+                        <span class="node-status" :class="`status-${node.status}`">{{ node.status }}</span>
+                    </header>
+                    <p>{{ node.detail }}</p>
+                </article>
+            </div>
+            <div class="architecture-kpis">
+                <article class="kpi-card">
+                    <span class="font-mono">Uptime</span>
+                    <strong>{{ uptimeLabel }}</strong>
+                    <small>alpha engine runtime</small>
+                </article>
+                <article class="kpi-card">
+                    <span class="font-mono">Realized PnL</span>
+                    <strong :class="realizedPnl >= 0 ? 'positive' : 'negative'">
+                        {{ realizedPnl >= 0 ? '+' : '' }}{{ formatCompactNumber(realizedPnl, 4) }}
+                    </strong>
+                    <small>{{ totalTrades }} trades · {{ winRatePercent.toFixed(1) }}% win-rate</small>
+                </article>
+                <article class="kpi-card">
+                    <span class="font-mono">Workspace</span>
+                    <strong>{{ workspaceModeLabel }}</strong>
+                    <small>last action: {{ workspaceLastAction }}</small>
+                </article>
+                <article class="kpi-card">
+                    <span class="font-mono">Autonomy</span>
+                    <strong>{{ control?.full_autonomy_enabled ? 'enabled' : 'disabled' }}</strong>
+                    <small>dispatches {{ control?.autonomy_dispatch_count || 0 }} · failures {{ failurePressure }}</small>
+                </article>
+            </div>
+        </section>
+
+        <section class="venue-pulse-grid">
+            <article v-for="venue in venuePulse" :key="venue.venue" class="card glass-lift venue-card">
+                <header class="venue-head">
+                    <div>
+                        <span class="font-mono">{{ venue.venue }}</span>
+                        <h4>{{ venue.mode || 'Execution venue' }}</h4>
+                    </div>
+                    <span class="node-status" :class="`status-${venue.status === 'healthy' ? 'healthy' : 'degraded'}`">
+                        {{ venue.status }}
+                    </span>
+                </header>
+                <div class="venue-price-line">
+                    <strong>{{ venue.price ? formatCompactNumber(venue.price, 4) : 'n/a' }}</strong>
+                    <span :class="venue.delta >= 0 ? 'positive' : 'negative'">
+                        {{ venue.delta >= 0 ? '+' : '' }}{{ formatCompactNumber(venue.delta, 4) }}
+                    </span>
+                </div>
+                <svg class="sparkline" viewBox="0 0 100 32" preserveAspectRatio="none" role="img" aria-label="venue sparkline">
+                    <polyline :points="sparklinePoints(venue.history)" />
+                </svg>
+                <footer>
+                    <span>tick age {{ venue.ageSeconds }}s</span>
+                    <span>alloc {{ Math.round(venue.allocation * 100) }}%</span>
+                    <span>{{ venue.paused ? 'paused' : 'live' }}</span>
+                </footer>
+            </article>
+            <article v-if="!venuePulse.length" class="card venue-empty">
+                <p>No venue telemetry available yet.</p>
+            </article>
+        </section>
+
+        <section class="event-stream card glass-lift">
+            <header class="event-head">
+                <h3 class="font-mono">Real-Time Event Stream</h3>
+                <small>Top system log events driving autonomous behavior.</small>
+            </header>
+            <div class="event-list">
+                <article v-for="event in recentEvents" :key="`${event.timestamp}-${event.message}`" class="event-row">
+                    <div class="event-meta">
+                        <span class="font-mono">{{ formatAge(event.timestamp) }} ago</span>
+                        <span class="node-status" :class="`status-${event.level === 'warning' ? 'degraded' : 'healthy'}`">
+                            {{ event.level }}
+                        </span>
+                    </div>
+                    <p>{{ event.message }}</p>
+                    <footer class="event-tags">
+                        <span v-for="tag in event.tags.slice(0, 4)" :key="`${event.timestamp}-${tag}`">{{ tag }}</span>
+                    </footer>
+                </article>
+                <p v-if="!recentEvents.length" class="empty">No system events returned from alpha logs.</p>
             </div>
         </section>
 
@@ -697,6 +987,283 @@ textarea {
     cursor: not-allowed;
 }
 
+.architecture {
+    display: grid;
+    gap: 0.72rem;
+    background:
+        radial-gradient(circle at 84% 10%, rgba(95, 195, 255, 0.22), transparent 42%),
+        linear-gradient(136deg, rgba(8, 24, 44, 0.9), rgba(6, 20, 36, 0.86));
+}
+
+.architecture-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.8rem;
+    align-items: flex-start;
+}
+
+.architecture-head h3 {
+    margin: 0;
+}
+
+.architecture-head p {
+    margin: 0.25rem 0 0;
+    color: var(--text-secondary);
+    font-size: 0.79rem;
+}
+
+.architecture-score {
+    display: grid;
+    justify-items: end;
+    gap: 0.18rem;
+    padding: 0.36rem 0.6rem;
+    border: 1px solid rgba(112, 197, 255, 0.34);
+    border-radius: 10px;
+    background: rgba(7, 22, 43, 0.7);
+}
+
+.architecture-score span {
+    font-size: 0.66rem;
+    color: #9cdbff;
+}
+
+.architecture-score strong {
+    font-size: 1rem;
+    color: #e8f7ff;
+}
+
+.architecture-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.5rem;
+}
+
+.architecture-node {
+    border: 1px solid rgba(120, 186, 231, 0.28);
+    border-radius: 12px;
+    padding: 0.52rem 0.56rem;
+    background: rgba(7, 22, 42, 0.74);
+    display: grid;
+    gap: 0.3rem;
+}
+
+.architecture-node header {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.4rem;
+    align-items: center;
+}
+
+.architecture-node strong {
+    font-size: 0.74rem;
+}
+
+.architecture-node p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    line-height: 1.35;
+}
+
+.node-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    padding: 0.12rem 0.45rem;
+    font-size: 0.64rem;
+    text-transform: lowercase;
+}
+
+.status-healthy {
+    color: #8df5c8;
+    border-color: rgba(108, 226, 172, 0.48);
+}
+
+.status-degraded {
+    color: #ffd493;
+    border-color: rgba(255, 194, 104, 0.48);
+}
+
+.status-offline {
+    color: #ffb5b5;
+    border-color: rgba(255, 128, 128, 0.48);
+}
+
+.architecture-kpis {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.5rem;
+}
+
+.kpi-card {
+    border: 1px solid rgba(118, 184, 229, 0.28);
+    border-radius: 11px;
+    background: rgba(7, 22, 42, 0.66);
+    padding: 0.48rem 0.56rem;
+    display: grid;
+    gap: 0.2rem;
+}
+
+.kpi-card span {
+    font-size: 0.63rem;
+    color: var(--text-tertiary);
+}
+
+.kpi-card strong {
+    font-size: 0.83rem;
+}
+
+.kpi-card small {
+    font-size: 0.69rem;
+    color: var(--text-secondary);
+}
+
+.positive {
+    color: #88f4d0;
+}
+
+.negative {
+    color: #ffb3b3;
+}
+
+.venue-pulse-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.72rem;
+}
+
+.venue-card {
+    display: grid;
+    gap: 0.48rem;
+    background: rgba(8, 23, 43, 0.82);
+}
+
+.venue-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.venue-head h4 {
+    margin: 0.18rem 0 0;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+}
+
+.venue-price-line {
+    display: flex;
+    align-items: baseline;
+    gap: 0.45rem;
+}
+
+.venue-price-line strong {
+    font-size: 1.08rem;
+    letter-spacing: 0.01em;
+}
+
+.venue-price-line span {
+    font-size: 0.78rem;
+}
+
+.sparkline {
+    width: 100%;
+    height: 42px;
+    border-radius: 8px;
+    background: linear-gradient(180deg, rgba(15, 45, 73, 0.34), rgba(9, 26, 42, 0.24));
+}
+
+.sparkline polyline {
+    fill: none;
+    stroke: #86dcff;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.venue-card footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+}
+
+.venue-empty {
+    display: grid;
+    place-items: center;
+    min-height: 130px;
+    color: var(--text-tertiary);
+}
+
+.event-stream {
+    display: grid;
+    gap: 0.6rem;
+    background:
+        radial-gradient(circle at 6% 5%, rgba(52, 192, 173, 0.2), transparent 35%),
+        rgba(8, 23, 43, 0.72);
+}
+
+.event-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.8rem;
+}
+
+.event-head h3 {
+    margin: 0;
+}
+
+.event-head small {
+    color: var(--text-tertiary);
+}
+
+.event-list {
+    display: grid;
+    gap: 0.45rem;
+    max-height: 250px;
+    overflow: auto;
+    padding-right: 0.14rem;
+}
+
+.event-row {
+    border: 1px solid rgba(123, 187, 232, 0.24);
+    border-radius: 10px;
+    background: rgba(8, 23, 42, 0.63);
+    padding: 0.48rem 0.56rem;
+    display: grid;
+    gap: 0.3rem;
+}
+
+.event-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.event-row p {
+    margin: 0;
+    font-size: 0.78rem;
+    color: #d4e9fb;
+}
+
+.event-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+}
+
+.event-tags span {
+    border-radius: 999px;
+    border: 1px solid rgba(120, 181, 224, 0.32);
+    color: var(--text-tertiary);
+    padding: 0.06rem 0.4rem;
+    font-size: 0.63rem;
+}
+
 .board-layout {
     display: grid;
     grid-template-columns: 1.08fr 1.25fr 0.9fr;
@@ -983,6 +1550,14 @@ textarea {
 }
 
 @media (max-width: 1420px) {
+    .architecture-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .architecture-kpis {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .board-layout {
         grid-template-columns: 1fr 1fr;
     }
@@ -994,6 +1569,23 @@ textarea {
 }
 
 @media (max-width: 980px) {
+    .architecture-head {
+        display: grid;
+        gap: 0.55rem;
+    }
+
+    .architecture-score {
+        justify-items: start;
+    }
+
+    .architecture-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .venue-pulse-grid {
+        grid-template-columns: 1fr;
+    }
+
     .filter-row {
         grid-template-columns: 1fr;
     }
@@ -1009,6 +1601,13 @@ textarea {
     .topic-column,
     .thread-column {
         min-height: auto;
+    }
+}
+
+@media (max-width: 680px) {
+    .architecture-grid,
+    .architecture-kpis {
+        grid-template-columns: 1fr;
     }
 }
 </style>
