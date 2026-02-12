@@ -119,6 +119,9 @@ class AlphaEngine:
             "SAPPHIRE_AUTONOMY_ALLOW_GCLOUD_CHANGES", default=True
         )
         self._autonomy_dry_run = self._env_flag("SAPPHIRE_AUTONOMY_DRY_RUN", default=False)
+        self._autonomy_require_owner_approval = self._env_flag(
+            "SAPPHIRE_AUTONOMY_REQUIRE_OWNER_APPROVAL", default=False
+        )
         self._autonomy_loop_seconds = max(
             300, int(os.getenv("SAPPHIRE_AUTONOMY_LOOP_SECONDS", "900"))
         )
@@ -610,6 +613,9 @@ class AlphaEngine:
             f"Enabled venues: `{venue_summary}`",
             f"Kill switch: `{'ACTIVE' if self._kill_switch_active else 'OFF'}`",
             f"Full autonomy mode: `{'ON' if self._full_autonomy_enabled else 'OFF'}`",
+            (
+                f"Owner approval gate: `{'ON' if self._autonomy_require_owner_approval else 'AUTO-APPROVE'}`"
+            ),
             f"TradingView autonomy: `{'ON' if self.tv_autonomy.enabled else 'OFF'}`",
             f"Community scripts: `{'ON' if self.tv_autonomy.community_access_enabled else 'OFF'}`",
             f"Owner directive: `{directive}`",
@@ -624,21 +630,22 @@ class AlphaEngine:
         live = [venue for venue, item in state.items() if not item["paused"] and item["allocation"] > 0]
         paused = [venue for venue, item in state.items() if item["paused"] or item["allocation"] <= 0]
         total_failures = sum(self._failure_counts.values())
+        pending_count = len(self._pending_autonomy_session_keys())
         directive = self._owner_directive.strip() or "none"
         if len(directive) > 120:
             directive = directive[:117] + "..."
 
         msg = (
             f"💓 **SAPPHIRE HEARTBEAT** (`{reason}`)\n"
-            f"Active venues: `{', '.join(live) if live else 'none'}`\n"
-            f"Paused/deallocated: `{', '.join(paused) if paused else 'none'}`\n"
-            f"Kill switch: `{'ACTIVE' if self._kill_switch_active else 'OFF'}`\n"
-            f"Full autonomy: `{'ON' if self._full_autonomy_enabled else 'OFF'}`\n"
-            f"Failure pressure: `{total_failures}`\n\n"
-            f"Owner directive: `{directive}`\n\n"
-            "Reply with `/status`, `/heartbeat`, `/focus`, `/promotion`, `/autonomy`, `/kill`, `/resume`, `/steer <directive>`, `/answer <response>`, "
-            "`/approve <session_key>`, `/reject <session_key> <reason>`, "
-            "or `@alpha deallocate <venue>`."
+            f"Active: `{', '.join(live) if live else 'none'}` | "
+            f"Paused: `{', '.join(paused) if paused else 'none'}`\n"
+            f"Kill switch: `{'ACTIVE' if self._kill_switch_active else 'OFF'}` | "
+            f"Autonomy: `{'ON' if self._full_autonomy_enabled else 'OFF'}` | "
+            f"Approvals: `{'OWNER' if self._autonomy_require_owner_approval else 'AUTO'}`\n"
+            f"Pending approvals: `{pending_count}` | Failure pressure: `{total_failures}`\n"
+            f"Directive: `{directive}`\n"
+            "Quick actions: `/status` `/focus` `/autonomy` `/approve_all`\n"
+            "Use `/help` for full command list."
         )
         await self.telegram.send_message(msg, priority="medium")
 
@@ -734,6 +741,74 @@ class AlphaEngine:
         pending.sort(key=lambda item: int(item.get("created_at", 0)), reverse=True)
         return str(pending[0].get("session_key", "")).strip()
 
+    def _pending_autonomy_session_keys(self) -> List[str]:
+        pending = [
+            item
+            for item in self._autonomy_sessions.values()
+            if item.get("decision", "pending") == "pending"
+        ]
+        pending.sort(key=lambda item: int(item.get("created_at", 0)))
+        keys = [str(item.get("session_key", "")).strip() for item in pending]
+        return [key for key in keys if key]
+
+    async def _apply_autonomy_session_decision(
+        self,
+        session_key: str,
+        decision: str,
+        note: str = "",
+        source: str = "owner",
+    ) -> Dict[str, Any]:
+        normalized_decision = str(decision or "").strip().upper()
+        if normalized_decision not in {"APPROVE", "REJECT"}:
+            return {"dispatched": False, "reason": "invalid_decision", "session_key": ""}
+
+        resolved_key = self._resolve_autonomy_session_key(session_key)
+        if not resolved_key:
+            return {"dispatched": False, "reason": "session_not_found", "session_key": ""}
+
+        trimmed_note = str(note or "").strip()
+        if len(trimmed_note) > 400:
+            trimmed_note = trimmed_note[:400]
+
+        entry = self._autonomy_sessions.get(resolved_key, {"session_key": resolved_key})
+        entry["decision"] = "approved" if normalized_decision == "APPROVE" else "rejected"
+        entry["decision_note"] = trimmed_note
+        entry["decision_at"] = int(time.time())
+        entry["decision_source"] = source
+        self._autonomy_sessions[resolved_key] = entry
+
+        hook_result = await self.tv_autonomy.dispatch_session_decision(
+            session_key=resolved_key,
+            decision=normalized_decision,
+            note=trimmed_note,
+        )
+        dispatched = bool(hook_result.get("dispatched"))
+        reason = str(hook_result.get("reason", "")).strip()
+        log_level = "info" if dispatched else "warning"
+        self._record_system_log(
+            (
+                f"Autonomy session {resolved_key} -> {normalized_decision}"
+                + (f" ({source})" if source else "")
+                + (f" failed: {reason}" if reason and not dispatched else "")
+            ),
+            level=log_level,
+            tags=["autonomy", "decision"],
+            metadata={
+                "session_key": resolved_key,
+                "decision": normalized_decision,
+                "source": source,
+                "reason": reason,
+                "dispatched": dispatched,
+            },
+        )
+        return {
+            "dispatched": dispatched,
+            "reason": reason,
+            "session_key": resolved_key,
+            "decision": normalized_decision,
+            "dispatch_session_key": str(hook_result.get("session_key", "")).strip(),
+        }
+
     @staticmethod
     def _parse_session_decision_payload(payload_text: str) -> Dict[str, str]:
         text = str(payload_text or "").strip()
@@ -808,15 +883,46 @@ class AlphaEngine:
                 tags=["autonomy", "dispatch"],
                 metadata={"session_key": hook_result.get("session_key", "")},
             )
-            await self.telegram.send_message(
-                (
-                    "🤖 Full autonomy cycle dispatched.\n"
-                    f"Trigger: `{trigger}`\n"
-                    f"Session: `{hook_result.get('session_key', 'n/a')}`\n"
+            if session_key and not self._autonomy_require_owner_approval:
+                auto_result = await self._apply_autonomy_session_decision(
+                    session_key=session_key,
+                    decision="APPROVE",
+                    note="Auto-approved by Sapphire autonomy policy.",
+                    source="policy_auto",
+                )
+                if auto_result.get("dispatched"):
+                    await self.telegram.send_message(
+                        (
+                            "🤖 Full autonomy cycle dispatched + auto-approved.\n"
+                            f"Trigger: `{trigger}`\n"
+                            f"Session: `{session_key}`"
+                        ),
+                        priority="high",
+                    )
+                else:
+                    await self.telegram.send_message(
+                        (
+                            "⚠️ Full autonomy cycle dispatched and marked auto-approved locally,\n"
+                            f"but decision dispatch failed for `{session_key}`.\n"
+                            f"Reason: `{auto_result.get('reason', 'unknown')}`"
+                        ),
+                        priority="high",
+                    )
+            else:
+                approval_line = (
                     "Decision loop: `/approve <session_key>` or `/reject <session_key> <reason>`."
-                ),
-                priority="high",
-            )
+                    if self._autonomy_require_owner_approval
+                    else "Decision loop skipped (session key unavailable)."
+                )
+                await self.telegram.send_message(
+                    (
+                        "🤖 Full autonomy cycle dispatched.\n"
+                        f"Trigger: `{trigger}`\n"
+                        f"Session: `{hook_result.get('session_key', 'n/a')}`\n"
+                        f"{approval_line}"
+                    ),
+                    priority="high",
+                )
         else:
             self._record_system_log(
                 f"Full autonomy dispatch unavailable ({trigger}): {hook_result.get('reason', 'unknown')}",
@@ -848,6 +954,52 @@ class AlphaEngine:
     async def _handle_control_command(self, target: str, action: str, value: float) -> None:
         normalized_action = action.upper()
 
+        if normalized_action == "APPROVE_ALL_SESSIONS":
+            decision_payload = self._parse_session_decision_payload(target)
+            note = str(decision_payload.get("note", "")).strip()
+            if len(note) > 400:
+                note = note[:400]
+
+            pending_keys = self._pending_autonomy_session_keys()
+            if not pending_keys:
+                await self.telegram.send_message(
+                    "ℹ️ No pending autonomy sessions to approve.",
+                    priority="high",
+                )
+                return
+
+            success_count = 0
+            failed: List[str] = []
+            for session_key in pending_keys:
+                result = await self._apply_autonomy_session_decision(
+                    session_key=session_key,
+                    decision="APPROVE",
+                    note=note,
+                    source="owner_bulk",
+                )
+                if result.get("dispatched"):
+                    success_count += 1
+                else:
+                    failed.append(
+                        f"{result.get('session_key', session_key)}:{result.get('reason', 'unknown')}"
+                    )
+
+            if failed:
+                await self.telegram.send_message(
+                    (
+                        f"⚠️ Bulk approval completed with partial failures.\n"
+                        f"Approved: `{success_count}` / `{len(pending_keys)}`\n"
+                        f"Failed: `{'; '.join(failed[:5])}`"
+                    ),
+                    priority="high",
+                )
+            else:
+                await self.telegram.send_message(
+                    f"✅ Bulk approval completed. Approved `{success_count}` pending session(s).",
+                    priority="high",
+                )
+            return
+
         if normalized_action in {"APPROVE_SESSION", "REJECT_SESSION"}:
             decision_payload = self._parse_session_decision_payload(target)
             session_key = self._resolve_autonomy_session_key(decision_payload.get("session_key", ""))
@@ -861,46 +1013,27 @@ class AlphaEngine:
                 )
                 return
 
-            entry = self._autonomy_sessions.get(session_key, {"session_key": session_key})
-            if len(note) > 400:
-                note = note[:400]
-            entry["decision"] = "approved" if decision == "APPROVE" else "rejected"
-            entry["decision_note"] = note
-            entry["decision_at"] = int(time.time())
-            self._autonomy_sessions[session_key] = entry
-
-            hook_result = await self.tv_autonomy.dispatch_session_decision(
+            result = await self._apply_autonomy_session_decision(
                 session_key=session_key,
                 decision=decision,
                 note=note,
+                source="owner_manual",
             )
-            if hook_result.get("dispatched"):
+            if result.get("dispatched"):
                 await self.telegram.send_message(
                     (
                         f"✅ Session `{session_key}` marked `{decision}`.\n"
-                        f"Dispatch: `{hook_result.get('session_key', 'n/a')}`"
+                        f"Dispatch: `{result.get('dispatch_session_key', 'n/a')}`"
                     ),
                     priority="high",
-                )
-                self._record_system_log(
-                    f"Owner session decision {decision} for {session_key}",
-                    level="info",
-                    tags=["autonomy", "decision"],
-                    metadata={"session_key": session_key, "decision": decision, "note": note},
                 )
             else:
                 await self.telegram.send_message(
                     (
                         f"⚠️ Session decision captured locally but dispatch failed for `{session_key}`.\n"
-                        f"Reason: `{hook_result.get('reason', 'unknown')}`"
+                        f"Reason: `{result.get('reason', 'unknown')}`"
                     ),
                     priority="high",
-                )
-                self._record_system_log(
-                    f"Session decision dispatch failed for {session_key}",
-                    level="warning",
-                    tags=["autonomy", "decision"],
-                    metadata={"session_key": session_key, "decision": decision, "reason": hook_result.get("reason", "")},
                 )
             return
 
@@ -1091,9 +1224,8 @@ class AlphaEngine:
                 dispatch_status = "yes" if dispatch.get("dispatched") else f"no ({dispatch.get('reason', 'n/a')})"
                 await self.telegram.send_message(
                     (
-                        f"🧩 TradingView workspace action `{normalized_action}` processed.\n"
-                        f"Result: `{result_type}`\n"
-                        f"OpenClaw dispatch: `{dispatch_status}`"
+                        f"🧩 Workspace `{normalized_action}` -> `{result_type}`"
+                        f" (dispatch `{dispatch_status}`)"
                     ),
                     priority="medium",
                 )

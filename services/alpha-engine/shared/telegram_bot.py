@@ -11,6 +11,7 @@ import asyncio
 import json
 import os
 import re
+from collections import OrderedDict
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set
 
@@ -133,9 +134,116 @@ class TelegramPlatformBot:
     async def _flush_buffer(self):
         if not self.message_buffer:
             return
-        batch_text = "📋 **Sapphire Activity Digest**\n" + "\n".join(self.message_buffer)
+        digest_lines = self._build_digest_lines(self.message_buffer)
         self.message_buffer.clear()
+        batch_text = "📋 **Sapphire Update Digest**\n" + "\n".join(digest_lines)
         await self._dispatch_message(batch_text, allow_markdown=True)
+
+    @staticmethod
+    def _clean_digest_text(text: str) -> str:
+        normalized = re.sub(r"\s+", " ", str(text or "").strip())
+        normalized = re.sub(r"Reply with /status.*$", "", normalized, flags=re.IGNORECASE)
+        return normalized.strip()
+
+    @staticmethod
+    def _extract_section(text: str, marker: str, stop_markers: List[str]) -> str:
+        source = str(text or "")
+        marker_idx = source.lower().find(marker.lower())
+        if marker_idx < 0:
+            return ""
+        tail = source[marker_idx + len(marker) :]
+        lower_tail = tail.lower()
+        stop_idx = len(tail)
+        for stop in stop_markers:
+            idx = lower_tail.find(stop.lower())
+            if idx >= 0:
+                stop_idx = min(stop_idx, idx)
+        return tail[:stop_idx].strip(" `:;,.")
+
+    @classmethod
+    def _summarize_digest_text(cls, text: str) -> str:
+        cleaned = cls._clean_digest_text(text)
+        lowered = cleaned.lower()
+
+        if "gemini flash" in lowered:
+            insight = cls._extract_section(cleaned, "Gemini Flash", [])
+            if not insight and ":" in cleaned:
+                insight = cleaned.split(":", 1)[1].strip()
+            return f"⚡ Market pulse: {insight}" if insight else "⚡ Market pulse update"
+
+        if "sapphire heartbeat" in lowered:
+            active = cls._extract_section(
+                cleaned, "Active venues:", ["Paused/deallocated:", "Kill switch:"]
+            )
+            paused = cls._extract_section(cleaned, "Paused/deallocated:", ["Kill switch:"])
+            kill = cls._extract_section(cleaned, "Kill switch:", ["Full autonomy:", "Failure pressure:"])
+            autonomy = cls._extract_section(
+                cleaned, "Full autonomy:", ["Failure pressure:", "Owner directive:"]
+            )
+            failure = cls._extract_section(cleaned, "Failure pressure:", ["Owner directive:"])
+            return (
+                "💓 Heartbeat: "
+                f"active `{active or 'none'}` | paused `{paused or 'none'}` | "
+                f"kill `{kill or 'n/a'}` | autonomy `{autonomy or 'n/a'}` | pressure `{failure or 'n/a'}`"
+            )
+
+        if "tradingview workspace action" in lowered:
+            action_match = re.search(
+                r"workspace action\s+`?([a-z0-9_:-]+)`?",
+                cleaned,
+                flags=re.IGNORECASE,
+            )
+            action = str(action_match.group(1) if action_match else "unknown").strip()
+            result = cls._extract_section(cleaned, "Result:", ["OpenClaw dispatch:"])
+            dispatch = cls._extract_section(cleaned, "OpenClaw dispatch:", [])
+            return (
+                f"🧩 Workspace `{action}`: `{result or 'processed'}`"
+                + (f" (dispatch `{dispatch}`)" if dispatch else "")
+            )
+
+        return cleaned
+
+    @classmethod
+    def _digest_signature(cls, text: str) -> str:
+        cleaned = cls._clean_digest_text(text).lower()
+        # Collapse highly repetitive AI flash lines into one digest bucket.
+        if "gemini flash" in cleaned or "market pulse" in cleaned:
+            return "gemini_flash"
+        if "sapphire heartbeat" in cleaned or cleaned.startswith("💓 heartbeat"):
+            return "heartbeat"
+        if "tradingview workspace action" in cleaned or cleaned.startswith("🧩 workspace"):
+            action_match = re.search(r"(tv_[a-z0-9_:-]+)", cleaned)
+            result_match = re.search(r"result[:\s`]+([a-z_]+)", cleaned)
+            action_key = action_match.group(1) if action_match else "unknown"
+            result_key = result_match.group(1) if result_match else "unknown"
+            return f"workspace:{action_key}:{result_key}"
+        return cleaned
+
+    @classmethod
+    def _build_digest_lines(cls, raw_messages: List[str]) -> List[str]:
+        if not raw_messages:
+            return ["- no updates"]
+
+        grouped: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
+        for raw in raw_messages[-20:]:
+            cleaned = cls._clean_digest_text(raw)
+            if not cleaned:
+                continue
+            summary = cls._summarize_digest_text(cleaned)
+            signature = cls._digest_signature(summary)
+            if signature in grouped:
+                grouped[signature]["count"] += 1
+                grouped[signature]["text"] = summary
+            else:
+                grouped[signature] = {"text": summary, "count": 1}
+
+        lines: List[str] = []
+        for idx, item in enumerate(grouped.values(), start=1):
+            text = item["text"]
+            count = int(item["count"])
+            suffix = f" _(x{count})_" if count > 1 else ""
+            lines.append(f"{idx}. {text}{suffix}")
+        return lines
 
     async def send_message(
         self,
@@ -282,6 +390,7 @@ class TelegramPlatformBot:
             "- `/kill`\n"
             "- `/resume`\n"
             "- `/approve <session_key> [note]`\n"
+            "- `/approve_all [note]`\n"
             "- `/reject <session_key> [reason]`\n"
             "- `/deallocate <venue>`\n"
             "- `/allocate <venue> <percent>`\n\n"
@@ -357,6 +466,31 @@ class TelegramPlatformBot:
             return
 
         # Session decision commands
+        slash_bulk_approve_match = re.search(
+            r"^/approve(?:[_-]?all|\s+all)(?:\s+(.+))?$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        mention_bulk_approve_match = re.search(
+            r"@(alpha|control)\s+approve(?:[_-]?all|\s+all)(?:\s+(.+))?$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if slash_bulk_approve_match or mention_bulk_approve_match:
+            if slash_bulk_approve_match:
+                note = str(slash_bulk_approve_match.group(1) or "").strip()
+            else:
+                note = str(mention_bulk_approve_match.group(2) or "").strip()
+            if len(note) > 400:
+                note = note[:400]
+            payload = json.dumps({"note": note}, separators=(",", ":"))
+            await self.send_message(
+                "✅ Bulk approval request received. Processing all pending autonomy sessions.",
+                priority=NotificationPriority.HIGH,
+            )
+            await self._dispatch_callback("CONTROL", payload, "APPROVE_ALL_SESSIONS", 0.0)
+            return
+
         slash_session_decision_match = re.search(
             r"^/(approve|reject)(?:\s+([A-Za-z0-9:._-]+|latest))?(?:\s+(.+))?$",
             text,

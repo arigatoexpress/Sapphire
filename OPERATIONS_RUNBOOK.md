@@ -44,6 +44,7 @@ Supported operator commands in Telegram:
 - `/kill`
 - `/resume`
 - `/approve <session_key> [note]`
+- `/approve_all [note]` (approve all pending autonomy sessions)
 - `/reject <session_key> [reason]`
 - `/deallocate <venue>`
 - `/allocate <venue> <percent>`
@@ -186,6 +187,7 @@ Full-autonomy env controls are applied by deploy defaults:
 - `SAPPHIRE_AUTONOMY_ALLOW_CODE_CHANGES=true`
 - `SAPPHIRE_AUTONOMY_ALLOW_GCLOUD_CHANGES=true`
 - `SAPPHIRE_AUTONOMY_DRY_RUN=false`
+- `SAPPHIRE_AUTONOMY_REQUIRE_OWNER_APPROVAL=false` (auto-approve autonomy sessions)
 - `SAPPHIRE_AUTONOMY_LOOP_SECONDS=900`
 
 Execution safety controls:

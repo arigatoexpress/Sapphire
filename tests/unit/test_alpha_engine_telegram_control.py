@@ -92,6 +92,59 @@ def test_reject_command_dispatches_session_payload(telegram_module):
     assert payload["note"] == "hold until risk is lower"
 
 
+def test_approve_all_command_dispatches_bulk_payload(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {
+                "message": {
+                    "chat": {"id": "12345"},
+                    "text": "/approve_all clear backlog now",
+                }
+            }
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert action == "APPROVE_ALL_SESSIONS"
+    assert quantity == 0.0
+
+    payload = json.loads(symbol)
+    assert payload["note"] == "clear backlog now"
+
+
+def test_digest_builder_summarizes_and_groups_repeated_updates(telegram_module):
+    lines = telegram_module.TelegramPlatformBot._build_digest_lines(
+        [
+            "📝 ⚡ Gemini Flash: Volatility remains within nominal bounds.",
+            "📝 ⚡ Gemini Flash: Volatility remains within nominal bounds.",
+            (
+                "📢 💓 SAPPHIRE HEARTBEAT (scheduled)\n"
+                "Active venues: ASTER, LIGHTER\n"
+                "Paused/deallocated: none\n"
+                "Kill switch: OFF\n"
+                "Full autonomy: ON\n"
+                "Failure pressure: 1\n\n"
+                "Owner directive: none\n\n"
+                "Reply with /status, /heartbeat, /focus."
+            ),
+        ]
+    )
+
+    assert any("Market pulse" in line and "x2" in line for line in lines)
+    assert any("Heartbeat:" in line for line in lines)
+    assert all("Reply with /status" not in line for line in lines)
+
+
 def test_answer_alias_still_routes_to_owner_steer(telegram_module):
     callback = AsyncMock()
     bot = telegram_module.TelegramPlatformBot(
