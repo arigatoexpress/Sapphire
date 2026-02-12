@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Standalone Symphony Fund Activation Script.
-Executes 5 trades to activate the Sapphire MIT Agent on Symphony.
+Standalone Aster Fund Activation Script.
+Executes 5 trades to activate the Sapphire MIT Agent on Aster.
 
 Usage:
-    python3 -m cloud_trader.scripts.activate_symphony
+    python3 -m cloud_trader.scripts.activate_aster
 """
 
 import asyncio
@@ -16,19 +16,19 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 
 async def main():
-    print("🎵 SYMPHONY FUND ACTIVATION SCRIPT")
+    print("🎵 ASTER FUND ACTIVATION SCRIPT")
     print("=" * 50)
 
     try:
-        from cloud_trader.symphony_client import get_symphony_client
+        from cloud_trader.aster_client import get_aster_client
 
         # Load config
-        agent_id = os.getenv("SYMPHONY_AGENT_ID")
+        agent_id = os.getenv("ASTER_AGENT_ID")
         if not agent_id:
-            print("❌ Error: SYMPHONY_AGENT_ID not set in environment")
+            print("❌ Error: ASTER_AGENT_ID not set in environment")
             return
 
-        client = get_symphony_client(agent_id=agent_id)
+        client = get_aster_client(agent_id=agent_id)
         print(f"🤖 Target Agent ID: {agent_id}")
 
         # Check current activation status

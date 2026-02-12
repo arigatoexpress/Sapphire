@@ -1,6 +1,6 @@
 """
-Symphony API Client for Monad Implementation Treasury (MIT)
-Autonomous AI agent trading on Symphony's execution network.
+Aster API Client for Monad Implementation Treasury (MIT)
+Autonomous AI agent trading on Aster's execution network.
 """
 
 import logging
@@ -13,21 +13,21 @@ from logger import get_logger
 
 logger = get_logger(__name__)
 
-# Symphony API Configuration
-# Symphony API Configuration
-from symphony_config import (
+# Aster API Configuration
+# Aster API Configuration
+from aster_config import (
     AGENTS_CONFIG,
     MIT_ACTIVATION_THRESHOLD,
-    SYMPHONY_AGENT_ID,
-    SYMPHONY_API_KEY,
-    SYMPHONY_BASE_URL,
+    ASTER_AGENT_ID,
+    ASTER_API_KEY,
+    ASTER_BASE_URL,
 )
 
 
-class SymphonyClient:
+class AsterClient:
     """
-    Client for Symphony API - Monad blockchain trading platform.
-    Official API Documentation: https://docs.symphony.io
+    Client for Aster API - Monad blockchain trading platform.
+    Official API Documentation: https://docs.aster.io
 
     Features:
     - Perpetual futures trading
@@ -38,17 +38,17 @@ class SymphonyClient:
 
     def __init__(self, api_key: Optional[str] = None, agent_id: Optional[str] = None):
         """
-        Initialize Symphony client with multi-agent support.
+        Initialize Aster client with multi-agent support.
         """
         # Default credentials (usually MILF based on local.env)
-        self.default_api_key = api_key or SYMPHONY_API_KEY
-        self.default_agent_id = agent_id or SYMPHONY_AGENT_ID
+        self.default_api_key = api_key or ASTER_API_KEY
+        self.default_agent_id = agent_id or ASTER_AGENT_ID
 
         if not self.default_api_key:
-            logger.warning("Symphony API key missing. Using mock key.")
+            logger.warning("Aster API key missing. Using mock key.")
             self.default_api_key = "mock_sk_live_demo123"
 
-        self.base_url = SYMPHONY_BASE_URL
+        self.base_url = ASTER_BASE_URL
 
         # Initialize clients for all configured agents
         self.clients: Dict[str, httpx.AsyncClient] = {}
@@ -111,14 +111,14 @@ class SymphonyClient:
             await client.aclose()
 
     async def notify(self, message: str):
-        """Send notification via Symphony (Logs for now)."""
-        logger.info(f"🔔 SYMPHONY NOTICE: {message}")
+        """Send notification via Aster (Logs for now)."""
+        logger.info(f"🔔 ASTER NOTICE: {message}")
 
     # ==================== ACCOUNT MANAGEMENT ====================
 
     async def get_account_info(self) -> Dict[str, Any]:
         """
-        Get Symphony smart account information.
+        Get Aster smart account information.
         """
         try:
             # We use get_perpetual_positions to infer activity since /wallet is 404
@@ -138,7 +138,7 @@ class SymphonyClient:
                 "agent_id": self.default_agent_id,
             }
         except Exception as e:
-            logger.error(f"Failed to get Symphony account info: {e}")
+            logger.error(f"Failed to get Aster account info: {e}")
             return {
                 "address": "unknown",
                 "balance": {"USDC": 0.0},
@@ -162,7 +162,7 @@ class SymphonyClient:
         profile_image: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Register a new Agentic Fund on Symphony.
+        Register a new Agentic Fund on Aster.
         """
         # ... (Implementation kept simple or skipped if not needed for activation)
         return {"id": "mock_id", "status": "simulated"}
@@ -186,7 +186,7 @@ class SymphonyClient:
     ) -> Dict[str, Any]:
         """
         Open a perpetual futures position via POST /agent/batch-open.
-        Per Symphony Docs: https://docs.symphony.io/developers/launch-agentic-fund/perpetual-trading-guide
+        Per Aster Docs: https://docs.aster.io/developers/launch-agentic-fund/perpetual-trading-guide
         """
         # Build payload per docs
         # Use provided agent_id or default
@@ -244,7 +244,7 @@ class SymphonyClient:
     async def close_perpetual_position(self, batch_id: str) -> Dict[str, Any]:
         """
         Close a perpetual position by batchId via POST /agent/batch-close.
-        Per Symphony Docs.
+        Per Aster Docs.
         """
         payload = {
             "agentId": self.default_agent_id,
@@ -441,7 +441,7 @@ class SymphonyClient:
 
     async def subscribe_strategy(self, strategy_id: str = "default") -> bool:
         """
-        Subscribe to a Symphony strategy for automated trading signals.
+        Subscribe to a Aster strategy for automated trading signals.
 
         Args:
             strategy_id: The ID of the strategy to subscribe to.
@@ -455,7 +455,7 @@ class SymphonyClient:
                 logger.warning(f"Strategy {strategy_id} not found, skipping subscription")
                 return False
             response.raise_for_status()
-            logger.info(f"✅ Subscribed to Symphony strategy: {strategy_id}")
+            logger.info(f"✅ Subscribed to Aster strategy: {strategy_id}")
             return True
         except Exception as e:
             logger.warning(f"⚠️ Failed to subscribe to strategy {strategy_id}: {e}")
@@ -463,14 +463,14 @@ class SymphonyClient:
 
 
 # Singleton instance
-_symphony_client: Optional[SymphonyClient] = None
+_aster_client: Optional[AsterClient] = None
 
 
-def get_symphony_client(
+def get_aster_client(
     api_key: Optional[str] = None, agent_id: Optional[str] = None
-) -> SymphonyClient:
-    """Get or create Symphony client singleton."""
-    global _symphony_client
-    if _symphony_client is None:
-        _symphony_client = SymphonyClient(api_key=api_key, agent_id=agent_id)
-    return _symphony_client
+) -> AsterClient:
+    """Get or create Aster client singleton."""
+    global _aster_client
+    if _aster_client is None:
+        _aster_client = AsterClient(api_key=api_key, agent_id=agent_id)
+    return _aster_client

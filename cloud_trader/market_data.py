@@ -1,6 +1,6 @@
 from typing import Any, Dict
 
-from .definitions import SYMBOL_CONFIG, SYMPHONY_SYMBOLS
+from .definitions import SYMBOL_CONFIG, ASTER_SYMBOLS
 
 
 class MarketDataManager:
@@ -54,10 +54,10 @@ class MarketDataManager:
 
             print(f"✅ Loaded market structure for {count} pairs.")
 
-            # --- INJECT SYMPHONY SYMBOLS ---
-            print("🎻 Injecting Symphony (Monad/Base) symbols...")
+            # --- INJECT ASTER SYMBOLS ---
+            print("🎻 Injecting Aster (Monad/Base) symbols...")
             injected_count = 0
-            for sym in SYMPHONY_SYMBOLS:
+            for sym in ASTER_SYMBOLS:
                 if sym not in self.market_structure:
                     # Use config if available, else defaults
                     config = SYMBOL_CONFIG.get(sym, {})
@@ -72,7 +72,7 @@ class MarketDataManager:
                     injected_count += 1
 
             print(
-                f"✅ Injected {injected_count} Symphony symbols. Total: {len(self.market_structure)}"
+                f"✅ Injected {injected_count} Aster symbols. Total: {len(self.market_structure)}"
             )
 
         except Exception as e:

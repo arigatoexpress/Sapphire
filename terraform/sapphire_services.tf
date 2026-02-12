@@ -83,10 +83,10 @@ resource "google_cloud_run_v2_service" "sapphire_cloud_trader" {
   }
 }
 
-# Hyperliquid Trader
-# Hyperliquid Trader
-resource "google_cloud_run_v2_service" "sapphire_hyperliquid_trader" {
-  name                = "sapphire-hyperliquid-trader"
+# Lighter Trader
+# Lighter Trader
+resource "google_cloud_run_v2_service" "sapphire_lighter_trader" {
+  name                = "sapphire-lighter-trader"
   location            = var.region
   project             = var.project_id
   ingress             = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"  # SECURITY: Restrict to internal + LB only
@@ -109,7 +109,7 @@ resource "google_cloud_run_v2_service" "sapphire_hyperliquid_trader" {
     }
 
     containers {
-      image = "gcr.io/${var.project_id}/hyperliquid-trader:latest"
+      image = "gcr.io/${var.project_id}/lighter-trader:latest"
 
       resources {
         limits = {

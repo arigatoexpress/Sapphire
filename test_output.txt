@@ -8,7 +8,7 @@ collected 2 items
 
 tests/test_final_integration.py {"timestamp": "2025-12-27T00:18:53.856678Z", "level": "INFO", "message": "\ud83d\ude80 VERSION: 2.1.0 (Refactored Init)", "module": "trading_service", "function": "__init__", "line": 167, "logger": "cloud_trader.trading_service"}
 {"timestamp": "2025-12-27T00:18:53.857672Z", "level": "WARNING", "message": "\ud83e\ude90 Treasurer: No Private Key found. Read-only mode.", "module": "treasurer", "function": "_load_wallet", "line": 51, "logger": "cloud_trader.swarm.treasurer"}
-{"timestamp": "2025-12-27T00:18:53.857812Z", "level": "INFO", "message": "\u2705 Initialized 3 Symphony agents from config", "module": "trading_service", "function": "__init__", "line": 284, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:53.857812Z", "level": "INFO", "message": "\u2705 Initialized 3 Aster agents from config", "module": "trading_service", "function": "__init__", "line": 284, "logger": "cloud_trader.trading_service"}
 {"timestamp": "2025-12-27T00:18:53.858460Z", "level": "INFO", "message": "\u2705 ActiveProfitManager initialized", "module": "profit_manager", "function": "__init__", "line": 75, "logger": "cloud_trader.profit_manager"}
 {"timestamp": "2025-12-27T00:18:53.858484Z", "level": "INFO", "message": "\u2705 ActiveProfitManager initialized", "module": "trading_service", "function": "_init_managers_offline", "line": 319, "logger": "cloud_trader.trading_service"}
 {"timestamp": "2025-12-27T00:18:53.920247Z", "level": "INFO", "message": "\u2705 Telegram notifications enabled", "module": "trading_service", "function": "_init_managers_offline", "line": 330, "logger": "cloud_trader.trading_service"}
@@ -20,14 +20,14 @@ tests/test_final_integration.py {"timestamp": "2025-12-27T00:18:53.856678Z", "le
 >>> Calling service.start()...
 {"timestamp": "2025-12-27T00:18:53.920414Z", "level": "INFO", "message": "\ud83d\ude80 Starting Aster Bull Agents (Minimal Service)...", "module": "trading_service", "function": "start", "line": 399, "logger": "cloud_trader.trading_service"}
 {"timestamp": "2025-12-27T00:18:53.920426Z", "level": "INFO", "message": "\ud83d\udd10 STARTING AUTH DIAGNOSTICS...", "module": "trading_service", "function": "_run_auth_diagnostics", "line": 453, "logger": "cloud_trader.trading_service"}
-{"timestamp": "2025-12-27T00:18:53.920787Z", "level": "INFO", "message": "\ud83c\udfb5 Identifying Symphony Agent Status...", "module": "trading_service", "function": "_ensure_symphony_initialized", "line": 4220, "logger": "cloud_trader.trading_service"}
-{"timestamp": "2025-12-27T00:18:53.921007Z", "level": "INFO", "message": "\u2705 Symphony Agent is ACTIVE and Connected.", "module": "trading_service", "function": "_ensure_symphony_initialized", "line": 4225, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:53.920787Z", "level": "INFO", "message": "\ud83c\udfb5 Identifying Aster Agent Status...", "module": "trading_service", "function": "_ensure_aster_initialized", "line": 4220, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:53.921007Z", "level": "INFO", "message": "\u2705 Aster Agent is ACTIVE and Connected.", "module": "trading_service", "function": "_ensure_aster_initialized", "line": 4225, "logger": "cloud_trader.trading_service"}
 {"timestamp": "2025-12-27T00:18:55.846466Z", "level": "INFO", "message": "   \u2705 Public API Accessible (200 OK)", "module": "trading_service", "function": "_run_auth_diagnostics", "line": 461, "logger": "cloud_trader.trading_service"}
 DEBUG: Loaded API Key: a951... (len=64)
 DEBUG: Loaded API Secret (len=64)
 {"timestamp": "2025-12-27T00:18:55.848297Z", "level": "INFO", "message": "   \ud83d\udd11 Using Key Prefix: a951d1...", "module": "trading_service", "function": "_run_auth_diagnostics", "line": 468, "logger": "cloud_trader.trading_service"}
 {"timestamp": "2025-12-27T00:18:55.848531Z", "level": "INFO", "message": "\ud83d\udd10 AUTH DIAGNOSTICS COMPLETE", "module": "trading_service", "function": "_run_auth_diagnostics", "line": 474, "logger": "cloud_trader.trading_service"}
-{"timestamp": "2025-12-27T00:18:55.873038Z", "level": "INFO", "message": "\ud83c\udfbb Subscribing to Symphony Strategy...", "module": "trading_service", "function": "_init_online_components", "line": 504, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:55.873038Z", "level": "INFO", "message": "\ud83c\udfbb Subscribing to Aster Strategy...", "module": "trading_service", "function": "_init_online_components", "line": 504, "logger": "cloud_trader.trading_service"}
 🌍 Fetching global market structure (all symbols)...
 ⚠️ Failed to fetch market structure: object MagicMock can't be used in 'await' expression. Falling back to config.
 ⚠️ Could not sync portfolio balance: object MagicMock can't be used in 'await' expression
@@ -67,7 +67,7 @@ DEBUG: Loaded API Secret (len=64)
 F{"timestamp": "2025-12-27T00:18:55.926057Z", "level": "INFO", "message": "Capital Efficiency Guard stopped", "module": "trading_service", "function": "_capital_efficiency_guard", "line": 3578, "logger": "cloud_trader.trading_service"}
 {"timestamp": "2025-12-27T00:18:55.934091Z", "level": "INFO", "message": "\ud83d\ude80 VERSION: 2.1.0 (Refactored Init)", "module": "trading_service", "function": "__init__", "line": 167, "logger": "cloud_trader.trading_service"}
 {"timestamp": "2025-12-27T00:18:55.934249Z", "level": "WARNING", "message": "\ud83e\ude90 Treasurer: No Private Key found. Read-only mode.", "module": "treasurer", "function": "_load_wallet", "line": 51, "logger": "cloud_trader.swarm.treasurer"}
-{"timestamp": "2025-12-27T00:18:55.934329Z", "level": "INFO", "message": "\u2705 Initialized 3 Symphony agents from config", "module": "trading_service", "function": "__init__", "line": 284, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:55.934329Z", "level": "INFO", "message": "\u2705 Initialized 3 Aster agents from config", "module": "trading_service", "function": "__init__", "line": 284, "logger": "cloud_trader.trading_service"}
 {"timestamp": "2025-12-27T00:18:55.934367Z", "level": "INFO", "message": "\u2705 ActiveProfitManager initialized", "module": "trading_service", "function": "_init_managers_offline", "line": 319, "logger": "cloud_trader.trading_service"}
 {"timestamp": "2025-12-27T00:18:55.978462Z", "level": "INFO", "message": "\u2705 Telegram notifications enabled", "module": "trading_service", "function": "_init_managers_offline", "line": 330, "logger": "cloud_trader.trading_service"}
 {"timestamp": "2025-12-27T00:18:55.978523Z", "level": "INFO", "message": "==================================================", "module": "trading_service", "function": "__init__", "line": 297, "logger": "cloud_trader.trading_service"}
@@ -76,14 +76,14 @@ F{"timestamp": "2025-12-27T00:18:55.926057Z", "level": "INFO", "message": "Capit
 {"timestamp": "2025-12-27T00:18:55.978569Z", "level": "INFO", "message": "==================================================", "module": "trading_service", "function": "__init__", "line": 302, "logger": "cloud_trader.trading_service"}
 {"timestamp": "2025-12-27T00:18:55.978579Z", "level": "INFO", "message": "\ud83d\ude80 Starting Aster Bull Agents (Minimal Service)...", "module": "trading_service", "function": "start", "line": 399, "logger": "cloud_trader.trading_service"}
 {"timestamp": "2025-12-27T00:18:55.978589Z", "level": "INFO", "message": "\ud83d\udd10 STARTING AUTH DIAGNOSTICS...", "module": "trading_service", "function": "_run_auth_diagnostics", "line": 453, "logger": "cloud_trader.trading_service"}
-{"timestamp": "2025-12-27T00:18:55.978844Z", "level": "INFO", "message": "\ud83c\udfb5 Identifying Symphony Agent Status...", "module": "trading_service", "function": "_ensure_symphony_initialized", "line": 4220, "logger": "cloud_trader.trading_service"}
-{"timestamp": "2025-12-27T00:18:55.978899Z", "level": "INFO", "message": "\u2705 Symphony Agent is ACTIVE and Connected.", "module": "trading_service", "function": "_ensure_symphony_initialized", "line": 4225, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:55.978844Z", "level": "INFO", "message": "\ud83c\udfb5 Identifying Aster Agent Status...", "module": "trading_service", "function": "_ensure_aster_initialized", "line": 4220, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:55.978899Z", "level": "INFO", "message": "\u2705 Aster Agent is ACTIVE and Connected.", "module": "trading_service", "function": "_ensure_aster_initialized", "line": 4225, "logger": "cloud_trader.trading_service"}
 {"timestamp": "2025-12-27T00:18:57.877214Z", "level": "INFO", "message": "   \u2705 Public API Accessible (200 OK)", "module": "trading_service", "function": "_run_auth_diagnostics", "line": 461, "logger": "cloud_trader.trading_service"}
 DEBUG: Loaded API Key: a951... (len=64)
 DEBUG: Loaded API Secret (len=64)
 {"timestamp": "2025-12-27T00:18:57.879223Z", "level": "INFO", "message": "   \ud83d\udd11 Using Key Prefix: a951d1...", "module": "trading_service", "function": "_run_auth_diagnostics", "line": 468, "logger": "cloud_trader.trading_service"}
 {"timestamp": "2025-12-27T00:18:57.879425Z", "level": "INFO", "message": "\ud83d\udd10 AUTH DIAGNOSTICS COMPLETE", "module": "trading_service", "function": "_run_auth_diagnostics", "line": 474, "logger": "cloud_trader.trading_service"}
-{"timestamp": "2025-12-27T00:18:57.903408Z", "level": "INFO", "message": "\ud83c\udfbb Subscribing to Symphony Strategy...", "module": "trading_service", "function": "_init_online_components", "line": 504, "logger": "cloud_trader.trading_service"}
+{"timestamp": "2025-12-27T00:18:57.903408Z", "level": "INFO", "message": "\ud83c\udfbb Subscribing to Aster Strategy...", "module": "trading_service", "function": "_init_online_components", "line": 504, "logger": "cloud_trader.trading_service"}
 🌍 Fetching global market structure (all symbols)...
 ⚠️ Failed to fetch market structure: object MagicMock can't be used in 'await' expression. Falling back to config.
 ⚠️ Could not sync portfolio balance: object MagicMock can't be used in 'await' expression
@@ -126,8 +126,8 @@ test_settings = Settings(aster_api_key='a951d11fda5023b288630ffe4263115d133d29c5
         # But we want the internal logic to run.
     
         with patch("cloud_trader.trading_service.AsterClient") as MockAster, \
-             patch("cloud_trader.symphony_client.get_symphony_client") as MockSymFactory, \
-             patch("cloud_trader.drift_client.get_drift_client") as MockDriftFactory, \
+             patch("cloud_trader.aster_client.get_aster_client") as MockSymFactory, \
+             patch("cloud_trader.aster_client.get_aster_client") as MockAsterFactory, \
              patch("cloud_trader.jupiter_client.get_jupiter_client") as MockJupFactory:
     
             # Setup Client Mocks
@@ -142,14 +142,14 @@ test_settings = Settings(aster_api_key='a951d11fda5023b288630ffe4263115d133d29c5
             mock_aster.initialize = AsyncMock()
             mock_aster.close = AsyncMock()
     
-            # Symphony
-            mock_symphony = AsyncMock()
-            mock_symphony.subscribe_strategy = AsyncMock(return_value=True)
-            MockSymFactory.return_value = mock_symphony
+            # Aster
+            mock_aster = AsyncMock()
+            mock_aster.subscribe_strategy = AsyncMock(return_value=True)
+            MockSymFactory.return_value = mock_aster
     
-            # Drift
-            mock_drift = AsyncMock()
-            MockDriftFactory.return_value = mock_drift
+            # Aster
+            mock_aster = AsyncMock()
+            MockAsterFactory.return_value = mock_aster
     
             # Jupiter
             mock_jup = AsyncMock()
@@ -171,7 +171,7 @@ test_settings = Settings(aster_api_key='a951d11fda5023b288630ffe4263115d133d29c5
             # 3. Verify Agents Initialized
             # We expect at least the configurable agents + autonomous agents
             print(f">>> Agent States: {len(service._agent_states)}")
-            assert len(service._agent_states) > 0 # Symphony/Config agents
+            assert len(service._agent_states) > 0 # Aster/Config agents
             assert service.autonomous_agents is not None
             # Check Autonomous Components were wired
             print(">>> Verifying DataStore...")

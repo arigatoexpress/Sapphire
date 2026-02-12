@@ -1,6 +1,6 @@
 ---
 name: Feature Request
-about: Suggest an idea for Agent Symphony
+about: Suggest an idea for Agent Aster
 title: '[FEATURE] '
 labels: enhancement
 assignees: ''

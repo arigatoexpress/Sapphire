@@ -16,8 +16,8 @@ def test_settings():
         enable_telegram=False, # Disable telegram to avoid network noise
         environment="test",
         # Ensure we don't accidentally hit real endpoints
-        symphony_api_url="http://mock-symphony",
-        drift_env="devnet"
+        aster_api_url="http://mock-aster",
+        aster_env="devnet"
     )
 
 @pytest.mark.asyncio
@@ -31,8 +31,8 @@ async def test_full_system_startup_and_wiring(test_settings):
     # But we want the internal logic to run.
     
     with patch("cloud_trader.trading_service.AsterClient") as MockAster, \
-         patch("cloud_trader.symphony_client.get_symphony_client") as MockSymFactory, \
-         patch("cloud_trader.drift_client.get_drift_client") as MockDriftFactory, \
+         patch("cloud_trader.aster_client.get_aster_client") as MockSymFactory, \
+         patch("cloud_trader.aster_client.get_aster_client") as MockAsterFactory, \
          patch("cloud_trader.jupiter_client.get_jupiter_client") as MockJupFactory:
          
         # Setup Client Mocks
@@ -47,14 +47,14 @@ async def test_full_system_startup_and_wiring(test_settings):
         mock_aster.initialize = AsyncMock()
         mock_aster.close = AsyncMock()
         
-        # Symphony
-        mock_symphony = AsyncMock()
-        mock_symphony.subscribe_strategy = AsyncMock(return_value=True)
-        MockSymFactory.return_value = mock_symphony
+        # Aster
+        mock_aster = AsyncMock()
+        mock_aster.subscribe_strategy = AsyncMock(return_value=True)
+        MockSymFactory.return_value = mock_aster
         
-        # Drift
-        mock_drift = AsyncMock()
-        MockDriftFactory.return_value = mock_drift
+        # Aster
+        mock_aster = AsyncMock()
+        MockAsterFactory.return_value = mock_aster
         
         # Jupiter
         mock_jup = AsyncMock()
@@ -76,7 +76,7 @@ async def test_full_system_startup_and_wiring(test_settings):
         # 3. Verify Agents Initialized
         # We expect at least the configurable agents + autonomous agents
         print(f">>> Agent States: {len(service._agent_states)}")
-        assert len(service._agent_states) > 0 # Symphony/Config agents
+        assert len(service._agent_states) > 0 # Aster/Config agents
         assert service.autonomous_agents is not None
         # Check Autonomous Components were wired
         print(">>> Verifying DataStore...")
@@ -126,16 +126,16 @@ async def test_api_dashboard_structure(test_settings):
     Verify that the service can produce the data structure required by the dashboard API.
     """
     with patch("cloud_trader.trading_service.AsterClient") as MockAster, \
-         patch("cloud_trader.symphony_client.get_symphony_client") as MockSymFactory, \
-         patch("cloud_trader.drift_client.get_drift_client"), \
+         patch("cloud_trader.aster_client.get_aster_client") as MockSymFactory, \
+         patch("cloud_trader.aster_client.get_aster_client"), \
          patch("cloud_trader.jupiter_client.get_jupiter_client"):
          
         # Configure crucial sync calls
-        mock_symphony = AsyncMock()
-        mock_symphony.subscribe_strategy = AsyncMock(return_value=True)
+        mock_aster = AsyncMock()
+        mock_aster.subscribe_strategy = AsyncMock(return_value=True)
         # Fix RuntimeWarning: get_account_info must be awaited and return dict
-        mock_symphony.get_account_info = AsyncMock(return_value={"balance": {"USDC": 1000.0}})
-        MockSymFactory.return_value = mock_symphony
+        mock_aster.get_account_info = AsyncMock(return_value={"balance": {"USDC": 1000.0}})
+        MockSymFactory.return_value = mock_aster
         
         mock_aster = MockAster.return_value
         mock_aster.get_historical_klines = AsyncMock(return_value=[])

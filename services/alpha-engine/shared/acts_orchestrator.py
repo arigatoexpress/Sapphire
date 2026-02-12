@@ -45,9 +45,9 @@ from dual_speed_cognition import (
 from enhanced_episodic_memory import EnhancedMemoryBank, MarketSnapshot, get_enhanced_memory
 from executor_agent import (
     AsterExecutorAgent,
-    DriftExecutorAgent,
+    AsterExecutorAgent,
     ExecutionRequest,
-    HyperliquidExecutorAgent,
+    LighterExecutorAgent,
     create_executor_swarm,
 )
 

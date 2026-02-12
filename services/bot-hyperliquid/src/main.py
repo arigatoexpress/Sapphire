@@ -1,8 +1,8 @@
 """
-Hyperliquid Trading Bot - Standalone Service
+Lighter Trading Bot - Standalone Service
 
-This is an independent microservice for trading on Hyperliquid L1.
-Optimized for Hyperliquid's sub-second block times and high TPS.
+This is an independent microservice for trading on Lighter L1.
+Optimized for Lighter's sub-second block times and high TPS.
 """
 
 import asyncio
@@ -32,10 +32,10 @@ from models import (
 logger = logging.getLogger(__name__)
 
 # Service configuration
-SERVICE_NAME = "bot-hyperliquid"
-PLATFORM = Platform.HYPERLIQUID
+SERVICE_NAME = "bot-lighter"
+PLATFORM = Platform.LIGHTER
 
-# Hyperliquid uses 'k' prefix for 1000x multiplied micro-cap tokens
+# Lighter uses 'k' prefix for 1000x multiplied micro-cap tokens
 HL_SYMBOL_MAP = {
     "BONK": "kBONK",
     "PEPE": "kPEPE",
@@ -43,16 +43,16 @@ HL_SYMBOL_MAP = {
     "SHIB": "kSHIB",
 }
 
-# Hyperliquid-specific settings
-HL_API_URL = os.getenv("HL_API_URL", "https://api.hyperliquid.xyz")
-HL_WS_URL = os.getenv("HL_WS_URL", "wss://api.hyperliquid.xyz/ws")
+# Lighter-specific settings
+HL_API_URL = os.getenv("HL_API_URL", "https://api.lighter.xyz")
+HL_WS_URL = os.getenv("HL_WS_URL", "wss://api.lighter.xyz/ws")
 
 
-class HyperliquidBot:
+class LighterBot:
     """
-    Standalone Hyperliquid trading bot.
+    Standalone Lighter trading bot.
 
-    Optimizations for Hyperliquid:
+    Optimizations for Lighter:
     - Sub-second block times for fast execution
     - Native leverage up to 50x
     - Websocket feeds for real-time orderbook
@@ -88,7 +88,7 @@ class HyperliquidBot:
         self._price_cache_ttl: float = 1.0  # 1 second TTL
 
     async def initialize(self):
-        """Initialize Hyperliquid connection."""
+        """Initialize Lighter connection."""
         logger.info(f"🚀 Initializing {SERVICE_NAME}...")
 
         try:
@@ -100,11 +100,11 @@ class HyperliquidBot:
                 logger.error("❌ HL_SECRET_KEY or HL_ACCOUNT_ADDRESS not configured")
                 return False
 
-            # Import Hyperliquid SDK
+            # Import Lighter SDK
             from eth_account import Account
-            from hyperliquid.exchange import Exchange
-            from hyperliquid.info import Info
-            from hyperliquid.utils import constants
+            from lighter.exchange import Exchange
+            from lighter.info import Info
+            from lighter.utils import constants
 
             # Initialize Info client
             # Enable WS for real-time updates (runs in background thread)
@@ -120,7 +120,7 @@ class HyperliquidBot:
 
             try:
                 wallet = Account.from_key(secret_key)
-                logger.info(f"✅ Created Hyperliquid LocalAccount: {wallet.address}")
+                logger.info(f"✅ Created Lighter LocalAccount: {wallet.address}")
 
                 # Validate it's actually an Account object
                 if not hasattr(wallet, "sign_message"):
@@ -149,7 +149,7 @@ class HyperliquidBot:
             return True
 
         except ImportError as e:
-            logger.warning(f"⚠️ Hyperliquid SDK not available: {e}")
+            logger.warning(f"⚠️ Lighter SDK not available: {e}")
             return False
         except Exception as e:
             logger.error(f"❌ Failed to initialize: {e}")
@@ -270,7 +270,7 @@ class HyperliquidBot:
             await asyncio.sleep(60)  # Check every minute
 
     async def _balance_sync_loop(self):
-        """Sync balance with Hyperliquid."""
+        """Sync balance with Lighter."""
         while self.running:
             try:
                 if self.info and self.wallet_address:
@@ -352,7 +352,7 @@ class HyperliquidBot:
     async def _verify_state(self):
         """Perform deep verification of account state."""
         try:
-            logger.info("🔍 STARTING DEEP VERIFICATION: HYPERLIQUID")
+            logger.info("🔍 STARTING DEEP VERIFICATION: LIGHTER")
 
             user_state = await asyncio.to_thread(self.info.user_state, self.wallet_address)
             margin_summary = user_state.get("marginSummary", {})
@@ -373,7 +373,7 @@ class HyperliquidBot:
             logger.error(f"❌ HL VERIFICATION FAILED: {e}")
 
     async def _execute_trade(self, signal: TradeSignal) -> TradeResult:
-        """Execute trade on Hyperliquid with HFT-optimized latency."""
+        """Execute trade on Lighter with HFT-optimized latency."""
         start_time = datetime.now()
 
         try:
@@ -385,7 +385,7 @@ class HyperliquidBot:
                 signal.symbol.replace("-USDC", "").replace("-PERP", "").replace("USDT", "")
             )
 
-            # Apply Hyperliquid-specific symbol mapping (e.g., BONK -> 1000BONK)
+            # Apply Lighter-specific symbol mapping (e.g., BONK -> 1000BONK)
             coin = HL_SYMBOL_MAP.get(base_symbol, base_symbol)
 
             # HFT OPTIMIZATION: Use cached price. Do NOT block for refresh.
@@ -427,7 +427,7 @@ class HyperliquidBot:
 
             normalized = await normalize_order(
                 symbol=coin,
-                platform="hyperliquid",
+                platform="lighter",
                 price=limit_price,
                 quantity=quantity,
                 side="BUY" if is_buy else "SELL",
@@ -521,7 +521,7 @@ class HyperliquidBot:
                     take_profit=signal.take_profit,
                 )
 
-                # Place native SL/TP trigger orders on Hyperliquid
+                # Place native SL/TP trigger orders on Lighter
                 if signal.stop_loss:
                     await self._place_trigger_order(
                         coin=coin,
@@ -578,7 +578,7 @@ class HyperliquidBot:
 
     def _calculate_position_size(self, signal: TradeSignal, price: float) -> float:
         """
-        Calculate position size dynamically based on Hyperliquid account balance.
+        Calculate position size dynamically based on Lighter account balance.
 
         Adapts to available funds - uses percentage based on account size.
 
@@ -606,7 +606,7 @@ class HyperliquidBot:
         # Convert to base asset quantity
         quantity = position_usd / price if price > 0 else 0
 
-        # Round to appropriate precision (Hyperliquid uses 4 decimals for most)
+        # Round to appropriate precision (Lighter uses 4 decimals for most)
         quantity = round(quantity, 4)
 
         logger.info(
@@ -618,7 +618,7 @@ class HyperliquidBot:
         return quantity
 
     async def _check_positions(self):
-        """Check positions on Hyperliquid."""
+        """Check positions on Lighter."""
         if not self.info or not self.wallet_address:
             return
 
@@ -648,9 +648,9 @@ class HyperliquidBot:
         entry_side: TradeSide,
     ):
         """
-        Place a native trigger order (TP/SL) on Hyperliquid.
+        Place a native trigger order (TP/SL) on Lighter.
 
-        Uses Hyperliquid's native trigger order support for reliable execution.
+        Uses Lighter's native trigger order support for reliable execution.
         """
         try:
             if not self.exchange:
@@ -661,7 +661,7 @@ class HyperliquidBot:
             is_buy = entry_side not in (TradeSide.BUY, TradeSide.LONG)
             trigger_type = "tp" if is_tp else "sl"
 
-            # Place trigger order using Hyperliquid SDK
+            # Place trigger order using Lighter SDK
             result = await asyncio.to_thread(
                 self.exchange.order,
                 coin,
@@ -714,7 +714,7 @@ class HyperliquidBot:
                         await asyncio.to_thread(self.exchange.market_close, coin)
 
                 self.positions.clear()
-                logger.info("✅ Closed all Hyperliquid positions")
+                logger.info("✅ Closed all Lighter positions")
         except Exception as e:
             logger.error(f"Close all error: {e}")
 
@@ -739,11 +739,11 @@ async def main():
     setup_logging(os.getenv("LOG_LEVEL", "INFO"))
 
     logger.info("=" * 50)
-    logger.info(f"🌊 HYPERLIQUID BOT SERVICE")
+    logger.info(f"🌊 LIGHTER BOT SERVICE")
     logger.info(f"📅 {datetime.now().isoformat()}")
     logger.info("=" * 50)
 
-    bot = HyperliquidBot()
+    bot = LighterBot()
 
     def handle_shutdown(sig, frame):
         logger.info(f"Received signal {sig}, shutting down...")

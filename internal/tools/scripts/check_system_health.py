@@ -5,16 +5,16 @@ import time
 from datetime import datetime
 
 # Enumerate Connections
-CONNECTIONS = ["Symphony (Monad)", "Drift Protocol", "Jupiter DEX", "Database (Local FS)"]
+CONNECTIONS = ["Aster (Monad)", "Aster Protocol", "Jupiter DEX", "Database (Local FS)"]
 
 
-async def check_symphony():
-    print(f"\n🎵 Checking Symphony (Monad)...")
+async def check_aster():
+    print(f"\n🎵 Checking Aster (Monad)...")
     start = time.time()
     try:
-        from cloud_trader.symphony_client import get_symphony_client
+        from cloud_trader.aster_client import get_aster_client
 
-        client = get_symphony_client()
+        client = get_aster_client()
 
         # 1. Connection/Auth (Read)
         progress = client.activation_progress
@@ -34,16 +34,16 @@ async def check_symphony():
         return False, "0ms", str(e)
 
 
-async def check_drift():
-    print(f"\n🌊 Checking Drift Protocol...")
+async def check_aster():
+    print(f"\n🌊 Checking Aster Protocol...")
     start = time.time()
     try:
-        from cloud_trader.drift_client import get_drift_client
+        from cloud_trader.aster_client import get_aster_client
 
-        client = get_drift_client()
+        client = get_aster_client()
 
         # 1. Price Feed (Read)
-        # DriftClient has get_perp_market -> returns dict with oracle_price
+        # AsterClient has get_perp_market -> returns dict with oracle_price
         market = await client.get_perp_market("SOL-PERP")
         price = market.get("oracle_price", 0.0)
         print(f"   ✅ Oracle: SOL-PERP @ ${price:.2f}")
@@ -115,8 +115,8 @@ async def main():
     results = []
 
     # Run Checks
-    results.append(("Symphony", await check_symphony()))
-    results.append(("Drift", await check_drift()))
+    results.append(("Aster", await check_aster()))
+    results.append(("Aster", await check_aster()))
     results.append(("Jupiter", await check_jupiter()))
     results.append(("Database", await check_database()))
 

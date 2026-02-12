@@ -28,14 +28,14 @@ class Credentials:
     telegram_bot_token: Optional[str] = None
     telegram_chat_id: Optional[str] = None
 
-    # Solana / Drift / Jupiter
+    # Solana / Aster / Jupiter
     solana_private_key: Optional[str] = None
     jupiter_api_key: Optional[str] = None
 
-    # Symphony (Monad)
-    symphony_api_key: Optional[str] = None
+    # Aster (Monad)
+    aster_api_key: Optional[str] = None
 
-    # Hyperliquid
+    # Lighter
     hl_private_key: Optional[str] = None
     hl_account_address: Optional[str] = None
 
@@ -156,31 +156,31 @@ def load_credentials(gcp_secret_project: Optional[str] = None) -> Credentials:
         print(f"DEBUG: Loaded Telegram Chat ID: {tg_chat}")
 
     # ==========================================================================
-    # SOLANA / DRIFT (Using DRIFT_SOLANA_PRIVATE_KEY - original key compromised)
+    # SOLANA / ASTER (Using ASTER_SOLANA_PRIVATE_KEY - original key compromised)
     # ==========================================================================
     solana_key = settings.solana_private_key
     if not solana_key and gcp_secret_project:
-        print(f"DEBUG: Fetching DRIFT_SOLANA_PRIVATE_KEY from Secret Manager...")
-        solana_key = _secret_manager.get_secret("DRIFT_SOLANA_PRIVATE_KEY", gcp_secret_project)
+        print(f"DEBUG: Fetching ASTER_SOLANA_PRIVATE_KEY from Secret Manager...")
+        solana_key = _secret_manager.get_secret("ASTER_SOLANA_PRIVATE_KEY", gcp_secret_project)
 
     if solana_key:
         solana_key = solana_key.strip()
         print(f"DEBUG: Loaded Solana Private Key (len={len(solana_key)})")
 
     # ==========================================================================
-    # SYMPHONY (MONAD)
+    # ASTER (MONAD)
     # ==========================================================================
-    symphony_key = settings.symphony_api_key
-    if not symphony_key and gcp_secret_project:
-        print(f"DEBUG: Fetching SYMPHONY_API_KEY from Secret Manager...")
-        symphony_key = _secret_manager.get_secret("SYMPHONY_API_KEY", gcp_secret_project)
+    aster_key = settings.aster_api_key
+    if not aster_key and gcp_secret_project:
+        print(f"DEBUG: Fetching ASTER_API_KEY from Secret Manager...")
+        aster_key = _secret_manager.get_secret("ASTER_API_KEY", gcp_secret_project)
     
-    if symphony_key:
-        symphony_key = symphony_key.strip()
-        print(f"DEBUG: Loaded Symphony API Key (len={len(symphony_key)})")
+    if aster_key:
+        aster_key = aster_key.strip()
+        print(f"DEBUG: Loaded Aster API Key (len={len(aster_key)})")
 
     # ==========================================================================
-    # HYPERLIQUID
+    # LIGHTER
     # ==========================================================================
     hl_private_key = os.environ.get("HL_SECRET_KEY")
     hl_account_address = os.environ.get("HL_ACCOUNT_ADDRESS")
@@ -195,10 +195,10 @@ def load_credentials(gcp_secret_project: Optional[str] = None) -> Credentials:
     
     if hl_private_key:
         hl_private_key = hl_private_key.strip()
-        print(f"DEBUG: Loaded Hyperliquid Private Key (len={len(hl_private_key)})")
+        print(f"DEBUG: Loaded Lighter Private Key (len={len(hl_private_key)})")
     if hl_account_address:
         hl_account_address = hl_account_address.strip()
-        print(f"DEBUG: Loaded Hyperliquid Account: {hl_account_address[:10]}...")
+        print(f"DEBUG: Loaded Lighter Account: {hl_account_address[:10]}...")
 
     # ==========================================================================
     # LIGHTER (supports separate account_index and api_key_index)
@@ -262,7 +262,7 @@ def load_credentials(gcp_secret_project: Optional[str] = None) -> Credentials:
         telegram_chat_id=tg_chat,
         solana_private_key=solana_key,
         jupiter_api_key=jupiter_api_key,
-        symphony_api_key=symphony_key,
+        aster_api_key=aster_key,
         hl_private_key=hl_private_key,
         hl_account_address=hl_account_address,
         lighter_pub_key=lighter_pub_key,

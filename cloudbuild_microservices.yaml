@@ -10,7 +10,7 @@ steps:
     id: 'push'
     waitFor: ['build']
 
-  # 3. Deploy: Hyperliquid Service (US - no geofence requirement)
+  # 3. Deploy: Lighter Service (US - no geofence requirement)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -37,7 +37,7 @@ steps:
       - '--min-instances'
       - '0'
       - '--set-env-vars'
-      - 'ENABLE_HYPERLIQUID=true,ENABLE_LIGHTER=false,ENABLE_DRIFT=false,ENABLE_SYMPHONY=false,ENABLE_ASTER=false,SERVE_FRONTEND=false,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,LOG_LEVEL=INFO'
+      - 'ENABLE_LIGHTER=true,ENABLE_LIGHTER=false,ENABLE_ASTER=false,ENABLE_ASTER=false,ENABLE_ASTER=false,SERVE_FRONTEND=false,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,LOG_LEVEL=INFO'
     id: 'deploy-hl'
     waitFor: ['push']
 
@@ -68,17 +68,17 @@ steps:
       - '--min-instances'
       - '0'
       - '--set-env-vars'
-      - 'ENABLE_HYPERLIQUID=false,ENABLE_LIGHTER=true,ENABLE_DRIFT=false,ENABLE_SYMPHONY=false,ENABLE_ASTER=false,SERVE_FRONTEND=false,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,LOG_LEVEL=INFO,LIGHTER_ACCOUNT_INDEX=699444,LIGHTER_API_KEY_INDEX=0,LIGHTER_INIT_TIMEOUT_SECONDS=30,LIGHTER_CHECK_CLIENT_TIMEOUT_SECONDS=15'
+      - 'ENABLE_LIGHTER=false,ENABLE_LIGHTER=true,ENABLE_ASTER=false,ENABLE_ASTER=false,ENABLE_ASTER=false,SERVE_FRONTEND=false,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,LOG_LEVEL=INFO,LIGHTER_ACCOUNT_INDEX=699444,LIGHTER_API_KEY_INDEX=0,LIGHTER_INIT_TIMEOUT_SECONDS=30,LIGHTER_CHECK_CLIENT_TIMEOUT_SECONDS=15'
     id: 'deploy-lighter'
     waitFor: ['push']
 
-  # 5. Deploy: Drift Service (US)
+  # 5. Deploy: Aster Service (US)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
       - 'run'
       - 'deploy'
-      - 'sapphire-drift'
+      - 'sapphire-aster'
       - '--project'
       - '$PROJECT_ID'
       - '--image'
@@ -99,8 +99,8 @@ steps:
       - '--min-instances'
       - '0'
       - '--set-env-vars'
-      - 'ENABLE_HYPERLIQUID=false,ENABLE_LIGHTER=false,ENABLE_DRIFT=true,ENABLE_SYMPHONY=false,ENABLE_ASTER=false,SERVE_FRONTEND=false,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,LOG_LEVEL=INFO'
-    id: 'deploy-drift'
+      - 'ENABLE_LIGHTER=false,ENABLE_LIGHTER=false,ENABLE_ASTER=true,ENABLE_ASTER=false,ENABLE_ASTER=false,SERVE_FRONTEND=false,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,LOG_LEVEL=INFO'
+    id: 'deploy-aster'
     waitFor: ['push']
 
   # 6. Deploy: Aster Service (US)
@@ -130,17 +130,17 @@ steps:
       - '--min-instances'
       - '0'
       - '--set-env-vars'
-      - 'ENABLE_HYPERLIQUID=false,ENABLE_LIGHTER=false,ENABLE_DRIFT=false,ENABLE_SYMPHONY=false,ENABLE_ASTER=true,SERVE_FRONTEND=false,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,LOG_LEVEL=INFO,ASTER_CODE_BUILDER_ADDRESS=0xAf72Ae447aD3dcdcDfBAA01bB9c7b3C37a031aAf,ASTER_CODE_FEE_RATE=0'
+      - 'ENABLE_LIGHTER=false,ENABLE_LIGHTER=false,ENABLE_ASTER=false,ENABLE_ASTER=false,ENABLE_ASTER=true,SERVE_FRONTEND=false,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,LOG_LEVEL=INFO,ASTER_CODE_BUILDER_ADDRESS=0xAf72Ae447aD3dcdcDfBAA01bB9c7b3C37a031aAf,ASTER_CODE_FEE_RATE=0'
     id: 'deploy-aster'
     waitFor: ['push']
 
-  # 7. Deploy: Symphony Service (US)
+  # 7. Deploy: Aster Service (US)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
       - 'run'
       - 'deploy'
-      - 'sapphire-symphony'
+      - 'sapphire-aster'
       - '--project'
       - '$PROJECT_ID'
       - '--image'
@@ -161,8 +161,8 @@ steps:
       - '--min-instances'
       - '0'
       - '--set-env-vars'
-      - 'ENABLE_HYPERLIQUID=false,ENABLE_LIGHTER=false,ENABLE_DRIFT=false,ENABLE_SYMPHONY=true,ENABLE_ASTER=false,SERVE_FRONTEND=false,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,LOG_LEVEL=INFO'
-    id: 'deploy-symphony'
+      - 'ENABLE_LIGHTER=false,ENABLE_LIGHTER=false,ENABLE_ASTER=false,ENABLE_ASTER=true,ENABLE_ASTER=false,SERVE_FRONTEND=false,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,LOG_LEVEL=INFO'
+    id: 'deploy-aster'
     waitFor: ['push']
 
   # 8. Deploy: Dashboard/Web Service (US)
@@ -192,7 +192,7 @@ steps:
       - '--min-instances'
       - '0'
       - '--set-env-vars'
-      - 'ENABLE_HYPERLIQUID=false,ENABLE_LIGHTER=false,ENABLE_DRIFT=false,ENABLE_SYMPHONY=false,ENABLE_ASTER=false,SERVE_FRONTEND=true,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID'
+      - 'ENABLE_LIGHTER=false,ENABLE_LIGHTER=false,ENABLE_ASTER=false,ENABLE_ASTER=false,ENABLE_ASTER=false,SERVE_FRONTEND=true,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID'
     id: 'deploy-web'
     waitFor: ['push']
 substitutions:

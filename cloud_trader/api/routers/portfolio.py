@@ -63,4 +63,4 @@ async def get_risk_metrics():
 @router.get("/balances")
 async def get_balances():
     """Get balances across all platforms."""
-    return {"total_usd": 0.0, "by_platform": {"aster": 0.0, "drift": 0.0, "symphony": 0.0}}
+    return {"total_usd": 0.0, "by_platform": {"aster": 0.0, "aster": 0.0, "aster": 0.0}}

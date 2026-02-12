@@ -9,9 +9,9 @@ const config = ref({
 })
 
 const apiKeys = ref([
-    { name: 'Drift Protocol', status: 'connected', key: '....d8a9' },
-    { name: 'Symphony', status: 'connected', key: '....3f21' },
-    { name: 'Hyperliquid', status: 'disconnected', key: '' },
+    { name: 'Aster Protocol', status: 'connected', key: '....d8a9' },
+    { name: 'Aster', status: 'connected', key: '....3f21' },
+    { name: 'Lighter', status: 'disconnected', key: '' },
 ])
 </script>
 

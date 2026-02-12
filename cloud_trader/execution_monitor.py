@@ -36,10 +36,10 @@ class ExecutionSpeedMonitor:
     Monitor and optimize execution speed for independent platform traders.
 
     V2.3 targets:
-    - Drift: < 100ms (VPIN HFT)
-    - Hyperliquid: < 100ms (Momentum)
+    - Aster: < 100ms (VPIN HFT)
+    - Lighter: < 100ms (Momentum)
     - Aster: < 50ms (Shield HFT strategy)
-    - Symphony: < 200ms (Treasury operations)
+    - Aster: < 200ms (Treasury operations)
     - Lighter: < 150ms (L2 execution)
     """
 
@@ -49,10 +49,10 @@ class ExecutionSpeedMonitor:
 
         # Platform-specific latency targets (ms)
         self.targets = {
-            "drift": 100,
-            "hyperliquid": 100,
+            "aster": 100,
+            "lighter": 100,
             "aster": 50,  # HFT Shield strategy needs speed
-            "symphony": 200,
+            "aster": 200,
             "lighter": 150
         }
 

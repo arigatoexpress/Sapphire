@@ -257,7 +257,7 @@ async def test_neural_cache():
             timestamp=int(time.time()),
             symbol="SOL",
             side=TradeSide.BUY,
-            platform=Platform.DRIFT,
+            platform=Platform.ASTER,
             price=142.50,
             quantity=1.5,
             trade_id="test-trade-123",
@@ -281,7 +281,7 @@ async def test_neural_cache():
                 "side": "SELL",
                 "price": 45000.00,
                 "quantity": 0.1,
-                "platform": "hyperliquid",
+                "platform": "lighter",
             }
         )
         test_result("TradePacket from_dict", packet.symbol == "BTC")

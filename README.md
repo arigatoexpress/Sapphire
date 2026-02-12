@@ -23,10 +23,10 @@ High-performance autonomous trading system with **independent platform traders**
 
 ### Platform-Specific Trading
 ```
-Drift Trader      → Drift Platform only (Solana Perps: SOL, JUP, BONK, WIF)
-Hyperliquid       → Hyperliquid only (L1 Perps: BTC, ETH, SOL, HYPE, DOGE)
+Aster Trader      → Aster Platform only (Solana Perps: SOL, JUP, BONK, WIF)
+Lighter       → Lighter only (L1 Perps: BTC, ETH, SOL, HYPE, DOGE)
 Aster Trader      → Aster only (CEX with Shield Strategy for HFT)
-Symphony Trader   → Symphony only (Monad Treasury: MON, DAC, DEGEN)
+Aster Trader   → Aster only (Monad Treasury: MON, DAC, DEGEN)
 Lighter Trader    → Lighter only (Eth L2: WBTC-USDC, WETH-USDC)
 ```
 
@@ -66,7 +66,7 @@ Lighter Trader    → Lighter only (Eth L2: WBTC-USDC, WETH-USDC)
 │                       │      │      │      │                                 │
 │                       ▼      ▼      ▼      ▼      ▼                          │
 │                  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐                   │
-│                  │Drift│ │Hyper│ │Aster│ │Symph│ │Light│                   │
+│                  │Aster│ │Hyper│ │Aster│ │Symph│ │Light│                   │
 │                  │     │ │liquid│ │     │ │ony │ │er   │                   │
 │                  │Perps│ │ L1  │ │ CEX │ │Monad│ │Eth  │                   │
 │                  │Sol  │ │Perps│ │Shield│ │Trea │ │ L2  │                   │
@@ -84,10 +84,10 @@ Lighter Trader    → Lighter only (Eth L2: WBTC-USDC, WETH-USDC)
 
 | Platform | Type | Chain | Status | Primary Symbols |
 |----------|------|-------|--------|-----------------|
-| **Hyperliquid** | DeFi Perpetuals | L1 | ✅ Active | BTC, ETH, SOL, HYPE, DOGE, AVAX |
-| **Drift** | Perpetuals | Solana | ✅ Active | SOL, JUP, PYTH, BONK, WIF |
+| **Lighter** | DeFi Perpetuals | L1 | ✅ Active | BTC, ETH, SOL, HYPE, DOGE, AVAX |
+| **Aster** | Perpetuals | Solana | ✅ Active | SOL, JUP, PYTH, BONK, WIF |
 | **Aster** | CEX | - | ✅ Active | All pairs (US blocked) |
-| **Symphony** | Treasury | Monad/Base | ✅ Active | MON, DAC, DEGEN, BRETT |
+| **Aster** | Treasury | Monad/Base | ✅ Active | MON, DAC, DEGEN, BRETT |
 | **Lighter** | Order Book | Ethereum L2 | ✅ Active | WBTC-USDC, WETH-USDC |
 | **Jupiter** | DEX Aggregator | Solana | 📊 Data Only | Price feeds (trading disabled) |
 
@@ -107,13 +107,13 @@ Lighter Trader    → Lighter only (Eth L2: WBTC-USDC, WETH-USDC)
 │         │              │          │          │              │               │
 │         ▼              ▼          ▼          ▼              ▼               │
 │   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐     │
-│   │  Drift   │  │  Hyper   │  │  Aster   │  │Symphony  │  │ Lighter  │     │
+│   │  Aster   │  │  Hyper   │  │  Aster   │  │Aster  │  │ Lighter  │     │
 │   │  Trader  │  │  liquid  │  │  Trader  │  │ Trader   │  │  Trader  │     │
 │   │    🌀    │  │  Trader  │  │    ⚡    │  │    🎵    │  │    💡    │     │
 │   │          │  │    🔷    │  │          │  │          │  │          │     │
 │   ├──────────┤  ├──────────┤  ├──────────┤  ├──────────┤  ├──────────┤     │
 │   │Platform: │  │Platform: │  │Platform: │  │Platform: │  │Platform: │     │
-│   │  Drift   │  │Hyperliq. │  │  Aster   │  │ Symphony │  │ Lighter  │     │
+│   │  Aster   │  │Hyperliq. │  │  Aster   │  │ Aster │  │ Lighter  │     │
 │   │          │  │          │  │          │  │          │  │          │     │
 │   │Strategy: │  │Strategy: │  │Strategy: │  │Strategy: │  │Strategy: │     │
 │   │VPIN HFT  │  │Momentum  │  │ Shield   │  │Treasury  │  │Arb/MM    │     │
@@ -192,10 +192,10 @@ gcloud run services describe sapphire-v2 --region=us-central1
 - **Intelligent SL distance**: Tighter stops for higher leverage
 
 ### Autonomous Learning System
-- **Drift**: Self-learning Solana perps trader, discovers optimal patterns through experience
-- **Hyperliquid**: Autonomous L1 trader, evolves strategies based on what works
+- **Aster**: Self-learning Solana perps trader, discovers optimal patterns through experience
+- **Lighter**: Autonomous L1 trader, evolves strategies based on what works
 - **Aster**: Adaptive HFT learner, masters high-leverage execution organically
-- **Symphony**: Self-improving Monad trader, learns profitable ecosystem patterns
+- **Aster**: Self-improving Monad trader, learns profitable ecosystem patterns
 - **Lighter**: Intelligent L2 trader, discovers arbitrage and market-making opportunities
 
 **NO hardcoded strategies** - Each agent develops its own methodology through:

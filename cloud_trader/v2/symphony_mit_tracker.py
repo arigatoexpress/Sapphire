@@ -1,7 +1,7 @@
 """
-Symphony MIT (Monad Implementation Treasury) Activation Tracker
+Aster MIT (Monad Implementation Treasury) Activation Tracker
 ================================================================
-Tracks the "5 trade" activation threshold for Symphony platform.
+Tracks the "5 trade" activation threshold for Aster platform.
 
 This module is extracted from trading_service.py to maintain clean
 separation of concerns per the V2 architecture guidelines.
@@ -137,12 +137,12 @@ class MITActivationProgress:
         return progress
 
 
-class SymphonyMITTracker:
+class AsterMITTracker:
     """
-    Tracks Symphony MIT activation with Firestore persistence.
+    Tracks Aster MIT activation with Firestore persistence.
     
     This class manages the "5 trade" activation threshold for the
-    Monad Implementation Treasury (MIT) on the Symphony platform.
+    Monad Implementation Treasury (MIT) on the Aster platform.
     
     Features:
     - Firestore persistence with fallback
@@ -151,7 +151,7 @@ class SymphonyMITTracker:
     - Agentic logging with emojis
     
     Usage:
-        tracker = SymphonyMITTracker()
+        tracker = AsterMITTracker()
         await tracker.initialize()
         
         # Record a trade
@@ -162,7 +162,7 @@ class SymphonyMITTracker:
             print("MIT is active!")
     """
     
-    FIRESTORE_COLLECTION = "symphony_mit"
+    FIRESTORE_COLLECTION = "aster_mit"
     FIRESTORE_DOC_ID = "activation_progress"
     
     def __init__(
@@ -210,7 +210,7 @@ class SymphonyMITTracker:
         if self._initialized:
             return True
             
-        logger.info("🚀 [MIT Tracker] Initializing Symphony MIT Tracker...")
+        logger.info("🚀 [MIT Tracker] Initializing Aster MIT Tracker...")
         
         try:
             # Initialize Firestore client if not provided
@@ -299,7 +299,7 @@ class SymphonyMITTracker:
             quantity: Trade quantity
             price: Execution price
             status: Trade status ("pending", "filled", "failed")
-            platform_response: Raw response from Symphony platform
+            platform_response: Raw response from Aster platform
             
         Returns:
             Updated activation progress
@@ -399,7 +399,7 @@ class SymphonyMITTracker:
         Get pending trades ready for batch execution.
         
         Returns:
-            List of trade dictionaries ready for Symphony batch-open
+            List of trade dictionaries ready for Aster batch-open
         """
         pending = [
             {
@@ -461,7 +461,7 @@ class SymphonyMITTracker:
 # Integration helper for main_v2.py
 async def create_mit_tracker(
     firestore_client: Optional[Any] = None,
-) -> SymphonyMITTracker:
+) -> AsterMITTracker:
     """
     Factory function to create and initialize MIT tracker.
     
@@ -472,9 +472,9 @@ async def create_mit_tracker(
         firestore_client: Optional Firestore client
         
     Returns:
-        Initialized SymphonyMITTracker instance
+        Initialized AsterMITTracker instance
     """
-    tracker = SymphonyMITTracker(firestore_client=firestore_client)
+    tracker = AsterMITTracker(firestore_client=firestore_client)
     await tracker.initialize()
     return tracker
 
@@ -483,10 +483,10 @@ async def create_mit_tracker(
 if __name__ == "__main__":
     async def demo():
         """Demonstrate MIT tracker functionality."""
-        print("🔷 Symphony MIT Tracker Demo\n")
+        print("🔷 Aster MIT Tracker Demo\n")
         
         # Create tracker (without Firestore for demo)
-        tracker = SymphonyMITTracker(firestore_client=None)
+        tracker = AsterMITTracker(firestore_client=None)
         await tracker.initialize()
         
         # Simulate 5 trades for activation

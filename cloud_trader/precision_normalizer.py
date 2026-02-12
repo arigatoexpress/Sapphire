@@ -68,7 +68,7 @@ class PrecisionNormalizer:
 
         # Default fallbacks when exchange info unavailable
         self._defaults = {
-            "hyperliquid": {
+            "lighter": {
                 "tick_size": Decimal("0.01"),
                 "lot_size": Decimal("0.0001"),
                 "min_notional": Decimal("10"),
@@ -78,12 +78,12 @@ class PrecisionNormalizer:
                 "lot_size": Decimal("0.00001"),  # Much smaller lot size to avoid precision errors
                 "min_notional": Decimal("5"),
             },
-            "symphony": {
+            "aster": {
                 "tick_size": Decimal("0.0001"),
                 "lot_size": Decimal("0.0001"),
                 "min_notional": Decimal("5"),
             },
-            "drift": {
+            "aster": {
                 "tick_size": Decimal("0.001"),
                 "lot_size": Decimal("0.01"),
                 "min_notional": Decimal("10"),
@@ -215,23 +215,23 @@ class PrecisionNormalizer:
         """
         Fetch exchange info from the actual exchange API.
         """
-        if platform == "hyperliquid":
-            return await self._fetch_hyperliquid_info(symbol)
+        if platform == "lighter":
+            return await self._fetch_lighter_info(symbol)
         elif platform == "aster":
             return await self._fetch_aster_info(symbol)
-        elif platform == "symphony":
-            return self._get_default_info(symbol, platform)  # Symphony doesn't expose this
+        elif platform == "aster":
+            return self._get_default_info(symbol, platform)  # Aster doesn't expose this
         else:
             return self._get_default_info(symbol, platform)
 
-    async def _fetch_hyperliquid_info(self, symbol: str) -> ExchangeInfo:
-        """Fetch and fat-cache Hyperliquid universe."""
+    async def _fetch_lighter_info(self, symbol: str) -> ExchangeInfo:
+        """Fetch and fat-cache Lighter universe."""
         import httpx
 
         try:
             async with httpx.AsyncClient() as client:
                 resp = await client.post(
-                    "https://api.hyperliquid.xyz/info", json={"type": "meta"}, timeout=10
+                    "https://api.lighter.xyz/info", json={"type": "meta"}, timeout=10
                 )
                 data = resp.json()
                 universe = data.get("universe", [])
@@ -247,7 +247,7 @@ class PrecisionNormalizer:
 
                         full_entry = ExchangeInfo(
                             symbol=asset_name,
-                            platform="hyperliquid",
+                            platform="lighter",
                             tick_size=Decimal("0.00000001"),  # HL supports high precision
                             lot_size=Decimal(10) ** Decimal(-sz_decimals),
                             min_notional=Decimal("10"),
@@ -256,19 +256,19 @@ class PrecisionNormalizer:
                             price_precision=8,
                             qty_precision=sz_decimals,
                         )
-                        self._cache.setdefault("hyperliquid", {})[asset_name] = full_entry
-                        self._cache_timestamps[f"hyperliquid:{asset_name}"] = now
+                        self._cache.setdefault("lighter", {})[asset_name] = full_entry
+                        self._cache_timestamps[f"lighter:{asset_name}"] = now
 
                 # Try to return the specific symbol requested
                 clean_symbol = symbol.replace("-USDC", "").replace("-USD", "")
-                return self._cache["hyperliquid"].get(clean_symbol) or self._get_default_info(
-                    symbol, "hyperliquid"
+                return self._cache["lighter"].get(clean_symbol) or self._get_default_info(
+                    symbol, "lighter"
                 )
 
         except Exception as e:
             logger.warning(f"Failed to fetch HL info for {symbol}: {e}")
 
-        return self._get_default_info(symbol, "hyperliquid")
+        return self._get_default_info(symbol, "lighter")
 
     async def _fetch_aster_info(self, symbol: str) -> ExchangeInfo:
         """Fetch symbol info from Aster/Binance-style API."""

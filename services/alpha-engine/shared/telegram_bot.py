@@ -180,7 +180,7 @@ class TelegramPlatformBot:
             symbol = cmd_match.group(4).upper()
 
             platforms = (
-                ["drift", "hyperliquid", "aster", "symphony", "lighter"]
+                ["aster", "lighter"]
                 if platform == "all"
                 else [platform]
             )
@@ -405,7 +405,7 @@ class TelegramPlatformBot:
                 logger.warning("No command callback registered for Telegram Bot")
             return
 
-        # Pattern 1: @platform action quantity symbol (e.g. @hyperliquid buy 0.1 sol)
+        # Pattern 1: @platform action quantity symbol (e.g. @lighter buy 0.1 sol)
         cmd_match = re.search(r"@(\w+)\s+(buy|sell|close)\s+([\d.]+)\s+(\w+)", text_lower)
 
         # Pattern 2: AI Commands (e.g. @alpha recap)
@@ -426,7 +426,7 @@ class TelegramPlatformBot:
 
             # Special case for "all"
             platforms = (
-                ["drift", "hyperliquid", "aster", "symphony", "lighter"]
+                ["aster", "lighter"]
                 if platform == "all"
                 else [platform]
             )

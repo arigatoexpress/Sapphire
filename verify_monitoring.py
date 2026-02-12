@@ -36,12 +36,12 @@ sys.modules["Crypto"] = MagicMock()
 sys.modules["Crypto.Cipher"] = MagicMock()
 sys.modules["Crypto.Util"] = MagicMock()
 
-# Bypass Hyperliquid's deep eth_account imports
-sys.modules["hyperliquid"] = MagicMock()
-sys.modules["hyperliquid.exchange"] = MagicMock()
-sys.modules["hyperliquid.info"] = MagicMock()
-sys.modules["hyperliquid.utils"] = MagicMock()
-sys.modules["hyperliquid.utils.signing"] = MagicMock()
+# Bypass Lighter's deep eth_account imports
+sys.modules["lighter"] = MagicMock()
+sys.modules["lighter.exchange"] = MagicMock()
+sys.modules["lighter.info"] = MagicMock()
+sys.modules["lighter.utils"] = MagicMock()
+sys.modules["lighter.utils.signing"] = MagicMock()
 
 from cloud_trader.trading_service import TradingService
 

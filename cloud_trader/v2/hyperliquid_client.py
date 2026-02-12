@@ -1,7 +1,7 @@
 """
-Hyperliquid Trading Client - Using Official SDK
+Lighter Trading Client - Using Official SDK
 ================================================
-Wraps the official hyperliquid-python-sdk for proper EIP-712 signing.
+Wraps the official lighter-python-sdk for proper EIP-712 signing.
 
 Author: Sapphire V2 Architecture Team
 Version: 2.3.0
@@ -19,19 +19,19 @@ logger = logging.getLogger(__name__)
 
 # Try to import official SDK, fallback gracefully if not available
 try:
-    from hyperliquid.exchange import Exchange
-    from hyperliquid.info import Info
-    from hyperliquid.utils.signing import get_timestamp_ms
-    HYPERLIQUID_SDK_AVAILABLE = True
-    logger.info("✅ Hyperliquid official SDK loaded")
+    from lighter.exchange import Exchange
+    from lighter.info import Info
+    from lighter.utils.signing import get_timestamp_ms
+    LIGHTER_SDK_AVAILABLE = True
+    logger.info("✅ Lighter official SDK loaded")
 except ImportError:
-    HYPERLIQUID_SDK_AVAILABLE = False
-    logger.warning("⚠️ Hyperliquid SDK not available - install hyperliquid-python-sdk")
+    LIGHTER_SDK_AVAILABLE = False
+    logger.warning("⚠️ Lighter SDK not available - install lighter-python-sdk")
 
 
 @dataclass
-class HyperliquidPosition:
-    """Represents a Hyperliquid position."""
+class LighterPosition:
+    """Represents a Lighter position."""
     symbol: str
     size: float
     entry_price: float
@@ -59,8 +59,8 @@ class HyperliquidPosition:
 
 
 @dataclass 
-class HyperliquidOrder:
-    """Represents a Hyperliquid order result."""
+class LighterOrder:
+    """Represents a Lighter order result."""
     order_id: str
     client_order_id: Optional[str]
     symbol: str
@@ -85,12 +85,12 @@ class HyperliquidOrder:
         }
 
 
-class HyperliquidClient:
+class LighterClient:
     """
-    Hyperliquid client using official SDK for proper EIP-712 signing.
+    Lighter client using official SDK for proper EIP-712 signing.
     
     The SDK handles all the complex signature generation internally,
-    ensuring trades execute correctly on Hyperliquid L1.
+    ensuring trades execute correctly on Lighter L1.
     """
     
     def __init__(
@@ -99,7 +99,7 @@ class HyperliquidClient:
         wallet_address: str,
         testnet: bool = False,
     ):
-        """Initialize Hyperliquid client with official SDK."""
+        """Initialize Lighter client with official SDK."""
         self._private_key = private_key
         self._wallet_address = wallet_address
         self._testnet = testnet
@@ -109,7 +109,7 @@ class HyperliquidClient:
         self._initialized = False
         
         # Cache
-        self._positions: dict[str, HyperliquidPosition] = {}
+        self._positions: dict[str, LighterPosition] = {}
         self._market_info: dict[str, dict] = {}
         
     @property
@@ -117,19 +117,19 @@ class HyperliquidClient:
         return self._initialized
     
     async def initialize(self) -> bool:
-        """Initialize the Hyperliquid SDK clients."""
+        """Initialize the Lighter SDK clients."""
         if self._initialized:
             return True
             
-        if not HYPERLIQUID_SDK_AVAILABLE:
-            logger.error("❌ Cannot initialize - Hyperliquid SDK not installed")
+        if not LIGHTER_SDK_AVAILABLE:
+            logger.error("❌ Cannot initialize - Lighter SDK not installed")
             return False
         
-        logger.info("🔷 [Hyperliquid] Initializing with official SDK...")
+        logger.info("🔷 [Lighter] Initializing with official SDK...")
         
         try:
             # Initialize SDK components
-            base_url = "https://api.hyperliquid-testnet.xyz" if self._testnet else "https://api.hyperliquid.xyz"
+            base_url = "https://api.lighter-testnet.xyz" if self._testnet else "https://api.lighter.xyz"
             
             # Info client for readonly operations
             self._info = Info(base_url, skip_ws=True)
@@ -153,11 +153,11 @@ class HyperliquidClient:
             await self.get_positions()
             
             self._initialized = True
-            logger.info(f"✅ [Hyperliquid] SDK client initialized | Testnet: {self._testnet}")
+            logger.info(f"✅ [Lighter] SDK client initialized | Testnet: {self._testnet}")
             return True
             
         except Exception as e:
-            logger.error(f"❌ [Hyperliquid] SDK initialization failed: {e}")
+            logger.error(f"❌ [Lighter] SDK initialization failed: {e}")
             return False
     
     async def _load_market_info(self) -> None:
@@ -179,12 +179,12 @@ class HyperliquidClient:
                         "max_leverage": market.get("maxLeverage", 50),
                     }
                     
-                logger.debug(f"📊 [Hyperliquid] Loaded {len(self._market_info)} markets")
+                logger.debug(f"📊 [Lighter] Loaded {len(self._market_info)} markets")
                 
         except Exception as e:
-            logger.warning(f"⚠️ [Hyperliquid] Failed to load market info: {e}")
+            logger.warning(f"⚠️ [Lighter] Failed to load market info: {e}")
     
-    async def get_positions(self) -> list[HyperliquidPosition]:
+    async def get_positions(self) -> list[LighterPosition]:
         """Get all open positions."""
         positions = []
         
@@ -204,7 +204,7 @@ class HyperliquidClient:
                     pos = pos_data.get("position", {})
                     size = float(pos.get("szi", 0))
                     if size != 0:
-                        position = HyperliquidPosition(
+                        position = LighterPosition(
                             symbol=pos.get("coin", ""),
                             size=abs(size),
                             entry_price=float(pos.get("entryPx", 0)),
@@ -219,10 +219,10 @@ class HyperliquidClient:
                         positions.append(position)
                         self._positions[position.symbol] = position
                         
-            logger.debug(f"📊 [Hyperliquid] Loaded {len(positions)} positions")
+            logger.debug(f"📊 [Lighter] Loaded {len(positions)} positions")
             
         except Exception as e:
-            logger.error(f"❌ [Hyperliquid] Failed to get positions: {e}")
+            logger.error(f"❌ [Lighter] Failed to get positions: {e}")
             
         return positions
     
@@ -260,7 +260,7 @@ class HyperliquidClient:
         is_buy = side.upper() == "BUY"
         
         logger.info(
-            f"📤 [Hyperliquid] Placing {order_type} {side} order | "
+            f"📤 [Lighter] Placing {order_type} {side} order | "
             f"Coin: {coin} | Qty: {quantity}"
         )
         
@@ -303,25 +303,25 @@ class HyperliquidClient:
                     if "filled" in status:
                         filled = status["filled"]
                         logger.info(
-                            f"✅ [Hyperliquid] Order FILLED | "
+                            f"✅ [Lighter] Order FILLED | "
                             f"Coin: {coin} | Avg Price: ${filled.get('avgPx', 'N/A')}"
                         )
                         return {"status": "ok", "filled": True, "data": filled}
                     elif "resting" in status:
-                        logger.info(f"📋 [Hyperliquid] Order RESTING | Coin: {coin}")
+                        logger.info(f"📋 [Lighter] Order RESTING | Coin: {coin}")
                         return {"status": "ok", "resting": True, "data": status["resting"]}
                     elif "error" in status:
-                        logger.error(f"❌ [Hyperliquid] Order error: {status['error']}")
+                        logger.error(f"❌ [Lighter] Order error: {status['error']}")
                         return {"status": "error", "error": status["error"]}
                         
                 return {"status": "ok", "response": result}
             else:
                 error = result.get("response", {}).get("data", {}).get("statuses", [{}])[0].get("error", "Unknown")
-                logger.error(f"❌ [Hyperliquid] Order failed: {error}")
+                logger.error(f"❌ [Lighter] Order failed: {error}")
                 return {"status": "error", "error": error}
                 
         except Exception as e:
-            logger.error(f"❌ [Hyperliquid] Order exception: {e}")
+            logger.error(f"❌ [Lighter] Order exception: {e}")
             return {"status": "error", "error": str(e)}
 
     async def place_trigger_order(
@@ -362,7 +362,7 @@ class HyperliquidClient:
         trigger_type = "tp" if is_tp else "sl"
         
         logger.info(
-            f"📤 [Hyperliquid] Placing {trigger_type.upper()} {side} trigger | "
+            f"📤 [Lighter] Placing {trigger_type.upper()} {side} trigger | "
             f"Coin: {coin} | Qty: {quantity} | Price: ${trigger_price}"
         )
         
@@ -393,20 +393,20 @@ class HyperliquidClient:
                 if statuses:
                     status = statuses[0]
                     if "resting" in status:
-                        logger.info(f"✅ [Hyperliquid] {trigger_type.upper()} Set | Coin: {coin}")
+                        logger.info(f"✅ [Lighter] {trigger_type.upper()} Set | Coin: {coin}")
                         return {"status": "ok", "resting": True, "data": status["resting"]}
                     elif "error" in status:
-                        logger.error(f"❌ [Hyperliquid] {trigger_type.upper()} error: {status['error']}")
+                        logger.error(f"❌ [Lighter] {trigger_type.upper()} error: {status['error']}")
                         return {"status": "error", "error": status["error"]}
                         
                 return {"status": "ok", "response": result}
             else:
                 error = result.get("response", {}).get("data", {}).get("statuses", [{}])[0].get("error", "Unknown")
-                logger.error(f"❌ [Hyperliquid] {trigger_type.upper()} failed: {error}")
+                logger.error(f"❌ [Lighter] {trigger_type.upper()} failed: {error}")
                 return {"status": "error", "error": error}
                 
         except Exception as e:
-            logger.error(f"❌ [Hyperliquid] {trigger_type.upper()} exception: {e}")
+            logger.error(f"❌ [Lighter] {trigger_type.upper()} exception: {e}")
             return {"status": "error", "error": str(e)}
     
     async def get_ticker(self, symbol: str) -> dict:
@@ -428,7 +428,7 @@ class HyperliquidClient:
                 }
                 
         except Exception as e:
-            logger.error(f"❌ [Hyperliquid] Failed to get ticker: {e}")
+            logger.error(f"❌ [Lighter] Failed to get ticker: {e}")
             
         return {}
     
@@ -449,7 +449,7 @@ class HyperliquidClient:
                 return float(user_state.get("marginSummary", {}).get("accountValue", 0))
                 
         except Exception as e:
-            logger.error(f"❌ [Hyperliquid] Failed to get account value: {e}")
+            logger.error(f"❌ [Lighter] Failed to get account value: {e}")
             
         return 0.0
     
@@ -458,13 +458,13 @@ class HyperliquidClient:
         self._initialized = False
         self._exchange = None
         self._info = None
-        logger.info("🔷 [Hyperliquid] Client closed")
+        logger.info("🔷 [Lighter] Client closed")
     
     def get_status(self) -> dict:
         """Get client status."""
         return {
             "initialized": self._initialized,
-            "sdk_available": HYPERLIQUID_SDK_AVAILABLE,
+            "sdk_available": LIGHTER_SDK_AVAILABLE,
             "testnet": self._testnet,
             "wallet": self._wallet_address[:10] + "..." if self._wallet_address else None,
             "markets_loaded": len(self._market_info),

@@ -1,4 +1,4 @@
-# Symphony Bot Dependencies
+# Aster Bot Dependencies
 httpx>=0.23.0
 google-cloud-pubsub>=2.18.0
 google-cloud-firestore>=2.14.0

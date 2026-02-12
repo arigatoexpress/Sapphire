@@ -1,5 +1,5 @@
 """
-Environment configuration for Symphony/Monad integration.
+Environment configuration for Aster/Monad integration.
 Securely manages API keys and settings.
 """
 
@@ -9,43 +9,43 @@ from config import get_settings
 
 settings = get_settings()
 
-# Symphony API Configuration
+# Aster API Configuration
 import os
 
-SYMPHONY_API_KEY: Optional[str] = settings.symphony_api_key
+ASTER_API_KEY: Optional[str] = settings.aster_api_key
 # Allow override via env var for microservices
-SYMPHONY_AGENT_ID: Optional[str] = (
-    os.getenv("SYMPHONY_AGENT_ID") or settings.symphony_milf_agent_id
+ASTER_AGENT_ID: Optional[str] = (
+    os.getenv("ASTER_AGENT_ID") or settings.aster_milf_agent_id
 )  # Default is MILF
-SYMPHONY_BASE_URL: str = "https://api.symphony.io"
-SYMPHONY_STRATEGY_ID: str = settings.symphony_strategy_id
+ASTER_BASE_URL: str = "https://api.aster.io"
+ASTER_STRATEGY_ID: str = settings.aster_strategy_id
 
 # Multi-Agent Configuration
-SYMPHONY_MILF_KEY = settings.symphony_api_key
-SYMPHONY_MILF_ID = settings.symphony_milf_agent_id
+ASTER_MILF_KEY = settings.aster_api_key
+ASTER_MILF_ID = settings.aster_milf_agent_id
 
-SYMPHONY_AGDG_KEY = settings.symphony_api_key
-SYMPHONY_AGDG_ID = settings.symphony_agdg_agent_id
+ASTER_AGDG_KEY = settings.aster_api_key
+ASTER_AGDG_ID = settings.aster_agdg_agent_id
 
-SYMPHONY_DEGEN_KEY = settings.symphony_api_key
-SYMPHONY_DEGEN_ID = settings.symphony_degen_agent_id
+ASTER_DEGEN_KEY = settings.aster_api_key
+ASTER_DEGEN_ID = settings.aster_degen_agent_id
 
-SYMPHONY_MIT_KEY = settings.symphony_api_key
-SYMPHONY_MIT_ID = settings.symphony_mit_agent_id
+ASTER_MIT_KEY = settings.aster_api_key
+ASTER_MIT_ID = settings.aster_mit_agent_id
 
 AGENTS_CONFIG = {
-    # Active Symphony Agents
+    # Active Aster Agents
     "MILF": {
-        "id": SYMPHONY_MILF_ID,
-        "key": SYMPHONY_MILF_KEY,
+        "id": ASTER_MILF_ID,
+        "key": ASTER_MILF_KEY,
         "type": "SWAP",
         "chain": "MONAD",
         "priority": True,
         "emoji": "🦾",
     },
     "AGDG": {
-        "id": SYMPHONY_AGDG_ID,
-        "key": SYMPHONY_AGDG_KEY,
+        "id": ASTER_AGDG_ID,
+        "key": ASTER_AGDG_KEY,
         "type": "PERPS",
         "chain": "BASE",
         "emoji": "🦅",
@@ -69,22 +69,22 @@ MIT_DEFAULT_SL_PERCENT: float = settings.mit_default_sl_percent
 MIT_DEFAULT_TP_PERCENT: float = settings.mit_default_tp_percent
 
 
-def validate_symphony_config() -> bool:
-    """Validate that Symphony is properly configured."""
-    if not SYMPHONY_API_KEY:
+def validate_aster_config() -> bool:
+    """Validate that Aster is properly configured."""
+    if not ASTER_API_KEY:
         return False
-    if not SYMPHONY_API_KEY.startswith("sk_live_"):
+    if not ASTER_API_KEY.startswith("sk_live_"):
         return False
     return True
 
 
-def get_symphony_config() -> dict:
-    """Get current Symphony configuration (without exposing keys)."""
+def get_aster_config() -> dict:
+    """Get current Aster configuration (without exposing keys)."""
     return {
-        "configured": validate_symphony_config(),
-        "api_key_set": bool(SYMPHONY_API_KEY),
-        "api_key_prefix": SYMPHONY_API_KEY[:12] + "..." if SYMPHONY_API_KEY else None,
-        "base_url": SYMPHONY_BASE_URL,
+        "configured": validate_aster_config(),
+        "api_key_set": bool(ASTER_API_KEY),
+        "api_key_prefix": ASTER_API_KEY[:12] + "..." if ASTER_API_KEY else None,
+        "base_url": ASTER_BASE_URL,
         "fund_name": MIT_FUND_NAME,
         "auto_subscribe": MIT_AUTO_SUBSCRIBE,
         "default_leverage": MIT_DEFAULT_LEVERAGE,

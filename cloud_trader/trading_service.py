@@ -31,7 +31,7 @@ from .data_store import DataStore
 from .definitions import (
     AGENT_DEFINITIONS,
     SYMBOL_CONFIG,
-    SYMPHONY_SYMBOLS,
+    ASTER_SYMBOLS,
     HealthStatus,
     MinimalAgentState,
 )
@@ -51,7 +51,7 @@ from .risk import PortfolioState, RiskManager
 from .self_healing import SelfHealingWatchdog
 from .storage import TradingStorage  # Import storage layer
 from .swarm import SwarmManager
-from .symphony_config import AGENTS_CONFIG
+from .aster_config import AGENTS_CONFIG
 from .websocket_manager import (
     broadcast_agent_status,
     broadcast_consensus_decision,
@@ -224,22 +224,22 @@ class TradingService:
 
         # Protocol Clients (Multi-Chain / Phase 5)
         # We load them lazily or here. Let's load headers here.
-        from .drift_client import get_drift_client
+        from .aster_client import get_aster_client
         from .jupiter_client import get_jupiter_client
-        from .symphony_client import get_symphony_client
+        from .aster_client import get_aster_client
 
-        self.symphony = get_symphony_client()
-        # Schedule Symphony Init Task
-        asyncio.create_task(self._ensure_symphony_initialized())
+        self.aster = get_aster_client()
+        # Schedule Aster Init Task
+        asyncio.create_task(self._ensure_aster_initialized())
         self.jupiter = get_jupiter_client()
-        self.drift = get_drift_client()
+        self.aster = get_aster_client()
 
         # Initialize Swarm Strategy Agents (Phase 7)
-        from .swarm.fund_manager import SymphonyFundManager
+        from .swarm.fund_manager import AsterFundManager
         from .swarm.treasurer import JupiterTreasurer
 
         self.treasurer = JupiterTreasurer()
-        self.fund_manager = SymphonyFundManager()
+        self.fund_manager = AsterFundManager()
 
         self._recent_trades = deque(maxlen=200)
         self._pending_orders: Dict[str, Dict] = {}
@@ -253,8 +253,8 @@ class TradingService:
             {}
         )  # Internal storage for property fallback
         self._account_balance: float = 0.0  # Will be updated from exchange
-        self._symphony_balance: float = 0.0  # Synced from Symphony
-        self._drift_balance: float = 0.0  # Synced from Drift
+        self._aster_balance: float = 0.0  # Synced from Aster
+        self._aster_balance: float = 0.0  # Synced from Aster
         self._last_balance_fetch: float = 0.0  # Timestamp of last balance fetch
 
         # AI & Agents
@@ -289,13 +289,13 @@ class TradingService:
         # Legacy trackers removed Phase 25
 
         # Platform balances
-        self._symphony_balance = 0.0
-        self._drift_balance = 0.0
+        self._aster_balance = 0.0
+        self._aster_balance = 0.0
 
-        # Hyperliquid - DEPRECATED (stubbed for backwards compatibility)
-        self._hyperliquid_balance = 0.0
-        self._hyperliquid_positions = {}
-        self._hyperliquid_metrics = {}
+        # Lighter - DEPRECATED (stubbed for backwards compatibility)
+        self._lighter_balance = 0.0
+        self._lighter_positions = {}
+        self._lighter_metrics = {}
         self.hl_client = None
 
         # Aster tracking
@@ -303,7 +303,7 @@ class TradingService:
         self._swept_profits = 0.0  # Track swept profits for dashboard
         self._latencies = deque(maxlen=50)  # Store recent API latencies in ms
 
-        # Populate initial agent states from Symphony Config
+        # Populate initial agent states from Aster Config
         if AGENTS_CONFIG:
             for name, config in AGENTS_CONFIG.items():
                 agent_id = config.get("id", name)
@@ -319,12 +319,12 @@ class TradingService:
                     type=config.get("type", "General"),
                     model="gemini-2.0-flash-exp",
                     system=config.get(
-                        "system", "symphony"
-                    ),  # Use system from config or default to symphony for these
+                        "system", "aster"
+                    ),  # Use system from config or default to aster for these
                 )
                 self._agent_states[agent_id] = state
                 self._agent_states[name] = state  # Map by name too for lookups
-            logger.info(f"✅ Initialized {len(self._agent_states)} Symphony agents from config")
+            logger.info(f"✅ Initialized {len(self._agent_states)} Aster agents from config")
 
         # Telegram
         self._telegram = None
@@ -364,7 +364,7 @@ class TradingService:
             self.profit_manager = get_profit_manager()
             logger.info("✅ ActiveProfitManager initialized")
 
-            # Symphony removed - was deprecated Pub/Sub system
+            # Aster removed - was deprecated Pub/Sub system
 
             # Telegram
             if TELEGRAM_AVAILABLE and self._settings.enable_telegram:
@@ -377,7 +377,7 @@ class TradingService:
                 except Exception as e:
                     logger.error(f"⚠️ Telegram initialization failed: {e}")
 
-            # Redis/Hyperliquid logic deleted in Phase 25
+            # Redis/Lighter logic deleted in Phase 25
 
         except Exception as e:
             logger.error(f"Manager initialization failed: {e}")
@@ -504,7 +504,7 @@ class TradingService:
             asyncio.create_task(self._capital_efficiency_guard())
 
             # 4. Start Listeners
-            # Redis listener (Hyperliquid) removed Phase 25
+            # Redis listener (Lighter) removed Phase 25
 
             # 5. Sync & Watchdog
             if self._settings.enable_aster:
@@ -594,11 +594,11 @@ class TradingService:
             platform = data.get("platform", "unknown").lower()
             balance = float(data.get("balance", 0.0))
 
-            if platform == "hyperliquid":
-                self._hyperliquid_balance = balance
+            if platform == "lighter":
+                self._lighter_balance = balance
                 # Clear metrics if explicitly passed?
-            elif platform == "symphony":
-                self._symphony_balance = balance
+            elif platform == "aster":
+                self._aster_balance = balance
             elif platform == "aster":
                 self._account_balance = balance
 
@@ -616,13 +616,13 @@ class TradingService:
 
                 # Update metrics
                 platform = data.get("platform", "").lower()
-                if platform == "hyperliquid":
+                if platform == "lighter":
                     # Update HL metrics
-                    current_vol = float(self._hyperliquid_metrics.get("total_volume", 0))
+                    current_vol = float(self._lighter_metrics.get("total_volume", 0))
                     current_vol += float(data.get("filled_quantity", 0)) * float(
                         data.get("avg_price", 0)
                     )
-                    self._hyperliquid_metrics["total_volume"] = current_vol
+                    self._lighter_metrics["total_volume"] = current_vol
 
         async def handle_position_update(data: Dict):
             # Update cached open positions
@@ -705,12 +705,12 @@ class TradingService:
         self._risk_manager = RiskManager(self._settings)
 
         # Subscribe Strategy
-        if self.symphony:
-            from .symphony_config import SYMPHONY_STRATEGY_ID
+        if self.aster:
+            from .aster_config import ASTER_STRATEGY_ID
 
-            logger.info(f"🎻 Subscribing to Symphony Strategy: {SYMPHONY_STRATEGY_ID}...")
-            self._strategy_subscription = await self.symphony.subscribe_strategy(
-                SYMPHONY_STRATEGY_ID
+            logger.info(f"🎻 Subscribing to Aster Strategy: {ASTER_STRATEGY_ID}...")
+            self._strategy_subscription = await self.aster.subscribe_strategy(
+                ASTER_STRATEGY_ID
             )
 
         # Core Data
@@ -730,19 +730,19 @@ class TradingService:
         )
         await self._initialize_basic_agents()
 
-        # Hyperliquid Initialization (Restored)
-        if self._settings.enable_hyperliquid and credentials.hl_private_key and credentials.hl_account_address:
+        # Lighter Initialization (Restored)
+        if self._settings.enable_lighter and credentials.hl_private_key and credentials.hl_account_address:
             try:
-                from .v2.hyperliquid_client import HyperliquidClient
-                logger.info("💧 Initializing Hyperliquid Client...")
-                self.hl_client = HyperliquidClient(
+                from .v2.lighter_client import LighterClient
+                logger.info("💧 Initializing Lighter Client...")
+                self.hl_client = LighterClient(
                     private_key=credentials.hl_private_key,
                     wallet_address=credentials.hl_account_address,
                 )
                 await self.hl_client.initialize()
-                logger.info("✅ Hyperliquid Client Initialized")
+                logger.info("✅ Lighter Client Initialized")
             except Exception as e:
-                logger.error(f"❌ Hyperliquid initialization failed: {e}")
+                logger.error(f"❌ Lighter initialization failed: {e}")
                 
                 # Try fallback to env vars if not in credentials object (Legacy Support)
                 try:
@@ -750,32 +750,32 @@ class TradingService:
                     pk = os.environ.get("HL_SECRET_KEY")
                     addr = os.environ.get("HL_ACCOUNT_ADDRESS")
                     if pk and addr:
-                        logger.info("💧 Hyperliquid: Retrying with env vars...")
-                        self.hl_client = HyperliquidClient(private_key=pk, wallet_address=addr)
+                        logger.info("💧 Lighter: Retrying with env vars...")
+                        self.hl_client = LighterClient(private_key=pk, wallet_address=addr)
                         await self.hl_client.initialize()
-                        logger.info("✅ Hyperliquid Client Initialized (Env Fallback)")
+                        logger.info("✅ Lighter Client Initialized (Env Fallback)")
                     else:
                         self.hl_client = None
                 except Exception as e2:
-                    logger.error(f"❌ Hyperliquid env fallback failed: {e2}")
+                    logger.error(f"❌ Lighter env fallback failed: {e2}")
                     self.hl_client = None
         else:
-            if not self._settings.enable_hyperliquid:
-                logger.info("🚫 Hyperliquid disabled by config")
+            if not self._settings.enable_lighter:
+                logger.info("🚫 Lighter disabled by config")
             else:
-                logger.warning("⚠️ Hyperliquid credentials missing, skipping initialization")
+                logger.warning("⚠️ Lighter credentials missing, skipping initialization")
             self.hl_client = None
 
-        # Initialize Drift
-        if self._settings.enable_drift and hasattr(self, "drift") and self.drift:
-            logger.info("🌀 Initializing Drift Client...")
+        # Initialize Aster
+        if self._settings.enable_aster and hasattr(self, "aster") and self.aster:
+            logger.info("🌀 Initializing Aster Client...")
             try:
-                await asyncio.wait_for(self.drift.initialize(), timeout=15.0)
+                await asyncio.wait_for(self.aster.initialize(), timeout=15.0)
             except Exception as e:
-                logger.error(f"❌ Drift initialization error: {e}")
-        elif not self._settings.enable_drift:
-            logger.info("🚫 Drift disabled by config")
-            self.drift = None
+                logger.error(f"❌ Aster initialization error: {e}")
+        elif not self._settings.enable_aster:
+            logger.info("🚫 Aster disabled by config")
+            self.aster = None
 
         # Initialize Lighter Client (Phase 3 Integration)
         if self._settings.enable_lighter:
@@ -807,9 +807,9 @@ class TradingService:
         ) = init_autonomous_components(
             feature_pipeline=self._feature_pipeline,
             exchange_client=self._exchange,
-            symphony_client=self.symphony,
+            aster_client=self.aster,
             hl_client=self.hl_client,
-            drift_client=self.drift,
+            aster_client=self.aster,
             lighter_client=getattr(self, "lighter_client", None),
             settings=self._settings,
         )
@@ -834,7 +834,7 @@ class TradingService:
             self.arbitrage_scanner = init_arbitrage_scanner(
                 aster_client=self._exchange_client,
                 hl_client=getattr(self, "hl_client", None),
-                drift_client=getattr(self, "drift", None),
+                aster_client=getattr(self, "aster", None),
             )
         except Exception as e:
             logger.warning(f"Arbitrage scanner init failed (non-critical): {e}")
@@ -1161,15 +1161,15 @@ class TradingService:
                     f"📥 IMPORTED POSITION: {symbol} {side} {abs_qty} @ {entry_price} -> Assigned to {agent.name}"
                 )
 
-            # --- HYPERLIQUID TAKEOVER ---
+            # --- LIGHTER TAKEOVER ---
             if self.hl_client and self.hl_client.is_initialized:
                 hl_positions = await self.hl_client.get_positions()
                 for hl_p in hl_positions:
                     h_symbol = hl_p["symbol"]
-                    if h_symbol in self._hyperliquid_positions:
+                    if h_symbol in self._lighter_positions:
                         continue
                     # Similar takeover logic
-                    self._hyperliquid_positions[h_symbol] = hl_p
+                    self._lighter_positions[h_symbol] = hl_p
                     print(
                         f"📥 IMPORTED HL POSITION: {h_symbol} {hl_p['side']} {hl_p['size']} @ {hl_p['entry_price']}"
                     )
@@ -1632,14 +1632,14 @@ class TradingService:
                 self._open_positions[symbol] = pos
                 print(f"✅ Updated Aster TP/SL for {symbol}: TP={tp}, SL={sl}")
 
-            # 2. Update Hyperliquid Position (Ghost State)
-            if symbol in self._hyperliquid_positions:
-                hl_pos = self._hyperliquid_positions[symbol]
+            # 2. Update Lighter Position (Ghost State)
+            if symbol in self._lighter_positions:
+                hl_pos = self._lighter_positions[symbol]
                 if tp is not None:
                     hl_pos["tp"] = float(tp)
                 if sl is not None:
                     hl_pos["sl"] = float(sl)
-                self._hyperliquid_positions[symbol] = hl_pos
+                self._lighter_positions[symbol] = hl_pos
 
             return True
 
@@ -1647,7 +1647,7 @@ class TradingService:
             logger.error(f"Error updating positions: {e}")
             return False
 
-            # 3. Publish Event for Execution Services (Hyperliquid Trader, etc.)
+            # 3. Publish Event for Execution Services (Lighter Trader, etc.)
             # Redis removed in Phase 25 - this is now a no-op
             # if self._redis_pubsub:
             #     await self._publish_event(
@@ -2347,20 +2347,20 @@ class TradingService:
             logger.error(f"❌ [ROUTER] Execution FAILED for {symbol}: {result.error}")
             return  # Short-cut the rest of the method
 
-            print(f"🌀 DRIFT ROUTING: Intercepting {symbol} for {agent.name}")
+            print(f"🌀 ASTER ROUTING: Intercepting {symbol} for {agent.name}")
             try:
                 # 1. Execute
-                result = await self.drift.place_perp_order(
+                result = await self.aster.place_perp_order(
                     symbol=symbol, side=side, amount=quantity_float, order_type="market"
                 )
 
                 if result and result.get("tx_sig"):
-                    print(f"✅ Drift Trade Success: {result}")
+                    print(f"✅ Aster Trade Success: {result}")
 
                     # --- METRICS: SLIPPAGE & FEES ---
                     try:
                         # 1. Simulate "Real Fill" by fetching updated price
-                        real_fill_price = await self.drift.get_perp_market(symbol)
+                        real_fill_price = await self.aster.get_perp_market(symbol)
                         real_fill_price = (
                             real_fill_price.get("oracle_price", curr_price)
                             if real_fill_price
@@ -2368,36 +2368,36 @@ class TradingService:
                         )
 
                         # 2. Calc Slippage
-                        drift_slippage = (
+                        aster_slippage = (
                             abs((real_fill_price - curr_price) / curr_price)
                             if curr_price > 0
                             else 0
                         )
 
-                        # 3. Calc Fees (Drift ~ 0.1% taker)
-                        drift_fee = (quantity_float * real_fill_price) * 0.001
+                        # 3. Calc Fees (Aster ~ 0.1% taker)
+                        aster_fee = (quantity_float * real_fill_price) * 0.001
 
                         # 4. Record
                         if hasattr(self, "tracker"):
-                            self.tracker.record_slippage(agent.id, drift_slippage)
-                            self.tracker.record_fee(agent.id, drift_fee)
+                            self.tracker.record_slippage(agent.id, aster_slippage)
+                            self.tracker.record_fee(agent.id, aster_fee)
 
                         # Update for notification
                         curr_price = real_fill_price
                     except Exception as e_metrics:
                         print(f"⚠️ Metrics Error: {e_metrics}")
                     # --------------------------------
-                    drift_total = quantity_float * curr_price if curr_price > 0 else 0.0
+                    aster_total = quantity_float * curr_price if curr_price > 0 else 0.0
                     await self._send_trade_notification(
                         agent,
                         symbol,
                         side,
                         quantity_float,
                         curr_price,
-                        drift_total,
+                        aster_total,
                         True,
                         status="FILLED",
-                        thesis=thesis + " (Drift Execution)",
+                        thesis=thesis + " (Aster Execution)",
                     )
 
                     if not is_closing:
@@ -2409,7 +2409,7 @@ class TradingService:
                             "agent_id": agent.id,
                             "agent": agent,
                             "open_time": time.time(),
-                            "drift_data": result,
+                            "aster_data": result,
                         }
                         self._save_positions()
                     elif symbol in self._open_positions:
@@ -2417,18 +2417,18 @@ class TradingService:
                         self._save_positions()
                     return  # Exit generic flow
                 else:
-                    print(f"❌ Drift Trade Failed: {result}")
+                    print(f"❌ Aster Trade Failed: {result}")
             except Exception as e:
-                print(f"⚠️ Drift Execution Error: {e}")
+                print(f"⚠️ Aster Execution Error: {e}")
 
-        # --- HYPERLIQUID ROUTING INJECTION ---
-        from .definitions import HYPERLIQUID_SYMBOLS
+        # --- LIGHTER ROUTING INJECTION ---
+        from .definitions import LIGHTER_SYMBOLS
 
-        if symbol in HYPERLIQUID_SYMBOLS and self.hl_client and self.hl_client.is_initialized:
-            print(f"🌊 HYPERLIQUID ROUTING: Intercepting {symbol} for {agent.name}")
+        if symbol in LIGHTER_SYMBOLS and self.hl_client and self.hl_client.is_initialized:
+            print(f"🌊 LIGHTER ROUTING: Intercepting {symbol} for {agent.name}")
             try:
                 # 1. Determine Action (Buy vs Sell)
-                # Hyperliquid needs coin (BTC, ETH, etc.)
+                # Lighter needs coin (BTC, ETH, etc.)
                 if "-" in symbol:
                     coin = symbol.split("-")[0]
                 elif symbol.endswith("USDC"):
@@ -2450,7 +2450,7 @@ class TradingService:
                 )
 
                 if result and result.get("status") == "ok":
-                    print(f"✅ Hyperliquid Trade Success: {result}")
+                    print(f"✅ Lighter Trade Success: {result}")
 
                     # --- METRICS: SLIPPAGE & FEES ---
                     try:
@@ -2488,7 +2488,7 @@ class TradingService:
                         hl_total,
                         True,
                         status="FILLED",
-                        thesis=thesis + " (Hyperliquid Execution)",
+                        thesis=thesis + " (Lighter Execution)",
                     )
 
                     if not is_closing:
@@ -2508,15 +2508,15 @@ class TradingService:
                         self._save_positions()
                     return  # Exit generic flow
                 else:
-                    print(f"❌ Hyperliquid Trade Failed: {result}")
+                    print(f"❌ Lighter Trade Failed: {result}")
             except Exception as e:
-                print(f"⚠️ Hyperliquid Execution Error: {e}")
+                print(f"⚠️ Lighter Execution Error: {e}")
 
-        # --- SYMPHONY ROUTING INJECTION ---
-        from .definitions import SYMPHONY_SYMBOLS
+        # --- ASTER ROUTING INJECTION ---
+        from .definitions import ASTER_SYMBOLS
 
-        if symbol in SYMPHONY_SYMBOLS and self.symphony:
-            print(f"🎻 SYMPHONY ROUTING: Intercepting {symbol} for {agent.name}")
+        if symbol in ASTER_SYMBOLS and self.aster:
+            print(f"🎻 ASTER ROUTING: Intercepting {symbol} for {agent.name}")
             try:
                 # 1. Determine Action Type (Swap vs Perp) based on Symbol
                 # Heuristic: Monad chain tokens -> Swap (MILF), Base chain tokens -> Perp (AGDG)
@@ -2544,7 +2544,7 @@ class TradingService:
                     print(
                         f"🎻 Executing Swap: {token_in} -> {token_out} (Weight: {trade_weight}%) via MILF ({target_agent_id})"
                     )
-                    result = await self.symphony.execute_swap(
+                    result = await self.aster.execute_swap(
                         token_in=token_in,
                         token_out=token_out,
                         weight=trade_weight,
@@ -2565,7 +2565,7 @@ class TradingService:
                     print(
                         f"🎻 Executing Perp: {perp_action} {token_symbol} (Weight: {trade_weight}%) via AGDG ({target_agent_id})"
                     )
-                    result = await self.symphony.open_perpetual_position(
+                    result = await self.aster.open_perpetual_position(
                         symbol=token_symbol,
                         action=perp_action,
                         weight=trade_weight,
@@ -2575,7 +2575,7 @@ class TradingService:
 
                 # 4. Handle Result
                 if result and result.get("successful", 0) > 0:
-                    print(f"✅ Symphony Trade Success: {result}")
+                    print(f"✅ Aster Trade Success: {result}")
                     
                     # Fetch estimated price if not returned
                     est_price = 0.0
@@ -2594,7 +2594,7 @@ class TradingService:
                         est_price * quantity_float,
                         True,
                         status="FILLED",
-                        thesis=thesis + " (Symphony Execution)",
+                        thesis=thesis + " (Aster Execution)",
                     )
 
                     # Track Position locally
@@ -2607,7 +2607,7 @@ class TradingService:
                             "agent_id": agent.id,
                             "agent": agent,
                             "open_time": time.time(),
-                            "symphony_data": result,
+                            "aster_data": result,
                         }
                         self._save_positions()
                     elif symbol in self._open_positions:
@@ -2615,12 +2615,12 @@ class TradingService:
                         self._save_positions()
 
                 else:
-                    print(f"❌ Symphony Trade Failed: {result}")
+                    print(f"❌ Aster Trade Failed: {result}")
 
                 return  # Exit generic flow
 
             except Exception as e:
-                print(f"⚠️ Symphony Execution Error: {e}")
+                print(f"⚠️ Aster Execution Error: {e}")
                 return  # Fail gracefully
 
         try:
@@ -3125,7 +3125,7 @@ class TradingService:
                 "💓 *Sapphire System Heartbeat*\n"
                 f"⏱️ Uptime: `{int(hours)}h {int(minutes)}m`\n"
                 f"🔎 Scanning: `ACTIVE`\n"
-                f"📉 Open Positions: `{len(self._open_positions) + len(self._hyperliquid_positions)}`"
+                f"📉 Open Positions: `{len(self._open_positions) + len(self._lighter_positions)}`"
             )
             await self._telegram.send_message(msg)
         except Exception as e:
@@ -3486,7 +3486,7 @@ SOURCE: *Source:* Sapphire Duality System"""
                                 is_closing=True,
                             )
 
-                            await self.symphony.notify(
+                            await self.aster.notify(
                                 f"🎯 **PARTIAL PROFIT TAKE**\\n"
                                 f"Symbol: {symbol}\\n"
                                 f"Size Closed: {close_size:.4f}\\n"
@@ -3545,7 +3545,7 @@ SOURCE: *Source:* Sapphire Duality System"""
                             # Clear profit manager state
                             self.profit_manager.clear_position_state(symbol)
 
-                            await self.symphony.notify(
+                            await self.aster.notify(
                                 f"🛑 **POSITION CLOSED**\\n"
                                 f"Symbol: {symbol}\\n"
                                 f"PnL: {action['pnl_percent']*100:.2f}%\\n"
@@ -3967,7 +3967,7 @@ SOURCE: *Source:* Sapphire Duality System"""
                         else "NOT_READY"
                     )
                     print(
-                        f"📡 [STATUS] Iteration {loop_iteration}: HL={hl_status} | Sym={self._symphony_balance:.2f} | Agents={len(self._agent_states)}"
+                        f"📡 [STATUS] Iteration {loop_iteration}: HL={hl_status} | Sym={self._aster_balance:.2f} | Agents={len(self._agent_states)}"
                     )
                     sys.stdout.flush()
 
@@ -4067,7 +4067,7 @@ SOURCE: *Source:* Sapphire Duality System"""
                 # Fast 100ms loop when we have open positions (HFT mode)
                 # Slower 1s loop when idle (resource efficiency)
                 has_positions = (
-                    len(self._open_positions) > 0 or len(self._hyperliquid_positions) > 0
+                    len(self._open_positions) > 0 or len(self._lighter_positions) > 0
                 )
                 target_latency = 0.1 if has_positions else 1.0
 
@@ -4100,7 +4100,7 @@ SOURCE: *Source:* Sapphire Duality System"""
         1. MarketScanner detects opportunities across all symbols
         2. AutonomousAgents formulate theses based on available data
         3. Agent consensus determines best trade
-        4. PlatformRouter executes on appropriate platform (Symphony/Aster)
+        4. PlatformRouter executes on appropriate platform (Aster/Aster)
         5. Agents learn from trade outcomes
 
         Target: Fully autonomous, self-learning trading system
@@ -4238,11 +4238,11 @@ SOURCE: *Source:* Sapphire Duality System"""
             risk_amount = max_position_size * final_confidence
 
             # PLATFORM-SPECIFIC MINIMUM TRADE SIZES
-            # Symphony requires >$5 per wallet AFTER fees - need higher amount for split
+            # Aster requires >$5 per wallet AFTER fees - need higher amount for split
             platform_minimums = {
-                "symphony": 15.0,  # Symphony splits across wallets, needs ~$7.50 per wallet
-                "hyperliquid": 1.0,  # Hyperliquid has low minimums
-                "drift": 1.0,  # Drift has low minimums
+                "aster": 15.0,  # Aster splits across wallets, needs ~$7.50 per wallet
+                "lighter": 1.0,  # Lighter has low minimums
+                "aster": 1.0,  # Aster has low minimums
                 "aster": 10.0,  # Aster default minimum
             }
             min_trade_size = platform_minimums.get(best_opportunity.platform, 10.0)
@@ -4281,7 +4281,7 @@ SOURCE: *Source:* Sapphire Duality System"""
                     "symbol": best_opportunity.symbol,
                     "side": final_signal,
                     "quantity": quantity,
-                    "platform": best_opportunity.platform or "symphony",
+                    "platform": best_opportunity.platform or "aster",
                     "timestamp": time.time(),
                     "strategy": "consensus_alpha",
                 }
@@ -4290,7 +4290,7 @@ SOURCE: *Source:* Sapphire Duality System"""
                 # Note: Bots need to listen to 'trade-signals' or similar.
                 # Currently bots listen to specific topics orpoll?
                 # Checking bot implementations:
-                # - Symphony: Listens to ??? -> Actually Bots currently poll or use their own logic.
+                # - Aster: Listens to ??? -> Actually Bots currently poll or use their own logic.
                 # - Aster: Listens to ???
                 # IF bots are autonomous, we shouldn't "Push" trades unless this is a Signal Overlay.
                 # Assuming this is the "Executor" agent broadcasting.
@@ -4421,7 +4421,7 @@ SOURCE: *Source:* Sapphire Duality System"""
         Execute cross-platform arbitrage opportunities.
 
         Phase 6 HFT Optimization:
-        - Scans for price discrepancies across Aster, Hyperliquid, Drift
+        - Scans for price discrepancies across Aster, Lighter, Aster
         - Executes simultaneous buy/sell for risk-free profit
         - Minimum 0.3% profit threshold (after fees)
         """
@@ -4584,9 +4584,9 @@ SOURCE: *Source:* Sapphire Duality System"""
 
                     quantity = position_size / current_price
 
-                    # Execute via PubSub (prefer Hyperliquid for HFT)
+                    # Execute via PubSub (prefer Lighter for HFT)
                     platform = (
-                        "hyperliquid" if hasattr(self, "hl_client") and self.hl_client else "aster"
+                        "lighter" if hasattr(self, "hl_client") and self.hl_client else "aster"
                     )
 
                     vpin_payload = {
@@ -4633,7 +4633,7 @@ SOURCE: *Source:* Sapphire Duality System"""
         """
         try:
             platform = platform.lower()
-            if platform == "hyperliquid" and self.hl_client:
+            if platform == "lighter" and self.hl_client:
                 # Always try to fetch real-time if initialized
                 if self.hl_client.is_initialized:
                     try:
@@ -4643,26 +4643,26 @@ SOURCE: *Source:* Sapphire Duality System"""
                             hl_acct.get("marginSummary", {}).get("accountValue", 0.0)
                         )
 
-                        if new_balance != self._hyperliquid_balance:
+                        if new_balance != self._lighter_balance:
                             logger.info(f"💰 [HL] Balance updated: ${new_balance:.2f}")
-                            self._hyperliquid_balance = new_balance
+                            self._lighter_balance = new_balance
 
                     except Exception as e:
                         logger.debug(f"Failed to refresh HL balance: {e}")
-                return self._hyperliquid_balance
+                return self._lighter_balance
 
-            elif platform == "drift" and self.drift:
+            elif platform == "aster" and self.aster:
                 # Always try to fetch real-time
                 try:
-                    new_balance = await self.drift.get_total_equity()
-                    if new_balance != self._drift_balance:
-                        logger.info(f"💰 [DRIFT] Balance updated: ${new_balance:.2f}")
-                        self._drift_balance = new_balance
+                    new_balance = await self.aster.get_total_equity()
+                    if new_balance != self._aster_balance:
+                        logger.info(f"💰 [ASTER] Balance updated: ${new_balance:.2f}")
+                        self._aster_balance = new_balance
                 except Exception as e:
-                    logger.debug(f"Failed to refresh Drift balance: {e}")
-                return self._drift_balance
-            elif platform == "symphony" and self.symphony:
-                return self._symphony_balance
+                    logger.debug(f"Failed to refresh Aster balance: {e}")
+                return self._aster_balance
+            elif platform == "aster" and self.aster:
+                return self._aster_balance
             else:
                 # Default to Aster / Internal Portfolio
                 return await self._get_account_balance()
@@ -4732,7 +4732,7 @@ SOURCE: *Source:* Sapphire Duality System"""
 
         # Calculate PnL for anti-stubborn logic
         entry_price = float(position.get("entryPrice", 0))
-        # Note: Drift position structure uses entryPrice
+        # Note: Aster position structure uses entryPrice
         # If simulation, use internal tracking
         if entry_price == 0 and symbol in self._open_positions:
             entry_price = self._open_positions[symbol].get("entry_price", 0)
@@ -4741,9 +4741,9 @@ SOURCE: *Source:* Sapphire Duality System"""
         # Mock expected price (last known)
         expected_price = float(position.get("markPrice", 0))
 
-        # Phase 5: Execute via Drift Protocol
+        # Phase 5: Execute via Aster Protocol
         # Execute trade
-        await self.drift.place_perp_order(symbol, side, amount, order_type="market")
+        await self.aster.place_perp_order(symbol, side, amount, order_type="market")
 
         # Record Loss if applicable (Anti-Stubborn Entry Logic)
         if entry_price > 0 and expected_price > 0:
@@ -4783,12 +4783,12 @@ SOURCE: *Source:* Sapphire Duality System"""
         # Fees
         fee_usd = (amount * fill_price) * 0.0006
         if hasattr(metrics, "TOTAL_FEES_PAID"):
-            metrics.TOTAL_FEES_PAID.labels(platform="drift", symbol=symbol).inc(fee_usd)
+            metrics.TOTAL_FEES_PAID.labels(platform="aster", symbol=symbol).inc(fee_usd)
 
         # Record to MetricsTracker for Dashboard (Granular Analysis)
         if hasattr(self, "tracker"):
-            # Assuming last active agent triggered this, or generic 'drift-execution'
-            agent_id = "drift-solana-agent"
+            # Assuming last active agent triggered this, or generic 'aster-execution'
+            agent_id = "aster-solana-agent"
             self.tracker.record_slippage(agent_id, slippage_pct)
             self.tracker.record_fee(agent_id, fee_usd)
 
@@ -5114,14 +5114,14 @@ SOURCE: *Source:* Sapphire Duality System"""
                 print(f"   Closing {symbol} ({side} {qty})...")
 
                 # Check routing
-                from .definitions import HYPERLIQUID_SYMBOLS
+                from .definitions import LIGHTER_SYMBOLS
 
                 if (
-                    symbol in HYPERLIQUID_SYMBOLS
+                    symbol in LIGHTER_SYMBOLS
                     and self.hl_client
                     and self.hl_client.is_initialized
                 ):
-                    print(f"   🌊 Closing Hyperliquid position {symbol}...")
+                    print(f"   🌊 Closing Lighter position {symbol}...")
                     # Determine coin
                     if "-" in symbol:
                         coin = symbol.split("-")[0]
@@ -5137,7 +5137,7 @@ SOURCE: *Source:* Sapphire Duality System"""
                         limit_px=0.0,  # Market
                         order_type={"market": {}},
                     )
-                    print(f"   ✅ Closed {symbol} (Hyperliquid)")
+                    print(f"   ✅ Closed {symbol} (Lighter)")
                 else:
                     # Attempt to close via Aster exchange client
                     # Round quantity for shutdown closure
@@ -5175,7 +5175,7 @@ SOURCE: *Source:* Sapphire Duality System"""
         # Global Total
         # Sum of all exchange balances
         current_value = (
-            aster_value + self._symphony_balance + self._drift_balance + self._hyperliquid_balance
+            aster_value + self._aster_balance + self._aster_balance + self._lighter_balance
         )
 
         return {
@@ -5200,9 +5200,9 @@ SOURCE: *Source:* Sapphire Duality System"""
             "timestamp": datetime.now().isoformat(),
             "breakdown": {
                 "aster": aster_value,
-                "symphony": self._symphony_balance,
-                "drift": self._drift_balance,
-                "hyperliquid": self._hyperliquid_balance,
+                "aster": self._aster_balance,
+                "aster": self._aster_balance,
+                "lighter": self._lighter_balance,
             },
         }
 
@@ -5244,7 +5244,7 @@ SOURCE: *Source:* Sapphire Duality System"""
         except Exception as e:
             print(f"⚠️ Failed to get MCP messages: {e}")
 
-        # Merge Positions (Aster + Hyperliquid)
+        # Merge Positions (Aster + Lighter)
         all_positions = []
 
         # Aster Positions
@@ -5278,8 +5278,8 @@ SOURCE: *Source:* Sapphire Duality System"""
                 }
             )
 
-        # Hyperliquid Positions
-        for s, p in self._hyperliquid_positions.items():
+        # Lighter Positions
+        for s, p in self._lighter_positions.items():
             all_positions.append(
                 {
                     "symbol": s,
@@ -5291,7 +5291,7 @@ SOURCE: *Source:* Sapphire Duality System"""
                     ),  # Need real-time price from HL or WS
                     "pnl": float(p.get("pnl", 0)),
                     "agent": "Hype Bull Agent",
-                    "system": "hyperliquid",
+                    "system": "lighter",
                     "tp": None,
                     "sl": None,
                 }
@@ -5309,13 +5309,13 @@ SOURCE: *Source:* Sapphire Duality System"""
                 * 100
             )
 
-        hl_pnl = float(self._hyperliquid_metrics.get("realized_pnl", 0.0))
-        hl_fees = float(self._hyperliquid_metrics.get("fees_paid", 0.0))
-        hl_volume = float(self._hyperliquid_metrics.get("total_volume", 0.0))
+        hl_pnl = float(self._lighter_metrics.get("realized_pnl", 0.0))
+        hl_fees = float(self._lighter_metrics.get("fees_paid", 0.0))
+        hl_volume = float(self._lighter_metrics.get("total_volume", 0.0))
 
         # Calc HL Win Rate
-        hl_trades = int(self._hyperliquid_metrics.get("total_trades", 0))
-        hl_wins = int(self._hyperliquid_metrics.get("winning_trades", 0))
+        hl_trades = int(self._lighter_metrics.get("total_trades", 0))
+        hl_wins = int(self._lighter_metrics.get("winning_trades", 0))
         hl_win_rate = (hl_wins / hl_trades * 100) if hl_trades > 0 else 0.0
 
         systems_data = {
@@ -5327,13 +5327,13 @@ SOURCE: *Source:* Sapphire Duality System"""
                 "active_agents": len([a for a in self._agent_states.values() if a.active]),
                 "swept_profits": self._swept_profits,
             },
-            "hyperliquid": {
+            "lighter": {
                 "pnl": hl_pnl,
                 "volume": hl_volume,
                 "fees": hl_fees,
                 "win_rate": hl_win_rate,
                 "active_agents": 1,  # The HL service itself
-                "swept_profits": float(self._hyperliquid_metrics.get("swept_profits", 0.0)),
+                "swept_profits": float(self._lighter_metrics.get("swept_profits", 0.0)),
             },
         }
 
@@ -5521,10 +5521,10 @@ SOURCE: *Source:* Sapphire Duality System"""
             sys.stdout.flush()
             await self.treasurer.run_sweep_cycle()
 
-        # 2. Symphony Fund Manager (Rebalance)
+        # 2. Aster Fund Manager (Rebalance)
         # Pass the regime to let it decide strategy
         regime_label = self.current_regime.regime.name if self.current_regime else "NEUTRAL"
-        print(f"🐝 [SWARM] Running Symphony Fund Manager ({regime_label})...")
+        print(f"🐝 [SWARM] Running Aster Fund Manager ({regime_label})...")
         sys.stdout.flush()
         await self.fund_manager.run_rebalance_cycle(regime_label)
         print("🐝 [SWARM] Cycle complete.")
@@ -5540,27 +5540,27 @@ SOURCE: *Source:* Sapphire Duality System"""
             funding_agent = get_funding_agent()
 
             # Fetch current funding rates
-            funding_rates = await funding_agent.fetch_funding_rates(self.drift)
+            funding_rates = await funding_agent.fetch_funding_rates(self.aster)
 
             # Get current prices for monitoring
             current_prices = {}
             for symbol in funding_rates.keys():
                 try:
-                    market_info = await self.drift.get_perp_market(symbol)
+                    market_info = await self.aster.get_perp_market(symbol)
                     current_prices[symbol] = market_info.get("oracle_price", 0)
                 except Exception:
                     pass
 
             # Monitor existing funding positions
             actions = await funding_agent.monitor_funding_positions(
-                drift_client=self.drift, current_prices=current_prices
+                aster_client=self.aster, current_prices=current_prices
             )
 
             # Execute close actions
             for action in actions:
                 if action["action"] == "close_funding_position":
                     await funding_agent.close_funding_position(
-                        symbol=action["symbol"], drift_client=self.drift, reason=action["reason"]
+                        symbol=action["symbol"], aster_client=self.aster, reason=action["reason"]
                     )
 
             # Evaluate new funding opportunities
@@ -5599,12 +5599,12 @@ SOURCE: *Source:* Sapphire Duality System"""
                 if opportunity and opportunity.confidence > 0.6:
                     await funding_agent.open_funding_position(
                         opportunity=opportunity,
-                        drift_client=self.drift,
+                        aster_client=self.aster,
                         available_capital=portfolio_value,
                     )
 
                     # Notify
-                    await self.symphony.notify(
+                    await self.aster.notify(
                         f"🏦 **FUNDING POSITION OPENED**\n"
                         f"Symbol: {opportunity.symbol}\n"
                         f"Side: {opportunity.recommended_side}\n"
@@ -5625,24 +5625,24 @@ SOURCE: *Source:* Sapphire Duality System"""
         """
         while not self._stop_event.is_set():
             try:
-                # 1. Symphony (Monad)
-                if self.symphony:
+                # 1. Aster (Monad)
+                if self.aster:
                     try:
-                        acct = await self.symphony.get_account_info()
+                        acct = await self.aster.get_account_info()
                         # Sum up all funds? Or just main account?
                         # For now, just main account USDC
-                        self._symphony_balance = float(acct.get("balance", {}).get("USDC", 0.0))
+                        self._aster_balance = float(acct.get("balance", {}).get("USDC", 0.0))
 
-                        # Sync Hyperliquid Balance
+                        # Sync Lighter Balance
                         if self.hl_client:
                             if self.hl_client.is_initialized:
                                 try:
                                     hl_acct = await self.hl_client.get_account_summary()
-                                    self._hyperliquid_balance = float(
+                                    self._lighter_balance = float(
                                         hl_acct.get("marginSummary", {}).get("accountValue", 0.0)
                                     )
                                     logger.info(
-                                        f"💰 [HL SYNC] Hyperliquid Balance: ${self._hyperliquid_balance:.2f}"
+                                        f"💰 [HL SYNC] Lighter Balance: ${self._lighter_balance:.2f}"
                                     )
                                 except Exception as hl_err:
                                     logger.warning(
@@ -5658,14 +5658,14 @@ SOURCE: *Source:* Sapphire Duality System"""
 
                     except Exception as e:
                         # Log debug only to avoid spam if not configured
-                        logger.debug(f"Failed to sync Symphony balance: {e}")
+                        logger.debug(f"Failed to sync Aster balance: {e}")
 
-                # 2. Drift (Solana)
-                if self.drift:
+                # 2. Aster (Solana)
+                if self.aster:
                     try:
-                        self._drift_balance = await self.drift.get_total_equity()
+                        self._aster_balance = await self.aster.get_total_equity()
                     except Exception as e:
-                        logger.debug(f"Failed to sync Drift balance: {e}")
+                        logger.debug(f"Failed to sync Aster balance: {e}")
 
                 # 3. Aster (Exchange) - Fetch actual balance
                 if self._exchange:
@@ -5680,7 +5680,7 @@ SOURCE: *Source:* Sapphire Duality System"""
                         logger.debug(f"⚠️ [ASTER SYNC] Failed to fetch balance: {e}")
 
                 logger.debug(
-                    f"💰 Global Balance Sync: Aster=${self._portfolio.balance:.2f} | Sym=${self._symphony_balance:.2f} | Drift=${self._drift_balance:.2f}"
+                    f"💰 Global Balance Sync: Aster=${self._portfolio.balance:.2f} | Sym=${self._aster_balance:.2f} | Aster=${self._aster_balance:.2f}"
                 )
 
             except Exception as e:
@@ -5694,41 +5694,41 @@ SOURCE: *Source:* Sapphire Duality System"""
         agents = self.get_agents()
         return {"agents": agents, "total_enabled": len(agents)}
 
-    async def _ensure_symphony_initialized(self):
+    async def _ensure_aster_initialized(self):
         """
-        Ensures the Symphony Agentic Fund is created and ready.
+        Ensures the Aster Agentic Fund is created and ready.
         Called on startup.
         """
         import asyncio
 
-        from .symphony_config import MIT_FUND_DESCRIPTION, MIT_FUND_NAME
+        from .aster_config import MIT_FUND_DESCRIPTION, MIT_FUND_NAME
 
-        logger.info("🎵 Identifying Symphony Agent Status...")
+        logger.info("🎵 Identifying Aster Agent Status...")
 
         try:
             # 1. Connection Check
-            await self.symphony.get_account_info()
-            logger.info("✅ Symphony Agent is ACTIVE and Connected.")
+            await self.aster.get_account_info()
+            logger.info("✅ Aster Agent is ACTIVE and Connected.")
 
         except Exception as e:
             # Check for 404 (Not Found) -> Needs Creation
             error_str = str(e)
             if "404" in error_str:
-                logger.info("⚠️ Symphony Agent not found. Initializing new Agentic Fund...")
+                logger.info("⚠️ Aster Agent not found. Initializing new Agentic Fund...")
                 try:
-                    fund = await self.symphony.create_agentic_fund(
+                    fund = await self.aster.create_agentic_fund(
                         name=MIT_FUND_NAME,
                         description=MIT_FUND_DESCRIPTION,
                         fund_type="perpetuals",
                         autosubscribe=True,
                     )
                     logger.info(
-                        f"🚀 Symphony Agent CREATED: {fund.get('name')} (ID: {fund.get('fund_id')})"
+                        f"🚀 Aster Agent CREATED: {fund.get('name')} (ID: {fund.get('fund_id')})"
                     )
                 except Exception as create_err:
-                    logger.error(f"❌ Failed to create Symphony Agent: {create_err}")
+                    logger.error(f"❌ Failed to create Aster Agent: {create_err}")
             else:
-                logger.error(f"❌ Symphony Connection Error using {self.symphony.base_url}: {e}")
+                logger.error(f"❌ Aster Connection Error using {self.aster.base_url}: {e}")
 
 
 # Global instance and lock

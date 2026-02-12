@@ -128,9 +128,9 @@ export const BotPerformanceChart: React.FC<BotPerformanceChartProps> = ({ bots }
               key={bot.id}
               type="monotone"
               dataKey={bot.name}
-              stroke={bot.system === 'hyperliquid' ? '#10b981' : COLORS[index % COLORS.length]}
+              stroke={bot.system === 'lighter' ? '#10b981' : COLORS[index % COLORS.length]}
               strokeWidth={2}
-              dot={{ r: 3, fill: bot.system === 'hyperliquid' ? '#10b981' : COLORS[index % COLORS.length], strokeWidth: 0 }}
+              dot={{ r: 3, fill: bot.system === 'lighter' ? '#10b981' : COLORS[index % COLORS.length], strokeWidth: 0 }}
               activeDot={{ r: 6, strokeWidth: 0 }}
               connectNulls
               animationDuration={1000}

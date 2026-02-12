@@ -126,7 +126,7 @@ export const Analytics: React.FC<AnalyticsProps> = ({ bots, trades }) => {
               const maxPnl = Math.max(...bots.map(b => Math.abs(b.pnl || 0)), 100);
               const barWidth = Math.min(100, (Math.abs(bot.pnl || 0) / maxPnl) * 100);
               const isProfitable = (bot.pnl || 0) >= 0;
-              const isHype = bot.system === 'hyperliquid';
+              const isHype = bot.system === 'lighter';
 
               return (
                 <div key={bot.id} className="p-4 bg-white/5 rounded-xl border border-white/5 hover:border-blue-500/30 transition-all">
@@ -247,7 +247,7 @@ export const Analytics: React.FC<AnalyticsProps> = ({ bots, trades }) => {
                   </td>
                   <td className="px-6 py-4 text-white font-medium">{trade.agent_name || trade.agentId}</td>
                   <td className="px-6 py-4">
-                    {trade.system === 'hyperliquid' ? (
+                    {trade.system === 'lighter' ? (
                       <span className="inline-flex items-center gap-1 text-[10px] bg-green-500/10 text-green-400 px-2 py-0.5 rounded border border-green-500/20">
                         <Zap size={10} /> HYPE
                       </span>

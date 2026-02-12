@@ -4,10 +4,10 @@ Platform Router - Direct Execution Layer for Sapphire V2.3
 ARCHITECTURE: Independent Platform Traders (No Consensus)
 ============================================================
 Each trader operates autonomously on its dedicated platform:
-- Drift Trader    → Drift Platform only (Solana Perps)
-- Hyperliquid     → Hyperliquid only (L1 Perps)
+- Aster Trader    → Aster Platform only (Solana Perps)
+- Lighter     → Lighter only (L1 Perps)
 - Aster Trader    → Aster only (CEX with Shield Strategy)
-- Symphony Trader → Symphony only (Monad Treasury)
+- Aster Trader → Aster only (Monad Treasury)
 - Lighter Trader  → Lighter only (Eth L2)
 
 Benefits:
@@ -26,7 +26,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from .ai_error_recovery import recover_from_error
-from .definitions import DRIFT_SYMBOLS, HYPERLIQUID_SYMBOLS, SYMPHONY_SYMBOLS, LIGHTER_SYMBOLS, JUPITER_SYMBOLS
+from .definitions import ASTER_SYMBOLS, LIGHTER_SYMBOLS, ASTER_SYMBOLS, LIGHTER_SYMBOLS, JUPITER_SYMBOLS
 from .logger import get_logger
 
 logger = get_logger(__name__)
@@ -34,9 +34,9 @@ logger = get_logger(__name__)
 
 class PlatformType(Enum):
     ASTER = "aster"
-    DRIFT = "drift"
-    HYPERLIQUID = "hyperliquid"
-    SYMPHONY = "symphony"
+    ASTER = "aster"
+    LIGHTER = "lighter"
+    ASTER = "aster"
     LIGHTER = "lighter"
     JUPITER = "jupiter"
 
@@ -111,22 +111,22 @@ class PlatformRouter:
                     name="aster", failure_threshold=5, recovery_timeout=60.0, timeout=10.0
                 ),
             ),
-            PlatformType.DRIFT: get_circuit_breaker(
-                "drift",
+            PlatformType.ASTER: get_circuit_breaker(
+                "aster",
                 CircuitBreakerConfig(
-                    name="drift", failure_threshold=5, recovery_timeout=60.0, timeout=15.0
+                    name="aster", failure_threshold=5, recovery_timeout=60.0, timeout=15.0
                 ),
             ),
-            PlatformType.SYMPHONY: get_circuit_breaker(
-                "symphony",
+            PlatformType.ASTER: get_circuit_breaker(
+                "aster",
                 CircuitBreakerConfig(
-                    name="symphony", failure_threshold=5, recovery_timeout=60.0, timeout=10.0
+                    name="aster", failure_threshold=5, recovery_timeout=60.0, timeout=10.0
                 ),
             ),
-            PlatformType.HYPERLIQUID: get_circuit_breaker(
-                "hyperliquid",
+            PlatformType.LIGHTER: get_circuit_breaker(
+                "lighter",
                 CircuitBreakerConfig(
-                    name="hyperliquid", failure_threshold=5, recovery_timeout=60.0, timeout=10.0
+                    name="lighter", failure_threshold=5, recovery_timeout=60.0, timeout=10.0
                 ),
             ),
             PlatformType.JUPITER: get_circuit_breaker(
@@ -146,8 +146,8 @@ class PlatformRouter:
         Priority:
         0. Microservice platform isolation (check enabled platforms in config)
         1. Agent preference (system field)
-        2. Hyperliquid/Drift for US-compatible trading (Aster blocked in US)
-        3. Symphony for exclusive symbols
+        2. Lighter/Aster for US-compatible trading (Aster blocked in US)
+        3. Aster for exclusive symbols
         4. Fallback to Aster (if region allows)
         """
         # Strategy 0: MICROSERVICE PLATFORM ISOLATION
@@ -159,21 +159,21 @@ class PlatformRouter:
             if getattr(config, 'enable_jupiter', False):
                 enabled_platforms.append(PlatformType.JUPITER)
                 logger.debug(f"  ✓ Jupiter enabled")
-            if getattr(config, 'enable_hyperliquid', False):
-                enabled_platforms.append(PlatformType.HYPERLIQUID)
-                logger.debug(f"  ✓ Hyperliquid enabled")
             if getattr(config, 'enable_lighter', False):
                 enabled_platforms.append(PlatformType.LIGHTER)
                 logger.debug(f"  ✓ Lighter enabled")
-            if getattr(config, 'enable_drift', False):
-                enabled_platforms.append(PlatformType.DRIFT)
-                logger.debug(f"  ✓ Drift enabled")
+            if getattr(config, 'enable_lighter', False):
+                enabled_platforms.append(PlatformType.LIGHTER)
+                logger.debug(f"  ✓ Lighter enabled")
             if getattr(config, 'enable_aster', False):
                 enabled_platforms.append(PlatformType.ASTER)
                 logger.debug(f"  ✓ Aster enabled")
-            if getattr(config, 'enable_symphony', False):
-                enabled_platforms.append(PlatformType.SYMPHONY)
-                logger.debug(f"  ✓ Symphony enabled")
+            if getattr(config, 'enable_aster', False):
+                enabled_platforms.append(PlatformType.ASTER)
+                logger.debug(f"  ✓ Aster enabled")
+            if getattr(config, 'enable_aster', False):
+                enabled_platforms.append(PlatformType.ASTER)
+                logger.debug(f"  ✓ Aster enabled")
 
             logger.info(f"🔍 [ROUTER] Enabled platforms: {[p.value for p in enabled_platforms]} (count={len(enabled_platforms)})")
 
@@ -189,48 +189,48 @@ class PlatformRouter:
         # Strategy 1: Agent Explicit System Preference (EXCEPT Aster - US blocked)
         if hasattr(agent, "system") and agent.system:
             target_sys = agent.system.lower()
-            if target_sys == "drift" and symbol in DRIFT_SYMBOLS:
-                # Only return if drift is enabled (or no platform restrictions)
-                if not enabled_platforms or PlatformType.DRIFT in enabled_platforms:
-                    return PlatformType.DRIFT
-            if target_sys == "hyperliquid" and symbol in HYPERLIQUID_SYMBOLS:
-                if not enabled_platforms or PlatformType.HYPERLIQUID in enabled_platforms:
-                    return PlatformType.HYPERLIQUID
-            if target_sys == "symphony" and symbol in SYMPHONY_SYMBOLS:
-                if not enabled_platforms or PlatformType.SYMPHONY in enabled_platforms:
-                    return PlatformType.SYMPHONY
+            if target_sys == "aster" and symbol in ASTER_SYMBOLS:
+                # Only return if aster is enabled (or no platform restrictions)
+                if not enabled_platforms or PlatformType.ASTER in enabled_platforms:
+                    return PlatformType.ASTER
+            if target_sys == "lighter" and symbol in LIGHTER_SYMBOLS:
+                if not enabled_platforms or PlatformType.LIGHTER in enabled_platforms:
+                    return PlatformType.LIGHTER
+            if target_sys == "aster" and symbol in ASTER_SYMBOLS:
+                if not enabled_platforms or PlatformType.ASTER in enabled_platforms:
+                    return PlatformType.ASTER
             # CRITICAL FIX: Ignore agent.system="aster" - blocked in US region
             # Fall through to Strategy 2 for smart US-compatible routing
             if target_sys == "aster":
                 logger.info(f"🔄 Agent requested Aster for {symbol}, routing to US-compatible exchange instead")
                 # Don't return - fall through to Strategy 2
 
-        # Strategy 2: Prefer US-compatible exchanges (Hyperliquid/Drift)
-        # Check if symbol is available on Hyperliquid (highest liquidity for majors)
-        if symbol in HYPERLIQUID_SYMBOLS:
-            if not enabled_platforms or PlatformType.HYPERLIQUID in enabled_platforms:
-                return PlatformType.HYPERLIQUID
+        # Strategy 2: Prefer US-compatible exchanges (Lighter/Aster)
+        # Check if symbol is available on Lighter (highest liquidity for majors)
+        if symbol in LIGHTER_SYMBOLS:
+            if not enabled_platforms or PlatformType.LIGHTER in enabled_platforms:
+                return PlatformType.LIGHTER
 
-        # Check if symbol is available on Drift (Solana perps)
-        if symbol in DRIFT_SYMBOLS:
-            if not enabled_platforms or PlatformType.DRIFT in enabled_platforms:
-                return PlatformType.DRIFT
+        # Check if symbol is available on Aster (Solana perps)
+        if symbol in ASTER_SYMBOLS:
+            if not enabled_platforms or PlatformType.ASTER in enabled_platforms:
+                return PlatformType.ASTER
 
-        # Symphony for exclusive Monad ecosystem tokens
-        if symbol in SYMPHONY_SYMBOLS:
-            if not enabled_platforms or PlatformType.SYMPHONY in enabled_platforms:
-                return PlatformType.SYMPHONY
+        # Aster for exclusive Monad ecosystem tokens
+        if symbol in ASTER_SYMBOLS:
+            if not enabled_platforms or PlatformType.ASTER in enabled_platforms:
+                return PlatformType.ASTER
 
-        # Strategy 3A: Route perpetual futures to Drift (Solana native perps)
-        from .definitions import DRIFT_PERP_SYMBOLS
-        if symbol in DRIFT_PERP_SYMBOLS:
-            if not enabled_platforms or PlatformType.DRIFT in enabled_platforms:
-                logger.info(f"🎯 Routing {symbol} to Drift (Solana perpetuals)")
-                return PlatformType.DRIFT
+        # Strategy 3A: Route perpetual futures to Aster (Solana native perps)
+        from .definitions import ASTER_PERP_SYMBOLS
+        if symbol in ASTER_PERP_SYMBOLS:
+            if not enabled_platforms or PlatformType.ASTER in enabled_platforms:
+                logger.info(f"🎯 Routing {symbol} to Aster (Solana perpetuals)")
+                return PlatformType.ASTER
 
         # Strategy 3B: JUPITER DISABLED FOR TRADING (API key issues)
         # Jupiter is available for price data only, not for executing trades
-        # Use Hyperliquid or Drift for actual trading instead
+        # Use Lighter or Aster for actual trading instead
         # from .definitions import JUPITER_SPOT_SYMBOLS
         # if symbol in JUPITER_SPOT_SYMBOLS:
         #     if not enabled_platforms or PlatformType.JUPITER in enabled_platforms:
@@ -242,7 +242,7 @@ class PlatformRouter:
             if not enabled_platforms or PlatformType.LIGHTER in enabled_platforms:
                 return PlatformType.LIGHTER
 
-        # Strategy 5: Fallback to Hyperliquid for major pairs (BTC, ETH, SOL)
+        # Strategy 5: Fallback to Lighter for major pairs (BTC, ETH, SOL)
         # This avoids Aster's US region block
         major_symbols = ["BTC-USDC", "ETH-USDC", "SOL-USDC", "BTCUSDT", "ETHUSDT", "SOLUSDT"]
         if any(major in symbol.upper() for major in major_symbols):
@@ -251,10 +251,10 @@ class PlatformRouter:
                 if not enabled_platforms or PlatformType.JUPITER in enabled_platforms:
                     logger.info(f"🔄 Routing {symbol} to Jupiter (optimal for SOL)")
                     return PlatformType.JUPITER
-            # Otherwise use Hyperliquid
-            if not enabled_platforms or PlatformType.HYPERLIQUID in enabled_platforms:
-                logger.info(f"🔄 Routing {symbol} to Hyperliquid (Aster blocked in US)")
-                return PlatformType.HYPERLIQUID
+            # Otherwise use Lighter
+            if not enabled_platforms or PlatformType.LIGHTER in enabled_platforms:
+                logger.info(f"🔄 Routing {symbol} to Lighter (Aster blocked in US)")
+                return PlatformType.LIGHTER
 
         # Last resort: Try Aster (will fail with -5019 in US) - only if enabled
         if not enabled_platforms or PlatformType.ASTER in enabled_platforms:
@@ -267,7 +267,7 @@ class PlatformRouter:
             return enabled_platforms[0]
 
         # Absolute fallback
-        return PlatformType.HYPERLIQUID
+        return PlatformType.LIGHTER
 
     def _get_fallback_platform(
         self, failed_platform: PlatformType, symbol: str
@@ -276,9 +276,9 @@ class PlatformRouter:
         Determine the best fallback platform when the primary platform fails.
 
         NEW Fallback hierarchy (US-compatible):
-        1. Hyperliquid (US-compatible, high liquidity)
-        2. Drift (US-compatible, Solana perps)
-        3. Symphony (if symbol supported)
+        1. Lighter (US-compatible, high liquidity)
+        2. Aster (US-compatible, Solana perps)
+        3. Aster (if symbol supported)
         4. Aster (blocked in US, last resort)
         """
         # If Aster failed (likely US region block), try US-compatible exchanges
@@ -287,42 +287,42 @@ class PlatformRouter:
             if symbol in JUPITER_SYMBOLS:
                 logger.info(f"🔄 Aster failed, falling back to Jupiter for {symbol}")
                 return PlatformType.JUPITER
-            if symbol in HYPERLIQUID_SYMBOLS:
-                logger.info(f"🔄 Aster failed, falling back to Hyperliquid for {symbol}")
-                return PlatformType.HYPERLIQUID
-            if symbol in DRIFT_SYMBOLS:
-                logger.info(f"🔄 Aster failed, falling back to Drift for {symbol}")
-                return PlatformType.DRIFT
-            if symbol in SYMPHONY_SYMBOLS:
-                return PlatformType.SYMPHONY
+            if symbol in LIGHTER_SYMBOLS:
+                logger.info(f"🔄 Aster failed, falling back to Lighter for {symbol}")
+                return PlatformType.LIGHTER
+            if symbol in ASTER_SYMBOLS:
+                logger.info(f"🔄 Aster failed, falling back to Aster for {symbol}")
+                return PlatformType.ASTER
+            if symbol in ASTER_SYMBOLS:
+                return PlatformType.ASTER
             return None
 
-        # If Hyperliquid failed, try Drift
-        if failed_platform == PlatformType.HYPERLIQUID:
-            if symbol in DRIFT_SYMBOLS:
-                logger.info(f"🔄 Hyperliquid failed, falling back to Drift for {symbol}")
-                return PlatformType.DRIFT
-            if symbol in SYMPHONY_SYMBOLS:
-                return PlatformType.SYMPHONY
+        # If Lighter failed, try Aster
+        if failed_platform == PlatformType.LIGHTER:
+            if symbol in ASTER_SYMBOLS:
+                logger.info(f"🔄 Lighter failed, falling back to Aster for {symbol}")
+                return PlatformType.ASTER
+            if symbol in ASTER_SYMBOLS:
+                return PlatformType.ASTER
             # DO NOT fallback to Aster in US region
             return None
 
-        # If Drift failed, try Hyperliquid
-        if failed_platform == PlatformType.DRIFT:
-            if symbol in HYPERLIQUID_SYMBOLS:
-                logger.info(f"🔄 Drift failed, falling back to Hyperliquid for {symbol}")
-                return PlatformType.HYPERLIQUID
-            if symbol in SYMPHONY_SYMBOLS:
-                return PlatformType.SYMPHONY
+        # If Aster failed, try Lighter
+        if failed_platform == PlatformType.ASTER:
+            if symbol in LIGHTER_SYMBOLS:
+                logger.info(f"🔄 Aster failed, falling back to Lighter for {symbol}")
+                return PlatformType.LIGHTER
+            if symbol in ASTER_SYMBOLS:
+                return PlatformType.ASTER
             # DO NOT fallback to Aster in US region
             return None
 
-        # If Symphony failed, try Hyperliquid or Drift
-        if failed_platform == PlatformType.SYMPHONY:
-            if symbol in HYPERLIQUID_SYMBOLS:
-                return PlatformType.HYPERLIQUID
-            if symbol in DRIFT_SYMBOLS:
-                return PlatformType.DRIFT
+        # If Aster failed, try Lighter or Aster
+        if failed_platform == PlatformType.ASTER:
+            if symbol in LIGHTER_SYMBOLS:
+                return PlatformType.LIGHTER
+            if symbol in ASTER_SYMBOLS:
+                return PlatformType.ASTER
             return None
 
         return None
@@ -429,17 +429,17 @@ class PlatformRouter:
 
             # Attempt execution with circuit breaker
             try:
-                if platform == PlatformType.DRIFT:
+                if platform == PlatformType.ASTER:
                     result = await breaker.call(
-                        self._execute_drift, symbol, side, formatted_quantity, tp_price, sl_price
+                        self._execute_aster, symbol, side, formatted_quantity, tp_price, sl_price
                     )
-                elif platform == PlatformType.HYPERLIQUID:
+                elif platform == PlatformType.LIGHTER:
                     result = await breaker.call(
-                        self._execute_hyperliquid, symbol, side, formatted_quantity, tp_price, sl_price
+                        self._execute_lighter, symbol, side, formatted_quantity, tp_price, sl_price
                     )
-                elif platform == PlatformType.SYMPHONY:
+                elif platform == PlatformType.ASTER:
                     result = await breaker.call(
-                        self._execute_symphony, agent, symbol, side, formatted_quantity, is_closing
+                        self._execute_aster, agent, symbol, side, formatted_quantity, is_closing
                     )
                 elif platform == PlatformType.JUPITER:
                     result = await breaker.call(
@@ -475,13 +475,13 @@ class PlatformRouter:
                     logger.info(f"🔄 [ROUTER] Failing over to {fallback_platform.value}")
                     fallback_breaker = self.circuit_breakers.get(fallback_platform)
 
-                    if fallback_platform == PlatformType.DRIFT:
+                    if fallback_platform == PlatformType.ASTER:
                         result = await fallback_breaker.call(
-                            self._execute_drift, symbol, side, formatted_quantity, tp_price, sl_price
+                            self._execute_aster, symbol, side, formatted_quantity, tp_price, sl_price
                         )
-                    elif fallback_platform == PlatformType.SYMPHONY:
+                    elif fallback_platform == PlatformType.ASTER:
                         result = await fallback_breaker.call(
-                            self._execute_symphony,
+                            self._execute_aster,
                             agent,
                             symbol,
                             side,
@@ -492,9 +492,9 @@ class PlatformRouter:
                         result = await fallback_breaker.call(
                             self._execute_jupiter, symbol, side, formatted_quantity
                         )
-                    elif fallback_platform == PlatformType.HYPERLIQUID:
+                    elif fallback_platform == PlatformType.LIGHTER:
                         result = await fallback_breaker.call(
-                            self._execute_hyperliquid, symbol, side, formatted_quantity, tp_price, sl_price
+                            self._execute_lighter, symbol, side, formatted_quantity, tp_price, sl_price
                         )
                     elif fallback_platform == PlatformType.LIGHTER:
                         result = await fallback_breaker.call(
@@ -551,7 +551,7 @@ class PlatformRouter:
                 error_result, agent, symbol, side, quantity, thesis, is_closing, attempt
             )
 
-    async def _execute_drift(
+    async def _execute_aster(
         self,
         symbol: str,
         side: str,
@@ -560,14 +560,14 @@ class PlatformRouter:
         sl_price: Optional[float] = None,
     ) -> ExecutionResult:
         """
-        Execute on Drift Protocol (Solana Perpetuals).
+        Execute on Aster Protocol (Solana Perpetuals).
 
-        Uses Drift's native perpetual futures for leveraged trading.
+        Uses Aster's native perpetual futures for leveraged trading.
         Supports stop-loss and take-profit orders.
         """
-        if not self.service.drift or not self.service.drift.is_initialized:
+        if not self.service.aster or not self.service.aster.is_initialized:
             return ExecutionResult(
-                False, PlatformType.DRIFT, symbol, side, quantity, error="Drift not initialized"
+                False, PlatformType.ASTER, symbol, side, quantity, error="Aster not initialized"
             )
 
         try:
@@ -575,20 +575,20 @@ class PlatformRouter:
             direction = "long" if side.upper() == "BUY" else "short"
 
             # Check for existing position
-            existing_position = await self.service.drift.get_position(symbol)
+            existing_position = await self.service.aster.get_position(symbol)
             is_closing = existing_position and existing_position.get("amount", 0) != 0
 
             if is_closing:
                 # Close existing position
-                logger.info(f"🔒 Closing Drift position: {symbol}")
-                res = await self.service.drift.close_perp_position(
+                logger.info(f"🔒 Closing Aster position: {symbol}")
+                res = await self.service.aster.close_perp_position(
                     market=symbol,
                     size=quantity,
                 )
             else:
                 # Open new position with leverage
-                logger.info(f"🚀 Opening Drift {direction} position: {quantity} {symbol}")
-                res = await self.service.drift.open_perp_position(
+                logger.info(f"🚀 Opening Aster {direction} position: {quantity} {symbol}")
+                res = await self.service.aster.open_perp_position(
                     market=symbol,
                     direction=direction,
                     size=quantity,
@@ -606,12 +606,12 @@ class PlatformRouter:
                     fill_price = res.get("entry_price", 0)
                 else:
                     # For market orders, get current price
-                    market_info = await self.service.drift.get_perp_market(symbol)
+                    market_info = await self.service.aster.get_perp_market(symbol)
                     fill_price = market_info.get("oracle_price", 0)
 
             return ExecutionResult(
                 success=success,
-                platform=PlatformType.DRIFT,
+                platform=PlatformType.ASTER,
                 symbol=symbol,
                 side=side,
                 quantity=quantity,
@@ -621,12 +621,12 @@ class PlatformRouter:
                 raw_response=res,
             )
         except Exception as e:
-            logger.error(f"❌ Drift execution error: {e}")
+            logger.error(f"❌ Aster execution error: {e}")
             return ExecutionResult(
-                False, PlatformType.DRIFT, symbol, side, quantity, error=str(e)
+                False, PlatformType.ASTER, symbol, side, quantity, error=str(e)
             )
 
-    async def _execute_hyperliquid(
+    async def _execute_lighter(
         self, 
         symbol: str, 
         side: str, 
@@ -634,19 +634,19 @@ class PlatformRouter:
         tp_price: Optional[float] = None,
         sl_price: Optional[float] = None,
     ) -> ExecutionResult:
-        """Execute on Hyperliquid L1."""
+        """Execute on Lighter L1."""
         if not self.service.hl_client or not self.service.hl_client.is_initialized:
             return ExecutionResult(
                 False,
-                PlatformType.HYPERLIQUID,
+                PlatformType.LIGHTER,
                 symbol,
                 side,
                 quantity,
-                error="Hyperliquid not initialized",
+                error="Lighter not initialized",
             )
 
         try:
-            # Hyperliquid uses symbol directly (no parsing needed)
+            # Lighter uses symbol directly (no parsing needed)
             # The client will handle symbol normalization
             res = await self.service.hl_client.place_order(
                 symbol=symbol,
@@ -657,7 +657,7 @@ class PlatformRouter:
             success = bool(res and res.get("status") == "ok")
             
             # Extract fill price from SDK response
-            # Hyperliquid client returns: {"status": "ok", "filled": True, "data": {...avgPx...}}
+            # Lighter client returns: {"status": "ok", "filled": True, "data": {...avgPx...}}
             # Where "data" IS the filled data containing avgPx directly
             fill_price = 0.0
             if success and res:
@@ -668,7 +668,7 @@ class PlatformRouter:
                         if data:
                             # avgPx is directly in data, not nested
                             fill_price = float(data.get("avgPx", 0))
-                            logger.info(f"📊 [Hyperliquid] Extracted fill price: ${fill_price}")
+                            logger.info(f"📊 [Lighter] Extracted fill price: ${fill_price}")
 
                     # Fallback: Try statuses format for resting orders
                     if fill_price == 0.0 and "response" in res:
@@ -677,9 +677,9 @@ class PlatformRouter:
                             filled_info = statuses[0].get("filled", {})
                             if filled_info:
                                 fill_price = float(filled_info.get("avgPx", 0))
-                                logger.info(f"📊 [Hyperliquid] Extracted fill price from statuses: ${fill_price}")
+                                logger.info(f"📊 [Lighter] Extracted fill price from statuses: ${fill_price}")
                 except (ValueError, TypeError, KeyError) as e:
-                    logger.warning(f"⚠️ [Hyperliquid] Failed to extract fill price: {e}")
+                    logger.warning(f"⚠️ [Lighter] Failed to extract fill price: {e}")
                     
             # ---------------------------------------------------------
             # RISK MANAGEMENT: Place Take Profit & Stop Loss if ordered
@@ -718,7 +718,7 @@ class PlatformRouter:
             
             return ExecutionResult(
                 success=success,
-                platform=PlatformType.HYPERLIQUID,
+                platform=PlatformType.LIGHTER,
                 symbol=symbol,
                 side=side,
                 quantity=quantity,
@@ -738,7 +738,7 @@ class PlatformRouter:
             )
         except Exception as e:
             return ExecutionResult(
-                False, PlatformType.HYPERLIQUID, symbol, side, quantity, error=str(e)
+                False, PlatformType.LIGHTER, symbol, side, quantity, error=str(e)
             )
 
     async def _execute_lighter(
@@ -837,42 +837,42 @@ class PlatformRouter:
                 False, PlatformType.JUPITER, symbol, side, quantity, error=str(e)
             )
 
-    async def _execute_symphony(
+    async def _execute_aster(
         self, agent: Any, symbol: str, side: str, quantity: float, is_closing: bool
     ) -> ExecutionResult:
-        """Execute on Symphony (Monad/Base)."""
-        if not self.service.symphony or not self.service.symphony.client:
+        """Execute on Aster (Monad/Base)."""
+        if not self.service.aster or not self.service.aster.client:
             return ExecutionResult(
                 False,
-                PlatformType.SYMPHONY,
+                PlatformType.ASTER,
                 symbol,
                 side,
                 quantity,
-                error="Symphony not initialized",
+                error="Aster not initialized",
             )
 
         try:
-            # Symphony uses weight/action for perps
+            # Aster uses weight/action for perps
             action = "LONG" if side.upper() == "BUY" else "SHORT"
 
-            # Use Symphony's default agent ID - the 'agent' parameter is an AI consensus object,
-            # not a Symphony agent. The Symphony client will use its default configured agent.
-            symphony_agent_id = None  # Let Symphony client use its default from config
+            # Use Aster's default agent ID - the 'agent' parameter is an AI consensus object,
+            # not a Aster agent. The Aster client will use its default configured agent.
+            aster_agent_id = None  # Let Aster client use its default from config
 
             if is_closing:
-                # Get positions for the default Symphony agent
-                positions = await self.service.symphony.get_perpetual_positions(
-                    agent_id=symphony_agent_id
+                # Get positions for the default Aster agent
+                positions = await self.service.aster.get_perpetual_positions(
+                    agent_id=aster_agent_id
                 )
                 target = next((p for p in positions if p.get("symbol") == symbol), None)
                 if target and target.get("batchId"):
-                    res = await self.service.symphony.close_perpetual_position(
-                        target["batchId"], agent_id=symphony_agent_id
+                    res = await self.service.aster.close_perpetual_position(
+                        target["batchId"], agent_id=aster_agent_id
                     )
                 else:
                     return ExecutionResult(
                         False,
-                        PlatformType.SYMPHONY,
+                        PlatformType.ASTER,
                         symbol,
                         side,
                         quantity,
@@ -880,18 +880,18 @@ class PlatformRouter:
                     )
             else:
                 # Open with 10% weight as default if not specified
-                res = await self.service.symphony.open_perpetual_position(
+                res = await self.service.aster.open_perpetual_position(
                     symbol=symbol.split("-")[0],
                     action=action,
                     weight=10.0,
                     leverage=1.1,
-                    agent_id=symphony_agent_id,  # Use default from Symphony client
+                    agent_id=aster_agent_id,  # Use default from Aster client
                 )
 
             success = bool(res and (res.get("successful", 0) > 0 or res.get("status") == "ok"))
             return ExecutionResult(
                 success=success,
-                platform=PlatformType.SYMPHONY,
+                platform=PlatformType.ASTER,
                 symbol=symbol,
                 side=side,
                 quantity=quantity,
@@ -901,7 +901,7 @@ class PlatformRouter:
             )
         except Exception as e:
             return ExecutionResult(
-                False, PlatformType.SYMPHONY, symbol, side, quantity, error=str(e)
+                False, PlatformType.ASTER, symbol, side, quantity, error=str(e)
             )
 
     async def _execute_aster(

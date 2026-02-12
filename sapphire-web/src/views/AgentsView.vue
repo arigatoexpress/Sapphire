@@ -9,7 +9,7 @@ interface Agent {
     type: string
     weight: number
     role: string
-    platform: 'all' | 'hyperliquid' | 'drift' | 'aster' | 'symphony'
+    platform: 'all' | 'lighter' | 'aster' | 'aster' | 'aster'
     status: 'active' | 'inactive' | 'pending'
     confidence: number
     lastSignal: string
@@ -67,7 +67,7 @@ const agents = ref<Agent[]>([
     }
 ])
 
-const symphonyAgents = ref([
+const asterAgents = ref([
     { ticker: '$MILF', name: 'Treasury Agent', status: 'active', trades: 127 },
     { ticker: '$AGDG', name: 'Degen Agent', status: 'active', trades: 89 },
     { ticker: '$MIT', name: 'Implementation Treasury', status: 'pending', trades: 0 }
@@ -180,14 +180,14 @@ const getConfidenceColor = (confidence: number) => {
             </div>
         </div>
 
-        <!-- Symphony Agents -->
-        <div class="symphony-section">
-            <h3 class="section-title font-mono">SYMPHONY TREASURY AGENTS</h3>
-            <div class="symphony-grid">
-                <div v-for="agent in symphonyAgents" :key="agent.ticker" class="symphony-card glass">
-                    <div class="symphony-ticker font-mono">{{ agent.ticker }}</div>
-                    <div class="symphony-name">{{ agent.name }}</div>
-                    <div class="symphony-stats">
+        <!-- Aster Agents -->
+        <div class="aster-section">
+            <h3 class="section-title font-mono">ASTER TREASURY AGENTS</h3>
+            <div class="aster-grid">
+                <div v-for="agent in asterAgents" :key="agent.ticker" class="aster-card glass">
+                    <div class="aster-ticker font-mono">{{ agent.ticker }}</div>
+                    <div class="aster-name">{{ agent.name }}</div>
+                    <div class="aster-stats">
                         <span class="status-pill font-mono" :class="agent.status">{{ agent.status.toUpperCase() }}</span>
                         <span class="trade-count font-mono">{{ agent.trades }} trades</span>
                     </div>
@@ -498,8 +498,8 @@ const getConfidenceColor = (confidence: number) => {
     color: var(--text-tertiary);
 }
 
-/* Symphony Section */
-.symphony-section {
+/* Aster Section */
+.aster-section {
     margin-top: 1rem;
 }
 
@@ -510,32 +510,32 @@ const getConfidenceColor = (confidence: number) => {
     margin: 0 0 1rem 0;
 }
 
-.symphony-grid {
+.aster-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 1rem;
 }
 
-.symphony-card {
+.aster-card {
     padding: 1.25rem;
     border-radius: var(--radius-md);
     text-align: center;
 }
 
-.symphony-ticker {
+.aster-ticker {
     font-size: 1.25rem;
     font-weight: 700;
     color: var(--color-purple);
     margin-bottom: 0.25rem;
 }
 
-.symphony-name {
+.aster-name {
     font-size: 0.75rem;
     color: var(--text-tertiary);
     margin-bottom: 1rem;
 }
 
-.symphony-stats {
+.aster-stats {
     display: flex;
     justify-content: space-between;
     align-items: center;

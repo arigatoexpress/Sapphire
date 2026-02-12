@@ -158,17 +158,17 @@ class EnhancedTelegramService:
             "✅ Enhanced Notification Service Active\n"
             "🎮 Interactive Commands: **ENABLED**\n\n"
             "*Available Commands:*\n"
-            "`@drift status` - Check Drift positions\n"
+            "`@aster status` - Check Aster positions\n"
             "`@jupiter status` - Check Jupiter routes\n"
             "`@aster status` - Check Aster HFT positions\n"
-            "`@hyperliquid status` - Check Hyperliquid\n"
-            "`@symphony status` - Check Symphony agents\n"
+            "`@lighter status` - Check Lighter\n"
+            "`@aster status` - Check Aster agents\n"
             "`@all status` - Check all platforms\n\n"
             "*Manual Trading:*\n"
             "`@[platform] buy [amount] [symbol]`\n"
             "`@[platform] sell [amount] [symbol]`\n"
             "`@[platform] close [amount] [symbol]`\n\n"
-            "Example: `@drift buy 0.5 sol`",
+            "Example: `@aster buy 0.5 sol`",
             priority=NotificationPriority.HIGH,
         )
 
@@ -228,10 +228,10 @@ class EnhancedTelegramService:
             action_text = f"{side}"
 
         platform_emoji = {
-            "drift": "🌊",
-            "hyperliquid": "💧",
+            "aster": "🌊",
+            "lighter": "💧",
             "aster": "⭐",
-            "symphony": "🎵",
+            "aster": "🎵",
             "lighter": "⚡",
             "jupiter": "🪐"
         }.get(str(platform).lower(), "🤖")
@@ -556,10 +556,10 @@ class EnhancedTelegramService:
         if self.chat_id and chat_id != self.chat_id:
             return
 
-        # Pattern 1: @platform action quantity symbol (e.g., @hyperliquid buy 0.1 sol)
+        # Pattern 1: @platform action quantity symbol (e.g., @lighter buy 0.1 sol)
         cmd_match = re.search(r"@(\w+)\s+(buy|sell|close)\s+([\d.]+)\s+(\w+)", text.lower())
 
-        # Pattern 2: Status commands (e.g., @drift status, @all status)
+        # Pattern 2: Status commands (e.g., @aster status, @all status)
         status_match = re.search(r"@(\w+)\s+(status|positions|health)", text.lower())
 
         if status_match:
@@ -590,7 +590,7 @@ class EnhancedTelegramService:
             symbol = cmd_match.group(4).upper()
 
             # Special case for "all"
-            platforms = ["drift", "hyperliquid", "aster", "symphony", "jupiter"] if platform == "all" else [platform]
+            platforms = ["aster", "lighter", "aster", "aster", "jupiter"] if platform == "all" else [platform]
 
             await self.send_message(
                 f"⚡ **MANUAL OVERRIDE DETECTED**\n"

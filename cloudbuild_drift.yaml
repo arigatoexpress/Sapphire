@@ -1,27 +1,27 @@
-# Sapphire Drift Microservice - Standalone Deployment
-# This builds a separate Docker image with driftpy isolated dependencies
+# Sapphire Aster Microservice - Standalone Deployment
+# This builds a separate Docker image with asterpy isolated dependencies
 # to avoid conflicts with the main application
 
 steps:
-  # Build Drift-specific Docker image
+  # Build Aster-specific Docker image
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/sapphire-drift:latest'
+      - 'gcr.io/$PROJECT_ID/sapphire-aster:latest'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/sapphire-drift:${_TAG}'
+      - 'gcr.io/$PROJECT_ID/sapphire-aster:${_TAG}'
       - '-f'
-      - 'services/bot-drift/Dockerfile'
-      - 'services/bot-drift'
-    id: 'build-drift'
+      - 'services/bot-aster/Dockerfile'
+      - 'services/bot-aster'
+    id: 'build-aster'
     timeout: 900s
 
   # Push to Container Registry
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/sapphire-drift:latest']
-    id: 'push-drift'
-    waitFor: ['build-drift']
+    args: ['push', 'gcr.io/$PROJECT_ID/sapphire-aster:latest']
+    id: 'push-aster'
+    waitFor: ['build-aster']
 
   # Deploy to Cloud Run (europe-west1 for non-US IP)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -29,9 +29,9 @@ steps:
     args:
       - 'run'
       - 'deploy'
-      - 'sapphire-drift'
+      - 'sapphire-aster'
       - '--image'
-      - 'gcr.io/$PROJECT_ID/sapphire-drift:latest'
+      - 'gcr.io/$PROJECT_ID/sapphire-aster:latest'
       - '--region'
       - 'europe-west1'
       - '--platform'
@@ -52,15 +52,15 @@ steps:
       - '--vpc-egress'
       - 'all-traffic'
       - '--set-env-vars'
-      - 'SERVICE_NAME=bot-drift,PLATFORM=drift,GCP_PROJECT_ID=$PROJECT_ID,ENVIRONMENT=production,LOG_LEVEL=INFO,SOLANA_RPC_URL=https://api.mainnet-beta.solana.com'
+      - 'SERVICE_NAME=bot-aster,PLATFORM=aster,GCP_PROJECT_ID=$PROJECT_ID,ENVIRONMENT=production,LOG_LEVEL=INFO,SOLANA_RPC_URL=https://api.mainnet-beta.solana.com'
       - '--set-secrets'
-      - 'SOLANA_PRIVATE_KEY=DRIFT_SOLANA_PRIVATE_KEY:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest'
-    id: 'deploy-drift'
-    waitFor: ['push-drift']
+      - 'SOLANA_PRIVATE_KEY=ASTER_SOLANA_PRIVATE_KEY:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest'
+    id: 'deploy-aster'
+    waitFor: ['push-aster']
 
 # Images
 images:
-  - 'gcr.io/$PROJECT_ID/sapphire-drift:latest'
+  - 'gcr.io/$PROJECT_ID/sapphire-aster:latest'
 
 # Build timeout
 timeout: 1800s

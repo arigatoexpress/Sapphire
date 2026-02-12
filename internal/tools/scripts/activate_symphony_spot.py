@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Symphony Spot Trading Activation Script (Monad).
+Aster Spot Trading Activation Script (Monad).
 Executes 5 spot swaps to activate the agent on Monad.
 
 Per Docs: "Spot Trading is currently only active on Monad.
 User's should start with $MON as their collateral asset"
 
 Usage:
-    python3 -m cloud_trader.scripts.activate_symphony_spot
+    python3 -m cloud_trader.scripts.activate_aster_spot
 """
 
 import asyncio
@@ -18,18 +18,18 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 
 async def main():
-    print("🎵 SYMPHONY SPOT ACTIVATION (MONAD)")
+    print("🎵 ASTER SPOT ACTIVATION (MONAD)")
     print("=" * 50)
 
     try:
-        from cloud_trader.symphony_client import get_symphony_client
+        from cloud_trader.aster_client import get_aster_client
 
-        agent_id = os.getenv("SYMPHONY_AGENT_ID")
+        agent_id = os.getenv("ASTER_AGENT_ID")
         if not agent_id:
-            print("❌ Error: SYMPHONY_AGENT_ID not set in environment")
+            print("❌ Error: ASTER_AGENT_ID not set in environment")
             return
 
-        client = get_symphony_client(agent_id=agent_id)
+        client = get_aster_client(agent_id=agent_id)
         print(f"🤖 Target Agent ID: {agent_id}")
 
         # Check current status

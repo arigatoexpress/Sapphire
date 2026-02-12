@@ -1,6 +1,6 @@
-# Drift Bot Dependencies (Solana)
-# Updated to driftpy 0.8.88 for better aiohttp compatibility
-driftpy>=0.8.88
+# Aster Bot Dependencies (Solana)
+# Updated to asterpy 0.8.88 for better aiohttp compatibility
+asterpy>=0.8.88
 solana>=0.34.0
 solders>=0.21.0
 anchorpy>=0.18.0

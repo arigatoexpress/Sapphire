@@ -4,8 +4,8 @@ Integration Test Suite for Multi-Platform Trading System.
 Tests connectivity, balance fetching, and order placement across:
 - Aster DEX
 
-- Drift (Solana)
-- Symphony (Monad/Base)
+- Aster (Solana)
+- Aster (Monad/Base)
 
 Run with: python -m cloud_trader.integration_test
 """
@@ -160,11 +160,11 @@ class PlatformIntegrationTester:
         self.results["aster"] = result
         return result
 
-    async def test_drift(self) -> IntegrationTestResult:
-        """Test Drift (Solana) integration."""
-        result = IntegrationTestResult("drift")
+    async def test_aster(self) -> IntegrationTestResult:
+        """Test Aster (Solana) integration."""
+        result = IntegrationTestResult("aster")
         print("\n" + "=" * 60)
-        print("🌀 TESTING DRIFT (SOLANA)")
+        print("🌀 TESTING ASTER (SOLANA)")
         print("=" * 60)
 
         try:
@@ -172,12 +172,12 @@ class PlatformIntegrationTester:
             if not self.settings.solana_private_key:
                 result.warnings.append("Solana private key not configured")
                 print("   ⚠️ Solana credentials not found in environment")
-                self.results["drift"] = result
+                self.results["aster"] = result
                 return result
 
-            from cloud_trader.drift_client import DriftClient
+            from cloud_trader.aster_client import AsterClient
 
-            client = DriftClient(
+            client = AsterClient(
                 private_key=self.settings.solana_private_key,
                 rpc_url=self.settings.solana_rpc_url,
             )
@@ -188,7 +188,7 @@ class PlatformIntegrationTester:
                 await client.initialize()
                 if client.is_initialized:
                     result.connection_ok = True
-                    print("   ✅ Connected to Drift!")
+                    print("   ✅ Connected to Aster!")
                 else:
                     result.errors.append("Initialization flag not set")
                     print("   ❌ Connection failed")
@@ -212,16 +212,16 @@ class PlatformIntegrationTester:
                     result.errors.append(f"Balance error: {str(e)}")
                     print(f"   ❌ Balance fetch failed: {e}")
 
-            # Test 3: Order test (read-only for now due to Drift complexity)
+            # Test 3: Order test (read-only for now due to Aster complexity)
             if result.connection_ok:
                 print("\n3️⃣ Testing order capability...")
                 try:
-                    # Just verify we can get positions (order placement on Drift requires more setup)
+                    # Just verify we can get positions (order placement on Aster requires more setup)
                     positions = await client.get_positions()
                     result.order_ok = True  # Mark as OK if we can read positions
                     print(f"   ✅ Can read positions: {len(positions) if positions else 0} active")
                     result.warnings.append(
-                        "Full order test skipped (Drift requires specific market setup)"
+                        "Full order test skipped (Aster requires specific market setup)"
                     )
                 except Exception as e:
                     result.errors.append(f"Position check error: {str(e)}")
@@ -229,33 +229,33 @@ class PlatformIntegrationTester:
 
         except ImportError as e:
             result.errors.append(f"Import error: {str(e)}")
-            print(f"   ❌ Drift client not available: {e}")
+            print(f"   ❌ Aster client not available: {e}")
         except Exception as e:
-            result.errors.append(f"Drift test failed: {str(e)}")
-            print(f"❌ Drift test failed: {e}")
+            result.errors.append(f"Aster test failed: {str(e)}")
+            print(f"❌ Aster test failed: {e}")
 
-        self.results["drift"] = result
+        self.results["aster"] = result
         return result
 
-    async def test_symphony(self) -> IntegrationTestResult:
-        """Test Symphony (Monad/Base) integration."""
-        result = IntegrationTestResult("symphony")
+    async def test_aster(self) -> IntegrationTestResult:
+        """Test Aster (Monad/Base) integration."""
+        result = IntegrationTestResult("aster")
         print("\n" + "=" * 60)
-        print("🎵 TESTING SYMPHONY (MONAD/BASE)")
+        print("🎵 TESTING ASTER (MONAD/BASE)")
         print("=" * 60)
 
         try:
             # Check if credentials exist
-            if not self.settings.symphony_api_key:
-                result.warnings.append("Symphony API key not configured")
-                print("   ⚠️ Symphony credentials not found in environment")
-                self.results["symphony"] = result
+            if not self.settings.aster_api_key:
+                result.warnings.append("Aster API key not configured")
+                print("   ⚠️ Aster credentials not found in environment")
+                self.results["aster"] = result
                 return result
 
-            from cloud_trader.symphony_client import SymphonyClient
-            from cloud_trader.symphony_config import AGENTS_CONFIG
+            from cloud_trader.aster_client import AsterClient
+            from cloud_trader.aster_config import AGENTS_CONFIG
 
-            client = SymphonyClient(api_key=self.settings.symphony_api_key)
+            client = AsterClient(api_key=self.settings.aster_api_key)
 
             # Test 1: Connection
             print("\n1️⃣ Testing connection...")
@@ -290,7 +290,7 @@ class PlatformIntegrationTester:
             if result.connection_ok:
                 print("\n3️⃣ Testing order capability...")
                 try:
-                    # Symphony uses agent-based execution
+                    # Aster uses agent-based execution
                     result.order_ok = hasattr(client, "open_perpetual_position") or hasattr(
                         client, "execute_swap"
                     )
@@ -306,12 +306,12 @@ class PlatformIntegrationTester:
 
         except ImportError as e:
             result.errors.append(f"Import error: {str(e)}")
-            print(f"   ❌ Symphony client not available: {e}")
+            print(f"   ❌ Aster client not available: {e}")
         except Exception as e:
-            result.errors.append(f"Symphony test failed: {str(e)}")
-            print(f"❌ Symphony test failed: {e}")
+            result.errors.append(f"Aster test failed: {str(e)}")
+            print(f"❌ Aster test failed: {e}")
 
-        self.results["symphony"] = result
+        self.results["aster"] = result
         return result
 
     def print_summary(self):
@@ -355,8 +355,8 @@ class PlatformIntegrationTester:
 
         await self.test_aster()
 
-        await self.test_drift()
-        await self.test_symphony()
+        await self.test_aster()
+        await self.test_aster()
 
         passed, total = self.print_summary()
 

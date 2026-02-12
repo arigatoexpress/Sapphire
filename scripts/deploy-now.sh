@@ -34,11 +34,11 @@ SERVICES_FILTER=("$@")
 
 if [ ${#SERVICES_FILTER[@]} -eq 0 ]; then
     echo "Deploying ALL services via ${CONFIG}..."
-    echo "  - sapphire-hl (Hyperliquid)"
+    echo "  - sapphire-hl (Lighter)"
     echo "  - sapphire-lighter (Lighter)"
-    echo "  - sapphire-drift (Drift)"
     echo "  - sapphire-aster (Aster)"
-    echo "  - sapphire-symphony (Symphony)"
+    echo "  - sapphire-aster (Aster)"
+    echo "  - sapphire-aster (Aster)"
     echo "  - sapphire-web (Dashboard)"
     echo ""
 

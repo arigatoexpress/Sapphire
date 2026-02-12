@@ -75,9 +75,9 @@ export const LiveMonitor: React.FC = () => {
                         >
                             <option value="ALL">ALL MODULES</option>
                             <option value="aster">ASTER</option>
-                            <option value="hyperliquid">HYPERLIQUID</option>
-                            <option value="symphony">SYMPHONY</option>
-                            <option value="drift">DRIFT</option>
+                            <option value="lighter">LIGHTER</option>
+                            <option value="aster">ASTER</option>
+                            <option value="aster">ASTER</option>
                             <option value="scanner">SCANNER</option>
                             <option value="consensus">CONSENSUS</option>
                         </select>

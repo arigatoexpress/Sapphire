@@ -94,10 +94,10 @@ class OpportunityCostAnalyzer:
     # Platform-specific trading costs (slippage + fees)
     PLATFORM_COSTS = {
         "aster": 0.002,  # 0.2% (CEX-style, tight spreads)
-        "drift": 0.005,  # 0.5% (Solana perps)
+        "aster": 0.005,  # 0.5% (Solana perps)
         "jupiter": 0.008,  # 0.8% (DEX, slippage)
-        "hyperliquid": 0.003,  # 0.3% (L1 perps)
-        "symphony": 0.006,  # 0.6% (EVM chains)
+        "lighter": 0.003,  # 0.3% (L1 perps)
+        "aster": 0.006,  # 0.6% (EVM chains)
         "lighter": 0.010,  # 1.0% (L2 DEX, higher slippage)
     }
 
@@ -304,8 +304,8 @@ class OpportunityCostAnalyzer:
         self,
         current_position: Position,
         new_signal: NewSignal,
-        current_platform: str = "drift",
-        new_platform: str = "drift"
+        current_platform: str = "aster",
+        new_platform: str = "aster"
     ) -> OpportunityCostAnalysis:
         """
         Analyze whether to switch from current position to new signal

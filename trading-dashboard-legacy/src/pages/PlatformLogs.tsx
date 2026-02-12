@@ -17,9 +17,9 @@ import {
 const PLATFORMS = [
     { id: 'all', name: 'All Platforms', icon: '🌐', color: 'blue' },
     { id: 'aster', name: 'Aster', icon: '⭐', color: 'amber' },
-    { id: 'symphony', name: 'Symphony', icon: '🎵', color: 'purple' },
-    { id: 'drift', name: 'Drift', icon: '🌊', color: 'cyan' },
-    { id: 'hyperliquid', name: 'Hyperliquid', icon: '💧', color: 'blue' },
+    { id: 'aster', name: 'Aster', icon: '🎵', color: 'purple' },
+    { id: 'aster', name: 'Aster', icon: '🌊', color: 'cyan' },
+    { id: 'lighter', name: 'Lighter', icon: '💧', color: 'blue' },
     { id: 'agents', name: 'AI Agents', icon: '🤖', color: 'emerald' },
     { id: 'system', name: 'System', icon: '⚙️', color: 'slate' },
 ];
@@ -83,7 +83,7 @@ export const PlatformLogs: React.FC = () => {
             if (response.ok) {
                 const data = await response.json();
                 const allPositions: any[] = [];
-                for (const platform of ['aster', 'symphony', 'drift', 'hyperliquid']) {
+                for (const platform of ['aster', 'aster', 'aster', 'lighter']) {
                     const platformData = data[platform];
                     if (platformData?.positions) {
                         platformData.positions.forEach((pos: any) => {

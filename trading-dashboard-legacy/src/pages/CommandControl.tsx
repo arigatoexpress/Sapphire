@@ -111,7 +111,7 @@ export const CommandControl = () => {
           />
           <SystemNode
             icon={Zap}
-            title="Hyperliquid"
+            title="Lighter"
             status="active"
             color="green"
             details={["L1 Chain", "Perps Engine", "Hype Staking"]}
@@ -144,7 +144,7 @@ export const CommandControl = () => {
             <span className="text-xs font-mono text-purple-300">REDIS DATA BUS</span>
           </div>
 
-          {/* Hyperliquid Engine */}
+          {/* Lighter Engine */}
           <div className="col-span-1 flex flex-col items-center">
             <SystemNode
               icon={GitBranch}

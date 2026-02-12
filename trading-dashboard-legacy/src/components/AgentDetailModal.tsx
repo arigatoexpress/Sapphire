@@ -61,9 +61,9 @@ const AgentDetailModal: React.FC<AgentDetailModalProps> = ({ open, onClose, agen
                                     sx={{
                                         height: 20,
                                         fontSize: '0.7rem',
-                                        bgcolor: agent.system === 'hyperliquid' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)',
-                                        color: agent.system === 'hyperliquid' ? '#10b981' : '#3b82f6',
-                                        border: `1px solid ${agent.system === 'hyperliquid' ? '#10b981' : '#3b82f6'}`
+                                        bgcolor: agent.system === 'lighter' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                                        color: agent.system === 'lighter' ? '#10b981' : '#3b82f6',
+                                        border: `1px solid ${agent.system === 'lighter' ? '#10b981' : '#3b82f6'}`
                                     }}
                                 />
                             )}

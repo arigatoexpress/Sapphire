@@ -36,16 +36,16 @@ Deploy Aster trader to a European Cloud Run region.
 gcloud run deploy sapphire-aster \
   --image=gcr.io/sapphire-479610/sapphire-trader:latest \
   --region=europe-west1 \
-  --set-env-vars="ENABLE_ASTER=true,ENABLE_DRIFT=false,ENABLE_HYPERLIQUID=false"
+  --set-env-vars="ENABLE_ASTER=true,ENABLE_ASTER=false,ENABLE_LIGHTER=false"
 ```
 
 **Architecture:**
 ```
 ┌─────────────────────────────────────┐
 │ US Region (us-central1)             │
-│  - Drift trader                     │
-│  - Hyperliquid trader               │
-│  - Symphony trader                  │
+│  - Aster trader                     │
+│  - Lighter trader               │
+│  - Aster trader                  │
 │  - Lighter trader                   │
 └─────────────────────────────────────┘
 

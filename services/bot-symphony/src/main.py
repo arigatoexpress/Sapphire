@@ -1,7 +1,7 @@
 """
-Symphony Trading Bot - Standalone Service
+Aster Trading Bot - Standalone Service
 
-This is an independent microservice for trading on Symphony (Monad/Base).
+This is an independent microservice for trading on Aster (Monad/Base).
 It communicates with other services via Pub/Sub and stores state in Firestore.
 """
 
@@ -33,17 +33,17 @@ from models import (
 logger = logging.getLogger(__name__)
 
 # Service configuration
-SERVICE_NAME = "bot-symphony"
-PLATFORM = Platform.SYMPHONY
+SERVICE_NAME = "bot-aster"
+PLATFORM = Platform.ASTER
 
 
-class SymphonyBot:
+class AsterBot:
     """
-    Standalone Symphony trading bot.
+    Standalone Aster trading bot.
 
     Features:
     - Listens for trading signals via Pub/Sub
-    - Executes trades on Symphony platform
+    - Executes trades on Aster platform
     - Publishes trade results and position updates
     - Independent scaling and deployment
     """
@@ -53,7 +53,7 @@ class SymphonyBot:
         self.running = False
         self._shutdown_event = asyncio.Event()
 
-        # Symphony client (imported lazily to avoid circular deps)
+        # Aster client (imported lazily to avoid circular deps)
         self.client = None
 
         # Position tracking
@@ -66,23 +66,23 @@ class SymphonyBot:
         self.last_sync = None
 
     async def initialize(self):
-        """Initialize the Symphony client and connect to services."""
+        """Initialize the Aster client and connect to services."""
         import os
 
         self.trading_mode = os.getenv("TRADING_MODE", "PERPS").upper()
         logger.info(f"🚀 Initializing {SERVICE_NAME} in {self.trading_mode} mode...")
 
         try:
-            # Import Symphony client
-            # In production, this would be the actual symphony_client.py
-            from symphony_client import SymphonyClient
-            from symphony_config import SYMPHONY_AGENT_ID, SYMPHONY_MILF_ID
+            # Import Aster client
+            # In production, this would be the actual aster_client.py
+            from aster_client import AsterClient
+            from aster_config import ASTER_AGENT_ID, ASTER_MILF_ID
 
             logger.info(
-                f"🔑 Configured Agent IDs - Default: {SYMPHONY_AGENT_ID}, MILF: {SYMPHONY_MILF_ID}"
+                f"🔑 Configured Agent IDs - Default: {ASTER_AGENT_ID}, MILF: {ASTER_MILF_ID}"
             )
 
-            self.client = SymphonyClient()
+            self.client = AsterClient()
 
             # Initialize Pub/Sub
             pubsub = get_pubsub_client()
@@ -200,7 +200,7 @@ class SymphonyBot:
                 await asyncio.sleep(5)  # Back off on error
 
     async def _sync_loop(self):
-        """Periodically sync positions with Symphony."""
+        """Periodically sync positions with Aster."""
         while self.running:
             try:
                 await self._sync_positions()
@@ -275,11 +275,11 @@ class SymphonyBot:
     async def _verify_state(self):
         """Perform deep verification of account state."""
         try:
-            logger.info("🔍 STARTING DEEP VERIFICATION: SYMPHONY")
+            logger.info("🔍 STARTING DEEP VERIFICATION: ASTER")
 
             # Check Funds
             funds = await self.client.get_my_funds()
-            logger.info(f"💰 SYMPHONY RAW FUNDS: {funds}")
+            logger.info(f"💰 ASTER RAW FUNDS: {funds}")
 
             balance = 0
             if isinstance(funds, list) and len(funds) > 0:
@@ -287,46 +287,46 @@ class SymphonyBot:
             elif isinstance(funds, dict):
                 balance = funds.get("available", 0)
 
-            logger.info(f"📊 SYMPHONY VERIFICATION_REPORT | ESTIMATED_BALANCE: {balance}")
+            logger.info(f"📊 ASTER VERIFICATION_REPORT | ESTIMATED_BALANCE: {balance}")
 
             # Check Positions
             positions = await self.client.get_perpetual_positions()
-            logger.info(f"📈 SYMPHONY RAW POSITIONS: {positions}")
+            logger.info(f"📈 ASTER RAW POSITIONS: {positions}")
 
             active_positions = []
             if isinstance(positions, list):
                 active_positions = [p for p in positions if float(p.get("size", 0)) != 0]
 
             count = len(active_positions)
-            logger.info(f"📊 SYMPHONY VERIFICATION_REPORT | OPEN_POSITIONS_COUNT: {count}")
+            logger.info(f"📊 ASTER VERIFICATION_REPORT | OPEN_POSITIONS_COUNT: {count}")
 
             if count > 0:
-                logger.warning(f"⚠️ SYMPHONY HAS OPEN POSITIONS: {active_positions}")
+                logger.warning(f"⚠️ ASTER HAS OPEN POSITIONS: {active_positions}")
             else:
-                logger.info("✅ SYMPHONY POSITIONS: CLEARED")
+                logger.info("✅ ASTER POSITIONS: CLEARED")
 
         except Exception as e:
-            logger.error(f"❌ SYMPHONY VERIFICATION FAILED: {e}")
+            logger.error(f"❌ ASTER VERIFICATION FAILED: {e}")
 
     async def _execute_trade(self, signal: TradeSignal) -> TradeResult:
-        """Execute a trade on Symphony."""
+        """Execute a trade on Aster."""
         start_time = datetime.now()
 
         try:
             if not self.client:
-                raise Exception("Symphony client not initialized")
+                raise Exception("Aster client not initialized")
 
-            # Determine quantity/weight for Symphony
+            # Determine quantity/weight for Aster
             quantity = signal.quantity or self._calculate_position_size(signal)
 
-            # Symphony uses weight as percentage of collateral (0-100)
+            # Aster uses weight as percentage of collateral (0-100)
             # Convert our dollar amount to a weight estimate (assuming ~$250 account)
             # Ensure weight is at least 1% and max 100%
             # Determine Action
             action = "LONG" if signal.side in [TradeSide.BUY, TradeSide.LONG] else "SHORT"
 
             # Calculate weight
-            # Symphony min trade size is $5 USDC.
+            # Aster min trade size is $5 USDC.
             # With $250 balance, 1% ($2.50) fails.
             # We enforce a minimum weight of 10% ($25) to be safe.
             raw_quantity = signal.quantity if signal.quantity else 10
@@ -340,12 +340,12 @@ class SymphonyBot:
                 f"Executing with AgentID: {agent_id}, Weight: {weight}% (Min 10% enforced) Mode: {self.trading_mode}"
             )
 
-            # AI SYMBOL RESOLVER: Dynamically resolve symbol for Symphony
+            # AI SYMBOL RESOLVER: Dynamically resolve symbol for Aster
             try:
                 from shared.ai_symbol_resolver import resolve_symbol
 
                 resolved_symbol = await resolve_symbol(
-                    signal.symbol, "symphony", use_llm_fallback=True
+                    signal.symbol, "aster", use_llm_fallback=True
                 )
                 if resolved_symbol != signal.symbol:
                     logger.info(f"🔄 Symbol resolved: {signal.symbol} -> {resolved_symbol}")
@@ -500,7 +500,7 @@ class SymphonyBot:
         position = self.positions[symbol]
 
         try:
-            # Close via Symphony
+            # Close via Aster
             result = await self.client.close_position(symbol)
 
             if result.get("success"):
@@ -525,16 +525,16 @@ class SymphonyBot:
             await self._close_position(symbol, "risk_alert")
 
     async def _sync_positions(self):
-        """Sync positions with Symphony."""
+        """Sync positions with Aster."""
         try:
             if not self.client:
                 return
 
-            # Fetch positions from Symphony
-            symphony_positions = await self.client.get_perpetual_positions()
+            # Fetch positions from Aster
+            aster_positions = await self.client.get_perpetual_positions()
 
             # Update local state
-            for pos_data in symphony_positions:
+            for pos_data in aster_positions:
                 symbol = pos_data.get("symbol")
                 if symbol:
                     if symbol in self.positions:
@@ -615,11 +615,11 @@ async def main():
     setup_logging(os.getenv("LOG_LEVEL", "INFO"))
 
     logger.info("=" * 50)
-    logger.info(f"🎵 SYMPHONY BOT SERVICE")
+    logger.info(f"🎵 ASTER BOT SERVICE")
     logger.info(f"📅 {datetime.now().isoformat()}")
     logger.info("=" * 50)
 
-    bot = SymphonyBot()
+    bot = AsterBot()
 
     # Handle shutdown signals
     def handle_shutdown(sig, frame):

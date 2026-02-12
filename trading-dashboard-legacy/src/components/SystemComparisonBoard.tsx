@@ -13,7 +13,7 @@ interface SystemMetrics {
 
 interface SystemComparisonBoardProps {
   asterMetrics: SystemMetrics;
-  hyperliquidMetrics: SystemMetrics;
+  lighterMetrics: SystemMetrics;
 }
 
 const MetricRow = ({ label, asterValue, hlValue, format = 'currency', inverse = false }: any) => {
@@ -45,7 +45,7 @@ const MetricRow = ({ label, asterValue, hlValue, format = 'currency', inverse = 
   );
 };
 
-export const SystemComparisonBoard: React.FC<SystemComparisonBoardProps> = ({ asterMetrics, hyperliquidMetrics }) => {
+export const SystemComparisonBoard: React.FC<SystemComparisonBoardProps> = ({ asterMetrics, lighterMetrics }) => {
   return (
     <div className="relative bg-slate-900/80 backdrop-blur-xl rounded-3xl border border-slate-700/50 p-6 overflow-hidden">
       {/* Background Glows */}
@@ -73,7 +73,7 @@ export const SystemComparisonBoard: React.FC<SystemComparisonBoardProps> = ({ as
         <div className="flex items-center gap-3 text-right">
           <div>
             <h3 className="text-lg font-bold text-white">Hype Bull Agents</h3>
-            <p className="text-xs text-emerald-400 font-mono">HYPERLIQUID</p>
+            <p className="text-xs text-emerald-400 font-mono">LIGHTER</p>
           </div>
           <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30">
             <Zap className="w-6 h-6 text-emerald-400" />
@@ -86,35 +86,35 @@ export const SystemComparisonBoard: React.FC<SystemComparisonBoardProps> = ({ as
         <MetricRow
           label="Net Profit (PnL)"
           asterValue={asterMetrics.pnl}
-          hlValue={hyperliquidMetrics.pnl}
+          hlValue={lighterMetrics.pnl}
         />
         <MetricRow
           label="Trading Volume"
           asterValue={asterMetrics.volume}
-          hlValue={hyperliquidMetrics.volume}
+          hlValue={lighterMetrics.volume}
         />
         <MetricRow
           label="Win Rate"
           asterValue={asterMetrics.win_rate}
-          hlValue={hyperliquidMetrics.win_rate}
+          hlValue={lighterMetrics.win_rate}
           format="percent"
         />
         <MetricRow
           label="Fees Paid"
           asterValue={asterMetrics.fees}
-          hlValue={hyperliquidMetrics.fees}
+          hlValue={lighterMetrics.fees}
           inverse={true}
         />
         <MetricRow
           label="Active Agents"
           asterValue={asterMetrics.active_agents}
-          hlValue={hyperliquidMetrics.active_agents}
+          hlValue={lighterMetrics.active_agents}
           format="number"
         />
         <MetricRow
           label="Swept Profits"
           asterValue={asterMetrics.swept_profits}
-          hlValue={hyperliquidMetrics.swept_profits}
+          hlValue={lighterMetrics.swept_profits}
         />
       </div>
 

@@ -3,8 +3,8 @@ Emergency Close All Positions - Safety Kill Switch.
 
 Provides functions to close all open positions across all integrated platforms:
 - Aster (Spot & Perps)
-- Symphony (Swaps & Perps)
-- Drift (Perps)
+- Aster (Swaps & Perps)
+- Aster (Perps)
 
 
 Usage:
@@ -41,15 +41,15 @@ class EmergencyClose:
 
         results = {
             "aster": await self._close_aster_positions(dry_run),
-            "symphony": await self._close_symphony_positions(dry_run),
-            "drift": await self._close_drift_positions(dry_run),
+            "aster": await self._close_aster_positions(dry_run),
+            "aster": await self._close_aster_positions(dry_run),
             "total_closed": 0,
             "total_errors": 0,
             "dry_run": dry_run,
         }
 
         # Aggregate totals
-        for platform in ["aster", "symphony", "drift"]:
+        for platform in ["aster", "aster", "aster"]:
             results["total_closed"] += results[platform].get("closed", 0)
             results["total_errors"] += results[platform].get("errors", 0)
 
@@ -114,15 +114,15 @@ class EmergencyClose:
 
         return result
 
-    async def _close_symphony_positions(self, dry_run: bool) -> Dict[str, Any]:
-        """Close all positions on Symphony (Monad chain)."""
-        result = {"platform": "symphony", "positions": [], "closed": 0, "errors": 0}
+    async def _close_aster_positions(self, dry_run: bool) -> Dict[str, Any]:
+        """Close all positions on Aster (Monad chain)."""
+        result = {"platform": "aster", "positions": [], "closed": 0, "errors": 0}
 
         try:
-            from .symphony_client import SymphonyClient
-            from .symphony_config import AGENTS_CONFIG
+            from .aster_client import AsterClient
+            from .aster_config import AGENTS_CONFIG
 
-            client = SymphonyClient()
+            client = AsterClient()
 
             # Close positions for each agent (MILF, AGDG)
             for agent_name, agent_config in AGENTS_CONFIG.items():
@@ -153,33 +153,33 @@ class EmergencyClose:
                                     agent_id=agent_id,
                                 )
                                 result["closed"] += 1
-                                logger.info(f"✅ Closed Symphony position: {agent_name}/{symbol}")
+                                logger.info(f"✅ Closed Aster position: {agent_name}/{symbol}")
                             except Exception as e:
                                 result["errors"] += 1
                                 logger.error(
-                                    f"❌ Failed to close Symphony {agent_name}/{symbol}: {e}"
+                                    f"❌ Failed to close Aster {agent_name}/{symbol}: {e}"
                                 )
                 except Exception as e:
-                    logger.warning(f"⚠️ Could not fetch Symphony positions for {agent_name}: {e}")
+                    logger.warning(f"⚠️ Could not fetch Aster positions for {agent_name}: {e}")
 
         except Exception as e:
-            logger.error(f"❌ Symphony emergency close error: {e}")
+            logger.error(f"❌ Aster emergency close error: {e}")
             result["error"] = str(e)
 
         return result
 
-    async def _close_drift_positions(self, dry_run: bool) -> Dict[str, Any]:
-        """Close all positions on Drift (Solana DEX)."""
-        result = {"platform": "drift", "positions": [], "closed": 0, "errors": 0}
+    async def _close_aster_positions(self, dry_run: bool) -> Dict[str, Any]:
+        """Close all positions on Aster (Solana DEX)."""
+        result = {"platform": "aster", "positions": [], "closed": 0, "errors": 0}
 
         try:
-            from .drift_client import DriftClient
+            from .aster_client import AsterClient
 
-            client = DriftClient()
+            client = AsterClient()
             await client.initialize()
 
             if not client.is_initialized:
-                result["error"] = "Drift client not initialized (missing key or driftpy)"
+                result["error"] = "Aster client not initialized (missing key or asterpy)"
                 return result
 
             # Get open positions
@@ -203,13 +203,13 @@ class EmergencyClose:
                     try:
                         await client.close_position(symbol)
                         result["closed"] += 1
-                        logger.info(f"✅ Closed Drift position: {symbol}")
+                        logger.info(f"✅ Closed Aster position: {symbol}")
                     except Exception as e:
                         result["errors"] += 1
-                        logger.error(f"❌ Failed to close Drift {symbol}: {e}")
+                        logger.error(f"❌ Failed to close Aster {symbol}: {e}")
 
         except Exception as e:
-            logger.error(f"❌ Drift emergency close error: {e}")
+            logger.error(f"❌ Aster emergency close error: {e}")
             result["error"] = str(e)
 
         return result

@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
-"""Test Symphony API directly to check fund status."""
+"""Test Aster API directly to check fund status."""
 
 import asyncio
 import os
 
 import httpx
 
-API_KEY = os.getenv("SYMPHONY_API_KEY")
-BASE_URL = "https://api.symphony.io"
+API_KEY = os.getenv("ASTER_API_KEY")
+BASE_URL = "https://api.aster.io"
 MIT_AGENT_ID = "ee5bcfda-0919-469c-ac8f-d665a5dd444e"
 
 
 async def check_fund_status():
-    """Check actual fund status from Symphony API."""
+    """Check actual fund status from Aster API."""
     async with httpx.AsyncClient() as client:
         # Try to get agent info
         headers = {"x-api-key": API_KEY}
 
-        print("🔍 Checking Symphony API endpoints...")
+        print("🔍 Checking Aster API endpoints...")
         print("\n1. Testing GET /agent/all")
         try:
             response = await client.get(f"{BASE_URL}/agent/all", headers=headers)

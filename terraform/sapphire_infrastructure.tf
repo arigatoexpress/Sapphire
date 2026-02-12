@@ -153,27 +153,27 @@ resource "google_project_service" "firebase_hosting" {
   disable_on_destroy = false
 }
 
-# Agent Symphony Pub/Sub
-resource "google_pubsub_topic" "symphony_strategy" {
-  name = "symphony-strategy"
+# Agent Aster Pub/Sub
+resource "google_pubsub_topic" "aster_strategy" {
+  name = "aster-strategy"
 }
 
-resource "google_pubsub_topic" "symphony_execution" {
-  name = "symphony-execution"
+resource "google_pubsub_topic" "aster_execution" {
+  name = "aster-execution"
 }
 
 # Subscriptions
 resource "google_pubsub_subscription" "aster_strategy_sub" {
   name  = "aster-strategy-sub"
-  topic = google_pubsub_topic.symphony_strategy.name
+  topic = google_pubsub_topic.aster_strategy.name
 }
 
-resource "google_pubsub_subscription" "hyperliquid_strategy_sub" {
-  name  = "hyperliquid-strategy-sub"
-  topic = google_pubsub_topic.symphony_strategy.name
+resource "google_pubsub_subscription" "lighter_strategy_sub" {
+  name  = "lighter-strategy-sub"
+  topic = google_pubsub_topic.aster_strategy.name
 }
 
 resource "google_pubsub_subscription" "dashboard_execution_sub" {
   name  = "dashboard-execution-sub"
-  topic = google_pubsub_topic.symphony_execution.name
+  topic = google_pubsub_topic.aster_execution.name
 }

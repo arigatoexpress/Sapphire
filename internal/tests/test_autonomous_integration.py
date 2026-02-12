@@ -31,7 +31,7 @@ async def test_autonomous_integration():
         from cloud_trader.data.feature_pipeline import FeaturePipeline
         from cloud_trader.data_store import DataStore
         from cloud_trader.market_scanner import MarketScanner
-        from cloud_trader.platform_router import AsterAdapter, PlatformRouter, SymphonyAdapter
+        from cloud_trader.platform_router import AsterAdapter, PlatformRouter, AsterAdapter
 
         print("   ✅ All components imported successfully")
 
@@ -45,7 +45,7 @@ async def test_autonomous_integration():
             async def place_order(self, **kwargs):
                 return {"orderId": "mock_123", "status": "FILLED"}
 
-        class MockSymphonyClient:
+        class MockAsterClient:
             async def execute_swap(self, **kwargs):
                 return {"txHash": "mock_tx_123"}
 
@@ -53,7 +53,7 @@ async def test_autonomous_integration():
                 return {"orderId": "mock_perp_123"}
 
         mock_exchange = MockExchangeClient()
-        mock_symphony = MockSymphonyClient()
+        mock_aster = MockAsterClient()
 
         # Create feature pipeline with mocked data
         feature_pipeline = FeaturePipeline(mock_exchange)
@@ -69,7 +69,7 @@ async def test_autonomous_integration():
         data_store, autonomous_agents, platform_router, market_scanner = init_autonomous_components(
             feature_pipeline=feature_pipeline,
             exchange_client=mock_exchange,
-            symphony_client=mock_symphony,
+            aster_client=mock_aster,
             settings=MockSettings(),
         )
 
@@ -124,11 +124,11 @@ async def test_autonomous_integration():
         )
         print(f"   ✅ Aster trade: {result.success} - Order ID: {result.order_id}")
 
-        # Test Symphony routing (swap)
+        # Test Aster routing (swap)
         result = await platform_router.execute(
-            symbol="MON-USDC", side="BUY", quantity=100, platform="symphony"
+            symbol="MON-USDC", side="BUY", quantity=100, platform="aster"
         )
-        print(f"   ✅ Symphony swap: {result.success}, Metadata: {result.metadata}")
+        print(f"   ✅ Aster swap: {result.success}, Metadata: {result.metadata}")
 
         # 7. Test Learning Mechanism
         print("\n7️⃣ Testing Agent Learning...")
@@ -159,7 +159,7 @@ async def test_autonomous_integration():
         print(f"   ✅ All components initialized successfully")
         print(f"   ✅ MarketScanner operational")
         print(f"   ✅ {len(autonomous_agents)} agents formulating theses")
-        print(f"   ✅ PlatformRouter routing to Symphony & Aster")
+        print(f"   ✅ PlatformRouter routing to Aster & Aster")
         print(f"   ✅ Learning mechanism functional")
         print("\n🚀 System ready for live deployment!\n")
 

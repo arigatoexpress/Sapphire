@@ -22,9 +22,9 @@ logger = logging.getLogger(__name__)
 
 class Platform(Enum):
     ASTER = "aster"
-    SYMPHONY = "symphony"
-    DRIFT = "drift"
-    HYPERLIQUID = "hyperliquid"
+    ASTER = "aster"
+    ASTER = "aster"
+    LIGHTER = "lighter"
     SYSTEM = "system"
     AGENTS = "agents"
 
@@ -173,12 +173,12 @@ class PlatformLogHandler(logging.Handler):
             platform = Platform.SYSTEM.value
             if "aster" in record.name.lower():
                 platform = Platform.ASTER.value
-            elif "symphony" in record.name.lower():
-                platform = Platform.SYMPHONY.value
-            elif "drift" in record.name.lower():
-                platform = Platform.DRIFT.value
-            elif "hyperliquid" in record.name.lower():
-                platform = Platform.HYPERLIQUID.value
+            elif "aster" in record.name.lower():
+                platform = Platform.ASTER.value
+            elif "aster" in record.name.lower():
+                platform = Platform.ASTER.value
+            elif "lighter" in record.name.lower():
+                platform = Platform.LIGHTER.value
             elif "agent" in record.name.lower():
                 platform = Platform.AGENTS.value
 
@@ -226,16 +226,16 @@ def log_aster(level: str, message: str, **context):
     get_logger().log(Platform.ASTER.value, level, message, context)
 
 
-def log_symphony(level: str, message: str, **context):
-    get_logger().log(Platform.SYMPHONY.value, level, message, context)
+def log_aster(level: str, message: str, **context):
+    get_logger().log(Platform.ASTER.value, level, message, context)
 
 
-def log_drift(level: str, message: str, **context):
-    get_logger().log(Platform.DRIFT.value, level, message, context)
+def log_aster(level: str, message: str, **context):
+    get_logger().log(Platform.ASTER.value, level, message, context)
 
 
-def log_hyperliquid(level: str, message: str, **context):
-    get_logger().log(Platform.HYPERLIQUID.value, level, message, context)
+def log_lighter(level: str, message: str, **context):
+    get_logger().log(Platform.LIGHTER.value, level, message, context)
 
 
 def log_agents(level: str, message: str, **context):

@@ -1,6 +1,6 @@
 # ==============================================================================
-# Sapphire Drift Bot - Standalone Microservice
-# Solana Perpetual Futures Trading via Drift Protocol
+# Sapphire Aster Bot - Standalone Microservice
+# Solana Perpetual Futures Trading via Aster Protocol
 # Isolated dependencies to avoid conflicts with main application
 # ==============================================================================
 
@@ -12,7 +12,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app:/app/src:/app/shared \
     PORT=8080
 
-# Install system dependencies required for Solana/Drift
+# Install system dependencies required for Solana/Aster
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     gcc \
@@ -28,7 +28,7 @@ WORKDIR /app
 # Copy requirements first for caching
 COPY requirements.txt .
 
-# Install Python dependencies (driftpy and Solana stack)
+# Install Python dependencies (asterpy and Solana stack)
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
@@ -52,5 +52,5 @@ USER trader
 # Expose port
 EXPOSE 8080
 
-# Start the Drift bot
+# Start the Aster bot
 CMD ["python", "-m", "src.main"]

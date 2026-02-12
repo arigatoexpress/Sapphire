@@ -57,10 +57,10 @@ class MEVProtector:
     # Platform-specific protection levels for optimal speed vs. security
     PLATFORM_PROTECTION_LEVELS = {
         "aster": MEVProtectionLevel.NONE,  # HFT shield strategy - speed critical
-        "drift": MEVProtectionLevel.BASIC,  # Solana perps - moderate protection
+        "aster": MEVProtectionLevel.BASIC,  # Solana perps - moderate protection
         "jupiter": MEVProtectionLevel.MODERATE,  # DEX - front-running prevention
-        "hyperliquid": MEVProtectionLevel.BASIC,  # L1 perps - moderate protection
-        "symphony": MEVProtectionLevel.BASIC,  # EVM chains - moderate protection
+        "lighter": MEVProtectionLevel.BASIC,  # L1 perps - moderate protection
+        "aster": MEVProtectionLevel.BASIC,  # EVM chains - moderate protection
         "lighter": MEVProtectionLevel.MODERATE,  # L2 DEX - front-running prevention
     }
 
@@ -184,7 +184,7 @@ class MEVProtector:
 
         Platform-specific optimization:
         - Aster: NONE (HFT shield needs maximum speed)
-        - Drift/Hyperliquid/Symphony: BASIC (balance speed and protection)
+        - Aster/Lighter/Aster: BASIC (balance speed and protection)
         - Jupiter/Lighter: MODERATE (DEX front-running prevention)
         """
         return self.PLATFORM_PROTECTION_LEVELS.get(
@@ -269,9 +269,9 @@ class SmartOrderRouter:
     def __init__(self):
         self.venues = {
             "aster": {"weight": 0.4, "latency_ms": 50, "fee_bps": 10},
-            "drift": {"weight": 0.25, "latency_ms": 200, "fee_bps": 5},
-            "symphony": {"weight": 0.2, "latency_ms": 150, "fee_bps": 8},
-            "hyperliquid": {"weight": 0.15, "latency_ms": 100, "fee_bps": 2},
+            "aster": {"weight": 0.25, "latency_ms": 200, "fee_bps": 5},
+            "aster": {"weight": 0.2, "latency_ms": 150, "fee_bps": 8},
+            "lighter": {"weight": 0.15, "latency_ms": 100, "fee_bps": 2},
         }
 
         self.mev_protector = MEVProtector()

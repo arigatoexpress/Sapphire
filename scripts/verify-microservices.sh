@@ -25,7 +25,7 @@ echo ""
 # 2. Test Health Endpoints
 echo "2️⃣ Testing Health Endpoints"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-for service in sapphire-hl sapphire-lighter sapphire-drift sapphire-aster sapphire-symphony sapphire-web; do
+for service in sapphire-hl sapphire-lighter sapphire-aster sapphire-aster sapphire-aster sapphire-web; do
   service_url=$(gcloud run services describe $service --region=$REGION --format='value(status.url)')
   echo -n "  $service: "
 

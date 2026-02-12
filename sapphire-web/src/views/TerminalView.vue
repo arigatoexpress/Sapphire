@@ -15,7 +15,7 @@ const autoRefresh = ref(true)
 const selectedPlatform = ref('all')
 let refreshInterval: ReturnType<typeof setInterval> | null = null
 
-const platforms = ['all', 'aster', 'hyperliquid', 'drift', 'symphony', 'jupiter', 'lighter']
+const platforms = ['all', 'aster', 'lighter', 'aster', 'aster', 'jupiter', 'lighter']
 
 const glossary: Record<string, string> = {
     INFO: 'text-secondary',
@@ -42,9 +42,9 @@ const parseLogSource = (message: string): string => {
     const sourceMatch = message.match(/\[([A-Z_]+)\]/)
     if (sourceMatch) return sourceMatch[1]
     if (message.toLowerCase().includes('aster')) return 'ASTER'
-    if (message.toLowerCase().includes('hyperliquid')) return 'HYPERLIQUID'
-    if (message.toLowerCase().includes('drift')) return 'DRIFT'
-    if (message.toLowerCase().includes('symphony')) return 'SYMPHONY'
+    if (message.toLowerCase().includes('lighter')) return 'LIGHTER'
+    if (message.toLowerCase().includes('aster')) return 'ASTER'
+    if (message.toLowerCase().includes('aster')) return 'ASTER'
     if (message.toLowerCase().includes('jupiter')) return 'JUPITER'
     if (message.toLowerCase().includes('router')) return 'ROUTER'
     if (message.toLowerCase().includes('agent')) return 'AGENT'

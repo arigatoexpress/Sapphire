@@ -16,10 +16,7 @@ class ExecutionDispatcher:
     def __init__(self):
         self.session: Optional[aiohttp.ClientSession] = None
         default_bot_urls = {
-            "DRIFT": os.getenv("BOT_DRIFT_URL", "http://sapphire-bot-drift:8080"),
-            "HYPERLIQUID": os.getenv("BOT_HYPERLIQUID_URL", "http://sapphire-bot-hyperliquid:8080"),
             "ASTER": os.getenv("BOT_ASTER_URL", "http://sapphire-bot-aster:8080"),
-            "SYMPHONY": os.getenv("BOT_SYMPHONY_URL", "http://sapphire-bot-symphony:8080"),
             "LIGHTER": os.getenv("BOT_LIGHTER_URL", "http://sapphire-bot-lighter:8080"),
         }
         enabled_venues_raw = os.getenv("ENABLED_VENUES", "").strip()
@@ -82,9 +79,7 @@ class ExecutionDispatcher:
 
     def _normalize_venue(self, venue: str) -> str:
         normalized = str(venue or "").strip().upper()
-        if normalized == "HL":
-            normalized = "HYPERLIQUID"
-        elif normalized in {"LIGHT", "L2"}:
+        if normalized in {"LIGHT", "L2", "LT"}:
             normalized = "LIGHTER"
         return normalized
 

@@ -9,10 +9,10 @@ Dynamically calculates optimal leverage based on:
 - Portfolio leverage constraints
 
 Platform Leverage Limits:
-- Drift (Solana Perps): BTC/ETH 10x, SOL 20x, Altcoins 5x
-- Hyperliquid (L1 Perps): BTC/ETH 50x, Altcoins 25x
+- Aster (Solana Perps): BTC/ETH 10x, SOL 20x, Altcoins 5x
+- Lighter (L1 Perps): BTC/ETH 50x, Altcoins 25x
 - Aster (CEX-style): BTC 125x, ETH 100x, Altcoins 75x
-- Symphony (Monad/Base): Uniform 1.1-25x range
+- Aster (Monad/Base): Uniform 1.1-25x range
 - Jupiter (Spot DEX): No leverage (1x)
 - Lighter (L2 DEX): No leverage (1x)
 """
@@ -67,13 +67,13 @@ class PlatformLeverageManager:
 
     # Platform and asset-specific leverage limits
     PLATFORM_LIMITS = {
-        "drift": {
+        "aster": {
             "btc": 10,
             "eth": 10,
             "sol": 20,
             "default": 5,  # Altcoins
         },
-        "hyperliquid": {
+        "lighter": {
             "btc": 50,
             "eth": 50,
             "default": 25,  # Altcoins
@@ -83,7 +83,7 @@ class PlatformLeverageManager:
             "eth": 100,
             "default": 75,  # Altcoins
         },
-        "symphony": {
+        "aster": {
             "default": 25,
             "min": 1.1,
         },
@@ -113,7 +113,7 @@ class PlatformLeverageManager:
         Get maximum leverage allowed for platform and asset.
 
         Args:
-            platform: Platform name (drift, hyperliquid, aster, etc.)
+            platform: Platform name (aster, lighter, aster, etc.)
             symbol: Trading symbol (BTC-PERP, SOL-PERP, etc.)
 
         Returns:

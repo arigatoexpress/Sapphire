@@ -82,7 +82,7 @@ def main():
 
     print("\n✅ Manual Activation Sequence Complete.")
     print("The Monad chain now has 5 transactions from your wallet.")
-    print("Symphony checks (activity) should pass shortly.")
+    print("Aster checks (activity) should pass shortly.")
 
 
 if __name__ == "__main__":

@@ -65,21 +65,21 @@ steps:
       - '--cpu-boost'
       - '--no-cpu-throttling'
       - '--set-env-vars'
-      - 'ENABLE_JUPITER=false,ENABLE_DRIFT=false,ENABLE_ASTER=false,ENABLE_HYPERLIQUID=true,ENABLE_LIGHTER=false,ENABLE_SYMPHONY=false,ENABLE_TELEGRAM_LISTENER=true,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,ENVIRONMENT=production,LOG_LEVEL=INFO,SOLANA_RPC_URL=https://api.mainnet-beta.solana.com'
+      - 'ENABLE_JUPITER=false,ENABLE_ASTER=false,ENABLE_ASTER=false,ENABLE_LIGHTER=true,ENABLE_LIGHTER=false,ENABLE_ASTER=false,ENABLE_TELEGRAM_LISTENER=true,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,ENVIRONMENT=production,LOG_LEVEL=INFO,SOLANA_RPC_URL=https://api.mainnet-beta.solana.com'
       - '--set-secrets'
       - 'JUPITER_API_KEY=JUPITER_API_KEY:latest,SOLANA_PRIVATE_KEY=SOLANA_PRIVATE_KEY:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest'
     id: 'deploy-jupiter'
     waitFor: ['push-latest']
 
   # ═══════════════════════════════════════════════════════════
-  # STEP 4: Deploy Drift Service (Solana Perps)
+  # STEP 4: Deploy Aster Service (Solana Perps)
   # ═══════════════════════════════════════════════════════════
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
       - 'run'
       - 'deploy'
-      - 'sapphire-drift'
+      - 'sapphire-aster'
       - '--image'
       - 'gcr.io/$PROJECT_ID/sapphire-microservice:latest'
       - '--region'
@@ -104,10 +104,10 @@ steps:
       - '--cpu-boost'
       - '--no-cpu-throttling'
       - '--set-env-vars'
-      - 'ENABLE_JUPITER=false,ENABLE_DRIFT=true,ENABLE_ASTER=false,ENABLE_HYPERLIQUID=false,ENABLE_LIGHTER=false,ENABLE_SYMPHONY=false,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,ENVIRONMENT=production,LOG_LEVEL=INFO,SOLANA_RPC_URL=https://api.mainnet-beta.solana.com'
+      - 'ENABLE_JUPITER=false,ENABLE_ASTER=true,ENABLE_ASTER=false,ENABLE_LIGHTER=false,ENABLE_LIGHTER=false,ENABLE_ASTER=false,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,ENVIRONMENT=production,LOG_LEVEL=INFO,SOLANA_RPC_URL=https://api.mainnet-beta.solana.com'
       - '--set-secrets'
-      - 'SOLANA_PRIVATE_KEY=DRIFT_SOLANA_PRIVATE_KEY:latest,DRIFT_PRIVATE_KEY=DRIFT_SOLANA_PRIVATE_KEY:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest'
-    id: 'deploy-drift'
+      - 'SOLANA_PRIVATE_KEY=ASTER_SOLANA_PRIVATE_KEY:latest,ASTER_PRIVATE_KEY=ASTER_SOLANA_PRIVATE_KEY:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest'
+    id: 'deploy-aster'
     waitFor: ['push-latest']
 
   # ═══════════════════════════════════════════════════════════
@@ -143,21 +143,21 @@ steps:
       - '--cpu-boost'
       - '--no-cpu-throttling'
       - '--set-env-vars'
-      - 'ENABLE_JUPITER=false,ENABLE_DRIFT=false,ENABLE_ASTER=true,ENABLE_HYPERLIQUID=false,ENABLE_LIGHTER=false,ENABLE_SYMPHONY=false,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,ENVIRONMENT=production,LOG_LEVEL=INFO'
+      - 'ENABLE_JUPITER=false,ENABLE_ASTER=false,ENABLE_ASTER=true,ENABLE_LIGHTER=false,ENABLE_LIGHTER=false,ENABLE_ASTER=false,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,ENVIRONMENT=production,LOG_LEVEL=INFO'
       - '--set-secrets'
       - 'ASTER_API_KEY=ASTER_API_KEY:latest,ASTER_SECRET_KEY=ASTER_SECRET_KEY:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest'
     id: 'deploy-aster'
     waitFor: ['push-latest']
 
   # ═══════════════════════════════════════════════════════════
-  # STEP 6: Deploy Hyperliquid Service (L1 Perps)
+  # STEP 6: Deploy Lighter Service (L1 Perps)
   # ═══════════════════════════════════════════════════════════
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
       - 'run'
       - 'deploy'
-      - 'sapphire-hyperliquid'
+      - 'sapphire-lighter'
       - '--image'
       - 'gcr.io/$PROJECT_ID/sapphire-microservice:latest'
       - '--region'
@@ -182,21 +182,21 @@ steps:
       - '--cpu-boost'
       - '--no-cpu-throttling'
       - '--set-env-vars'
-      - 'ENABLE_JUPITER=false,ENABLE_DRIFT=false,ENABLE_ASTER=false,ENABLE_HYPERLIQUID=true,ENABLE_LIGHTER=false,ENABLE_SYMPHONY=false,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,ENVIRONMENT=production,LOG_LEVEL=INFO'
+      - 'ENABLE_JUPITER=false,ENABLE_ASTER=false,ENABLE_ASTER=false,ENABLE_LIGHTER=true,ENABLE_LIGHTER=false,ENABLE_ASTER=false,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,ENVIRONMENT=production,LOG_LEVEL=INFO'
       - '--set-secrets'
       - 'HL_SECRET_KEY=HL_SECRET_KEY:latest,HL_ACCOUNT_ADDRESS=HL_ACCOUNT_ADDRESS:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest'
-    id: 'deploy-hyperliquid'
+    id: 'deploy-lighter'
     waitFor: ['push-latest']
 
   # ═══════════════════════════════════════════════════════════
-  # STEP 7: Deploy Symphony Service (Monad/Base)
+  # STEP 7: Deploy Aster Service (Monad/Base)
   # ═══════════════════════════════════════════════════════════
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
       - 'run'
       - 'deploy'
-      - 'sapphire-symphony'
+      - 'sapphire-aster'
       - '--image'
       - 'gcr.io/$PROJECT_ID/sapphire-microservice:latest'
       - '--region'
@@ -221,10 +221,10 @@ steps:
       - '--cpu-boost'
       - '--no-cpu-throttling'
       - '--set-env-vars'
-      - 'ENABLE_JUPITER=false,ENABLE_DRIFT=false,ENABLE_ASTER=false,ENABLE_HYPERLIQUID=false,ENABLE_LIGHTER=false,ENABLE_SYMPHONY=true,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,ENVIRONMENT=production,LOG_LEVEL=INFO'
+      - 'ENABLE_JUPITER=false,ENABLE_ASTER=false,ENABLE_ASTER=false,ENABLE_LIGHTER=false,ENABLE_LIGHTER=false,ENABLE_ASTER=true,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,ENVIRONMENT=production,LOG_LEVEL=INFO'
       - '--set-secrets'
-      - 'SYMPHONY_API_KEY=SYMPHONY_API_KEY:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest'
-    id: 'deploy-symphony'
+      - 'ASTER_API_KEY=ASTER_API_KEY:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest'
+    id: 'deploy-aster'
     waitFor: ['push-latest']
 
   # ═══════════════════════════════════════════════════════════
@@ -261,7 +261,7 @@ steps:
       - '--cpu-boost'
       - '--no-cpu-throttling'
       - '--set-env-vars'
-      - 'ENABLE_JUPITER=false,ENABLE_DRIFT=false,ENABLE_ASTER=false,ENABLE_HYPERLIQUID=false,ENABLE_LIGHTER=true,ENABLE_SYMPHONY=false,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,ENVIRONMENT=production,LOG_LEVEL=INFO'
+      - 'ENABLE_JUPITER=false,ENABLE_ASTER=false,ENABLE_ASTER=false,ENABLE_LIGHTER=false,ENABLE_LIGHTER=true,ENABLE_ASTER=false,ENABLE_PUBSUB=true,GCP_PROJECT_ID=$PROJECT_ID,ENVIRONMENT=production,LOG_LEVEL=INFO'
       - '--set-secrets'
       - 'LIGHTER_PUB_KEY=LIGHTER_PUB_KEY:latest,LIGHTER_PRIV_KEY=LIGHTER_PRIV_KEY:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,TELEGRAM_CHAT_ID=TELEGRAM_CHAT_ID:latest'
     id: 'deploy-lighter'

@@ -6,7 +6,7 @@ interface TradeFormProps {
     onTradeComplete: () => void;
 }
 
-export const SymphonyTradeForm: React.FC<TradeFormProps> = ({ onTradeComplete }) => {
+export const AsterTradeForm: React.FC<TradeFormProps> = ({ onTradeComplete }) => {
     const { user } = useAuth();
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -31,7 +31,7 @@ export const SymphonyTradeForm: React.FC<TradeFormProps> = ({ onTradeComplete })
         try {
             const token = await user.getIdToken();
             const response = await fetch(
-                `${import.meta.env.VITE_API_URL}/api/symphony/trade/perpetual`,
+                `${import.meta.env.VITE_API_URL}/api/aster/trade/perpetual`,
                 {
                     method: 'POST',
                     headers: {
@@ -80,8 +80,8 @@ export const SymphonyTradeForm: React.FC<TradeFormProps> = ({ onTradeComplete })
         try {
             const token = await user.getIdToken();
             const endpoint = formData.tradeType === 'perpetual'
-                ? '/api/symphony/trade/perpetual'
-                : '/api/symphony/trade/spot';
+                ? '/api/aster/trade/perpetual'
+                : '/api/aster/trade/spot';
 
             const body = formData.tradeType === 'perpetual'
                 ? {
@@ -260,4 +260,4 @@ export const SymphonyTradeForm: React.FC<TradeFormProps> = ({ onTradeComplete })
     );
 };
 
-export default SymphonyTradeForm;
+export default AsterTradeForm;

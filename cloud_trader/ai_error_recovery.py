@@ -159,7 +159,7 @@ class AIErrorRecoveryAgent:
         normalizer = get_precision_normalizer()
 
         signal = context.get("signal")
-        platform = context.get("platform", "hyperliquid")
+        platform = context.get("platform", "lighter")
 
         if not signal:
             return None
@@ -198,7 +198,7 @@ class AIErrorRecoveryAgent:
         resolver = get_symbol_resolver()
 
         signal = context.get("signal")
-        platform = context.get("platform", "hyperliquid")
+        platform = context.get("platform", "lighter")
 
         if not signal:
             return None

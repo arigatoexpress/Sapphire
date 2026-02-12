@@ -30,10 +30,10 @@ const activeAgents = computed(() => {
 const platforms = computed(() => {
     const health = systemHealth.value?.orchestrator?.config || {}
     return [
-        { name: 'Hyperliquid', key: 'hyperliquid', enabled: true, type: 'DeFi Perps' },
-        { name: 'Drift', key: 'drift', enabled: health.enable_drift, type: 'Solana Perps' },
+        { name: 'Lighter', key: 'lighter', enabled: true, type: 'DeFi Perps' },
+        { name: 'Aster', key: 'aster', enabled: health.enable_aster, type: 'Solana Perps' },
         { name: 'Aster', key: 'aster', enabled: health.enable_aster, type: 'CEX' },
-        { name: 'Symphony', key: 'symphony', enabled: health.enable_symphony, type: 'Monad Treasury' },
+        { name: 'Aster', key: 'aster', enabled: health.enable_aster, type: 'Monad Treasury' },
     ]
 })
 
@@ -179,36 +179,36 @@ onMounted(() => {
                 </div>
             </div>
 
-            <!-- Symphony Treasury -->
-            <div class="panel glass symphony-panel">
+            <!-- Aster Treasury -->
+            <div class="panel glass aster-panel">
                 <div class="panel-header">
-                    <h3 class="font-mono">SYMPHONY TREASURY</h3>
-                    <span class="badge symphony font-mono">MONAD</span>
+                    <h3 class="font-mono">ASTER TREASURY</h3>
+                    <span class="badge aster font-mono">MONAD</span>
                 </div>
-                <div class="symphony-agents">
-                    <div class="symphony-agent">
-                        <div class="symphony-icon">💰</div>
-                        <div class="symphony-info">
-                            <span class="symphony-ticker font-mono">$MILF</span>
-                            <span class="symphony-name">Treasury Agent</span>
+                <div class="aster-agents">
+                    <div class="aster-agent">
+                        <div class="aster-icon">💰</div>
+                        <div class="aster-info">
+                            <span class="aster-ticker font-mono">$MILF</span>
+                            <span class="aster-name">Treasury Agent</span>
                         </div>
-                        <span class="symphony-status active font-mono">ACTIVE</span>
+                        <span class="aster-status active font-mono">ACTIVE</span>
                     </div>
-                    <div class="symphony-agent">
-                        <div class="symphony-icon">🔥</div>
-                        <div class="symphony-info">
-                            <span class="symphony-ticker font-mono">$AGDG</span>
-                            <span class="symphony-name">Degen Agent</span>
+                    <div class="aster-agent">
+                        <div class="aster-icon">🔥</div>
+                        <div class="aster-info">
+                            <span class="aster-ticker font-mono">$AGDG</span>
+                            <span class="aster-name">Degen Agent</span>
                         </div>
-                        <span class="symphony-status active font-mono">ACTIVE</span>
+                        <span class="aster-status active font-mono">ACTIVE</span>
                     </div>
-                    <div class="symphony-agent">
-                        <div class="symphony-icon">🏦</div>
-                        <div class="symphony-info">
-                            <span class="symphony-ticker font-mono">$MIT</span>
-                            <span class="symphony-name">Implementation Treasury</span>
+                    <div class="aster-agent">
+                        <div class="aster-icon">🏦</div>
+                        <div class="aster-info">
+                            <span class="aster-ticker font-mono">$MIT</span>
+                            <span class="aster-name">Implementation Treasury</span>
                         </div>
-                        <span class="symphony-status pending font-mono">{{ mitProgress.remaining }}/5 TRADES</span>
+                        <span class="aster-status pending font-mono">{{ mitProgress.remaining }}/5 TRADES</span>
                     </div>
                 </div>
                 <div class="mit-progress">
@@ -360,7 +360,7 @@ onMounted(() => {
     letter-spacing: 0.05em;
 }
 
-.badge.symphony {
+.badge.aster {
     background: var(--color-purple-dim);
     color: var(--color-purple);
 }
@@ -393,10 +393,10 @@ onMounted(() => {
     border-radius: 50%;
 }
 
-.platform-dot.hyperliquid { background: var(--platform-hyperliquid); box-shadow: 0 0 8px var(--platform-hyperliquid); }
-.platform-dot.drift { background: var(--platform-drift); box-shadow: 0 0 8px var(--platform-drift); }
+.platform-dot.lighter { background: var(--platform-lighter); box-shadow: 0 0 8px var(--platform-lighter); }
 .platform-dot.aster { background: var(--platform-aster); box-shadow: 0 0 8px var(--platform-aster); }
-.platform-dot.symphony { background: var(--platform-symphony); box-shadow: 0 0 8px var(--platform-symphony); }
+.platform-dot.aster { background: var(--platform-aster); box-shadow: 0 0 8px var(--platform-aster); }
+.platform-dot.aster { background: var(--platform-aster); box-shadow: 0 0 8px var(--platform-aster); }
 
 .platform-details {
     display: flex;
@@ -477,15 +477,15 @@ onMounted(() => {
     box-shadow: 0 0 8px var(--color-success);
 }
 
-/* Symphony Panel */
-.symphony-agents {
+/* Aster Panel */
+.aster-agents {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
     margin-bottom: 1rem;
 }
 
-.symphony-agent {
+.aster-agent {
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -494,39 +494,39 @@ onMounted(() => {
     border-radius: var(--radius-sm);
 }
 
-.symphony-icon {
+.aster-icon {
     font-size: 1.25rem;
 }
 
-.symphony-info {
+.aster-info {
     flex: 1;
     display: flex;
     flex-direction: column;
 }
 
-.symphony-ticker {
+.aster-ticker {
     font-size: 0.75rem;
     font-weight: 700;
 }
 
-.symphony-name {
+.aster-name {
     font-size: 0.625rem;
     color: var(--text-tertiary);
 }
 
-.symphony-status {
+.aster-status {
     font-size: 0.5625rem;
     padding: 0.25rem 0.5rem;
     border-radius: var(--radius-xs);
     font-weight: 600;
 }
 
-.symphony-status.active {
+.aster-status.active {
     background: var(--color-success-dim);
     color: var(--color-success);
 }
 
-.symphony-status.pending {
+.aster-status.pending {
     background: var(--color-warning-dim);
     color: var(--color-warning);
 }

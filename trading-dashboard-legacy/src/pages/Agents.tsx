@@ -58,7 +58,7 @@ export const Agents: React.FC<AgentsProps> = ({ bots, messages }) => {
       specialty: 'Whale Tracking',
       riskLevel: 'Medium',
       timeHorizon: 'Short',
-      system: 'symphony',
+      system: 'aster',
       description: 'Strategic Monad whale follower and smart money tracker.'
     },
     {
@@ -69,30 +69,30 @@ export const Agents: React.FC<AgentsProps> = ({ bots, messages }) => {
       specialty: 'Asymmetric Bets',
       riskLevel: 'High',
       timeHorizon: 'Short',
-      system: 'symphony',
+      system: 'aster',
       description: 'Aggressive, risk-on asymmetric bettor investing in AI/Privacy/Virtuals.'
     },
     {
-      id: 'drift-solana-agent',
-      name: 'Drift Trader',
+      id: 'aster-solana-agent',
+      name: 'Aster Trader',
       emoji: '🌀',
       model: 'Gemini 3.0 Flash',
       specialty: 'Solana Perps',
       riskLevel: 'Medium',
       timeHorizon: 'Short',
-      system: 'drift',
+      system: 'aster',
       description: 'Fast-acting Solana trader capturing ecosystem momentum.'
     },
     {
-      id: 'hyperliquid-l1-agent',
+      id: 'lighter-l1-agent',
       name: 'HyperTrader',
       emoji: '🌊',
       model: 'Gemini 3.0 Flash',
       specialty: 'HFT Perps',
       riskLevel: 'Medium',
       timeHorizon: 'Very Short',
-      system: 'hyperliquid',
-      description: 'Low-latency trader executing on Hyperliquid L1.'
+      system: 'lighter',
+      description: 'Low-latency trader executing on Lighter L1.'
     }
   ];
 
@@ -157,7 +157,7 @@ export const Agents: React.FC<AgentsProps> = ({ bots, messages }) => {
           const pnl = botData.pnl || 0;
           const score = botData.performance_score || 0;
           const isProfitable = pnl >= 0;
-          const isHype = agent.system === 'hyperliquid';
+          const isHype = agent.system === 'lighter';
 
           return (
             <div

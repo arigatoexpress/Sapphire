@@ -62,10 +62,9 @@ class AlphaEngine:
     def _normalize_platform(self, platform: str) -> str:
         value = str(platform or "").strip().upper()
         aliases = {
-            "HL": "HYPERLIQUID",
-            "HYPER": "HYPERLIQUID",
             "LIGHT": "LIGHTER",
             "L2": "LIGHTER",
+            "LT": "LIGHTER",
             "ALL": "ALL",
         }
         return aliases.get(value, value)

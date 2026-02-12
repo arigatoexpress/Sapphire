@@ -1,7 +1,7 @@
 """Service identity management for microservices architecture.
 
 Each Cloud Run service needs to know:
-- Who am I? (Hyperliquid, Lighter, Drift, etc.)
+- Who am I? (Lighter, Lighter, Aster, etc.)
 - What should I do? (Only my designated platform)
 - What should I NOT do? (Other platforms)
 """
@@ -19,11 +19,11 @@ logger = logging.getLogger(__name__)
 class ServiceType(str, Enum):
     """Types of services in the Sapphire microservices mesh."""
 
-    HYPERLIQUID = "hyperliquid"
     LIGHTER = "lighter"
-    DRIFT = "drift"
+    LIGHTER = "lighter"
     ASTER = "aster"
-    SYMPHONY = "symphony"
+    ASTER = "aster"
+    ASTER = "aster"
     WEB = "web"
     UNKNOWN = "unknown"
 
@@ -54,11 +54,11 @@ class ServiceIdentity:
             return True
 
         # Handle aliases
-        if service_type_str == "hyperliquid" and platform_lower in ["hl", "hyperliquid"]:
+        if service_type_str == "lighter" and platform_lower in ["hl", "lighter"]:
             return True
         if service_type_str == "lighter" and platform_lower in ["lighter", "lighter.xyz"]:
             return True
-        if service_type_str == "drift" and platform_lower in ["drift", "drift protocol"]:
+        if service_type_str == "aster" and platform_lower in ["aster", "aster protocol"]:
             return True
         if service_type_str == "aster" and platform_lower in ["aster", "asterdex"]:
             return True
@@ -73,39 +73,39 @@ def _detect_service_type_from_env() -> ServiceType:
     """Detect service type from environment variables.
 
     Cloud Run deployment sets these flags per service:
-    - sapphire-hl: ENABLE_HYPERLIQUID=true, all others false
+    - sapphire-hl: ENABLE_LIGHTER=true, all others false
     - sapphire-lighter: ENABLE_LIGHTER=true, all others false
-    - sapphire-drift: ENABLE_DRIFT=true, all others false
     - sapphire-aster: ENABLE_ASTER=true, all others false
-    - sapphire-symphony: ENABLE_SYMPHONY=true, all others false
+    - sapphire-aster: ENABLE_ASTER=true, all others false
+    - sapphire-aster: ENABLE_ASTER=true, all others false
     - sapphire-web: SERVE_FRONTEND=true, all others false
     """
     # Check enable flags
-    if os.getenv("ENABLE_HYPERLIQUID", "false").lower() == "true":
-        return ServiceType.HYPERLIQUID
     if os.getenv("ENABLE_LIGHTER", "false").lower() == "true":
         return ServiceType.LIGHTER
-    if os.getenv("ENABLE_DRIFT", "false").lower() == "true":
-        return ServiceType.DRIFT
+    if os.getenv("ENABLE_LIGHTER", "false").lower() == "true":
+        return ServiceType.LIGHTER
     if os.getenv("ENABLE_ASTER", "false").lower() == "true":
         return ServiceType.ASTER
-    if os.getenv("ENABLE_SYMPHONY", "false").lower() == "true":
-        return ServiceType.SYMPHONY
+    if os.getenv("ENABLE_ASTER", "false").lower() == "true":
+        return ServiceType.ASTER
+    if os.getenv("ENABLE_ASTER", "false").lower() == "true":
+        return ServiceType.ASTER
     if os.getenv("SERVE_FRONTEND", "false").lower() == "true":
         return ServiceType.WEB
 
     # Fallback: check K_SERVICE env var (Cloud Run service name)
     k_service = os.getenv("K_SERVICE", "").lower()
-    if "hl" in k_service or "hyperliquid" in k_service:
-        return ServiceType.HYPERLIQUID
+    if "hl" in k_service or "lighter" in k_service:
+        return ServiceType.LIGHTER
     if "lighter" in k_service:
         return ServiceType.LIGHTER
-    if "drift" in k_service:
-        return ServiceType.DRIFT
     if "aster" in k_service:
         return ServiceType.ASTER
-    if "symphony" in k_service:
-        return ServiceType.SYMPHONY
+    if "aster" in k_service:
+        return ServiceType.ASTER
+    if "aster" in k_service:
+        return ServiceType.ASTER
     if "web" in k_service:
         return ServiceType.WEB
 
@@ -116,11 +116,11 @@ def _detect_service_type_from_env() -> ServiceType:
 def _get_emoji_for_service(service_type: ServiceType) -> str:
     """Get emoji representation for a service type."""
     emoji_map = {
-        ServiceType.HYPERLIQUID: "💧",
+        ServiceType.LIGHTER: "💧",
         ServiceType.LIGHTER: "⚡",
-        ServiceType.DRIFT: "🌀",
+        ServiceType.ASTER: "🌀",
         ServiceType.ASTER: "⭐",
-        ServiceType.SYMPHONY: "🎻",
+        ServiceType.ASTER: "🎻",
         ServiceType.WEB: "🌐",
         ServiceType.UNKNOWN: "❓",
     }
@@ -148,13 +148,13 @@ def get_service_identity() -> ServiceIdentity:
 
     # Service characteristics
     is_trading_service = service_type in [
-        ServiceType.HYPERLIQUID,
         ServiceType.LIGHTER,
-        ServiceType.DRIFT,
+        ServiceType.LIGHTER,
+        ServiceType.ASTER,
         ServiceType.ASTER,
     ]
     is_web_service = service_type == ServiceType.WEB
-    is_orchestrator = service_type == ServiceType.SYMPHONY
+    is_orchestrator = service_type == ServiceType.ASTER
 
     identity = ServiceIdentity(
         service_type=service_type,

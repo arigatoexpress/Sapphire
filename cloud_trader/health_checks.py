@@ -79,18 +79,18 @@ async def check_platform_health(service, platform: str) -> dict:
         import time
         start = time.time()
 
-        if platform.lower() == "drift" and hasattr(service, 'drift_client'):
-            # Quick Drift health check - get account info
-            if service.drift_client:
-                positions = await service.drift_client.get_positions()
+        if platform.lower() == "aster" and hasattr(service, 'aster_client'):
+            # Quick Aster health check - get account info
+            if service.aster_client:
+                positions = await service.aster_client.get_positions()
                 health["healthy"] = True
                 health["last_trade"] = len(positions) if positions else 0
 
-        elif platform.lower() == "hyperliquid" and hasattr(service, 'hyperliquid_client'):
-            # Quick Hyperliquid health check
-            if service.hyperliquid_client:
+        elif platform.lower() == "lighter" and hasattr(service, 'lighter_client'):
+            # Quick Lighter health check
+            if service.lighter_client:
                 # Try to get user state
-                user_state = await service.hyperliquid_client.get_user_state()
+                user_state = await service.lighter_client.get_user_state()
                 health["healthy"] = True if user_state else False
 
         elif platform.lower() == "aster" and hasattr(service, '_exchange_client'):
@@ -99,9 +99,9 @@ async def check_platform_health(service, platform: str) -> dict:
                 server_time = await service._exchange_client.get_server_time()
                 health["healthy"] = True if server_time else False
 
-        elif platform.lower() == "symphony":
-            # Symphony health check - verify agent manager
-            if hasattr(service, 'symphony_manager') and service.symphony_manager:
+        elif platform.lower() == "aster":
+            # Aster health check - verify agent manager
+            if hasattr(service, 'aster_manager') and service.aster_manager:
                 health["healthy"] = True
 
         elif platform.lower() == "lighter":
@@ -124,7 +124,7 @@ async def check_all_platforms_health(service) -> dict:
     V2.3: Check health of all independent platform traders.
     Returns comprehensive health status for autonomous trading system.
     """
-    platforms = ["drift", "hyperliquid", "aster", "symphony", "lighter"]
+    platforms = ["aster", "lighter", "aster", "aster", "lighter"]
     results = {}
 
     for platform in platforms:

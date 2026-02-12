@@ -83,15 +83,15 @@ class AISymbolResolver:
 
         # Known symbol mappings (common transformations)
         self._known_mappings = {
-            "hyperliquid": {
+            "lighter": {
                 "BONK": "1000BONK",
                 "SHIB": "1000SHIB",
                 "PEPE": "1000PEPE",
                 "FLOKI": "1000FLOKI",
                 "LUNC": "1000LUNC",
             },
-            "symphony": {
-                # Symphony uses full addresses for some tokens
+            "aster": {
+                # Aster uses full addresses for some tokens
                 # Add known mappings as discovered
             },
             "aster": {
@@ -101,10 +101,10 @@ class AISymbolResolver:
 
         # Common symbol format patterns
         self._format_transformations = {
-            "hyperliquid": self._format_for_hyperliquid,
+            "lighter": self._format_for_lighter,
             "aster": self._format_for_aster,
-            "symphony": self._format_for_symphony,
-            "drift": self._format_for_drift,
+            "aster": self._format_for_aster,
+            "aster": self._format_for_aster,
         }
 
     async def resolve(
@@ -115,7 +115,7 @@ class AISymbolResolver:
 
         Args:
             generic_symbol: The symbol in generic format (e.g., "BTC-USDC", "ETH/USDT")
-            platform: Target platform ("hyperliquid", "aster", "symphony", "drift")
+            platform: Target platform ("lighter", "aster", "aster", "aster")
             use_llm_fallback: Whether to use LLM for unresolved cases
 
         Returns:
@@ -237,8 +237,8 @@ class AISymbolResolver:
 
         return symbol
 
-    def _format_for_hyperliquid(self, symbol: str) -> str:
-        """Format symbol for Hyperliquid (just base asset)."""
+    def _format_for_lighter(self, symbol: str) -> str:
+        """Format symbol for Lighter (just base asset)."""
         return self._extract_base(symbol)
 
     def _format_for_aster(self, symbol: str) -> str:
@@ -246,13 +246,13 @@ class AISymbolResolver:
         base = self._extract_base(symbol)
         return f"{base}USDT"
 
-    def _format_for_symphony(self, symbol: str) -> str:
-        """Format symbol for Symphony (BTC-USDC format)."""
+    def _format_for_aster(self, symbol: str) -> str:
+        """Format symbol for Aster (BTC-USDC format)."""
         base = self._extract_base(symbol)
         return f"{base}-USDC"
 
-    def _format_for_drift(self, symbol: str) -> str:
-        """Format symbol for Drift (SOL-PERP format)."""
+    def _format_for_aster(self, symbol: str) -> str:
+        """Format symbol for Aster (SOL-PERP format)."""
         base = self._extract_base(symbol)
         return f"{base}-PERP"
 
@@ -270,8 +270,8 @@ class AISymbolResolver:
                 return self._exchange_symbols[platform]
 
         try:
-            if platform == "hyperliquid":
-                symbols = await self._fetch_hyperliquid_symbols()
+            if platform == "lighter":
+                symbols = await self._fetch_lighter_symbols()
             elif platform == "aster":
                 symbols = await self._fetch_aster_symbols()
             else:
@@ -285,14 +285,14 @@ class AISymbolResolver:
             logger.warning(f"Failed to fetch symbols for {platform}: {e}")
             return set()
 
-    async def _fetch_hyperliquid_symbols(self) -> Set[str]:
-        """Fetch supported symbols from Hyperliquid."""
+    async def _fetch_lighter_symbols(self) -> Set[str]:
+        """Fetch supported symbols from Lighter."""
         import httpx
 
         try:
             async with httpx.AsyncClient() as client:
                 resp = await client.post(
-                    "https://api.hyperliquid.xyz/info", json={"type": "meta"}, timeout=10
+                    "https://api.lighter.xyz/info", json={"type": "meta"}, timeout=10
                 )
                 data = resp.json()
                 universe = data.get("universe", [])
@@ -348,10 +348,10 @@ class AISymbolResolver:
 Given the generic trading symbol "{symbol}", what is the correct symbol format for the {platform} exchange?
 
 Rules:
-- Hyperliquid: Uses just the base asset (e.g., "BTC", "ETH", "1000BONK" for meme coins)
+- Lighter: Uses just the base asset (e.g., "BTC", "ETH", "1000BONK" for meme coins)
 - Aster: Uses BTCUSDT format (concatenated with USDT)
-- Symphony: Uses BTC-USDC format (hyphenated with USDC)
-- Drift: Uses SOL-PERP format (hyphenated with PERP for perpetuals)
+- Aster: Uses BTC-USDC format (hyphenated with USDC)
+- Aster: Uses SOL-PERP format (hyphenated with PERP for perpetuals)
 
 Respond with ONLY the resolved symbol, nothing else. If you cannot determine the correct symbol, respond with "UNKNOWN".
 """

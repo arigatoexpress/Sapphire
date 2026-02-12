@@ -25,7 +25,7 @@ fi
 # We will read them into variables to pass to gcloud
 source .env
 
-if [ -z "$SYMPHONY_API_KEY" ] || [ -z "$SOLANA_PRIVATE_KEY" ]; then
+if [ -z "$ASTER_API_KEY" ] || [ -z "$SOLANA_PRIVATE_KEY" ]; then
     echo "❌ Error: Keys missing in .env."
     exit 1
 fi
@@ -43,10 +43,10 @@ gcloud run deploy $APP_NAME \
   --platform managed \
   --region $REGION \
   --allow-unauthenticated \
-  --set-env-vars="SYMPHONY_API_KEY=$SYMPHONY_API_KEY" \
+  --set-env-vars="ASTER_API_KEY=$ASTER_API_KEY" \
   --set-env-vars="SOLANA_PRIVATE_KEY=$SOLANA_PRIVATE_KEY" \
   --set-env-vars="JUPITER_API_KEY=$JUPITER_API_KEY" \
-  --set-env-vars="SYMPHONY_BASE_URL=$SYMPHONY_BASE_URL" \
+  --set-env-vars="ASTER_BASE_URL=$ASTER_BASE_URL" \
   --min-instances=1 \
   --max-instances=10 \
   --memory=1Gi \

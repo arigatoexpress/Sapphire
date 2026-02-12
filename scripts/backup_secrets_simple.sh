@@ -30,7 +30,7 @@ echo "✅ Inventory exported"
 
 # 2. Export non-critical secrets (API keys)
 echo -e "${YELLOW}🔑 Exporting API keys...${NC}"
-for secret in ASTER_API_KEY SYMPHONY_API_KEY GEMINI_API_KEY TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID GROK_API_KEY vertex_api_key_v1; do
+for secret in ASTER_API_KEY ASTER_API_KEY GEMINI_API_KEY TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID GROK_API_KEY vertex_api_key_v1; do
   echo " - Exporting $secret..."
   gcloud secrets versions access latest --secret=$secret --project=$PROJECT_ID > "${secret}.txt" 2>/dev/null || echo "⚠️  Failed to export $secret"
 done
@@ -135,8 +135,8 @@ gcloud firestore import \$(cat firestore-backup-location.txt) --project=$PROJECT
 
 ## Critical Private Keys (HIGHEST PRIORITY)
 🔴 Restore these immediately if exchange wallets compromised:
-- HL_SECRET_KEY (Hyperliquid - controls funds)
-- SOLANA_PRIVATE_KEY (Drift Protocol - controls funds)
+- HL_SECRET_KEY (Lighter - controls funds)
+- SOLANA_PRIVATE_KEY (Aster Protocol - controls funds)
 - ASTER_SECRET_KEY (Aster DEX - controls funds)
 
 ## Security Notes

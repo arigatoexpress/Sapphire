@@ -1,6 +1,6 @@
 """
 Comprehensive Platform Tests
-Tests for all trading platforms: Hyperliquid, Aster, Symphony, Lighter
+Tests for all trading platforms: Lighter, Aster, Aster, Lighter
 """
 
 import asyncio
@@ -11,27 +11,27 @@ from typing import List, Dict, Any
 # Add parent to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from cloud_trader.hyperliquid_client import get_hyperliquid_client
+from cloud_trader.lighter_client import get_lighter_client
 from cloud_trader.aster_client import get_aster_client
-from cloud_trader.symphony_client import get_symphony_client
+from cloud_trader.aster_client import get_aster_client
 from cloud_trader.lighter_client import get_lighter_client
 from tests.test_base import PlatformTestBase, TestConfig, assert_price_valid
 
 
-class HyperliquidTests(Platform
+class LighterTests(Platform
 
 TestBase):
-    """Unit tests for Hyperliquid client"""
+    """Unit tests for Lighter client"""
 
     def __init__(self):
-        super().__init__("Hyperliquid")
+        super().__init__("Lighter")
 
     async def setup(self):
-        """Initialize Hyperliquid client"""
+        """Initialize Lighter client"""
         print(f"\n{'='*70}")
-        print(f"🌐 HYPERLIQUID TESTS")
+        print(f"🌐 LIGHTER TESTS")
         print(f"{'='*70}")
-        self.client = get_hyperliquid_client()
+        self.client = get_lighter_client()
 
     async def test_initialization(self):
         """Test client initialization"""
@@ -137,18 +137,18 @@ class AsterTests(PlatformTestBase):
         return self.get_summary()
 
 
-class SymphonyTests(PlatformTestBase):
-    """Unit tests for Symphony client"""
+class AsterTests(PlatformTestBase):
+    """Unit tests for Aster client"""
 
     def __init__(self):
-        super().__init__("Symphony")
+        super().__init__("Aster")
 
     async def setup(self):
-        """Initialize Symphony client"""
+        """Initialize Aster client"""
         print(f"\n{'='*70}")
-        print(f"🎵 SYMPHONY TESTS")
+        print(f"🎵 ASTER TESTS")
         print(f"{'='*70}")
-        self.client = get_symphony_client()
+        self.client = get_aster_client()
 
     async def test_initialization(self):
         """Test client initialization"""
@@ -249,14 +249,14 @@ async def run_all_platform_tests() -> List[Dict[str, Any]]:
     print(f"\n{'='*70}")
     print(f"🧪 COMPREHENSIVE PLATFORM TESTS")
     print(f"{'='*70}")
-    print(f"Testing: Hyperliquid, Aster, Symphony, Lighter")
+    print(f"Testing: Lighter, Aster, Aster, Lighter")
     print(f"{'='*70}\n")
 
     summaries = []
 
-    # Hyperliquid
-    print(f"\n🌐 Running Hyperliquid Tests...")
-    hl_tests = HyperliquidTests()
+    # Lighter
+    print(f"\n🌐 Running Lighter Tests...")
+    hl_tests = LighterTests()
     summaries.append(await hl_tests.run_all_tests())
 
     # Aster
@@ -264,10 +264,10 @@ async def run_all_platform_tests() -> List[Dict[str, Any]]:
     aster_tests = AsterTests()
     summaries.append(await aster_tests.run_all_tests())
 
-    # Symphony
-    print(f"\n🎵 Running Symphony Tests...")
-    symphony_tests = SymphonyTests()
-    summaries.append(await symphony_tests.run_all_tests())
+    # Aster
+    print(f"\n🎵 Running Aster Tests...")
+    aster_tests = AsterTests()
+    summaries.append(await aster_tests.run_all_tests())
 
     # Lighter
     print(f"\n💡 Running Lighter Tests...")

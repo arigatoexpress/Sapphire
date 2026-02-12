@@ -16,15 +16,15 @@
     </div>
 
     <div class="terminals-grid">
-      <!-- Drift Terminal -->
+      <!-- Aster Terminal -->
       <TraderTerminal
-        :trader="traders.drift"
+        :trader="traders.aster"
         @send-command="sendCommand"
       />
 
-      <!-- Hyperliquid Terminal -->
+      <!-- Lighter Terminal -->
       <TraderTerminal
-        :trader="traders.hyperliquid"
+        :trader="traders.lighter"
         @send-command="sendCommand"
       />
 
@@ -34,9 +34,9 @@
         @send-command="sendCommand"
       />
 
-      <!-- Symphony Terminal -->
+      <!-- Aster Terminal -->
       <TraderTerminal
-        :trader="traders.symphony"
+        :trader="traders.aster"
         @send-command="sendCommand"
       />
 
@@ -76,16 +76,16 @@ const connectionStatus = ref<'connected' | 'disconnected' | 'connecting'>('conne
 const logsPaused = ref(false)
 
 const traders = reactive({
-  drift: {
-    id: 'drift',
-    name: 'Drift (Solana Perps)',
+  aster: {
+    id: 'aster',
+    name: 'Aster (Solana Perps)',
     status: 'offline',
     logs: [] as LogEntry[],
     stats: { trades: 0, pnl: 0, winRate: 0, volume: 0 }
   },
-  hyperliquid: {
-    id: 'hyperliquid',
-    name: 'Hyperliquid',
+  lighter: {
+    id: 'lighter',
+    name: 'Lighter',
     status: 'offline',
     logs: [] as LogEntry[],
     stats: { trades: 0, pnl: 0, winRate: 0, volume: 0 }
@@ -97,9 +97,9 @@ const traders = reactive({
     logs: [] as LogEntry[],
     stats: { trades: 0, pnl: 0, winRate: 0, volume: 0 }
   },
-  symphony: {
-    id: 'symphony',
-    name: 'Symphony (Monad)',
+  aster: {
+    id: 'aster',
+    name: 'Aster (Monad)',
     status: 'offline',
     logs: [] as LogEntry[],
     stats: { trades: 0, pnl: 0, winRate: 0, volume: 0 }
@@ -229,13 +229,13 @@ const clearAllLogs = () => {
 // Simulate logs for demo (remove when WebSocket is connected)
 const simulateLogs = () => {
   const messages = [
-    { trader: 'drift', level: 'info', message: '📊 Analyzing SOL-PERP trends...' },
-    { trader: 'drift', level: 'success', message: '✅ VPIN signal detected: SOL-PERP (conf: 0.85)' },
-    { trader: 'hyperliquid', level: 'info', message: '🔍 Scanning BTC-USDC market...' },
-    { trader: 'hyperliquid', level: 'warn', message: '⚠️ High volatility detected on BTC-USDC' },
-    { trader: 'hyperliquid', level: 'trade', message: '🧠 [Momentum] BTC-USDC: LONG (conf: 0.72)' },
+    { trader: 'aster', level: 'info', message: '📊 Analyzing SOL-PERP trends...' },
+    { trader: 'aster', level: 'success', message: '✅ VPIN signal detected: SOL-PERP (conf: 0.85)' },
+    { trader: 'lighter', level: 'info', message: '🔍 Scanning BTC-USDC market...' },
+    { trader: 'lighter', level: 'warn', message: '⚠️ High volatility detected on BTC-USDC' },
+    { trader: 'lighter', level: 'trade', message: '🧠 [Momentum] BTC-USDC: LONG (conf: 0.72)' },
     { trader: 'aster', level: 'info', message: '⚡ Shield strategy active, monitoring BTC-PERP...' },
-    { trader: 'symphony', level: 'info', message: '🎵 Monitoring MON-USDC liquidity...' },
+    { trader: 'aster', level: 'info', message: '🎵 Monitoring MON-USDC liquidity...' },
     { trader: 'lighter', level: 'info', message: '💡 Lighter orderbook analysis running...' },
   ]
 

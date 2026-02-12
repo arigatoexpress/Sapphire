@@ -108,21 +108,21 @@ class PositionMonitor:
 
     async def _sync_all_positions(self):
         """Sync positions from all platforms."""
-        # Sync Drift positions
-        if self.service.drift and self.service.drift.is_initialized:
-            await self._sync_drift_positions()
+        # Sync Aster positions
+        if self.service.aster and self.service.aster.is_initialized:
+            await self._sync_aster_positions()
 
-        # Sync Hyperliquid positions (if perpetuals are used there)
+        # Sync Lighter positions (if perpetuals are used there)
         # Add additional platforms as needed
 
-    async def _sync_drift_positions(self):
-        """Sync perpetual positions from Drift Protocol."""
+    async def _sync_aster_positions(self):
+        """Sync perpetual positions from Aster Protocol."""
         try:
-            positions = await self.service.drift.get_all_perp_positions()
+            positions = await self.service.aster.get_all_perp_positions()
 
             for pos_data in positions:
                 symbol = pos_data["market"]
-                key = f"drift:{symbol}"
+                key = f"aster:{symbol}"
 
                 # Calculate P&L percentage
                 entry_price = pos_data["entry_price"]
@@ -137,7 +137,7 @@ class PositionMonitor:
 
                 # Create Position object
                 position = Position(
-                    platform=PlatformType.DRIFT,
+                    platform=PlatformType.ASTER,
                     symbol=symbol,
                     side=pos_data["side"],
                     size=pos_data["size"],
@@ -160,16 +160,16 @@ class PositionMonitor:
                 )
 
             # Remove closed positions
-            drift_symbols = {pos["market"] for pos in positions}
+            aster_symbols = {pos["market"] for pos in positions}
             for key in list(self.positions.keys()):
-                if key.startswith("drift:"):
+                if key.startswith("aster:"):
                     symbol = key.split(":")[1]
-                    if symbol not in drift_symbols:
+                    if symbol not in aster_symbols:
                         logger.info(f"🔒 Position closed: {symbol}")
                         del self.positions[key]
 
         except Exception as e:
-            logger.error(f"❌ Failed to sync Drift positions: {e}")
+            logger.error(f"❌ Failed to sync Aster positions: {e}")
 
     async def _check_liquidation_risk(self):
         """Check all positions for liquidation risk and send alerts."""

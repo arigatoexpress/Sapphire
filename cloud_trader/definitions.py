@@ -116,16 +116,16 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         # Regime preferences (boost/reduce activity)
         "preferred_regimes": ["trending_up", "trending_down"],
     },
-    # ============ SYMPHONY AGENTS ============
-    # These agents route to Symphony for Monad/Base chain execution
+    # ============ ASTER AGENTS ============
+    # These agents route to Aster for Monad/Base chain execution
     {
         "id": "monad-treasury-agent",  # Formerly MILF
         "name": "Monad Implementation Treasury Agent",
         "model": "gemini-3.0-flash-001",
-        "system": "symphony",
+        "system": "aster",
         "emoji": "🏛️",
         "type": "swap",
-        "symbols": [],  # Empty = trade all SYMPHONY_SYMBOLS dynamically
+        "symbols": [],  # Empty = trade all ASTER_SYMBOLS dynamically
         "description": "Monad Treasury Agent focusing on top-market cap projects and whale tracking.",
         "personality": "Strategic Monad whale follower and smart money tracker.",
         "baseline_win_rate": 0.60,
@@ -149,7 +149,7 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         "id": "ari-gold-fund",  # Formerly AGDG
         "name": "The Ari Gold Fund",
         "model": "gemini-3.0-flash-001",
-        "system": "symphony",
+        "system": "aster",
         "emoji": "🚁",
         "type": "perps",
         "symbols": ["ETH-USDC", "BTC-USDC", "DEGEN-USDC", "BRETT-USDC", "VIRTUAL-USDC"],
@@ -174,14 +174,14 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
     },
     # Degen agent removed - consolidated into "The Ari Gold Fund"
     {
-        "id": "drift-autonomous-trader",
-        "name": "Drift Autonomous Trader",
+        "id": "aster-autonomous-trader",
+        "name": "Aster Autonomous Trader",
         "model": "gemini-3.0-flash-001",
-        "system": "drift",
+        "system": "aster",
         "emoji": "🌀",
         "type": "adaptive_learning",
         "symbols": [],  # Learns which Solana tokens trade best
-        "description": "Autonomous learning agent mastering Drift Protocol through experience and pattern discovery.",
+        "description": "Autonomous learning agent mastering Aster Protocol through experience and pattern discovery.",
         "personality": "Intelligent Solana trader that evolves strategies based on platform-specific insights.",
         "baseline_win_rate": 0.50,  # Improves through learning
         "risk_multiplier": 1.2,
@@ -192,7 +192,7 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         "self_tuning_enabled": True,
         "adaptive_params": {
             "confidence_threshold": 0.40,
-            "leverage": 10.0,  # Will discover optimal leverage for Drift
+            "leverage": 10.0,  # Will discover optimal leverage for Aster
             "position_size_pct": 0.15,
         },
         "max_leverage_limit": 20.0,
@@ -202,7 +202,7 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         "enable_episodic_memory": True,
         "enable_pattern_discovery": True,
     },
-    # Hyperliquid Agent Removed (Deprecated) - Coverage moved to Aster/Drift
+    # Lighter Agent Removed (Deprecated) - Coverage moved to Aster/Aster
 ]
 
 # Agents trade all available symbols dynamically
@@ -218,16 +218,16 @@ SYMBOL_CONFIG = {
     # Base Ecosystem (Aster Verified)
     "ASTERUSDC": {"qty": 10.0, "precision": 1},
     "TOSHIUSDC": {"qty": 1000.0, "precision": 0},
-    # Hyperliquid Cross-Listed (Aster Verified)
+    # Lighter Cross-Listed (Aster Verified)
     "HYPEUSDC": {"qty": 1.0, "precision": 1},
     # Additional Aster-Verified Pairs
     "ZECUSDC": {"qty": 0.1, "precision": 2},
     "TRUMPUSDC": {"qty": 1.0, "precision": 1},
 }
 
-# Assets supported by Symphony Agents (Monad chain priority)
-# Assets supported by Symphony Agents (Monad chain priority)
-SYMPHONY_SYMBOLS = [
+# Assets supported by Aster Agents (Monad chain priority)
+# Assets supported by Aster Agents (Monad chain priority)
+ASTER_SYMBOLS = [
     # Monad Ecosystem - Priority for chain launch incentives
     "ETH-USDC",  # Native ETH on Monad
     "MON-USDC",  # Monad native token
@@ -241,14 +241,14 @@ SYMPHONY_SYMBOLS = [
     "VIRTUAL-USDC",
 ]
 
-# Assets supported by Hyperliquid (US-compatible exchange)
+# Assets supported by Lighter (US-compatible exchange)
 # Expanded to cover major trading pairs - bypasses Aster's US region block
-HYPERLIQUID_SYMBOLS = [
+LIGHTER_SYMBOLS = [
     # Major pairs (highest liquidity)
     "BTC-USDC", "BTCUSDT", "BTCUSD",
     "ETH-USDC", "ETHUSDT", "ETHUSD",
     "SOL-USDC", "SOLUSDT", "SOLUSD",
-    # Altcoins available on Hyperliquid
+    # Altcoins available on Lighter
     "HYPE-USDC", "PURR-USDC",
     "BNB-USDC", "BNBUSDT",
     "AVAX-USDC", "AVAXUSDT",
@@ -257,12 +257,12 @@ HYPERLIQUID_SYMBOLS = [
     "DOGE-USDC", "DOGEUSDT",
 ]
 
-# Assets supported by Drift (Solana perps - US-compatible)
-DRIFT_SYMBOLS = [
+# Assets supported by Aster (Solana perps - US-compatible)
+ASTER_SYMBOLS = [
     "JUP-USDC", "JUPUSDT",
     "PYTH-USDC", "PYTHUSDT",
     "BONK-USDC", "BONKUSDT",
-    "SOL-USDC", "SOLUSDT",  # Also on Drift
+    "SOL-USDC", "SOLUSDT",  # Also on Aster
 ]
 
 
@@ -293,9 +293,9 @@ JUPITER_SPOT_SYMBOLS = [
 # Legacy alias for backward compatibility
 JUPITER_SYMBOLS = JUPITER_SPOT_SYMBOLS
 
-# Assets supported by Drift (Solana Perpetuals - PERPS ONLY)
-# Drift Protocol for leveraged perpetual futures trading
-DRIFT_PERP_SYMBOLS = [
+# Assets supported by Aster (Solana Perpetuals - PERPS ONLY)
+# Aster Protocol for leveraged perpetual futures trading
+ASTER_PERP_SYMBOLS = [
     "SOL-PERP",
     "BTC-PERP",
     "ETH-PERP",

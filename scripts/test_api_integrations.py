@@ -3,9 +3,9 @@ Comprehensive API Integration Testing Suite
 Tests all external service connections and documents capabilities.
 
 Services tested:
-1. Drift Protocol - Solana perpetual futures
+1. Aster Protocol - Solana perpetual futures
 2. Jupiter Ultra - Solana DEX swaps
-3. Symphony.finance - Fund management
+3. Aster.finance - Fund management
 4. Monad - Agent orchestration (if applicable)
 
 For each service, this suite:
@@ -24,10 +24,10 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
-from cloud_trader.drift_client import get_drift_client
+from cloud_trader.aster_client import get_aster_client
 from cloud_trader.jupiter_client import JupiterSwapClient
 from cloud_trader.logger import get_logger
-from cloud_trader.symphony_client import SymphonyClient
+from cloud_trader.aster_client import AsterClient
 
 logger = get_logger(__name__)
 
@@ -64,16 +64,16 @@ class APITestResult:
         }
 
 
-class DriftProtocolTester:
+class AsterProtocolTester:
     """
-    Test suite for Drift Protocol integration.
+    Test suite for Aster Protocol integration.
 
-    Drift is a decentralized perpetual futures DEX on Solana.
+    Aster is a decentralized perpetual futures DEX on Solana.
     """
 
     def __init__(self):
-        self.client = get_drift_client()
-        self.service_name = "Drift Protocol"
+        self.client = get_aster_client()
+        self.service_name = "Aster Protocol"
         self.results: List[APITestResult] = []
 
     async def test_initialization(self) -> APITestResult:
@@ -198,7 +198,7 @@ class DriftProtocolTester:
             )
 
     async def run_all_tests(self) -> List[APITestResult]:
-        """Run all Drift Protocol tests."""
+        """Run all Aster Protocol tests."""
         logger.info(f"🧪 Testing {self.service_name}...")
 
         self.results = [
@@ -215,9 +215,9 @@ class DriftProtocolTester:
         return self.results
 
     def get_capabilities(self) -> Dict[str, Any]:
-        """Document Drift Protocol capabilities."""
+        """Document Aster Protocol capabilities."""
         return {
-            "service": "Drift Protocol",
+            "service": "Aster Protocol",
             "type": "Decentralized Perpetual Futures DEX",
             "blockchain": "Solana",
             "capabilities": {
@@ -255,13 +255,13 @@ class DriftProtocolTester:
             },
             "authentication": {
                 "method": "Solana wallet signature",
-                "required": ["SOLANA_PRIVATE_KEY", "DRIFT_SUBACCOUNT_ID"],
+                "required": ["SOLANA_PRIVATE_KEY", "ASTER_SUBACCOUNT_ID"],
                 "test_mode": "Available (no real funds)",
             },
-            "sdk": {"python": "driftpy", "version": ">=0.4.0", "docs": "https://docs.drift.trade"},
+            "sdk": {"python": "asterpy", "version": ">=0.4.0", "docs": "https://docs.aster.trade"},
             "notes": [
                 "Currently using CoinGecko for prices (backup source)",
-                "Full driftpy integration pending",
+                "Full asterpy integration pending",
                 "Funding rates are mocked until SDK integrated",
                 "All orders are simulated in current implementation",
             ],
@@ -465,22 +465,22 @@ class JupiterUltraTester:
         }
 
 
-class SymphonyTester:
+class AsterTester:
     """
-    Test suite for Symphony.finance integration.
+    Test suite for Aster.finance integration.
 
-    Symphony provides on-chain fund management infrastructure.
+    Aster provides on-chain fund management infrastructure.
     """
 
     def __init__(self):
         try:
-            self.client = SymphonyClient()
-            self.service_name = "Symphony Finance"
+            self.client = AsterClient()
+            self.service_name = "Aster Finance"
             self.results: List[APITestResult] = []
         except Exception as e:
-            logger.error(f"Failed to initialize Symphony client: {e}")
+            logger.error(f"Failed to initialize Aster client: {e}")
             self.client = None
-            self.service_name = "Symphony Finance"
+            self.service_name = "Aster Finance"
             self.results = []
 
     async def test_api_connection(self) -> APITestResult:
@@ -518,7 +518,7 @@ class SymphonyTester:
             )
 
     async def test_authentication(self) -> APITestResult:
-        """Test Symphony API authentication."""
+        """Test Aster API authentication."""
         if not self.client:
             return APITestResult(
                 service=self.service_name,
@@ -534,7 +534,7 @@ class SymphonyTester:
                 service=self.service_name,
                 test_name="authentication",
                 status="FAIL",
-                error="SYMPHONY_API_KEY not configured",
+                error="ASTER_API_KEY not configured",
             )
 
         # Test with actual API call
@@ -608,7 +608,7 @@ class SymphonyTester:
                 )
 
     async def run_all_tests(self) -> List[APITestResult]:
-        """Run all Symphony tests."""
+        """Run all Aster tests."""
         logger.info(f"🧪 Testing {self.service_name}...")
 
         self.results = [
@@ -624,9 +624,9 @@ class SymphonyTester:
         return self.results
 
     def get_capabilities(self) -> Dict[str, Any]:
-        """Document Symphony capabilities."""
+        """Document Aster capabilities."""
         return {
-            "service": "Symphony Finance",
+            "service": "Aster Finance",
             "type": "On-Chain Fund Management",
             "blockchain": "Multi-chain (EVM, Solana)",
             "capabilities": {
@@ -652,20 +652,20 @@ class SymphonyTester:
             "rate_limits": {
                 "api": "100 requests/minute (estimated)",
                 "websocket": "Not available",
-                "note": "Contact Symphony for enterprise limits",
+                "note": "Contact Aster for enterprise limits",
             },
             "fees": {
-                "platform": "Variable (check Symphony docs)",
+                "platform": "Variable (check Aster docs)",
                 "gas_optimization": "Batched transactions",
             },
             "authentication": {
                 "method": "API key",
-                "required": ["SYMPHONY_API_KEY"],
+                "required": ["ASTER_API_KEY"],
                 "test_mode": "Available",
             },
-            "api": {"base_url": "https://api.symphony.io", "docs": "https://docs.symphony.finance"},
+            "api": {"base_url": "https://api.aster.io", "docs": "https://docs.aster.finance"},
             "notes": [
-                "Current  implementation uses symphony.io domain",
+                "Current  implementation uses aster.io domain",
                 "404 errors expected if no fund created yet",
                 "Supports both fund creation and management",
                 "Integrates with multiple DeFi protocols",
@@ -685,15 +685,15 @@ async def run_all_api_tests() -> Dict[str, Any]:
     logger.info("=" * 60)
 
     # Initialize testers
-    drift_tester = DriftProtocolTester()
+    aster_tester = AsterProtocolTester()
     jupiter_tester = JupiterUltraTester()
-    symphony_tester = SymphonyTester()
+    aster_tester = AsterTester()
 
     # Run all tests
     all_results = []
-    all_results.extend(await drift_tester.run_all_tests())
+    all_results.extend(await aster_tester.run_all_tests())
     all_results.extend(await jupiter_tester.run_all_tests())
-    all_results.extend(await symphony_tester.run_all_tests())
+    all_results.extend(await aster_tester.run_all_tests())
 
     # Compile report
     report = {
@@ -705,14 +705,14 @@ async def run_all_api_tests() -> Dict[str, Any]:
             "skipped": sum(1 for r in all_results if r.status == "SKIP"),
         },
         "results_by_service": {
-            "drift": [r.to_dict() for r in all_results if r.service == "Drift Protocol"],
+            "aster": [r.to_dict() for r in all_results if r.service == "Aster Protocol"],
             "jupiter": [r.to_dict() for r in all_results if r.service == "Jupiter Ultra"],
-            "symphony": [r.to_dict() for r in all_results if r.service == "Symphony Finance"],
+            "aster": [r.to_dict() for r in all_results if r.service == "Aster Finance"],
         },
         "capabilities": {
-            "drift": drift_tester.get_capabilities(),
+            "aster": aster_tester.get_capabilities(),
             "jupiter": jupiter_tester.get_capabilities(),
-            "symphony": symphony_tester.get_capabilities(),
+            "aster": aster_tester.get_capabilities(),
         },
     }
 

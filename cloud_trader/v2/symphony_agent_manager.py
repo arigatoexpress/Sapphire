@@ -1,7 +1,7 @@
 """
-Symphony Multi-Agent Manager
+Aster Multi-Agent Manager
 =============================
-Manages multiple Symphony agents with individual activation tracking.
+Manages multiple Aster agents with individual activation tracking.
 
 Current Agents:
 - $MILF (Monad Implementation Treasury Agent) - ACTIVATED ✅
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 class AgentStatus(Enum):
-    """Symphony agent activation status."""
+    """Aster agent activation status."""
     INACTIVE = "inactive"           # Never started
     PENDING_ACTIVATION = "pending"  # Working toward activation
     ACTIVATING = "activating"       # Final trade in progress
@@ -38,15 +38,15 @@ class AgentStatus(Enum):
 
 
 class AgentType(Enum):
-    """Symphony agent types."""
+    """Aster agent types."""
     MILF = "milf"   # Monad Implementation Treasury Agent
     AGDG = "agdg"   # Ari Gold Degen Agent
     MIT = "mit"     # Monad Implementation Treasury
 
 
 @dataclass
-class SymphonyAgentConfig:
-    """Configuration for a Symphony agent."""
+class AsterAgentConfig:
+    """Configuration for a Aster agent."""
     agent_type: AgentType
     ticker: str
     full_name: str
@@ -112,11 +112,11 @@ class AgentTrade:
 
 
 @dataclass
-class SymphonyAgent:
+class AsterAgent:
     """
-    Represents a single Symphony agent with full state tracking.
+    Represents a single Aster agent with full state tracking.
     """
-    config: SymphonyAgentConfig
+    config: AsterAgentConfig
     status: AgentStatus = AgentStatus.INACTIVE
     trades: list[AgentTrade] = field(default_factory=list)
     
@@ -199,7 +199,7 @@ class SymphonyAgent:
                 self.status = AgentStatus.ACTIVE
                 self.activation_completed = datetime.utcnow()
                 logger.info(
-                    f"🎉 [Symphony:{self.ticker}] AGENT ACTIVATED! | "
+                    f"🎉 [Aster:{self.ticker}] AGENT ACTIVATED! | "
                     f"Trades: {self.activation_progress} | "
                     f"Duration: {self.activation_completed - self.activation_started if self.activation_started else 'N/A'}"
                 )
@@ -226,9 +226,9 @@ class SymphonyAgent:
         }
 
 
-class SymphonyAgentManager:
+class AsterAgentManager:
     """
-    Manages all Symphony agents with centralized tracking.
+    Manages all Aster agents with centralized tracking.
     
     Current State:
     - $MILF: ACTIVE ✅
@@ -236,7 +236,7 @@ class SymphonyAgentManager:
     - $MIT: PENDING ACTIVATION ⏳ (needs 5 trades)
     
     Usage:
-        manager = SymphonyAgentManager()
+        manager = AsterAgentManager()
         await manager.initialize()
         
         # Check MIT activation status
@@ -254,7 +254,7 @@ class SymphonyAgentManager:
     
     # Pre-configured agents
     AGENT_CONFIGS = {
-        AgentType.MILF: SymphonyAgentConfig(
+        AgentType.MILF: AsterAgentConfig(
             agent_type=AgentType.MILF,
             ticker="$MILF",
             full_name="Monad Implementation Treasury Agent",
@@ -262,7 +262,7 @@ class SymphonyAgentManager:
             strategy="momentum",
             risk_params={"max_drawdown": 0.1, "position_limit": 5},
         ),
-        AgentType.AGDG: SymphonyAgentConfig(
+        AgentType.AGDG: AsterAgentConfig(
             agent_type=AgentType.AGDG,
             ticker="$AGDG",
             full_name="Ari Gold Degen Agent",
@@ -270,7 +270,7 @@ class SymphonyAgentManager:
             strategy="degen_momentum",
             risk_params={"max_drawdown": 0.15, "position_limit": 10},
         ),
-        AgentType.MIT: SymphonyAgentConfig(
+        AgentType.MIT: AsterAgentConfig(
             agent_type=AgentType.MIT,
             ticker="$MIT",
             full_name="Monad Implementation Treasury",
@@ -290,19 +290,19 @@ class SymphonyAgentManager:
     def __init__(
         self,
         firestore_client: Optional[Any] = None,
-        symphony_client: Optional[Any] = None,
+        aster_client: Optional[Any] = None,
     ):
         """
-        Initialize Symphony agent manager.
+        Initialize Aster agent manager.
         
         Args:
             firestore_client: Optional Firestore client for persistence
-            symphony_client: Optional Symphony platform client
+            aster_client: Optional Aster platform client
         """
         self._db = firestore_client
-        self._symphony = symphony_client
+        self._aster = aster_client
         
-        self._agents: dict[AgentType, SymphonyAgent] = {}
+        self._agents: dict[AgentType, AsterAgent] = {}
         self._initialized = False
         self._lock = asyncio.Lock()
         
@@ -311,12 +311,12 @@ class SymphonyAgentManager:
         if self._initialized:
             return
         
-        logger.info("🎭 [Symphony] Initializing Multi-Agent Manager...")
+        logger.info("🎭 [Aster] Initializing Multi-Agent Manager...")
         
         for agent_type, config in self.AGENT_CONFIGS.items():
             initial_status = self.INITIAL_STATES.get(agent_type, AgentStatus.INACTIVE)
             
-            agent = SymphonyAgent(
+            agent = AsterAgent(
                 config=config,
                 status=initial_status,
             )
@@ -342,7 +342,7 @@ class SymphonyAgentManager:
         # Log MIT activation status prominently
         mit = self._agents[AgentType.MIT]
         logger.info(
-            f"\n🎯 [Symphony] MIT Activation Status:\n"
+            f"\n🎯 [Aster] MIT Activation Status:\n"
             f"    Ticker: {mit.ticker}\n"
             f"    Status: {mit.status.value}\n"
             f"    Progress: {mit.activation_progress}/{mit.config.activation_threshold} trades\n"
@@ -352,12 +352,12 @@ class SymphonyAgentManager:
     async def _load_persisted_state(self) -> None:
         """Load persisted agent state from Firestore."""
         if self._db is None:
-            logger.debug("[Symphony] No Firestore client - skipping state load")
+            logger.debug("[Aster] No Firestore client - skipping state load")
             return
         
         try:
             for agent_type in self._agents:
-                doc_ref = self._db.collection("symphony_agents").document(agent_type.value)
+                doc_ref = self._db.collection("aster_agents").document(agent_type.value)
                 doc = await doc_ref.get()
                 
                 if doc.exists:
@@ -381,40 +381,40 @@ class SymphonyAgentManager:
                         if data.get("activation_completed"):
                             agent.activation_completed = datetime.fromisoformat(data["activation_completed"])
                     
-                    logger.info(f"📥 [Symphony:{agent.ticker}] Loaded persisted state")
+                    logger.info(f"📥 [Aster:{agent.ticker}] Loaded persisted state")
                     
         except Exception as e:
-            logger.warning(f"⚠️ [Symphony] Failed to load persisted state: {e}")
+            logger.warning(f"⚠️ [Aster] Failed to load persisted state: {e}")
     
-    async def _persist_agent_state(self, agent: SymphonyAgent) -> bool:
+    async def _persist_agent_state(self, agent: AsterAgent) -> bool:
         """Persist agent state to Firestore."""
         if self._db is None:
             return False
         
         try:
-            doc_ref = self._db.collection("symphony_agents").document(agent.agent_type.value)
+            doc_ref = self._db.collection("aster_agents").document(agent.agent_type.value)
             await doc_ref.set({
                 **agent.to_dict(),
                 "trades": [t.to_dict() for t in agent.trades],
             })
             return True
         except Exception as e:
-            logger.error(f"❌ [Symphony:{agent.ticker}] Failed to persist state: {e}")
+            logger.error(f"❌ [Aster:{agent.ticker}] Failed to persist state: {e}")
             return False
     
-    def get_agent(self, agent_type: AgentType) -> SymphonyAgent:
+    def get_agent(self, agent_type: AgentType) -> AsterAgent:
         """Get agent by type."""
         return self._agents[agent_type]
     
-    def get_mit_agent(self) -> SymphonyAgent:
+    def get_mit_agent(self) -> AsterAgent:
         """Convenience method to get the MIT agent."""
         return self._agents[AgentType.MIT]
     
-    def get_active_agents(self) -> list[SymphonyAgent]:
+    def get_active_agents(self) -> list[AsterAgent]:
         """Get all active agents."""
         return [a for a in self._agents.values() if a.is_active]
     
-    def get_pending_agents(self) -> list[SymphonyAgent]:
+    def get_pending_agents(self) -> list[AsterAgent]:
         """Get agents pending activation."""
         return [a for a in self._agents.values() if a.status == AgentStatus.PENDING_ACTIVATION]
     
@@ -430,7 +430,7 @@ class SymphonyAgentManager:
         pnl: Optional[float] = None,
         platform_order_id: Optional[str] = None,
         batch_id: Optional[str] = None,
-    ) -> SymphonyAgent:
+    ) -> AsterAgent:
         """
         Record a trade for an agent.
         
@@ -445,7 +445,7 @@ class SymphonyAgentManager:
             price: Execution price
             status: Trade status
             pnl: Realized P&L (if known)
-            platform_order_id: Symphony order ID
+            platform_order_id: Aster order ID
             batch_id: Batch operation ID (for batch-open)
             
         Returns:
@@ -464,7 +464,7 @@ class SymphonyAgentManager:
                 and status == "filled"
             ):
                 agent.activation_started = datetime.utcnow()
-                logger.info(f"🎯 [Symphony:{agent.ticker}] Activation sequence STARTED")
+                logger.info(f"🎯 [Aster:{agent.ticker}] Activation sequence STARTED")
             
             # Create trade record
             trade = AgentTrade(
@@ -489,14 +489,14 @@ class SymphonyAgentManager:
             if agent_type == AgentType.MIT and not was_active:
                 if agent.is_active:
                     logger.info(
-                        f"🎉🎉🎉 [Symphony:$MIT] ACTIVATED! 🎉🎉🎉\n"
+                        f"🎉🎉🎉 [Aster:$MIT] ACTIVATED! 🎉🎉🎉\n"
                         f"    Monad Implementation Treasury is now LIVE!\n"
                         f"    Total activation trades: {agent.activation_progress}\n"
                         f"    Duration: {agent.activation_completed - agent.activation_started}"
                     )
                 else:
                     logger.info(
-                        f"📈 [Symphony:$MIT] Trade recorded | "
+                        f"📈 [Aster:$MIT] Trade recorded | "
                         f"Progress: {agent.activation_progress}/{agent.config.activation_threshold} | "
                         f"Remaining: {agent.trades_until_activation} trades"
                     )
@@ -517,7 +517,7 @@ class SymphonyAgentManager:
         
         This is a convenience method that:
         1. Validates MIT is not yet activated
-        2. Executes trade via Symphony client
+        2. Executes trade via Aster client
         3. Records the trade
         4. Returns activation status
         
@@ -532,7 +532,7 @@ class SymphonyAgentManager:
         mit = self.get_mit_agent()
         
         if mit.is_active:
-            logger.info(f"✅ [Symphony:$MIT] Already activated - no activation trade needed")
+            logger.info(f"✅ [Aster:$MIT] Already activated - no activation trade needed")
             return {
                 "success": True,
                 "already_active": True,
@@ -546,22 +546,22 @@ class SymphonyAgentManager:
         ).hexdigest()[:16]
         
         logger.info(
-            f"🎯 [Symphony:$MIT] Executing activation trade #{mit.activation_progress + 1} | "
+            f"🎯 [Aster:$MIT] Executing activation trade #{mit.activation_progress + 1} | "
             f"Symbol: {symbol} | Side: {side} | Qty: {quantity}"
         )
         
-        # Execute via Symphony client if available
+        # Execute via Aster client if available
         execution_result = None
-        if self._symphony:
+        if self._aster:
             try:
-                execution_result = await self._symphony.place_order(
+                execution_result = await self._aster.place_order(
                     symbol=symbol,
                     side=side,
                     quantity=quantity,
                     order_type="MARKET",
                 )
             except Exception as e:
-                logger.error(f"❌ [Symphony:$MIT] Execution failed: {e}")
+                logger.error(f"❌ [Aster:$MIT] Execution failed: {e}")
                 return {
                     "success": False,
                     "error": str(e),
@@ -599,7 +599,7 @@ class SymphonyAgentManager:
         """
         Execute multiple trades in a batch for MIT activation.
         
-        This uses Symphony's batch-open capability to execute
+        This uses Aster's batch-open capability to execute
         multiple trades in a single operation.
         
         Args:
@@ -621,7 +621,7 @@ class SymphonyAgentManager:
         trades_to_execute = trades[:trades_needed]
         
         logger.info(
-            f"📦 [Symphony:$MIT] Batch activation | "
+            f"📦 [Aster:$MIT] Batch activation | "
             f"Executing {len(trades_to_execute)} trades | "
             f"Progress: {mit.activation_progress}/{mit.config.activation_threshold}"
         )
@@ -685,7 +685,7 @@ class SymphonyAgentManager:
         
         logger.info(
             f"\n{'='*60}\n"
-            f"🎭 SYMPHONY AGENT STATUS REPORT\n"
+            f"🎭 ASTER AGENT STATUS REPORT\n"
             f"{'='*60}\n"
         )
         
@@ -708,23 +708,23 @@ class SymphonyAgentManager:
 
 
 # Factory function for main_v2.py
-async def create_symphony_manager(
+async def create_aster_manager(
     firestore_client: Optional[Any] = None,
-    symphony_client: Optional[Any] = None,
-) -> SymphonyAgentManager:
+    aster_client: Optional[Any] = None,
+) -> AsterAgentManager:
     """
-    Create and initialize Symphony agent manager.
+    Create and initialize Aster agent manager.
     
     Args:
         firestore_client: Optional Firestore client
-        symphony_client: Optional Symphony platform client
+        aster_client: Optional Aster platform client
         
     Returns:
-        Initialized SymphonyAgentManager
+        Initialized AsterAgentManager
     """
-    manager = SymphonyAgentManager(
+    manager = AsterAgentManager(
         firestore_client=firestore_client,
-        symphony_client=symphony_client,
+        aster_client=aster_client,
     )
     await manager.initialize()
     return manager
@@ -733,11 +733,11 @@ async def create_symphony_manager(
 # Example usage
 if __name__ == "__main__":
     async def demo():
-        """Demonstrate Symphony agent management."""
-        print("🎭 Symphony Multi-Agent Manager Demo\n")
+        """Demonstrate Aster agent management."""
+        print("🎭 Aster Multi-Agent Manager Demo\n")
         
         # Create manager
-        manager = SymphonyAgentManager()
+        manager = AsterAgentManager()
         await manager.initialize()
         
         # Show current status

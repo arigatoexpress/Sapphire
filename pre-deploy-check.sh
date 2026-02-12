@@ -32,7 +32,7 @@ echo ""
 echo "2. Checking Required Secrets..."
 REQUIRED_SECRETS=(
     "JUPITER_API_KEY"
-    "DRIFT_SOLANA_PRIVATE_KEY"
+    "ASTER_SOLANA_PRIVATE_KEY"
     "TELEGRAM_BOT_TOKEN"
     "TELEGRAM_CHAT_ID"
     "ASTER_API_KEY"
@@ -67,10 +67,10 @@ if [ -f "cloudbuild.yaml" ]; then
         echo -e "${YELLOW}⚠️  ENABLE_JUPITER not set in cloudbuild.yaml${NC}"
     fi
     
-    if grep -q "ENABLE_DRIFT=false" cloudbuild.yaml; then
-        echo -e "${GREEN}✅ ENABLE_DRIFT=false found${NC}"
+    if grep -q "ENABLE_ASTER=false" cloudbuild.yaml; then
+        echo -e "${GREEN}✅ ENABLE_ASTER=false found${NC}"
     else
-        echo -e "${YELLOW}⚠️  ENABLE_DRIFT not set to false${NC}"
+        echo -e "${YELLOW}⚠️  ENABLE_ASTER not set to false${NC}"
     fi
 else
     echo -e "${RED}❌ cloudbuild.yaml not found${NC}"
@@ -133,8 +133,8 @@ echo -e "${GREEN}🎉 Pre-Deployment Validation PASSED!${NC}"
 echo ""
 echo "Ready to deploy with:"
 echo "  • Jupiter: ENABLED"
-echo "  • Drift: DISABLED"
-echo "  • Wallet: Configured via DRIFT_SOLANA_PRIVATE_KEY secret"
+echo "  • Aster: DISABLED"
+echo "  • Wallet: Configured via ASTER_SOLANA_PRIVATE_KEY secret"
 echo ""
 echo "To deploy, run:"
 echo "  gcloud builds submit --config=cloudbuild.yaml"

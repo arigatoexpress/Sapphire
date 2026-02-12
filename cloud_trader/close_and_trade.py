@@ -22,8 +22,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from cloud_trader.config import get_settings
 from cloud_trader.credentials import Credentials
 from cloud_trader.exchange import AsterClient
-from cloud_trader.symphony_client import SymphonyClient
-from cloud_trader.symphony_config import AGENTS_CONFIG
+from cloud_trader.aster_client import AsterClient
+from cloud_trader.aster_config import AGENTS_CONFIG
 
 
 class PositionCloser:
@@ -96,23 +96,23 @@ class PositionCloser:
         self.results["aster"] = result
         return result
 
-    async def close_drift_positions(self) -> Dict[str, Any]:
-        """Close all Drift positions."""
-        result = {"platform": "drift", "positions_closed": 0, "balance": 0.0, "errors": []}
+    async def close_aster_positions(self) -> Dict[str, Any]:
+        """Close all Aster positions."""
+        result = {"platform": "aster", "positions_closed": 0, "balance": 0.0, "errors": []}
         print("\n" + "=" * 60)
-        print("🌀 DRIFT (SOLANA) - Closing Positions")
+        print("🌀 ASTER (SOLANA) - Closing Positions")
         print("=" * 60)
 
         try:
             if not self.settings.solana_private_key:
                 result["errors"].append("Solana credentials not configured")
                 print("   ⚠️ Solana credentials not found")
-                self.results["drift"] = result
+                self.results["aster"] = result
                 return result
 
-            from cloud_trader.drift_client import DriftClient
+            from cloud_trader.aster_client import AsterClient
 
-            client = DriftClient(
+            client = AsterClient(
                 private_key=self.settings.solana_private_key,
                 rpc_url=self.settings.solana_rpc_url,
             )
@@ -152,23 +152,23 @@ class PositionCloser:
 
         except ImportError as e:
             result["errors"].append(f"Import error: {str(e)}")
-            print(f"   ⚠️ Drift client unavailable locally")
+            print(f"   ⚠️ Aster client unavailable locally")
         except Exception as e:
             result["errors"].append(str(e))
-            print(f"❌ Drift error: {e}")
+            print(f"❌ Aster error: {e}")
 
-        self.results["drift"] = result
+        self.results["aster"] = result
         return result
 
-    async def close_symphony_positions(self) -> Dict[str, Any]:
-        """Close all Symphony positions."""
-        result = {"platform": "symphony", "positions_closed": 0, "balance": 250.0, "errors": []}
+    async def close_aster_positions(self) -> Dict[str, Any]:
+        """Close all Aster positions."""
+        result = {"platform": "aster", "positions_closed": 0, "balance": 250.0, "errors": []}
         print("\n" + "=" * 60)
-        print("🎵 SYMPHONY - Closing Positions")
+        print("🎵 ASTER - Closing Positions")
         print("=" * 60)
 
         try:
-            client = SymphonyClient()
+            client = AsterClient()
 
             # Get positions for each agent
             print("\n📊 Fetching positions...")
@@ -209,9 +209,9 @@ class PositionCloser:
 
         except Exception as e:
             result["errors"].append(str(e))
-            print(f"❌ Symphony error: {e}")
+            print(f"❌ Aster error: {e}")
 
-        self.results["symphony"] = result
+        self.results["aster"] = result
         return result
 
     def print_summary(self):
@@ -253,8 +253,8 @@ class PositionCloser:
 
         await self.close_aster_positions()
 
-        await self.close_drift_positions()
-        await self.close_symphony_positions()
+        await self.close_aster_positions()
+        await self.close_aster_positions()
 
         total_balance, total_closed = self.print_summary()
 

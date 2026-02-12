@@ -61,7 +61,7 @@ class MarketScanner:
             "CHOG-USDC",
         ]
 
-        # Funding rates (from HL, Drift)
+        # Funding rates (from HL, Aster)
         self.funding_rates: Dict[str, Dict[str, float]] = {}
 
         # Performance tracking
@@ -199,19 +199,19 @@ class MarketScanner:
             for symbol in ["ETH-USDC", "BTC-USDC", "SOL-USDC"]:
                 # Simulated price differences
                 hl_price = 3000 + random.uniform(-50, 50)
-                drift_price = 3000 + random.uniform(-50, 50)
+                aster_price = 3000 + random.uniform(-50, 50)
 
-                spread_pct = abs(hl_price - drift_price) / min(hl_price, drift_price)
+                spread_pct = abs(hl_price - aster_price) / min(hl_price, aster_price)
 
                 # If spread > 0.2% (profitable after fees)
                 if spread_pct > 0.002:
                     # Buy on cheaper, sell on more expensive
-                    if hl_price < drift_price:
-                        buy_platform = "hyperliquid"
-                        sell_platform = "drift"
+                    if hl_price < aster_price:
+                        buy_platform = "lighter"
+                        sell_platform = "aster"
                     else:
-                        buy_platform = "drift"
-                        sell_platform = "hyperliquid"
+                        buy_platform = "aster"
+                        sell_platform = "lighter"
 
                     # Create paired signals
                     signals.append(
@@ -243,7 +243,7 @@ class MarketScanner:
         signals = []
 
         try:
-            # In production, fetch real funding rates from HL and Drift
+            # In production, fetch real funding rates from HL and Aster
             # If funding is very positive -> short perps, long spot
             # If funding is very negative -> long perps, short spot (if available)
 
@@ -261,7 +261,7 @@ class MarketScanner:
                             signal_type=SignalType.ENTRY,
                             confidence=0.70,
                             source="market-scanner:funding",
-                            target_platforms=["hyperliquid", "drift"],
+                            target_platforms=["lighter", "aster"],
                             metadata={
                                 "strategy": "funding_arbitrage",
                                 "funding_rate": funding_rate,
@@ -279,21 +279,21 @@ class MarketScanner:
         """Determine which platforms support a symbol."""
         # Map symbols to supported platforms
         symbol_platforms = {
-            # Solana ecosystem -> Drift
-            "SOL-USDC": ["drift", "hyperliquid"],
-            "JUP-USDC": ["drift"],
-            "PYTH-USDC": ["drift"],
-            "BONK-USDC": ["drift", "hyperliquid"],
-            # Monad/Base -> Symphony
-            "MON-USDC": ["symphony"],
-            "CHOG-USDC": ["symphony"],
-            "DEGEN-USDC": ["symphony"],
+            # Solana ecosystem -> Aster
+            "SOL-USDC": ["aster", "lighter"],
+            "JUP-USDC": ["aster"],
+            "PYTH-USDC": ["aster"],
+            "BONK-USDC": ["aster", "lighter"],
+            # Monad/Base -> Aster
+            "MON-USDC": ["aster"],
+            "CHOG-USDC": ["aster"],
+            "DEGEN-USDC": ["aster"],
             # Major pairs -> All platforms
-            "ETH-USDC": ["symphony", "drift", "hyperliquid", "aster"],
-            "BTC-USDC": ["symphony", "drift", "hyperliquid", "aster"],
+            "ETH-USDC": ["aster", "aster", "lighter", "aster"],
+            "BTC-USDC": ["aster", "aster", "lighter", "aster"],
         }
 
-        return symbol_platforms.get(symbol, ["symphony", "aster"])
+        return symbol_platforms.get(symbol, ["aster", "aster"])
 
     async def _publish_signal(self, signal: TradeSignal):
         """Publish a trading signal to Pub/Sub."""

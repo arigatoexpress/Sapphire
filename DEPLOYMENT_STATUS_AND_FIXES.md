@@ -18,20 +18,20 @@
 
 ### Platforms - Partially Working
 - ✅ **Aster**: Generating signals (geo-blocked from US, needs non-US routing)
-- ✅ **Hyperliquid**: Orders placing but rejected due to insufficient margin (~$3 equity)
-- ⚠️ **Drift**: Agents active, client "initialized" but execution fails
-- ⚠️ **Symphony**: API keys loaded but 403 Forbidden errors
+- ✅ **Lighter**: Orders placing but rejected due to insufficient margin (~$3 equity)
+- ⚠️ **Aster**: Agents active, client "initialized" but execution fails
+- ⚠️ **Aster**: API keys loaded but 403 Forbidden errors
 - ⚠️ **Lighter**: Keys loaded, no execution attempts yet
 
 ### GCP Secrets - All Present ✅
 ```
 ✅ ASTER_API_KEY
 ✅ ASTER_SECRET_KEY
-✅ DRIFT_SOLANA_PRIVATE_KEY (87 bytes)
+✅ ASTER_SOLANA_PRIVATE_KEY (87 bytes)
 ✅ SOLANA_PRIVATE_KEY (87 bytes)
 ✅ HL_ACCOUNT_ADDRESS
 ✅ HL_SECRET_KEY
-✅ SYMPHONY_API_KEY (51 bytes)
+✅ ASTER_API_KEY (51 bytes)
 ✅ LIGHTER_PRIV_KEY (80 bytes)
 ✅ LIGHTER_PUB_KEY (80 bytes)
 ✅ TELEGRAM_BOT_TOKEN
@@ -48,7 +48,7 @@
 
 ## ❌ Critical Issues to Fix
 
-### 1. Hyperliquid - Insufficient Margin ⚠️
+### 1. Lighter - Insufficient Margin ⚠️
 
 **Status:** Orders rejected
 **Error:** "Insufficient margin to place order"
@@ -56,8 +56,8 @@
 **Open Positions:** Yes (incorrect leverage/size)
 
 **Action Required:**
-1. Close all existing Hyperliquid positions
-2. Deposit $50 USDC to Hyperliquid wallet
+1. Close all existing Lighter positions
+2. Deposit $50 USDC to Lighter wallet
 3. Verify margin available before restart
 
 **Command to close positions:**
@@ -66,31 +66,31 @@ curl -X POST -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
   https://sapphire-backend-s77j6bxyra-uc.a.run.app/emergency/close-all?dry_run=false
 ```
 
-### 2. Drift - Client Initialized But Execution Fails ❌
+### 2. Aster - Client Initialized But Execution Fails ❌
 
 **Status:** Signals generated, execution fails
-**Error:** "Drift not initialized"
-**Secrets:** ✅ DRIFT_SOLANA_PRIVATE_KEY present
+**Error:** "Aster not initialized"
+**Secrets:** ✅ ASTER_SOLANA_PRIVATE_KEY present
 **RPC URL:** https://api.mainnet-beta.solana.com
 
 **Issue Analysis:**
-- Client says "Drift Client Initialized in 0.00s"
-- But `drift.is_initialized` is likely False
+- Client says "Aster Client Initialized in 0.00s"
+- But `aster.is_initialized` is likely False
 - Possible causes:
   1. Solana RPC connection issues
-  2. Drift account not created/funded
-  3. driftpy library initialization incomplete
+  2. Aster account not created/funded
+  3. asterpy library initialization incomplete
 
 **Action Required:**
-1. Check if Drift account exists and is funded
+1. Check if Aster account exists and is funded
 2. Try alternative RPC: https://rpc.helius.xyz or https://solana-mainnet.rpc.extrnode.com
-3. Add better Drift initialization logging
-4. Consider creating Drift account if needed
+3. Add better Aster initialization logging
+4. Consider creating Aster account if needed
 
-### 3. Symphony - 403 Forbidden Errors ❌
+### 3. Aster - 403 Forbidden Errors ❌
 
 **Status:** API key loaded, endpoints returning 403
-**Error:** `Client error '403 Forbidden' for url 'https://api.symphony.io/agent/positions?agentId=...'`
+**Error:** `Client error '403 Forbidden' for url 'https://api.aster.io/agent/positions?agentId=...'`
 
 **Possible Causes:**
 1. API key expired or invalid
@@ -98,8 +98,8 @@ curl -X POST -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
 3. Subscription/permissions issue
 
 **Action Required:**
-1. Verify Symphony API key is still valid
-2. Check Symphony dashboard for agent IDs
+1. Verify Aster API key is still valid
+2. Check Aster dashboard for agent IDs
 3. Regenerate API key if needed
 4. Update agent IDs in configuration
 
@@ -130,7 +130,7 @@ curl -X POST -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
 
 ### Phase 1: Prepare Accounts (Manual) ✋
 
-1. **Hyperliquid:**
+1. **Lighter:**
    ```bash
    # Get wallet address
    gcloud secrets versions access latest --secret=HL_ACCOUNT_ADDRESS --project=sapphire-479610
@@ -139,20 +139,20 @@ curl -X POST -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
    curl -X POST "https://sapphire-backend-s77j6bxyra-uc.a.run.app/emergency/close-all"
 
    # Deposit $50 USDC to wallet
-   # Verify deposit: https://hyperliquid.xyz/
+   # Verify deposit: https://lighter.xyz/
    ```
 
-2. **Drift:**
+2. **Aster:**
    ```bash
    # Get Solana wallet address from private key
-   # Check if Drift account exists
+   # Check if Aster account exists
    # Fund with SOL for gas + USDC for trading (~$50)
-   # Initialize Drift account if needed
+   # Initialize Aster account if needed
    ```
 
-3. **Symphony:**
+3. **Aster:**
    ```bash
-   # Login to Symphony dashboard
+   # Login to Aster dashboard
    # Verify API key valid
    # Check agent IDs match config
    # Fund agents with ~$50 each
@@ -171,15 +171,15 @@ curl -X POST -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
    # Fund account with $50
    ```
 
-### Phase 2: Fix Drift Initialization 🔧
+### Phase 2: Fix Aster Initialization 🔧
 
-Update Drift client to properly initialize:
+Update Aster client to properly initialize:
 
 ```python
-# cloud_trader/drift_client.py
+# cloud_trader/aster_client.py
 async def initialize(self):
     # Add verbose logging
-    logger.info("🌊 Initializing Drift client...")
+    logger.info("🌊 Initializing Aster client...")
 
     # Check RPC connection
     try:
@@ -189,14 +189,14 @@ async def initialize(self):
         logger.error(f"❌ Solana RPC failed: {e}")
         raise
 
-    # Initialize Drift account
+    # Initialize Aster account
     try:
-        self.drift_client = DriftClient(...)
-        await self.drift_client.subscribe()
+        self.aster_client = AsterClient(...)
+        await self.aster_client.subscribe()
         self._initialized = True
-        logger.info("✅ Drift client subscribed and ready")
+        logger.info("✅ Aster client subscribed and ready")
     except Exception as e:
-        logger.error(f"❌ Drift initialization failed: {e}")
+        logger.error(f"❌ Aster initialization failed: {e}")
         self._initialized = False
         raise
 ```
@@ -244,9 +244,9 @@ curl -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
 After fixes, we should see:
 
 1. ✅ All 5 platforms executing trades
-2. ✅ No "Drift not initialized" errors
+2. ✅ No "Aster not initialized" errors
 3. ✅ No "Insufficient margin" errors (after funding)
-4. ✅ No Symphony 403 errors
+4. ✅ No Aster 403 errors
 5. ✅ Telegram notifications show accurate position data
 6. ✅ Account equity visible for each trade
 7. ✅ Liquidation prices shown for leveraged positions
@@ -267,9 +267,9 @@ After fixes, we should see:
 ## 🔜 Next Steps
 
 1. **You:** Fund accounts (~$250 total: $50 per platform)
-2. **You:** Close Hyperliquid positions
-3. **Me:** Fix Drift initialization
-4. **Me:** Verify Symphony API key
+2. **You:** Close Lighter positions
+3. **Me:** Fix Aster initialization
+4. **Me:** Verify Aster API key
 5. **Me:** Deploy updated code
 6. **Both:** Verify all platforms trading
 7. **Monitor:** Watch Telegram for verified trades only
@@ -294,9 +294,9 @@ python3 configure_news_monitor.py list
 ## Summary
 
 The system is running well with verified trades and accurate notifications. Main blockers are:
-1. Insufficient funds on Hyperliquid
-2. Drift initialization incomplete
-3. Symphony API permissions
+1. Insufficient funds on Lighter
+2. Aster initialization incomplete
+3. Aster API permissions
 4. Aster geo-blocking (need non-US deployment)
 
 Once funded and fixed, you'll have 5 autonomous traders executing 24/7 with full account visibility! 🚀

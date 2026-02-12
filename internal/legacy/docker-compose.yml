@@ -71,16 +71,16 @@ services:
       trading_net:
         ipv4_address: 172.28.0.2
 
-  # Hyperliquid Trader
-  hyperliquid-trader:
+  # Lighter Trader
+  lighter-trader:
     build:
-      context: ./hyperliquid_trader
+      context: ./lighter_trader
       dockerfile: Dockerfile
     env_file:
       - .env
       - .env.local
     volumes:
-      - ./hyperliquid_trader:/app
+      - ./lighter_trader:/app
     restart: always
     networks:
       trading_net:

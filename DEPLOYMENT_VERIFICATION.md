@@ -20,13 +20,13 @@
 ### Phase 2: Platform Connectivity
 Verify ALL 5 platforms can connect from Singapore:
 
-- [ ] **Drift (Solana Perps)**
+- [ ] **Aster (Solana Perps)**
   - Connection established
   - API key valid
   - Can fetch positions
   - Latency < 100ms
 
-- [ ] **Hyperliquid (L1 Perps)**
+- [ ] **Lighter (L1 Perps)**
   - Connection established
   - Wallet authenticated
   - Can query user state
@@ -39,7 +39,7 @@ Verify ALL 5 platforms can connect from Singapore:
   - Can fetch balances
   - Latency < 50ms
 
-- [ ] **Symphony (Monad Treasury)**
+- [ ] **Aster (Monad Treasury)**
   - Connection established
   - Agent manager initialized
   - Can query agents
@@ -60,14 +60,14 @@ curl https://sapphire-backend-xxx.run.app/api/platform-router/health | jq
 ### Phase 3: Autonomous Learning Agents
 Verify all 5 agents initialized:
 
-- [ ] **drift-learner**
+- [ ] **aster-learner**
   - Agent created
   - Gemini 2.0 Flash model loaded
   - Episodic memory initialized
   - Pattern discovery enabled
   - Exploration rate: 25%
 
-- [ ] **hyperliquid-learner**
+- [ ] **lighter-learner**
   - Agent created
   - Model loaded
   - Learning enabled
@@ -79,7 +79,7 @@ Verify all 5 agents initialized:
   - Learning enabled
   - Exploration rate: 30% (more exploration for HFT)
 
-- [ ] **symphony-learner**
+- [ ] **aster-learner**
   - Agent created
   - Model loaded
   - Learning enabled
@@ -134,10 +134,10 @@ curl https://sapphire-backend-xxx.run.app/api/agents/metrics | jq '.[] | {agent,
 ### Phase 6: Performance Targets
 
 **Speed:**
-- [ ] Drift decisions: < 100ms
-- [ ] Hyperliquid decisions: < 100ms
+- [ ] Aster decisions: < 100ms
+- [ ] Lighter decisions: < 100ms
 - [ ] Aster decisions: < 50ms
-- [ ] Symphony decisions: < 200ms
+- [ ] Aster decisions: < 200ms
 - [ ] Lighter decisions: < 150ms
 
 **Learning:**

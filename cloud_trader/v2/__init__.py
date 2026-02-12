@@ -1,21 +1,21 @@
 """
 Sapphire V2 Enhancement Modules
 ================================
-Multi-platform trading with Hyperliquid and Drift.
+Multi-platform trading with Lighter and Aster.
 
 Platforms:
-- Hyperliquid: ACTIVE ✅ (Reinstated DeFi Perps)
-- Drift: ACTIVE ✅ (Solana Perps)
+- Lighter: ACTIVE ✅ (Reinstated DeFi Perps)
+- Aster: ACTIVE ✅ (Solana Perps)
 - Aster: ACTIVE ✅ (CEX)
-- Symphony: ACTIVE ✅ (Monad Treasury)
+- Aster: ACTIVE ✅ (Monad Treasury)
 
 Version: 2.2.0
 """
 
-from .hyperliquid_client import (
-    HyperliquidClient,
-    HyperliquidOrder,
-    HyperliquidPosition,
+from .lighter_client import (
+    LighterClient,
+    LighterOrder,
+    LighterPosition,
 )
 
 from .dual_platform_router import (
@@ -27,12 +27,12 @@ from .dual_platform_router import (
     create_dual_router,
 )
 
-from .symphony_agent_manager import (
-    SymphonyAgentManager,
-    SymphonyAgent,
+from .aster_agent_manager import (
+    AsterAgentManager,
+    AsterAgent,
     AgentType,
     AgentStatus,
-    create_symphony_manager,
+    create_aster_manager,
 )
 
 from .hardened_memory_manager import (
@@ -55,8 +55,8 @@ from .enhanced_circuit_breaker import (
     circuit_protected,
 )
 
-from .symphony_mit_tracker import (
-    SymphonyMITTracker,
+from .aster_mit_tracker import (
+    AsterMITTracker,
     MITActivationState,
     MITActivationProgress,
     create_mit_tracker,
@@ -74,10 +74,10 @@ from .v2_integration import (
 )
 
 __all__ = [
-    # Hyperliquid Client
-    "HyperliquidClient",
-    "HyperliquidOrder",
-    "HyperliquidPosition",
+    # Lighter Client
+    "LighterClient",
+    "LighterOrder",
+    "LighterPosition",
     
     # Dual Platform Router
     "DualPlatformRouter",
@@ -87,12 +87,12 @@ __all__ = [
     "ExecutionResult",
     "create_dual_router",
     
-    # Symphony Agent Manager
-    "SymphonyAgentManager",
-    "SymphonyAgent",
+    # Aster Agent Manager
+    "AsterAgentManager",
+    "AsterAgent",
     "AgentType",
     "AgentStatus",
-    "create_symphony_manager",
+    "create_aster_manager",
     
     # Memory Manager
     "HardenedMemoryManager",
@@ -113,7 +113,7 @@ __all__ = [
     "circuit_protected",
     
     # MIT Tracker
-    "SymphonyMITTracker",
+    "AsterMITTracker",
     "MITActivationState",
     "MITActivationProgress",
     "create_mit_tracker",

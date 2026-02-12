@@ -2,7 +2,7 @@
 Executor Agent - Platform-Specific Trade Execution with Cognitive Reasoning
 
 This module provides ExecutorAgent classes that wrap existing platform bots
-(Drift, Aster, Hyperliquid) with cognitive mesh integration.
+(Aster, Aster, Lighter) with cognitive mesh integration.
 
 Each executor:
 - Receives consensus decisions from the mesh
@@ -265,22 +265,22 @@ class AsterExecutorAgent(ExecutorAgent):
             )
 
 
-class DriftExecutorAgent(ExecutorAgent):
+class AsterExecutorAgent(ExecutorAgent):
     """
-    Executor agent for Drift Protocol (Solana).
+    Executor agent for Aster Protocol (Solana).
 
-    Wraps the existing DriftBot for cognitive execution.
+    Wraps the existing AsterBot for cognitive execution.
     """
 
-    def __init__(self, agent_id: str = "drift-executor"):
-        super().__init__(agent_id, "drift")
-        self.drift_client = None
+    def __init__(self, agent_id: str = "aster-executor"):
+        super().__init__(agent_id, "aster")
+        self.aster_client = None
 
     async def initialize_client(self):
-        """Initialize the Drift SDK client."""
+        """Initialize the Aster SDK client."""
         try:
-            from driftpy.account_subscription_config import AccountSubscriptionConfig
-            from driftpy.drift_client import DriftClient
+            from asterpy.account_subscription_config import AccountSubscriptionConfig
+            from asterpy.aster_client import AsterClient
             from solana.rpc.async_api import AsyncClient
             from solders.keypair import Keypair
 
@@ -301,32 +301,32 @@ class DriftExecutorAgent(ExecutorAgent):
             else:
                 keypair = Keypair.from_base58_string(private_key)
 
-            self.drift_client = DriftClient(
+            self.aster_client = AsterClient(
                 connection,
                 keypair,
                 env="mainnet",
                 account_subscription=AccountSubscriptionConfig("websocket"),
             )
-            await self.drift_client.subscribe()
+            await self.aster_client.subscribe()
 
-            logger.info("🌀 Drift Executor initialized")
+            logger.info("🌀 Aster Executor initialized")
             return True
 
         except Exception as e:
-            logger.error(f"Failed to initialize Drift client: {e}")
+            logger.error(f"Failed to initialize Aster client: {e}")
             return False
 
     async def execute(self, request: ExecutionRequest) -> ExecutionReport:
-        """Execute trade on Drift."""
-        if not self.drift_client:
+        """Execute trade on Aster."""
+        if not self.aster_client:
             return ExecutionReport(
                 success=False,
-                platform="drift",
-                error_message="Drift client not initialized",
+                platform="aster",
+                error_message="Aster client not initialized",
             )
 
         try:
-            from driftpy.types import MarketType, OrderParams, OrderType, PositionDirection
+            from asterpy.types import MarketType, OrderParams, OrderType, PositionDirection
 
             # Symbol to market index mapping
             symbol_map = {"SOL": 0, "BTC": 1, "ETH": 2, "JUP": 8}
@@ -335,7 +335,7 @@ class DriftExecutorAgent(ExecutorAgent):
             if market_index is None:
                 return ExecutionReport(
                     success=False,
-                    platform="drift",
+                    platform="aster",
                     error_message=f"Unknown market: {request.symbol}",
                 )
 
@@ -353,7 +353,7 @@ class DriftExecutorAgent(ExecutorAgent):
                 direction=direction,
             )
 
-            tx_sig = await self.drift_client.place_perp_order(order_params)
+            tx_sig = await self.aster_client.place_perp_order(order_params)
 
             # Wait for confirmation (Solana is fast)
             # Note: In production, this would use confirm_transaction
@@ -363,55 +363,55 @@ class DriftExecutorAgent(ExecutorAgent):
                 trade_id=str(tx_sig),
                 filled_quantity=request.quantity,
                 avg_price=0.0,  # Would need oracle price
-                platform="drift",
+                platform="aster",
             )
 
         except Exception as e:
-            logger.error(f"Drift execution failed: {e}")
+            logger.error(f"Aster execution failed: {e}")
             return ExecutionReport(
                 success=False,
-                platform="drift",
+                platform="aster",
                 error_message=str(e),
             )
 
 
-class HyperliquidExecutorAgent(ExecutorAgent):
+class LighterExecutorAgent(ExecutorAgent):
     """
-    Executor agent for Hyperliquid.
+    Executor agent for Lighter.
 
-    Wraps the existing HyperliquidClient for cognitive execution.
+    Wraps the existing LighterClient for cognitive execution.
     """
 
     def __init__(self, agent_id: str = "hl-executor"):
-        super().__init__(agent_id, "hyperliquid")
+        super().__init__(agent_id, "lighter")
         self.hl_client = None
 
     async def initialize_client(self):
-        """Initialize the Hyperliquid client."""
+        """Initialize the Lighter client."""
         try:
-            from hyperliquid.api import API
+            from lighter.api import API
 
-            private_key = os.getenv("HYPERLIQUID_PRIVATE_KEY")
+            private_key = os.getenv("LIGHTER_PRIVATE_KEY")
 
             if not private_key:
-                logger.warning("Hyperliquid private key not configured")
+                logger.warning("Lighter private key not configured")
                 return False
 
             self.hl_client = API(private_key, testnet=False)
-            logger.info("⚡ Hyperliquid Executor initialized")
+            logger.info("⚡ Lighter Executor initialized")
             return True
 
         except Exception as e:
-            logger.error(f"Failed to initialize Hyperliquid client: {e}")
+            logger.error(f"Failed to initialize Lighter client: {e}")
             return False
 
     async def execute(self, request: ExecutionRequest) -> ExecutionReport:
-        """Execute trade on Hyperliquid."""
+        """Execute trade on Lighter."""
         if not self.hl_client:
             return ExecutionReport(
                 success=False,
-                platform="hyperliquid",
-                error_message="Hyperliquid client not initialized",
+                platform="lighter",
+                error_message="Lighter client not initialized",
             )
 
         try:
@@ -441,20 +441,20 @@ class HyperliquidExecutorAgent(ExecutorAgent):
                     ),
                     filled_quantity=float(status.get("filled", {}).get("totalSz", 0)),
                     avg_price=float(status.get("filled", {}).get("avgPx", 0)),
-                    platform="hyperliquid",
+                    platform="lighter",
                 )
             else:
                 return ExecutionReport(
                     success=False,
-                    platform="hyperliquid",
+                    platform="lighter",
                     error_message="Order not filled",
                 )
 
         except Exception as e:
-            logger.error(f"Hyperliquid execution failed: {e}")
+            logger.error(f"Lighter execution failed: {e}")
             return ExecutionReport(
                 success=False,
-                platform="hyperliquid",
+                platform="lighter",
                 error_message=str(e),
             )
 
@@ -464,8 +464,8 @@ async def create_executor_swarm() -> Dict[str, ExecutorAgent]:
     """Create and initialize all executor agents."""
     executors = {
         "aster": AsterExecutorAgent(),
-        "drift": DriftExecutorAgent(),
-        "hyperliquid": HyperliquidExecutorAgent(),
+        "aster": AsterExecutorAgent(),
+        "lighter": LighterExecutorAgent(),
     }
 
     mesh = get_cognitive_mesh()

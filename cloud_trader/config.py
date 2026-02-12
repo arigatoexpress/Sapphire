@@ -36,11 +36,11 @@ class Settings(BaseSettings):
     gemini_api_key: str | None = Field(default=None, validation_alias="GEMINI_API_KEY")
     hl_secret_key: str | None = Field(default=None, validation_alias="HL_SECRET_KEY")
     hl_account_address: str | None = Field(default=None, validation_alias="HL_ACCOUNT_ADDRESS")
-    solana_private_key: str | None = Field(default=None, validation_alias="DRIFT_SOLANA_PRIVATE_KEY")
+    solana_private_key: str | None = Field(default=None, validation_alias="ASTER_SOLANA_PRIVATE_KEY")
     solana_rpc_url: str = Field(
         default="https://api.mainnet-beta.solana.com", validation_alias="SOLANA_RPC_URL"
     )
-    symphony_api_key: str | None = Field(default=None, validation_alias="SYMPHONY_API_KEY")
+    aster_api_key: str | None = Field(default=None, validation_alias="ASTER_API_KEY")
     telegram_summary_interval_seconds: int = Field(
         default=14_400,
         ge=0,
@@ -59,10 +59,10 @@ class Settings(BaseSettings):
 
     # Platform enable flags (for platform-specific symbol defaults)
     enable_jupiter: bool = Field(default=False, validation_alias="ENABLE_JUPITER")
-    enable_drift: bool = Field(default=False, validation_alias="ENABLE_DRIFT")
     enable_aster: bool = Field(default=False, validation_alias="ENABLE_ASTER")
-    enable_hyperliquid: bool = Field(default=False, validation_alias="ENABLE_HYPERLIQUID")
-    enable_symphony: bool = Field(default=False, validation_alias="ENABLE_SYMPHONY")
+    enable_aster: bool = Field(default=False, validation_alias="ENABLE_ASTER")
+    enable_lighter: bool = Field(default=False, validation_alias="ENABLE_LIGHTER")
+    enable_aster: bool = Field(default=False, validation_alias="ENABLE_ASTER")
     enable_lighter: bool = Field(default=False, validation_alias="ENABLE_LIGHTER")
 
     # Database configuration
@@ -103,13 +103,13 @@ class Settings(BaseSettings):
         # Platform-specific defaults based on enabled platforms
         if getattr(self, 'enable_jupiter', False):
             return ["SOL", "BONK", "WIF", "JUP", "JTO"]  # Solana tokens
-        elif getattr(self, 'enable_drift', False):
-            return ["SOL-PERP", "BTC-PERP", "ETH-PERP"]  # Drift perps
+        elif getattr(self, 'enable_aster', False):
+            return ["SOL-PERP", "BTC-PERP", "ETH-PERP"]  # Aster perps
         elif getattr(self, 'enable_aster', False):
             return ["BTCUSDT", "ETHUSDT", "SOLUSDT"]  # CEX-style
-        elif getattr(self, 'enable_hyperliquid', False):
-            return ["BTC", "ETH", "SOL"]  # Hyperliquid perps
-        elif getattr(self, 'enable_symphony', False):
+        elif getattr(self, 'enable_lighter', False):
+            return ["BTC", "ETH", "SOL"]  # Lighter perps
+        elif getattr(self, 'enable_aster', False):
             return ["ETH", "MON", "USDC"]  # Monad/Base tokens
         elif getattr(self, 'enable_lighter', False):
             return ["SOL", "ETH", "BTC"]  # L2 tokens
@@ -186,21 +186,21 @@ class Settings(BaseSettings):
         default=True, validation_alias="ENABLE_PROFIT_MAXIMIZATION"
     )
 
-    # Symphony Agent Registration
-    symphony_milf_agent_id: str | None = Field(
-        default="f6cc5590-ff96-4077-ac80-9775c7f805cc", validation_alias="SYMPHONY_MILF_AGENT_ID"
+    # Aster Agent Registration
+    aster_milf_agent_id: str | None = Field(
+        default="f6cc5590-ff96-4077-ac80-9775c7f805cc", validation_alias="ASTER_MILF_AGENT_ID"
     )
-    symphony_agdg_agent_id: str | None = Field(
-        default="01b8c2b7-b210-493f-8c76-dafd97663e2c", validation_alias="SYMPHONY_AGDG_AGENT_ID"
+    aster_agdg_agent_id: str | None = Field(
+        default="01b8c2b7-b210-493f-8c76-dafd97663e2c", validation_alias="ASTER_AGDG_AGENT_ID"
     )
-    symphony_degen_agent_id: str | None = Field(
-        default="01b8c2b7-b210-493f-8c76-dafd97663e2c", validation_alias="SYMPHONY_DEGEN_AGENT_ID"
+    aster_degen_agent_id: str | None = Field(
+        default="01b8c2b7-b210-493f-8c76-dafd97663e2c", validation_alias="ASTER_DEGEN_AGENT_ID"
     )
-    symphony_mit_agent_id: str | None = Field(
-        default="ee5bcfda-0919-469c-ac8f-d665a5dd444e", validation_alias="SYMPHONY_MIT_AGENT_ID"
+    aster_mit_agent_id: str | None = Field(
+        default="ee5bcfda-0919-469c-ac8f-d665a5dd444e", validation_alias="ASTER_MIT_AGENT_ID"
     )
-    symphony_api_key: str | None = Field(default=None, validation_alias="SYMPHONY_API_KEY")
-    symphony_strategy_id: str = Field(default="default", validation_alias="SYMPHONY_STRATEGY_ID")
+    aster_api_key: str | None = Field(default=None, validation_alias="ASTER_API_KEY")
+    aster_strategy_id: str = Field(default="default", validation_alias="ASTER_STRATEGY_ID")
 
     # Vertex AI Configuration
     enable_vertex_ai: bool = Field(default=True, validation_alias="ENABLE_VERTEX_AI")
@@ -350,25 +350,25 @@ class Settings(BaseSettings):
     enable_aster: bool = Field(default=True, validation_alias="ENABLE_ASTER")
     
     # Microservices Platform Flags (Platform Isolation)
-    enable_hyperliquid: bool = Field(
+    enable_lighter: bool = Field(
         default=True, 
-        validation_alias="ENABLE_HYPERLIQUID",
-        description="Enable Hyperliquid integration"
+        validation_alias="ENABLE_LIGHTER",
+        description="Enable Lighter integration"
     )
     enable_lighter: bool = Field(
         default=True, 
         validation_alias="ENABLE_LIGHTER",
         description="Enable Lighter.xyz integration"
     )
-    enable_drift: bool = Field(
+    enable_aster: bool = Field(
         default=True, 
-        validation_alias="ENABLE_DRIFT",
-        description="Enable Drift Protocol integration"
+        validation_alias="ENABLE_ASTER",
+        description="Enable Aster Protocol integration"
     )
-    enable_symphony: bool = Field(
+    enable_aster: bool = Field(
         default=True,
-        validation_alias="ENABLE_SYMPHONY",
-        description="Enable Symphony Agent integration"
+        validation_alias="ENABLE_ASTER",
+        description="Enable Aster Agent integration"
     )
     enable_jupiter: bool = Field(
         default=True,

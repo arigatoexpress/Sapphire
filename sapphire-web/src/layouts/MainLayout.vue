@@ -87,19 +87,19 @@ const formatUptime = (seconds: number) => {
             <div class="sidebar-footer">
                 <div class="platform-status">
                     <div class="platform-item">
-                        <span class="platform-dot hyperliquid"></span>
+                        <span class="platform-dot lighter"></span>
                         <span class="font-mono">HL</span>
-                    </div>
-                    <div class="platform-item">
-                        <span class="platform-dot drift"></span>
-                        <span class="font-mono">DRIFT</span>
                     </div>
                     <div class="platform-item">
                         <span class="platform-dot aster"></span>
                         <span class="font-mono">ASTER</span>
                     </div>
                     <div class="platform-item">
-                        <span class="platform-dot symphony"></span>
+                        <span class="platform-dot aster"></span>
+                        <span class="font-mono">ASTER</span>
+                    </div>
+                    <div class="platform-item">
+                        <span class="platform-dot aster"></span>
                         <span class="font-mono">SYM</span>
                     </div>
                 </div>
@@ -268,10 +268,10 @@ const formatUptime = (seconds: number) => {
     border-radius: 50%;
 }
 
-.platform-dot.hyperliquid { background: var(--platform-hyperliquid); box-shadow: 0 0 8px var(--platform-hyperliquid); }
-.platform-dot.drift { background: var(--platform-drift); box-shadow: 0 0 8px var(--platform-drift); }
+.platform-dot.lighter { background: var(--platform-lighter); box-shadow: 0 0 8px var(--platform-lighter); }
 .platform-dot.aster { background: var(--platform-aster); box-shadow: 0 0 8px var(--platform-aster); }
-.platform-dot.symphony { background: var(--platform-symphony); box-shadow: 0 0 8px var(--platform-symphony); }
+.platform-dot.aster { background: var(--platform-aster); box-shadow: 0 0 8px var(--platform-aster); }
+.platform-dot.aster { background: var(--platform-aster); box-shadow: 0 0 8px var(--platform-aster); }
 
 /* Main Content */
 .main-content {

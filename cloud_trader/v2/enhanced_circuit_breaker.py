@@ -1,13 +1,13 @@
 """
 Enhanced Circuit Breaker with Multi-Platform Support
 =====================================================
-Production-grade circuit breaker for Hyperliquid, Drift, and other platforms.
+Production-grade circuit breaker for Lighter, Aster, and other platforms.
 
 Platforms:
 - ASTER: CEX (Primary spot/margin)
-- DRIFT: Solana DeFi Perps
-- HYPERLIQUID: EVM DeFi Perps (REINSTATED)
-- SYMPHONY: Monad Treasury Operations
+- ASTER: Solana DeFi Perps
+- LIGHTER: EVM DeFi Perps (REINSTATED)
+- ASTER: Monad Treasury Operations
 
 Author: Sapphire V2 Architecture Team
 Version: 2.2.0
@@ -36,11 +36,11 @@ class CircuitState(Enum):
 
 
 class Platform(Enum):
-    """Trading platforms - Hyperliquid is ACTIVE."""
+    """Trading platforms - Lighter is ACTIVE."""
     ASTER = "aster"
-    DRIFT = "drift"
-    HYPERLIQUID = "hyperliquid"  # REINSTATED as active
-    SYMPHONY = "symphony"
+    ASTER = "aster"
+    LIGHTER = "lighter"  # REINSTATED as active
+    ASTER = "aster"
 
 
 @dataclass
@@ -239,38 +239,38 @@ class CircuitBreaker(Generic[T]):
 
 
 class PlatformCircuitManager:
-    """Manages circuit breakers for all platforms including Hyperliquid."""
+    """Manages circuit breakers for all platforms including Lighter."""
     
-    # Platform configurations - Hyperliquid is now ACTIVE
+    # Platform configurations - Lighter is now ACTIVE
     PLATFORM_CONFIGS = {
         Platform.ASTER: CircuitConfig(
             failure_threshold=5,
             success_threshold=3,
             recovery_timeout=timedelta(seconds=60),
         ),
-        Platform.DRIFT: CircuitConfig(
+        Platform.ASTER: CircuitConfig(
             failure_threshold=3,
             success_threshold=2,
             recovery_timeout=timedelta(seconds=30),
         ),
-        Platform.HYPERLIQUID: CircuitConfig(
-            failure_threshold=3,  # Same as Drift - both are active DeFi platforms
+        Platform.LIGHTER: CircuitConfig(
+            failure_threshold=3,  # Same as Aster - both are active DeFi platforms
             success_threshold=2,
             recovery_timeout=timedelta(seconds=30),
         ),
-        Platform.SYMPHONY: CircuitConfig(
+        Platform.ASTER: CircuitConfig(
             failure_threshold=5,
             success_threshold=3,
             recovery_timeout=timedelta(seconds=45),
         ),
     }
     
-    # Failover chains - Hyperliquid and Drift can failover to each other
+    # Failover chains - Lighter and Aster can failover to each other
     FAILOVER_CHAIN = {
-        Platform.ASTER: [Platform.DRIFT, Platform.HYPERLIQUID],
-        Platform.DRIFT: [Platform.HYPERLIQUID, Platform.ASTER],  # Drift -> Hyperliquid -> Aster
-        Platform.HYPERLIQUID: [Platform.DRIFT, Platform.ASTER],  # Hyperliquid -> Drift -> Aster
-        Platform.SYMPHONY: [Platform.DRIFT, Platform.HYPERLIQUID],
+        Platform.ASTER: [Platform.ASTER, Platform.LIGHTER],
+        Platform.ASTER: [Platform.LIGHTER, Platform.ASTER],  # Aster -> Lighter -> Aster
+        Platform.LIGHTER: [Platform.ASTER, Platform.ASTER],  # Lighter -> Aster -> Aster
+        Platform.ASTER: [Platform.ASTER, Platform.LIGHTER],
     }
     
     def __init__(self, custom_configs: Optional[dict[Platform, CircuitConfig]] = None):
@@ -284,7 +284,7 @@ class PlatformCircuitManager:
         logger.info(
             f"🔧 [CircuitManager] Initialized | "
             f"Platforms: {[p.value for p in Platform]} | "
-            f"Hyperliquid: ACTIVE ✅"
+            f"Lighter: ACTIVE ✅"
         )
     
     def get_circuit(self, platform: Platform) -> CircuitBreaker:
@@ -373,7 +373,7 @@ def circuit_protected(platform: Platform, enable_failover: bool = True):
 
 if __name__ == "__main__":
     async def demo():
-        print("🔌 Circuit Breaker Demo (Hyperliquid ACTIVE)\n")
+        print("🔌 Circuit Breaker Demo (Lighter ACTIVE)\n")
         
         manager = PlatformCircuitManager()
         

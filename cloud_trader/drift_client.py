@@ -1,6 +1,6 @@
 """
-Drift Protocol v2 Client.
-Handles Solana Perpetual Futures trading via Drift.
+Aster Protocol v2 Client.
+Handles Solana Perpetual Futures trading via Aster.
 """
 
 import logging
@@ -14,10 +14,10 @@ from .logger import get_logger
 logger = get_logger(__name__)
 
 
-class DriftClient:
+class AsterClient:
     """
-    Client for Drift Protocol (Solana Perps).
-    Wraps driftpy SDK for high-level trading operations.
+    Client for Aster Protocol (Solana Perps).
+    Wraps asterpy SDK for high-level trading operations.
     """
 
     def __init__(self, rpc_url: Optional[str] = None):
@@ -26,58 +26,58 @@ class DriftClient:
         settings = get_settings()
         self.rpc_url = rpc_url or settings.solana_rpc_url
 
-        # Use Drift-specific private key if available, fallback to general SOLANA_PRIVATE_KEY
+        # Use Aster-specific private key if available, fallback to general SOLANA_PRIVATE_KEY
         self.private_key = (
-            os.getenv("DRIFT_PRIVATE_KEY") or
-            os.getenv("DRIFT_SOLANA_PRIVATE_KEY") or
+            os.getenv("ASTER_PRIVATE_KEY") or
+            os.getenv("ASTER_SOLANA_PRIVATE_KEY") or
             settings.solana_private_key
         )
 
-        # Expected Drift wallet address for verification
+        # Expected Aster wallet address for verification
         self.expected_wallet = "B1UUWzWr9hWYfUE2xLEDVpyWzWWNWcTPv7Ea2j6guEZD"
 
-        self.subaccount_id = int(os.getenv("DRIFT_SUBACCOUNT_ID", "0"))
+        self.subaccount_id = int(os.getenv("ASTER_SUBACCOUNT_ID", "0"))
 
-        self.drift_user = None
+        self.aster_user = None
         self.connection = None
         self.kp = None
         self.is_initialized = False
 
         # Check for optional dependency
         try:
-            import driftpy
+            import asterpy
 
-            self.has_driftpy = True
+            self.has_asterpy = True
         except ImportError:
-            self.has_driftpy = False
-            logger.warning("DriftPy not installed. Drift client will be in mock mode.")
+            self.has_asterpy = False
+            logger.warning("AsterPy not installed. Aster client will be in mock mode.")
 
         if self.private_key:
-            logger.info("Drift Client: Drift wallet private key loaded (redacted).")
+            logger.info("Aster Client: Aster wallet private key loaded (redacted).")
         else:
-            logger.warning("Drift Client: DRIFT_PRIVATE_KEY missing. Read-only mode.")
+            logger.warning("Aster Client: ASTER_PRIVATE_KEY missing. Read-only mode.")
 
     async def initialize(self):
-        """Async init of Drift SDK/User."""
-        logger.info(f"🔍 [DRIFT INIT] Starting initialization... has_driftpy={self.has_driftpy}, has_private_key={bool(self.private_key)}")
+        """Async init of Aster SDK/User."""
+        logger.info(f"🔍 [ASTER INIT] Starting initialization... has_asterpy={self.has_asterpy}, has_private_key={bool(self.private_key)}")
 
-        if not self.has_driftpy:
-            logger.warning("❌ DriftClient: Skipping init - driftpy not installed")
+        if not self.has_asterpy:
+            logger.warning("❌ AsterClient: Skipping init - asterpy not installed")
             self.is_initialized = False
             return
 
         if not self.private_key:
-            logger.warning("❌ DriftClient: Skipping init - SOLANA_PRIVATE_KEY missing")
+            logger.warning("❌ AsterClient: Skipping init - SOLANA_PRIVATE_KEY missing")
             self.is_initialized = False
             return
 
         try:
-            logger.info(f"Initializing Drift Protocol Client (RPC: {self.rpc_url})...")
+            logger.info(f"Initializing Aster Protocol Client (RPC: {self.rpc_url})...")
 
             # Imports inside method to avoid crash if missing
             import base58
-            from driftpy.account_subscription_config import AccountSubscriptionConfig
-            from driftpy.drift_client import DriftClient as SDKDriftClient
+            from asterpy.account_subscription_config import AccountSubscriptionConfig
+            from asterpy.aster_client import AsterClient as SDKAsterClient
             from solana.rpc.async_api import AsyncClient
             from solders.keypair import Keypair
             from solders.pubkey import Pubkey
@@ -103,17 +103,17 @@ class DriftClient:
                 raise k_err
 
             # Initialize SDK Client
-            self.sdk_client = SDKDriftClient(
+            self.sdk_client = SDKAsterClient(
                 self.connection,
                 self.kp,
                 env="mainnet",
                 account_subscription=AccountSubscriptionConfig("websocket"),
             )
 
-            logger.info("🔄 [DRIFT INIT] Subscribing to Drift SDK...")
+            logger.info("🔄 [ASTER INIT] Subscribing to Aster SDK...")
             await self.sdk_client.subscribe()
-            logger.info("🔄 [DRIFT INIT] Getting user...")
-            self.drift_user = self.sdk_client.get_user(self.subaccount_id)
+            logger.info("🔄 [ASTER INIT] Getting user...")
+            self.aster_user = self.sdk_client.get_user(self.subaccount_id)
             # User subscription handling might vary by SDK version,
             # simplified here assuming client subscription covers it or it's fetched on demand
 
@@ -121,11 +121,11 @@ class DriftClient:
 
             # Verify wallet address
             actual_wallet = str(self.kp.pubkey())
-            logger.info(f"✅ [DRIFT INIT] Drift Client Initialized Successfully!")
-            logger.info(f"🔑 Drift Wallet Address: {actual_wallet}")
+            logger.info(f"✅ [ASTER INIT] Aster Client Initialized Successfully!")
+            logger.info(f"🔑 Aster Wallet Address: {actual_wallet}")
 
             if actual_wallet == self.expected_wallet:
-                logger.info(f"✅ Wallet verification PASSED - Using correct Drift account")
+                logger.info(f"✅ Wallet verification PASSED - Using correct Aster account")
             else:
                 logger.warning(f"⚠️ Wallet mismatch detected!")
                 logger.warning(f"   Expected: {self.expected_wallet}")
@@ -133,7 +133,7 @@ class DriftClient:
                 logger.warning(f"   This may indicate wrong private key is being used")
 
         except Exception as e:
-            logger.error(f"❌ Failed to initialize Drift Client: {e}")
+            logger.error(f"❌ Failed to initialize Aster Client: {e}")
             self.is_initialized = False
 
     async def get_perp_market(self, symbol: str = "SOL-PERP"):
@@ -182,18 +182,18 @@ class DriftClient:
 
                 real_sol_equity = sol_balance * price
                 logger.info(
-                    f"DriftClient: Real SOL Balance: {sol_balance:.4f} (~${real_sol_equity:.2f})"
+                    f"AsterClient: Real SOL Balance: {sol_balance:.4f} (~${real_sol_equity:.2f})"
                 )
             except Exception as e:
-                logger.warning(f"DriftClient: Failed to fetch real SOL balance: {e}")
+                logger.warning(f"AsterClient: Failed to fetch real SOL balance: {e}")
 
-        if not self.is_initialized or not self.drift_user:
+        if not self.is_initialized or not self.aster_user:
             return max(real_sol_equity, 1500.0)  # Return real if found, else stub
 
         try:
             # Using SDK to get spot + perp value
             # This is pseudo-code for SDK usage, adjusting to likely API
-            net_asset_value = self.drift_user.get_net_asset_value()
+            net_asset_value = self.aster_user.get_net_asset_value()
             return (
                 float(net_asset_value) / 1e6
             )  # Convert based on precision (usually 6 decimals for USDC)
@@ -202,19 +202,19 @@ class DriftClient:
 
     async def get_position(self, symbol: str) -> Dict[str, Any]:
         """Get current position for symbol."""
-        if not self.is_initialized or not self.drift_user:
+        if not self.is_initialized or not self.aster_user:
             return {}
 
         try:
             # Map symbol string to market index (e.g. SOL-PERP -> 0)
             # Need market map, for now stubbed or assuming checking all positions
-            positions = await self.drift_user.get_perp_positions()
+            positions = await self.aster_user.get_perp_positions()
             for p in positions:
                 # Logic to match p.market_index to symbol would go here
                 pass
             return {"symbol": symbol, "amount": 0.0, "entry_price": 0.0, "unrealized_pnl": 0.0}
         except Exception as e:
-            logger.error(f"Drift get_position error: {e}")
+            logger.error(f"Aster get_position error: {e}")
             return {}
 
     async def place_perp_order(
@@ -225,18 +225,18 @@ class DriftClient:
         order_type: str = "market",
         price: Optional[float] = None,
     ):
-        """Place a perp order on Drift using Real SDK."""
+        """Place a perp order on Aster using Real SDK."""
         if not self.is_initialized:
-            logger.warning("Drift not initialized. Simulating order.")
+            logger.warning("Aster not initialized. Simulating order.")
             return {
-                "tx_sig": "sim_drift_tx_uninit",
+                "tx_sig": "sim_aster_tx_uninit",
                 "status": "simulated",
                 "error": "Not initialized",
             }
 
         try:
-            from driftpy.math.conversion import to_precision
-            from driftpy.types import OrderParams, OrderType, PositionDirection
+            from asterpy.math.conversion import to_precision
+            from asterpy.types import OrderParams, OrderType, PositionDirection
 
             # Map side to PositionDirection
             direction = (
@@ -253,7 +253,7 @@ class DriftClient:
             elif "ETH" in symbol:
                 market_index = 2
 
-            # Convert amount to Drift precision (base precision usually 1e9 for SOL)
+            # Convert amount to Aster precision (base precision usually 1e9 for SOL)
             # This requires knowing the base scale for each market.
             # For Safety in this v2.2.10 update, we will wrap this in a try/catch specifically for SDK call
 
@@ -268,12 +268,12 @@ class DriftClient:
                 market_index=market_index,
             )
 
-            logger.info(f"🌊 Drift Sending Order: {side} {amount} {symbol} (Idx: {market_index})")
+            logger.info(f"🌊 Aster Sending Order: {side} {amount} {symbol} (Idx: {market_index})")
 
             # Execute
             tx_sig = await self.sdk_client.place_perp_order(params)
 
-            logger.info(f"✅ Drift Order Sent! Sig: {tx_sig}")
+            logger.info(f"✅ Aster Order Sent! Sig: {tx_sig}")
 
             return {
                 "tx_sig": str(tx_sig),
@@ -282,7 +282,7 @@ class DriftClient:
             }
 
         except Exception as e:
-            logger.error(f"❌ Drift place_order failed: {e}")
+            logger.error(f"❌ Aster place_order failed: {e}")
             # Fallback to simulated response if real fails, to prevent crash loop, but mark error
             return {"tx_sig": None, "status": "failed", "error": str(e)}
 
@@ -297,7 +297,7 @@ class DriftClient:
         take_profit: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
-        Open a perpetual position on Drift.
+        Open a perpetual position on Aster.
 
         Args:
             market: Market symbol (e.g., "SOL-PERP", "BTC-PERP", "ETH-PERP")
@@ -312,14 +312,14 @@ class DriftClient:
             Dict with transaction signature, status, and position details
         """
         if not self.is_initialized:
-            logger.warning("Drift not initialized. Cannot open position.")
+            logger.warning("Aster not initialized. Cannot open position.")
             return {
                 "success": False,
-                "error": "Drift client not initialized",
+                "error": "Aster client not initialized",
             }
 
         try:
-            from driftpy.types import OrderParams, OrderType, PositionDirection, MarketType
+            from asterpy.types import OrderParams, OrderType, PositionDirection, MarketType
 
             # Map market to index
             market_index = self._get_market_index(market)
@@ -333,7 +333,7 @@ class DriftClient:
                 else PositionDirection.Short()
             )
 
-            # Convert size to Drift precision (9 decimals for most markets)
+            # Convert size to Aster precision (9 decimals for most markets)
             base_asset_amount = int(size * 1e9)
 
             # Determine order type
@@ -341,7 +341,7 @@ class DriftClient:
                 OrderType.Limit() if limit_price else OrderType.Market()
             )
 
-            # Convert limit price to Drift precision (6 decimals for USDC quote)
+            # Convert limit price to Aster precision (6 decimals for USDC quote)
             price_param = int(limit_price * 1e6) if limit_price else 0
 
             # Create order params
@@ -396,7 +396,7 @@ class DriftClient:
         limit_price: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
-        Close a perpetual position on Drift.
+        Close a perpetual position on Aster.
 
         Args:
             market: Market symbol (e.g., "SOL-PERP")
@@ -407,11 +407,11 @@ class DriftClient:
             Dict with transaction signature and P&L
         """
         if not self.is_initialized:
-            logger.warning("Drift not initialized. Cannot close position.")
-            return {"success": False, "error": "Drift client not initialized"}
+            logger.warning("Aster not initialized. Cannot close position.")
+            return {"success": False, "error": "Aster client not initialized"}
 
         try:
-            from driftpy.types import OrderParams, OrderType, PositionDirection, MarketType
+            from asterpy.types import OrderParams, OrderType, PositionDirection, MarketType
 
             # Get current position
             current_position = await self.get_position(market)
@@ -483,14 +483,14 @@ class DriftClient:
         Returns:
             List of position dicts with market, size, entry_price, pnl, etc.
         """
-        if not self.is_initialized or not self.drift_user:
+        if not self.is_initialized or not self.aster_user:
             return []
 
         try:
             positions = []
 
-            # Get all perp positions from Drift user
-            user_positions = self.drift_user.get_perp_positions()
+            # Get all perp positions from Aster user
+            user_positions = self.aster_user.get_perp_positions()
 
             for pos in user_positions:
                 # Skip empty positions
@@ -550,7 +550,7 @@ class DriftClient:
             return {"success": False, "error": "Not initialized"}
 
         try:
-            # Note: Drift doesn't have direct leverage adjustment
+            # Note: Aster doesn't have direct leverage adjustment
             # Leverage is adjusted by adding/removing collateral
             # This would require deposit/withdraw operations
 
@@ -569,7 +569,7 @@ class DriftClient:
             return {"success": False, "error": str(e)}
 
     def _get_market_index(self, symbol: str) -> Optional[int]:
-        """Map market symbol to Drift market index."""
+        """Map market symbol to Aster market index."""
         market_map = {
             "SOL-PERP": 0,
             "BTC-PERP": 1,
@@ -590,7 +590,7 @@ class DriftClient:
         return market_map.get(symbol.upper())
 
     def _get_market_symbol(self, market_index: int) -> str:
-        """Map Drift market index to symbol."""
+        """Map Aster market index to symbol."""
         symbol_map = {
             0: "SOL-PERP",
             1: "BTC-PERP",
@@ -636,7 +636,7 @@ class DriftClient:
     ):
         """Place a stop-loss order."""
         try:
-            from driftpy.types import OrderParams, OrderType, PositionDirection, MarketType, OrderTriggerCondition
+            from asterpy.types import OrderParams, OrderType, PositionDirection, MarketType, OrderTriggerCondition
 
             market_index = self._get_market_index(market)
 
@@ -677,7 +677,7 @@ class DriftClient:
     ):
         """Place a take-profit order."""
         try:
-            from driftpy.types import OrderParams, OrderType, PositionDirection, MarketType, OrderTriggerCondition
+            from asterpy.types import OrderParams, OrderType, PositionDirection, MarketType, OrderTriggerCondition
 
             market_index = self._get_market_index(market)
 
@@ -751,16 +751,16 @@ class DriftClient:
                 price = float(data.get(cg_id, {}).get("usd", 0))
                 return price
         except Exception as e:
-            logger.debug(f"Drift get_token_price error for {symbol}: {e}")
+            logger.debug(f"Aster get_token_price error for {symbol}: {e}")
             return 0.0
 
 
 # Singleton
-_drift_client = None
+_aster_client = None
 
 
-def get_drift_client() -> DriftClient:
-    global _drift_client
-    if not _drift_client:
-        _drift_client = DriftClient()
-    return _drift_client
+def get_aster_client() -> AsterClient:
+    global _aster_client
+    if not _aster_client:
+        _aster_client = AsterClient()
+    return _aster_client

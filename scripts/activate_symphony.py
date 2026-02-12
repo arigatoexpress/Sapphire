@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Symphony MIT Fund Activation Script
+Aster MIT Fund Activation Script
 Executes 5 trades to activate the MIT fund.
 """
 
@@ -10,8 +10,8 @@ import os
 import httpx
 
 # Configuration
-API_KEY = os.getenv("SYMPHONY_API_KEY", "sk_live_MZDK1SgMeRQzEKpuRFM7FXbcMgD833YA8Y69DnpprvE")
-BASE_URL = "https://api.symphony.io"
+API_KEY = os.getenv("ASTER_API_KEY", "sk_live_MZDK1SgMeRQzEKpuRFM7FXbcMgD833YA8Y69DnpprvE")
+BASE_URL = "https://api.aster.io"
 
 # Agent IDs
 MIT_AGENT_ID = "ee5bcfda-0919-469c-ac8f-d665a5dd444e"
@@ -21,7 +21,7 @@ ARI_GOLD_AGENT_ID = "01b8c2b7-b210-493f-8c76-dafd97663e2c"
 async def open_perpetual_trade(
     agent_id: str, fund_name: str, symbol: str, action: str, weight: float = 10, leverage: int = 1
 ):
-    """Open a perpetual trade on Symphony."""
+    """Open a perpetual trade on Aster."""
     async with httpx.AsyncClient() as client:
         payload = {
             "agentId": agent_id,
@@ -65,7 +65,7 @@ async def activate_fund(agent_id: str, fund_name: str):
     print("=" * 70)
 
     # Activation trades - small size to minimize risk
-    # Note: Leverage must be decimal (1.1, not 1) per Symphony API docs
+    # Note: Leverage must be decimal (1.1, not 1) per Aster API docs
     trades = [
         ("BTC", "LONG", 10, 1.1),
         ("ETH", "LONG", 10, 1.1),
@@ -107,7 +107,7 @@ async def main():
     """Main activation flow."""
     print("\n" + "█" * 70)
     print("█" + " " * 68 + "█")
-    print("█" + "  SAPPHIRE AI - SYMPHONY FUND ACTIVATION".center(68) + "█")
+    print("█" + "  SAPPHIRE AI - ASTER FUND ACTIVATION".center(68) + "█")
     print("█" + " " * 68 + "█")
     print("█" * 70)
 
@@ -135,7 +135,7 @@ async def main():
     print("█" * 70)
     print()
     print("📊 Check your dashboard: https://sapphire-479610.web.app/mit")
-    print("🌐 Symphony App: https://app.symphony.io/agentic-funds")
+    print("🌐 Aster App: https://app.aster.io/agentic-funds")
     print()
 
 

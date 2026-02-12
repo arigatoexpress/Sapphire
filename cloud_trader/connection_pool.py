@@ -115,10 +115,10 @@ class ConnectionPoolManager:
         # Platform-specific connection pool sizes
         # HFT platforms get larger pools
         self.pool_sizes = {
-            "drift": 10,
-            "hyperliquid": 10,
+            "aster": 10,
+            "lighter": 10,
             "aster": 15,  # Larger pool for HFT Shield strategy
-            "symphony": 5,
+            "aster": 5,
             "lighter": 8
         }
 
@@ -172,7 +172,7 @@ async def get_platform_session(platform: str) -> aiohttp.ClientSession:
     Get persistent HTTP session for a platform.
 
     Usage:
-        session = await get_platform_session("drift")
+        session = await get_platform_session("aster")
         async with session.get(url) as response:
             data = await response.json()
 

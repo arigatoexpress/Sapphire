@@ -180,7 +180,7 @@ class TelegramPlatformBot:
             symbol = cmd_match.group(4).upper()
 
             platforms = (
-                ["drift", "hyperliquid", "aster", "symphony"] if platform == "all" else [platform]
+                ["aster", "lighter"] if platform == "all" else [platform]
             )
 
             await self.send_message(
@@ -281,7 +281,7 @@ class TelegramPlatformBot:
         if self.chat_id and chat_id != self.chat_id:
             return
 
-        # Pattern 1: @platform action quantity symbol (e.g. @hyperliquid buy 0.1 sol)
+        # Pattern 1: @platform action quantity symbol (e.g. @lighter buy 0.1 sol)
         cmd_match = re.search(r"@(\w+)\s+(buy|sell|close)\s+([\d.]+)\s+(\w+)", text.lower())
 
         # Pattern 2: AI Commands (e.g. @alpha recap)
@@ -302,7 +302,7 @@ class TelegramPlatformBot:
 
             # Special case for "all"
             platforms = (
-                ["drift", "hyperliquid", "aster", "symphony"] if platform == "all" else [platform]
+                ["aster", "lighter"] if platform == "all" else [platform]
             )
 
             await self.send_message(

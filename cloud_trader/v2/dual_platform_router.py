@@ -1,7 +1,7 @@
 """
-Dual Platform Router - Hyperliquid & Drift
+Dual Platform Router - Lighter & Aster
 ==========================================
-Smart routing between Hyperliquid and Drift perpetual platforms.
+Smart routing between Lighter and Aster perpetual platforms.
 
 Routing Strategy:
 - Each platform has its own symbol set
@@ -10,8 +10,8 @@ Routing Strategy:
 - Automatic failover between platforms
 
 Symbol Allocation (Configurable):
-- Hyperliquid Primary: BTC, ETH, ARB, OP, MATIC, AVAX, LINK, DOGE
-- Drift Primary: SOL, JTO, PYTH, BONK, WIF, JUP, RNDR, HNT
+- Lighter Primary: BTC, ETH, ARB, OP, MATIC, AVAX, LINK, DOGE
+- Aster Primary: SOL, JTO, PYTH, BONK, WIF, JUP, RNDR, HNT
 
 Author: Sapphire V2 Architecture Team
 Version: 2.2.0
@@ -54,7 +54,7 @@ class RoutingConfig:
     """Configuration for dual-platform routing."""
     
     # Primary platform assignments by symbol
-    hyperliquid_symbols: list[str] = field(default_factory=lambda: [
+    lighter_symbols: list[str] = field(default_factory=lambda: [
         "BTC-PERP", "BTC",
         "ETH-PERP", "ETH", 
         "ARB-PERP", "ARB",
@@ -67,7 +67,7 @@ class RoutingConfig:
         "AAVE-PERP", "AAVE",
     ])
     
-    drift_symbols: list[str] = field(default_factory=lambda: [
+    aster_symbols: list[str] = field(default_factory=lambda: [
         "SOL-PERP", "SOL",
         "JTO-PERP", "JTO",
         "PYTH-PERP", "PYTH",
@@ -96,10 +96,10 @@ class RoutingConfig:
     fuzz_percent: float = 0.02  # 2% quantity fuzzing
     
     # Circuit breaker settings
-    hyperliquid_failure_threshold: int = 3
-    hyperliquid_recovery_seconds: int = 30
-    drift_failure_threshold: int = 3
-    drift_recovery_seconds: int = 30
+    lighter_failure_threshold: int = 3
+    lighter_recovery_seconds: int = 30
+    aster_failure_threshold: int = 3
+    aster_recovery_seconds: int = 30
 
 
 @dataclass
@@ -160,7 +160,7 @@ class ExecutionResult:
 
 class DualPlatformRouter:
     """
-    Routes trades between Hyperliquid and Drift platforms.
+    Routes trades between Lighter and Aster platforms.
     
     Features:
     - Symbol-based routing with configurable assignments
@@ -171,8 +171,8 @@ class DualPlatformRouter:
     
     Usage:
         router = DualPlatformRouter(
-            hyperliquid_client=hl_client,
-            drift_client=drift_client,
+            lighter_client=hl_client,
+            aster_client=aster_client,
         )
         await router.initialize()
         
@@ -186,42 +186,42 @@ class DualPlatformRouter:
     
     def __init__(
         self,
-        hyperliquid_client: Any,
-        drift_client: Any,
+        lighter_client: Any,
+        aster_client: Any,
         config: Optional[RoutingConfig] = None,
     ):
         """
         Initialize dual-platform router.
         
         Args:
-            hyperliquid_client: Initialized Hyperliquid client
-            drift_client: Initialized Drift client
+            lighter_client: Initialized Lighter client
+            aster_client: Initialized Aster client
             config: Optional routing configuration
         """
-        self._hl_client = hyperliquid_client
-        self._drift_client = drift_client
+        self._hl_client = lighter_client
+        self._aster_client = aster_client
         self.config = config or RoutingConfig()
         
         # Circuit breakers
         self._hl_breaker = CircuitBreaker(
-            "hyperliquid",
+            "lighter",
             CircuitConfig(
-                failure_threshold=self.config.hyperliquid_failure_threshold,
-                recovery_timeout=asyncio.timedelta(seconds=self.config.hyperliquid_recovery_seconds),
+                failure_threshold=self.config.lighter_failure_threshold,
+                recovery_timeout=asyncio.timedelta(seconds=self.config.lighter_recovery_seconds),
             )
         )
-        self._drift_breaker = CircuitBreaker(
-            "drift", 
+        self._aster_breaker = CircuitBreaker(
+            "aster", 
             CircuitConfig(
-                failure_threshold=self.config.drift_failure_threshold,
-                recovery_timeout=asyncio.timedelta(seconds=self.config.drift_recovery_seconds),
+                failure_threshold=self.config.aster_failure_threshold,
+                recovery_timeout=asyncio.timedelta(seconds=self.config.aster_recovery_seconds),
             )
         )
         
         # Metrics
         self._executions: list[ExecutionResult] = []
         self._hl_executions = 0
-        self._drift_executions = 0
+        self._aster_executions = 0
         self._failovers = 0
         self._round_robin_index = 0
         
@@ -236,7 +236,7 @@ class DualPlatformRouter:
         """Initialize router and verify platform connectivity."""
         logger.info("🔀 [Router] Initializing Dual-Platform Router...")
         
-        # Verify Hyperliquid
+        # Verify Lighter
         hl_ok = False
         if self._hl_client:
             try:
@@ -244,29 +244,29 @@ class DualPlatformRouter:
                     hl_ok = self._hl_client.is_initialized
                 else:
                     hl_ok = True
-                logger.info(f"  {'✅' if hl_ok else '❌'} Hyperliquid: {'Ready' if hl_ok else 'Not Ready'}")
+                logger.info(f"  {'✅' if hl_ok else '❌'} Lighter: {'Ready' if hl_ok else 'Not Ready'}")
             except Exception as e:
-                logger.warning(f"  ❌ Hyperliquid: {e}")
+                logger.warning(f"  ❌ Lighter: {e}")
         
-        # Verify Drift
-        drift_ok = False
-        if self._drift_client:
+        # Verify Aster
+        aster_ok = False
+        if self._aster_client:
             try:
-                if hasattr(self._drift_client, 'is_initialized'):
-                    drift_ok = self._drift_client.is_initialized
+                if hasattr(self._aster_client, 'is_initialized'):
+                    aster_ok = self._aster_client.is_initialized
                 else:
-                    drift_ok = True
-                logger.info(f"  {'✅' if drift_ok else '❌'} Drift: {'Ready' if drift_ok else 'Not Ready'}")
+                    aster_ok = True
+                logger.info(f"  {'✅' if aster_ok else '❌'} Aster: {'Ready' if aster_ok else 'Not Ready'}")
             except Exception as e:
-                logger.warning(f"  ❌ Drift: {e}")
+                logger.warning(f"  ❌ Aster: {e}")
         
-        self._initialized = hl_ok or drift_ok
+        self._initialized = hl_ok or aster_ok
         
         if self._initialized:
             logger.info(
                 f"✅ [Router] Initialized | "
-                f"Hyperliquid: {'✅' if hl_ok else '❌'} | "
-                f"Drift: {'✅' if drift_ok else '❌'}"
+                f"Lighter: {'✅' if hl_ok else '❌'} | "
+                f"Aster: {'✅' if aster_ok else '❌'}"
             )
         else:
             logger.error("❌ [Router] Failed - no platforms available")
@@ -282,24 +282,24 @@ class DualPlatformRouter:
         normalized = self._normalize_symbol(symbol)
         base = normalized.replace("-PERP", "").replace("-USDC", "")
         
-        # Check Hyperliquid symbols
-        for hl_sym in self.config.hyperliquid_symbols:
+        # Check Lighter symbols
+        for hl_sym in self.config.lighter_symbols:
             if base in hl_sym or hl_sym in normalized:
-                return Platform.HYPERLIQUID
+                return Platform.LIGHTER
         
-        # Check Drift symbols  
-        for drift_sym in self.config.drift_symbols:
-            if base in drift_sym or drift_sym in normalized:
-                return Platform.DRIFT
+        # Check Aster symbols  
+        for aster_sym in self.config.aster_symbols:
+            if base in aster_sym or aster_sym in normalized:
+                return Platform.ASTER
         
-        # Default to Hyperliquid for unknown symbols
-        return Platform.HYPERLIQUID
+        # Default to Lighter for unknown symbols
+        return Platform.LIGHTER
     
     def _get_failover_platform(self, primary: Platform) -> Platform:
         """Get failover platform."""
-        if primary == Platform.HYPERLIQUID:
-            return Platform.DRIFT
-        return Platform.HYPERLIQUID
+        if primary == Platform.LIGHTER:
+            return Platform.ASTER
+        return Platform.LIGHTER
     
     def _apply_jitter(self) -> int:
         """Calculate jitter delay in milliseconds."""
@@ -337,12 +337,12 @@ class DualPlatformRouter:
         fallback = self._get_failover_platform(primary) if self.config.enable_failover else None
         
         # Check circuit breakers
-        primary_breaker = self._hl_breaker if primary == Platform.HYPERLIQUID else self._drift_breaker
+        primary_breaker = self._hl_breaker if primary == Platform.LIGHTER else self._aster_breaker
         
         if primary_breaker.is_open:
             # Primary is down, use fallback
             if fallback:
-                fallback_breaker = self._hl_breaker if fallback == Platform.HYPERLIQUID else self._drift_breaker
+                fallback_breaker = self._hl_breaker if fallback == Platform.LIGHTER else self._aster_breaker
                 if not fallback_breaker.is_open:
                     logger.info(
                         f"🔄 [Router] Primary {primary.value} circuit open, "
@@ -447,10 +447,10 @@ class DualPlatformRouter:
         
         # Track metrics
         self._executions.append(result)
-        if result.platform == Platform.HYPERLIQUID:
+        if result.platform == Platform.LIGHTER:
             self._hl_executions += 1
         else:
-            self._drift_executions += 1
+            self._aster_executions += 1
         
         return result
     
@@ -465,8 +465,8 @@ class DualPlatformRouter:
         reduce_only: bool,
     ) -> ExecutionResult:
         """Execute on a specific platform."""
-        breaker = self._hl_breaker if platform == Platform.HYPERLIQUID else self._drift_breaker
-        client = self._hl_client if platform == Platform.HYPERLIQUID else self._drift_client
+        breaker = self._hl_breaker if platform == Platform.LIGHTER else self._aster_breaker
+        client = self._hl_client if platform == Platform.LIGHTER else self._aster_client
         
         if client is None:
             return ExecutionResult(
@@ -491,14 +491,14 @@ class DualPlatformRouter:
             )
             
             # Extract price from order result
-            # For Hyperliquid: order is a dict with {"status": "ok", "filled": True, "data": {...}}
-            # For Drift: order may be an object or dict
+            # For Lighter: order is a dict with {"status": "ok", "filled": True, "data": {...}}
+            # For Aster: order may be an object or dict
             fill_price = price or 0
             fill_qty = quantity
             order_id = None
 
             if isinstance(order, dict):
-                # Hyperliquid returns dict
+                # Lighter returns dict
                 if order.get("filled") and order.get("data"):
                     fill_data = order["data"]
                     fill_price = float(fill_data.get("avgPx", 0)) or price or 0
@@ -507,7 +507,7 @@ class DualPlatformRouter:
                 else:
                     order_id = str(order)
             else:
-                # Object-based response (Drift)
+                # Object-based response (Aster)
                 fill_price = getattr(order, 'price', price or 0)
                 fill_qty = getattr(order, 'filled_quantity', quantity)
                 order_id = getattr(order, 'order_id', str(order))
@@ -549,51 +549,51 @@ class DualPlatformRouter:
         """Get positions from one or both platforms."""
         positions = {}
         
-        if platform is None or platform == Platform.HYPERLIQUID:
+        if platform is None or platform == Platform.LIGHTER:
             if self._hl_client and hasattr(self._hl_client, 'get_positions'):
                 try:
                     hl_positions = await self._hl_client.get_positions()
-                    positions["hyperliquid"] = [p.to_dict() if hasattr(p, 'to_dict') else p for p in hl_positions]
+                    positions["lighter"] = [p.to_dict() if hasattr(p, 'to_dict') else p for p in hl_positions]
                 except Exception as e:
-                    logger.error(f"❌ [Router] Failed to get Hyperliquid positions: {e}")
-                    positions["hyperliquid"] = []
+                    logger.error(f"❌ [Router] Failed to get Lighter positions: {e}")
+                    positions["lighter"] = []
         
-        if platform is None or platform == Platform.DRIFT:
-            if self._drift_client and hasattr(self._drift_client, 'get_positions'):
+        if platform is None or platform == Platform.ASTER:
+            if self._aster_client and hasattr(self._aster_client, 'get_positions'):
                 try:
-                    drift_positions = await self._drift_client.get_positions()
-                    positions["drift"] = [p.to_dict() if hasattr(p, 'to_dict') else p for p in drift_positions]
+                    aster_positions = await self._aster_client.get_positions()
+                    positions["aster"] = [p.to_dict() if hasattr(p, 'to_dict') else p for p in aster_positions]
                 except Exception as e:
-                    logger.error(f"❌ [Router] Failed to get Drift positions: {e}")
-                    positions["drift"] = []
+                    logger.error(f"❌ [Router] Failed to get Aster positions: {e}")
+                    positions["aster"] = []
         
         return positions
     
     def get_circuit_status(self) -> dict:
         """Get circuit breaker status for both platforms."""
         return {
-            "hyperliquid": {
+            "lighter": {
                 "state": self._hl_breaker.state.value,
                 "is_closed": self._hl_breaker.is_closed,
                 "metrics": self._hl_breaker.metrics.to_dict(),
             },
-            "drift": {
-                "state": self._drift_breaker.state.value,
-                "is_closed": self._drift_breaker.is_closed,
-                "metrics": self._drift_breaker.metrics.to_dict(),
+            "aster": {
+                "state": self._aster_breaker.state.value,
+                "is_closed": self._aster_breaker.is_closed,
+                "metrics": self._aster_breaker.metrics.to_dict(),
             },
         }
     
     def get_routing_stats(self) -> dict:
         """Get routing statistics."""
-        total = self._hl_executions + self._drift_executions
+        total = self._hl_executions + self._aster_executions
         
         return {
             "total_executions": total,
-            "hyperliquid_executions": self._hl_executions,
-            "drift_executions": self._drift_executions,
-            "hyperliquid_percent": round(self._hl_executions / total * 100, 1) if total > 0 else 0,
-            "drift_percent": round(self._drift_executions / total * 100, 1) if total > 0 else 0,
+            "lighter_executions": self._hl_executions,
+            "aster_executions": self._aster_executions,
+            "lighter_percent": round(self._hl_executions / total * 100, 1) if total > 0 else 0,
+            "aster_percent": round(self._aster_executions / total * 100, 1) if total > 0 else 0,
             "failovers": self._failovers,
             "failover_rate": round(self._failovers / total * 100, 2) if total > 0 else 0,
             "circuits": self.get_circuit_status(),
@@ -603,13 +603,13 @@ class DualPlatformRouter:
         """Get symbol to platform mapping."""
         routing = {}
         
-        for sym in self.config.hyperliquid_symbols:
+        for sym in self.config.lighter_symbols:
             base = sym.replace("-PERP", "")
-            routing[base] = "hyperliquid"
+            routing[base] = "lighter"
         
-        for sym in self.config.drift_symbols:
+        for sym in self.config.aster_symbols:
             base = sym.replace("-PERP", "")
-            routing[base] = "drift"
+            routing[base] = "aster"
         
         return routing
     
@@ -624,15 +624,15 @@ class DualPlatformRouter:
                 "enable_fuzzing": self.config.enable_fuzzing,
             },
             "platforms": {
-                "hyperliquid": {
+                "lighter": {
                     "connected": self._hl_client is not None,
-                    "symbols": len(self.config.hyperliquid_symbols),
+                    "symbols": len(self.config.lighter_symbols),
                     "circuit": self._hl_breaker.state.value,
                 },
-                "drift": {
-                    "connected": self._drift_client is not None,
-                    "symbols": len(self.config.drift_symbols),
-                    "circuit": self._drift_breaker.state.value,
+                "aster": {
+                    "connected": self._aster_client is not None,
+                    "symbols": len(self.config.aster_symbols),
+                    "circuit": self._aster_breaker.state.value,
                 },
             },
             "stats": self.get_routing_stats(),
@@ -641,24 +641,24 @@ class DualPlatformRouter:
 
 # Factory function
 async def create_dual_router(
-    hyperliquid_client: Any,
-    drift_client: Any,
+    lighter_client: Any,
+    aster_client: Any,
     config: Optional[RoutingConfig] = None,
 ) -> DualPlatformRouter:
     """
     Create and initialize a dual-platform router.
     
     Args:
-        hyperliquid_client: Hyperliquid client
-        drift_client: Drift client
+        lighter_client: Lighter client
+        aster_client: Aster client
         config: Optional routing configuration
         
     Returns:
         Initialized router
     """
     router = DualPlatformRouter(
-        hyperliquid_client=hyperliquid_client,
-        drift_client=drift_client,
+        lighter_client=lighter_client,
+        aster_client=aster_client,
         config=config,
     )
     await router.initialize()
@@ -671,8 +671,8 @@ if __name__ == "__main__":
         
         # Create router without real clients for demo
         router = DualPlatformRouter(
-            hyperliquid_client=None,
-            drift_client=None,
+            lighter_client=None,
+            aster_client=None,
         )
         
         # Test routing decisions

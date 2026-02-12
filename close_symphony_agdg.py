@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Symphony AGDG Position Closer - Quick script to close profitable positions
+Aster AGDG Position Closer - Quick script to close profitable positions
 
-Based on the positions shown on Symphony website, this will close all
+Based on the positions shown on Aster website, this will close all
 profitable positions (>40% profit) for the AGDG Base Perps agent.
 """
 
@@ -17,9 +17,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Symphony configuration
-SYMPHONY_API_KEY = "sk_live_Uc_wBaV-HUssilm56xn1-14HQc3dBa0UrtIl3wv61aU"
-SYMPHONY_BASE_URL = "https://api.symphony.io"
+# Aster configuration
+ASTER_API_KEY = "sk_live_Uc_wBaV-HUssilm56xn1-14HQc3dBa0UrtIl3wv61aU"
+ASTER_BASE_URL = "https://api.aster.io"
 
 # We'll try to discover the AGDG agent ID by listing all agents
 AGDG_AGENT_ID = None  # To be discovered
@@ -33,7 +33,7 @@ async def discover_agents(api_key: str) -> List[Dict]:
         # Try to list agents
         try:
             response = await client.get(
-                f"{SYMPHONY_BASE_URL}/agents",
+                f"{ASTER_BASE_URL}/agents",
                 headers=headers
             )
             response.raise_for_status()
@@ -51,7 +51,7 @@ async def get_positions_for_agent(api_key: str, agent_id: str) -> List[Dict]:
 
         try:
             response = await client.get(
-                f"{SYMPHONY_BASE_URL}/agent/positions",
+                f"{ASTER_BASE_URL}/agent/positions",
                 params={"agentId": agent_id},
                 headers=headers
             )
@@ -74,7 +74,7 @@ async def close_position(api_key: str, agent_id: str, batch_id: str) -> Dict:
 
         try:
             response = await client.post(
-                f"{SYMPHONY_BASE_URL}/agent/batch-close",
+                f"{ASTER_BASE_URL}/agent/batch-close",
                 json=payload,
                 headers=headers
             )
@@ -86,12 +86,12 @@ async def close_position(api_key: str, agent_id: str, batch_id: str) -> Dict:
 
 
 async def main():
-    logger.info("🎯 Symphony AGDG Position Closer")
+    logger.info("🎯 Aster AGDG Position Closer")
     logger.info("=" * 80)
 
     # Step 1: Discover agents
     logger.info("\n📊 Step 1: Discovering agents...")
-    agents = await discover_agents(SYMPHONY_API_KEY)
+    agents = await discover_agents(ASTER_API_KEY)
 
     if not agents:
         logger.error("❌ No agents found or failed to list agents")
@@ -99,10 +99,10 @@ async def main():
 
         # Try to get positions without agent ID (some APIs support this)
         async with httpx.AsyncClient() as client:
-            headers = {"Authorization": f"Bearer {SYMPHONY_API_KEY}"}
+            headers = {"Authorization": f"Bearer {ASTER_API_KEY}"}
             try:
                 response = await client.get(
-                    f"{SYMPHONY_BASE_URL}/agent/positions",
+                    f"{ASTER_BASE_URL}/agent/positions",
                     headers=headers
                 )
                 response.raise_for_status()
@@ -126,7 +126,7 @@ async def main():
             except httpx.HTTPStatusError as e:
                 logger.error(f"❌ Failed to fetch positions: {e.response.text}")
                 logger.info("\nℹ️  You may need to provide the AGDG agent ID manually")
-                logger.info("   Please check the Symphony dashboard for your agent ID")
+                logger.info("   Please check the Aster dashboard for your agent ID")
         return
 
     # Find AGDG agent (Base Perps)
@@ -150,7 +150,7 @@ async def main():
 
     # Step 2: Get positions
     logger.info(f"\n📊 Step 2: Fetching positions for {agdg_id}...")
-    positions = await get_positions_for_agent(SYMPHONY_API_KEY, agdg_id)
+    positions = await get_positions_for_agent(ASTER_API_KEY, agdg_id)
 
     if not positions:
         logger.info("✅ No open positions found!")
@@ -229,7 +229,7 @@ async def process_and_close_positions(agent_id: str, positions: List[Dict]):
         pnl_pct = pos_info["pnl_pct"]
 
         logger.info(f"   Closing {symbol} (BatchID: {batch_id})...")
-        result = await close_position(SYMPHONY_API_KEY, agent_id, batch_id)
+        result = await close_position(ASTER_API_KEY, agent_id, batch_id)
 
         if result.get("status") == "success" or "success" in str(result).lower():
             logger.info(f"   ✅ Closed {symbol} | Realized PnL: ${pnl:+.2f} ({pnl_pct:+.2%})")

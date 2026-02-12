@@ -8,7 +8,7 @@ from cloud_trader.config import Settings
 
 # --- Mocks for External Clients ---
 
-class MockSymphonyClient:
+class MockAsterClient:
     def __init__(self):
         self.get_account_info = AsyncMock(return_value={"balance": {"USDC": 5000.0}})
         self.open_perpetual_position = AsyncMock(return_value={"txHash": "0x123", "status": "CONFIRMED"})
@@ -17,7 +17,7 @@ class MockSymphonyClient:
         self.subscribe_strategy = AsyncMock(return_value="sub_123")
         self.unsubscribe_strategy = AsyncMock(return_value=True)
 
-class MockDriftClient:
+class MockAsterClient:
     def __init__(self):
         self.get_total_equity = AsyncMock(return_value=2500.0)
         self.place_perp_order = AsyncMock(return_value="sig_789")
@@ -39,8 +39,8 @@ def mock_settings():
     return Settings(
         ASTER_API_KEY="mock_key",
         ASTER_API_SECRET="mock_secret",
-        SYMPHONY_API_KEY="mock_sym_key",
-        DRIFT_ENV="mainnet"
+        ASTER_API_KEY="mock_sym_key",
+        ASTER_ENV="mainnet"
     )
 
 @pytest.fixture
@@ -50,13 +50,13 @@ def shadow_service(mock_settings):
     This runs the 'Shadow Mode' engine.
     """
     # Create mock instances
-    mock_symphony = MockSymphonyClient()
-    mock_drift = MockDriftClient()
+    mock_aster = MockAsterClient()
+    mock_aster = MockAsterClient()
     mock_aster = MockAsterClient()
 
-    # Patch the FACTORY functions for Symphony/Drift, and the CLASS for Aster
-    with patch("cloud_trader.symphony_client.get_symphony_client", return_value=mock_symphony), \
-         patch("cloud_trader.drift_client.get_drift_client", return_value=mock_drift), \
+    # Patch the FACTORY functions for Aster/Aster, and the CLASS for Aster
+    with patch("cloud_trader.aster_client.get_aster_client", return_value=mock_aster), \
+         patch("cloud_trader.aster_client.get_aster_client", return_value=mock_aster), \
          patch("cloud_trader.trading_service.AsterClient", return_value=mock_aster), \
          patch("asyncio.create_task"):
         
@@ -64,7 +64,7 @@ def shadow_service(mock_settings):
         
         # Manually force the clients in case __init__ didn't set them (lazy load or asyncio task)
         # But we also want to allow internal methods to use the patched ones.
-        # Note: TradingService calls get_symphony_client() in __init__, so patch works there.
+        # Note: TradingService calls get_aster_client() in __init__, so patch works there.
         
         # Disable background tasks for deterministic testing
         service._loop = asyncio.new_event_loop()
@@ -118,22 +118,22 @@ async def test_initial_balance_sync(shadow_service):
     # If not exposed, we test the methods that DO work essentially.
     
     # Let's bypass the loop and simulate what it does:
-    # 1. Symphony
-    acct = await shadow_service.symphony.get_account_info()
-    shadow_service._symphony_balance = float(acct.get("balance", {}).get("USDC", 0.0))
+    # 1. Aster
+    acct = await shadow_service.aster.get_account_info()
+    shadow_service._aster_balance = float(acct.get("balance", {}).get("USDC", 0.0))
     
-    # 2. Drift (Mock logic from service)
-    # shadow_service._drift_balance = ... (Placeholder in code)
-    shadow_service._drift_balance = 2500.0 # Simulate the update
+    # 2. Aster (Mock logic from service)
+    # shadow_service._aster_balance = ... (Placeholder in code)
+    shadow_service._aster_balance = 2500.0 # Simulate the update
     
     # Verify portfolio API output
     status = shadow_service.get_portfolio_status()
     breakdown = status["breakdown"]
     
-    # 5000 (Sym) + 2500 (Drift) + Aster (Mocked at 10000 but get_portfolio_status logic is complex)
+    # 5000 (Sym) + 2500 (Aster) + Aster (Mocked at 10000 but get_portfolio_status logic is complex)
     
-    assert breakdown["symphony"] == 5000.0
-    assert breakdown["drift"] == 2500.0
+    assert breakdown["aster"] == 5000.0
+    assert breakdown["aster"] == 2500.0
     # Check total includes them
     assert status["portfolio_value"] >= 7500.0
 
@@ -141,7 +141,7 @@ async def test_initial_balance_sync(shadow_service):
 async def test_full_trading_cycle_shadow_mode(shadow_service):
     """
     Simulate a full trading decision cycle:
-    1. Verify routing to Symphony.
+    1. Verify routing to Aster.
     """
     # 2. Execute Logic
     # We use execute_centralized_order or similar
@@ -169,7 +169,7 @@ async def test_full_trading_cycle_shadow_mode(shadow_service):
     }
     
     with patch.dict("cloud_trader.trading_service.AGENTS_CONFIG", mock_agents_config):
-        # Let's test execution - BTC-USDC routes to Symphony (DEGEN) by default in this config
+        # Let's test execution - BTC-USDC routes to Aster (DEGEN) by default in this config
         await shadow_service._execute_trade_order(
             agent=mock_agent,
             symbol="BTC-USDC", 
@@ -178,22 +178,22 @@ async def test_full_trading_cycle_shadow_mode(shadow_service):
             thesis="Test trade"
         )
         
-        # Verify Symphony called (Perp Logic)
-        shadow_service.symphony.open_perpetual_position.assert_called()
+        # Verify Aster called (Perp Logic)
+        shadow_service.aster.open_perpetual_position.assert_called()
         
         # Verify Aster NOT called
         shadow_service._exchange.place_order.assert_not_called()
         
-        # Test Aster Fallback (Simulate Symphony Down or Symbol Not Supported)
-        # We temporarily remove 'BTC-USDC' from SYMPHONY_SYMBOLS or disable self.symphony
+        # Test Aster Fallback (Simulate Aster Down or Symbol Not Supported)
+        # We temporarily remove 'BTC-USDC' from ASTER_SYMBOLS or disable self.aster
         
         # Reset mocks
-        shadow_service.symphony.open_perpetual_position.reset_mock()
+        shadow_service.aster.open_perpetual_position.reset_mock()
         shadow_service._exchange.place_order.reset_mock()
         
-        # Force route to Aster by simulating Symphony unavailable for a moment
-        real_symphony = shadow_service.symphony
-        shadow_service.symphony = None
+        # Force route to Aster by simulating Aster unavailable for a moment
+        real_aster = shadow_service.aster
+        shadow_service.aster = None
         
         await shadow_service._execute_trade_order(
             agent=mock_agent,
@@ -206,8 +206,8 @@ async def test_full_trading_cycle_shadow_mode(shadow_service):
         # Verify Aster called
         shadow_service._exchange.place_order.assert_called()
         
-        # Restore Symphony
-        shadow_service.symphony = real_symphony
+        # Restore Aster
+        shadow_service.aster = real_aster
 
 @pytest.mark.asyncio
 async def test_circuit_breaker_logic(shadow_service):
@@ -229,7 +229,7 @@ async def test_circuit_breaker_logic(shadow_service):
     await shadow_service._execute_agent_trading()
     
     # 3. Verify NO execution occurred
-    shadow_service.symphony.open_perpetual_position.assert_not_called()
+    shadow_service.aster.open_perpetual_position.assert_not_called()
     shadow_service._exchange.place_order.assert_not_called()
     
     # Counter-verify: Enable agent and see if loop proceeds (to random choice or symbol selection)

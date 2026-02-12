@@ -2,12 +2,12 @@ import asyncio
 from typing import Any, Dict
 
 from cloud_trader.logger import get_logger
-from cloud_trader.symphony_client import get_symphony_client
+from cloud_trader.aster_client import get_aster_client
 
 logger = get_logger(__name__)
 
 
-class SymphonyFundManager:
+class AsterFundManager:
     """
     The Fund Manager Agent 🎵
     Objective: Long-term capital growth (Beta).
@@ -15,7 +15,7 @@ class SymphonyFundManager:
     """
 
     def __init__(self):
-        self.symphony = get_symphony_client()
+        self.aster = get_aster_client()
 
         # Target Weights (The "Thesis")
         # In a real app, these would come from the AI Brain
@@ -34,7 +34,7 @@ class SymphonyFundManager:
         logger.info(f"🎵 Fund Manager: Assessing Portfolio (Regime: {market_regime})")
 
         # 1. Ensure Fund Exists
-        if not self.symphony.is_activated:
+        if not self.aster.is_activated:
             logger.info("   Fund Agent not fully active. Skipping rebalance.")
             return
 
@@ -43,7 +43,7 @@ class SymphonyFundManager:
             # Risk On: Heavy Crypto/AI + MEMES
             logger.info("   Strategy: AGGRESSIVE GROWTH 🚀 (Long EMO/MON)")
             # Logic: Overweight High Beta
-            # self.symphony.execute_spot_trade(symbol="EMO-USDC", side="BUY", ...)
+            # self.aster.execute_spot_trade(symbol="EMO-USDC", side="BUY", ...)
 
         elif market_regime == "BEAR_TRENDING":
             # Risk Off: High Cash/Stable, Reduce Memes
@@ -58,7 +58,7 @@ class SymphonyFundManager:
     async def get_health_status(self) -> Dict[str, Any]:
         """Return fund metrics."""
         try:
-            acc = await self.symphony.get_account_info()
+            acc = await self.aster.get_account_info()
             return {
                 "status": "active" if acc.get("is_activated") else "pending",
                 "aum_usdc": acc.get("balance", {}).get("USDC", 0),

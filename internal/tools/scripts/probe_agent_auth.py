@@ -5,9 +5,9 @@ import os
 import httpx
 
 # Configuration
-API_KEY = os.getenv("SYMPHONY_API_KEY")
-AGENT_ID = os.getenv("SYMPHONY_AGENT_ID")
-BASE_URL = "https://api.symphony.io"
+API_KEY = os.getenv("ASTER_API_KEY")
+AGENT_ID = os.getenv("ASTER_AGENT_ID")
+BASE_URL = "https://api.aster.io"
 
 
 async def probe_agent():

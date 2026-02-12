@@ -58,10 +58,10 @@ class TradeSide(IntEnum):
 class Platform(IntEnum):
     """Compact platform encoding."""
 
-    DRIFT = 0
+    ASTER = 0
     ASTER = 1
-    HYPERLIQUID = 2
-    SYMPHONY = 3
+    LIGHTER = 2
+    ASTER = 3
 
 
 # Symbol to 2-byte index mapping (extensible)
@@ -163,13 +163,13 @@ class TradePacket:
 
         # Parse platform
         platform_str = data.get("platform", "").lower()
-        platform = Platform.DRIFT
+        platform = Platform.ASTER
         if "aster" in platform_str:
             platform = Platform.ASTER
-        elif "hyperliquid" in platform_str or "hl" in platform_str:
-            platform = Platform.HYPERLIQUID
-        elif "symphony" in platform_str:
-            platform = Platform.SYMPHONY
+        elif "lighter" in platform_str or "hl" in platform_str:
+            platform = Platform.LIGHTER
+        elif "aster" in platform_str:
+            platform = Platform.ASTER
 
         return cls(
             timestamp=ts,
@@ -776,7 +776,7 @@ async def demo_neural_cache():
                 "side": "BUY" if i % 2 == 0 else "SELL",
                 "price": 100 + i * 0.1,
                 "quantity": 1.0 + i * 0.01,
-                "platform": "drift",
+                "platform": "aster",
                 "trade_id": f"trade-{i}",
             }
         )

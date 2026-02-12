@@ -50,7 +50,7 @@ export interface Position {
   agent: string;
   tp?: number;
   sl?: number;
-  system?: 'ASTER' | 'HYPERLIQUID';
+  system?: 'ASTER' | 'LIGHTER';
 }
 
 export interface Trade {
@@ -135,8 +135,8 @@ const AGENT_COLORS: Record<string, string> = {
   'swing-trader-agent': '#34d399',   // Emerald
   'monad-treasury-agent': '#818cf8', // Indigo/Blue
   'ari-gold-fund': '#fbbf24',        // Amber/Gold
-  'drift-solana-agent': '#f472b6',   // Pink
-  'hyperliquid-l1-agent': '#38bdf8', // Light Blue
+  'aster-solana-agent': '#f472b6',   // Pink
+  'lighter-l1-agent': '#38bdf8', // Light Blue
 };
 
 // Agent specializations
@@ -146,8 +146,8 @@ const AGENT_SPECIALIZATIONS: Record<string, string> = {
   'swing-trader-agent': 'Multi-day Trend Capturing',
   'monad-treasury-agent': 'Whale Tracking & Smart Money',
   'ari-gold-fund': 'Asymmetric Risk-On Bets',
-  'drift-solana-agent': 'Solana Ecosystem Perp Trading',
-  'hyperliquid-l1-agent': 'High-Frequency Perp Scalping',
+  'aster-solana-agent': 'Solana Ecosystem Perp Trading',
+  'lighter-l1-agent': 'High-Frequency Perp Scalping',
 };
 
 // Helper to transform Agent to AgentActivity
@@ -175,8 +175,8 @@ const AGENT_EMOJIS: Record<string, string> = {
   'swing-trader-agent': '🧠',
   'monad-treasury-agent': '🏛️',
   'ari-gold-fund': '🚁',
-  'drift-solana-agent': '🌀',
-  'hyperliquid-l1-agent': '🌊',
+  'aster-solana-agent': '🌀',
+  'lighter-l1-agent': '🌊',
 };
 
 const AGENT_NAMES: Record<string, string> = {
@@ -185,8 +185,8 @@ const AGENT_NAMES: Record<string, string> = {
   'swing-trader-agent': 'Swing Trader',
   'monad-treasury-agent': 'Monad Treasury',
   'ari-gold-fund': 'The Ari Gold Fund',
-  'drift-solana-agent': 'Drift Trader',
-  'hyperliquid-l1-agent': 'HyperTrader',
+  'aster-solana-agent': 'Aster Trader',
+  'lighter-l1-agent': 'HyperTrader',
 };
 
 // --- Safe Defaults ---

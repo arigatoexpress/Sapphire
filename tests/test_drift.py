@@ -1,6 +1,6 @@
 """
-Drift Protocol Unit Tests
-Tests for Solana perpetual futures trading via Drift
+Aster Protocol Unit Tests
+Tests for Solana perpetual futures trading via Aster
 """
 
 import asyncio
@@ -10,7 +10,7 @@ from pathlib import Path
 # Add parent to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from cloud_trader.drift_client import get_drift_client
+from cloud_trader.aster_client import get_aster_client
 from tests.test_base import (
     PlatformTestBase,
     TestConfig,
@@ -20,42 +20,42 @@ from tests.test_base import (
 )
 
 
-class DriftTests(PlatformTestBase):
-    """Unit tests for Drift Protocol client"""
+class AsterTests(PlatformTestBase):
+    """Unit tests for Aster Protocol client"""
 
     def __init__(self):
-        super().__init__("Drift")
+        super().__init__("Aster")
         self.client = None
         self.test_position_opened = False
 
     async def setup(self):
-        """Initialize Drift client"""
+        """Initialize Aster client"""
         print(f"\n{'='*70}")
-        print(f"🌊 DRIFT PROTOCOL TESTS")
+        print(f"🌊 ASTER PROTOCOL TESTS")
         print(f"{'='*70}")
         print(f"Platform: Solana Perpetual Futures")
-        print(f"Markets: {', '.join(TestConfig.DRIFT_TEST_SYMBOLS)}")
+        print(f"Markets: {', '.join(TestConfig.ASTER_TEST_SYMBOLS)}")
         print(f"Test Size: {TestConfig.TEST_SOL_SIZE} SOL")
         print(f"Leverage: {TestConfig.TEST_LEVERAGE}x")
         print(f"{'='*70}\n")
 
-        self.client = get_drift_client()
+        self.client = get_aster_client()
 
     async def teardown(self):
-        """Cleanup Drift client"""
+        """Cleanup Aster client"""
         if self.client:
             await self.client.close()
 
     # Test 1: Initialization
     async def test_initialization(self):
-        """Test Drift client initializes correctly"""
+        """Test Aster client initializes correctly"""
         print(f"🔧 Test 1: Initialization")
 
         await self.client.initialize()
 
         if not self.client.is_initialized:
-            print(f"   ⚠️ Drift not initialized (expected in local testing)")
-            print(f"      Drift requires private key from Cloud Run secrets")
+            print(f"   ⚠️ Aster not initialized (expected in local testing)")
+            print(f"      Aster requires private key from Cloud Run secrets")
             return {"initialized": False, "note": "Requires production environment"}
 
         print(f"   ✅ Client initialized")
@@ -239,9 +239,9 @@ class DriftTests(PlatformTestBase):
         """Test getting list of supported perpetual markets"""
         print(f"\n📋 Test 7: Get Supported Markets")
 
-        from cloud_trader.definitions import DRIFT_PERP_SYMBOLS
+        from cloud_trader.definitions import ASTER_PERP_SYMBOLS
 
-        markets = DRIFT_PERP_SYMBOLS
+        markets = ASTER_PERP_SYMBOLS
         print(f"   📊 Total Markets: {len(markets)}")
         print(f"   🎯 Markets: {', '.join(markets)}")
 
@@ -269,7 +269,7 @@ class DriftTests(PlatformTestBase):
         }
 
     async def run_all_tests(self):
-        """Run all Drift tests"""
+        """Run all Aster tests"""
         await self.setup()
 
         # Run tests in sequence
@@ -288,12 +288,12 @@ class DriftTests(PlatformTestBase):
 
 
 async def main():
-    """Run Drift tests"""
-    tests = DriftTests()
+    """Run Aster tests"""
+    tests = AsterTests()
     summary = await tests.run_all_tests()
 
     print(f"\n{'='*70}")
-    print(f"📊 DRIFT TEST SUMMARY")
+    print(f"📊 ASTER TEST SUMMARY")
     print(f"{'='*70}")
     print(f"Platform: {summary['platform']}")
     print(f"Total Tests: {summary['total']}")

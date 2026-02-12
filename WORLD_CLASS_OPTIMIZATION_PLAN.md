@@ -41,7 +41,7 @@
 **Fix:**
 - ✅ Platform-aware symbol configuration implemented
 - ✅ Jupiter: SOL, BONK, WIF, JUP, JTO
-- ✅ Drift: SOL-PERP, BTC-PERP, ETH-PERP
+- ✅ Aster: SOL-PERP, BTC-PERP, ETH-PERP
 - ✅ Deploying now (Build: e57fe027)
 
 ---

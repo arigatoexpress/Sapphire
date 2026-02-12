@@ -67,9 +67,9 @@ class TradeHistory(Base):
     timestamp = Column(BigInteger, nullable=False)
 
     # Platform identification
-    platform = Column(String, nullable=True)  # jupiter, drift, hyperliquid, aster, symphony, lighter
+    platform = Column(String, nullable=True)  # jupiter, aster, lighter, aster, aster, lighter
 
-    # Blockchain verification (for Solana-based platforms like Jupiter, Drift)
+    # Blockchain verification (for Solana-based platforms like Jupiter, Aster)
     blockchain = Column(String, nullable=True)  # solana, ethereum, etc.
     tx_verified = Column(String, nullable=True)  # "pending", "confirmed", "failed", null for CEX
     verification_timestamp = Column(BigInteger, nullable=True)  # When verification was last checked

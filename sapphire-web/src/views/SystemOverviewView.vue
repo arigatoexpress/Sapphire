@@ -90,16 +90,16 @@
           <!-- Trading Platforms -->
           <g class="trading-platforms">
             <circle cx="700" cy="60" r="25" class="node pulse-fast" />
-            <text x="700" y="100" text-anchor="middle" class="node-label">Drift</text>
+            <text x="700" y="100" text-anchor="middle" class="node-label">Aster</text>
 
             <circle cx="700" cy="140" r="25" class="node pulse-fast" />
-            <text x="700" y="180" text-anchor="middle" class="node-label">Hyperliquid</text>
+            <text x="700" y="180" text-anchor="middle" class="node-label">Lighter</text>
 
             <circle cx="700" cy="220" r="25" class="node pulse-fast" />
             <text x="700" y="260" text-anchor="middle" class="node-label">Aster</text>
 
             <circle cx="700" cy="300" r="25" class="node pulse-fast" />
-            <text x="700" y="340" text-anchor="middle" class="node-label">Symphony</text>
+            <text x="700" y="340" text-anchor="middle" class="node-label">Aster</text>
           </g>
 
           <!-- Animated Connections -->
@@ -166,10 +166,10 @@ const coreComponents = reactive([
 ])
 
 const platforms = reactive([
-  { id: 'drift', name: 'Drift', status: 'offline' as const, trades: 0, volume: 0 },
-  { id: 'hyperliquid', name: 'Hyperliquid', status: 'offline' as const, trades: 0, volume: 0 },
   { id: 'aster', name: 'Aster', status: 'offline' as const, trades: 0, volume: 0 },
-  { id: 'symphony', name: 'Symphony', status: 'offline' as const, trades: 0, volume: 0 },
+  { id: 'lighter', name: 'Lighter', status: 'offline' as const, trades: 0, volume: 0 },
+  { id: 'aster', name: 'Aster', status: 'offline' as const, trades: 0, volume: 0 },
+  { id: 'aster', name: 'Aster', status: 'offline' as const, trades: 0, volume: 0 },
   { id: 'lighter', name: 'Lighter', status: 'offline' as const, trades: 0, volume: 0 },
 ])
 
@@ -191,7 +191,7 @@ const metrics = reactive({
 const recentActivity = reactive([
   { timestamp: new Date(), type: 'info', message: 'System initialized: 5 platforms ready' },
   { timestamp: new Date(Date.now() - 15000), type: 'signal', message: 'AI Signal: BUY confidence 0.78' },
-  { timestamp: new Date(Date.now() - 32000), type: 'info', message: 'Hyperliquid connection established' },
+  { timestamp: new Date(Date.now() - 32000), type: 'info', message: 'Lighter connection established' },
   { timestamp: new Date(Date.now() - 58000), type: 'success', message: 'Configuration loaded successfully' },
   { timestamp: new Date(Date.now() - 92000), type: 'info', message: 'Monitoring services started' },
 ])
@@ -232,7 +232,7 @@ const simulateUpdates = () => {
       metrics.winRate = metrics.winRate * 0.95 + (Math.random() > 0.4 ? 0.05 : 0)
 
       // Add activity
-      const platformNames = ['Drift', 'Hyperliquid', 'Aster', 'Symphony', 'Lighter']
+      const platformNames = ['Aster', 'Lighter', 'Aster', 'Aster', 'Lighter']
       const randomPlatform = platformNames[Math.floor(Math.random() * platformNames.length)]
       const activities = [
         { type: 'signal', message: `AI Signal: ${Math.random() > 0.5 ? 'BUY' : 'SELL'} confidence ${(0.5 + Math.random() * 0.5).toFixed(2)}` },

@@ -74,7 +74,7 @@ class TradingEnv(gym.Env):
         volumes = []
 
         for _ in range(length - 1):
-            # Random walk with drift
+            # Random walk with aster
             change = np.random.normal(0.0001, 0.02)
             prices.append(prices[-1] * (1 + change))
             volumes.append(np.random.uniform(1000, 10000))

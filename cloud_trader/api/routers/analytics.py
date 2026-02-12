@@ -77,8 +77,8 @@ async def get_performance_by_platform():
     return {
         "platforms": {
             "aster": {"trades": 0, "pnl": 0.0, "win_rate": 0.0},
-            "drift": {"trades": 0, "pnl": 0.0, "win_rate": 0.0},
-            "symphony": {"trades": 0, "pnl": 0.0, "win_rate": 0.0},
+            "aster": {"trades": 0, "pnl": 0.0, "win_rate": 0.0},
+            "aster": {"trades": 0, "pnl": 0.0, "win_rate": 0.0},
         }
     }
 

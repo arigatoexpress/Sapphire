@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-about: Report a bug in Agent Symphony
+about: Report a bug in Agent Aster
 title: '[BUG] '
 labels: bug
 assignees: ''

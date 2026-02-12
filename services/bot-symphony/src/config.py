@@ -1,5 +1,5 @@
 """
-Minimal configuration for Symphony bot microservice.
+Minimal configuration for Aster bot microservice.
 Loads settings from environment variables.
 """
 
@@ -10,15 +10,15 @@ from typing import Optional
 
 @dataclass
 class Settings:
-    """Symphony configuration settings loaded from environment."""
+    """Aster configuration settings loaded from environment."""
 
-    # Symphony API
-    symphony_api_key: Optional[str] = None
-    symphony_milf_agent_id: Optional[str] = None
-    symphony_agdg_agent_id: Optional[str] = None
-    symphony_degen_agent_id: Optional[str] = None
-    symphony_mit_agent_id: Optional[str] = None
-    symphony_strategy_id: str = "default"
+    # Aster API
+    aster_api_key: Optional[str] = None
+    aster_milf_agent_id: Optional[str] = None
+    aster_agdg_agent_id: Optional[str] = None
+    aster_degen_agent_id: Optional[str] = None
+    aster_mit_agent_id: Optional[str] = None
+    aster_strategy_id: str = "default"
 
     # MIT Fund Settings
     mit_fund_name: str = "Sapphire MIT Fund"
@@ -39,12 +39,12 @@ class Settings:
 def get_settings() -> Settings:
     """Load settings from environment variables."""
     return Settings(
-        symphony_api_key=os.getenv("SYMPHONY_API_KEY"),
-        symphony_milf_agent_id=os.getenv("SYMPHONY_MILF_AGENT_ID"),
-        symphony_agdg_agent_id=os.getenv("SYMPHONY_AGDG_AGENT_ID"),
-        symphony_degen_agent_id=os.getenv("SYMPHONY_DEGEN_AGENT_ID"),
-        symphony_mit_agent_id=os.getenv("SYMPHONY_MIT_AGENT_ID"),
-        symphony_strategy_id=os.getenv("SYMPHONY_STRATEGY_ID", "default"),
+        aster_api_key=os.getenv("ASTER_API_KEY"),
+        aster_milf_agent_id=os.getenv("ASTER_MILF_AGENT_ID"),
+        aster_agdg_agent_id=os.getenv("ASTER_AGDG_AGENT_ID"),
+        aster_degen_agent_id=os.getenv("ASTER_DEGEN_AGENT_ID"),
+        aster_mit_agent_id=os.getenv("ASTER_MIT_AGENT_ID"),
+        aster_strategy_id=os.getenv("ASTER_STRATEGY_ID", "default"),
         mit_fund_name=os.getenv("MIT_FUND_NAME", "Sapphire MIT Fund"),
         mit_fund_description=os.getenv(
             "MIT_FUND_DESCRIPTION", "Sapphire AI-powered trading fund on Monad"

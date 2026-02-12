@@ -27,9 +27,9 @@ Testing shows ALL major exchanges have better reliability from non-US IPs:
 | Platform | US IP Status | Recommendation |
 |----------|--------------|----------------|
 | **Aster** | ❌ BLOCKED | REQUIRED: Non-US |
-| **Drift** | ⚠️ Throttled | Better from Asia |
-| **Hyperliquid** | ⚠️ Limited | Better from Asia |
-| **Symphony** | ✅ Works | Better from Asia |
+| **Aster** | ⚠️ Throttled | Better from Asia |
+| **Lighter** | ⚠️ Limited | Better from Asia |
+| **Aster** | ✅ Works | Better from Asia |
 | **Lighter** | ⚠️ L2 restrictions | Better from Asia |
 
 **Conclusion: ALL traders benefit from Asia-Pacific deployment**
@@ -78,10 +78,10 @@ SAVINGS: $15-92/month
 
 | Exchange | Estimated Latency | Optimal? |
 |----------|------------------|----------|
-| **Drift** (Solana) | ~80-120ms | ✅ Good |
-| **Hyperliquid** (L1) | ~100-150ms | ✅ Good |
+| **Aster** (Solana) | ~80-120ms | ✅ Good |
+| **Lighter** (L1) | ~100-150ms | ✅ Good |
 | **Aster** (CEX) | ~50-100ms | ✅ Excellent |
-| **Symphony** (Monad) | ~120-180ms | ✅ Acceptable |
+| **Aster** (Monad) | ~120-180ms | ✅ Acceptable |
 | **Lighter** (Eth L2) | ~100-150ms | ✅ Good |
 
 All within our < 100-200ms targets! ✅
@@ -221,5 +221,5 @@ gcloud run deploy sapphire-v2 \
   --cpu=4 \
   --min-instances=1 \
   --max-instances=10 \
-  --set-env-vars="ENVIRONMENT=production,LOG_LEVEL=INFO,ENABLE_DRIFT=true,ENABLE_HYPERLIQUID=true,ENABLE_ASTER=true,ENABLE_SYMPHONY=true,ENABLE_LIGHTER=true,GEMINI_MODEL=gemini-2.0-flash-exp"
+  --set-env-vars="ENVIRONMENT=production,LOG_LEVEL=INFO,ENABLE_ASTER=true,ENABLE_LIGHTER=true,ENABLE_ASTER=true,ENABLE_ASTER=true,ENABLE_LIGHTER=true,GEMINI_MODEL=gemini-2.0-flash-exp"
 ```

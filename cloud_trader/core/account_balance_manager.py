@@ -42,14 +42,14 @@ class AccountBalanceManager:
 
         # Fetch fresh balance based on platform
         try:
-            if platform == "hyperliquid":
-                balance = await self._get_hyperliquid_balance()
-            elif platform == "drift":
-                balance = await self._get_drift_balance()
+            if platform == "lighter":
+                balance = await self._get_lighter_balance()
             elif platform == "aster":
                 balance = await self._get_aster_balance()
-            elif platform == "symphony":
-                balance = await self._get_symphony_balance()
+            elif platform == "aster":
+                balance = await self._get_aster_balance()
+            elif platform == "aster":
+                balance = await self._get_aster_balance()
             elif platform == "lighter":
                 balance = await self._get_lighter_balance()
             else:
@@ -70,10 +70,10 @@ class AccountBalanceManager:
             logger.error(f"❌ Error fetching {platform} balance: {e}")
             return None
 
-    async def _get_hyperliquid_balance(self) -> Optional[float]:
-        """Get Hyperliquid account equity"""
+    async def _get_lighter_balance(self) -> Optional[float]:
+        """Get Lighter account equity"""
         if not hasattr(self.orchestrator, 'hl_client') or not self.orchestrator.hl_client:
-            logger.warning("⚠️ Hyperliquid client not available")
+            logger.warning("⚠️ Lighter client not available")
             return None
 
         try:
@@ -82,7 +82,7 @@ class AccountBalanceManager:
             # Get user state
             account_state = await hl_client.get_user_state()
             if not account_state:
-                logger.warning("⚠️ Could not fetch Hyperliquid account state")
+                logger.warning("⚠️ Could not fetch Lighter account state")
                 return None
 
             # Extract account value
@@ -90,26 +90,26 @@ class AccountBalanceManager:
             return float(account_value)
 
         except Exception as e:
-            logger.error(f"❌ Hyperliquid balance error: {e}")
+            logger.error(f"❌ Lighter balance error: {e}")
             return None
 
-    async def _get_drift_balance(self) -> Optional[float]:
-        """Get Drift account equity"""
-        if not hasattr(self.orchestrator, 'drift') or not self.orchestrator.drift:
-            logger.warning("⚠️ Drift client not available")
+    async def _get_aster_balance(self) -> Optional[float]:
+        """Get Aster account equity"""
+        if not hasattr(self.orchestrator, 'aster') or not self.orchestrator.aster:
+            logger.warning("⚠️ Aster client not available")
             return None
 
         try:
-            if not self.orchestrator.drift.is_initialized:
-                logger.warning("⚠️ Drift client not initialized")
+            if not self.orchestrator.aster.is_initialized:
+                logger.warning("⚠️ Aster client not initialized")
                 return None
 
             # Get total equity (includes SOL balance + unrealized PnL)
-            equity = await self.orchestrator.drift.get_total_equity()
+            equity = await self.orchestrator.aster.get_total_equity()
             return float(equity) if equity else None
 
         except Exception as e:
-            logger.error(f"❌ Drift balance error: {e}")
+            logger.error(f"❌ Aster balance error: {e}")
             return None
 
     async def _get_aster_balance(self) -> Optional[float]:
@@ -148,23 +148,23 @@ class AccountBalanceManager:
             logger.error(f"❌ Aster balance error: {e}")
             return None
 
-    async def _get_symphony_balance(self) -> Optional[float]:
-        """Get Symphony account balance"""
-        if not hasattr(self.orchestrator, 'symphony') or not self.orchestrator.symphony:
-            logger.warning("⚠️ Symphony client not available")
+    async def _get_aster_balance(self) -> Optional[float]:
+        """Get Aster account balance"""
+        if not hasattr(self.orchestrator, 'aster') or not self.orchestrator.aster:
+            logger.warning("⚠️ Aster client not available")
             return None
 
         try:
-            symphony_client = self.orchestrator.symphony
+            aster_client = self.orchestrator.aster
 
-            # Symphony has multiple agents, need to sum them
+            # Aster has multiple agents, need to sum them
             # For now, return a conservative estimate
-            # TODO: Implement proper Symphony balance fetching
-            logger.warning("⚠️ Symphony balance fetching not yet implemented")
+            # TODO: Implement proper Aster balance fetching
+            logger.warning("⚠️ Aster balance fetching not yet implemented")
             return None
 
         except Exception as e:
-            logger.error(f"❌ Symphony balance error: {e}")
+            logger.error(f"❌ Aster balance error: {e}")
             return None
 
     async def _get_lighter_balance(self) -> Optional[float]:
@@ -186,7 +186,7 @@ class AccountBalanceManager:
         """Get total balance across all platforms"""
         total = 0.0
 
-        for platform in ["hyperliquid", "drift", "aster", "symphony", "lighter"]:
+        for platform in ["lighter", "aster", "aster", "aster", "lighter"]:
             balance = await self.get_platform_balance(platform)
             if balance:
                 total += balance

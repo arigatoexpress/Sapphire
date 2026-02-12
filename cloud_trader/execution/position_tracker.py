@@ -126,7 +126,7 @@ class PositionTracker:
     Unified position management across all platforms.
 
     Features:
-    - Track positions from Aster, Drift, Symphony, Hyperliquid
+    - Track positions from Aster, Aster, Aster, Lighter
     - Persistent storage
     - Real-time P&L calculation
     - Position reconciliation

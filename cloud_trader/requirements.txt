@@ -12,7 +12,7 @@ aiosignal>=1.3.1
 uvloop>=0.19.0
 httptools>=0.6.0
 
-# Gemini AI (stable SDK, compatible with driftpy/httpx constraints)
+# Gemini AI (stable SDK, compatible with asterpy/httpx constraints)
 google-generativeai>=0.8.0
 
 redis==7.0.1
@@ -39,7 +39,7 @@ google-cloud-bigquery-storage==2.24.0
 ccxt>=4.0.0
 websocket-client>=1.6.0
 
-driftpy==0.7.0
+asterpy==0.7.0
 eth-account>=0.8.0
 base58>=2.1.1
 google-cloud-aiplatform>=1.70.0
@@ -57,8 +57,8 @@ alembic>=1.12.0
 cryptography>=41.0.0
 solders==0.21.0
 
-# Hyperliquid SDK (official, handles EIP-712 signing)
-hyperliquid-python-sdk>=0.6.0
+# Lighter SDK (official, handles EIP-712 signing)
+lighter-python-sdk>=0.6.0
 
 # Lighter SDK (decentralized perps on Ethereum L2)
 lighter-sdk>=1.0.0

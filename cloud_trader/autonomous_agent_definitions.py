@@ -16,13 +16,13 @@ from typing import Any, Dict, List
 # V2.3 AUTONOMOUS AGENTS - One per platform
 AUTONOMOUS_AGENT_DEFINITIONS: List[Dict[str, Any]] = [
     {
-        "id": "drift-learner",
-        "name": "Drift Autonomous Trader",
-        "platform": "drift",
+        "id": "aster-learner",
+        "name": "Aster Autonomous Trader",
+        "platform": "aster",
         "model": "gemini-2.0-flash-exp",
-        "system": "drift",
+        "system": "aster",
         "emoji": "🌀",
-        "description": "Self-learning trader mastering Drift Protocol (Solana Perps) through experience.",
+        "description": "Self-learning trader mastering Aster Protocol (Solana Perps) through experience.",
         "personality": "Adaptive, data-driven trader that discovers optimal patterns for Solana perpetuals.",
 
         # Learning Configuration
@@ -53,13 +53,13 @@ AUTONOMOUS_AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         "preferred_regimes": [],  # Discovers when to trade
     },
     {
-        "id": "hyperliquid-learner",
-        "name": "Hyperliquid Autonomous Trader",
-        "platform": "hyperliquid",
+        "id": "lighter-learner",
+        "name": "Lighter Autonomous Trader",
+        "platform": "lighter",
         "model": "gemini-2.0-flash-exp",
-        "system": "hyperliquid",
+        "system": "lighter",
         "emoji": "🔷",
-        "description": "Self-learning trader mastering Hyperliquid L1 through pattern discovery.",
+        "description": "Self-learning trader mastering Lighter L1 through pattern discovery.",
         "personality": "Intelligent L1 trader evolving strategies based on what works.",
 
         "type": "autonomous_learning",
@@ -117,11 +117,11 @@ AUTONOMOUS_AGENT_DEFINITIONS: List[Dict[str, Any]] = [
         "preferred_regimes": [],
     },
     {
-        "id": "symphony-learner",
-        "name": "Symphony Autonomous Trader",
-        "platform": "symphony",
+        "id": "aster-learner",
+        "name": "Aster Autonomous Trader",
+        "platform": "aster",
         "model": "gemini-2.0-flash-exp",
-        "system": "symphony",
+        "system": "aster",
         "emoji": "🎵",
         "description": "Self-learning treasury agent mastering Monad/Base ecosystem.",
         "personality": "Strategic learner discovering profitable patterns in Monad ecosystem.",

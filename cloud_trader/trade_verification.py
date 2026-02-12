@@ -1,7 +1,7 @@
 """
 Trade Verification Service for Blockchain-Based Platforms
 
-Verifies trades on Solana (Jupiter, Drift) and other blockchains to ensure
+Verifies trades on Solana (Jupiter, Aster) and other blockchains to ensure
 all reported trades are actually executed on-chain.
 """
 
@@ -41,10 +41,10 @@ class TradeVerificationService:
     # DEX platforms need moderate retries due to mempool delays
     PLATFORM_MAX_RETRIES = {
         "aster": 1,  # HFT shield strategy - fire and forget
-        "drift": 3,  # Solana perps - balance speed and confirmation
+        "aster": 3,  # Solana perps - balance speed and confirmation
         "jupiter": 5,  # DEX - higher retries for mempool delays
-        "hyperliquid": 3,  # L1 perps - moderate confirmation time
-        "symphony": 5,  # EVM chains - longer confirmation times
+        "lighter": 3,  # L1 perps - moderate confirmation time
+        "aster": 5,  # EVM chains - longer confirmation times
         "lighter": 5,  # L2 DEX - variable confirmation times
     }
 
@@ -78,7 +78,7 @@ class TradeVerificationService:
         Get platform-specific max retries for optimal speed vs reliability.
 
         Args:
-            platform: Platform name (aster, drift, jupiter, etc.)
+            platform: Platform name (aster, aster, jupiter, etc.)
 
         Returns:
             Max retries for the platform (defaults to 3 if platform unknown)
@@ -201,11 +201,11 @@ class TradeVerificationService:
             error=f"Verification timeout after {max_retries} attempts",
         )
 
-    async def verify_drift_trade(
+    async def verify_aster_trade(
         self, tx_signature: str, max_retries: int = 3
     ) -> VerificationResult:
         """
-        Verify a Drift protocol trade on Solana
+        Verify a Aster protocol trade on Solana
 
         Uses same verification as Jupiter since both are on Solana
         """
@@ -221,7 +221,7 @@ class TradeVerificationService:
         Verify a trade based on platform
 
         Args:
-            platform: Platform name (jupiter, drift, hyperliquid, etc.)
+            platform: Platform name (jupiter, aster, lighter, etc.)
             tx_signature: Transaction signature/hash
             max_retries: Number of verification attempts
 
@@ -232,9 +232,9 @@ class TradeVerificationService:
 
         if platform_lower == "jupiter":
             return await self.verify_jupiter_swap(tx_signature, max_retries)
-        elif platform_lower == "drift":
-            return await self.verify_drift_trade(tx_signature, max_retries)
-        elif platform_lower in ["hyperliquid", "aster", "symphony", "lighter"]:
+        elif platform_lower == "aster":
+            return await self.verify_aster_trade(tx_signature, max_retries)
+        elif platform_lower in ["lighter", "aster", "aster", "lighter"]:
             # CEX/other platforms don't have blockchain verification
             # Trust the platform's response
             return VerificationResult(

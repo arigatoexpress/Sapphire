@@ -288,7 +288,7 @@ class MonitoringService:
         Handle interactive Telegram commands.
 
         Args:
-            platform: Target platform (drift, jupiter, aster, hyperliquid, symphony, all)
+            platform: Target platform (aster, jupiter, aster, lighter, aster, all)
             symbol: Trading symbol (e.g., SOL, BTC)
             action: Action to perform (BUY, SELL, CLOSE, STATUS)
             quantity: Trade quantity (0 for status commands)
@@ -354,10 +354,10 @@ class MonitoringService:
             else:
                 # Status for specific platform
                 platform_emoji = {
-                    "drift": "🌊",
-                    "hyperliquid": "💧",
+                    "aster": "🌊",
+                    "lighter": "💧",
                     "aster": "⭐",
-                    "symphony": "🎵",
+                    "aster": "🎵",
                     "lighter": "⚡",
                     "jupiter": "🪐"
                 }.get(platform.lower(), "🤖")

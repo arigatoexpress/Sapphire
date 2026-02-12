@@ -1,5 +1,5 @@
-# Hyperliquid Bot Dependencies
-hyperliquid-python-sdk>=0.7.0
+# Lighter Bot Dependencies
+lighter-python-sdk>=0.7.0
 eth-account>=0.10.0
 httpx>=0.23.0
 google-cloud-pubsub>=2.18.0

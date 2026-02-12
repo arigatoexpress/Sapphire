@@ -5,7 +5,7 @@ from typing import Optional
 import base58
 from solders.keypair import Keypair
 
-from cloud_trader.drift_client import get_drift_client
+from cloud_trader.aster_client import get_aster_client
 from cloud_trader.jupiter_client import COMMON_TOKENS, get_jupiter_client
 from cloud_trader.logger import get_logger
 
@@ -32,7 +32,7 @@ class JupiterTreasurer:
             pct_to_sweep: % of excess to sweep (0.5 = 50%).
         """
         self.jup = get_jupiter_client()
-        self.drift = get_drift_client()
+        self.aster = get_aster_client()
         self.sweep_threshold = sweep_threshold_usdc
         self.buffer = keep_buffer_usdc
         self.pct = pct_to_sweep
@@ -64,15 +64,15 @@ class JupiterTreasurer:
         logger.info("🪐 Treasurer: Analyzing Liquidity...")
 
         try:
-            # 1. Get USDC Balance (From Drift User Account or Wallet ATA?)
-            # Usually profits settle in the Wallet ATA after Drift settle,
-            # OR they stay in Drift.
+            # 1. Get USDC Balance (From Aster User Account or Wallet ATA?)
+            # Usually profits settle in the Wallet ATA after Aster settle,
+            # OR they stay in Aster.
             # For simplicity in this Phase, we assume we check the WALLET USDC first.
-            # Real implementation would also check Drift 'settled' PnL.
+            # Real implementation would also check Aster 'settled' PnL.
 
-            # Mocking wallet fetch for now via DriftClient or direct RPC
+            # Mocking wallet fetch for now via AsterClient or direct RPC
             # In a full flow, we'd query the ATA of the wallet.
-            # Let's assume DriftClient has a helper or we use a balance check.
+            # Let's assume AsterClient has a helper or we use a balance check.
 
             current_usdc_balance = 1200.00  # TODO: Wire to real RPC balance check
 

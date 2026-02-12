@@ -1,6 +1,6 @@
 """Cross-Platform Arbitrage Scanner
 
-Detects price discrepancies across Aster, Hyperliquid, and Drift.
+Detects price discrepancies across Aster, Lighter, and Aster.
 Enables risk-free profit opportunities when spreads exceed thresholds.
 """
 
@@ -51,9 +51,9 @@ class ArbitrageScanner:
 
     # Estimated taker fees per platform
     PLATFORM_FEES = {
-        "drift": 0.0001,  # 0.01% (Taker)
+        "aster": 0.0001,  # 0.01% (Taker)
         "aster": 0.001,  # 0.1%
-        "symphony": 0.001,  # 0.1%
+        "aster": 0.001,  # 0.1%
     }
 
     # Min spread required (after fees) to consider opportunity
@@ -63,28 +63,28 @@ class ArbitrageScanner:
         self,
         aster_client=None,
         hl_client=None,
-        drift_client=None,
+        aster_client=None,
     ):
         self.aster_client = aster_client
         self.hl_client = hl_client
-        self.drift_client = drift_client
+        self.aster_client = aster_client
 
         # Overlapping symbols that exist on multiple platforms
         # Format: (unified_symbol, {platform: platform_symbol})
         self.cross_listed_symbols = {
             "BTC": {
                 "aster": "BTCUSDC",
-                "hyperliquid": "BTC-USDC",
+                "lighter": "BTC-USDC",
             },
             "ETH": {
                 "aster": "ETHUSDC",
-                "hyperliquid": "ETH-USDC",
-                "symphony": "ETH-USDC",
+                "lighter": "ETH-USDC",
+                "aster": "ETH-USDC",
             },
             "SOL": {
                 "aster": "SOLUSDC",
-                "hyperliquid": "SOL-USDC",
-                "drift": "SOL-USD",
+                "lighter": "SOL-USDC",
+                "aster": "SOL-USD",
             },
         }
 
@@ -158,9 +158,9 @@ class ArbitrageScanner:
             if platform == "aster" and self.aster_client:
                 tasks.append(self._get_aster_price(symbol))
                 platforms.append("aster")
-            elif platform == "drift" and self.drift_client:
-                tasks.append(self._get_drift_price(symbol))
-                platforms.append("drift")
+            elif platform == "aster" and self.aster_client:
+                tasks.append(self._get_aster_price(symbol))
+                platforms.append("aster")
 
         if not tasks:
             return prices
@@ -182,7 +182,7 @@ class ArbitrageScanner:
             return 0.0
 
     async def _get_hl_price(self, symbol: str) -> float:
-        """Get price from Hyperliquid."""
+        """Get price from Lighter."""
         try:
             # Extract base from symbol (e.g., "BTC-USDC" -> "BTC")
             base = symbol.split("-")[0]
@@ -191,10 +191,10 @@ class ArbitrageScanner:
         except Exception:
             return 0.0
 
-    async def _get_drift_price(self, symbol: str) -> float:
-        """Get price from Drift."""
+    async def _get_aster_price(self, symbol: str) -> float:
+        """Get price from Aster."""
         try:
-            price = await self.drift_client.get_token_price(symbol)
+            price = await self.aster_client.get_token_price(symbol)
             return float(price) if price else 0.0
         except Exception:
             return 0.0
@@ -211,14 +211,14 @@ def get_arbitrage_scanner() -> Optional[ArbitrageScanner]:
 
 
 def init_arbitrage_scanner(
-    aster_client=None, hl_client=None, drift_client=None
+    aster_client=None, hl_client=None, aster_client=None
 ) -> ArbitrageScanner:
     """Initialize the global arbitrage scanner."""
     global _arb_scanner
     _arb_scanner = ArbitrageScanner(
         aster_client=aster_client,
         hl_client=hl_client,
-        drift_client=drift_client,
+        aster_client=aster_client,
     )
     logger.info("✅ ArbitrageScanner initialized")
     return _arb_scanner

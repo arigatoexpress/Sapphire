@@ -14,7 +14,7 @@ except ImportError:
     pd = None
     print("⚠️ Pandas not found. FeaturePipeline will be disabled.")
 
-from ..definitions import DRIFT_SYMBOLS, HYPERLIQUID_SYMBOLS, SYMPHONY_SYMBOLS
+from ..definitions import ASTER_SYMBOLS, LIGHTER_SYMBOLS, ASTER_SYMBOLS
 from ..logger import get_logger
 
 logger = get_logger(__name__)
@@ -69,9 +69,9 @@ class FeaturePipeline:
         except Exception as e:
             # Fallback for known registries or missing data
             if (
-                symbol in SYMPHONY_SYMBOLS
-                or symbol in HYPERLIQUID_SYMBOLS
-                or symbol in DRIFT_SYMBOLS
+                symbol in ASTER_SYMBOLS
+                or symbol in LIGHTER_SYMBOLS
+                or symbol in ASTER_SYMBOLS
             ):
                 # print(f"⚠️ Using synthetic data for {symbol}")
                 return self._generate_synthetic_candles(symbol, limit)

@@ -27,7 +27,7 @@ class TimeSyncConfig(BaseModel):
 
     ntp_servers: List[str] = ["pool.ntp.org", "time.nist.gov", "time.google.com"]
     sync_interval_seconds: int = 300  # 5 minutes
-    max_drift_microseconds: int = 1000  # 1ms max acceptable drift
+    max_aster_microseconds: int = 1000  # 1ms max acceptable aster
     retries: int = 3
 
 
@@ -42,8 +42,8 @@ class TimeSample:
     precision: float
 
     @property
-    def drift_microseconds(self) -> float:
-        """Calculate time drift in microseconds."""
+    def aster_microseconds(self) -> float:
+        """Calculate time aster in microseconds."""
         return abs(self.offset) * 1_000_000
 
 
@@ -55,7 +55,7 @@ class PrecisionClock:
         self.ntp_client = ntplib.NTPClient() if NTP_AVAILABLE else None
         self._offset_ns: int = 0
         self._last_sync: Optional[float] = None
-        self._drift_history: List[TimeSample] = []
+        self._aster_history: List[TimeSample] = []
         self._sync_task: Optional[asyncio.Task] = None
 
     async def start_sync(self) -> None:
@@ -124,14 +124,14 @@ class PrecisionClock:
         if best_sample:
             self._offset_ns = int(best_sample.offset * 1_000_000_000)
             self._last_sync = time.time()
-            self._drift_history.append(best_sample)
+            self._aster_history.append(best_sample)
 
             # Keep only last 100 samples
-            if len(self._drift_history) > 100:
-                self._drift_history = self._drift_history[-100:]
+            if len(self._aster_history) > 100:
+                self._aster_history = self._aster_history[-100:]
 
-            drift_us = best_sample.drift_microseconds
-            if drift_us > self.config.max_drift_microseconds:
+            aster_us = best_sample.aster_microseconds
+            if aster_us > self.config.max_aster_microseconds:
                 logger.warning(".2f" f"server={best_sample.delay:.3f}s")
 
             logger.debug(".6f" f"offset={best_sample.offset:.6f}s")
@@ -154,16 +154,16 @@ class PrecisionClock:
             return None
         return time.time() - self._last_sync
 
-    def get_drift_stats(self) -> Dict[str, float]:
-        """Get drift statistics."""
-        if not self._drift_history:
-            return {"samples": 0, "avg_drift_us": 0, "max_drift_us": 0}
+    def get_aster_stats(self) -> Dict[str, float]:
+        """Get aster statistics."""
+        if not self._aster_history:
+            return {"samples": 0, "avg_aster_us": 0, "max_aster_us": 0}
 
-        drifts = [s.drift_microseconds for s in self._drift_history]
+        asters = [s.aster_microseconds for s in self._aster_history]
         return {
-            "samples": len(drifts),
-            "avg_drift_us": sum(drifts) / len(drifts),
-            "max_drift_us": max(drifts),
+            "samples": len(asters),
+            "avg_aster_us": sum(asters) / len(asters),
+            "max_aster_us": max(asters),
             "current_offset_ns": self._offset_ns,
         }
 

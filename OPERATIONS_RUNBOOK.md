@@ -52,17 +52,16 @@ Idempotent job setup script:
 
 ## Secret Readiness Check
 
-Before expanding to additional venues, run:
+Run:
 
 ```bash
 ./scripts/check_required_secrets.sh
 ```
 
-Expected blockers (until secrets are added):
+Expected result for current scope:
 
-- `DRIFT`: `SOLANA_PRIVATE_KEY`
-- `HYPERLIQUID`: `HL_SECRET_KEY`, `HL_ACCOUNT_ADDRESS`
-- `SYMPHONY`: `SYMPHONY_API_KEY`
+- `ASTER` ready
+- `LIGHTER` ready
 
 ## Incident Commands
 

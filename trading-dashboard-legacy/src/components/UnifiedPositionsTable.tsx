@@ -33,7 +33,7 @@ interface Position {
     pnlPercent: number;
     tp?: number;
     sl?: number;
-    system: 'ASTER' | 'HYPERLIQUID';
+    system: 'ASTER' | 'LIGHTER';
 }
 
 interface UnifiedPositionsTableProps {
@@ -79,7 +79,7 @@ const UnifiedPositionsTable: React.FC<UnifiedPositionsTableProps> = ({ asterPosi
                 <Tabs value={tab} onChange={(_, v) => setTab(v)} textColor="inherit" indicatorColor="secondary">
                     <Tab label="ALL POSITIONS" sx={{ fontWeight: 700, fontSize: '0.8rem' }} />
                     <Tab label="ASTER (SWARM)" sx={{ fontWeight: 700, fontSize: '0.8rem', color: tab === 1 ? '#00d4aa' : undefined }} />
-                    <Tab label="HYPERLIQUID (HFT)" sx={{ fontWeight: 700, fontSize: '0.8rem', color: tab === 2 ? '#8a2be2' : undefined }} />
+                    <Tab label="LIGHTER (HFT)" sx={{ fontWeight: 700, fontSize: '0.8rem', color: tab === 2 ? '#8a2be2' : undefined }} />
                 </Tabs>
             </Box>
 

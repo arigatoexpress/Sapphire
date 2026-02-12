@@ -34,10 +34,7 @@ class SignalType(str, Enum):
 class Platform(str, Enum):
     """Supported trading platforms."""
 
-    SYMPHONY = "symphony"
-    DRIFT = "drift"
     ASTER = "aster"
-    HYPERLIQUID = "hyperliquid"
     LIGHTER = "lighter"
     # Add new platforms here
 

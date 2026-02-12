@@ -59,8 +59,8 @@ const PlatformCard: React.FC<{ name: string; health: PlatformHealth; metrics: Pl
             <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center gap-3">
                     <div className={`p-2 rounded-lg ${isHealthy ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
-                        {name.toLowerCase().includes('hyperliquid') ? <Zap size={20} /> :
-                            name.toLowerCase().includes('symphony') ? <Layers size={20} /> :
+                        {name.toLowerCase().includes('lighter') ? <Zap size={20} /> :
+                            name.toLowerCase().includes('aster') ? <Layers size={20} /> :
                                 <Activity size={20} />}
                     </div>
                     <div>

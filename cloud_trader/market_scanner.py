@@ -2,7 +2,7 @@ import asyncio
 from dataclasses import dataclass
 from typing import List, Optional
 
-from .definitions import SYMPHONY_SYMBOLS
+from .definitions import ASTER_SYMBOLS
 from .logger import get_logger
 
 logger = get_logger(__name__)
@@ -16,7 +16,7 @@ class Opportunity:
     signal: str  # "BUY" | "SELL"
     confidence: float  # 0.0 to 1.0
     reason: str
-    platform: str  # "symphony" | "aster"
+    platform: str  # "aster" | "aster"
     score: float  # For ranking
     price: float = 0.0  # Current price at detection
 
@@ -42,24 +42,24 @@ class MarketScanner:
         """
         opportunities = []
 
-        # Get all tradable symbols - combine market_data + always include SYMPHONY_SYMBOLS
+        # Get all tradable symbols - combine market_data + always include ASTER_SYMBOLS
         symbols = []
 
-        # 1. Include Symphony/Monad tokens (priority for chain launch incentives)
-        from .definitions import DRIFT_SYMBOLS, HYPERLIQUID_SYMBOLS, SYMPHONY_SYMBOLS
+        # 1. Include Aster/Monad tokens (priority for chain launch incentives)
+        from .definitions import ASTER_SYMBOLS, LIGHTER_SYMBOLS, ASTER_SYMBOLS
 
-        symbols.extend(SYMPHONY_SYMBOLS)
+        symbols.extend(ASTER_SYMBOLS)
         logger.info(
-            f"🌟 Scanner including {len(SYMPHONY_SYMBOLS)} Symphony/Monad tokens (priority)"
+            f"🌟 Scanner including {len(ASTER_SYMBOLS)} Aster/Monad tokens (priority)"
         )
 
-        # 2. Include Drift (Solana) tokens
-        symbols.extend(DRIFT_SYMBOLS)
-        logger.info(f"🌌 Scanner including {len(DRIFT_SYMBOLS)} Drift/Solana tokens")
+        # 2. Include Aster (Solana) tokens
+        symbols.extend(ASTER_SYMBOLS)
+        logger.info(f"🌌 Scanner including {len(ASTER_SYMBOLS)} Aster/Solana tokens")
 
-        # 3. Include Hyperliquid tokens
-        symbols.extend(HYPERLIQUID_SYMBOLS)
-        logger.info(f"🌊 Scanner including {len(HYPERLIQUID_SYMBOLS)} Hyperliquid tokens")
+        # 3. Include Lighter tokens
+        symbols.extend(LIGHTER_SYMBOLS)
+        logger.info(f"🌊 Scanner including {len(LIGHTER_SYMBOLS)} Lighter tokens")
 
         # Then add Aster symbols from market_data if available
         if (
@@ -190,14 +190,14 @@ class MarketScanner:
             adx = ta.get("adx", 20)  # Trend strength
 
             # Determine platform
-            from .definitions import DRIFT_SYMBOLS, HYPERLIQUID_SYMBOLS, SYMPHONY_SYMBOLS
+            from .definitions import ASTER_SYMBOLS, LIGHTER_SYMBOLS, ASTER_SYMBOLS
 
-            if symbol in SYMPHONY_SYMBOLS:
-                platform = "symphony"
-            elif symbol in DRIFT_SYMBOLS:
-                platform = "drift"
-            elif symbol in HYPERLIQUID_SYMBOLS:
-                platform = "hyperliquid"
+            if symbol in ASTER_SYMBOLS:
+                platform = "aster"
+            elif symbol in ASTER_SYMBOLS:
+                platform = "aster"
+            elif symbol in LIGHTER_SYMBOLS:
+                platform = "lighter"
             else:
                 platform = "aster"
 
@@ -326,7 +326,7 @@ class MarketScanner:
                 # PLATFORM PRIORITY BOOST: Encourage trading on non-Aster platforms
                 # This helps ensure we're actively using all integrated platforms
                 platform_boost = 0.0
-                if platform in ["symphony", "drift"]:
+                if platform in ["aster", "aster"]:
                     platform_boost = 0.10  # 10% boost for non-Aster platforms
 
                 final_score = abs(composite_score) + platform_boost

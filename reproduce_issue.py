@@ -15,7 +15,7 @@ class MockExchangeClient:
     pass
 
 
-class MockSymphonyClient:
+class MockAsterClient:
     pass
 
 
@@ -31,7 +31,7 @@ async def test_platform_router():
         data_store, agents, router, scanner = init_autonomous_components(
             feature_pipeline=MockFeaturePipeline(),
             exchange_client=MockExchangeClient(),
-            symphony_client=MockSymphonyClient(),
+            aster_client=MockAsterClient(),
             settings=MockSettings(),
         )
 

@@ -7,7 +7,7 @@ Instead of hardcoded strategies (VPIN, Momentum, etc.), agents:
 3. Adapt to their platform's unique characteristics
 4. Continuously improve through episodic memory
 
-Each platform trader (Drift, Hyperliquid, Aster, Symphony, Lighter) develops
+Each platform trader (Aster, Lighter, Aster, Aster, Lighter) develops
 its own trading methodology organically through trial, error, and success.
 """
 

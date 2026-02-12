@@ -31,10 +31,10 @@
     --color-purple-dim: rgba(168, 85, 247, 0.15);
 
     /* Platform Colors */
-    --platform-hyperliquid: #00FF88;
-    --platform-drift: #FFB800;
+    --platform-lighter: #00FF88;
+    --platform-aster: #FFB800;
     --platform-aster: #00D4FF;
-    --platform-symphony: #A855F7;
+    --platform-aster: #A855F7;
 
     /* Borders & Effects */
     --border-subtle: rgba(255, 255, 255, 0.06);
@@ -287,15 +287,15 @@ body {
     text-transform: uppercase;
 }
 
-.platform-badge.hyperliquid {
+.platform-badge.lighter {
     background: rgba(0, 255, 136, 0.1);
-    color: var(--platform-hyperliquid);
+    color: var(--platform-lighter);
     border: 1px solid rgba(0, 255, 136, 0.2);
 }
 
-.platform-badge.drift {
+.platform-badge.aster {
     background: rgba(255, 184, 0, 0.1);
-    color: var(--platform-drift);
+    color: var(--platform-aster);
     border: 1px solid rgba(255, 184, 0, 0.2);
 }
 
@@ -305,9 +305,9 @@ body {
     border: 1px solid rgba(0, 212, 255, 0.2);
 }
 
-.platform-badge.symphony {
+.platform-badge.aster {
     background: rgba(168, 85, 247, 0.1);
-    color: var(--platform-symphony);
+    color: var(--platform-aster);
     border: 1px solid rgba(168, 85, 247, 0.2);
 }
 

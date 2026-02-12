@@ -287,12 +287,12 @@ async def lifespan(app: FastAPI):
             ts = trading_service
 
             await initialize_v2_components(
-                hyperliquid_private_key=creds.hl_private_key,
-                hyperliquid_wallet=creds.hl_account_address,
-                drift_private_key=creds.solana_private_key,
-                symphony_client=ts.symphony if ts else None,
+                lighter_private_key=creds.hl_private_key,
+                lighter_wallet=creds.hl_account_address,
+                aster_private_key=creds.solana_private_key,
+                aster_client=ts.aster if ts else None,
                 aster_client=ts._exchange_client if ts else None,
-                drift_client=ts.drift if ts else None,
+                aster_client=ts.aster if ts else None,
             )
         except Exception as exc:
             logger.exception("❌ STARTUP: Failed to initialize V2 components: %s", exc)
@@ -797,8 +797,8 @@ async def get_positions_alias():
                 "mode": "local",
             }
 
-        # Fallback to symphony route logic if needed
-        return await get_symphony_positions()
+        # Fallback to aster route logic if needed
+        return await get_aster_positions()
     except Exception as e:
         logger.error(f"Failed to get positions: {e}")
         return {"success": True, "positions": []}
@@ -1007,9 +1007,9 @@ async def get_platform_router_history(limit: int = Query(20, ge=1, le=100)) -> D
 # from .observability_api import router as observability_router
 
 # app.include_router(observability_router)
-from . import symphony_endpoints
+from . import aster_endpoints
 
-app.include_router(symphony_endpoints.router)
+app.include_router(aster_endpoints.router)
 
 # ===================================================================
 # HISTORICAL DATA ENDPOINTS (Frontend Persistence)
@@ -1019,26 +1019,26 @@ app.include_router(symphony_endpoints.router)
 # app.include_router(history_router)
 
 # ===================================================================
-# SYMPHONY / MONAD INTEGRATION ENDPOINTS
+# ASTER / MONAD INTEGRATION ENDPOINTS
 # ===================================================================
 
 
-@app.get("/api/symphony/status")
-async def get_symphony_status() -> Dict[str, Any]:
+@app.get("/api/aster/status")
+async def get_aster_status() -> Dict[str, Any]:
     """
-    Get Symphony (Monad) MIT fund status and activation progress.
+    Get Aster (Monad) MIT fund status and activation progress.
 
     Returns activation status and fund information for the MIT dashboard.
     """
     try:
-        from .symphony_client import get_symphony_client
-        from .symphony_config import validate_symphony_config
+        from .aster_client import get_aster_client
+        from .aster_config import validate_aster_config
 
-        # Check if Symphony is configured
-        if not validate_symphony_config():
+        # Check if Aster is configured
+        if not validate_aster_config():
             return {
                 "configured": False,
-                "error": "Symphony API not configured. Add SYMPHONY_API_KEY to environment.",
+                "error": "Aster API not configured. Add ASTER_API_KEY to environment.",
                 "fund": {
                     "name": "Sapphire MIT Agent",
                     "balance": 0,
@@ -1055,8 +1055,8 @@ async def get_symphony_status() -> Dict[str, Any]:
                 },
             }
 
-        # Get Symphony client and fetch account info
-        client = get_symphony_client()
+        # Get Aster client and fetch account info
+        client = get_aster_client()
         account = await client.get_account_info()
 
         return {
@@ -1074,7 +1074,7 @@ async def get_symphony_status() -> Dict[str, Any]:
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     except Exception as e:
-        logger.error(f"Symphony status check failed: {e}")
+        logger.error(f"Aster status check failed: {e}")
         return {
             "configured": False,
             "error": str(e),
@@ -1095,10 +1095,10 @@ async def get_symphony_status() -> Dict[str, Any]:
         }
 
 
-@app.post("/api/symphony/trade/perpetual")
-async def execute_symphony_perpetual(request: Request) -> Dict[str, Any]:
+@app.post("/api/aster/trade/perpetual")
+async def execute_aster_perpetual(request: Request) -> Dict[str, Any]:
     """
-    Execute a perpetual futures trade on Symphony/Monad.
+    Execute a perpetual futures trade on Aster/Monad.
 
     Body:
     {
@@ -1111,8 +1111,8 @@ async def execute_symphony_perpetual(request: Request) -> Dict[str, Any]:
     }
     """
     try:
-        from .symphony_client import get_symphony_client
-        from .symphony_config import MIT_DEFAULT_LEVERAGE, MIT_MAX_POSITION_SIZE_USDC
+        from .aster_client import get_aster_client
+        from .aster_config import MIT_DEFAULT_LEVERAGE, MIT_MAX_POSITION_SIZE_USDC
 
         # Require authentication
         uid = getattr(request.state, "uid", None)
@@ -1138,7 +1138,7 @@ async def execute_symphony_perpetual(request: Request) -> Dict[str, Any]:
             )
 
         # Execute trade
-        client = get_symphony_client()
+        client = get_aster_client()
         agent_id = body.get("agent_id")
 
         position = await client.open_perpetual_position(
@@ -1151,7 +1151,7 @@ async def execute_symphony_perpetual(request: Request) -> Dict[str, Any]:
             agent_id=agent_id,
         )
 
-        logger.info(f"Symphony perpetual opened: {symbol} {side} {size} @ {leverage}x by {uid}")
+        logger.info(f"Aster perpetual opened: {symbol} {side} {size} @ {leverage}x by {uid}")
 
         return {
             "success": True,
@@ -1162,14 +1162,14 @@ async def execute_symphony_perpetual(request: Request) -> Dict[str, Any]:
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Symphony perpetual trade failed: {e}")
+        logger.error(f"Aster perpetual trade failed: {e}")
         return {"success": False, "error": str(e)}
 
 
-@app.post("/api/symphony/trade/spot")
-async def execute_symphony_spot(request: Request) -> Dict[str, Any]:
+@app.post("/api/aster/trade/spot")
+async def execute_aster_spot(request: Request) -> Dict[str, Any]:
     """
-    Execute a spot trade on Symphony/Monad.
+    Execute a spot trade on Aster/Monad.
 
     Body:
     {
@@ -1180,7 +1180,7 @@ async def execute_symphony_spot(request: Request) -> Dict[str, Any]:
     }
     """
     try:
-        from .symphony_client import get_symphony_client
+        from .aster_client import get_aster_client
 
         # Require authentication
         uid = getattr(request.state, "uid", None)
@@ -1200,14 +1200,14 @@ async def execute_symphony_spot(request: Request) -> Dict[str, Any]:
             raise HTTPException(status_code=400, detail="quantity must be positive")
 
         # Execute trade
-        client = get_symphony_client()
+        client = get_aster_client()
         agent_id = body.get("agent_id")
 
         order = await client.execute_spot_trade(
             symbol=symbol, side=side, quantity=quantity, order_type=order_type, agent_id=agent_id
         )
 
-        logger.info(f"Symphony spot trade: {side} {quantity} {symbol} by {uid}")
+        logger.info(f"Aster spot trade: {side} {quantity} {symbol} by {uid}")
 
         return {
             "success": True,
@@ -1218,29 +1218,29 @@ async def execute_symphony_spot(request: Request) -> Dict[str, Any]:
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Symphony spot trade failed: {e}")
+        logger.error(f"Aster spot trade failed: {e}")
         return {"success": False, "error": str(e)}
 
 
-@app.get("/api/symphony/positions")
-async def get_symphony_positions() -> Dict[str, Any]:
-    """Get all open Symphony perpetual positions."""
+@app.get("/api/aster/positions")
+async def get_aster_positions() -> Dict[str, Any]:
+    """Get all open Aster perpetual positions."""
     try:
-        from .symphony_client import get_symphony_client
+        from .aster_client import get_aster_client
 
-        client = get_symphony_client()
+        client = get_aster_client()
         positions = await client.get_perpetual_positions()
 
         return {"success": True, "positions": positions, "count": len(positions)}
     except Exception as e:
-        logger.error(f"Failed to get Symphony positions: {e}")
+        logger.error(f"Failed to get Aster positions: {e}")
         return {"success": False, "error": str(e), "positions": []}
 
 
-@app.post("/api/symphony/fund/create")
-async def create_symphony_fund(request: Request) -> Dict[str, Any]:
+@app.post("/api/aster/fund/create")
+async def create_aster_fund(request: Request) -> Dict[str, Any]:
     """
-    Create a new agentic fund on Symphony.
+    Create a new agentic fund on Aster.
 
     Body:
     {
@@ -1251,7 +1251,7 @@ async def create_symphony_fund(request: Request) -> Dict[str, Any]:
     }
     """
     try:
-        from .symphony_client import get_symphony_client
+        from .aster_client import get_aster_client
 
         # Require authentication
         uid = getattr(request.state, "uid", None)
@@ -1264,7 +1264,7 @@ async def create_symphony_fund(request: Request) -> Dict[str, Any]:
         fund_type = body.get("fund_type", "perpetuals")
         autosubscribe = body.get("autosubscribe", True)
 
-        client = get_symphony_client()
+        client = get_aster_client()
         fund = await client.create_agentic_fund(
             name=name, description=description, fund_type=fund_type, autosubscribe=autosubscribe
         )
@@ -1279,19 +1279,19 @@ async def create_symphony_fund(request: Request) -> Dict[str, Any]:
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Symphony fund creation failed: {e}")
+        logger.error(f"Aster fund creation failed: {e}")
         return {"success": False, "error": str(e)}
 
 
 # ===================================================================
-# SYMPHONY DEMO ACTIVATION ENDPOINT
+# ASTER DEMO ACTIVATION ENDPOINT
 # ===================================================================
 
 
-@app.post("/api/symphony/activate-demo")
-async def activate_symphony_demo() -> Dict[str, Any]:
+@app.post("/api/aster/activate-demo")
+async def activate_aster_demo() -> Dict[str, Any]:
     """
-    Execute 5 small trades to activate the Symphony fund for demo purposes.
+    Execute 5 small trades to activate the Aster fund for demo purposes.
 
     This endpoint does NOT require authentication and is for development only.
     Each trade is a minimal size to meet the activation threshold.
@@ -1300,9 +1300,9 @@ async def activate_symphony_demo() -> Dict[str, Any]:
         Activation progress and trade results.
     """
     try:
-        from .symphony_client import get_symphony_client
+        from .aster_client import get_aster_client
 
-        client = get_symphony_client()
+        client = get_aster_client()
 
         # Check current activation status
         progress = client.activation_progress
@@ -1362,7 +1362,7 @@ async def activate_symphony_demo() -> Dict[str, Any]:
             "message": f"Executed {len(trade_results)} activation trades",
         }
     except Exception as e:
-        logger.error(f"Symphony activation failed: {e}")
+        logger.error(f"Aster activation failed: {e}")
         return {"success": False, "error": str(e)}
 
 
@@ -2613,10 +2613,10 @@ async def get_consensus_state() -> Dict[str, Any]:
                     (total_pnl / initial_balance) * 100 if initial_balance > 0 else 0.0
                 )
 
-                # Add External Integration Data (Symphony & Hyperliquid)
-                symphony_balance = getattr(service, "_symphony_balance", 0.0)
-                hyperliquid_balance = getattr(service, "_hyperliquid_balance", 0.0)
-                drift_balance = getattr(service, "_drift_balance", 0.0)
+                # Add External Integration Data (Aster & Lighter)
+                aster_balance = getattr(service, "_aster_balance", 0.0)
+                lighter_balance = getattr(service, "_lighter_balance", 0.0)
+                aster_balance = getattr(service, "_aster_balance", 0.0)
 
                 # Aggregate Portfolio Value
                 # Only include Aster if enabled
@@ -2628,9 +2628,9 @@ async def get_consensus_state() -> Dict[str, Any]:
 
                 total_portfolio_value = (
                     aster_balance
-                    + symphony_balance
-                    + hyperliquid_balance
-                    + drift_balance
+                    + aster_balance
+                    + lighter_balance
+                    + aster_balance
                     + total_pnl
                 )
 
@@ -2643,9 +2643,9 @@ async def get_consensus_state() -> Dict[str, Any]:
                     "total_funding": total_funding,
                     "portfolio_value": total_portfolio_value,
                     "cash_balance": aster_balance,
-                    "symphony_balance": symphony_balance,
-                    "hyperliquid_balance": hyperliquid_balance,
-                    "drift_balance": drift_balance,
+                    "aster_balance": aster_balance,
+                    "lighter_balance": lighter_balance,
+                    "aster_balance": aster_balance,
                     "aster_enabled": hasattr(service, "_settings")
                     and service._settings.enable_aster,
                 }

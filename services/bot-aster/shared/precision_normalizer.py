@@ -52,7 +52,7 @@ class PrecisionNormalizer:
 
         # Default fallbacks when exchange info unavailable
         self._defaults = {
-            "hyperliquid": {
+            "lighter": {
                 "tick_size": Decimal("0.01"),
                 "lot_size": Decimal("0.001"),
                 "min_notional": Decimal("10"),
@@ -62,12 +62,12 @@ class PrecisionNormalizer:
                 "lot_size": Decimal("0.001"),
                 "min_notional": Decimal("5"),
             },
-            "symphony": {
+            "aster": {
                 "tick_size": Decimal("0.0001"),
                 "lot_size": Decimal("0.0001"),
                 "min_notional": Decimal("5"),
             },
-            "drift": {
+            "aster": {
                 "tick_size": Decimal("0.001"),
                 "lot_size": Decimal("0.01"),
                 "min_notional": Decimal("10"),
@@ -188,24 +188,24 @@ class PrecisionNormalizer:
         """
         Fetch exchange info from the actual exchange API.
         """
-        if platform == "hyperliquid":
-            return await self._fetch_hyperliquid_info(symbol)
+        if platform == "lighter":
+            return await self._fetch_lighter_info(symbol)
         elif platform == "aster":
             return await self._fetch_aster_info(symbol)
-        elif platform == "symphony":
-            return self._get_default_info(symbol, platform)  # Symphony doesn't expose this
+        elif platform == "aster":
+            return self._get_default_info(symbol, platform)  # Aster doesn't expose this
         else:
             return self._get_default_info(symbol, platform)
 
-    async def _fetch_hyperliquid_info(self, symbol: str) -> ExchangeInfo:
-        """Fetch symbol info from Hyperliquid API."""
+    async def _fetch_lighter_info(self, symbol: str) -> ExchangeInfo:
+        """Fetch symbol info from Lighter API."""
         import httpx
 
         try:
             async with httpx.AsyncClient() as client:
-                # Hyperliquid meta endpoint
+                # Lighter meta endpoint
                 resp = await client.post(
-                    "https://api.hyperliquid.xyz/info", json={"type": "meta"}, timeout=10
+                    "https://api.lighter.xyz/info", json={"type": "meta"}, timeout=10
                 )
                 data = resp.json()
 
@@ -217,7 +217,7 @@ class PrecisionNormalizer:
 
                         return ExchangeInfo(
                             symbol=symbol,
-                            platform="hyperliquid",
+                            platform="lighter",
                             tick_size=Decimal("0.01"),  # HL uses price precision dynamically
                             lot_size=Decimal(10) ** Decimal(-sz_decimals),
                             min_notional=Decimal("10"),
@@ -229,7 +229,7 @@ class PrecisionNormalizer:
         except Exception as e:
             logger.warning(f"Failed to fetch HL info for {symbol}: {e}")
 
-        return self._get_default_info(symbol, "hyperliquid")
+        return self._get_default_info(symbol, "lighter")
 
     async def _fetch_aster_info(self, symbol: str) -> ExchangeInfo:
         """Fetch symbol info from Aster/Binance-style API."""

@@ -1,7 +1,7 @@
 """
-Drift Trading Bot - Standalone Service (Solana)
+Aster Trading Bot - Standalone Service (Solana)
 
-This is an independent microservice for trading on Drift Protocol (Solana).
+This is an independent microservice for trading on Aster Protocol (Solana).
 Optimized for Solana's fast finality and low latency.
 """
 
@@ -33,17 +33,17 @@ from models import (
 logger = logging.getLogger(__name__)
 
 # Service configuration
-SERVICE_NAME = "bot-drift"
-PLATFORM = Platform.DRIFT
+SERVICE_NAME = "bot-aster"
+PLATFORM = Platform.ASTER
 
-# Drift-specific optimizations
+# Aster-specific optimizations
 SOLANA_RPC_URL = os.getenv("SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com")
-DRIFT_SUBACCOUNT_ID = int(os.getenv("DRIFT_SUBACCOUNT_ID", "0"))
+ASTER_SUBACCOUNT_ID = int(os.getenv("ASTER_SUBACCOUNT_ID", "0"))
 
 
-class DriftBot:
+class AsterBot:
     """
-    Standalone Drift Protocol trading bot.
+    Standalone Aster Protocol trading bot.
 
     Optimizations for Solana:
     - Fast block times (~400ms) allow quick order confirmation
@@ -56,7 +56,7 @@ class DriftBot:
         self.running = False
         self._shutdown_event = asyncio.Event()
 
-        # Drift SDK client
+        # Aster SDK client
         self.client = None
         self.sdk_client = None
         self.connection = None
@@ -76,7 +76,7 @@ class DriftBot:
         self.avg_confirmation_ms = 0.0
 
     async def initialize(self):
-        """Initialize the Drift client with Solana connection."""
+        """Initialize the Aster client with Solana connection."""
         logger.info(f"🚀 Initializing {SERVICE_NAME}...")
 
         try:
@@ -86,17 +86,17 @@ class DriftBot:
                 logger.error("❌ SOLANA_PRIVATE_KEY not configured")
                 return False
 
-            # Import Drift SDK components
-            from driftpy.account_subscription_config import AccountSubscriptionConfig
-            from driftpy.drift_client import DriftClient as SDKDriftClient
+            # Import Aster SDK components
+            from asterpy.account_subscription_config import AccountSubscriptionConfig
+            from asterpy.aster_client import AsterClient as SDKAsterClient
 
             try:
-                from driftpy.priority_fees.priority_fee_subscriber import PriorityFeeSubscriber
-                from driftpy.priority_fees.types import PriorityFeeSubscriberConfig
+                from asterpy.priority_fees.priority_fee_subscriber import PriorityFeeSubscriber
+                from asterpy.priority_fees.types import PriorityFeeSubscriberConfig
 
                 HAS_PF_CLIENT = True
             except ImportError:
-                logger.warning("⚠️ PriorityFeeSubscriber not available in this version of driftpy")
+                logger.warning("⚠️ PriorityFeeSubscriber not available in this version of asterpy")
                 HAS_PF_CLIENT = False
             from solana.rpc.async_api import AsyncClient
             from solders.keypair import Keypair
@@ -113,7 +113,7 @@ class DriftBot:
             else:
                 self.keypair = Keypair.from_base58_string(private_key)
 
-            logger.info(f"🔑 Drift wallet: {self.keypair.pubkey()}")
+            logger.info(f"🔑 Aster wallet: {self.keypair.pubkey()}")
 
             if HAS_PF_CLIENT:
                 try:
@@ -133,10 +133,10 @@ class DriftBot:
             else:
                 self.pf_subscriber = None
 
-            # Initialize Drift client
+            # Initialize Aster client
             # Use 'cached' subscription mode for more reliable initialization
             # 'websocket' can timeout in Cloud Run environments
-            self.sdk_client = SDKDriftClient(
+            self.sdk_client = SDKAsterClient(
                 self.connection,
                 self.keypair,
                 env="mainnet",
@@ -148,7 +148,7 @@ class DriftBot:
             try:
                 await asyncio.wait_for(self.sdk_client.subscribe(), timeout=60)
             except asyncio.TimeoutError:
-                logger.warning("⚠️ Drift subscription timeout - continuing with limited functionality")
+                logger.warning("⚠️ Aster subscription timeout - continuing with limited functionality")
                 # Don't fail completely, allow basic operations
 
             # Initialize Pub/Sub (optional - may fail if not configured)
@@ -167,7 +167,7 @@ class DriftBot:
             return True
 
         except ImportError as e:
-            logger.warning(f"⚠️ Drift SDK not available: {e}")
+            logger.warning(f"⚠️ Aster SDK not available: {e}")
             return False
         except Exception as e:
             logger.error(f"❌ Failed to initialize: {e}")
@@ -335,7 +335,7 @@ class DriftBot:
         while self.running:
             try:
                 if self.sdk_client:
-                    user = self.sdk_client.get_user(DRIFT_SUBACCOUNT_ID)
+                    user = self.sdk_client.get_user(ASTER_SUBACCOUNT_ID)
                     # Get collateral in USDC terms
                     collateral = user.get_total_collateral() / 1e6  # Convert from base units
                     self.balance = float(collateral)
@@ -385,14 +385,14 @@ class DriftBot:
             self.config.trading_enabled = True
 
     async def _execute_trade(self, signal: TradeSignal) -> TradeResult:
-        """Execute trade on Drift with Solana-optimized confirmation."""
+        """Execute trade on Aster with Solana-optimized confirmation."""
         start_time = datetime.now()
 
         try:
             if not self.sdk_client:
-                raise Exception("Drift SDK not initialized")
+                raise Exception("Aster SDK not initialized")
 
-            # Convert symbol to Drift market index
+            # Convert symbol to Aster market index
             market_index = self._symbol_to_market_index(signal.symbol)
             if market_index is None:
                 raise Exception(f"Unknown market: {signal.symbol}")
@@ -446,7 +446,7 @@ class DriftBot:
             )
 
             # Determine direction
-            from driftpy.types import MarketType, OrderParams, OrderType, PositionDirection
+            from asterpy.types import MarketType, OrderParams, OrderType, PositionDirection
 
             direction = (
                 PositionDirection.Long()
@@ -477,9 +477,9 @@ class DriftBot:
 
             self.trades_executed += 1
 
-            # Place native SL/TP trigger orders on Drift
+            # Place native SL/TP trigger orders on Aster
             if signal.stop_loss:
-                await self._place_drift_trigger_order(
+                await self._place_aster_trigger_order(
                     market_index=market_index,
                     trigger_price=signal.stop_loss,
                     base_amount=base_asset_quantity,
@@ -487,7 +487,7 @@ class DriftBot:
                     entry_direction=direction,
                 )
             if signal.take_profit:
-                await self._place_drift_trigger_order(
+                await self._place_aster_trigger_order(
                     market_index=market_index,
                     trigger_price=signal.take_profit,
                     base_amount=base_asset_quantity,
@@ -509,7 +509,7 @@ class DriftBot:
             )
 
         except Exception as e:
-            logger.error(f"❌ Drift Execution Failed: {e}")
+            logger.error(f"❌ Aster Execution Failed: {e}")
             self.trades_failed += 1
             execution_time = (datetime.now() - start_time).total_seconds() * 1000
             return TradeResult(
@@ -523,7 +523,7 @@ class DriftBot:
                 execution_time_ms=execution_time,
             )
 
-    async def _place_drift_trigger_order(
+    async def _place_aster_trigger_order(
         self,
         market_index: int,
         trigger_price: float,
@@ -532,12 +532,12 @@ class DriftBot:
         entry_direction,
     ):
         """
-        Place a native trigger order (TP/SL) on Drift Protocol.
+        Place a native trigger order (TP/SL) on Aster Protocol.
 
-        Drift supports trigger orders that execute automatically when price is reached.
+        Aster supports trigger orders that execute automatically when price is reached.
         """
         try:
-            from driftpy.types import (
+            from asterpy.types import (
                 MarketType,
                 OrderParams,
                 OrderTriggerCondition,
@@ -562,7 +562,7 @@ class DriftBot:
 
             trigger_type = "TP" if is_tp else "SL"
 
-            # Convert trigger price to Drift's 6 decimal format
+            # Convert trigger price to Aster's 6 decimal format
             trigger_price_int = int(trigger_price * 1e6)
 
             order_params = OrderParams(
@@ -580,13 +580,13 @@ class DriftBot:
             await self.connection.confirm_transaction(tx_sig)
 
             logger.info(
-                f"✅ [DRIFT] Native {trigger_type} placed @ ${trigger_price:.2f} | TxSig: {str(tx_sig)[:20]}..."
+                f"✅ [ASTER] Native {trigger_type} placed @ ${trigger_price:.2f} | TxSig: {str(tx_sig)[:20]}..."
             )
             return tx_sig
 
         except Exception as e:
             trigger_type = "TP" if is_tp else "SL"
-            logger.error(f"❌ [DRIFT] Failed to place {trigger_type} trigger order: {e}")
+            logger.error(f"❌ [ASTER] Failed to place {trigger_type} trigger order: {e}")
             return None
 
     async def place_oracle_order(self, signal: TradeSignal, offset_format: str = "PRICE"):
@@ -598,7 +598,7 @@ class DriftBot:
             offset_format: "PRICE" or "PCT" (not yet implemented)
         """
         try:
-            from driftpy.types import OrderParams, OrderType, PositionDirection
+            from asterpy.types import OrderParams, OrderType, PositionDirection
 
             market_index = self._symbol_to_market_index(signal.symbol)
             # ALWAYS use our controlled sizing, ignore signal.quantity
@@ -628,8 +628,8 @@ class DriftBot:
             logger.error(f"Oracle Order failed: {e}")
 
     def _symbol_to_market_index(self, symbol: str) -> Optional[int]:
-        """Convert symbol to Drift market index."""
-        # Drift market indices (mainnet)
+        """Convert symbol to Aster market index."""
+        # Aster market indices (mainnet)
         markets = {
             "SOL": 0,
             "SOL-USDC": 0,
@@ -653,7 +653,7 @@ class DriftBot:
             return 0.0
         try:
             # get_health() returns 0-100 where 0 is liquidation
-            user = self.sdk_client.get_user(DRIFT_SUBACCOUNT_ID)
+            user = self.sdk_client.get_user(ASTER_SUBACCOUNT_ID)
             return float(user.get_health())
         except Exception as e:
             logger.warning(f"Failed to get margin health: {e}")
@@ -670,7 +670,7 @@ class DriftBot:
             Position size in USD, or 0 if insufficient funds
         """
         try:
-            user = self.sdk_client.get_user(DRIFT_SUBACCOUNT_ID)
+            user = self.sdk_client.get_user(ASTER_SUBACCOUNT_ID)
 
             # Get actual available funds
             collateral = user.get_total_collateral() / 1e6  # USDC
@@ -692,9 +692,9 @@ class DriftBot:
 
             position_size = available * position_pct
 
-            # Drift has platform-level minimums per market
-            # Lowered for small account support - Drift actually allows micro-positions
-            drift_minimums = {
+            # Aster has platform-level minimums per market
+            # Lowered for small account support - Aster actually allows micro-positions
+            aster_minimums = {
                 "SOL-PERP": 5,  # ~0.03 SOL minimum
                 "SOL": 5,
                 "BTC-PERP": 5,
@@ -711,7 +711,7 @@ class DriftBot:
 
             # Match symbol with or without -PERP suffix
             symbol_key = signal.symbol.replace("-USDC", "").replace("-PERP", "")
-            market_min = drift_minimums.get(symbol_key, drift_minimums.get(signal.symbol, 5))
+            market_min = aster_minimums.get(symbol_key, aster_minimums.get(signal.symbol, 5))
 
             if position_size < market_min:
                 logger.warning(
@@ -735,20 +735,20 @@ class DriftBot:
             return 5.0  # Minimal fallback
 
     async def _check_positions(self):
-        """Check positions using Drift's oracle prices."""
+        """Check positions using Aster's oracle prices."""
         if not self.sdk_client:
             return
 
         try:
-            # Use the correct driftpy API: get_user_account() returns the UserAccount (sync)
-            user_account = self.sdk_client.get_user_account(DRIFT_SUBACCOUNT_ID)
+            # Use the correct asterpy API: get_user_account() returns the UserAccount (sync)
+            user_account = self.sdk_client.get_user_account(ASTER_SUBACCOUNT_ID)
             perp_positions = user_account.perp_positions
 
             for pos in perp_positions:
                 if pos.base_asset_amount != 0:
                     symbol = f"MARKET_{pos.market_index}"
 
-                    # Get entry price - driftpy uses quote_entry_amount and base_asset_amount
+                    # Get entry price - asterpy uses quote_entry_amount and base_asset_amount
                     # or simply get cost basis if available
                     try:
                         # Try quote_entry_amount / base_asset_amount for average price
@@ -775,10 +775,10 @@ class DriftBot:
             logger.error(f"Position check error: {e}")
 
     async def _close_all_positions(self):
-        """Close all positions on Drift."""
+        """Close all positions on Aster."""
         try:
             if self.sdk_client:
-                user = self.sdk_client.get_user(DRIFT_SUBACCOUNT_ID)
+                user = self.sdk_client.get_user(ASTER_SUBACCOUNT_ID)
                 for pos in user.get_perp_positions():
                     if pos.base_asset_amount != 0:
                         await self.sdk_client.close_position(pos.market_index)
@@ -807,11 +807,11 @@ async def main():
     setup_logging(os.getenv("LOG_LEVEL", "INFO"))
 
     logger.info("=" * 50)
-    logger.info(f"🌀 DRIFT BOT SERVICE (Solana)")
+    logger.info(f"🌀 ASTER BOT SERVICE (Solana)")
     logger.info(f"📅 {datetime.now().isoformat()}")
     logger.info("=" * 50)
 
-    bot = DriftBot()
+    bot = AsterBot()
 
     def handle_shutdown(sig, frame):
         logger.info(f"Received signal {sig}, shutting down...")

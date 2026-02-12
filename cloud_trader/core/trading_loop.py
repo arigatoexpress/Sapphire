@@ -53,9 +53,9 @@ class TradingLoop:
         # Configuration
         # Watchlist includes tokens for all platforms
         # Jupiter (Solana DEX): SOL, BONK, WIF, JUP, JTO
-        # Drift (Solana Perps): SOL-PERP, BTC-PERP
-        # Aster/Hyperliquid (Perps): BTC-USDC, ETH-USDC, SOL-USDC
-        # Symphony (Monad/Base): ETH-USDC, MON-USDC, DEGEN-USDC
+        # Aster (Solana Perps): SOL-PERP, BTC-PERP
+        # Aster/Lighter (Perps): BTC-USDC, ETH-USDC, SOL-USDC
+        # Aster (Monad/Base): ETH-USDC, MON-USDC, DEGEN-USDC
         self.watchlist: List[str] = [
             # Solana tokens for Jupiter DEX swaps
             "SOL-USDC",
@@ -63,10 +63,10 @@ class TradingLoop:
             "WIF-USDC",
             "JUP-USDC",
             "JTO-USDC",
-            # Major pairs for Aster/Hyperliquid perps
+            # Major pairs for Aster/Lighter perps
             "BTC-USDC",
             "ETH-USDC",
-            # Monad/Base tokens for Symphony
+            # Monad/Base tokens for Aster
             "MON-USDC",
             "DEGEN-USDC",
         ]
@@ -577,15 +577,15 @@ class TradingLoop:
                 except Exception as e:
                     logger.debug(f"Jupiter price fetch failed for {symbol}: {e}")
 
-            # Try Drift (for perps like SOL-PERP)
-            if self.orchestrator.drift and symbol.endswith("-PERP"):
+            # Try Aster (for perps like SOL-PERP)
+            if self.orchestrator.aster and symbol.endswith("-PERP"):
                 try:
-                    # Drift has market data access
-                    logger.info(f"📊 Drift price fetch for {symbol}")
-                    # TODO: Implement Drift.get_oracle_price()
+                    # Aster has market data access
+                    logger.info(f"📊 Aster price fetch for {symbol}")
+                    # TODO: Implement Aster.get_oracle_price()
                     return 0.0  # Temporary
                 except Exception as e:
-                    logger.debug(f"Drift price fetch failed for {symbol}: {e}")
+                    logger.debug(f"Aster price fetch failed for {symbol}: {e}")
 
             # Try Aster (for CEX-style pairs like BTCUSDT)
             if self.orchestrator._exchange_client:
@@ -602,24 +602,24 @@ class TradingLoop:
                 except Exception as e:
                     logger.debug(f"Aster price fetch failed for {symbol}: {e}")
 
-            # Try Hyperliquid
+            # Try Lighter
             if self.orchestrator.hl_client:
                 try:
-                    # Hyperliquid has its own price API
-                    logger.info(f"📊 Hyperliquid price fetch for {symbol}")
-                    # TODO: Implement Hyperliquid.get_mark_price()
+                    # Lighter has its own price API
+                    logger.info(f"📊 Lighter price fetch for {symbol}")
+                    # TODO: Implement Lighter.get_mark_price()
                     return 0.0  # Temporary
                 except Exception as e:
-                    logger.debug(f"Hyperliquid price fetch failed for {symbol}: {e}")
+                    logger.debug(f"Lighter price fetch failed for {symbol}: {e}")
 
-            # Try Symphony
-            if self.orchestrator.symphony:
+            # Try Aster
+            if self.orchestrator.aster:
                 try:
-                    logger.info(f"📊 Symphony price fetch for {symbol}")
-                    # TODO: Implement Symphony.get_price()
+                    logger.info(f"📊 Aster price fetch for {symbol}")
+                    # TODO: Implement Aster.get_price()
                     return 0.0  # Temporary
                 except Exception as e:
-                    logger.debug(f"Symphony price fetch failed for {symbol}: {e}")
+                    logger.debug(f"Aster price fetch failed for {symbol}: {e}")
 
             # Try Lighter
             if self.orchestrator.lighter_client:

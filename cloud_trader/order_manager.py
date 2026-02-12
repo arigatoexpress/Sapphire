@@ -58,7 +58,7 @@ class OrderManager:
                     price = float(price)
                     deviation = abs(current_price - price) / price
 
-                    # Logic: if price moves AWAY from our limit, we might never get filled and it's drifting.
+                    # Logic: if price moves AWAY from our limit, we might never get filled and it's astering.
                     # Or if market moves drastically against us?
                     # The requirement: "Cancel if current_price moves > 0.2% away from limit price"
                     if deviation > self.cancel_threshold_pct:

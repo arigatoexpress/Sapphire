@@ -5,11 +5,11 @@
 # Platform Configuration
 # ============================================================================
 ENABLE_JUPITER: "true"
-ENABLE_DRIFT: "false"
+ENABLE_ASTER: "false"
 ENABLE_ASTER: "true"
-ENABLE_HYPERLIQUID: "true"
 ENABLE_LIGHTER: "true"
-ENABLE_SYMPHONY: "true"
+ENABLE_LIGHTER: "true"
+ENABLE_ASTER: "true"
 
 # ============================================================================
 # Solana / Jupiter Configuration

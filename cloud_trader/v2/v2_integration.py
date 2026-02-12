@@ -1,13 +1,13 @@
 """
 Sapphire V2 Integration Module - Multi-Platform Edition
 ========================================================
-Integrates all V2 components including reinstated Hyperliquid.
+Integrates all V2 components including reinstated Lighter.
 
 Platforms:
-- Hyperliquid: ACTIVE ✅ (DeFi Perps)
-- Drift: ACTIVE ✅ (Solana Perps)  
+- Lighter: ACTIVE ✅ (DeFi Perps)
+- Aster: ACTIVE ✅ (Solana Perps)  
 - Aster: ACTIVE ✅ (CEX)
-- Symphony: ACTIVE ✅ (Monad Treasury)
+- Aster: ACTIVE ✅ (Monad Treasury)
 
 Author: Sapphire V2 Architecture Team
 Version: 2.2.0
@@ -26,10 +26,10 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 # Import V2 modules
-from .symphony_agent_manager import (
+from .aster_agent_manager import (
     AgentType,
-    SymphonyAgentManager,
-    create_symphony_manager,
+    AsterAgentManager,
+    create_aster_manager,
 )
 from .hardened_memory_manager import (
     HardenedMemoryManager,
@@ -47,8 +47,8 @@ from .dual_platform_router import (
     RoutingStrategy,
     create_dual_router,
 )
-from .hyperliquid_client import (
-    HyperliquidClient,
+from .lighter_client import (
+    LighterClient,
 )
 
 logger = logging.getLogger(__name__)
@@ -65,7 +65,7 @@ class TradeRequest(BaseModel):
     quantity: float
     order_type: str = "MARKET"
     price: Optional[float] = None
-    platform: Optional[str] = None  # hyperliquid, drift, or auto
+    platform: Optional[str] = None  # lighter, aster, or auto
     reduce_only: bool = False
 
 
@@ -97,14 +97,14 @@ class MemoryRecallRequest(BaseModel):
 class SapphireV2State:
     """Centralized application state."""
     # Platform clients
-    hyperliquid_client: Optional[HyperliquidClient] = None
-    drift_client: Optional[Any] = None
+    lighter_client: Optional[LighterClient] = None
     aster_client: Optional[Any] = None
-    symphony_client: Optional[Any] = None
+    aster_client: Optional[Any] = None
+    aster_client: Optional[Any] = None
     
     # Core managers
     dual_router: Optional[DualPlatformRouter] = None
-    symphony_manager: Optional[SymphonyAgentManager] = None
+    aster_manager: Optional[AsterAgentManager] = None
     memory_manager: Optional[HardenedMemoryManager] = None
     circuit_manager: Optional[PlatformCircuitManager] = None
     
@@ -132,29 +132,29 @@ def get_app_state() -> SapphireV2State:
 
 async def initialize_v2_components(
     # Credentials from Secret Manager
-    hyperliquid_private_key: Optional[str] = None,
-    hyperliquid_wallet: Optional[str] = None,
-    drift_private_key: Optional[str] = None,
+    lighter_private_key: Optional[str] = None,
+    lighter_wallet: Optional[str] = None,
+    aster_private_key: Optional[str] = None,
     # Existing clients (optional)
-    drift_client: Optional[Any] = None,
     aster_client: Optional[Any] = None,
-    symphony_client: Optional[Any] = None,
+    aster_client: Optional[Any] = None,
+    aster_client: Optional[Any] = None,
     firestore_client: Optional[Any] = None,
     # Configuration
-    hyperliquid_testnet: bool = False,
+    lighter_testnet: bool = False,
 ) -> SapphireV2State:
     """
-    Initialize all V2 components including Hyperliquid.
+    Initialize all V2 components including Lighter.
     
     Args:
-        hyperliquid_private_key: Hyperliquid wallet private key
-        hyperliquid_wallet: Hyperliquid wallet address
-        drift_private_key: Drift/Solana private key
-        drift_client: Existing Drift client
+        lighter_private_key: Lighter wallet private key
+        lighter_wallet: Lighter wallet address
+        aster_private_key: Aster/Solana private key
         aster_client: Existing Aster client
-        symphony_client: Existing Symphony client
+        aster_client: Existing Aster client
+        aster_client: Existing Aster client
         firestore_client: Firestore client for persistence
-        hyperliquid_testnet: Use Hyperliquid testnet
+        lighter_testnet: Use Lighter testnet
         
     Returns:
         Initialized application state
@@ -173,49 +173,49 @@ async def initialize_v2_components(
     state.circuit_manager = configure_circuit_manager()
     logger.info("  ✅ Circuit Manager ready (4 platforms)")
     
-    # 2. Initialize Hyperliquid Client
-    if hyperliquid_private_key and hyperliquid_wallet:
-        logger.info("  🔷 Initializing Hyperliquid Client...")
+    # 2. Initialize Lighter Client
+    if lighter_private_key and lighter_wallet:
+        logger.info("  🔷 Initializing Lighter Client...")
         try:
-            state.hyperliquid_client = HyperliquidClient(
-                private_key=hyperliquid_private_key,
-                wallet_address=hyperliquid_wallet,
-                testnet=hyperliquid_testnet,
+            state.lighter_client = LighterClient(
+                private_key=lighter_private_key,
+                wallet_address=lighter_wallet,
+                testnet=lighter_testnet,
             )
-            await state.hyperliquid_client.initialize()
-            logger.info("  ✅ Hyperliquid Client ready")
+            await state.lighter_client.initialize()
+            logger.info("  ✅ Lighter Client ready")
         except Exception as e:
-            logger.error(f"  ❌ Hyperliquid Client failed: {e}")
+            logger.error(f"  ❌ Lighter Client failed: {e}")
     else:
-        logger.warning("  ⚠️ Hyperliquid credentials not provided - client disabled")
+        logger.warning("  ⚠️ Lighter credentials not provided - client disabled")
     
     # 3. Store existing clients
-    state.drift_client = drift_client
     state.aster_client = aster_client
-    state.symphony_client = symphony_client
+    state.aster_client = aster_client
+    state.aster_client = aster_client
     
     # 4. Initialize Dual Platform Router
-    if state.hyperliquid_client or state.drift_client:
+    if state.lighter_client or state.aster_client:
         logger.info("  🔀 Initializing Dual Platform Router...")
         try:
             state.dual_router = await create_dual_router(
-                hyperliquid_client=state.hyperliquid_client,
-                drift_client=state.drift_client,
+                lighter_client=state.lighter_client,
+                aster_client=state.aster_client,
             )
             logger.info("  ✅ Dual Router ready")
         except Exception as e:
             logger.error(f"  ❌ Dual Router failed: {e}")
     
-    # 5. Initialize Symphony Agent Manager
-    logger.info("  🎭 Initializing Symphony Agent Manager...")
+    # 5. Initialize Aster Agent Manager
+    logger.info("  🎭 Initializing Aster Agent Manager...")
     try:
-        state.symphony_manager = await create_symphony_manager(
+        state.aster_manager = await create_aster_manager(
             firestore_client=firestore_client,
-            symphony_client=symphony_client,
+            aster_client=aster_client,
         )
-        logger.info("  ✅ Symphony Manager ready ($MILF, $AGDG active, $MIT pending)")
+        logger.info("  ✅ Aster Manager ready ($MILF, $AGDG active, $MIT pending)")
     except Exception as e:
-        logger.error(f"  ❌ Symphony Manager failed: {e}")
+        logger.error(f"  ❌ Aster Manager failed: {e}")
     
     # 6. Initialize Memory Manager
     logger.info("  🧠 Initializing Memory Manager...")
@@ -234,17 +234,17 @@ async def initialize_v2_components(
         f"\n{'='*60}\n"
         f"🎉 SAPPHIRE V2 INITIALIZATION COMPLETE\n"
         f"{'='*60}\n"
-        f"  Hyperliquid: {'✅ ACTIVE' if state.hyperliquid_client else '❌ Disabled'}\n"
-        f"  Drift: {'✅ ACTIVE' if state.drift_client else '❌ Disabled'}\n"
+        f"  Lighter: {'✅ ACTIVE' if state.lighter_client else '❌ Disabled'}\n"
+        f"  Aster: {'✅ ACTIVE' if state.aster_client else '❌ Disabled'}\n"
         f"  Dual Router: {'✅ Ready' if state.dual_router else '❌ Disabled'}\n"
-        f"  Symphony: {'✅ Ready' if state.symphony_manager else '❌ Disabled'}\n"
+        f"  Aster: {'✅ Ready' if state.aster_manager else '❌ Disabled'}\n"
         f"  Memory: {'✅ Ready' if state.memory_manager else '❌ Disabled'}\n"
         f"{'='*60}\n"
     )
     
     # Log MIT status
-    if state.symphony_manager:
-        mit = state.symphony_manager.get_mit_agent()
+    if state.aster_manager:
+        mit = state.aster_manager.get_mit_agent()
         logger.info(
             f"🎯 MIT STATUS: {mit.status.value} | "
             f"Progress: {mit.activation_progress}/5 | "
@@ -260,8 +260,8 @@ async def shutdown_v2_components() -> None:
     
     logger.info("🛑 [V2] Shutting down...")
     
-    if state.hyperliquid_client:
-        await state.hyperliquid_client.close()
+    if state.lighter_client:
+        await state.lighter_client.close()
     
     if state.memory_manager:
         await state.memory_manager.shutdown()
@@ -293,8 +293,8 @@ async def execute_trade(request: TradeRequest):
     
     Platform routing:
     - auto: Router decides based on symbol
-    - hyperliquid: Force Hyperliquid
-    - drift: Force Drift
+    - lighter: Force Lighter
+    - aster: Force Aster
     """
     state = get_app_state()
     
@@ -302,10 +302,10 @@ async def execute_trade(request: TradeRequest):
         raise HTTPException(status_code=503, detail="Dual router not initialized")
     
     # Force platform if specified
-    if request.platform and request.platform.lower() in ("hyperliquid", "drift"):
+    if request.platform and request.platform.lower() in ("lighter", "aster"):
         # Direct execution
-        if request.platform.lower() == "hyperliquid" and state.hyperliquid_client:
-            result = await state.hyperliquid_client.place_order(
+        if request.platform.lower() == "lighter" and state.lighter_client:
+            result = await state.lighter_client.place_order(
                 symbol=request.symbol,
                 side=request.side,
                 quantity=request.quantity,
@@ -313,14 +313,14 @@ async def execute_trade(request: TradeRequest):
                 price=request.price,
                 reduce_only=request.reduce_only,
             )
-            return {"success": True, "platform": "hyperliquid", "order": result.to_dict()}
-        elif request.platform.lower() == "drift" and state.drift_client:
-            result = await state.drift_client.place_order(
+            return {"success": True, "platform": "lighter", "order": result.to_dict()}
+        elif request.platform.lower() == "aster" and state.aster_client:
+            result = await state.aster_client.place_order(
                 symbol=request.symbol,
                 side=request.side,
                 quantity=request.quantity,
             )
-            return {"success": True, "platform": "drift", "order": result}
+            return {"success": True, "platform": "aster", "order": result}
     
     # Auto routing
     result = await state.dual_router.execute(
@@ -358,18 +358,18 @@ async def get_platforms_status():
     state = get_app_state()
     
     status = {
-        "hyperliquid": {
-            "enabled": state.hyperliquid_client is not None,
-            "status": state.hyperliquid_client.get_status() if state.hyperliquid_client else None,
-        },
-        "drift": {
-            "enabled": state.drift_client is not None,
+        "lighter": {
+            "enabled": state.lighter_client is not None,
+            "status": state.lighter_client.get_status() if state.lighter_client else None,
         },
         "aster": {
             "enabled": state.aster_client is not None,
         },
-        "symphony": {
-            "enabled": state.symphony_client is not None,
+        "aster": {
+            "enabled": state.aster_client is not None,
+        },
+        "aster": {
+            "enabled": state.aster_client is not None,
         },
     }
     
@@ -379,35 +379,35 @@ async def get_platforms_status():
     return {"success": True, "platforms": status}
 
 
-@router.get("/platforms/hyperliquid/positions")
-async def get_hyperliquid_positions():
-    """Get Hyperliquid positions."""
+@router.get("/platforms/lighter/positions")
+async def get_lighter_positions():
+    """Get Lighter positions."""
     state = get_app_state()
     
-    if not state.hyperliquid_client:
-        raise HTTPException(status_code=503, detail="Hyperliquid not configured")
+    if not state.lighter_client:
+        raise HTTPException(status_code=503, detail="Lighter not configured")
     
-    positions = await state.hyperliquid_client.get_positions()
+    positions = await state.lighter_client.get_positions()
     return {
         "success": True,
-        "platform": "hyperliquid",
+        "platform": "lighter",
         "positions": [p.to_dict() for p in positions],
     }
 
 
-@router.get("/platforms/drift/positions")
-async def get_drift_positions():
-    """Get Drift positions."""
+@router.get("/platforms/aster/positions")
+async def get_aster_positions():
+    """Get Aster positions."""
     state = get_app_state()
     
-    if not state.drift_client:
-        raise HTTPException(status_code=503, detail="Drift not configured")
+    if not state.aster_client:
+        raise HTTPException(status_code=503, detail="Aster not configured")
     
-    if hasattr(state.drift_client, 'get_positions'):
-        positions = await state.drift_client.get_positions()
-        return {"success": True, "platform": "drift", "positions": positions}
+    if hasattr(state.aster_client, 'get_positions'):
+        positions = await state.aster_client.get_positions()
+        return {"success": True, "platform": "aster", "positions": positions}
     
-    return {"success": True, "platform": "drift", "positions": []}
+    return {"success": True, "platform": "aster", "positions": []}
 
 
 @router.get("/platforms/all/positions")
@@ -424,28 +424,28 @@ async def get_all_positions():
     return {"success": True, "positions": {}}
 
 
-# --- Symphony Endpoints ---
+# --- Aster Endpoints ---
 
-@router.get("/symphony/status")
-async def get_symphony_status():
-    """Get Symphony agent status."""
+@router.get("/aster/status")
+async def get_aster_status():
+    """Get Aster agent status."""
     state = get_app_state()
     
-    if not state.symphony_manager:
-        raise HTTPException(status_code=503, detail="Symphony manager not initialized")
+    if not state.aster_manager:
+        raise HTTPException(status_code=503, detail="Aster manager not initialized")
     
-    return {"success": True, "data": state.symphony_manager.get_all_status()}
+    return {"success": True, "data": state.aster_manager.get_all_status()}
 
 
-@router.get("/symphony/mit/status")
+@router.get("/aster/mit/status")
 async def get_mit_status():
     """Get MIT activation status."""
     state = get_app_state()
     
-    if not state.symphony_manager:
-        raise HTTPException(status_code=503, detail="Symphony manager not initialized")
+    if not state.aster_manager:
+        raise HTTPException(status_code=503, detail="Aster manager not initialized")
     
-    mit = state.symphony_manager.get_mit_agent()
+    mit = state.aster_manager.get_mit_agent()
     
     return {
         "success": True,
@@ -459,15 +459,15 @@ async def get_mit_status():
     }
 
 
-@router.post("/symphony/mit/activate")
+@router.post("/aster/mit/activate")
 async def execute_mit_activation(request: MITActivationRequest):
     """Execute MIT activation trade."""
     state = get_app_state()
     
-    if not state.symphony_manager:
-        raise HTTPException(status_code=503, detail="Symphony manager not initialized")
+    if not state.aster_manager:
+        raise HTTPException(status_code=503, detail="Aster manager not initialized")
     
-    result = await state.symphony_manager.execute_mit_activation_trade(
+    result = await state.aster_manager.execute_mit_activation_trade(
         symbol=request.symbol,
         side=request.side,
         quantity=request.quantity,
@@ -547,10 +547,10 @@ async def v2_health():
         "initialized": state.initialized,
         "startup_time": state.startup_time.isoformat() if state.startup_time else None,
         "components": {
-            "hyperliquid": state.hyperliquid_client is not None,
-            "drift": state.drift_client is not None,
+            "lighter": state.lighter_client is not None,
+            "aster": state.aster_client is not None,
             "dual_router": state.dual_router is not None,
-            "symphony": state.symphony_manager is not None,
+            "aster": state.aster_manager is not None,
             "memory": state.memory_manager is not None,
         },
     }
@@ -570,10 +570,10 @@ async def get_mit_activation_status() -> dict:
     """Quick helper to get MIT status."""
     state = get_app_state()
     
-    if not state.symphony_manager:
+    if not state.aster_manager:
         return {"error": "Not initialized", "is_active": False}
     
-    mit = state.symphony_manager.get_mit_agent()
+    mit = state.aster_manager.get_mit_agent()
     return {
         "is_active": mit.is_active,
         "progress": mit.activation_progress,
@@ -583,5 +583,5 @@ async def get_mit_activation_status() -> dict:
 
 if __name__ == "__main__":
     print("Sapphire V2 Integration Module")
-    print("Hyperliquid: REINSTATED ✅")
-    print("Drift: ACTIVE ✅")
+    print("Lighter: REINSTATED ✅")
+    print("Aster: ACTIVE ✅")

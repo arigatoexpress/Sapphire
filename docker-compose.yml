@@ -54,13 +54,13 @@ services:
       - .env
 
   # ============ TRADING BOTS ============
-  bot-symphony:
+  bot-aster:
     build:
       context: .
-      dockerfile: services/bot-symphony/Dockerfile
+      dockerfile: services/bot-aster/Dockerfile
     environment:
       - PUBSUB_EMULATOR_HOST=pubsub-emulator:8085
-      - SERVICE_NAME=bot-symphony
+      - SERVICE_NAME=bot-aster
       - TRADING_ENABLED=true
     depends_on:
       - pubsub-emulator
@@ -68,13 +68,13 @@ services:
     env_file:
       - .env
 
-  bot-drift:
+  bot-aster:
     build:
       context: .
-      dockerfile: services/bot-drift/Dockerfile
+      dockerfile: services/bot-aster/Dockerfile
     environment:
       - PUBSUB_EMULATOR_HOST=pubsub-emulator:8085
-      - SERVICE_NAME=bot-drift
+      - SERVICE_NAME=bot-aster
       - TRADING_ENABLED=true
     depends_on:
       - pubsub-emulator
@@ -82,13 +82,13 @@ services:
     env_file:
       - .env
 
-  bot-hyperliquid:
+  bot-lighter:
     build:
       context: .
-      dockerfile: services/bot-hyperliquid/Dockerfile
+      dockerfile: services/bot-lighter/Dockerfile
     environment:
       - PUBSUB_EMULATOR_HOST=pubsub-emulator:8085
-      - SERVICE_NAME=bot-hyperliquid
+      - SERVICE_NAME=bot-lighter
       - TRADING_ENABLED=true
     depends_on:
       - pubsub-emulator

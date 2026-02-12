@@ -306,7 +306,7 @@ async def platform_router_status():
             "total_platforms": 4,
             "platforms": {
                 p: {"is_healthy": p in state.balances}
-                for p in ["symphony", "drift", "hyperliquid", "aster"]
+                for p in ["aster", "aster", "lighter", "aster"]
             },
         },
         "metrics": {
@@ -488,7 +488,7 @@ async def get_platforms():
                 "last_update": state.last_updates.get(platform, "never"),
                 "status": "active" if platform in state.balances else "inactive",
             }
-            for platform in ["symphony", "drift", "hyperliquid", "aster"]
+            for platform in ["aster", "aster", "lighter", "aster"]
         ]
     }
 

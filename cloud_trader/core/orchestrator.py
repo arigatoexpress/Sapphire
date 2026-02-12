@@ -23,9 +23,9 @@ class OrchestratorConfig:
     """Configuration for the trading orchestrator."""
 
     enable_aster: bool = True
-    enable_drift: bool = True
-    enable_symphony: bool = True
-    enable_hyperliquid: bool = True
+    enable_aster: bool = True
+    enable_aster: bool = True
+    enable_lighter: bool = True
     enable_lighter: bool = True
     enable_jupiter: bool = True
 
@@ -57,9 +57,9 @@ class TradingOrchestrator:
         self.settings = settings or Settings()
         self.config = OrchestratorConfig(
             enable_aster=self.settings.enable_aster,
-            enable_drift=self.settings.enable_drift,
-            enable_symphony=self.settings.enable_symphony,
-            enable_hyperliquid=self.settings.enable_hyperliquid,
+            enable_aster=self.settings.enable_aster,
+            enable_aster=self.settings.enable_aster,
+            enable_lighter=self.settings.enable_lighter,
             enable_lighter=self.settings.enable_lighter,
             enable_jupiter=getattr(self.settings, "enable_jupiter", True),
             paper_trading=getattr(self.settings, "paper_trading", False),
@@ -75,9 +75,9 @@ class TradingOrchestrator:
 
         # Platform Clients
         self._exchange_client = None  # Aster
-        self.drift = None
-        self.symphony = None
-        self.hl_client = None  # Hyperliquid
+        self.aster = None
+        self.aster = None
+        self.hl_client = None  # Lighter
         self.lighter_client = None  # Lighter
         self.jupiter_client = None  # Jupiter
 
@@ -163,9 +163,9 @@ class TradingOrchestrator:
 
         # 0. API Credentials & Platform Clients
         from ..credentials import load_credentials
-        from ..drift_client import DriftClient
+        from ..aster_client import AsterClient
         from ..exchange import AsterClient
-        from ..symphony_client import SymphonyClient
+        from ..aster_client import AsterClient
 
         step_start = time.time()
         creds = load_credentials()
@@ -185,8 +185,8 @@ class TradingOrchestrator:
         elif creds.gemini_api_key:
             self.settings.gemini_api_key = creds.gemini_api_key
             logger.info("🤖 Using Gemini API key")
-        if creds.symphony_api_key:
-            self.settings.symphony_api_key = creds.symphony_api_key
+        if creds.aster_api_key:
+            self.settings.aster_api_key = creds.aster_api_key
 
         logger.info("🔑 All API credentials loaded from GCP Secret Manager")
 
@@ -198,45 +198,45 @@ class TradingOrchestrator:
         else:
             logger.info("ℹ️ Aster disabled, skipping initialization")
 
-        # Initialize Drift
+        # Initialize Aster
         step_start = time.time()
-        if self.config.enable_drift:
-            self.drift = DriftClient(rpc_url=self.settings.solana_rpc_url)
-            await self.drift.initialize()
-            logger.info(f"🔌 Drift Client Initialized in {time.time() - step_start:.2f}s")
+        if self.config.enable_aster:
+            self.aster = AsterClient(rpc_url=self.settings.solana_rpc_url)
+            await self.aster.initialize()
+            logger.info(f"🔌 Aster Client Initialized in {time.time() - step_start:.2f}s")
         else:
-            logger.info("ℹ️ Drift disabled, skipping initialization")
+            logger.info("ℹ️ Aster disabled, skipping initialization")
 
-        # Initialize Symphony
+        # Initialize Aster
         step_start = time.time()
-        if self.config.enable_symphony:
-            self.symphony = SymphonyClient()
-            logger.info(f"🔌 Symphony Client Initialized in {time.time() - step_start:.2f}s")
-            # Ensure agents are registered on Symphony (skip during startup - do lazy)
+        if self.config.enable_aster:
+            self.aster = AsterClient()
+            logger.info(f"🔌 Aster Client Initialized in {time.time() - step_start:.2f}s")
+            # Ensure agents are registered on Aster (skip during startup - do lazy)
             # This can be slow, so we'll do it on first trade attempt instead
-            logger.info("ℹ️ Symphony agent registration deferred to first trade (lazy init)")
+            logger.info("ℹ️ Aster agent registration deferred to first trade (lazy init)")
         else:
-            logger.info("ℹ️ Symphony disabled, skipping initialization")
+            logger.info("ℹ️ Aster disabled, skipping initialization")
 
-        # Initialize Hyperliquid (only if enabled AND credentials exist)
+        # Initialize Lighter (only if enabled AND credentials exist)
         step_start = time.time()
-        if self.config.enable_hyperliquid and creds.hl_private_key and creds.hl_account_address:
+        if self.config.enable_lighter and creds.hl_private_key and creds.hl_account_address:
             try:
-                from ..v2.hyperliquid_client import HyperliquidClient
-                self.hl_client = HyperliquidClient(
+                from ..v2.lighter_client import LighterClient
+                self.hl_client = LighterClient(
                     private_key=creds.hl_private_key,
                     wallet_address=creds.hl_account_address,
                 )
                 await self.hl_client.initialize()
-                logger.info(f"🔌 Hyperliquid Client Initialized in {time.time() - step_start:.2f}s")
+                logger.info(f"🔌 Lighter Client Initialized in {time.time() - step_start:.2f}s")
             except Exception as e:
-                logger.warning(f"⚠️ Hyperliquid initialization failed in {time.time() - step_start:.2f}s: {e}")
+                logger.warning(f"⚠️ Lighter initialization failed in {time.time() - step_start:.2f}s: {e}")
                 self.hl_client = None
         else:
-            if not self.config.enable_hyperliquid:
-                logger.info("ℹ️ Hyperliquid disabled, skipping initialization")
+            if not self.config.enable_lighter:
+                logger.info("ℹ️ Lighter disabled, skipping initialization")
             else:
-                logger.info("ℹ️ Hyperliquid credentials not found, skipping initialization")
+                logger.info("ℹ️ Lighter credentials not found, skipping initialization")
 
         # Initialize Lighter (only if enabled AND credentials exist)
         step_start = time.time()
@@ -379,8 +379,8 @@ class TradingOrchestrator:
             # Warm cache for all platforms
             logger.info(f"🔥 Warming precision cache for {len(symbols_to_warm)} symbols...")
             await normalizer.warm_cache(list(symbols_to_warm), "aster")
-            if self.config.enable_hyperliquid and self.hl_client:
-                await normalizer.warm_cache(list(symbols_to_warm), "hyperliquid")
+            if self.config.enable_lighter and self.hl_client:
+                await normalizer.warm_cache(list(symbols_to_warm), "lighter")
             logger.info("✅ Precision cache warmed")
         except Exception as e:
             logger.warning(f"⚠️ Precision cache warmup failed (non-critical): {e}")
@@ -530,9 +530,9 @@ class TradingOrchestrator:
             "uptime_seconds": uptime,
             "config": {
                 "enable_aster": self.config.enable_aster,
-                "enable_drift": self.config.enable_drift,
-                "enable_symphony": self.config.enable_symphony,
-                "enable_hyperliquid": self.config.enable_hyperliquid,
+                "enable_aster": self.config.enable_aster,
+                "enable_aster": self.config.enable_aster,
+                "enable_lighter": self.config.enable_lighter,
                 "enable_lighter": self.config.enable_lighter,
                 "paper_trading": self.config.paper_trading,
             },

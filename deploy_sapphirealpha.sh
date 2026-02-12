@@ -57,7 +57,7 @@ gcloud run deploy ${SERVICE_NAME} \
     --max-instances 10 \
     --vpc-connector ${VPC_CONNECTOR} \
     --vpc-egress all-traffic \
-    --set-env-vars "ENVIRONMENT=production,LOG_LEVEL=INFO,ENABLE_JUPITER=true,ENABLE_DRIFT=true,ENABLE_ASTER=true,ENABLE_HYPERLIQUID=true,ENABLE_LIGHTER=true,ENABLE_SYMPHONY=true,ENABLE_PUBSUB=true,GCP_PROJECT_ID=${PROJECT_ID}"
+    --set-env-vars "ENVIRONMENT=production,LOG_LEVEL=INFO,ENABLE_JUPITER=true,ENABLE_ASTER=true,ENABLE_ASTER=true,ENABLE_LIGHTER=true,ENABLE_LIGHTER=true,ENABLE_ASTER=true,ENABLE_PUBSUB=true,GCP_PROJECT_ID=${PROJECT_ID}"
 
 # Step 5: Get Cloud Run URL
 log_info "Step 5: Getting Cloud Run URL..."

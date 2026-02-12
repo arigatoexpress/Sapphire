@@ -56,7 +56,7 @@ async def verify_loop():
     side = "BUY"
 
     # We call _execute_trade_order directly
-    # This should hit our injected Symphony logic
+    # This should hit our injected Aster logic
     await service._execute_trade_order(
         agent=agent,
         symbol=symbol,
@@ -77,10 +77,10 @@ async def verify_loop():
         is_closing=False,
     )
 
-    print("\n✅ Verification Complete. Check logs above for 'Symphony Trade Success'.")
+    print("\n✅ Verification Complete. Check logs above for 'Aster Trade Success'.")
     await service._exchange_client.close()
-    if service.symphony:
-        await service.symphony.close()
+    if service.aster:
+        await service.aster.close()
 
 
 if __name__ == "__main__":

@@ -80,8 +80,8 @@ const AgentCard = memo<{
                 <div className="flex flex-col">
                     <span className="text-sm font-medium text-white">{name}</span>
                     <span className={`text-[9px] uppercase tracking-tighter font-bold ${system === 'aster' ? 'text-emerald-400' :
-                        system === 'symphony' ? 'text-purple-400' :
-                            system === 'drift' ? 'text-blue-400' : 'text-cyan-400'
+                        system === 'aster' ? 'text-purple-400' :
+                            system === 'aster' ? 'text-blue-400' : 'text-cyan-400'
                         }`}>
                         {system}
                     </span>

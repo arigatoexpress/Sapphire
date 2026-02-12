@@ -100,20 +100,20 @@ class TradeVerificationService:
         # Step 3: Platform-specific verification
         platform = execution_result.platform.value
 
-        if platform == "hyperliquid":
-            verified = await self._verify_hyperliquid_trade(
-                execution_result, symbol, side, quantity
-            )
-        elif platform == "drift":
-            verified = await self._verify_drift_trade(
+        if platform == "lighter":
+            verified = await self._verify_lighter_trade(
                 execution_result, symbol, side, quantity
             )
         elif platform == "aster":
             verified = await self._verify_aster_trade(
                 execution_result, symbol, side, quantity
             )
-        elif platform == "symphony":
-            verified = await self._verify_symphony_trade(
+        elif platform == "aster":
+            verified = await self._verify_aster_trade(
+                execution_result, symbol, side, quantity
+            )
+        elif platform == "aster":
+            verified = await self._verify_aster_trade(
                 execution_result, symbol, side, quantity
             )
         elif platform == "lighter":
@@ -134,18 +134,18 @@ class TradeVerificationService:
 
         return verified
 
-    async def _verify_hyperliquid_trade(
+    async def _verify_lighter_trade(
         self,
         execution_result,
         symbol: str,
         side: str,
         quantity: float,
     ) -> Optional[VerifiedTrade]:
-        """Verify Hyperliquid trade and fetch account/position data"""
+        """Verify Lighter trade and fetch account/position data"""
 
-        # Check if Hyperliquid client is available
+        # Check if Lighter client is available
         if not hasattr(self.orchestrator, 'hl_client') or not self.orchestrator.hl_client:
-            logger.error("❌ Hyperliquid client not available for verification")
+            logger.error("❌ Lighter client not available for verification")
             return None
 
         hl_client = self.orchestrator.hl_client
@@ -154,7 +154,7 @@ class TradeVerificationService:
             # Get account state
             account_state = await hl_client.get_user_state()
             if not account_state:
-                logger.error("❌ Could not fetch Hyperliquid account state")
+                logger.error("❌ Could not fetch Lighter account state")
                 return None
 
             # Extract account info
@@ -194,7 +194,7 @@ class TradeVerificationService:
                 side=side,
                 quantity=quantity,
                 fill_price=execution_result.price,
-                platform="hyperliquid",
+                platform="lighter",
                 tx_sig=execution_result.tx_sig,
                 timestamp=datetime.now(),
                 account_balance=float(account_value),
@@ -210,24 +210,24 @@ class TradeVerificationService:
             )
 
         except Exception as e:
-            logger.error(f"❌ Hyperliquid verification error: {e}", exc_info=True)
+            logger.error(f"❌ Lighter verification error: {e}", exc_info=True)
             return None
 
-    async def _verify_drift_trade(
+    async def _verify_aster_trade(
         self,
         execution_result,
         symbol: str,
         side: str,
         quantity: float,
     ) -> Optional[VerifiedTrade]:
-        """Verify Drift trade and fetch account/position data"""
+        """Verify Aster trade and fetch account/position data"""
 
-        if not hasattr(self.orchestrator, 'drift') or not self.orchestrator.drift:
-            logger.error("❌ Drift client not available for verification")
+        if not hasattr(self.orchestrator, 'aster') or not self.orchestrator.aster:
+            logger.error("❌ Aster client not available for verification")
             return None
 
-        # TODO: Implement Drift verification when client is connected
-        logger.warning("⚠️ Drift verification not yet implemented")
+        # TODO: Implement Aster verification when client is connected
+        logger.warning("⚠️ Aster verification not yet implemented")
         return None
 
     async def _verify_aster_trade(
@@ -247,21 +247,21 @@ class TradeVerificationService:
         logger.warning("⚠️ Aster verification not yet implemented")
         return None
 
-    async def _verify_symphony_trade(
+    async def _verify_aster_trade(
         self,
         execution_result,
         symbol: str,
         side: str,
         quantity: float,
     ) -> Optional[VerifiedTrade]:
-        """Verify Symphony trade and fetch account/position data"""
+        """Verify Aster trade and fetch account/position data"""
 
-        if not hasattr(self.orchestrator, 'symphony') or not self.orchestrator.symphony:
-            logger.error("❌ Symphony client not available for verification")
+        if not hasattr(self.orchestrator, 'aster') or not self.orchestrator.aster:
+            logger.error("❌ Aster client not available for verification")
             return None
 
-        # TODO: Implement Symphony verification
-        logger.warning("⚠️ Symphony verification not yet implemented")
+        # TODO: Implement Aster verification
+        logger.warning("⚠️ Aster verification not yet implemented")
         return None
 
     async def _verify_lighter_trade(

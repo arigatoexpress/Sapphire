@@ -25,7 +25,7 @@ const MonadMIT: React.FC = () => {
 
     const fetchMITStatus = async () => {
         try {
-            const response = await fetch(`${API_URL}/api/symphony/status`);
+            const response = await fetch(`${API_URL}/api/aster/status`);
             const data = await response.json();
             setFund(data);
         } catch (e) {
@@ -43,7 +43,7 @@ const MonadMIT: React.FC = () => {
                         Monad MIT
                     </Typography>
                     <Typography variant="subtitle1" className="text-slate-400">
-                        Symphony-powered managed investment tokens
+                        Aster-powered managed investment tokens
                     </Typography>
                 </div>
                 <Button variant="contained" color="primary" startIcon={<ExternalLink size={18} />}>
@@ -73,7 +73,7 @@ const MonadMIT: React.FC = () => {
 
                         <Typography className="text-slate-300 mb-8 leading-relaxed">
                             The Sapphire Alpha Fund utilizes the Aster Analysis Engine to rotate capital between high-conviction
-                            narratives across Monad and Solana. Managed by Symphony, sALP offers institutional-grade
+                            narratives across Monad and Solana. Managed by Aster, sALP offers institutional-grade
                             risk management with autonomous execution.
                         </Typography>
 

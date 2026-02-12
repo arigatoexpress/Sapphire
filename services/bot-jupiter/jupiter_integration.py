@@ -339,11 +339,11 @@ async def example_integration():
     integration.add_price_alert("SOL", "change_pct", Decimal("2.0"), cooldown_minutes=15)
 
     # Register callback for other traders
-    async def hyperliquid_price_update(prices):
-        logger.info(f"Hyperliquid received price update: {prices}")
-        # Send to Hyperliquid trader...
+    async def lighter_price_update(prices):
+        logger.info(f"Lighter received price update: {prices}")
+        # Send to Lighter trader...
 
-    integration.register_price_callback(hyperliquid_price_update)
+    integration.register_price_callback(lighter_price_update)
 
     # Run monitoring
     await integration.run_price_monitoring(interval_seconds=60)

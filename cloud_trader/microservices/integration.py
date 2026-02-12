@@ -210,7 +210,7 @@ def validate_trading_scope(platform: str) -> None:
     This is a safety check to prevent services from trading on wrong platforms.
 
     Args:
-        platform: Platform name (e.g., "hyperliquid", "lighter", "drift")
+        platform: Platform name (e.g., "lighter", "lighter", "aster")
 
     Raises:
         RuntimeError: If the service should not trade on this platform

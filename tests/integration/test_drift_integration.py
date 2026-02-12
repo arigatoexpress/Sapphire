@@ -1,6 +1,6 @@
-"""Drift Protocol Integration Tests with Real API Calls.
+"""Aster Protocol Integration Tests with Real API Calls.
 
-Tests the Drift client for Solana perpetual futures trading.
+Tests the Aster client for Solana perpetual futures trading.
 Uses real API calls where possible (CoinGecko for pricing, etc).
 """
 
@@ -10,7 +10,7 @@ from typing import Optional
 
 import pytest
 
-from cloud_trader.drift_client import DriftClient, get_drift_client
+from cloud_trader.aster_client import AsterClient, get_aster_client
 
 
 # ============================================================================
@@ -23,8 +23,8 @@ def has_solana_rpc() -> bool:
     return bool(os.getenv("SOLANA_RPC_URL"))
 
 
-def has_drift_wallet() -> bool:
-    """Check if Drift wallet is configured for trading."""
+def has_aster_wallet() -> bool:
+    """Check if Aster wallet is configured for trading."""
     return bool(os.getenv("SOLANA_PRIVATE_KEY"))
 
 
@@ -35,7 +35,7 @@ requires_rpc = pytest.mark.skipif(
 )
 
 requires_wallet = pytest.mark.skipif(
-    not has_drift_wallet(),
+    not has_aster_wallet(),
     reason="SOLANA_PRIVATE_KEY not set (required for trading operations)"
 )
 
@@ -46,9 +46,9 @@ requires_wallet = pytest.mark.skipif(
 
 
 @pytest.fixture
-def drift_client():
-    """Create a Drift client for testing."""
-    return DriftClient()
+def aster_client():
+    """Create a Aster client for testing."""
+    return AsterClient()
 
 
 # ============================================================================
@@ -56,26 +56,26 @@ def drift_client():
 # ============================================================================
 
 
-class TestDriftClientInitialization:
+class TestAsterClientInitialization:
     """Test client initialization and configuration."""
 
     def test_client_initialization(self):
         """Test that client initializes correctly."""
-        client = DriftClient()
+        client = AsterClient()
         assert client is not None
         assert client.rpc_url is not None
 
     def test_singleton_pattern(self):
-        """Test that get_drift_client returns singleton."""
-        client1 = get_drift_client()
-        client2 = get_drift_client()
+        """Test that get_aster_client returns singleton."""
+        client1 = get_aster_client()
+        client2 = get_aster_client()
         assert client1 is client2
 
     @pytest.mark.asyncio
-    async def test_async_initialization(self, drift_client):
+    async def test_async_initialization(self, aster_client):
         """Test async initialization."""
-        await drift_client.initialize()
-        assert drift_client.is_initialized is True
+        await aster_client.initialize()
+        assert aster_client.is_initialized is True
 
 
 # ============================================================================
@@ -83,13 +83,13 @@ class TestDriftClientInitialization:
 # ============================================================================
 
 
-class TestDriftRealMarketData:
+class TestAsterRealMarketData:
     """Tests that fetch real market data (via CoinGecko/public APIs)."""
 
     @pytest.mark.asyncio
-    async def test_get_sol_perp_market_real(self, drift_client):
+    async def test_get_sol_perp_market_real(self, aster_client):
         """Test fetching real SOL-PERP market data."""
-        market = await drift_client.get_perp_market("SOL-PERP")
+        market = await aster_client.get_perp_market("SOL-PERP")
         
         print(f"\n📊 SOL-PERP Market Data: {market}")
         assert market is not None
@@ -101,17 +101,17 @@ class TestDriftRealMarketData:
             print(f"   💵 SOL Oracle Price: ${market['oracle_price']:.2f}")
 
     @pytest.mark.asyncio
-    async def test_get_market_includes_funding_rate(self, drift_client):
+    async def test_get_market_includes_funding_rate(self, aster_client):
         """Test that market data includes funding rate."""
-        market = await drift_client.get_perp_market()
+        market = await aster_client.get_perp_market()
         
         assert "funding_rate_24h" in market
         print(f"\n💸 24h Funding Rate: {market['funding_rate_24h']}")
 
     @pytest.mark.asyncio
-    async def test_get_market_includes_open_interest(self, drift_client):
+    async def test_get_market_includes_open_interest(self, aster_client):
         """Test that market data includes open interest."""
-        market = await drift_client.get_perp_market()
+        market = await aster_client.get_perp_market()
         
         assert "open_interest" in market
         print(f"\n📈 Open Interest: {market['open_interest']}")
@@ -122,23 +122,23 @@ class TestDriftRealMarketData:
 # ============================================================================
 
 
-class TestDriftPositions:
+class TestAsterPositions:
     """Test position-related functionality."""
 
     @pytest.mark.asyncio
-    async def test_get_position_uninitialized(self, drift_client):
+    async def test_get_position_uninitialized(self, aster_client):
         """Test getting position when client is not initialized."""
-        position = await drift_client.get_position("SOL-PERP")
+        position = await aster_client.get_position("SOL-PERP")
         
         # Should return empty dict for uninitialized client
         assert position == {}
 
     @pytest.mark.asyncio
-    async def test_get_position_initialized(self, drift_client):
+    async def test_get_position_initialized(self, aster_client):
         """Test getting position after initialization."""
-        await drift_client.initialize()
+        await aster_client.initialize()
         
-        position = await drift_client.get_position("SOL-PERP")
+        position = await aster_client.get_position("SOL-PERP")
         
         print(f"\n📍 Position: {position}")
         assert "symbol" in position
@@ -150,13 +150,13 @@ class TestDriftPositions:
 # ============================================================================
 
 
-class TestDriftOrderSimulation:
+class TestAsterOrderSimulation:
     """Test order operations (simulated, not real trades)."""
 
     @pytest.mark.asyncio
-    async def test_order_structure_market(self, drift_client):
+    async def test_order_structure_market(self, aster_client):
         """Test that market order returns proper structure."""
-        result = await drift_client.place_perp_order(
+        result = await aster_client.place_perp_order(
             symbol="SOL-PERP",
             side="BUY",
             amount=0.01,  # Very small amount
@@ -169,9 +169,9 @@ class TestDriftOrderSimulation:
         assert "status" in result
 
     @pytest.mark.asyncio
-    async def test_order_structure_limit(self, drift_client):
+    async def test_order_structure_limit(self, aster_client):
         """Test that limit order returns proper structure."""
-        result = await drift_client.place_perp_order(
+        result = await aster_client.place_perp_order(
             symbol="SOL-PERP",
             side="SELL",
             amount=0.01,
@@ -189,13 +189,13 @@ class TestDriftOrderSimulation:
 
 
 @pytest.mark.skip(reason="Live trading tests disabled by default")
-class TestDriftLiveTrading:
+class TestAsterLiveTrading:
     """Live trading tests - only run manually with proper wallet setup."""
 
     @requires_wallet
     @pytest.mark.asyncio
     async def test_place_real_order(self):
-        """Test placing a real order on Drift (DISABLED)."""
+        """Test placing a real order on Aster (DISABLED)."""
         pass
 
     @requires_wallet
@@ -210,8 +210,8 @@ class TestDriftLiveTrading:
 # ============================================================================
 
 
-class TestDriftHealthCheck:
-    """Health check tests for Drift integration."""
+class TestAsterHealthCheck:
+    """Health check tests for Aster integration."""
 
     @pytest.mark.asyncio
     async def test_coingecko_reachable(self):

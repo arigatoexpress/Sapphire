@@ -175,12 +175,12 @@ def create_app() -> FastAPI:
             "architecture": "ElizaOS-inspired modular design",
             "platforms": [
                 "Aster (CEX)",
-                "Drift (Solana Perps)",
-                "Hyperliquid (L1 Perps)",
+                "Aster (Solana Perps)",
+                "Lighter (L1 Perps)",
                 "Jupiter (Solana DEX)",
                 "Lighter (Ethereum L2)",
-                "Symphony Monad (Spot Swaps)",
-                "Symphony Base (Perps)",
+                "Aster Monad (Spot Swaps)",
+                "Aster Base (Perps)",
             ],
             "components": [
                 "TradingOrchestrator",

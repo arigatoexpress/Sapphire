@@ -305,7 +305,7 @@ class AgentOrchestrator:
         enabling sub-second decision latency for HFT strategies.
 
         Args:
-            platform: Platform name (aster, drift, jupiter, etc.)
+            platform: Platform name (aster, aster, jupiter, etc.)
             symbol: Trading pair to analyze
             context: "entry" or "exit_check"
             market_data: Optional market data

@@ -1,9 +1,9 @@
 """
 Verification Script for Multi-Chain Account Links.
 Checks connection and balances for:
-1. Symphony (Monad)
+1. Aster (Monad)
 2. Solana Wallet (Standard)
-3. Drift Protocol (Futures)
+3. Aster Protocol (Futures)
 """
 
 import asyncio
@@ -11,22 +11,22 @@ import logging
 import os
 
 # from cloud_trader.solana_wallet_manager import get_wallet_manager # Requires Firestore creds, might fail in local env without key
-from cloud_trader.drift_client import get_drift_client
+from cloud_trader.aster_client import get_aster_client
 from cloud_trader.logger import get_logger
-from cloud_trader.symphony_client import get_symphony_client
+from cloud_trader.aster_client import get_aster_client
 
 # Simple console logger
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ACCOUNTS_CHECK")
 
 
-async def verify_symphony():
-    print("\n🎵 --- CHECKING SYMPHONY (MONAD) ---")
+async def verify_aster():
+    print("\n🎵 --- CHECKING ASTER (MONAD) ---")
     try:
-        client = get_symphony_client()
+        client = get_aster_client()
         # Check config
         if not client.api_key:
-            print("❌ Symphony API Key NOT SET.")
+            print("❌ Aster API Key NOT SET.")
             return
 
         print(f"✅ Client Initialized. URL: {client.base_url}")
@@ -66,14 +66,14 @@ async def verify_symphony():
         print(f"❌ Error: {e}")
 
 
-async def verify_drift():
-    print("\n🌊 --- CHECKING DRIFT (SOLANA PERPS) ---")
+async def verify_aster():
+    print("\n🌊 --- CHECKING ASTER (SOLANA PERPS) ---")
     try:
-        client = get_drift_client()
+        client = get_aster_client()
         print(f"✅ Client Initialized. RPC: {client.rpc_url}")
 
         # Test Config
-        # In this environment we might not have a real wallet key for driftpy
+        # In this environment we might not have a real wallet key for asterpy
         # But we can check if the client thinks it's ready.
 
         # Simulate check
@@ -107,12 +107,12 @@ async def verify_solana_wallet():
             print(f"✅ Wallet Loaded Successfully!")
             print(f"   Public Key: {pubkey}")
 
-            # 2. Check Balance (via Drift Client RPC for convenience)
-            from cloud_trader.drift_client import get_drift_client
+            # 2. Check Balance (via Aster Client RPC for convenience)
+            from cloud_trader.aster_client import get_aster_client
 
-            drift = get_drift_client()
-            # Need a simple RPC call here. Drift client might expose w3-like or we use requests
-            # For this simple script, we'll try to rely on DriftClient logs if we integrated it fully,
+            aster = get_aster_client()
+            # Need a simple RPC call here. Aster client might expose w3-like or we use requests
+            # For this simple script, we'll try to rely on AsterClient logs if we integrated it fully,
             # but for now, just proving the key is valid is a huge win.
 
         except Exception as e:
@@ -157,8 +157,8 @@ async def main():
     print("   ACCOUNT CONNECTION VERIFICATION       ")
     print("=========================================")
 
-    await verify_symphony()
-    await verify_drift()
+    await verify_aster()
+    await verify_aster()
     await verify_solana_wallet()
     await verify_jupiter()
 

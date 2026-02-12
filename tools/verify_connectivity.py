@@ -3,7 +3,7 @@
 Sapphire AI Trading System - Connectivity Verification Tool
 ============================================================
 A professional-grade diagnostic tool to verify connectivity to all
-core trading platforms (Aster, Symphony, Drift) before cloud deployment.
+core trading platforms (Aster, Aster, Aster) before cloud deployment.
 
 Usage:
     python tools/verify_connectivity.py
@@ -178,26 +178,26 @@ async def check_aster_exchange_info() -> ConnectivityResult:
 
 
 # =============================================================================
-# Symphony Connectivity Checks
+# Aster Connectivity Checks
 # =============================================================================
 
-async def check_symphony_ping() -> ConnectivityResult:
+async def check_aster_ping() -> ConnectivityResult:
     """
-    Verify Symphony API is accessible.
+    Verify Aster API is accessible.
     Test: GET /health or a public endpoint.
     """
-    from cloud_trader.symphony_config import SYMPHONY_BASE_URL
+    from cloud_trader.aster_config import ASTER_BASE_URL
     
-    url = f"{SYMPHONY_BASE_URL}/health"
+    url = f"{ASTER_BASE_URL}/health"
     start = time.perf_counter()
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(url)
             latency = (time.perf_counter() - start) * 1000
-            # Symphony may not have a /health, so accept 2xx or 404 as "reachable"
+            # Aster may not have a /health, so accept 2xx or 404 as "reachable"
             if resp.status_code < 500:
                 return ConnectivityResult(
-                    service="Symphony",
+                    service="Aster",
                     test_name="API Ping",
                     passed=True,
                     latency_ms=latency,
@@ -205,7 +205,7 @@ async def check_symphony_ping() -> ConnectivityResult:
                 )
             else:
                 return ConnectivityResult(
-                    service="Symphony",
+                    service="Aster",
                     test_name="API Ping",
                     passed=False,
                     latency_ms=latency,
@@ -214,29 +214,29 @@ async def check_symphony_ping() -> ConnectivityResult:
     except Exception as e:
         latency = (time.perf_counter() - start) * 1000
         return ConnectivityResult(
-            service="Symphony",
+            service="Aster",
             test_name="API Ping",
             passed=False,
             latency_ms=latency,
             message=str(e)
         )
 
-async def check_symphony_authenticated() -> ConnectivityResult:
+async def check_aster_authenticated() -> ConnectivityResult:
     """
-    Verify Symphony authentication by fetching account info.
+    Verify Aster authentication by fetching account info.
     """
-    from cloud_trader.symphony_client import get_symphony_client
-    from cloud_trader.symphony_config import SYMPHONY_API_KEY
+    from cloud_trader.aster_client import get_aster_client
+    from cloud_trader.aster_config import ASTER_API_KEY
 
-    if not SYMPHONY_API_KEY:
+    if not ASTER_API_KEY:
         return ConnectivityResult(
-            service="Symphony",
+            service="Aster",
             test_name="Authenticated Account Info",
             passed=False,
-            message="❌ SYMPHONY_API_KEY not configured."
+            message="❌ ASTER_API_KEY not configured."
         )
 
-    client = get_symphony_client()
+    client = get_aster_client()
     start = time.perf_counter()
     try:
         account_info = await client.get_account_info()
@@ -244,7 +244,7 @@ async def check_symphony_authenticated() -> ConnectivityResult:
         await client.close()
         
         return ConnectivityResult(
-            service="Symphony",
+            service="Aster",
             test_name="Authenticated Account Info",
             passed=True,
             latency_ms=latency,
@@ -255,29 +255,29 @@ async def check_symphony_authenticated() -> ConnectivityResult:
         latency = (time.perf_counter() - start) * 1000
         await client.close()
         return ConnectivityResult(
-            service="Symphony",
+            service="Aster",
             test_name="Authenticated Account Info",
             passed=False,
             latency_ms=latency,
             message=str(e)
         )
 
-async def check_symphony_strategy_subscription() -> ConnectivityResult:
+async def check_aster_strategy_subscription() -> ConnectivityResult:
     """
-    Verify Symphony Strategy Subscription capability.
+    Verify Aster Strategy Subscription capability.
     """
-    from cloud_trader.symphony_client import get_symphony_client
-    from cloud_trader.symphony_config import SYMPHONY_API_KEY
+    from cloud_trader.aster_client import get_aster_client
+    from cloud_trader.aster_config import ASTER_API_KEY
 
-    if not SYMPHONY_API_KEY:
+    if not ASTER_API_KEY:
         return ConnectivityResult(
-            service="Symphony",
+            service="Aster",
             test_name="Strategy Subscription",
             passed=False,
             message="❌ API Key not configured."
         )
 
-    client = get_symphony_client()
+    client = get_aster_client()
     start = time.perf_counter()
     try:
         result = await client.subscribe_strategy("sapphire-connectivity-test")
@@ -285,7 +285,7 @@ async def check_symphony_strategy_subscription() -> ConnectivityResult:
         await client.close()
         
         return ConnectivityResult(
-            service="Symphony",
+            service="Aster",
             test_name="Strategy Subscription",
             passed=True,
             latency_ms=latency,
@@ -295,7 +295,7 @@ async def check_symphony_strategy_subscription() -> ConnectivityResult:
         latency = (time.perf_counter() - start) * 1000
         await client.close()
         return ConnectivityResult(
-            service="Symphony",
+            service="Aster",
             test_name="Strategy Subscription",
             passed=False,
             latency_ms=latency,
@@ -304,12 +304,12 @@ async def check_symphony_strategy_subscription() -> ConnectivityResult:
 
 
 # =============================================================================
-# Drift Connectivity Checks
+# Aster Connectivity Checks
 # =============================================================================
 
-async def check_drift_rpc() -> ConnectivityResult:
+async def check_aster_rpc() -> ConnectivityResult:
     """
-    Verify Solana RPC connectivity (for Drift).
+    Verify Solana RPC connectivity (for Aster).
     """
     rpc_url = os.getenv("SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com")
     
@@ -325,7 +325,7 @@ async def check_drift_rpc() -> ConnectivityResult:
             
             if "result" in data and data["result"] == "ok":
                 return ConnectivityResult(
-                    service="Drift (Solana RPC)",
+                    service="Aster (Solana RPC)",
                     test_name="RPC Health Check",
                     passed=True,
                     latency_ms=latency,
@@ -333,7 +333,7 @@ async def check_drift_rpc() -> ConnectivityResult:
                 )
             else:
                 return ConnectivityResult(
-                    service="Drift (Solana RPC)",
+                    service="Aster (Solana RPC)",
                     test_name="RPC Health Check",
                     passed=False,
                     latency_ms=latency,
@@ -342,20 +342,20 @@ async def check_drift_rpc() -> ConnectivityResult:
     except Exception as e:
         latency = (time.perf_counter() - start) * 1000
         return ConnectivityResult(
-            service="Drift (Solana RPC)",
+            service="Aster (Solana RPC)",
             test_name="RPC Health Check",
             passed=False,
             latency_ms=latency,
             message=str(e)
         )
 
-async def check_drift_market_data() -> ConnectivityResult:
+async def check_aster_market_data() -> ConnectivityResult:
     """
-    Verify Drift market data fetch.
+    Verify Aster market data fetch.
     """
-    from cloud_trader.drift_client import get_drift_client
+    from cloud_trader.aster_client import get_aster_client
 
-    client = get_drift_client()
+    client = get_aster_client()
     start = time.perf_counter()
     try:
         await client.initialize()
@@ -364,7 +364,7 @@ async def check_drift_market_data() -> ConnectivityResult:
         
         price = market.get("oracle_price", 0)
         return ConnectivityResult(
-            service="Drift",
+            service="Aster",
             test_name="Market Data (SOL-PERP)",
             passed=price > 0,
             latency_ms=latency,
@@ -374,7 +374,7 @@ async def check_drift_market_data() -> ConnectivityResult:
     except Exception as e:
         latency = (time.perf_counter() - start) * 1000
         return ConnectivityResult(
-            service="Drift",
+            service="Aster",
             test_name="Market Data (SOL-PERP)",
             passed=False,
             latency_ms=latency,
@@ -443,38 +443,38 @@ async def run_all_checks() -> List[ServiceReport]:
         overall_latency_ms=aster_latency
     )
     
-    # ===== Symphony =====
-    print("🔍 Checking Symphony Connectivity...", flush=True)
-    symphony_results = [
-        await check_symphony_ping(),
-        await check_symphony_authenticated(),
-        await check_symphony_strategy_subscription(),
+    # ===== Aster =====
+    print("🔍 Checking Aster Connectivity...", flush=True)
+    aster_results = [
+        await check_aster_ping(),
+        await check_aster_authenticated(),
+        await check_aster_strategy_subscription(),
     ]
-    symphony_latency = sum(r.latency_ms for r in symphony_results) / len(symphony_results) if symphony_results else 0
-    symphony_healthy = all(r.passed for r in symphony_results)
-    symphony_report = ServiceReport(
-        service="Symphony (Monad)",
-        is_healthy=symphony_healthy,
-        results=symphony_results,
-        overall_latency_ms=symphony_latency
+    aster_latency = sum(r.latency_ms for r in aster_results) / len(aster_results) if aster_results else 0
+    aster_healthy = all(r.passed for r in aster_results)
+    aster_report = ServiceReport(
+        service="Aster (Monad)",
+        is_healthy=aster_healthy,
+        results=aster_results,
+        overall_latency_ms=aster_latency
     )
     
-    # ===== Drift =====
-    print("🔍 Checking Drift Connectivity...", flush=True)
-    drift_results = [
-        await check_drift_rpc(),
-        await check_drift_market_data(),
+    # ===== Aster =====
+    print("🔍 Checking Aster Connectivity...", flush=True)
+    aster_results = [
+        await check_aster_rpc(),
+        await check_aster_market_data(),
     ]
-    drift_latency = sum(r.latency_ms for r in drift_results) / len(drift_results) if drift_results else 0
-    drift_healthy = all(r.passed for r in drift_results)
-    drift_report = ServiceReport(
-        service="Drift (Solana)",
-        is_healthy=drift_healthy,
-        results=drift_results,
-        overall_latency_ms=drift_latency
+    aster_latency = sum(r.latency_ms for r in aster_results) / len(aster_results) if aster_results else 0
+    aster_healthy = all(r.passed for r in aster_results)
+    aster_report = ServiceReport(
+        service="Aster (Solana)",
+        is_healthy=aster_healthy,
+        results=aster_results,
+        overall_latency_ms=aster_latency
     )
     
-    return [aster_report, symphony_report, drift_report]
+    return [aster_report, aster_report, aster_report]
 
 
 async def main():

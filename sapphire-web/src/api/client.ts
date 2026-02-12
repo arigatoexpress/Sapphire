@@ -132,22 +132,22 @@ export const fetchRoutingInfo = async () => {
 }
 
 // ============================================================================
-// Symphony Agents (Monad Treasury)
+// Aster Agents (Monad Treasury)
 // ============================================================================
 
-export const fetchSymphonyStatus = async () => {
+export const fetchAsterStatus = async () => {
     try {
-        const response = await api.get('/api/v2/symphony/status')
+        const response = await api.get('/api/v2/aster/status')
         return response.data
     } catch (error) {
-        console.error('Failed to fetch Symphony status:', error)
+        console.error('Failed to fetch Aster status:', error)
         return null
     }
 }
 
 export const fetchMITStatus = async () => {
     try {
-        const response = await api.get('/api/v2/symphony/mit/status')
+        const response = await api.get('/api/v2/aster/mit/status')
         return response.data
     } catch (error) {
         console.error('Failed to fetch MIT status:', error)

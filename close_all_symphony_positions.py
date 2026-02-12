@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Symphony Position Closer - Close ALL open positions
+Aster Position Closer - Close ALL open positions
 
-Closes all open positions for both AGDG and MILF agents on Symphony.
+Closes all open positions for both AGDG and MILF agents on Aster.
 
 Usage:
-    python3 close_all_symphony_positions.py [--agent agdg|milf|both]
+    python3 close_all_aster_positions.py [--agent agdg|milf|both]
 """
 
 import asyncio
@@ -20,8 +20,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Symphony API Configuration
-SYMPHONY_BASE_URL = "https://api.symphony.io"
+# Aster API Configuration
+ASTER_BASE_URL = "https://api.aster.io"
 
 # Agent Configuration
 import os
@@ -29,15 +29,15 @@ import os
 AGENTS = {
     "agdg": {
         "name": "Ari Gold Fund ($AGDG)",
-        "id": os.getenv("SYMPHONY_AGDG_AGENT_ID", "01b8c2b7-b210-493f-8c76-dafd97663e2c"),
-        "api_key": os.getenv("SYMPHONY_AGDG_API_KEY", ""),  # Set via environment variable
+        "id": os.getenv("ASTER_AGDG_AGENT_ID", "01b8c2b7-b210-493f-8c76-dafd97663e2c"),
+        "api_key": os.getenv("ASTER_AGDG_API_KEY", ""),  # Set via environment variable
         "type": "PERPS",
         "chain": "BASE"
     },
     "milf": {
         "name": "Monad Implementation Treasury ($MILF)",
-        "id": os.getenv("SYMPHONY_MILF_AGENT_ID", "f6cc5590-ff96-4077-ac80-9775c7f805cc"),
-        "api_key": os.getenv("SYMPHONY_MILF_API_KEY", ""),  # Set via environment variable
+        "id": os.getenv("ASTER_MILF_AGENT_ID", "f6cc5590-ff96-4077-ac80-9775c7f805cc"),
+        "api_key": os.getenv("ASTER_MILF_API_KEY", ""),  # Set via environment variable
         "type": "SWAP",
         "chain": "MONAD"
     }
@@ -47,7 +47,7 @@ AGENTS = {
 for agent_key, agent_config in AGENTS.items():
     if not agent_config["api_key"]:
         logger.error(f"ERROR: {agent_config['name']} API key not set!")
-        logger.error(f"Please set SYMPHONY_{agent_key.upper()}_API_KEY environment variable")
+        logger.error(f"Please set ASTER_{agent_key.upper()}_API_KEY environment variable")
         # Note: Script will fail when trying to use this agent
 
 
@@ -58,7 +58,7 @@ async def get_positions(api_key: str, agent_id: str) -> List[Dict]:
 
         try:
             response = await client.get(
-                f"{SYMPHONY_BASE_URL}/agent/positions",
+                f"{ASTER_BASE_URL}/agent/positions",
                 params={"agentId": agent_id},
                 headers=headers
             )
@@ -85,7 +85,7 @@ async def close_position(api_key: str, agent_id: str, batch_id: str) -> Dict:
 
         try:
             response = await client.post(
-                f"{SYMPHONY_BASE_URL}/agent/batch-close",
+                f"{ASTER_BASE_URL}/agent/batch-close",
                 json=payload,
                 headers=headers
             )
@@ -231,7 +231,7 @@ async def close_agent_positions(agent_key: str):
 
 async def main(agent_filter: str = "both"):
     """Main execution function."""
-    logger.info("🎯 Symphony Position Closer - Close ALL Positions")
+    logger.info("🎯 Aster Position Closer - Close ALL Positions")
     logger.info("=" * 80)
     logger.info(f"   Mode: {agent_filter.upper()}")
     logger.info("=" * 80)
@@ -281,7 +281,7 @@ async def main(agent_filter: str = "both"):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Close all Symphony positions for AGDG and/or MILF agents"
+        description="Close all Aster positions for AGDG and/or MILF agents"
     )
     parser.add_argument(
         "--agent",

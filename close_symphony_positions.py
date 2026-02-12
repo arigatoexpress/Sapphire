@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Symphony Position Closer - Close profitable AGDG positions
+Aster Position Closer - Close profitable AGDG positions
 
 This script will:
 1. Fetch all open positions for the AGDG agent
@@ -8,7 +8,7 @@ This script will:
 3. Keep positions with <40% profit open for more gains
 
 Usage:
-    python close_symphony_positions.py [--dry-run] [--min-profit 0.4]
+    python close_aster_positions.py [--dry-run] [--min-profit 0.4]
 """
 
 import asyncio
@@ -16,11 +16,11 @@ import argparse
 import sys
 from pathlib import Path
 
-# Add services/bot-symphony/src to path
-sys.path.insert(0, str(Path(__file__).parent / "services" / "bot-symphony" / "src"))
+# Add services/bot-aster/src to path
+sys.path.insert(0, str(Path(__file__).parent / "services" / "bot-aster" / "src"))
 
-from symphony_client import SymphonyClient
-from symphony_config import SYMPHONY_AGDG_ID, SYMPHONY_AGDG_KEY
+from aster_client import AsterClient
+from aster_config import ASTER_AGDG_ID, ASTER_AGDG_KEY
 import logging
 
 logging.basicConfig(
@@ -32,20 +32,20 @@ logger = logging.getLogger(__name__)
 
 async def close_profitable_positions(min_profit_pct: float = 0.40, dry_run: bool = False):
     """
-    Close Symphony positions above profit threshold.
+    Close Aster positions above profit threshold.
 
     Args:
         min_profit_pct: Minimum profit percentage to close (default 40%)
         dry_run: If True, only show what would be closed without actually closing
     """
-    logger.info(f"🎯 Symphony Position Closer")
-    logger.info(f"   Agent: AGDG ({SYMPHONY_AGDG_ID})")
+    logger.info(f"🎯 Aster Position Closer")
+    logger.info(f"   Agent: AGDG ({ASTER_AGDG_ID})")
     logger.info(f"   Min Profit: {min_profit_pct:.1%}")
     logger.info(f"   Dry Run: {dry_run}")
     logger.info("")
 
-    # Initialize Symphony client
-    client = SymphonyClient(agent_id=SYMPHONY_AGDG_ID, api_key=SYMPHONY_AGDG_KEY)
+    # Initialize Aster client
+    client = AsterClient(agent_id=ASTER_AGDG_ID, api_key=ASTER_AGDG_KEY)
 
     try:
         # Fetch all open positions
@@ -176,7 +176,7 @@ async def close_profitable_positions(min_profit_pct: float = 0.40, dry_run: bool
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Close profitable Symphony AGDG positions"
+        description="Close profitable Aster AGDG positions"
     )
     parser.add_argument(
         "--dry-run",
