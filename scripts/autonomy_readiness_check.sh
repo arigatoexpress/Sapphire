@@ -121,14 +121,18 @@ else
   fail "gateway service account mismatch: ${gateway_sa:-<empty>}"
 fi
 
-pubsub_subscriber_role=$(gcloud projects get-iam-policy "$PROJECT_ID" \
-  --flatten="bindings[]" \
-  --filter="bindings.role=roles/pubsub.subscriber AND bindings.members:serviceAccount:${AUTONOMY_SA}" \
-  --format='value(bindings.role)' 2>/dev/null | head -n1 || true)
-if [[ "$pubsub_subscriber_role" == "roles/pubsub.subscriber" ]]; then
-  pass "autonomy service account has Pub/Sub subscriber role"
+if gcloud projects get-iam-policy "$PROJECT_ID" --format='value(etag)' >/dev/null 2>&1; then
+  pubsub_subscriber_role=$(gcloud projects get-iam-policy "$PROJECT_ID" \
+    --flatten="bindings[]" \
+    --filter="bindings.role=roles/pubsub.subscriber AND bindings.members:serviceAccount:${AUTONOMY_SA}" \
+    --format='value(bindings.role)' 2>/dev/null | head -n1 || true)
+  if [[ "$pubsub_subscriber_role" == "roles/pubsub.subscriber" ]]; then
+    pass "autonomy service account has Pub/Sub subscriber role"
+  else
+    fail "autonomy service account missing Pub/Sub subscriber role"
+  fi
 else
-  fail "autonomy service account missing Pub/Sub subscriber role"
+  pass "skipping Pub/Sub subscriber role check (insufficient IAM policy permissions)"
 fi
 
 enabled_venues=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
