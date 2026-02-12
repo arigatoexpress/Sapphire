@@ -8,6 +8,7 @@ Design goals:
 """
 
 import asyncio
+import json
 import os
 import re
 from enum import Enum
@@ -280,6 +281,8 @@ class TelegramPlatformBot:
             "- `/autonomy`\n"
             "- `/kill`\n"
             "- `/resume`\n"
+            "- `/approve <session_key> [note]`\n"
+            "- `/reject <session_key> [reason]`\n"
             "- `/deallocate <venue>`\n"
             "- `/allocate <venue> <percent>`\n\n"
             "Owner steering:\n"
@@ -351,6 +354,44 @@ class TelegramPlatformBot:
                 priority=NotificationPriority.HIGH,
             )
             await self._dispatch_callback("CONTROL", directive, "OWNER_STEER", 0.0)
+            return
+
+        # Session decision commands
+        slash_session_decision_match = re.search(
+            r"^/(approve|reject)(?:\s+([A-Za-z0-9:._-]+|latest))?(?:\s+(.+))?$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        mention_session_decision_match = re.search(
+            r"@(alpha|control)\s+(approve|reject)(?:\s+([A-Za-z0-9:._-]+|latest))?(?:\s+(.+))?$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if slash_session_decision_match or mention_session_decision_match:
+            if slash_session_decision_match:
+                raw_action = str(slash_session_decision_match.group(1) or "").strip().lower()
+                session_key = str(slash_session_decision_match.group(2) or "").strip()
+                note = str(slash_session_decision_match.group(3) or "").strip()
+            else:
+                raw_action = str(mention_session_decision_match.group(2) or "").strip().lower()
+                session_key = str(mention_session_decision_match.group(3) or "").strip()
+                note = str(mention_session_decision_match.group(4) or "").strip()
+
+            if len(note) > 400:
+                note = note[:400]
+
+            decision_payload = json.dumps(
+                {"session_key": session_key, "note": note},
+                separators=(",", ":"),
+            )
+            decision_action = "APPROVE_SESSION" if raw_action == "approve" else "REJECT_SESSION"
+            decision_label = "APPROVE" if raw_action == "approve" else "REJECT"
+
+            await self.send_message(
+                f"🗳️ Session decision captured: `{decision_label}` `{session_key or 'latest'}`",
+                priority=NotificationPriority.HIGH,
+            )
+            await self._dispatch_callback("CONTROL", decision_payload, decision_action, 0.0)
             return
 
         # Control commands: /status, /kill, etc.

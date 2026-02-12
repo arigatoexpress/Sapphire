@@ -40,6 +40,8 @@ Supported operator commands in Telegram:
 - `/promotion`
 - `/kill`
 - `/resume`
+- `/approve <session_key> [note]`
+- `/reject <session_key> [reason]`
 - `/deallocate <venue>`
 - `/allocate <venue> <percent>`
 - `/steer <directive>`
@@ -148,6 +150,7 @@ Run:
 ./scripts/frontend_contract_check.sh
 ./scripts/focus_guard.sh
 ./scripts/verify_focused_stack.sh
+./scripts/holistic_ops_check.sh
 ```
 
 ## Web Frontend Deploy

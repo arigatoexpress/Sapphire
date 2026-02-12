@@ -129,6 +129,11 @@ class AlphaEngine:
         self._autonomy_last_dispatch_at = 0.0
         self._autonomy_last_trigger = ""
         self._autonomy_dispatch_count = 0
+        self._autonomy_session_history_max = max(
+            20, int(os.getenv("SAPPHIRE_AUTONOMY_SESSION_HISTORY_MAX", "200"))
+        )
+        self._autonomy_sessions: Dict[str, Dict[str, Any]] = {}
+        self._latest_autonomy_session_key = ""
         self._started_at = time.time()
         self._system_log_max_entries = max(100, int(os.getenv("SYSTEM_LOG_MAX_ENTRIES", "500")))
         self._system_logs: Deque[Dict[str, Any]] = deque(maxlen=self._system_log_max_entries)
@@ -563,11 +568,17 @@ class AlphaEngine:
 
     async def _send_control_status(self) -> None:
         state = dispatcher.get_control_state()
+        pending_sessions = [
+            session
+            for session in self._autonomy_sessions.values()
+            if session.get("decision", "pending") == "pending"
+        ]
         lines = [
             "📊 **CONTROL STATUS**",
             f"Kill switch: `{'ACTIVE' if self._kill_switch_active else 'INACTIVE'}`",
             f"Full autonomy: `{'ON' if self._full_autonomy_enabled else 'OFF'}`",
             f"Autonomy dispatches: `{self._autonomy_dispatch_count}`",
+            f"Pending autonomy decisions: `{len(pending_sessions)}`",
             "",
         ]
         for venue in sorted(state.keys()):
@@ -626,6 +637,7 @@ class AlphaEngine:
             f"Failure pressure: `{total_failures}`\n\n"
             f"Owner directive: `{directive}`\n\n"
             "Reply with `/status`, `/heartbeat`, `/focus`, `/promotion`, `/autonomy`, `/kill`, `/resume`, `/steer <directive>`, `/answer <response>`, "
+            "`/approve <session_key>`, `/reject <session_key> <reason>`, "
             "or `@alpha deallocate <venue>`."
         )
         await self.telegram.send_message(msg, priority="medium")
@@ -650,6 +662,14 @@ class AlphaEngine:
             "autonomy_dispatch_count": self._autonomy_dispatch_count,
             "allowed_repo_scope": sorted(list(getattr(self.tv_autonomy, "allowed_repo_scope", set()))),
             "allowed_project_scope": sorted(list(getattr(self.tv_autonomy, "allowed_project_scope", set()))),
+            "pending_autonomy_sessions": len(
+                [
+                    session
+                    for session in self._autonomy_sessions.values()
+                    if session.get("decision", "pending") == "pending"
+                ]
+            ),
+            "latest_autonomy_session_key": self._latest_autonomy_session_key,
         }
 
     def _autonomy_trigger_reason(self, context: Dict[str, Any]) -> str:
@@ -663,6 +683,78 @@ class AlphaEngine:
         if total_failures > self._trading_gate_max_failure_pressure:
             return "failure_pressure"
         return "scheduled_cycle"
+
+    def _record_autonomy_session(self, session_key: str, trigger: str, instruction: str) -> None:
+        key = str(session_key or "").strip()
+        if not key:
+            return
+
+        now = int(time.time())
+        trimmed_instruction = str(instruction or "").strip()
+        if len(trimmed_instruction) > 260:
+            trimmed_instruction = trimmed_instruction[:257] + "..."
+
+        self._autonomy_sessions[key] = {
+            "session_key": key,
+            "trigger": str(trigger or "").strip(),
+            "instruction": trimmed_instruction,
+            "created_at": now,
+            "decision": "pending",
+            "decision_note": "",
+            "decision_at": 0,
+            "dispatched": True,
+        }
+        self._latest_autonomy_session_key = key
+
+        if len(self._autonomy_sessions) > self._autonomy_session_history_max:
+            oldest = sorted(
+                self._autonomy_sessions.items(),
+                key=lambda item: int(item[1].get("created_at", 0)),
+            )[: len(self._autonomy_sessions) - self._autonomy_session_history_max]
+            for old_key, _ in oldest:
+                self._autonomy_sessions.pop(old_key, None)
+
+    def _resolve_autonomy_session_key(self, raw_session_key: str) -> str:
+        candidate = str(raw_session_key or "").strip()
+        if candidate and candidate.lower() != "latest":
+            return candidate
+
+        if self._latest_autonomy_session_key:
+            latest_entry = self._autonomy_sessions.get(self._latest_autonomy_session_key, {})
+            if latest_entry and latest_entry.get("decision", "pending") == "pending":
+                return self._latest_autonomy_session_key
+
+        pending = [
+            item
+            for item in self._autonomy_sessions.values()
+            if item.get("decision", "pending") == "pending"
+        ]
+        if not pending:
+            return ""
+        pending.sort(key=lambda item: int(item.get("created_at", 0)), reverse=True)
+        return str(pending[0].get("session_key", "")).strip()
+
+    @staticmethod
+    def _parse_session_decision_payload(payload_text: str) -> Dict[str, str]:
+        text = str(payload_text or "").strip()
+        if not text:
+            return {"session_key": "", "note": ""}
+
+        try:
+            parsed = json.loads(text)
+            if isinstance(parsed, dict):
+                return {
+                    "session_key": str(parsed.get("session_key", "")).strip(),
+                    "note": str(parsed.get("note", "")).strip(),
+                }
+        except Exception:
+            pass
+
+        if " " in text:
+            head, tail = text.split(" ", 1)
+            return {"session_key": head.strip(), "note": tail.strip()}
+
+        return {"session_key": text, "note": ""}
 
     async def _dispatch_full_autonomy_cycle(self, trigger: str, force: bool = False) -> Dict[str, Any]:
         if not self._full_autonomy_enabled:
@@ -708,6 +800,8 @@ class AlphaEngine:
             self._autonomy_last_dispatch_at = now
             self._autonomy_last_trigger = trigger
             self._autonomy_dispatch_count += 1
+            session_key = str(hook_result.get("session_key", "")).strip()
+            self._record_autonomy_session(session_key, trigger, instruction)
             self._record_system_log(
                 f"Full autonomy cycle dispatched ({trigger})",
                 level="info",
@@ -718,7 +812,8 @@ class AlphaEngine:
                 (
                     "🤖 Full autonomy cycle dispatched.\n"
                     f"Trigger: `{trigger}`\n"
-                    f"Session: `{hook_result.get('session_key', 'n/a')}`"
+                    f"Session: `{hook_result.get('session_key', 'n/a')}`\n"
+                    "Decision loop: `/approve <session_key>` or `/reject <session_key> <reason>`."
                 ),
                 priority="high",
             )
@@ -751,8 +846,65 @@ class AlphaEngine:
                 logger.error(f"Autonomy loop error: {exc}")
 
     async def _handle_control_command(self, target: str, action: str, value: float) -> None:
-        normalized_target = self._normalize_platform(target or "ALL")
         normalized_action = action.upper()
+
+        if normalized_action in {"APPROVE_SESSION", "REJECT_SESSION"}:
+            decision_payload = self._parse_session_decision_payload(target)
+            session_key = self._resolve_autonomy_session_key(decision_payload.get("session_key", ""))
+            note = str(decision_payload.get("note", "")).strip()
+            decision = "APPROVE" if normalized_action == "APPROVE_SESSION" else "REJECT"
+
+            if not session_key:
+                await self.telegram.send_message(
+                    "⚠️ No pending autonomy session found. Trigger one with `/autonomy` first.",
+                    priority="high",
+                )
+                return
+
+            entry = self._autonomy_sessions.get(session_key, {"session_key": session_key})
+            if len(note) > 400:
+                note = note[:400]
+            entry["decision"] = "approved" if decision == "APPROVE" else "rejected"
+            entry["decision_note"] = note
+            entry["decision_at"] = int(time.time())
+            self._autonomy_sessions[session_key] = entry
+
+            hook_result = await self.tv_autonomy.dispatch_session_decision(
+                session_key=session_key,
+                decision=decision,
+                note=note,
+            )
+            if hook_result.get("dispatched"):
+                await self.telegram.send_message(
+                    (
+                        f"✅ Session `{session_key}` marked `{decision}`.\n"
+                        f"Dispatch: `{hook_result.get('session_key', 'n/a')}`"
+                    ),
+                    priority="high",
+                )
+                self._record_system_log(
+                    f"Owner session decision {decision} for {session_key}",
+                    level="info",
+                    tags=["autonomy", "decision"],
+                    metadata={"session_key": session_key, "decision": decision, "note": note},
+                )
+            else:
+                await self.telegram.send_message(
+                    (
+                        f"⚠️ Session decision captured locally but dispatch failed for `{session_key}`.\n"
+                        f"Reason: `{hook_result.get('reason', 'unknown')}`"
+                    ),
+                    priority="high",
+                )
+                self._record_system_log(
+                    f"Session decision dispatch failed for {session_key}",
+                    level="warning",
+                    tags=["autonomy", "decision"],
+                    metadata={"session_key": session_key, "decision": decision, "reason": hook_result.get("reason", "")},
+                )
+            return
+
+        normalized_target = self._normalize_platform(target or "ALL")
 
         if normalized_action in {"KILL", "HALT", "HALT_TRADING"}:
             await self._activate_kill_switch("Manual command from Telegram")

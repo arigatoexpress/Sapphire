@@ -9,9 +9,9 @@ cd "${ROOT_DIR}"
 echo "== Sapphire Focused Stack Verification =="
 ./scripts/check_required_secrets.sh
 ./scripts/focus_guard.sh
+./scripts/frontend_contract_check.sh
 ./scripts/autonomy_readiness_check.sh
 ./scripts/gcp_scope_reconcile.sh
 
 echo
 echo "Focused stack verification PASSED."
-

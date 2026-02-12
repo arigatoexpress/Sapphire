@@ -313,6 +313,44 @@ class TradingViewAutonomyPlugin:
             agent_id=agent_id,
         )
 
+    async def dispatch_session_decision(
+        self,
+        session_key: str,
+        decision: str,
+        note: str = "",
+        agent_id: str = "",
+    ) -> Dict[str, Any]:
+        session_key = str(session_key or "").strip()
+        normalized_decision = str(decision or "").strip().upper()
+        decision_note = str(note or "").strip()
+
+        if not session_key:
+            return {"dispatched": False, "reason": "session_key_missing"}
+        if normalized_decision not in {"APPROVE", "REJECT"}:
+            return {"dispatched": False, "reason": "invalid_decision"}
+        if len(decision_note) > 400:
+            decision_note = decision_note[:400]
+
+        note_text = (
+            f"Owner session decision for `{session_key}`: `{normalized_decision}`. "
+            f"{self._scope_policy_line()} "
+            "Apply this decision to the active autonomy workflow and acknowledge in Telegram with a concise action summary."
+        )
+        if decision_note:
+            note_text += f" Owner note: {decision_note}"
+
+        payload = {
+            "session_key": session_key,
+            "decision": normalized_decision,
+            "note": decision_note,
+        }
+        return await self._dispatch_to_openclaw(
+            action=f"session_{normalized_decision.lower()}",
+            payload=payload,
+            note=note_text,
+            agent_id=agent_id,
+        )
+
     async def dispatch_environment_instruction(
         self,
         instruction: str,
