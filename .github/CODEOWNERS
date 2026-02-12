@@ -1,0 +1,12 @@
+# Sapphire repository ownership policy
+# Enforced by branch protection: require_code_owner_reviews=true
+
+# Default ownership across the full codebase
+* @arigatoexpress
+
+# Critical automation and infrastructure surfaces
+/.github/workflows/ @arigatoexpress
+/scripts/ @arigatoexpress
+/services/ @arigatoexpress
+/terraform/ @arigatoexpress
+/skills/ @arigatoexpress
