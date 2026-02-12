@@ -1,4 +1,5 @@
 import asyncio
+import os
 import time
 
 from loguru import logger
@@ -11,11 +12,23 @@ class AlphaStrategyEngine:
         self.running = False
         self.min_spread_pct = 0.001  # 0.1%
         self.last_execution_time = 0
+        self.internal_arb_execution_enabled = (
+            os.getenv("INTERNAL_ARB_EXECUTION_ENABLED", "false").strip().lower()
+            in {"1", "true", "yes", "on"}
+        )
+        self.internal_arb_quantity = max(
+            0.0,
+            float(os.getenv("INTERNAL_ARB_EXECUTION_QUANTITY", "0.02")),
+        )
 
     async def start(self):
         self.running = True
         asyncio.create_task(self._arb_loop())
-        logger.info("🧠 Alpha Strategy Engine Started")
+        logger.info(
+            "🧠 Alpha Strategy Engine Started | internal_arb_execution_enabled={} qty={}",
+            self.internal_arb_execution_enabled,
+            self.internal_arb_quantity,
+        )
 
     async def stop(self):
         self.running = False
@@ -38,17 +51,22 @@ class AlphaStrategyEngine:
                                 f"⚡ ARB OPPORTUNITY: Aster={aster_price} Lighter={lighter_price} Spread={spread_pct:.4f}"
                             )
 
-                            # Phase 2.2: Dispatch Execution
-                            from src.execution.dispatcher import dispatcher
+                            if self.internal_arb_execution_enabled:
+                                from src.execution.dispatcher import dispatcher
 
-                            cmd = {
-                                "type": "ARB_EXECUTE",
-                                "side": "BUY" if aster_price < lighter_price else "SELL",
-                                "symbol": "SOL",
-                                "spread": spread_pct,
-                            }
-                            # Example: Send to Aster
-                            await dispatcher.send_command("ASTER", cmd)
+                                cmd = {
+                                    "type": "ARB_EXECUTE",
+                                    "side": "BUY" if aster_price < lighter_price else "SELL",
+                                    "symbol": "SOL",
+                                    "quantity": self.internal_arb_quantity,
+                                    "spread": spread_pct,
+                                    "source": "alpha_internal_arb",
+                                }
+                                await dispatcher.send_command("ASTER", cmd)
+                            else:
+                                logger.info(
+                                    "Internal ARB execution disabled; opportunity observed only."
+                                )
                             self.last_execution_time = now
 
                 # Slower pace for Cloud Run stability (500ms)

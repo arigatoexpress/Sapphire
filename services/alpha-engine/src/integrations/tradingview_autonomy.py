@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import re
@@ -336,25 +337,32 @@ class TradingViewAutonomyPlugin:
             f"service-accounts/default/identity?audience={audience}"
         )
 
-        try:
-            timeout = aiohttp.ClientTimeout(total=8)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(
-                    token_url,
-                    headers={"Metadata-Flavor": "Google"},
-                ) as resp:
-                    if resp.status != 200:
-                        logger.warning(
-                            "Serverless token fetch failed status={} body={}",
-                            resp.status,
-                            (await resp.text())[:200],
-                        )
-                        return {}
-                    token = (await resp.text()).strip()
-                    if not token:
-                        return {}
-        except Exception as exc:
-            logger.warning(f"Serverless token fetch error: {exc}")
+        token = ""
+        last_error = ""
+        for attempt in range(1, 4):
+            try:
+                timeout = aiohttp.ClientTimeout(total=8)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.get(
+                        token_url,
+                        headers={"Metadata-Flavor": "Google"},
+                    ) as resp:
+                        if resp.status == 200:
+                            token = (await resp.text()).strip()
+                            if token:
+                                break
+                            last_error = "empty_token"
+                        else:
+                            body = (await resp.text())[:200]
+                            last_error = f"status={resp.status} body={body}"
+            except Exception as exc:
+                last_error = str(exc)
+
+            if attempt < 3:
+                await asyncio.sleep(0.35 * attempt)
+
+        if not token:
+            logger.warning(f"Serverless token fetch failed after retries: {last_error}")
             return {}
 
         # Metadata tokens are typically valid for ~1h; refresh proactively.

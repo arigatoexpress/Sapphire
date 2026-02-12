@@ -26,16 +26,13 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from .ai_error_recovery import recover_from_error
-from .definitions import ASTER_SYMBOLS, LIGHTER_SYMBOLS, ASTER_SYMBOLS, LIGHTER_SYMBOLS, JUPITER_SYMBOLS
+from .definitions import ASTER_PERP_SYMBOLS, ASTER_SYMBOLS, JUPITER_SYMBOLS, LIGHTER_SYMBOLS
 from .logger import get_logger
 
 logger = get_logger(__name__)
 
 
 class PlatformType(Enum):
-    ASTER = "aster"
-    ASTER = "aster"
-    LIGHTER = "lighter"
     ASTER = "aster"
     LIGHTER = "lighter"
     JUPITER = "jupiter"
@@ -111,18 +108,6 @@ class PlatformRouter:
                     name="aster", failure_threshold=5, recovery_timeout=60.0, timeout=10.0
                 ),
             ),
-            PlatformType.ASTER: get_circuit_breaker(
-                "aster",
-                CircuitBreakerConfig(
-                    name="aster", failure_threshold=5, recovery_timeout=60.0, timeout=15.0
-                ),
-            ),
-            PlatformType.ASTER: get_circuit_breaker(
-                "aster",
-                CircuitBreakerConfig(
-                    name="aster", failure_threshold=5, recovery_timeout=60.0, timeout=10.0
-                ),
-            ),
             PlatformType.LIGHTER: get_circuit_breaker(
                 "lighter",
                 CircuitBreakerConfig(
@@ -164,15 +149,6 @@ class PlatformRouter:
             if getattr(config, 'enable_lighter', False):
                 enabled_platforms.append(PlatformType.LIGHTER)
                 logger.debug(f"  ✓ Lighter enabled")
-            if getattr(config, 'enable_lighter', False):
-                enabled_platforms.append(PlatformType.LIGHTER)
-                logger.debug(f"  ✓ Lighter enabled")
-            if getattr(config, 'enable_aster', False):
-                enabled_platforms.append(PlatformType.ASTER)
-                logger.debug(f"  ✓ Aster enabled")
-            if getattr(config, 'enable_aster', False):
-                enabled_platforms.append(PlatformType.ASTER)
-                logger.debug(f"  ✓ Aster enabled")
             if getattr(config, 'enable_aster', False):
                 enabled_platforms.append(PlatformType.ASTER)
                 logger.debug(f"  ✓ Aster enabled")
@@ -212,9 +188,6 @@ class PlatformRouter:
             if target_sys == "lighter" and symbol in LIGHTER_SYMBOLS:
                 if not enabled_platforms or PlatformType.LIGHTER in enabled_platforms:
                     return PlatformType.LIGHTER
-            if target_sys == "aster" and symbol in ASTER_SYMBOLS:
-                if not enabled_platforms or PlatformType.ASTER in enabled_platforms:
-                    return PlatformType.ASTER
             # CRITICAL FIX: Ignore agent.system="aster" - blocked in US region
             # Fall through to Strategy 2 for smart US-compatible routing
             if target_sys == "aster":
@@ -232,13 +205,7 @@ class PlatformRouter:
             if not enabled_platforms or PlatformType.ASTER in enabled_platforms:
                 return PlatformType.ASTER
 
-        # Aster for exclusive Monad ecosystem tokens
-        if symbol in ASTER_SYMBOLS:
-            if not enabled_platforms or PlatformType.ASTER in enabled_platforms:
-                return PlatformType.ASTER
-
         # Strategy 3A: Route perpetual futures to Aster (Solana native perps)
-        from .definitions import ASTER_PERP_SYMBOLS
         if symbol in ASTER_PERP_SYMBOLS:
             if not enabled_platforms or PlatformType.ASTER in enabled_platforms:
                 logger.info(f"🎯 Routing {symbol} to Aster (Solana perpetuals)")

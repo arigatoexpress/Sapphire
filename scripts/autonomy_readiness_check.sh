@@ -76,10 +76,26 @@ service_ready() {
       else
         pass "$service blocks unauthenticated invoke"
       fi
+    elif [[ "$service" == "$ALPHA_SERVICE" ]]; then
+      if curl -fsS "$url/health" >/dev/null 2>&1; then
+        pass "$service health endpoint"
+      else
+        fail "$service health endpoint unexpected response"
+      fi
     elif curl -fsS "$url/health" >/dev/null 2>&1; then
-      pass "$service health endpoint"
+      fail "$service unexpectedly allows unauthenticated invoke"
     else
-      fail "$service health endpoint unexpected response"
+      local id_token
+      id_token="$(gcloud auth print-identity-token --audiences="$url" 2>/dev/null || true)"
+      if [[ -z "$id_token" ]]; then
+        id_token="$(gcloud auth print-identity-token 2>/dev/null || true)"
+      fi
+      if [[ -n "$id_token" ]] && curl -fsS -H "Authorization: Bearer ${id_token}" "$url/health" >/dev/null 2>&1; then
+        pass "$service authenticated health endpoint"
+        pass "$service blocks unauthenticated invoke"
+      else
+        fail "$service authenticated health endpoint unexpected response"
+      fi
     fi
   else
     fail "$service missing URL"

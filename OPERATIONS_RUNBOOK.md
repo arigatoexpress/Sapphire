@@ -120,11 +120,11 @@ Focused jobs in `us-central1`:
 - `sapphire-alpha-heartbeat-30m` -> sends synthetic `/heartbeat` through alpha webhook every 30 minutes
 - `sapphire-alpha-status-daily` -> sends synthetic `/status` update through alpha webhook daily at `14:15 UTC`
 - `sapphire-alpha-strategy-gate-daily` -> sends `/promotion` through alpha webhook daily at `14:45 UTC`
-- `sapphire-heartbeat-30m` -> Sapphire agent heartbeat hook
-- `obsidian-heartbeat-30m` -> Obsidian agent heartbeat hook
-- `emerald-heartbeat-30m` -> Emerald agent heartbeat hook
-- `sapphire-dep-audit-daily` -> daily dependency audit via gateway hook
-- `sapphire-security-scan-weekly` -> weekly security scan via gateway hook
+- `sapphire-heartbeat-30m` -> Sapphire agent heartbeat via alpha `/tradingview/webhook`
+- `obsidian-heartbeat-30m` -> Obsidian agent heartbeat via alpha `/tradingview/webhook`
+- `emerald-heartbeat-30m` -> Emerald agent heartbeat via alpha `/tradingview/webhook`
+- `sapphire-dep-audit-daily` -> daily dependency audit via alpha `/tradingview/webhook`
+- `sapphire-security-scan-weekly` -> weekly security scan via alpha `/tradingview/webhook`
 
 Idempotent job setup script:
 
@@ -133,7 +133,11 @@ Idempotent job setup script:
 ./scripts/setup_clawdbot_jobs.sh
 ```
 
-Gateway-targeting jobs now use OIDC tokens from `sapphire-main-sa@sapphire-479610.iam.gserviceaccount.com`.
+Scheduler auth model:
+
+- `sapphire-aster-health-6h`, `sapphire-lighter-health-6h`, and `sapphire-gateway-health-6h` use OIDC tokens from `sapphire-main-sa@sapphire-479610.iam.gserviceaccount.com`.
+- OpenClaw employee jobs (`sapphire-heartbeat-30m`, `obsidian-heartbeat-30m`, `emerald-heartbeat-30m`, `sapphire-dep-audit-daily`, `sapphire-security-scan-weekly`) route through `sapphire-alpha` `/tradingview/webhook` with `X-Sapphire-Webhook-Secret`, then dispatch to gateway.
+- `sapphire-aster` and `sapphire-lighter` are authenticated-only Cloud Run services (`roles/run.invoker` limited to `sapphire-main-sa`).
 
 Scope reconciliation (dry-run then apply):
 
@@ -184,6 +188,11 @@ Full-autonomy env controls are applied by deploy defaults:
 - `SAPPHIRE_AUTONOMY_DRY_RUN=false`
 - `SAPPHIRE_AUTONOMY_LOOP_SECONDS=900`
 
+Execution safety controls:
+
+- `TRADINGVIEW_EXECUTION_ENABLED=true` enables strategy/webhook trade dispatch (guarded by strategy + symbol + quantity limits).
+- `INTERNAL_ARB_EXECUTION_ENABLED=false` keeps internal spread loop in observe-only mode unless explicitly enabled.
+
 Expected result for current scope:
 
 - `CONTROL_PLANE` ready
@@ -196,7 +205,8 @@ Immediate safety actions:
 
 1. `/kill` in Telegram to halt and deallocate all enabled venues.
 2. Verify:
-   - `GET /health` for `sapphire-alpha`, `sapphire-aster`, `sapphire-lighter`
+   - `GET /health` for `sapphire-alpha`
+   - run authenticated scheduler probes for `sapphire-aster-health-6h` and `sapphire-lighter-health-6h`
    - latest Cloud Run revision status is `Ready=True`
 3. Resume only after issue triage:
    - `/resume`
@@ -208,7 +218,7 @@ Immediate safety actions:
 gcloud run services list --project sapphire-479610 --platform managed
 gcloud scheduler jobs list --project sapphire-479610 --location us-central1
 curl -sS https://sapphire-alpha-267358751314.us-central1.run.app/health
-curl -sS https://sapphire-aster-267358751314.us-central1.run.app/health
-curl -sS https://sapphire-lighter-267358751314.europe-west1.run.app/health
+gcloud scheduler jobs run sapphire-aster-health-6h --project sapphire-479610 --location us-central1
+gcloud scheduler jobs run sapphire-lighter-health-6h --project sapphire-479610 --location us-central1
 ./scripts/focus_guard.sh
 ```
