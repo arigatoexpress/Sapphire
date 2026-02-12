@@ -48,6 +48,10 @@ Supported operator commands in Telegram:
 - `/reject <session_key> [reason]`
 - `/trade on [qty]` / `/trade off` (runtime execution mode)
 - `/qty <amount>` (runtime default TradingView quantity)
+- `/stage <paper|staged_live|full_live>` (DEX execution stage)
+- `/scout status` (scout bridge readiness)
+- `/scout register <username> [display_name]` (external scout provisioning)
+- `/scout publish <note>` (sanitized external collaboration note)
 - `/deallocate <venue>`
 - `/allocate <venue> <percent>`
 - `/steer <directive>`
@@ -193,6 +197,20 @@ Full-autonomy env controls are applied by deploy defaults:
 - `SAPPHIRE_AUTONOMY_LOOP_SECONDS=900`
 - `TRADINGVIEW_EXECUTION_ENABLED=false` (TradingView remains workbench/dry-run by default)
 - `TRADINGVIEW_DEFAULT_QUANTITY=0.02`
+
+Wire true external Moltbook bridge when endpoint/token credentials are ready:
+
+```bash
+MOLTBOOK_REGISTER_URL='https://<your-moltbook>/api/scout/register' \
+MOLTBOOK_POST_URL='https://<your-moltbook>/api/scout/post' \
+MOLTBOOK_API_TOKEN='<external-api-token>' \
+./scripts/wire_moltbook_bridge.sh
+```
+
+This creates/updates and binds:
+- `SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL`
+- `SAPPHIRE_SCOUT_EXTERNAL_POST_URL`
+- `SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN`
 
 Execution safety controls:
 

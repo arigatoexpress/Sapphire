@@ -53,11 +53,23 @@ PYTHONUNBUFFERED="${PYTHONUNBUFFERED:-1}"
 SAPPHIRE_ALLOWED_REPOS="${SAPPHIRE_ALLOWED_REPOS:-arigatoexpress/Sapphire;Sapphire}"
 SAPPHIRE_ALLOWED_GCP_PROJECTS="${SAPPHIRE_ALLOWED_GCP_PROJECTS:-${PROJECT_ID}}"
 SAPPHIRE_BLOCKED_SCOPE_TERMS="${SAPPHIRE_BLOCKED_SCOPE_TERMS:-sapphireai;sapphire-inc;sapphire_inc}"
+SAPPHIRE_SCOUT_AGENT_ID="${SAPPHIRE_SCOUT_AGENT_ID:-SAPPHIRE_SCOUT}"
+SAPPHIRE_SCOUT_DISPATCH_AGENT_ID="${SAPPHIRE_SCOUT_DISPATCH_AGENT_ID:-sapphire}"
+SAPPHIRE_SCOUT_OPENCLAW_CHAT_ID="${SAPPHIRE_SCOUT_OPENCLAW_CHAT_ID:-${TELEGRAM_CHAT_ID:-}}"
+SAPPHIRE_SCOUT_OPENCLAW_HOOK_URL="${SAPPHIRE_SCOUT_OPENCLAW_HOOK_URL:-${TRADINGVIEW_AUTONOMY_HOOK_URL}}"
+SCOUT_REGISTER_URL_SECRET="${SCOUT_REGISTER_URL_SECRET:-SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL}"
+SCOUT_POST_URL_SECRET="${SCOUT_POST_URL_SECRET:-SAPPHIRE_SCOUT_EXTERNAL_POST_URL}"
+SCOUT_API_TOKEN_SECRET="${SCOUT_API_TOKEN_SECRET:-SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ALPHA_DIR="${ROOT_DIR}/services/alpha-engine"
 IMAGE_URI="${AR_REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${IMAGE_NAME}:${IMAGE_TAG}"
 IMAGE_LATEST="${AR_REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${IMAGE_NAME}:latest"
+
+has_secret() {
+  local name="$1"
+  gcloud secrets describe "${name}" --project "${PROJECT_ID}" >/dev/null 2>&1
+}
 
 echo "== Sapphire Alpha Deploy =="
 echo "Project: ${PROJECT_ID}"
@@ -118,7 +130,41 @@ gcloud run deploy "${SERVICE_NAME}" \
   --update-env-vars "TRADINGVIEW_DEFAULT_QUANTITY=${TRADINGVIEW_DEFAULT_QUANTITY}" \
   --update-env-vars "SAPPHIRE_ALLOWED_REPOS=${SAPPHIRE_ALLOWED_REPOS}" \
   --update-env-vars "SAPPHIRE_ALLOWED_GCP_PROJECTS=${SAPPHIRE_ALLOWED_GCP_PROJECTS}" \
-  --update-env-vars "SAPPHIRE_BLOCKED_SCOPE_TERMS=${SAPPHIRE_BLOCKED_SCOPE_TERMS}"
+  --update-env-vars "SAPPHIRE_BLOCKED_SCOPE_TERMS=${SAPPHIRE_BLOCKED_SCOPE_TERMS}" \
+  --update-env-vars "SAPPHIRE_SCOUT_AGENT_ID=${SAPPHIRE_SCOUT_AGENT_ID}" \
+  --update-env-vars "SAPPHIRE_SCOUT_DISPATCH_AGENT_ID=${SAPPHIRE_SCOUT_DISPATCH_AGENT_ID}" \
+  --update-env-vars "SAPPHIRE_SCOUT_OPENCLAW_HOOK_URL=${SAPPHIRE_SCOUT_OPENCLAW_HOOK_URL}"
+
+if [[ -n "${SAPPHIRE_SCOUT_OPENCLAW_CHAT_ID}" ]]; then
+  gcloud run services update "${SERVICE_NAME}" \
+    --project "${PROJECT_ID}" \
+    --region "${REGION}" \
+    --update-env-vars "SAPPHIRE_SCOUT_OPENCLAW_CHAT_ID=${SAPPHIRE_SCOUT_OPENCLAW_CHAT_ID}" >/dev/null
+  echo "Applied explicit SAPPHIRE_SCOUT_OPENCLAW_CHAT_ID override."
+fi
+
+SCOUT_SECRET_MAPPINGS=()
+if has_secret "${SCOUT_REGISTER_URL_SECRET}"; then
+  SCOUT_SECRET_MAPPINGS+=("SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL=${SCOUT_REGISTER_URL_SECRET}:latest")
+fi
+if has_secret "${SCOUT_POST_URL_SECRET}"; then
+  SCOUT_SECRET_MAPPINGS+=("SAPPHIRE_SCOUT_EXTERNAL_POST_URL=${SCOUT_POST_URL_SECRET}:latest")
+fi
+if has_secret "${SCOUT_API_TOKEN_SECRET}"; then
+  SCOUT_SECRET_MAPPINGS+=("SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN=${SCOUT_API_TOKEN_SECRET}:latest")
+fi
+
+if [[ "${#SCOUT_SECRET_MAPPINGS[@]}" -gt 0 ]]; then
+  SCOUT_SECRET_ARG="$(IFS=,; echo "${SCOUT_SECRET_MAPPINGS[*]}")"
+  echo "Applying scout external bridge secrets to ${SERVICE_NAME}: ${SCOUT_SECRET_ARG}"
+  gcloud run services update "${SERVICE_NAME}" \
+    --project "${PROJECT_ID}" \
+    --region "${REGION}" \
+    --update-secrets "${SCOUT_SECRET_ARG}" >/dev/null
+  echo "Scout external bridge secret bindings applied."
+else
+  echo "Scout external bridge secrets not found yet; keeping OpenClaw fallback active."
+fi
 
 SERVICE_URL="$(gcloud run services describe "${SERVICE_NAME}" --project "${PROJECT_ID}" --region "${REGION}" --format='value(status.url)')"
 echo
