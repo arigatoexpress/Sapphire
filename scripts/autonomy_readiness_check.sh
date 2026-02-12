@@ -175,6 +175,22 @@ else
   fail "alpha TradingView strategy rules missing"
 fi
 
+tv_execution_enabled=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
+  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_EXECUTION_ENABLED") | .value // empty')
+if [[ "$tv_execution_enabled" == "true" ]]; then
+  pass "alpha TradingView execution enabled"
+else
+  fail "alpha TradingView execution disabled: ${tv_execution_enabled:-<empty>}"
+fi
+
+tv_default_quantity=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
+  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_DEFAULT_QUANTITY") | .value // empty')
+if [[ -n "$tv_default_quantity" ]] && awk "BEGIN {exit !($tv_default_quantity > 0)}"; then
+  pass "alpha TradingView default quantity > 0"
+else
+  fail "alpha TradingView default quantity invalid: ${tv_default_quantity:-<empty>}"
+fi
+
 tv_autonomy_enabled=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
   | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_AUTONOMY_ENABLED") | .value // empty')
 if [[ "$tv_autonomy_enabled" == "true" ]]; then

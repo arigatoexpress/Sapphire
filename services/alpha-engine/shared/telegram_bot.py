@@ -392,6 +392,8 @@ class TelegramPlatformBot:
             "- `/approve <session_key> [note]`\n"
             "- `/approve_all [note]`\n"
             "- `/reject <session_key> [reason]`\n"
+            "- `/trade on [qty]` / `/trade off`\n"
+            "- `/qty <amount>`\n"
             "- `/deallocate <venue>`\n"
             "- `/allocate <venue> <percent>`\n\n"
             "Owner steering:\n"
@@ -526,6 +528,82 @@ class TelegramPlatformBot:
                 priority=NotificationPriority.HIGH,
             )
             await self._dispatch_callback("CONTROL", decision_payload, decision_action, 0.0)
+            return
+
+        # Trading execution mode commands
+        slash_trade_mode_match = re.search(
+            r"^/(trade|execution)\s+(on|off)(?:\s+([\d.]+))?$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        mention_trade_mode_match = re.search(
+            r"@(alpha|control)\s+(trade|execution)\s+(on|off)(?:\s+([\d.]+))?$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if slash_trade_mode_match or mention_trade_mode_match:
+            if slash_trade_mode_match:
+                mode_text = str(slash_trade_mode_match.group(2) or "").strip().upper()
+                qty_text = str(slash_trade_mode_match.group(3) or "").strip()
+            else:
+                mode_text = str(mention_trade_mode_match.group(3) or "").strip().upper()
+                qty_text = str(mention_trade_mode_match.group(4) or "").strip()
+
+            qty_value = 0.0
+            if qty_text:
+                try:
+                    qty_value = float(qty_text)
+                except ValueError:
+                    await self.send_message(
+                        "❌ Trade mode quantity must be numeric.",
+                        priority=NotificationPriority.HIGH,
+                    )
+                    return
+
+            enabled = mode_text == "ON"
+            await self.send_message(
+                (
+                    f"🧭 Trade execution mode requested: `{'LIVE' if enabled else 'PAUSED'}`"
+                    + (f" | qty `{qty_value}`" if qty_value > 0 else "")
+                ),
+                priority=NotificationPriority.HIGH,
+            )
+            await self._dispatch_callback("CONTROL", mode_text, "SET_TRADING_EXECUTION", qty_value)
+            return
+
+        # Default TradingView quantity command
+        slash_qty_match = re.search(
+            r"^/(qty|quantity)\s+([\d.]+)$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        mention_qty_match = re.search(
+            r"@(alpha|control)\s+(qty|quantity)\s+([\d.]+)$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if slash_qty_match or mention_qty_match:
+            raw_qty = slash_qty_match.group(2) if slash_qty_match else mention_qty_match.group(3)
+            try:
+                qty_value = float(raw_qty)
+            except (TypeError, ValueError):
+                await self.send_message(
+                    "❌ Quantity must be numeric.",
+                    priority=NotificationPriority.HIGH,
+                )
+                return
+            if qty_value <= 0:
+                await self.send_message(
+                    "❌ Quantity must be greater than zero.",
+                    priority=NotificationPriority.HIGH,
+                )
+                return
+
+            await self.send_message(
+                f"🧭 Default TradingView quantity update requested: `{qty_value}`",
+                priority=NotificationPriority.HIGH,
+            )
+            await self._dispatch_callback("CONTROL", "ALL", "SET_TRADINGVIEW_DEFAULT_QUANTITY", qty_value)
             return
 
         # Control commands: /status, /kill, etc.

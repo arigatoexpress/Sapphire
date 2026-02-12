@@ -46,6 +46,8 @@ Supported operator commands in Telegram:
 - `/approve <session_key> [note]`
 - `/approve_all [note]` (approve all pending autonomy sessions)
 - `/reject <session_key> [reason]`
+- `/trade on [qty]` / `/trade off` (runtime execution mode)
+- `/qty <amount>` (runtime default TradingView quantity)
 - `/deallocate <venue>`
 - `/allocate <venue> <percent>`
 - `/steer <directive>`
@@ -189,6 +191,8 @@ Full-autonomy env controls are applied by deploy defaults:
 - `SAPPHIRE_AUTONOMY_DRY_RUN=false`
 - `SAPPHIRE_AUTONOMY_REQUIRE_OWNER_APPROVAL=false` (auto-approve autonomy sessions)
 - `SAPPHIRE_AUTONOMY_LOOP_SECONDS=900`
+- `TRADINGVIEW_EXECUTION_ENABLED=true`
+- `TRADINGVIEW_DEFAULT_QUANTITY=0.02`
 
 Execution safety controls:
 

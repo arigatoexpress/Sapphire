@@ -275,6 +275,53 @@ class AlphaEngine:
             return self._tradingview_max_quantity_default
         return None
 
+    def _effective_trade_quantity_cap(self) -> float | None:
+        caps: List[float] = []
+        for venue in dispatcher.bot_urls.keys():
+            venue_cap = self._max_quantity_for_venue(venue)
+            if venue_cap is not None and venue_cap > 0:
+                caps.append(float(venue_cap))
+
+        for rule in self._tradingview_strategy_rules.values():
+            strategy_cap = rule.get("max_quantity")
+            if isinstance(strategy_cap, (int, float)) and float(strategy_cap) > 0:
+                caps.append(float(strategy_cap))
+
+        return min(caps) if caps else None
+
+    def _recommended_default_trade_quantity(self) -> float:
+        base = 0.02
+        cap = self._effective_trade_quantity_cap()
+        if cap is None:
+            return base
+        return round(max(0.001, min(base, float(cap))), 8)
+
+    def _set_tradingview_default_quantity(self, requested_quantity: float) -> Dict[str, Any]:
+        requested = max(0.0, float(requested_quantity))
+        if requested <= 0:
+            return {
+                "ok": False,
+                "reason": "quantity_must_be_positive",
+                "requested": requested,
+            }
+
+        cap = self._effective_trade_quantity_cap()
+        applied = requested
+        capped = False
+        if cap is not None and applied > cap:
+            applied = float(cap)
+            capped = True
+
+        applied = round(applied, 8)
+        self._tradingview_default_quantity = applied
+        return {
+            "ok": True,
+            "requested": requested,
+            "applied": applied,
+            "capped": capped,
+            "cap": cap,
+        }
+
     def _parse_strategy_rules(self, raw_value: str) -> Dict[str, Dict[str, Any]]:
         if not raw_value:
             return {}
@@ -356,9 +403,9 @@ class AlphaEngine:
                 "Strategy rules not enforced or missing",
             ),
             (
-                "TradingView execution still dry-run",
-                not self._tradingview_execution_enabled,
-                "TRADINGVIEW_EXECUTION_ENABLED=true",
+                "TradingView execution enabled",
+                self._tradingview_execution_enabled,
+                "TRADINGVIEW_EXECUTION_ENABLED is not true",
             ),
             (
                 "TradingView autonomy plugin enabled",
@@ -580,6 +627,8 @@ class AlphaEngine:
             "📊 **CONTROL STATUS**",
             f"Kill switch: `{'ACTIVE' if self._kill_switch_active else 'INACTIVE'}`",
             f"Full autonomy: `{'ON' if self._full_autonomy_enabled else 'OFF'}`",
+            f"TradingView execution: `{'LIVE' if self._tradingview_execution_enabled else 'DRY-RUN'}`",
+            f"Default quantity: `{self._tradingview_default_quantity}`",
             f"Autonomy dispatches: `{self._autonomy_dispatch_count}`",
             f"Pending autonomy decisions: `{len(pending_sessions)}`",
             "",
@@ -642,6 +691,8 @@ class AlphaEngine:
             f"Kill switch: `{'ACTIVE' if self._kill_switch_active else 'OFF'}` | "
             f"Autonomy: `{'ON' if self._full_autonomy_enabled else 'OFF'}` | "
             f"Approvals: `{'OWNER' if self._autonomy_require_owner_approval else 'AUTO'}`\n"
+            f"Execution: `{'LIVE' if self._tradingview_execution_enabled else 'DRY-RUN'}` | "
+            f"Default qty: `{self._tradingview_default_quantity}`\n"
             f"Pending approvals: `{pending_count}` | Failure pressure: `{total_failures}`\n"
             f"Directive: `{directive}`\n"
             "Quick actions: `/status` `/focus` `/autonomy` `/approve_all`\n"
@@ -953,6 +1004,98 @@ class AlphaEngine:
 
     async def _handle_control_command(self, target: str, action: str, value: float) -> None:
         normalized_action = action.upper()
+
+        if normalized_action in {"SET_TRADING_EXECUTION", "SET_EXECUTION"}:
+            mode = str(target or "").strip().upper()
+            if mode not in {"ON", "OFF", "TRUE", "FALSE", "1", "0"}:
+                await self.telegram.send_message(
+                    "❌ Invalid trade execution mode. Use `/trade on [qty]` or `/trade off`.",
+                    priority="high",
+                )
+                return
+
+            enable_execution = mode in {"ON", "TRUE", "1"}
+            quantity_value = max(0.0, float(value or 0.0))
+            quantity_result: Dict[str, Any] | None = None
+
+            self._tradingview_execution_enabled = enable_execution
+            if enable_execution:
+                if quantity_value > 0:
+                    quantity_result = self._set_tradingview_default_quantity(quantity_value)
+                elif self._tradingview_default_quantity <= 0:
+                    quantity_result = self._set_tradingview_default_quantity(
+                        self._recommended_default_trade_quantity()
+                    )
+            self._record_system_log(
+                (
+                    f"TradingView execution mode set to {'LIVE' if enable_execution else 'DRY-RUN'}"
+                    + (
+                        f" (qty={self._tradingview_default_quantity})"
+                        if enable_execution
+                        else ""
+                    )
+                ),
+                level="warning",
+                tags=["control", "execution_mode"],
+                metadata={
+                    "execution_enabled": enable_execution,
+                    "default_quantity": self._tradingview_default_quantity,
+                },
+            )
+
+            if enable_execution:
+                qty_note = f"Default qty `{self._tradingview_default_quantity}`."
+                if quantity_result and quantity_result.get("capped"):
+                    qty_note = (
+                        f"Default qty capped to `{quantity_result.get('applied')}` "
+                        f"(cap `{quantity_result.get('cap')}`)."
+                    )
+                await self.telegram.send_message(
+                    f"✅ TradingView execution mode: `LIVE`. {qty_note}",
+                    priority="high",
+                )
+            else:
+                await self.telegram.send_message(
+                    "🛑 TradingView execution mode: `DRY-RUN` (signals observed but not executed).",
+                    priority="high",
+                )
+            return
+
+        if normalized_action in {"SET_TRADINGVIEW_DEFAULT_QUANTITY", "SET_DEFAULT_QUANTITY"}:
+            result = self._set_tradingview_default_quantity(float(value or 0.0))
+            if not result.get("ok"):
+                await self.telegram.send_message(
+                    "❌ Default quantity must be greater than zero.",
+                    priority="high",
+                )
+                return
+
+            self._record_system_log(
+                "TradingView default quantity updated",
+                level="warning",
+                tags=["control", "execution_mode"],
+                metadata={
+                    "requested_quantity": result.get("requested"),
+                    "applied_quantity": result.get("applied"),
+                    "capped": bool(result.get("capped")),
+                    "cap": result.get("cap"),
+                },
+            )
+            if result.get("capped"):
+                await self.telegram.send_message(
+                    (
+                        f"⚠️ Default quantity capped to `{result.get('applied')}` "
+                        f"(requested `{result.get('requested')}`, cap `{result.get('cap')}`)."
+                    ),
+                    priority="high",
+                )
+            else:
+                live_note = "LIVE" if self._tradingview_execution_enabled else "DRY-RUN"
+                await self.telegram.send_message(
+                    f"✅ Default TradingView quantity set to `{result.get('applied')}` (mode `{live_note}`).",
+                    priority="high",
+                )
+            return
 
         if normalized_action == "APPROVE_ALL_SESSIONS":
             decision_payload = self._parse_session_decision_payload(target)

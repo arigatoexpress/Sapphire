@@ -145,6 +145,62 @@ def test_digest_builder_summarizes_and_groups_repeated_updates(telegram_module):
     assert all("Reply with /status" not in line for line in lines)
 
 
+def test_trade_mode_command_dispatches_execution_toggle(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {
+                "message": {
+                    "chat": {"id": "12345"},
+                    "text": "/trade on 0.03",
+                }
+            }
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert symbol == "ON"
+    assert action == "SET_TRADING_EXECUTION"
+    assert quantity == 0.03
+
+
+def test_qty_command_dispatches_default_quantity_update(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {
+                "message": {
+                    "chat": {"id": "12345"},
+                    "text": "/qty 0.05",
+                }
+            }
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert symbol == "ALL"
+    assert action == "SET_TRADINGVIEW_DEFAULT_QUANTITY"
+    assert quantity == 0.05
+
+
 def test_answer_alias_still_routes_to_owner_steer(telegram_module):
     callback = AsyncMock()
     bot = telegram_module.TelegramPlatformBot(
