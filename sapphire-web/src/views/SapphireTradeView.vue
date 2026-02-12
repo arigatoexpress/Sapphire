@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import TradingChart from '../components/TradingChart.vue'
 import { fetchPlatformStatus, fetchSystemLogs } from '../api/client'
 
 interface VenueCard {
@@ -8,6 +9,7 @@ interface VenueCard {
     status: 'online' | 'degraded' | 'offline'
     mode: string
     notes: string
+    price: number | null
 }
 
 const venues = ref<VenueCard[]>([
@@ -16,24 +18,46 @@ const venues = ref<VenueCard[]>([
         label: 'ASTER',
         status: 'offline',
         mode: 'Awaiting telemetry',
-        notes: 'Perps execution lane',
+        notes: 'Execution lane',
+        price: null,
     },
     {
         id: 'lighter',
         label: 'LIGHTER',
         status: 'offline',
         mode: 'Awaiting telemetry',
-        notes: 'Execution + liquidity lane',
+        notes: 'Liquidity lane',
+        price: null,
     },
 ])
 
 const recentOps = ref<string[]>([])
 const loading = ref(true)
+const lastRefreshEpoch = ref(0)
+const nowEpoch = ref(Date.now())
 let refreshTimer: ReturnType<typeof setInterval> | null = null
+let clockTimer: ReturnType<typeof setInterval> | null = null
 
 const statusClass = (status: VenueCard['status']) => `status-${status}`
 
 const healthyCount = computed(() => venues.value.filter((venue) => venue.status === 'online').length)
+
+const portfolioPosture = computed(() => {
+    if (healthyCount.value === venues.value.length) return 'Dual-venue live'
+    if (healthyCount.value > 0) return 'Single-venue guarded'
+    return 'Fail-safe hold'
+})
+
+const refreshAge = computed(() => {
+    if (!lastRefreshEpoch.value) return 'sync pending'
+    return `${Math.max(0, Math.round((nowEpoch.value - lastRefreshEpoch.value) / 1000))}s ago`
+})
+
+const chartBasePrice = computed(() => {
+    const valid = venues.value.map((item) => item.price).filter((price): price is number => typeof price === 'number')
+    if (valid.length === 0) return 80
+    return valid.reduce((sum, value) => sum + value, 0) / valid.length
+})
 
 const normalizeVenueStatus = (value: unknown): VenueCard['status'] => {
     if (typeof value !== 'string') return 'offline'
@@ -43,6 +67,12 @@ const normalizeVenueStatus = (value: unknown): VenueCard['status'] => {
     return 'offline'
 }
 
+const toPrice = (value: unknown): number | null => {
+    const numeric = Number(value)
+    if (!Number.isFinite(numeric) || numeric <= 0) return null
+    return numeric
+}
+
 const applyPlatformPayload = (payload: any) => {
     const entries = payload?.platforms || payload?.data || payload || {}
     const next = [...venues.value]
@@ -50,9 +80,10 @@ const applyPlatformPayload = (payload: any) => {
     next.forEach((venue, index) => {
         const raw = entries?.[venue.id] ?? {}
         const status = normalizeVenueStatus(raw?.status ?? raw?.health)
-        const mode = raw?.mode || raw?.routing || (status === 'online' ? 'Autonomous execution ready' : 'Waiting for heartbeat')
+        const mode = raw?.mode || raw?.routing || (status === 'online' ? 'Autonomous ready' : 'Waiting heartbeat')
         const notes = raw?.note || raw?.message || venue.notes
-        next[index] = { ...venue, status, mode, notes }
+        const price = toPrice(raw?.price ?? raw?.mark_price ?? raw?.markPrice ?? raw?.mid_price ?? raw?.midPrice)
+        next[index] = { ...venue, status, mode, notes, price }
     })
 
     venues.value = next
@@ -60,19 +91,19 @@ const applyPlatformPayload = (payload: any) => {
 
 const loadOpsView = async () => {
     try {
-        const [platforms, logs] = await Promise.all([
-            fetchPlatformStatus(),
-            fetchSystemLogs(),
-        ])
+        const [platforms, logs] = await Promise.all([fetchPlatformStatus(), fetchSystemLogs()])
 
         if (platforms) applyPlatformPayload(platforms)
         if (Array.isArray(logs)) {
             recentOps.value = logs
                 .map((entry: any) => entry?.message || entry?.msg || String(entry))
-                .filter((message: string) => /aster|lighter|deploy|risk|position|execution/i.test(message))
-                .slice(-6)
+                .filter((message: string) =>
+                    /aster|lighter|deploy|risk|position|execution|promotion|allocation|heartbeat/i.test(message),
+                )
+                .slice(-8)
                 .reverse()
         }
+        lastRefreshEpoch.value = Date.now()
     } catch (error) {
         console.error('Failed to load trade view data:', error)
     } finally {
@@ -83,38 +114,67 @@ const loadOpsView = async () => {
 onMounted(() => {
     loadOpsView()
     refreshTimer = setInterval(loadOpsView, 12000)
+    clockTimer = setInterval(() => {
+        nowEpoch.value = Date.now()
+    }, 1000)
 })
 
 onUnmounted(() => {
     if (refreshTimer) clearInterval(refreshTimer)
+    if (clockTimer) clearInterval(clockTimer)
 })
 </script>
 
 <template>
-    <div class="trade-view">
-        <section class="hero card">
-            <h2 class="font-mono">SapphireTrade</h2>
-            <p>Operational execution for ASTER and LIGHTER with read-only telemetry. All overrides and trade instructions route through Telegram heartbeat.</p>
+    <div class="trade-view fade-in">
+        <section class="hero card glass-lift">
+            <div class="hero-copy">
+                <span class="font-mono kicker">SAPPHIRETRADE</span>
+                <h2>Autonomous execution board for ASTER + LIGHTER.</h2>
+                <p>Web controls remain read-only. Execution commands and overrides are routed through Telegram heartbeat.</p>
+            </div>
             <div class="health-line">
                 <span class="chip">
                     Healthy venues: {{ healthyCount }}/{{ venues.length }}
                 </span>
                 <span class="chip muted">
-                    Web control disabled
+                    Posture: {{ portfolioPosture }}
+                </span>
+                <span class="chip muted">
+                    Sync: {{ refreshAge }}
                 </span>
             </div>
         </section>
 
-        <section class="venues-grid">
-            <article v-for="venue in venues" :key="venue.id" class="venue-card card">
+        <section class="grid">
+            <article class="chart-panel card glass-lift">
                 <header>
-                    <h3 class="font-mono">{{ venue.label }}</h3>
-                    <span class="status-pill font-mono" :class="statusClass(venue.status)">
-                        {{ venue.status.toUpperCase() }}
-                    </span>
+                    <h3 class="font-mono">Cross-Venue Price Pulse</h3>
+                    <small>Synthetic display seeded from latest venue prices</small>
                 </header>
-                <p class="mode">{{ venue.mode }}</p>
-                <p class="notes">{{ venue.notes }}</p>
+                <TradingChart :base-price="chartBasePrice" :height="300" />
+            </article>
+
+            <article class="venue-board card">
+                <header>
+                    <h3 class="font-mono">Venue State</h3>
+                    <small>read-only telemetry</small>
+                </header>
+                <div class="venues-grid">
+                    <article v-for="venue in venues" :key="venue.id" class="venue-card glass-lift">
+                        <header>
+                            <h4 class="font-mono">{{ venue.label }}</h4>
+                            <span class="status-pill font-mono" :class="statusClass(venue.status)">
+                                {{ venue.status.toUpperCase() }}
+                            </span>
+                        </header>
+                        <strong class="price">
+                            {{ venue.price === null ? 'n/a' : `$${venue.price.toFixed(3)}` }}
+                        </strong>
+                        <p class="mode">{{ venue.mode }}</p>
+                        <p class="notes">{{ venue.notes }}</p>
+                    </article>
+                </div>
             </article>
         </section>
 
@@ -126,9 +186,7 @@ onUnmounted(() => {
             <ul v-if="recentOps.length > 0">
                 <li v-for="(line, idx) in recentOps" :key="idx">{{ line }}</li>
             </ul>
-            <p v-else class="empty">
-                Waiting for execution telemetry from runtime logs.
-            </p>
+            <p v-else class="empty">Waiting for execution telemetry from runtime logs.</p>
         </section>
     </div>
 </template>
@@ -136,104 +194,150 @@ onUnmounted(() => {
 <style scoped>
 .trade-view {
     display: grid;
-    gap: 1rem;
+    gap: 0.9rem;
 }
 
 .hero {
-    border-radius: 14px;
+    display: grid;
+    gap: 0.76rem;
     background:
-        radial-gradient(circle at 85% 15%, rgba(20, 184, 166, 0.2), transparent 48%),
-        rgba(8, 15, 23, 0.88);
+        radial-gradient(circle at 92% 8%, rgba(52, 181, 255, 0.18), transparent 44%),
+        linear-gradient(125deg, rgba(8, 24, 43, 0.9), rgba(7, 22, 39, 0.78));
+}
+
+.kicker {
+    color: #9de4ff;
+    letter-spacing: 0.08em;
+    font-size: 0.65rem;
 }
 
 .hero h2 {
-    margin: 0 0 0.3rem;
+    margin: 0.34rem 0 0.28rem;
+    font-size: 1.1rem;
 }
 
 .hero p {
     margin: 0;
     color: var(--text-secondary);
-    max-width: 74ch;
+    max-width: 72ch;
 }
 
 .health-line {
-    margin-top: 0.85rem;
     display: flex;
-    gap: 0.55rem;
+    gap: 0.42rem;
     flex-wrap: wrap;
 }
 
 .chip {
     border-radius: 999px;
-    padding: 0.2rem 0.6rem;
+    padding: 0.2rem 0.57rem;
     font-size: 0.74rem;
-    border: 1px solid rgba(16, 185, 129, 0.45);
-    color: #6ee7b7;
+    border: 1px solid rgba(23, 200, 136, 0.55);
+    color: #78efbf;
 }
 
 .chip.muted {
-    border-color: rgba(56, 189, 248, 0.4);
-    color: #7dd3fc;
+    border-color: rgba(95, 181, 241, 0.56);
+    color: #9cdcff;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    gap: 0.8rem;
+}
+
+.chart-panel,
+.venue-board {
+    background: rgba(8, 22, 40, 0.74);
+}
+
+.chart-panel header,
+.venue-board header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 0.72rem;
+    gap: 0.65rem;
+}
+
+.chart-panel h3,
+.venue-board h3 {
+    margin: 0;
+}
+
+.chart-panel small,
+.venue-board small {
+    color: var(--text-tertiary);
+    font-size: 0.72rem;
 }
 
 .venues-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 0.8rem;
+    gap: 0.6rem;
 }
 
 .venue-card {
-    border-radius: 12px;
-    background: rgba(7, 13, 23, 0.84);
+    border: 1px solid rgba(126, 185, 232, 0.26);
+    border-radius: var(--radius-md);
+    background: rgba(8, 22, 40, 0.7);
+    padding: 0.72rem;
 }
 
 .venue-card header {
     display: flex;
     justify-content: space-between;
-    gap: 0.6rem;
     align-items: center;
+    gap: 0.55rem;
+    margin-bottom: 0.4rem;
 }
 
-.venue-card h3 {
+.venue-card h4 {
     margin: 0;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
+}
+
+.price {
+    font-size: 1.02rem;
+    color: #d8efff;
 }
 
 .status-pill {
-    font-size: 0.64rem;
+    font-size: 0.62rem;
     border-radius: 999px;
-    padding: 0.2rem 0.55rem;
+    padding: 0.2rem 0.5rem;
 }
 
 .status-online {
-    background: rgba(16, 185, 129, 0.16);
-    color: #6ee7b7;
+    background: rgba(23, 200, 136, 0.17);
+    color: #78efbf;
 }
 
 .status-degraded {
-    background: rgba(245, 158, 11, 0.17);
-    color: #fcd34d;
+    background: rgba(244, 180, 68, 0.2);
+    color: #ffd79a;
 }
 
 .status-offline {
-    background: rgba(248, 113, 113, 0.16);
-    color: #fda4af;
+    background: rgba(255, 116, 116, 0.2);
+    color: #ffb1b1;
 }
 
 .mode {
-    margin: 0.7rem 0 0;
-    color: #e2e8f0;
+    margin: 0.44rem 0 0;
+    color: #d9efff;
+    font-size: 0.84rem;
 }
 
 .notes {
-    margin: 0.45rem 0 0;
+    margin: 0.4rem 0 0;
     color: var(--text-secondary);
-    font-size: 0.85rem;
+    font-size: 0.78rem;
 }
 
 .ops-log {
-    border-radius: 12px;
-    background: rgba(7, 13, 23, 0.84);
+    border-radius: var(--radius-lg);
+    background: rgba(8, 22, 40, 0.74);
 }
 
 .ops-log header {
@@ -241,7 +345,7 @@ onUnmounted(() => {
     justify-content: space-between;
     align-items: center;
     gap: 0.6rem;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.66rem;
 }
 
 .ops-log h3 {
@@ -257,16 +361,22 @@ onUnmounted(() => {
     margin: 0;
     padding-left: 1rem;
     display: grid;
-    gap: 0.4rem;
-    color: #d1d5db;
+    gap: 0.38rem;
+    color: #d7ebfe;
 }
 
 .ops-log li {
-    font-size: 0.84rem;
+    font-size: 0.82rem;
 }
 
 .empty {
     margin: 0;
     color: var(--text-secondary);
+}
+
+@media (max-width: 1120px) {
+    .grid {
+        grid-template-columns: 1fr;
+    }
 }
 </style>

@@ -18,6 +18,34 @@ class MarketDataAggregator:
         }
         self.running = False
 
+        self._aster_symbol = str(os.getenv("ASTER_SYMBOL", "SOLUSDT")).strip().upper() or "SOLUSDT"
+        self._aster_ticker_url = str(
+            os.getenv(
+                "ASTER_TICKER_URL",
+                f"https://fapi.asterdex.com/fapi/v1/ticker/price?symbol={self._aster_symbol}",
+            )
+        ).strip()
+        self._aster_mark_price_url = str(
+            os.getenv(
+                "ASTER_MARK_PRICE_URL",
+                f"https://fapi.asterdex.com/fapi/v1/premiumIndex?symbol={self._aster_symbol}",
+            )
+        ).strip()
+        self._aster_book_ticker_url = str(
+            os.getenv(
+                "ASTER_BOOK_TICKER_URL",
+                f"https://fapi.asterdex.com/fapi/v1/ticker/bookTicker?symbol={self._aster_symbol}",
+            )
+        ).strip()
+        self._aster_poll_interval_seconds = self._env_float(
+            "ASTER_POLL_INTERVAL_SECONDS", 2.0, minimum=0.5
+        )
+        self._aster_http_timeout_seconds = self._env_float(
+            "ASTER_HTTP_TIMEOUT_SECONDS", 8.0, minimum=1.0
+        )
+        self._aster_last_issue = ""
+        self._aster_last_issue_ts = 0.0
+
         self._lighter_market_symbol = str(
             os.getenv("LIGHTER_MARKET_SYMBOL", "SOL")
         ).strip().upper() or "SOL"
@@ -87,16 +115,60 @@ class MarketDataAggregator:
         return self.prices.get(venue, {}).get(symbol, 0.0)
 
     async def _aster_feed(self):
-        """Simulated Aster WS Feed (replace with actual Aster WS protocol)."""
-        logger.info("🌊 Connecting to Aster Feed...")
-        while self.running:
+        """Aster market feed via public REST endpoints."""
+        logger.info(f"🌊 Aster feed starting (symbol={self._aster_symbol})")
+        timeout = aiohttp.ClientTimeout(total=self._aster_http_timeout_seconds)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            while self.running:
+                try:
+                    price = await self._fetch_aster_price(session)
+                    if price is not None and price > 0:
+                        self.prices["ASTER"]["SOL"] = price
+                        self._clear_aster_issue()
+                    else:
+                        self._log_aster_issue("Aster poll returned no usable price.")
+                except Exception as exc:
+                    self._log_aster_issue(f"Aster poll error: {exc}")
+                await asyncio.sleep(self._aster_poll_interval_seconds)
+
+    async def _fetch_aster_price(self, session: aiohttp.ClientSession) -> Optional[float]:
+        endpoint_candidates = [
+            self._aster_ticker_url,
+            self._aster_mark_price_url,
+            self._aster_book_ticker_url,
+        ]
+        tried: List[str] = []
+        errors: List[str] = []
+
+        for endpoint in endpoint_candidates:
+            endpoint = str(endpoint or "").strip()
+            if not endpoint or endpoint in tried:
+                continue
+            tried.append(endpoint)
+
             try:
-                # Placeholder until full Aster protocol implementation.
-                self.prices["ASTER"]["SOL"] = 150.0
-                await asyncio.sleep(0.1)
+                async with session.get(endpoint) as response:
+                    if response.status != 200:
+                        body = (await response.text())[:120]
+                        errors.append(f"{endpoint} ({response.status}) {body}")
+                        continue
+
+                    payload = await response.json(content_type=None)
             except Exception as exc:
-                logger.error(f"Aster WS Error: {exc}")
-                await asyncio.sleep(1)
+                errors.append(f"{endpoint} ({exc})")
+                continue
+
+            price = self._extract_price_from_object(payload)
+            if price is not None and price > 0:
+                return price
+
+            midpoint = self._extract_book_ticker_midpoint(payload)
+            if midpoint is not None and midpoint > 0:
+                return midpoint
+
+        if errors:
+            self._log_aster_issue("Aster poll failed: " + " | ".join(errors[:3]))
+        return None
 
     async def _lighter_feed(self):
         ws_task: Optional[asyncio.Task[Any]] = None
@@ -214,7 +286,16 @@ class MarketDataAggregator:
 
     def _extract_price_from_object(self, payload: Any) -> Optional[float]:
         if isinstance(payload, dict):
-            for key in ("price", "last_price", "lastPrice", "mid", "mid_price", "mark_price"):
+            for key in (
+                "price",
+                "last_price",
+                "lastPrice",
+                "mid",
+                "mid_price",
+                "mark_price",
+                "markPrice",
+                "indexPrice",
+            ):
                 value = payload.get(key)
                 price = self._coerce_price(value)
                 if price is not None and price > 0:
@@ -243,6 +324,16 @@ class MarketDataAggregator:
             return None
 
         return self._coerce_price(payload)
+
+    def _extract_book_ticker_midpoint(self, payload: Any) -> Optional[float]:
+        if not isinstance(payload, dict):
+            return None
+
+        bid = self._coerce_price(payload.get("bidPrice"))
+        ask = self._coerce_price(payload.get("askPrice"))
+        if bid is not None and ask is not None and bid > 0 and ask > 0:
+            return (bid + ask) / 2.0
+        return None
 
     def _extract_best_side_price(self, entries: List[Any]) -> Optional[float]:
         if not entries:
@@ -274,3 +365,14 @@ class MarketDataAggregator:
     def _clear_lighter_issue(self) -> None:
         self._lighter_last_issue = ""
         self._lighter_last_issue_ts = 0.0
+
+    def _log_aster_issue(self, message: str) -> None:
+        now = time.time()
+        if message != self._aster_last_issue or (now - self._aster_last_issue_ts) >= 60:
+            logger.warning(message)
+            self._aster_last_issue = message
+            self._aster_last_issue_ts = now
+
+    def _clear_aster_issue(self) -> None:
+        self._aster_last_issue = ""
+        self._aster_last_issue_ts = 0.0

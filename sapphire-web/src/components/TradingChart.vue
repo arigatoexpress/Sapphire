@@ -1,56 +1,141 @@
 <script setup lang="ts">
-import { createChart, ColorType } from 'lightweight-charts';
-import { onMounted, ref } from 'vue';
+import {
+    createChart,
+    CandlestickSeries,
+    HistogramSeries,
+    type IChartApi,
+    ColorType,
+    type UTCTimestamp,
+} from 'lightweight-charts'
+import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 
-const chartContainer = ref<HTMLElement | null>(null);
+const props = withDefaults(
+    defineProps<{
+        basePrice?: number
+        height?: number
+    }>(),
+    {
+        basePrice: 80,
+        height: 280,
+    },
+)
 
-onMounted(() => {
-    if (!chartContainer.value) return;
+const chartContainer = ref<HTMLElement | null>(null)
+let chart: IChartApi | null = null
+let candleSeries: any = null
+let volumeSeries: any = null
+let resizeHandler: (() => void) | null = null
 
-    const chart = createChart(chartContainer.value, {
+const seedCandles = (base: number) => {
+    const data: Array<{
+        time: UTCTimestamp
+        open: number
+        high: number
+        low: number
+        close: number
+    }> = []
+    const now = Math.floor(Date.now() / 1000)
+    let prior = base
+
+    for (let i = 120; i >= 1; i -= 1) {
+        const drift = (Math.random() - 0.5) * 0.8
+        const open = prior
+        const close = Math.max(0.001, open + drift)
+        const high = Math.max(open, close) + Math.random() * 0.5
+        const low = Math.min(open, close) - Math.random() * 0.5
+        const time = (now - i * 60) as UTCTimestamp
+        data.push({
+            time,
+            open: Number(open.toFixed(3)),
+            high: Number(high.toFixed(3)),
+            low: Number(low.toFixed(3)),
+            close: Number(close.toFixed(3)),
+        })
+        prior = close
+    }
+    return data
+}
+
+const seedVolume = (candles: Array<{ time: UTCTimestamp; open: number; close: number }>) =>
+    candles.map((item) => ({
+        time: item.time,
+        value: Math.round(120 + Math.random() * 360),
+        color: item.close >= item.open ? 'rgba(23,200,136,0.45)' : 'rgba(255,116,116,0.45)',
+    }))
+
+const renderChart = async () => {
+    if (!chartContainer.value) return
+
+    await nextTick()
+    if (!chartContainer.value) return
+
+    chart?.remove()
+    chart = createChart(chartContainer.value, {
+        width: chartContainer.value.clientWidth,
+        height: props.height,
         layout: {
             background: { type: ColorType.Solid, color: 'transparent' },
-            textColor: '#A1A1AA',
+            textColor: 'rgba(184, 214, 245, 0.82)',
+            attributionLogo: false,
         },
         grid: {
-            vertLines: { color: 'rgba(255, 255, 255, 0.05)' },
-            horzLines: { color: 'rgba(255, 255, 255, 0.05)' },
+            vertLines: { color: 'rgba(110, 164, 212, 0.12)' },
+            horzLines: { color: 'rgba(110, 164, 212, 0.12)' },
         },
-        width: chartContainer.value.clientWidth,
-        height: 400,
-    });
+        rightPriceScale: {
+            borderColor: 'rgba(110, 164, 212, 0.2)',
+        },
+        timeScale: {
+            borderColor: 'rgba(110, 164, 212, 0.2)',
+            timeVisible: true,
+            secondsVisible: false,
+        },
+        crosshair: {
+            horzLine: { color: 'rgba(120, 199, 255, 0.4)' },
+            vertLine: { color: 'rgba(120, 199, 255, 0.4)' },
+        },
+    })
 
-    const candleSeries = (chart as any).addCandlestickSeries({
-        upColor: '#39FF14',
-        downColor: '#FF003C',
+    candleSeries = chart.addSeries(CandlestickSeries, {
+        upColor: '#17c888',
+        downColor: '#ff7474',
         borderVisible: false,
-        wickUpColor: '#39FF14',
-        wickDownColor: '#FF003C',
-    });
+        wickUpColor: '#17c888',
+        wickDownColor: '#ff7474',
+    })
 
-    // Mock Data
-    const data = [
-        { time: '2018-12-22', open: 75.16, high: 82.84, low: 36.16, close: 45.72 },
-        { time: '2018-12-23', open: 45.12, high: 53.90, low: 45.12, close: 48.09 },
-        { time: '2018-12-24', open: 60.71, high: 60.71, low: 53.39, close: 59.29 },
-        { time: '2018-12-25', open: 68.26, high: 68.26, low: 59.04, close: 60.50 },
-        { time: '2018-12-26', open: 67.71, high: 105.85, low: 66.67, close: 91.04 },
-        { time: '2018-12-27', open: 91.04, high: 121.40, low: 82.70, close: 111.40 },
-        { time: '2018-12-28', open: 111.51, high: 142.83, low: 103.34, close: 131.25 },
-        { time: '2018-12-29', open: 131.33, high: 151.17, low: 77.68, close: 96.43 },
-        { time: '2018-12-30', open: 106.33, high: 110.20, low: 90.39, close: 98.10 },
-        { time: '2018-12-31', open: 109.87, high: 114.69, low: 85.66, close: 111.26 },
-    ];
+    volumeSeries = chart.addSeries(HistogramSeries, {
+        priceFormat: { type: 'volume' },
+        priceScaleId: '',
+    })
 
-    candleSeries.setData(data);
+    const candles = seedCandles(props.basePrice)
+    if (candleSeries) candleSeries.setData(candles)
+    if (volumeSeries) volumeSeries.setData(seedVolume(candles))
 
-    // Resize handler
-    window.addEventListener('resize', () => {
-        if (chartContainer.value) {
-            chart.applyOptions({ width: chartContainer.value.clientWidth });
-        }
-    });
-});
+    chart.timeScale().fitContent()
+}
+
+onMounted(() => {
+    renderChart()
+    resizeHandler = () => {
+        if (!chartContainer.value || !chart) return
+        chart.applyOptions({ width: chartContainer.value.clientWidth })
+    }
+    window.addEventListener('resize', resizeHandler)
+})
+
+onUnmounted(() => {
+    if (resizeHandler) window.removeEventListener('resize', resizeHandler)
+    chart?.remove()
+})
+
+watch(
+    () => props.basePrice,
+    () => {
+        renderChart()
+    },
+)
 </script>
 
 <template>
@@ -60,6 +145,7 @@ onMounted(() => {
 <style scoped>
 .chart-wrapper {
     width: 100%;
-    height: 100%;
+    border-radius: 12px;
+    overflow: hidden;
 }
 </style>
