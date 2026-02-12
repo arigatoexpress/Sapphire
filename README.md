@@ -76,6 +76,7 @@ Web UI is read-only for control actions. Agent prompting, approvals, and steerin
 - `docs/SAPPHIRE_ORGANIZATION.md`
 - `docs/TRADINGVIEW_QUANT_WORKBENCH.md`
 - `docs/SAPPHIRE_STACK_ASCII.md`
+- `docs/FIRST_PRINCIPLES_AUDIT_2026-02-12.md`
 
 ## Current Objective
 Keep Sapphire fully autonomous, operationally tight, and explicitly aligned to the masterplan before expanding scope.
