@@ -72,6 +72,7 @@ class AlphaEngine:
         )
         self._telegram_webhook_url = os.getenv("TELEGRAM_WEBHOOK_URL", "").strip()
         self._telegram_webhook_secret = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
+        self._control_api_token = os.getenv("SAPPHIRE_CONTROL_API_TOKEN", "").strip()
         self._telegram_webhook_mode = bool(self._telegram_webhook_url)
         self._tradingview_webhook_secret = os.getenv("TRADINGVIEW_WEBHOOK_SECRET", "").strip()
         self._tradingview_execution_enabled = (
@@ -2115,6 +2116,7 @@ class AlphaEngine:
             await start_health_server(
                 telegram_update_handler=self.telegram._process_update,
                 telegram_webhook_secret=self._telegram_webhook_secret,
+                control_api_token=self._control_api_token,
                 tradingview_update_handler=self._handle_tradingview_signal,
                 tradingview_webhook_secret=self._tradingview_webhook_secret,
                 market_ohlc_handler=self._handle_market_ohlc_request,
@@ -2136,6 +2138,7 @@ class AlphaEngine:
             )
         else:
             await start_health_server(
+                control_api_token=self._control_api_token,
                 tradingview_update_handler=self._handle_tradingview_signal,
                 tradingview_webhook_secret=self._tradingview_webhook_secret,
                 market_ohlc_handler=self._handle_market_ohlc_request,

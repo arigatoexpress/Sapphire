@@ -60,6 +60,7 @@ SAPPHIRE_SCOUT_OPENCLAW_HOOK_URL="${SAPPHIRE_SCOUT_OPENCLAW_HOOK_URL:-${TRADINGV
 SCOUT_REGISTER_URL_SECRET="${SCOUT_REGISTER_URL_SECRET:-SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL}"
 SCOUT_POST_URL_SECRET="${SCOUT_POST_URL_SECRET:-SAPPHIRE_SCOUT_EXTERNAL_POST_URL}"
 SCOUT_API_TOKEN_SECRET="${SCOUT_API_TOKEN_SECRET:-SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN}"
+CONTROL_API_TOKEN_SECRET="${CONTROL_API_TOKEN_SECRET:-SAPPHIRE_CONTROL_API_TOKEN}"
 SAPPHIRE_VT_ENABLED="${SAPPHIRE_VT_ENABLED:-true}"
 SAPPHIRE_VT_ENFORCEMENT_MODE="${SAPPHIRE_VT_ENFORCEMENT_MODE:-block_malicious}"
 SAPPHIRE_VT_UPLOAD_IF_MISSING="${SAPPHIRE_VT_UPLOAD_IF_MISSING:-false}"
@@ -182,6 +183,17 @@ if [[ "${#SCOUT_SECRET_MAPPINGS[@]}" -gt 0 ]]; then
   echo "Scout external bridge secret bindings applied."
 else
   echo "Scout external bridge secrets not found yet; keeping OpenClaw fallback active."
+fi
+
+if has_secret "${CONTROL_API_TOKEN_SECRET}"; then
+  echo "Applying control API token secret binding to ${SERVICE_NAME}."
+  gcloud run services update "${SERVICE_NAME}" \
+    --project "${PROJECT_ID}" \
+    --region "${REGION}" \
+    --update-secrets "SAPPHIRE_CONTROL_API_TOKEN=${CONTROL_API_TOKEN_SECRET}:latest" >/dev/null
+  echo "Control API token binding applied."
+else
+  echo "Control API token secret ${CONTROL_API_TOKEN_SECRET} not found; mutable API routes will be locked (503)."
 fi
 
 if has_secret "${VIRUSTOTAL_API_KEY_SECRET}"; then

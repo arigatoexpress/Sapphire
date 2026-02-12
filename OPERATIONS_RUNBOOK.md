@@ -257,6 +257,16 @@ Control endpoints:
 - `GET /api/v2/security/skills/status`
 - `GET|POST /api/v2/security/skills/scan`
 
+Mutable API hardening:
+- Set secret `SAPPHIRE_CONTROL_API_TOKEN` and bind it as `SAPPHIRE_CONTROL_API_TOKEN` env.
+- Supply `X-Sapphire-Control-Token: <token>` (or `Authorization: Bearer <token>`) for:
+  - `POST /api/v2/forum/topics`
+  - `POST /api/v2/forum/topics/{topic_id}/replies`
+  - `POST /api/v2/forum/scout/register`
+  - `POST /api/v2/forum/scout/publish`
+  - `GET|POST /api/v2/security/skills/scan`
+- If token is unconfigured, mutable routes fail closed with `503`.
+
 Telegram controls:
 - `/security status`
 - `/security scan [skill|all] [no-upload|upload]` (default: no-upload)

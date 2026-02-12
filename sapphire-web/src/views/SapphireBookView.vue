@@ -43,6 +43,10 @@ const scout = ref<ForumScoutStatusResponse | null>(null)
 const feedback = ref('')
 const nowEpoch = ref(Date.now())
 const lastSyncEpoch = ref(0)
+const forumMutationsEnabled =
+    String(import.meta.env.VITE_SAPPHIREBOOK_MUTATIONS || 'false')
+        .trim()
+        .toLowerCase() === 'true'
 
 const laneFilter = ref('')
 const stateFilter = ref('')
@@ -230,6 +234,10 @@ const loadBoard = async () => {
 }
 
 const submitNewTopic = async () => {
+    if (!forumMutationsEnabled) {
+        feedback.value = 'SapphireBook is in read-only mode. Use Telegram commands for control actions.'
+        return
+    }
     if (!newTopic.value.title.trim() || !newTopic.value.body.trim()) {
         feedback.value = 'Topic title and body are required.'
         return
@@ -261,6 +269,10 @@ const submitNewTopic = async () => {
 }
 
 const submitReply = async () => {
+    if (!forumMutationsEnabled) {
+        feedback.value = 'SapphireBook is in read-only mode. Use Telegram commands for control actions.'
+        return
+    }
     if (!selectedTopicId.value || !replyDraft.value.body.trim()) {
         feedback.value = 'Select a topic and add a reply body.'
         return
@@ -287,6 +299,10 @@ const submitReply = async () => {
 }
 
 const submitScoutRegistration = async () => {
+    if (!forumMutationsEnabled) {
+        feedback.value = 'SapphireBook is in read-only mode. Use Telegram commands for control actions.'
+        return
+    }
     if (!scoutRegistration.value.username.trim()) {
         feedback.value = 'Scout username is required.'
         return
@@ -312,6 +328,10 @@ const submitScoutRegistration = async () => {
 }
 
 const submitScoutNote = async () => {
+    if (!forumMutationsEnabled) {
+        feedback.value = 'SapphireBook is in read-only mode. Use Telegram commands for control actions.'
+        return
+    }
     if (!scoutNote.value.body.trim()) {
         feedback.value = 'Scout note body is required.'
         return
@@ -397,7 +417,11 @@ onUnmounted(() => {
                     <small>{{ topics.length }} visible</small>
                 </header>
 
-                <form class="compose" @submit.prevent="submitNewTopic">
+                <p v-if="!forumMutationsEnabled" class="read-only-note">
+                    Read-only mode: create/reply/scout actions are locked to Telegram control commands.
+                </p>
+
+                <form v-if="forumMutationsEnabled" class="compose" @submit.prevent="submitNewTopic">
                     <input v-model="newTopic.title" type="text" placeholder="New topic title" maxlength="140" />
                     <textarea v-model="newTopic.body" rows="3" placeholder="Describe context, objective, and expected outcome" />
                     <div class="compose-grid">
@@ -484,7 +508,11 @@ onUnmounted(() => {
                     <p v-if="!selectedTopic.replies.length" class="empty">No replies yet. Add the first collaboration note.</p>
                 </section>
 
-                <form class="reply-compose" @submit.prevent="submitReply">
+                <p v-if="!forumMutationsEnabled" class="read-only-note">
+                    Reply actions are disabled in UI. Use Telegram (`/steer`, `/answer`, `/approve`, `/reject`) for execution control.
+                </p>
+
+                <form v-if="forumMutationsEnabled" class="reply-compose" @submit.prevent="submitReply">
                     <textarea v-model="replyDraft.body" rows="3" placeholder="Post a reply, decision, or execution update" />
                     <div class="compose-grid">
                         <input v-model="replyDraft.author" type="text" placeholder="Author" />
@@ -546,7 +574,10 @@ onUnmounted(() => {
                         External bridge:
                         <strong>{{ scout?.external_bridge.register_url_configured ? 'configured' : 'not configured' }}</strong>
                     </p>
-                    <form class="scout-form" @submit.prevent="submitScoutRegistration">
+                    <p v-if="!forumMutationsEnabled" class="read-only-note">
+                        Scout register/publish actions are Telegram-only in this hardened mode.
+                    </p>
+                    <form v-if="forumMutationsEnabled" class="scout-form" @submit.prevent="submitScoutRegistration">
                         <input v-model="scoutRegistration.username" type="text" placeholder="Scout username" />
                         <input v-model="scoutRegistration.display_name" type="text" placeholder="Display name" />
                         <textarea v-model="scoutRegistration.bio" rows="2" placeholder="Scout profile bio" />
@@ -554,7 +585,7 @@ onUnmounted(() => {
                             {{ registeringScout ? 'Submitting...' : 'Register Scout' }}
                         </button>
                     </form>
-                    <form class="scout-form" @submit.prevent="submitScoutNote">
+                    <form v-if="forumMutationsEnabled" class="scout-form" @submit.prevent="submitScoutNote">
                         <input v-model="scoutNote.title" type="text" placeholder="External note title (optional)" />
                         <textarea v-model="scoutNote.body" rows="2" placeholder="Scout outbound summary (sanitized)" />
                         <input v-model="scoutNote.tags" type="text" placeholder="tags,comma,separated" />
@@ -706,6 +737,17 @@ textarea {
 .scout-form {
     display: grid;
     gap: 0.5rem;
+}
+
+.read-only-note {
+    margin: 0;
+    border: 1px solid rgba(120, 179, 219, 0.28);
+    border-radius: 10px;
+    padding: 0.5rem 0.62rem;
+    background: rgba(8, 22, 41, 0.62);
+    color: var(--text-secondary);
+    font-size: 0.77rem;
+    line-height: 1.35;
 }
 
 .compose-grid {

@@ -30,7 +30,7 @@ def _apply_cors_headers(request: web.Request, response: web.StreamResponse) -> N
         response.headers["Vary"] = "Origin"
         response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
         response.headers["Access-Control-Allow-Headers"] = (
-            "Content-Type,Authorization,X-Sapphire-Webhook-Secret,X-Telegram-Bot-Api-Secret-Token"
+            "Content-Type,Authorization,X-Sapphire-Webhook-Secret,X-Sapphire-Control-Token,X-Telegram-Bot-Api-Secret-Token"
         )
 
 
@@ -75,6 +75,32 @@ async def telegram_webhook(request):
             logger.error(f"Telegram webhook handler error: {exc}")
 
     return web.Response(text="OK", status=200)
+
+
+def _extract_control_token(request: web.Request) -> str:
+    token = (request.headers.get("X-Sapphire-Control-Token") or "").strip()
+    if token:
+        return token
+
+    auth = (request.headers.get("Authorization") or "").strip()
+    if auth.lower().startswith("bearer "):
+        bearer_token = auth[7:].strip()
+        if bearer_token:
+            return bearer_token
+
+    return ""
+
+
+def _require_control_token(request: web.Request) -> Optional[web.Response]:
+    expected_token = str(request.app.get("control_api_token") or "").strip()
+    if not expected_token:
+        return web.json_response({"ok": False, "error": "control_token_unconfigured"}, status=503)
+
+    provided_token = _extract_control_token(request)
+    if provided_token != expected_token:
+        return web.json_response({"ok": False, "error": "forbidden"}, status=403)
+
+    return None
 
 
 def _extract_shared_secret(
@@ -285,6 +311,9 @@ async def forum_topics(request: web.Request) -> web.Response:
         handler = request.app.get("forum_create_topic_handler")
         if handler is None:
             return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
+        denied = _require_control_token(request)
+        if denied is not None:
+            return denied
         payload = await _read_json_payload(request)
 
     try:
@@ -323,6 +352,9 @@ async def forum_replies(request: web.Request) -> web.Response:
     if handler is None:
         return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
 
+    denied = _require_control_token(request)
+    if denied is not None:
+        return denied
     payload = await _read_json_payload(request)
     payload["topic_id"] = str(request.match_info.get("topic_id", "")).strip()
     try:
@@ -357,6 +389,9 @@ async def forum_scout_register(request: web.Request) -> web.Response:
     if handler is None:
         return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
 
+    denied = _require_control_token(request)
+    if denied is not None:
+        return denied
     payload = await _read_json_payload(request)
     try:
         result = await handler(payload)
@@ -374,6 +409,9 @@ async def forum_scout_publish(request: web.Request) -> web.Response:
     if handler is None:
         return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
 
+    denied = _require_control_token(request)
+    if denied is not None:
+        return denied
     payload = await _read_json_payload(request)
     try:
         result = await handler(payload)
@@ -406,6 +444,9 @@ async def security_skills_scan(request: web.Request) -> web.Response:
     if handler is None:
         return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
 
+    denied = _require_control_token(request)
+    if denied is not None:
+        return denied
     if request.method == "GET":
         upload_value = str(request.rel_url.query.get("upload_if_missing", "false")).strip().lower()
         payload = {
@@ -429,6 +470,7 @@ async def security_skills_scan(request: web.Request) -> web.Response:
 async def start_health_server(
     telegram_update_handler: Optional[Callable[[dict[str, Any]], Awaitable[None]]] = None,
     telegram_webhook_secret: str = "",
+    control_api_token: str = "",
     tradingview_update_handler: Optional[
         Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]
     ] = None,
@@ -459,6 +501,7 @@ async def start_health_server(
 
     app = web.Application(middlewares=[cors_middleware])
     app["cors_allowlist"] = _build_cors_allowlist()
+    app["control_api_token"] = (control_api_token or "").strip()
     app.router.add_get("/", health_check)
     app.router.add_get("/health", health_check)
     app.router.add_get("/readiness", readiness_check)

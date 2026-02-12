@@ -33,6 +33,7 @@ All three agents operate through OpenClaw with Sapphire-only skills in:
 - Telegram command ingress: `POST /telegram/webhook` on `sapphire-alpha`
 - TradingView signal ingress: `POST /tradingview/webhook` on `sapphire-alpha`
 - OpenClaw gateway control: `sapphire-gateway` (Cloud Run invoker IAM check enabled)
+- Alpha mutable API routes require `X-Sapphire-Control-Token` (backed by `SAPPHIRE_CONTROL_API_TOKEN` secret)
 
 Owner steering controls in Telegram:
 - `/focus` for current Sapphire-only operating scope
