@@ -93,6 +93,22 @@ else
   fail "alpha enabled venues mismatch: ${enabled_venues:-<empty>}"
 fi
 
+tv_rules_enforced=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
+  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_ENFORCE_STRATEGY_RULES") | .value // empty')
+if [[ "$tv_rules_enforced" == "true" ]]; then
+  pass "alpha enforces TradingView strategy rules"
+else
+  fail "alpha strategy rule enforcement disabled: ${tv_rules_enforced:-<empty>}"
+fi
+
+tv_rules_json=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
+  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_STRATEGY_RULES_JSON") | .value // empty')
+if [[ -n "$tv_rules_json" ]]; then
+  pass "alpha TradingView strategy rules configured"
+else
+  fail "alpha TradingView strategy rules missing"
+fi
+
 required_jobs=(
   "sapphire-alpha-health-6h"
   "sapphire-aster-health-6h"

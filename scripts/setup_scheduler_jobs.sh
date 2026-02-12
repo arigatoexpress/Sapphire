@@ -30,7 +30,7 @@ JSON
 )"
 
 STRATEGY_GATE_BODY="$(cat <<JSON
-{"update_id":900000003,"message":{"chat":{"id":"${CHAT_ID}"},"text":"@alpha report"}}
+{"update_id":900000003,"message":{"chat":{"id":"${CHAT_ID}"},"text":"/promotion"}}
 JSON
 )"
 

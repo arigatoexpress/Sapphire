@@ -57,11 +57,14 @@ Reference docs:
   "venue": "ASTER",
   "symbol": "SOL",
   "quantity": 0.25,
-  "strategy": "tv-breakout-v1",
+  "strategy": "tv-aster-breakout",
   "timeframe": "15m",
   "secret": "${TRADINGVIEW_WEBHOOK_SECRET}"
 }
 ```
+
+When `TRADINGVIEW_ENFORCE_STRATEGY_RULES=true`, `strategy` is required and must match
+`TRADINGVIEW_STRATEGY_RULES_JSON`.
 
 ## Promotion Workflow
 
@@ -80,6 +83,7 @@ Reference docs:
 - Idempotency guard active (`TRADINGVIEW_IDEMPOTENCY_WINDOW_SECONDS`).
 - Per-venue max quantity caps configured (`TRADINGVIEW_MAX_QUANTITY_*`).
 - Symbol allowlists configured for each venue (`TRADINGVIEW_ALLOWED_SYMBOLS_*`).
+- Strategy rules configured and enforced (`TRADINGVIEW_ENFORCE_STRATEGY_RULES=true`).
 
 ## Operational Checklist
 
@@ -88,6 +92,9 @@ Reference docs:
 - Alpha env has venue allowlists configured:
   - `TRADINGVIEW_ALLOWED_SYMBOLS_ASTER=SOL;JUP;PYTH;BONK;WIF`
   - `TRADINGVIEW_ALLOWED_SYMBOLS_LIGHTER=BTC;ETH;SOL;HYPE;DOGE;AVAX`
+- Alpha env enforces strategy rules:
+  - `TRADINGVIEW_ENFORCE_STRATEGY_RULES=true`
+  - `TRADINGVIEW_STRATEGY_RULES_JSON` maps strategy name to allowed venues/symbols/size caps
 - Telegram receives every accepted TradingView signal.
 - Scheduler heartbeat remains active for independent liveness checks.
 - Duplicate alerts are ignored (same signal in idempotency window).

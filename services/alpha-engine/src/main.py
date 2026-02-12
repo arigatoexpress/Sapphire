@@ -6,7 +6,7 @@ import signal
 import sys
 import time
 from collections import defaultdict
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, List, Optional, Set
 
 import uvloop
 from src.ai.gemini_guard import GeminiGuard
@@ -85,6 +85,19 @@ class AlphaEngine:
         )
         self._tradingview_idempotency_max_keys = max(
             100, int(os.getenv("TRADINGVIEW_IDEMPOTENCY_MAX_KEYS", "2000"))
+        )
+        self._tradingview_enforce_strategy_rules = (
+            os.getenv("TRADINGVIEW_ENFORCE_STRATEGY_RULES", "false").strip().lower()
+            in {"1", "true", "yes", "on"}
+        )
+        self._tradingview_strategy_rules = self._parse_strategy_rules(
+            os.getenv("TRADINGVIEW_STRATEGY_RULES_JSON", "")
+        )
+        self._trading_gate_max_failure_pressure = max(
+            0, int(os.getenv("TRADING_GATE_MAX_FAILURE_PRESSURE", "2"))
+        )
+        self._trading_gate_min_active_venues = max(
+            0, int(os.getenv("TRADING_GATE_MIN_ACTIVE_VENUES", "1"))
         )
         self._tradingview_signal_seen_at: Dict[str, float] = {}
         self._failure_counts: Dict[str, int] = defaultdict(int)
@@ -174,6 +187,118 @@ class AlphaEngine:
         if self._tradingview_max_quantity_default > 0:
             return self._tradingview_max_quantity_default
         return None
+
+    def _parse_strategy_rules(self, raw_value: str) -> Dict[str, Dict[str, Any]]:
+        if not raw_value:
+            return {}
+
+        try:
+            payload = json.loads(raw_value)
+        except Exception as exc:
+            logger.error(f"Failed to parse TRADINGVIEW_STRATEGY_RULES_JSON: {exc}")
+            return {}
+
+        if not isinstance(payload, dict):
+            logger.error("TRADINGVIEW_STRATEGY_RULES_JSON must be a JSON object.")
+            return {}
+
+        rules: Dict[str, Dict[str, Any]] = {}
+        for name, rule in payload.items():
+            if not isinstance(name, str) or not name.strip():
+                continue
+            if not isinstance(rule, dict):
+                continue
+
+            venues_raw = rule.get("venues", [])
+            symbols_raw = rule.get("symbols", [])
+
+            venues: Set[str] = set()
+            if isinstance(venues_raw, list):
+                venues = {self._normalize_platform(item) for item in venues_raw if isinstance(item, str)}
+
+            symbols: Set[str] = set()
+            if isinstance(symbols_raw, list):
+                symbols = {
+                    str(item).strip().upper() for item in symbols_raw if isinstance(item, str) and str(item).strip()
+                }
+
+            max_quantity: Optional[float] = None
+            max_quantity_raw = rule.get("max_quantity")
+            if max_quantity_raw is not None:
+                try:
+                    max_quantity_val = float(max_quantity_raw)
+                    if max_quantity_val > 0:
+                        max_quantity = max_quantity_val
+                except (TypeError, ValueError):
+                    logger.warning(f"Invalid max_quantity for strategy rule `{name}`: {max_quantity_raw}")
+
+            rules[name.strip().lower()] = {
+                "venues": venues,
+                "symbols": symbols,
+                "max_quantity": max_quantity,
+            }
+
+        return rules
+
+    async def _send_promotion_gate_report(self, reason: str = "manual") -> None:
+        state = dispatcher.get_control_state()
+        active_venues = [
+            venue for venue, item in state.items() if not item["paused"] and item["allocation"] > 0
+        ]
+        total_failures = sum(self._failure_counts.values())
+
+        checks = [
+            (
+                "Kill switch off",
+                not self._kill_switch_active,
+                "Kill switch is active",
+            ),
+            (
+                f"Active venues >= {self._trading_gate_min_active_venues}",
+                len(active_venues) >= self._trading_gate_min_active_venues,
+                f"Only {len(active_venues)} active venue(s)",
+            ),
+            (
+                f"Failure pressure <= {self._trading_gate_max_failure_pressure}",
+                total_failures <= self._trading_gate_max_failure_pressure,
+                f"Failure pressure is {total_failures}",
+            ),
+            (
+                "TradingView rules enforced",
+                self._tradingview_enforce_strategy_rules and bool(self._tradingview_strategy_rules),
+                "Strategy rules not enforced or missing",
+            ),
+            (
+                "TradingView execution still dry-run",
+                not self._tradingview_execution_enabled,
+                "TRADINGVIEW_EXECUTION_ENABLED=true",
+            ),
+        ]
+
+        failed_checks = [item for item in checks if not item[1]]
+        status = "PASS" if not failed_checks else "FAIL"
+        icon = "✅" if status == "PASS" else "⚠️"
+
+        lines = [
+            f"{icon} **PROMOTION GATE REPORT** (`{reason}`)",
+            f"Overall: `{status}`",
+            "",
+        ]
+
+        for label, ok, note in checks:
+            marker = "PASS" if ok else "FAIL"
+            lines.append(f"- `{marker}` {label}" + (f" ({note})" if not ok else ""))
+
+        lines.extend(
+            [
+                "",
+                f"Active venues: `{', '.join(active_venues) if active_venues else 'none'}`",
+                f"Failure pressure: `{total_failures}`",
+                f"Rules configured: `{len(self._tradingview_strategy_rules)}`",
+            ]
+        )
+
+        await self.telegram.send_message("\n".join(lines), priority="high" if status == "FAIL" else "medium")
 
     def _build_signal_key(
         self,
@@ -344,7 +469,7 @@ class AlphaEngine:
             f"Paused/deallocated: `{', '.join(paused) if paused else 'none'}`\n"
             f"Kill switch: `{'ACTIVE' if self._kill_switch_active else 'OFF'}`\n"
             f"Failure pressure: `{total_failures}`\n\n"
-            "Reply with `/status`, `/heartbeat`, `/kill`, `/resume`, or `@alpha deallocate <venue>`."
+            "Reply with `/status`, `/heartbeat`, `/promotion`, `/kill`, `/resume`, or `@alpha deallocate <venue>`."
         )
         await self.telegram.send_message(msg, priority="medium")
 
@@ -366,6 +491,10 @@ class AlphaEngine:
 
         if normalized_action in {"STATUS", "CONTROL_STATUS"}:
             await self._send_control_status()
+            return
+
+        if normalized_action in {"PROMOTION_GATE", "STRATEGY_GATE", "PROMOTION", "GATE"}:
+            await self._send_promotion_gate_report("manual")
             return
 
         if normalized_action == "SET_ALLOCATION":
@@ -454,6 +583,13 @@ class AlphaEngine:
             ["quantity", "qty", "size", "contracts", "notional"],
             default=self._tradingview_default_quantity,
         )
+        strategy_label = self._extract_text_value(
+            merged_payload,
+            ["strategy", "strategy_name", "alert_name", "name"],
+        ).strip().lower()
+        strategy_rule = (
+            self._tradingview_strategy_rules.get(strategy_label) if strategy_label else None
+        )
         allocation_percent = self._extract_float_value(
             merged_payload,
             ["allocation", "allocation_percent", "percent"],
@@ -507,6 +643,54 @@ class AlphaEngine:
             )
             return {"accepted": "rejected", "reason": "unknown_target"}
 
+        if self._tradingview_enforce_strategy_rules:
+            if not strategy_label:
+                await self.telegram.send_message(
+                    "⚠️ TradingView alert blocked: strategy label is required.",
+                    priority="high",
+                )
+                return {"accepted": "blocked", "reason": "missing_strategy"}
+            if strategy_rule is None:
+                await self.telegram.send_message(
+                    f"⚠️ TradingView alert blocked: unknown strategy `{strategy_label}`.",
+                    priority="high",
+                )
+                return {"accepted": "blocked", "reason": "unknown_strategy", "strategy": strategy_label}
+
+        if strategy_rule is not None:
+            strategy_venues = strategy_rule.get("venues", set())
+            if strategy_venues:
+                disallowed_strategy_targets = [venue for venue in targets if venue not in strategy_venues]
+                if disallowed_strategy_targets:
+                    await self.telegram.send_message(
+                        (
+                            f"⚠️ TradingView alert blocked: strategy `{strategy_label}` cannot target "
+                            f"`{', '.join(disallowed_strategy_targets)}`."
+                        ),
+                        priority="high",
+                    )
+                    return {
+                        "accepted": "blocked",
+                        "reason": "strategy_venue_mismatch",
+                        "targets": disallowed_strategy_targets,
+                        "strategy": strategy_label,
+                    }
+
+            strategy_symbols = strategy_rule.get("symbols", set())
+            if strategy_symbols and symbol not in strategy_symbols:
+                await self.telegram.send_message(
+                    (
+                        f"⚠️ TradingView alert blocked: `{symbol}` not allowed for strategy "
+                        f"`{strategy_label}`."
+                    ),
+                    priority="high",
+                )
+                return {
+                    "accepted": "blocked",
+                    "reason": "strategy_symbol_mismatch",
+                    "strategy": strategy_label,
+                }
+
         disallowed_targets = [venue for venue in targets if not self._symbol_allowed_for_venue(venue, symbol)]
         if disallowed_targets:
             await self.telegram.send_message(
@@ -547,6 +731,9 @@ class AlphaEngine:
         capped_targets: List[str] = []
         for venue in targets:
             venue_cap = self._max_quantity_for_venue(venue)
+            strategy_cap = strategy_rule.get("max_quantity") if strategy_rule else None
+            if strategy_cap is not None:
+                venue_cap = strategy_cap if venue_cap is None else min(venue_cap, strategy_cap)
             venue_qty = quantity
             if venue_cap is not None and venue_qty > venue_cap:
                 venue_qty = venue_cap
@@ -574,6 +761,7 @@ class AlphaEngine:
                 "signal_key": signal_key,
                 "quantities": per_target_quantity,
                 "capped_targets": sorted(set(capped_targets)),
+                "strategy": strategy_label or None,
             }
 
         dispatch_results: Dict[str, bool] = {}
@@ -602,6 +790,7 @@ class AlphaEngine:
                 "signal_key": signal_key,
                 "quantities": per_target_quantity,
                 "capped_targets": sorted(set(capped_targets)),
+                "strategy": strategy_label or None,
             }
 
         qty_parts = [f"{venue}:{per_target_quantity[venue]}" for venue in sorted(targets)]
@@ -615,6 +804,7 @@ class AlphaEngine:
             "signal_key": signal_key,
             "quantities": per_target_quantity,
             "capped_targets": sorted(set(capped_targets)),
+            "strategy": strategy_label or None,
         }
 
     async def _record_trade_outcome(self, platform: str, success: bool, error_message: str = "") -> None:

@@ -29,6 +29,7 @@ Supported operator commands in Telegram:
 
 - `/status`
 - `/heartbeat`
+- `/promotion`
 - `/kill`
 - `/resume`
 - `/deallocate <venue>`
@@ -58,6 +59,8 @@ Risk controls for TradingView ingress (env-configured):
 
 - `TRADINGVIEW_IDEMPOTENCY_WINDOW_SECONDS` (default `300`)
 - `TRADINGVIEW_IDEMPOTENCY_MAX_KEYS` (default `2000`)
+- `TRADINGVIEW_ENFORCE_STRATEGY_RULES` (`true` requires strategy labels and rule matches)
+- `TRADINGVIEW_STRATEGY_RULES_JSON` (strategy -> venues/symbols/max_quantity policy)
 - `TRADINGVIEW_MAX_QUANTITY` (global cap, optional)
 - `TRADINGVIEW_MAX_QUANTITY_ASTER` / `TRADINGVIEW_MAX_QUANTITY_LIGHTER` (venue caps, optional)
 - `TRADINGVIEW_ALLOWED_SYMBOLS` (global allowlist, optional)
@@ -72,7 +75,7 @@ Health and status jobs are configured in `us-central1`:
 - `sapphire-lighter-health-6h` -> lighter `/health` every 6 hours (10 min offset)
 - `sapphire-alpha-heartbeat-30m` -> sends synthetic `/heartbeat` through alpha webhook every 30 minutes
 - `sapphire-alpha-status-daily` -> sends synthetic `/status` update through alpha webhook daily at `14:15 UTC`
-- `sapphire-alpha-strategy-gate-daily` -> sends `@alpha report` through alpha webhook daily at `14:45 UTC`
+- `sapphire-alpha-strategy-gate-daily` -> sends `/promotion` through alpha webhook daily at `14:45 UTC`
 
 Idempotent job setup script:
 

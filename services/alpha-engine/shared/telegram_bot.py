@@ -330,9 +330,9 @@ class TelegramPlatformBot:
 
         text_lower = text.lower()
 
-        # Slash control commands: /kill /resume /status /heartbeat [optional-target]
+        # Slash control commands: /kill /resume /status /heartbeat /promotion [optional-target]
         slash_control_match = re.search(
-            r"^/(kill|halt|resume|status|heartbeat)(?:\s+(\w+))?$",
+            r"^/(kill|halt|resume|status|heartbeat|promotion|gate)(?:\s+(\w+))?$",
             text_lower,
         )
         slash_allocation_match = re.search(
@@ -342,7 +342,7 @@ class TelegramPlatformBot:
 
         # Mention control commands: @alpha kill, @all resume, @control status
         mention_control_match = re.search(
-            r"@(alpha|all|control)\s+(kill|halt|resume|status|heartbeat)(?:\s+(\w+))?$",
+            r"@(alpha|all|control)\s+(kill|halt|resume|status|heartbeat|promotion|gate)(?:\s+(\w+))?$",
             text_lower,
         )
         mention_allocation_match = re.search(
@@ -364,6 +364,8 @@ class TelegramPlatformBot:
                 "resume": "RESUME_TRADING",
                 "status": "CONTROL_STATUS",
                 "heartbeat": "HEARTBEAT",
+                "promotion": "PROMOTION_GATE",
+                "gate": "PROMOTION_GATE",
             }
             mapped_action = action_map[raw_action]
 
