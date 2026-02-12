@@ -28,6 +28,7 @@ All three agents operate through OpenClaw with Sapphire-only skills in:
 - `skills/code-review`
 - `skills/dep-update`
 - `skills/git-ops`
+- `skills/moltbook-interact` (least-privilege external scout collaboration helper)
 
 ## Control Channels
 - Telegram command ingress: `POST /telegram/webhook` on `sapphire-alpha`
