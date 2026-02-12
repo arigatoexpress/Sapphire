@@ -16,7 +16,7 @@ Operate Sapphire as a profitable, 24/7 autonomous trading organization with stri
 
 ## Tactical Queue
 1. Maintain daily readiness checks and alerting.
-2. Keep TradingView autonomy in strategy-gated mode with explicit limits.
+2. Keep ASTER/LIGHTER as the primary DEX-native analysis/execution plane; use TradingView as a workbench/backtest layer by default.
 3. Keep frontend read-only for control; Telegram remains the only agent command channel.
 4. Keep SapphireTrade/Sapphire Alpha visuals data-native using live OHLC feeds from active venues.
 5. Enforce frontend-to-alpha API contract checks before deploy (`frontend_contract_check.sh`).

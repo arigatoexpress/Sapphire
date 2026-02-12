@@ -84,7 +84,7 @@ Supported TradingView actions:
 - `tv_chart_set`, `tv_indicator_add`, `tv_indicator_remove`
 - `tv_strategy_add`, `tv_strategy_remove`
 - `tv_script_add`, `tv_script_remove`
-- `tv_scan_assets`, `tv_ta`, `tv_status`, `tv_custom`
+- `tv_scan_assets`, `tv_backtest`, `tv_ta`, `tv_status`, `tv_custom`
 
 Safety default:
 
@@ -191,12 +191,13 @@ Full-autonomy env controls are applied by deploy defaults:
 - `SAPPHIRE_AUTONOMY_DRY_RUN=false`
 - `SAPPHIRE_AUTONOMY_REQUIRE_OWNER_APPROVAL=false` (auto-approve autonomy sessions)
 - `SAPPHIRE_AUTONOMY_LOOP_SECONDS=900`
-- `TRADINGVIEW_EXECUTION_ENABLED=true`
+- `TRADINGVIEW_EXECUTION_ENABLED=false` (TradingView remains workbench/dry-run by default)
 - `TRADINGVIEW_DEFAULT_QUANTITY=0.02`
 
 Execution safety controls:
 
-- `TRADINGVIEW_EXECUTION_ENABLED=true` enables strategy/webhook trade dispatch (guarded by strategy + symbol + quantity limits).
+- `TRADINGVIEW_EXECUTION_ENABLED=false` keeps TradingView in workbench mode (strategy/backtest/signal capture only).
+- Set `TRADINGVIEW_EXECUTION_ENABLED=true` only for controlled live-signal windows after validation.
 - `INTERNAL_ARB_EXECUTION_ENABLED=false` keeps internal spread loop in observe-only mode unless explicitly enabled.
 
 Expected result for current scope:

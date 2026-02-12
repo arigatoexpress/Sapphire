@@ -72,7 +72,7 @@ const latestMergedClose = computed(() => {
 })
 
 const executionModeLabel = computed(() =>
-    controlState.value?.tradingview_execution_enabled ? 'Live execution' : 'Dry-run guarded',
+    controlState.value?.tradingview_execution_enabled ? 'signals live' : 'workbench dry-run',
 )
 
 const defaultQtyLabel = computed(() => {
@@ -260,7 +260,7 @@ onUnmounted(() => {
             <div class="hero-copy">
                 <span class="font-mono kicker">SAPPHIRETRADE</span>
                 <h2>Autonomous execution board for ASTER + LIGHTER.</h2>
-                <p>Web controls remain read-only. Execution commands and overrides are routed through Telegram heartbeat.</p>
+                <p>DEX-native execution is primary. Web controls remain read-only and operator overrides stay Telegram-routed.</p>
             </div>
             <div class="health-line">
                 <span class="chip">
@@ -273,7 +273,10 @@ onUnmounted(() => {
                     Sync: {{ refreshAge }}
                 </span>
                 <span class="chip muted">
-                    {{ executionModeLabel }} · qty {{ defaultQtyLabel }}
+                    DEX execution: ASTER + LIGHTER
+                </span>
+                <span class="chip muted">
+                    TV: {{ executionModeLabel }} · qty {{ defaultQtyLabel }}
                 </span>
                 <span class="chip muted">
                     Pending decisions: {{ pendingDecisionCount }}

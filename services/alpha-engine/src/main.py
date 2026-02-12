@@ -403,11 +403,6 @@ class AlphaEngine:
                 "Strategy rules not enforced or missing",
             ),
             (
-                "TradingView execution enabled",
-                self._tradingview_execution_enabled,
-                "TRADINGVIEW_EXECUTION_ENABLED is not true",
-            ),
-            (
                 "TradingView autonomy plugin enabled",
                 self.tv_autonomy.enabled,
                 "TRADINGVIEW_AUTONOMY_ENABLED is not true",
@@ -460,6 +455,11 @@ class AlphaEngine:
                 f"Failure pressure: `{total_failures}`",
                 f"Rules configured: `{len(self._tradingview_strategy_rules)}`",
                 f"TV autonomy enabled: `{self.tv_autonomy.enabled}`",
+                (
+                    "TV signal mode: `LIVE`"
+                    if self._tradingview_execution_enabled
+                    else "TV signal mode: `WORKBENCH_DRY_RUN`"
+                ),
                 f"TV hook configured: `{bool(self.tv_autonomy.hook_url and self.tv_autonomy.hook_token)}`",
             ]
         )
@@ -618,12 +618,19 @@ class AlphaEngine:
 
     async def _send_control_status(self) -> None:
         snapshot = self._control_snapshot()
+        primary_venues = ", ".join(sorted(snapshot["primary_execution_venues"])) or "none"
+        tv_signal_mode = (
+            "LIVE_SIGNAL_EXECUTION"
+            if snapshot["tradingview_signal_mode"] == "live"
+            else "WORKBENCH_DRY_RUN"
+        )
         lines = [
             "📊 **CONTROL STATUS**",
             f"Kill switch: `{'ACTIVE' if snapshot['kill_switch_active'] else 'INACTIVE'}`",
             f"Full autonomy: `{'ON' if snapshot['full_autonomy_enabled'] else 'OFF'}`",
-            f"TradingView execution: `{'LIVE' if snapshot['tradingview_execution_enabled'] else 'DRY-RUN'}`",
-            f"Default quantity: `{snapshot['tradingview_default_quantity']}`",
+            f"Primary execution: `DEX_NATIVE ({primary_venues})`",
+            f"TradingView signal mode: `{tv_signal_mode}`",
+            f"Signal default quantity: `{snapshot['tradingview_default_quantity']}`",
             f"Autonomy dispatches: `{snapshot['autonomy_dispatch_count']}`",
             f"Pending autonomy decisions: `{snapshot['pending_autonomy_decisions']}`",
             "",
@@ -671,7 +678,10 @@ class AlphaEngine:
             "kill_switch_active": self._kill_switch_active,
             "full_autonomy_enabled": self._full_autonomy_enabled,
             "owner_approval_required": self._autonomy_require_owner_approval,
+            "primary_execution_plane": "dex_venues",
+            "primary_execution_venues": sorted(venues.keys()),
             "tradingview_execution_enabled": self._tradingview_execution_enabled,
+            "tradingview_signal_mode": "live" if self._tradingview_execution_enabled else "workbench_dry_run",
             "tradingview_default_quantity": float(self._tradingview_default_quantity),
             "autonomy_dispatch_count": int(self._autonomy_dispatch_count),
             "pending_autonomy_decisions": len(pending_summary),
@@ -704,6 +714,12 @@ class AlphaEngine:
             (
                 f"Owner approval gate: `{'ON' if self._autonomy_require_owner_approval else 'AUTO-APPROVE'}`"
             ),
+            "Primary execution plane: `DEX_NATIVE (ASTER/LIGHTER)`",
+            (
+                "TradingView signal mode: `LIVE`"
+                if self._tradingview_execution_enabled
+                else "TradingView signal mode: `WORKBENCH_DRY_RUN`"
+            ),
             f"TradingView autonomy: `{'ON' if self.tv_autonomy.enabled else 'OFF'}`",
             f"Community scripts: `{'ON' if self.tv_autonomy.community_access_enabled else 'OFF'}`",
             f"Owner directive: `{directive}`",
@@ -727,10 +743,11 @@ class AlphaEngine:
             f"💓 **SAPPHIRE HEARTBEAT** (`{reason}`)\n"
             f"Active: `{', '.join(live) if live else 'none'}` | "
             f"Paused: `{', '.join(paused) if paused else 'none'}`\n"
+            "Primary execution: `DEX_NATIVE (ASTER/LIGHTER)`\n"
             f"Kill switch: `{'ACTIVE' if self._kill_switch_active else 'OFF'}` | "
             f"Autonomy: `{'ON' if self._full_autonomy_enabled else 'OFF'}` | "
             f"Approvals: `{'OWNER' if self._autonomy_require_owner_approval else 'AUTO'}`\n"
-            f"Execution: `{'LIVE' if self._tradingview_execution_enabled else 'DRY-RUN'}` | "
+            f"TV signals: `{'LIVE' if self._tradingview_execution_enabled else 'WORKBENCH_DRY-RUN'}` | "
             f"Default qty: `{self._tradingview_default_quantity}`\n"
             f"Pending approvals: `{pending_count}` | Failure pressure: `{total_failures}`\n"
             f"Directive: `{directive}`\n"
@@ -1048,7 +1065,7 @@ class AlphaEngine:
             mode = str(target or "").strip().upper()
             if mode not in {"ON", "OFF", "TRUE", "FALSE", "1", "0"}:
                 await self.telegram.send_message(
-                    "❌ Invalid trade execution mode. Use `/trade on [qty]` or `/trade off`.",
+                    "❌ Invalid TradingView signal mode. Use `/trade on [qty]` or `/trade off`.",
                     priority="high",
                 )
                 return
@@ -1067,7 +1084,7 @@ class AlphaEngine:
                     )
             self._record_system_log(
                 (
-                    f"TradingView execution mode set to {'LIVE' if enable_execution else 'DRY-RUN'}"
+                    f"TradingView signal mode set to {'LIVE' if enable_execution else 'WORKBENCH_DRY-RUN'}"
                     + (
                         f" (qty={self._tradingview_default_quantity})"
                         if enable_execution
@@ -1090,12 +1107,12 @@ class AlphaEngine:
                         f"(cap `{quantity_result.get('cap')}`)."
                     )
                 await self.telegram.send_message(
-                    f"✅ TradingView execution mode: `LIVE`. {qty_note}",
+                    f"✅ TradingView signal mode: `LIVE`. {qty_note}",
                     priority="high",
                 )
             else:
                 await self.telegram.send_message(
-                    "🛑 TradingView execution mode: `DRY-RUN` (signals observed but not executed).",
+                    "🧪 TradingView signal mode: `WORKBENCH_DRY-RUN` (signals captured for research/backtests only).",
                     priority="high",
                 )
             return
@@ -1401,7 +1418,13 @@ class AlphaEngine:
         if self.tv_autonomy.is_workspace_action(normalized_action):
             workspace_result = await self.tv_autonomy.handle_action(normalized_action, merged_payload)
             result_type = workspace_result.get("accepted", "unknown")
-            if result_type in {"workspace_updated", "workspace_noop", "scan_requested", "custom_requested"}:
+            if result_type in {
+                "workspace_updated",
+                "workspace_noop",
+                "scan_requested",
+                "backtest_requested",
+                "custom_requested",
+            }:
                 dispatch = workspace_result.get("dispatch", {})
                 dispatch_status = "yes" if dispatch.get("dispatched") else f"no ({dispatch.get('reason', 'n/a')})"
                 await self.telegram.send_message(
@@ -1568,7 +1591,7 @@ class AlphaEngine:
             )
             await self.telegram.send_message(
                 (
-                    f"📥 TradingView signal captured (dry-run): `{normalized_action.upper()} {symbol}` "
+                    f"📥 TradingView signal captured (workbench dry-run): `{normalized_action.upper()} {symbol}` "
                     f"with quantities `{', '.join(qty_parts)}`. Set `TRADINGVIEW_EXECUTION_ENABLED=true` to execute."
                     f"{cap_note}"
                 ),

@@ -36,7 +36,7 @@ const navItems = [
     {
         to: '/sapphirealpha',
         label: 'Sapphire Alpha',
-        subtitle: 'Quant research + signal engine',
+        subtitle: 'Quant research + TV workbench',
         icon: Radar,
     },
 ]
@@ -59,7 +59,7 @@ const syncAgeSeconds = computed(() => {
 })
 
 const executionModeLabel = computed(() =>
-    controlStatus.value?.tradingview_execution_enabled ? 'Live Execution' : 'Dry-Run Guarded',
+    controlStatus.value?.tradingview_execution_enabled ? 'TV Signals Live' : 'TV Workbench Dry-Run',
 )
 
 const defaultQuantityLabel = computed(() => {
@@ -211,9 +211,9 @@ onUnmounted(() => {
                     <small>Authenticated operator channel</small>
                 </article>
                 <article class="quick-card glass-lift">
-                    <p class="font-mono">Execution</p>
+                    <p class="font-mono">TV Workbench</p>
                     <strong>{{ executionModeLabel }}</strong>
-                    <small>Default qty {{ defaultQuantityLabel }}</small>
+                    <small>Signal qty {{ defaultQuantityLabel }}</small>
                 </article>
                 <article class="quick-card glass-lift">
                     <p class="font-mono">Autonomy</p>

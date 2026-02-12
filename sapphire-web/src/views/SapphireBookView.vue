@@ -55,8 +55,7 @@ const autonomyScore = computed(() => {
     const weighted =
         stats.value.active * 1.2 +
         stats.value.queued * 0.5 -
-        pressure * 1.1 +
-        (control.value?.tradingview_execution_enabled ? 12 : 0)
+        pressure * 1.1
     const normalized = Math.round((weighted / total) * 35 + 50)
     return Math.max(5, Math.min(99, normalized))
 })

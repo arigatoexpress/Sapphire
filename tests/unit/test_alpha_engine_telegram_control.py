@@ -276,3 +276,34 @@ def test_dispatch_session_decision_rejects_invalid_inputs(autonomy_module):
     )
     assert invalid_decision["dispatched"] is False
     assert invalid_decision["reason"] == "invalid_decision"
+
+
+def test_tradingview_backtest_action_dispatches_workbench_request(autonomy_module, monkeypatch):
+    plugin = autonomy_module.TradingViewAutonomyPlugin(_DummyMarketData(), default_chat_id="12345")
+
+    async def fake_dispatch(action, payload, note, agent_id=""):
+        return {
+            "dispatched": True,
+            "action": action,
+            "payload": payload,
+            "note": note,
+            "agent_id": agent_id,
+        }
+
+    monkeypatch.setattr(plugin, "_dispatch_to_openclaw", fake_dispatch)
+
+    result = asyncio.run(
+        plugin.handle_action(
+            "tv_backtest",
+            {
+                "strategy": "tv-aster-breakout",
+                "symbol": "SOL",
+                "timeframe": "15",
+            },
+        )
+    )
+
+    assert result["accepted"] == "backtest_requested"
+    assert result["dispatch"]["dispatched"] is True
+    assert result["dispatch"]["action"] == "tv_backtest"
+    assert "workspace" in result

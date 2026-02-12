@@ -36,7 +36,7 @@ const refreshAge = computed(() => {
 })
 
 const executionMode = computed(() =>
-    control.value?.tradingview_execution_enabled ? 'Live execution' : 'Dry-run guarded',
+    control.value?.tradingview_execution_enabled ? 'TV signals live' : 'TV workbench dry-run',
 )
 
 const pendingDecisions = computed(() => Number(control.value?.pending_autonomy_decisions || 0))
@@ -75,21 +75,21 @@ const insightCards = computed<InsightCard[]>(() => [
         detail: `Mode: ${routingMode.value}`,
     },
     {
-        title: 'Execution Policy',
+        title: 'TradingView Mode',
         value: executionMode.value,
         detail: `Pending decisions: ${pendingDecisions.value}`,
     },
 ])
 
 const riskTone = computed(() => {
-    if (!control.value?.tradingview_execution_enabled) return 'tone-guarded'
     if ((routingConfidencePct.value || 0) >= 70) return 'tone-offensive'
-    return 'tone-balanced'
+    if ((routingConfidencePct.value || 0) >= 45) return 'tone-balanced'
+    return 'tone-guarded'
 })
 
 const readinessScore = computed(() => {
     const confidence = routingConfidencePct.value ?? 0
-    const executionBoost = control.value?.tradingview_execution_enabled ? 10 : -15
+    const executionBoost = control.value?.tradingview_execution_enabled ? 5 : 0
     const queuePenalty = Math.min(20, pendingDecisions.value * 4)
     const composite = Math.round(confidence + executionBoost - queuePenalty)
     return Math.max(0, Math.min(100, composite))
@@ -120,7 +120,7 @@ const strategyRail = computed(() => [
     {
         label: 'Route',
         detail: executionMode.value,
-        status: control.value?.tradingview_execution_enabled ? 'ready' : 'pending',
+        status: control.value ? 'ready' : 'pending',
     },
 ])
 
@@ -199,8 +199,8 @@ onUnmounted(() => {
                 <span class="font-mono kicker">SAPPHIRE ALPHA LIVE</span>
                 <h2>Market-intelligence suite synchronized with runtime routing and TradingView workspace state.</h2>
                 <p>
-                    This surface now reflects live confidence, execution policy, watchlists, and strategy assets. Control mutations stay
-                    Telegram-routed.
+                    DEX-native market data drives live routing and execution context. TradingView remains the strategy workbench for
+                    testing, backtesting, and signal iteration.
                 </p>
             </div>
             <div class="meta-line">

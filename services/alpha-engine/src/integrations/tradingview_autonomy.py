@@ -42,6 +42,7 @@ class TradingViewAutonomyPlugin:
         "tv_script_add",
         "tv_script_remove",
         "tv_scan_assets",
+        "tv_backtest",
         "tv_ta",
         "tv_custom",
     }
@@ -537,6 +538,13 @@ class TradingViewAutonomyPlugin:
             base.append(
                 "Scan all available assets for notable technical setups and return top opportunities."
             )
+        elif action == "tv_backtest":
+            strategy_name = str(payload.get("strategy", "")).strip() or "current workspace strategy set"
+            symbol = str(payload.get("symbol", self._state["selected_symbol"])).strip().upper()
+            timeframe = str(payload.get("timeframe", self._state["selected_timeframe"])).strip()
+            base.append(
+                f"Run TradingView strategy backtest for `{strategy_name}` on `{symbol}` timeframe `{timeframe}` and summarize performance metrics."
+            )
         elif action == "tv_ta":
             base.append(
                 f"Run technical analysis on `{payload.get('symbol', self._state['selected_symbol'])}` with preferred indicators."
@@ -703,6 +711,24 @@ class TradingViewAutonomyPlugin:
                 agent_id=target_agent,
             )
             return {"accepted": "scan_requested", "dispatch": dispatch, "note": note, "workspace": self.status_snapshot()}
+
+        elif action == "tv_backtest":
+            strategy_name = str(payload.get("strategy", "")).strip() or "workspace_strategies"
+            symbol = self._normalize_symbol(payload.get("symbol", state["selected_symbol"]))
+            timeframe = str(payload.get("timeframe", state["selected_timeframe"])).strip() or state["selected_timeframe"]
+            note = f"Backtest requested for strategy={strategy_name} symbol={symbol} timeframe={timeframe}."
+            dispatch = await self._dispatch_to_openclaw(
+                action,
+                payload,
+                self._make_openclaw_instruction(action, payload),
+                agent_id=target_agent,
+            )
+            return {
+                "accepted": "backtest_requested",
+                "dispatch": dispatch,
+                "note": note,
+                "workspace": self.status_snapshot(),
+            }
 
         elif action == "tv_custom":
             instruction = str(payload.get("instruction", "")).strip()

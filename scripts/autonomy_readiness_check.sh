@@ -14,6 +14,8 @@ LIGHTER_REGION="${LIGHTER_REGION:-europe-west1}"
 GATEWAY_REGION="${GATEWAY_REGION:-us-central1}"
 SCHEDULER_REGION="${SCHEDULER_REGION:-us-central1}"
 AUTONOMY_SA="${AUTONOMY_SA:-sapphire-main-sa@${PROJECT_ID}.iam.gserviceaccount.com}"
+EXPECTED_TV_SIGNAL_MODE="${EXPECTED_TV_SIGNAL_MODE:-workbench}"
+EXPECTED_TV_SIGNAL_MODE="$(echo "$EXPECTED_TV_SIGNAL_MODE" | tr '[:upper:]' '[:lower:]')"
 
 FAILURES=0
 
@@ -159,28 +161,39 @@ else
   fail "alpha enabled venues mismatch: ${enabled_venues:-<empty>}"
 fi
 
-tv_rules_enforced=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
-  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_ENFORCE_STRATEGY_RULES") | .value // empty')
-if [[ "$tv_rules_enforced" == "true" ]]; then
-  pass "alpha enforces TradingView strategy rules"
-else
-  fail "alpha strategy rule enforcement disabled: ${tv_rules_enforced:-<empty>}"
-fi
-
-tv_rules_json=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
-  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_STRATEGY_RULES_JSON") | .value // empty')
-if [[ -n "$tv_rules_json" ]]; then
-  pass "alpha TradingView strategy rules configured"
-else
-  fail "alpha TradingView strategy rules missing"
-fi
-
 tv_execution_enabled=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
   | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_EXECUTION_ENABLED") | .value // empty')
-if [[ "$tv_execution_enabled" == "true" ]]; then
-  pass "alpha TradingView execution enabled"
+if [[ "$EXPECTED_TV_SIGNAL_MODE" == "live" ]]; then
+  if [[ "$tv_execution_enabled" == "true" ]]; then
+    pass "alpha TradingView signal mode live"
+  else
+    fail "alpha TradingView signal mode expected live, got: ${tv_execution_enabled:-<empty>}"
+  fi
 else
-  fail "alpha TradingView execution disabled: ${tv_execution_enabled:-<empty>}"
+  if [[ "$tv_execution_enabled" == "true" ]]; then
+    fail "alpha TradingView signal mode expected workbench dry-run, got live"
+  else
+    pass "alpha TradingView signal mode workbench dry-run"
+  fi
+fi
+
+tv_rules_enforced=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
+  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_ENFORCE_STRATEGY_RULES") | .value // empty')
+tv_rules_json=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
+  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_STRATEGY_RULES_JSON") | .value // empty')
+if [[ "$tv_execution_enabled" == "true" ]]; then
+  if [[ "$tv_rules_enforced" == "true" ]]; then
+    pass "alpha enforces TradingView strategy rules in live signal mode"
+  else
+    fail "alpha strategy rule enforcement disabled in live signal mode: ${tv_rules_enforced:-<empty>}"
+  fi
+  if [[ -n "$tv_rules_json" ]]; then
+    pass "alpha TradingView strategy rules configured for live signal mode"
+  else
+    fail "alpha TradingView strategy rules missing in live signal mode"
+  fi
+else
+  pass "alpha TradingView strategy rules optional in workbench mode"
 fi
 
 tv_default_quantity=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
