@@ -11,7 +11,7 @@ echo "== Sapphire Focused Stack Verification =="
 ./scripts/focus_guard.sh
 ./scripts/frontend_contract_check.sh
 ./scripts/autonomy_readiness_check.sh
-./scripts/gcp_scope_reconcile.sh
+./scripts/gcp_scope_reconcile.sh --strict
 
 echo
 echo "Focused stack verification PASSED."

@@ -7,6 +7,7 @@ PROJECT_ID="${PROJECT_ID:-sapphire-479610}"
 LOCATION="${LOCATION:-us-central1}"
 APPLY=0
 DELETE_SERVICES=0
+STRICT=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -16,9 +17,12 @@ while [[ $# -gt 0 ]]; do
     --delete-services)
       DELETE_SERVICES=1
       ;;
+    --strict)
+      STRICT=1
+      ;;
     *)
       echo "Unknown option: $1"
-      echo "Usage: $0 [--apply] [--delete-services]"
+      echo "Usage: $0 [--apply] [--delete-services] [--strict]"
       exit 2
       ;;
   esac
@@ -61,48 +65,99 @@ contains() {
   return 1
 }
 
+load_inventory() {
+  mapfile -t CURRENT_SERVICES < <(
+    gcloud run services list --project "${PROJECT_ID}" --platform managed --format='value(name)' | sort
+  )
+  mapfile -t CURRENT_JOBS < <(
+    gcloud scheduler jobs list --project "${PROJECT_ID}" --location "${LOCATION}" --format='value(name.basename())' | sort
+  )
+}
+
+compute_extras() {
+  EXTRA_SERVICES=()
+  for svc in "${CURRENT_SERVICES[@]}"; do
+    if ! contains "${svc}" "${ALLOWED_SERVICES[@]}"; then
+      EXTRA_SERVICES+=("${svc}")
+    fi
+  done
+
+  EXTRA_JOBS=()
+  for job in "${CURRENT_JOBS[@]}"; do
+    if ! contains "${job}" "${ALLOWED_JOBS[@]}"; then
+      EXTRA_JOBS+=("${job}")
+    fi
+  done
+}
+
+print_extras() {
+  if [[ ${#EXTRA_SERVICES[@]} -eq 0 ]]; then
+    echo "No extra Cloud Run services outside focus scope."
+  else
+    echo "Extra Cloud Run services outside focus scope:"
+    printf '  %s\n' "${EXTRA_SERVICES[@]}"
+  fi
+
+  echo
+  if [[ ${#EXTRA_JOBS[@]} -eq 0 ]]; then
+    echo "No extra Scheduler jobs outside focus scope."
+  else
+    echo "Extra Scheduler jobs outside focus scope:"
+    printf '  %s\n' "${EXTRA_JOBS[@]}"
+  fi
+}
+
+resolve_service_region() {
+  local service_name="$1"
+  local region
+
+  region="$(
+    gcloud run services list \
+      --project "${PROJECT_ID}" \
+      --platform managed \
+      --format='value(name,region)' \
+      | awk -v target="${service_name}" '$1 == target {print $2; exit}'
+  )"
+  if [[ -n "${region}" ]]; then
+    echo "${region}"
+    return
+  fi
+
+  region="$(
+    gcloud run services describe "${service_name}" \
+      --project "${PROJECT_ID}" \
+      --platform managed \
+      --format='value(region)' 2>/dev/null || true
+  )"
+  if [[ -n "${region}" ]]; then
+    echo "${region}"
+    return
+  fi
+
+  region="$(
+    gcloud run services describe "${service_name}" \
+      --project "${PROJECT_ID}" \
+      --platform managed \
+      --format='value(location)' 2>/dev/null || true
+  )"
+  echo "${region}"
+}
+
 echo "Project: ${PROJECT_ID}"
 echo "Location: ${LOCATION}"
 echo
 
+load_inventory
 echo "Cloud Run services:"
-mapfile -t CURRENT_SERVICES < <(gcloud run services list --project "${PROJECT_ID}" --platform managed --format='value(name)' | sort)
 printf '  %s\n' "${CURRENT_SERVICES[@]}"
 echo
 
 echo "Scheduler jobs (${LOCATION}):"
-mapfile -t CURRENT_JOBS < <(gcloud scheduler jobs list --project "${PROJECT_ID}" --location "${LOCATION}" --format='value(name.basename())' | sort)
 printf '  %s\n' "${CURRENT_JOBS[@]}"
 echo
 
-EXTRA_SERVICES=()
-for svc in "${CURRENT_SERVICES[@]}"; do
-  if ! contains "${svc}" "${ALLOWED_SERVICES[@]}"; then
-    EXTRA_SERVICES+=("${svc}")
-  fi
-done
-
-EXTRA_JOBS=()
-for job in "${CURRENT_JOBS[@]}"; do
-  if ! contains "${job}" "${ALLOWED_JOBS[@]}"; then
-    EXTRA_JOBS+=("${job}")
-  fi
-done
-
-if [[ ${#EXTRA_SERVICES[@]} -eq 0 ]]; then
-  echo "No extra Cloud Run services outside focus scope."
-else
-  echo "Extra Cloud Run services outside focus scope:"
-  printf '  %s\n' "${EXTRA_SERVICES[@]}"
-fi
-
-echo
-if [[ ${#EXTRA_JOBS[@]} -eq 0 ]]; then
-  echo "No extra Scheduler jobs outside focus scope."
-else
-  echo "Extra Scheduler jobs outside focus scope:"
-  printf '  %s\n' "${EXTRA_JOBS[@]}"
-fi
+compute_extras
+print_extras
 
 if [[ "${APPLY}" -eq 1 ]]; then
   echo
@@ -118,7 +173,7 @@ if [[ "${APPLY}" -eq 1 ]]; then
   if [[ "${DELETE_SERVICES}" -eq 1 && ${#EXTRA_SERVICES[@]} -gt 0 ]]; then
     for svc in "${EXTRA_SERVICES[@]}"; do
       echo "Deleting Cloud Run service: ${svc}"
-      region="$(gcloud run services describe "${svc}" --project "${PROJECT_ID}" --platform managed --format='value(location)' 2>/dev/null || true)"
+      region="$(resolve_service_region "${svc}")"
       if [[ -n "${region}" ]]; then
         gcloud run services delete "${svc}" --project "${PROJECT_ID}" --region "${region}" --quiet
       else
@@ -128,7 +183,30 @@ if [[ "${APPLY}" -eq 1 ]]; then
   fi
 
   echo "Reconciliation complete."
+
+  if [[ "${STRICT}" -eq 1 ]]; then
+    echo
+    echo "Running strict post-reconcile scope check..."
+    load_inventory
+    compute_extras
+    if [[ ${#EXTRA_SERVICES[@]} -gt 0 || ${#EXTRA_JOBS[@]} -gt 0 ]]; then
+      print_extras
+      echo "Strict scope check FAILED after reconciliation."
+      exit 1
+    fi
+    echo "Strict scope check PASSED."
+  fi
 else
+  if [[ "${STRICT}" -eq 1 ]]; then
+    if [[ ${#EXTRA_SERVICES[@]} -gt 0 || ${#EXTRA_JOBS[@]} -gt 0 ]]; then
+      echo
+      echo "Strict scope check FAILED: extras detected."
+      exit 1
+    fi
+    echo
+    echo "Strict scope check PASSED."
+  fi
+
   echo
   echo "Dry-run only. Re-run with --apply to delete extra scheduler jobs."
   echo "Add --delete-services to also delete extra Cloud Run services."

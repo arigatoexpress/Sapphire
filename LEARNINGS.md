@@ -13,6 +13,7 @@
 - Strategy-gated TradingView autonomy (`TRADINGVIEW_ENFORCE_STRATEGY_RULES=true`) is required to keep autonomous actions bounded.
 - OpenClaw dispatch should reject out-of-scope repo/project directives before execution to prevent cross-repo divergence.
 - `./scripts/holistic_ops_check.sh` is the best single preflight command for focused operations readiness.
+- `./scripts/gcp_scope_reconcile.sh --strict` must fail the pipeline if out-of-scope Cloud Run services or scheduler jobs reappear.
 - Deprecated surfaces (`trading-dashboard-legacy`, `services/bot-retired_*`) should be removed to reduce operational entropy.
 
 ## Always Preserve

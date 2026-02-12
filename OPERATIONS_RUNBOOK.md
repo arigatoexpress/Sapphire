@@ -136,7 +136,9 @@ Scope reconciliation (dry-run then apply):
 
 ```bash
 ./scripts/gcp_scope_reconcile.sh
+./scripts/gcp_scope_reconcile.sh --strict
 ./scripts/gcp_scope_reconcile.sh --apply
+./scripts/gcp_scope_reconcile.sh --apply --delete-services --strict
 ```
 
 ## Secret Readiness Check
