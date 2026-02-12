@@ -14,6 +14,7 @@ from src.collaboration.forum import SapphireForumService
 from src.execution.dispatcher import dispatcher
 from src.feeds.market_data import MarketDataAggregator
 from src.integrations.tradingview_autonomy import TradingViewAutonomyPlugin
+from src.security.virustotal_scanner import VirusTotalSkillScanner
 from src.strategy.engine import AlphaStrategyEngine
 
 # Add shared library to path
@@ -148,6 +149,7 @@ class AlphaEngine:
         self._system_log_max_entries = max(100, int(os.getenv("SYSTEM_LOG_MAX_ENTRIES", "500")))
         self._system_logs: Deque[Dict[str, Any]] = deque(maxlen=self._system_log_max_entries)
         self.forum = SapphireForumService()
+        self.vt_scanner = VirusTotalSkillScanner()
         self._trade_metrics: Dict[str, float] = {
             "total_trades": 0.0,
             "wins": 0.0,
@@ -689,6 +691,12 @@ class AlphaEngine:
             f"DEX effective qty: `{snapshot['dex_effective_quantity']}`",
             f"TradingView signal mode: `{tv_signal_mode}`",
             f"Signal default quantity: `{snapshot['tradingview_default_quantity']}`",
+            (
+                "VT skill security: `ON`"
+                if snapshot.get("vt_security_enabled")
+                else "VT skill security: `OFF`"
+            ),
+            f"VT policy mode: `{snapshot.get('vt_enforcement_mode', 'warn')}`",
             f"Autonomy dispatches: `{snapshot['autonomy_dispatch_count']}`",
             f"Pending autonomy decisions: `{snapshot['pending_autonomy_decisions']}`",
             "",
@@ -752,6 +760,9 @@ class AlphaEngine:
             "pending_sessions": pending_summary,
             "owner_directive": self._owner_directive or "",
             "failure_pressure": int(sum(self._failure_counts.values())),
+            "vt_security_enabled": bool(self.vt_scanner.enabled),
+            "vt_api_key_configured": bool(self.vt_scanner.api_key),
+            "vt_enforcement_mode": self.vt_scanner.enforcement_mode,
             "venues": venues,
             "timestamp": int(time.time()),
         }
@@ -792,6 +803,7 @@ class AlphaEngine:
             ),
             f"TradingView autonomy: `{'ON' if self.tv_autonomy.enabled else 'OFF'}`",
             f"Community scripts: `{'ON' if self.tv_autonomy.community_access_enabled else 'OFF'}`",
+            f"VT skill security: `{'ON' if self.vt_scanner.enabled else 'OFF'}` (`{self.vt_scanner.enforcement_mode}`)",
             f"Owner directive: `{directive}`",
             f"Directive updated: `{directive_updated}`",
             "",
@@ -1151,6 +1163,88 @@ class AlphaEngine:
 
     async def _handle_control_command(self, target: str, action: str, value: float) -> None:
         normalized_action = action.upper()
+
+        if normalized_action in {"SECURITY_STATUS", "VT_STATUS", "SKILL_SECURITY_STATUS"}:
+            status = await self._handle_security_skills_status_request({})
+            last_scan = status.get("last_scan", {}) if isinstance(status, dict) else {}
+            last_scan_type = str(last_scan.get("type", "none")).strip() or "none"
+            last_scan_time = int(last_scan.get("timestamp", 0) or 0)
+            last_scan_verdict = str(last_scan.get("verdict", "n/a")).strip() or "n/a"
+            await self.telegram.send_message(
+                (
+                    "🛡️ **VIRUSTOTAL SKILL SECURITY**\n"
+                    f"Enabled: `{'YES' if status.get('enabled') else 'NO'}`\n"
+                    f"API key configured: `{'YES' if status.get('api_key_configured') else 'NO'}`\n"
+                    f"Policy mode: `{status.get('enforcement_mode', 'warn')}`\n"
+                    f"Skills dir: `{status.get('skills_dir', '')}`\n"
+                    f"Upload-on-miss: `{'YES' if status.get('upload_if_missing_default') else 'NO'}`\n"
+                    f"Last scan: `{last_scan_type}` at `{last_scan_time}` verdict `{last_scan_verdict}`"
+                ),
+                priority="medium",
+            )
+            return
+
+        if normalized_action in {"SECURITY_SCAN", "VT_SCAN", "SKILL_SECURITY_SCAN"}:
+            payload = self._parse_json_payload(target)
+            requested_skill = str(payload.get("skill", "")).strip()
+            if not requested_skill:
+                requested_skill = str(target or "").strip()
+            if requested_skill.startswith("{"):
+                requested_skill = ""
+            upload_if_missing = payload.get("upload_if_missing", self.vt_scanner.upload_if_missing_default)
+            upload_bool = str(upload_if_missing).strip().lower() in {"1", "true", "yes", "on"}
+
+            scan_scope = requested_skill if requested_skill and requested_skill.lower() != "all" else "all"
+            await self.telegram.send_message(
+                f"🛡️ VirusTotal scan requested for `{scan_scope}` (upload-on-miss: `{'YES' if upload_bool else 'NO'}`).",
+                priority="high",
+            )
+            result = await self._handle_security_skill_scan_request(
+                {
+                    "skill": requested_skill,
+                    "upload_if_missing": upload_bool,
+                }
+            )
+
+            if not result.get("ok"):
+                await self.telegram.send_message(
+                    (
+                        "❌ VirusTotal scan failed.\n"
+                        f"Reason: `{result.get('error', 'unknown')}`"
+                    ),
+                    priority="high",
+                )
+                return
+
+            if isinstance(result.get("results"), list):
+                counts = result.get("counts", {})
+                await self.telegram.send_message(
+                    (
+                        "✅ VirusTotal batch scan completed.\n"
+                        f"Skills scanned: `{result.get('skills_scanned', 0)}`\n"
+                        f"Benign: `{counts.get('benign', 0)}` | "
+                        f"Suspicious: `{counts.get('suspicious', 0)}` | "
+                        f"Malicious: `{counts.get('malicious', 0)}` | "
+                        f"Unknown: `{counts.get('unknown', 0)}`\n"
+                        f"Policy blocked: `{result.get('blocked_count', 0)}`"
+                    ),
+                    priority="high",
+                )
+            else:
+                security = result.get("security", {})
+                policy = security.get("policy", {}) if isinstance(security, dict) else {}
+                await self.telegram.send_message(
+                    (
+                        f"✅ VirusTotal scan completed for `{result.get('skill', 'unknown')}`.\n"
+                        f"Verdict: `{security.get('verdict', 'unknown')}` | "
+                        f"Code Insight: `{security.get('code_insight_verdict', 'unknown')}`\n"
+                        f"Policy: `{policy.get('mode', 'warn')}` | "
+                        f"Allowed: `{'YES' if policy.get('allowed') else 'NO'}`\n"
+                        f"Report: {result.get('vt', {}).get('report_url', 'n/a')}"
+                    ),
+                    priority="high",
+                )
+            return
 
         if normalized_action in {"SCOUT_STATUS", "FORUM_SCOUT_STATUS"}:
             status = self.forum.scout_status()
@@ -2037,6 +2131,8 @@ class AlphaEngine:
                 forum_scout_status_handler=self._handle_forum_scout_status_request,
                 forum_scout_register_handler=self._handle_forum_scout_register_request,
                 forum_scout_publish_handler=self._handle_forum_scout_publish_request,
+                security_skills_status_handler=self._handle_security_skills_status_request,
+                security_skills_scan_handler=self._handle_security_skill_scan_request,
             )
         else:
             await start_health_server(
@@ -2056,6 +2152,8 @@ class AlphaEngine:
                 forum_scout_status_handler=self._handle_forum_scout_status_request,
                 forum_scout_register_handler=self._handle_forum_scout_register_request,
                 forum_scout_publish_handler=self._handle_forum_scout_publish_request,
+                security_skills_status_handler=self._handle_security_skills_status_request,
+                security_skills_scan_handler=self._handle_security_skill_scan_request,
             )
 
         # 1. Start Telegram FIRST for immediate status
@@ -2335,6 +2433,51 @@ class AlphaEngine:
             "workspace": snapshot,
             "timestamp": int(time.time()),
         }
+
+    async def _handle_security_skills_status_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
+        status = self.vt_scanner.status()
+        status["timestamp"] = int(time.time())
+        return status
+
+    async def _handle_security_skill_scan_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        requested_skill = str(payload.get("skill", "")).strip()
+        upload_if_missing_raw = payload.get("upload_if_missing", self.vt_scanner.upload_if_missing_default)
+        upload_if_missing = str(upload_if_missing_raw).strip().lower() in {"1", "true", "yes", "on"}
+
+        if requested_skill and requested_skill.lower() != "all":
+            result = await self.vt_scanner.scan_skill(
+                requested_skill,
+                upload_if_missing=upload_if_missing,
+            )
+            if result.get("ok"):
+                security = result.get("security", {})
+                self._record_system_log(
+                    f"VirusTotal scan completed for {requested_skill}",
+                    level="info",
+                    tags=["security", "virustotal", "skills"],
+                    metadata={
+                        "skill": requested_skill,
+                        "verdict": security.get("verdict", "unknown"),
+                        "policy_blocked": bool(
+                            (security.get("policy", {}) or {}).get("blocked", False)
+                        ),
+                    },
+                )
+            return result
+
+        batch_result = await self.vt_scanner.scan_all_skills(upload_if_missing=upload_if_missing)
+        if batch_result.get("ok"):
+            self._record_system_log(
+                "VirusTotal batch scan completed",
+                level="info",
+                tags=["security", "virustotal", "skills"],
+                metadata={
+                    "skills_scanned": int(batch_result.get("skills_scanned", 0)),
+                    "counts": batch_result.get("counts", {}),
+                    "blocked_count": int(batch_result.get("blocked_count", 0)),
+                },
+            )
+        return batch_result
 
     async def _handle_forum_topics_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         board = self.forum.list_topics(payload)

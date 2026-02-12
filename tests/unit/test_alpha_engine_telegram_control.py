@@ -340,6 +340,54 @@ def test_answer_alias_still_routes_to_owner_steer(telegram_module):
     assert "prioritize reliability" in symbol
 
 
+def test_security_status_command_dispatches_action(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/security status"}}
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert symbol == "ALL"
+    assert action == "SECURITY_STATUS"
+    assert quantity == 0.0
+
+
+def test_security_scan_command_dispatches_payload(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/security scan ci-cd no-upload"}}
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert action == "SECURITY_SCAN"
+    assert quantity == 0.0
+    payload = json.loads(symbol)
+    assert payload["skill"] == "ci-cd"
+    assert payload["upload_if_missing"] is False
+
+
 def test_dispatch_session_decision_payload(autonomy_module, monkeypatch):
     plugin = autonomy_module.TradingViewAutonomyPlugin(_DummyMarketData(), default_chat_id="12345")
 

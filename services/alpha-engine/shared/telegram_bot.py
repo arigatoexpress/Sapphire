@@ -39,6 +39,7 @@ class TelegramPlatformBot:
         "gate": "PROMOTION_GATE",
         "focus": "CONTROL_FOCUS",
         "autonomy": "AUTONOMY_CYCLE",
+        "security": "SECURITY_STATUS",
     }
     TARGET_ALIASES = {
         "LIGHT": "LIGHTER",
@@ -398,6 +399,8 @@ class TelegramPlatformBot:
             "- `/scout status`\n"
             "- `/scout register <username> [display_name]`\n"
             "- `/scout publish <note>`\n"
+            "- `/security status`\n"
+            "- `/security scan [skill|all] [upload|no-upload]`\n"
             "- `/deallocate <venue>`\n"
             "- `/allocate <venue> <percent>`\n\n"
             "Owner steering:\n"
@@ -541,6 +544,53 @@ class TelegramPlatformBot:
                 priority=NotificationPriority.HIGH,
             )
             await self._dispatch_callback("CONTROL", payload, "SCOUT_PUBLISH", 0.0)
+            return
+
+        # VirusTotal security commands
+        slash_security_cmd = re.search(
+            r"^/security\s+(status|scan)(?:\s+([A-Za-z0-9._-]+|all))?(?:\s+(upload|no-upload))?$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        mention_security_cmd = re.search(
+            r"@(alpha|control)\s+security\s+(status|scan)(?:\s+([A-Za-z0-9._-]+|all))?(?:\s+(upload|no-upload))?$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if slash_security_cmd or mention_security_cmd:
+            if slash_security_cmd:
+                command = str(slash_security_cmd.group(1) or "").strip().lower()
+                skill = str(slash_security_cmd.group(2) or "").strip()
+                upload_token = str(slash_security_cmd.group(3) or "").strip().lower()
+            else:
+                command = str(mention_security_cmd.group(2) or "").strip().lower()
+                skill = str(mention_security_cmd.group(3) or "").strip()
+                upload_token = str(mention_security_cmd.group(4) or "").strip().lower()
+
+            if command == "status":
+                await self.send_message(
+                    "🛡️ VirusTotal security status request accepted.",
+                    priority=NotificationPriority.HIGH,
+                )
+                await self._dispatch_callback("CONTROL", "ALL", "SECURITY_STATUS", 0.0)
+                return
+
+            upload_if_missing = upload_token != "no-upload"
+            payload = json.dumps(
+                {
+                    "skill": skill or "all",
+                    "upload_if_missing": upload_if_missing,
+                },
+                separators=(",", ":"),
+            )
+            await self.send_message(
+                (
+                    "🛡️ VirusTotal scan request accepted."
+                    f" Scope: `{skill or 'all'}` | upload-on-miss: `{'YES' if upload_if_missing else 'NO'}`"
+                ),
+                priority=NotificationPriority.HIGH,
+            )
+            await self._dispatch_callback("CONTROL", payload, "SECURITY_SCAN", 0.0)
             return
 
         # Owner steering command

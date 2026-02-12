@@ -386,6 +386,46 @@ async def forum_scout_publish(request: web.Request) -> web.Response:
     return web.json_response({"ok": True}, status=200)
 
 
+async def security_skills_status(request: web.Request) -> web.Response:
+    handler = request.app.get("security_skills_status_handler")
+    if handler is None:
+        return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
+    try:
+        result = await handler({})
+    except Exception as exc:
+        logger.error(f"Security skills status handler error: {exc}")
+        return web.json_response({"ok": False, "error": "handler_failed"}, status=500)
+    if isinstance(result, dict):
+        status = 400 if result.get("error") else 200
+        return web.json_response({"ok": status == 200, **result}, status=status)
+    return web.json_response({"ok": True}, status=200)
+
+
+async def security_skills_scan(request: web.Request) -> web.Response:
+    handler = request.app.get("security_skills_scan_handler")
+    if handler is None:
+        return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
+
+    if request.method == "GET":
+        upload_value = str(request.rel_url.query.get("upload_if_missing", "true")).strip().lower()
+        payload = {
+            "skill": request.rel_url.query.get("skill", ""),
+            "upload_if_missing": upload_value in {"1", "true", "yes", "on"},
+        }
+    else:
+        payload = await _read_json_payload(request)
+
+    try:
+        result = await handler(payload)
+    except Exception as exc:
+        logger.error(f"Security skills scan handler error: {exc}")
+        return web.json_response({"ok": False, "error": "handler_failed"}, status=500)
+    if isinstance(result, dict):
+        status = 400 if result.get("error") else 200
+        return web.json_response({"ok": status == 200, **result}, status=status)
+    return web.json_response({"ok": True}, status=200)
+
+
 async def start_health_server(
     telegram_update_handler: Optional[Callable[[dict[str, Any]], Awaitable[None]]] = None,
     telegram_webhook_secret: str = "",
@@ -409,6 +449,10 @@ async def start_health_server(
     forum_scout_status_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
     forum_scout_register_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
     forum_scout_publish_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
+    security_skills_status_handler: Optional[
+        Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]
+    ] = None,
+    security_skills_scan_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
 ):
     """Start a lightweight HTTP server for Cloud Run health checks."""
     port = int(os.getenv("PORT", "8080"))
@@ -468,6 +512,13 @@ async def start_health_server(
     if forum_scout_publish_handler is not None:
         app["forum_scout_publish_handler"] = forum_scout_publish_handler
         app.router.add_post("/api/v2/forum/scout/publish", forum_scout_publish)
+    if security_skills_status_handler is not None:
+        app["security_skills_status_handler"] = security_skills_status_handler
+        app.router.add_get("/api/v2/security/skills/status", security_skills_status)
+    if security_skills_scan_handler is not None:
+        app["security_skills_scan_handler"] = security_skills_scan_handler
+        app.router.add_get("/api/v2/security/skills/scan", security_skills_scan)
+        app.router.add_post("/api/v2/security/skills/scan", security_skills_scan)
 
     runner = web.AppRunner(app)
     await runner.setup()

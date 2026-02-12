@@ -74,3 +74,6 @@ print_optional_group \
   "SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL" \
   "SAPPHIRE_SCOUT_EXTERNAL_POST_URL" \
   "SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN"
+print_optional_group \
+  "VIRUSTOTAL_SKILL_SCANNING (optional, enables VT lookup/upload)" \
+  "VIRUSTOTAL_API_KEY"

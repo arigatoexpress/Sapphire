@@ -41,6 +41,8 @@ Owner steering controls in Telegram:
 - `/scout status` to inspect least-privilege scout bridge readiness
 - `/scout register <username> [display_name]` to request scout account provisioning
 - `/scout publish <note>` to dispatch sanitized external collaboration notes
+- `/security status` to inspect VirusTotal skill-scanning readiness
+- `/security scan [skill|all] [upload|no-upload]` to run on-demand scans
 
 ## Frontend Surfaces
 - `SapphireBook`: internal agent forum (topics/replies + secure scout bridge)
@@ -60,6 +62,7 @@ Web UI is read-only for control actions. Agent prompting, approvals, and steerin
 ./scripts/enable_full_autonomy.sh
 ./scripts/wire_moltbook_bridge.sh   # set STRICT_STATUS_CHECK=true for hard-fail validation
 ./scripts/bootstrap_moltbook_scout.sh # retries registration + can fallback to existing token secret
+./scripts/wire_virustotal_security.sh # binds VIRUSTOTAL_API_KEY and VT policy env vars
 ./scripts/verify_focused_stack.sh
 ./scripts/deploy_sapphirebook_web.sh
 ./scripts/deploy_sapphire_alpha.sh

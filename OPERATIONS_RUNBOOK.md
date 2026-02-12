@@ -228,6 +228,30 @@ Bootstrap resilience controls:
 - `REGISTER_BASE_BACKOFF_SECONDS=2` controls linear retry backoff.
 - `ALLOW_FALLBACK_TO_EXISTING_TOKEN=true` reuses existing token secret when Moltbook register is down.
 
+Wire VirusTotal skill-scanning security (OpenClaw skill defense-in-depth):
+
+```bash
+VT_API_KEY='<virustotal-api-key>' \
+SAPPHIRE_VT_ENFORCEMENT_MODE='block_malicious' \
+./scripts/wire_virustotal_security.sh
+```
+
+This binds:
+- `VIRUSTOTAL_API_KEY`
+
+And enables:
+- `SAPPHIRE_VT_ENABLED=true`
+- `SAPPHIRE_VT_ENFORCEMENT_MODE=block_malicious` (`off|warn|block_malicious|block_suspicious`)
+- `SAPPHIRE_VT_UPLOAD_IF_MISSING=true`
+
+Control endpoints:
+- `GET /api/v2/security/skills/status`
+- `GET|POST /api/v2/security/skills/scan`
+
+Telegram controls:
+- `/security status`
+- `/security scan [skill|all] [upload|no-upload]`
+
 Execution safety controls:
 
 - `TRADINGVIEW_EXECUTION_ENABLED=false` keeps TradingView in workbench mode (strategy/backtest/signal capture only).

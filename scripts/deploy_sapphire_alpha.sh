@@ -60,6 +60,12 @@ SAPPHIRE_SCOUT_OPENCLAW_HOOK_URL="${SAPPHIRE_SCOUT_OPENCLAW_HOOK_URL:-${TRADINGV
 SCOUT_REGISTER_URL_SECRET="${SCOUT_REGISTER_URL_SECRET:-SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL}"
 SCOUT_POST_URL_SECRET="${SCOUT_POST_URL_SECRET:-SAPPHIRE_SCOUT_EXTERNAL_POST_URL}"
 SCOUT_API_TOKEN_SECRET="${SCOUT_API_TOKEN_SECRET:-SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN}"
+SAPPHIRE_VT_ENABLED="${SAPPHIRE_VT_ENABLED:-true}"
+SAPPHIRE_VT_ENFORCEMENT_MODE="${SAPPHIRE_VT_ENFORCEMENT_MODE:-block_malicious}"
+SAPPHIRE_VT_UPLOAD_IF_MISSING="${SAPPHIRE_VT_UPLOAD_IF_MISSING:-true}"
+SAPPHIRE_VT_MAX_POLL_ATTEMPTS="${SAPPHIRE_VT_MAX_POLL_ATTEMPTS:-12}"
+SAPPHIRE_VT_POLL_INTERVAL_SECONDS="${SAPPHIRE_VT_POLL_INTERVAL_SECONDS:-5}"
+VIRUSTOTAL_API_KEY_SECRET="${VIRUSTOTAL_API_KEY_SECRET:-VIRUSTOTAL_API_KEY}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ALPHA_DIR="${ROOT_DIR}/services/alpha-engine"
@@ -79,9 +85,10 @@ echo
 
 docker buildx build \
   --platform "${PLATFORM}" \
+  -f "${ALPHA_DIR}/Dockerfile" \
   -t "${IMAGE_URI}" \
   -t "${IMAGE_LATEST}" \
-  --push "${ALPHA_DIR}"
+  --push "${ROOT_DIR}"
 
 gcloud run deploy "${SERVICE_NAME}" \
   --project "${PROJECT_ID}" \
@@ -131,6 +138,11 @@ gcloud run deploy "${SERVICE_NAME}" \
   --update-env-vars "SAPPHIRE_ALLOWED_REPOS=${SAPPHIRE_ALLOWED_REPOS}" \
   --update-env-vars "SAPPHIRE_ALLOWED_GCP_PROJECTS=${SAPPHIRE_ALLOWED_GCP_PROJECTS}" \
   --update-env-vars "SAPPHIRE_BLOCKED_SCOPE_TERMS=${SAPPHIRE_BLOCKED_SCOPE_TERMS}" \
+  --update-env-vars "SAPPHIRE_VT_ENABLED=${SAPPHIRE_VT_ENABLED}" \
+  --update-env-vars "SAPPHIRE_VT_ENFORCEMENT_MODE=${SAPPHIRE_VT_ENFORCEMENT_MODE}" \
+  --update-env-vars "SAPPHIRE_VT_UPLOAD_IF_MISSING=${SAPPHIRE_VT_UPLOAD_IF_MISSING}" \
+  --update-env-vars "SAPPHIRE_VT_MAX_POLL_ATTEMPTS=${SAPPHIRE_VT_MAX_POLL_ATTEMPTS}" \
+  --update-env-vars "SAPPHIRE_VT_POLL_INTERVAL_SECONDS=${SAPPHIRE_VT_POLL_INTERVAL_SECONDS}" \
   --update-env-vars "SAPPHIRE_SCOUT_AGENT_ID=${SAPPHIRE_SCOUT_AGENT_ID}" \
   --update-env-vars "SAPPHIRE_SCOUT_DISPATCH_AGENT_ID=${SAPPHIRE_SCOUT_DISPATCH_AGENT_ID}" \
   --update-env-vars "SAPPHIRE_SCOUT_OPENCLAW_HOOK_URL=${SAPPHIRE_SCOUT_OPENCLAW_HOOK_URL}"
@@ -164,6 +176,17 @@ if [[ "${#SCOUT_SECRET_MAPPINGS[@]}" -gt 0 ]]; then
   echo "Scout external bridge secret bindings applied."
 else
   echo "Scout external bridge secrets not found yet; keeping OpenClaw fallback active."
+fi
+
+if has_secret "${VIRUSTOTAL_API_KEY_SECRET}"; then
+  echo "Applying VirusTotal API secret binding to ${SERVICE_NAME}."
+  gcloud run services update "${SERVICE_NAME}" \
+    --project "${PROJECT_ID}" \
+    --region "${REGION}" \
+    --update-secrets "VIRUSTOTAL_API_KEY=${VIRUSTOTAL_API_KEY_SECRET}:latest" >/dev/null
+  echo "VirusTotal secret binding applied."
+else
+  echo "VirusTotal secret ${VIRUSTOTAL_API_KEY_SECRET} not found; VT scans will remain unavailable."
 fi
 
 SERVICE_URL="$(gcloud run services describe "${SERVICE_NAME}" --project "${PROJECT_ID}" --region "${REGION}" --format='value(status.url)')"
