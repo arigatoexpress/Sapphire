@@ -25,17 +25,17 @@ class AlphaStrategyEngine:
         while self.running:
             try:
                 aster_price = self.market_data.get_price("ASTER", "SOL")
-                hl_price = self.market_data.get_price("LIGHTER", "SOL")
+                lighter_price = self.market_data.get_price("LIGHTER", "SOL")
 
-                if aster_price > 0 and hl_price > 0:
-                    spread = abs(aster_price - hl_price)
-                    spread_pct = spread / min(aster_price, hl_price)
+                if aster_price > 0 and lighter_price > 0:
+                    spread = abs(aster_price - lighter_price)
+                    spread_pct = spread / min(aster_price, lighter_price)
 
                     if spread_pct > self.min_spread_pct:
                         now = time.time()
                         if now - self.last_execution_time > 5.0:  # 5s cooldown for now (debug mode)
                             logger.info(
-                                f"⚡ ARB OPPORTUNITY: Aster={aster_price} HL={hl_price} Spread={spread_pct:.4f}"
+                                f"⚡ ARB OPPORTUNITY: Aster={aster_price} Lighter={lighter_price} Spread={spread_pct:.4f}"
                             )
 
                             # Phase 2.2: Dispatch Execution
@@ -43,7 +43,7 @@ class AlphaStrategyEngine:
 
                             cmd = {
                                 "type": "ARB_EXECUTE",
-                                "side": "BUY" if aster_price < hl_price else "SELL",
+                                "side": "BUY" if aster_price < lighter_price else "SELL",
                                 "symbol": "SOL",
                                 "spread": spread_pct,
                             }
