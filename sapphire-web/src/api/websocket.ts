@@ -18,7 +18,7 @@ export class WebSocketClient {
         // If dev mode, use the known backend URL (optional fallback)
         const baseUrl = import.meta.env.PROD
             ? `${protocol}//${host}`
-            : 'wss://sapphire-v2-s77j6bxyra-uc.a.run.app'
+            : 'wss://sapphire-alpha-s77j6bxyra-uc.a.run.app'
 
         this.url = `${baseUrl}${endpoint}`
     }

@@ -23,11 +23,9 @@ class OrchestratorConfig:
     """Configuration for the trading orchestrator."""
 
     enable_aster: bool = True
-    enable_aster: bool = True
-    enable_aster: bool = True
     enable_lighter: bool = True
-    enable_lighter: bool = True
-    enable_jupiter: bool = True
+    enable_jupiter: bool = False
+    sapphire_focused_mode: bool = True
 
     max_concurrent_trades: int = 5
     loop_interval_seconds: float = 60.0
@@ -57,11 +55,13 @@ class TradingOrchestrator:
         self.settings = settings or Settings()
         self.config = OrchestratorConfig(
             enable_aster=self.settings.enable_aster,
-            enable_aster=self.settings.enable_aster,
-            enable_aster=self.settings.enable_aster,
             enable_lighter=self.settings.enable_lighter,
-            enable_lighter=self.settings.enable_lighter,
-            enable_jupiter=getattr(self.settings, "enable_jupiter", True),
+            enable_jupiter=(
+                False
+                if getattr(self.settings, "sapphire_focused_mode", True)
+                else getattr(self.settings, "enable_jupiter", True)
+            ),
+            sapphire_focused_mode=getattr(self.settings, "sapphire_focused_mode", True),
             paper_trading=getattr(self.settings, "paper_trading", False),
         )
 
@@ -75,7 +75,6 @@ class TradingOrchestrator:
 
         # Platform Clients
         self._exchange_client = None  # Aster
-        self.aster = None
         self.aster = None
         self.hl_client = None  # Lighter
         self.lighter_client = None  # Lighter
@@ -258,9 +257,11 @@ class TradingOrchestrator:
             else:
                 logger.info("ℹ️ Lighter credentials not found, skipping initialization")
 
-        # Initialize Jupiter (only if enabled AND credentials exist)
+        # Initialize Jupiter (disabled by default in Sapphire focused mode)
         step_start = time.time()
-        if self.config.enable_jupiter and creds.jupiter_api_key and creds.solana_private_key:
+        if self.config.sapphire_focused_mode:
+            logger.info("ℹ️ Sapphire focused mode active: Jupiter initialization disabled")
+        elif self.config.enable_jupiter and creds.jupiter_api_key and creds.solana_private_key:
             try:
                 from ..jupiter_trader_unified import JupiterTraderUnified
                 logger.info("⏱️ [INIT] Starting Jupiter client initialization...")

@@ -64,6 +64,11 @@ class Settings(BaseSettings):
     enable_lighter: bool = Field(default=False, validation_alias="ENABLE_LIGHTER")
     enable_aster: bool = Field(default=False, validation_alias="ENABLE_ASTER")
     enable_lighter: bool = Field(default=False, validation_alias="ENABLE_LIGHTER")
+    sapphire_focused_mode: bool = Field(
+        default=True,
+        validation_alias="SAPPHIRE_FOCUSED_MODE",
+        description="Lock runtime to Sapphire-focused venues (ASTER/LIGHTER) and disable legacy routes.",
+    )
 
     # Database configuration
     database_enabled: bool = Field(default=True, validation_alias="DATABASE_ENABLED")
@@ -99,6 +104,14 @@ class Settings(BaseSettings):
             # Support both comma and semicolon separators (semicolon for gcloud compatibility)
             separator = ";" if ";" in self.trading_symbols else ","
             return [s.strip().upper() for s in self.trading_symbols.split(separator) if s.strip()]
+
+        # Focus mode keeps runtime bounded to active Sapphire venues only.
+        if getattr(self, "sapphire_focused_mode", True):
+            if getattr(self, "enable_aster", False):
+                return ["SOL-PERP", "BTC-PERP", "ETH-PERP"]
+            if getattr(self, "enable_lighter", False):
+                return ["BTC", "ETH", "SOL"]
+            return ["BTC", "ETH", "SOL"]
 
         # Platform-specific defaults based on enabled platforms
         if getattr(self, 'enable_jupiter', False):
@@ -371,9 +384,14 @@ class Settings(BaseSettings):
         description="Enable Aster Agent integration"
     )
     enable_jupiter: bool = Field(
-        default=True,
+        default=False,
         validation_alias="ENABLE_JUPITER",
         description="Enable Jupiter DEX aggregator integration"
+    )
+    sapphire_focused_mode: bool = Field(
+        default=True,
+        validation_alias="SAPPHIRE_FOCUSED_MODE",
+        description="Lock runtime to Sapphire-focused venues (ASTER/LIGHTER) and disable legacy routes.",
     )
 
     # Paper trading testnet configuration

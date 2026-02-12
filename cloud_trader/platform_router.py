@@ -150,6 +150,8 @@ class PlatformRouter:
         3. Aster for exclusive symbols
         4. Fallback to Aster (if region allows)
         """
+        focused_mode = getattr(getattr(self.service, "settings", None), "sapphire_focused_mode", True)
+
         # Strategy 0: MICROSERVICE PLATFORM ISOLATION
         # In microservices mode, each service only routes to its designated platform
         enabled_platforms = []
@@ -185,6 +187,20 @@ class PlatformRouter:
             # If NO platforms enabled, log warning and continue with normal routing
             if len(enabled_platforms) == 0:
                 logger.warning(f"⚠️ No platforms enabled in config, using default routing logic")
+
+        # In Sapphire focused mode we hard-limit routing to ASTER/LIGHTER only.
+        if focused_mode:
+            if symbol in ASTER_SYMBOLS:
+                return PlatformType.ASTER
+            if symbol in LIGHTER_SYMBOLS:
+                return PlatformType.LIGHTER
+            if enabled_platforms:
+                if PlatformType.ASTER in enabled_platforms:
+                    return PlatformType.ASTER
+                if PlatformType.LIGHTER in enabled_platforms:
+                    return PlatformType.LIGHTER
+                return enabled_platforms[0]
+            return PlatformType.LIGHTER
 
         # Strategy 1: Agent Explicit System Preference (EXCEPT Aster - US blocked)
         if hasattr(agent, "system") and agent.system:
@@ -281,6 +297,14 @@ class PlatformRouter:
         3. Aster (if symbol supported)
         4. Aster (blocked in US, last resort)
         """
+        focused_mode = getattr(getattr(self.service, "settings", None), "sapphire_focused_mode", True)
+        if focused_mode:
+            if failed_platform == PlatformType.ASTER and symbol in LIGHTER_SYMBOLS:
+                return PlatformType.LIGHTER
+            if failed_platform == PlatformType.LIGHTER and symbol in ASTER_SYMBOLS:
+                return PlatformType.ASTER
+            return None
+
         # If Aster failed (likely US region block), try US-compatible exchanges
         if failed_platform == PlatformType.ASTER:
             # Prefer Jupiter for Solana tokens

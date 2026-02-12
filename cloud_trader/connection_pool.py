@@ -66,7 +66,7 @@ class PlatformConnectionPool:
                 connector=connector,
                 timeout=timeout,
                 headers={
-                    "User-Agent": "Sapphire-V2.3-HFT",
+                    "User-Agent": "Sapphire-Focused",
                     "Connection": "keep-alive"
                 }
             )

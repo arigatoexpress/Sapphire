@@ -286,8 +286,8 @@ class AISymbolResolver:
     async def _llm_resolve(self, symbol: str, platform: str) -> Optional[str]:
         """Use LLM to resolve complex symbol mappings."""
         try:
-            # Import Vertex AI client
-            from cloud_trader.vertex_ai_client import get_vertex_client
+            # Import lightweight bridge to avoid hard coupling to legacy monolith modules.
+            from vertex_ai_bridge import get_vertex_client
 
             client = get_vertex_client()
             if not client:

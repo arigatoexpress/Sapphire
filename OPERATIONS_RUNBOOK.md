@@ -101,6 +101,7 @@ Idempotent job setup script:
 
 ```bash
 ./scripts/setup_scheduler_jobs.sh
+./scripts/setup_clawdbot_jobs.sh
 ```
 
 Scope reconciliation (dry-run then apply):
@@ -118,6 +119,7 @@ Run:
 ./scripts/check_required_secrets.sh
 ./scripts/autonomy_readiness_check.sh
 ./scripts/focus_guard.sh
+./scripts/verify_focused_stack.sh
 ```
 
 Expected result for current scope:

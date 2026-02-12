@@ -40,6 +40,8 @@ All three agents operate through OpenClaw with Sapphire-only skills in:
 ./scripts/autonomy_readiness_check.sh
 ./scripts/focus_guard.sh
 ./scripts/gcp_scope_reconcile.sh
+./scripts/setup_clawdbot_jobs.sh
+./scripts/verify_focused_stack.sh
 ```
 
 ## Authoritative Operating Docs
