@@ -604,7 +604,7 @@ class AlphaEngine:
             f"Owner directive: `{directive}`",
             f"Directive updated: `{directive_updated}`",
             "",
-            "Use `/steer <directive>` to update direction.",
+            "Use `/steer <directive>` or `/answer <response>` to update direction.",
         ]
         await self.telegram.send_message("\n".join(lines), priority="medium")
 
@@ -625,7 +625,7 @@ class AlphaEngine:
             f"Full autonomy: `{'ON' if self._full_autonomy_enabled else 'OFF'}`\n"
             f"Failure pressure: `{total_failures}`\n\n"
             f"Owner directive: `{directive}`\n\n"
-            "Reply with `/status`, `/heartbeat`, `/focus`, `/promotion`, `/autonomy`, `/kill`, `/resume`, `/steer <directive>`, "
+            "Reply with `/status`, `/heartbeat`, `/focus`, `/promotion`, `/autonomy`, `/kill`, `/resume`, `/steer <directive>`, `/answer <response>`, "
             "or `@alpha deallocate <venue>`."
         )
         await self.telegram.send_message(msg, priority="medium")
@@ -648,6 +648,8 @@ class AlphaEngine:
             "owner_directive": self._owner_directive or "",
             "enabled_venues": sorted(list(dispatcher.bot_urls.keys())),
             "autonomy_dispatch_count": self._autonomy_dispatch_count,
+            "allowed_repo_scope": sorted(list(getattr(self.tv_autonomy, "allowed_repo_scope", set()))),
+            "allowed_project_scope": sorted(list(getattr(self.tv_autonomy, "allowed_project_scope", set()))),
         }
 
     def _autonomy_trigger_reason(self, context: Dict[str, Any]) -> str:
@@ -784,7 +786,7 @@ class AlphaEngine:
             directive = str(target or "").strip()
             if not directive:
                 await self.telegram.send_message(
-                    "❌ Owner steering directive is empty. Use `/steer <directive>`.",
+                    "❌ Owner steering directive is empty. Use `/steer <directive>` or `/answer <response>`.",
                     priority="high",
                 )
                 return

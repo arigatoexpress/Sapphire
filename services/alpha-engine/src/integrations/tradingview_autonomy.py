@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
@@ -57,6 +58,11 @@ class TradingViewAutonomyPlugin:
         "tv_script_remove",
     }
 
+    @staticmethod
+    def _parse_scope_items(value: str) -> Set[str]:
+        cleaned = str(value or "").replace("|", ",").replace(";", ",")
+        return {token.strip() for token in cleaned.split(",") if token.strip()}
+
     def __init__(self, market_data: Any, default_chat_id: str = "") -> None:
         self.market_data = market_data
         self.enabled = _env_flag("TRADINGVIEW_AUTONOMY_ENABLED", default=False)
@@ -73,6 +79,18 @@ class TradingViewAutonomyPlugin:
             os.getenv("TRADINGVIEW_AUTONOMY_CHAT_ID", "").strip() or str(default_chat_id or "").strip()
         )
         self.workspace_label = os.getenv("TRADINGVIEW_WORKSPACE_LABEL", "SAPPHIRE_MAIN").strip()
+        self.allowed_repo_scope = self._parse_scope_items(
+            os.getenv("SAPPHIRE_ALLOWED_REPOS", "arigatoexpress/Sapphire,Sapphire")
+        ) or {"arigatoexpress/Sapphire", "Sapphire"}
+        self.allowed_project_scope = self._parse_scope_items(
+            os.getenv("SAPPHIRE_ALLOWED_GCP_PROJECTS", "sapphire-479610")
+        ) or {"sapphire-479610"}
+        self.blocked_scope_terms = {
+            term.lower()
+            for term in self._parse_scope_items(
+                os.getenv("SAPPHIRE_BLOCKED_SCOPE_TERMS", "sapphireai,sapphire-inc,sapphire inc")
+            )
+        }
         self.state_path = Path(
             os.getenv("TRADINGVIEW_WORKSPACE_STATE_FILE", "/tmp/tradingview_workspace_state.json").strip()
         )
@@ -91,8 +109,56 @@ class TradingViewAutonomyPlugin:
             "hook_token_set": bool(self.hook_token),
             "agent_id": self.autonomy_agent_id,
             "workspace_label": self.workspace_label,
+            "allowed_repo_scope": sorted(self.allowed_repo_scope),
+            "allowed_project_scope": sorted(self.allowed_project_scope),
             "state": self._state,
         }
+
+    def _scope_policy_line(self) -> str:
+        repos = ", ".join(sorted(self.allowed_repo_scope))
+        projects = ", ".join(sorted(self.allowed_project_scope))
+        return f"Hard scope: repos [{repos}] and projects [{projects}] only."
+
+    def _scope_violation_reason(self, instruction: str) -> Optional[str]:
+        text = str(instruction or "").strip()
+        if not text:
+            return None
+
+        lowered = text.lower()
+        blocked_hits = [term for term in sorted(self.blocked_scope_terms) if term and term in lowered]
+        if blocked_hits:
+            return f"blocked_scope_terms:{','.join(blocked_hits[:3])}"
+
+        allowed_repos = {item.lower() for item in self.allowed_repo_scope}
+        detected_repos: Set[str] = set()
+        for match in re.finditer(r"\b([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)\b", text):
+            owner = match.group(1)
+            repo = match.group(2)
+            # Ignore domain/path matches (e.g., run.app/hooks).
+            if "." in owner or "." in repo:
+                continue
+            detected_repos.add(f"{owner}/{repo}")
+
+        disallowed_repos = sorted([repo for repo in detected_repos if repo.lower() not in allowed_repos])
+        if disallowed_repos:
+            return f"repo_scope_violation:{','.join(disallowed_repos[:3])}"
+
+        allowed_projects = {item.lower() for item in self.allowed_project_scope}
+        detected_projects: Set[str] = set()
+        for pattern in (
+            r"--project(?:=|\s+)([a-z][a-z0-9-]+)",
+            r"projects/([a-z][a-z0-9-]+)",
+        ):
+            for match in re.finditer(pattern, text, flags=re.IGNORECASE):
+                detected_projects.add(match.group(1))
+
+        disallowed_projects = sorted(
+            [project for project in detected_projects if project.lower() not in allowed_projects]
+        )
+        if disallowed_projects:
+            return f"project_scope_violation:{','.join(disallowed_projects[:3])}"
+
+        return None
 
     def _default_state(self) -> Dict[str, Any]:
         return {
@@ -230,9 +296,13 @@ class TradingViewAutonomyPlugin:
         instruction = str(instruction or "").strip()
         if not instruction:
             return {"dispatched": False, "reason": "empty_instruction"}
+        scope_violation = self._scope_violation_reason(instruction)
+        if scope_violation:
+            return {"dispatched": False, "reason": "scope_violation", "detail": scope_violation}
 
         note = (
             "Owner steering update for Sapphire-focused operations only. "
+            f"{self._scope_policy_line()} "
             f"Directive: {instruction} "
             "Acknowledge in Telegram, then provide the next 3 executable steps with risk controls."
         )
@@ -255,10 +325,13 @@ class TradingViewAutonomyPlugin:
         instruction = str(instruction or "").strip()
         if not instruction:
             return {"dispatched": False, "reason": "empty_instruction"}
+        scope_violation = self._scope_violation_reason(instruction)
+        if scope_violation:
+            return {"dispatched": False, "reason": "scope_violation", "detail": scope_violation}
 
         context = dict(context or {})
         guardrails = [
-            "Scope strictly to arigatoexpress/Sapphire and project sapphire-479610.",
+            self._scope_policy_line(),
             "Do not touch non-Sapphire repos or external projects.",
             "Post a concise changelog + risk note back to Telegram after execution.",
         ]
@@ -300,6 +373,7 @@ class TradingViewAutonomyPlugin:
 
     def _make_openclaw_instruction(self, action: str, payload: Dict[str, Any]) -> str:
         base = [
+            self._scope_policy_line(),
             "Use browser automation in TradingView with configured account/session.",
             f"Workspace: {self.workspace_label}.",
             f"Requested action: {action}.",

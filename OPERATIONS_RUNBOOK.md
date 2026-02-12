@@ -43,6 +43,7 @@ Supported operator commands in Telegram:
 - `/deallocate <venue>`
 - `/allocate <venue> <percent>`
 - `/steer <directive>`
+- `/answer <response>` (heartbeat reply alias to steering)
 - `@alpha` / `@all` command forms for manual overrides
 - `@alpha steer <directive>` for owner direction updates
 
@@ -95,6 +96,9 @@ Risk controls for TradingView ingress (env-configured):
 - `TRADINGVIEW_AUTONOMY_AGENT_ID` (default `sapphire`)
 - `TRADINGVIEW_ALLOW_ALL_ASSETS` (`true` enables full asset universe mode)
 - `TRADINGVIEW_COMMUNITY_ACCESS_ENABLED` (`true` enables community script actions)
+- `SAPPHIRE_ALLOWED_REPOS` (default `arigatoexpress/Sapphire;Sapphire`; hard scope for autonomy dispatch)
+- `SAPPHIRE_ALLOWED_GCP_PROJECTS` (default `sapphire-479610`; hard project scope for autonomy dispatch)
+- `SAPPHIRE_BLOCKED_SCOPE_TERMS` (default includes `sapphireai`; blocks deprecated scope mentions in autonomy dispatch)
 - `TRADINGVIEW_MAX_QUANTITY` (global cap, optional)
 - `TRADINGVIEW_MAX_QUANTITY_ASTER` / `TRADINGVIEW_MAX_QUANTITY_LIGHTER` (venue caps, optional)
 - `TRADINGVIEW_ALLOWED_SYMBOLS` (global allowlist, optional)

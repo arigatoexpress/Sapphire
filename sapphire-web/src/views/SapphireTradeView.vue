@@ -256,7 +256,7 @@ onUnmounted(() => {
                 <small>High/low spread over the active telemetry window.</small>
             </article>
             <article class="metric card glass-lift">
-                <p class="font-mono">Momentum Drift</p>
+                <p class="font-mono">Momentum Delta</p>
                 <strong :class="{ bullish: (momentumPct || 0) > 0, bearish: (momentumPct || 0) < 0 }">
                     {{ momentumPct === null ? 'n/a' : `${momentumPct.toFixed(2)}%` }}
                 </strong>

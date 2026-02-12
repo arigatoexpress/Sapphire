@@ -284,6 +284,7 @@ class TelegramPlatformBot:
             "- `/allocate <venue> <percent>`\n\n"
             "Owner steering:\n"
             "- `/steer <directive>`\n"
+            "- `/answer <response>` (heartbeat reply)\n"
             "- `@alpha steer <directive>`\n\n"
             "Manual trade override:\n"
             "- `@aster buy 1.0 BTC`\n"
@@ -321,16 +322,32 @@ class TelegramPlatformBot:
             return
 
         # Owner steering command
-        steer_match = re.search(r"^/(steer|directive|note)\s+(.+)$", text, flags=re.IGNORECASE)
+        steer_match = re.search(
+            r"^/(steer|directive|note|answer|reply|respond)\s+(.+)$",
+            text,
+            flags=re.IGNORECASE,
+        )
         mention_steer_match = re.search(
-            r"@(alpha|control)\s+(steer|directive|note)\s+(.+)$", text, flags=re.IGNORECASE
+            r"@(alpha|control)\s+(steer|directive|note|answer|reply|respond)\s+(.+)$",
+            text,
+            flags=re.IGNORECASE,
         )
         if steer_match or mention_steer_match:
-            directive = (steer_match.group(2) if steer_match else mention_steer_match.group(3)).strip()
+            if steer_match:
+                intent = str(steer_match.group(1) or "").strip().lower()
+                directive = str(steer_match.group(2) or "").strip()
+            else:
+                intent = str(mention_steer_match.group(2) or "").strip().lower()
+                directive = str(mention_steer_match.group(3) or "").strip()
             if len(directive) > 500:
                 directive = directive[:500]
+            response_ack = (
+                "💓 Heartbeat response captured and queued for Sapphire execution context."
+                if intent in {"answer", "reply", "respond"}
+                else "🧠 Owner directive captured and queued for Sapphire execution context."
+            )
             await self.send_message(
-                "🧠 Owner directive captured and queued for Sapphire execution context.",
+                response_ack,
                 priority=NotificationPriority.HIGH,
             )
             await self._dispatch_callback("CONTROL", directive, "OWNER_STEER", 0.0)
