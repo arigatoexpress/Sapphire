@@ -51,25 +51,12 @@ jobs:
           ${{ toJson(github.event) }}
           JSON
 
-      - name: Authenticate to Google Cloud (WIF)
+      - name: Resolve hook audience
         if: ${{ steps.hook-auth.outputs.enabled == 'true' }}
-        uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-
-      - name: Set up Cloud SDK
-        if: ${{ steps.hook-auth.outputs.enabled == 'true' }}
-        uses: google-github-actions/setup-gcloud@v2
-
-      - name: Forward event to Sapphire gateway hook
-        if: ${{ steps.hook-auth.outputs.enabled == 'true' }}
+        id: hook-audience
         env:
           HOOK_URL: ${{ secrets.OPENCLAW_HOOK_URL }}
-          HOOK_TOKEN: ${{ secrets.OPENCLAW_HOOKS_TOKEN }}
           HOOK_AUDIENCE: ${{ secrets.OPENCLAW_HOOK_AUDIENCE }}
-          EVENT_NAME: ${{ github.event_name }}
-          DELIVERY_ID: ${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
         run: |
           set -euo pipefail
 
@@ -83,12 +70,38 @@ jobs:
             exit 1
           fi
 
-          id_token="$(gcloud auth print-identity-token --audiences="${audience}")"
+          echo "value=${audience}" >> "$GITHUB_OUTPUT"
+
+      - name: Authenticate to Google Cloud (WIF)
+        if: ${{ steps.hook-auth.outputs.enabled == 'true' }}
+        id: gcp-auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          token_format: id_token
+          id_token_audience: ${{ steps.hook-audience.outputs.value }}
+
+      - name: Forward event to Sapphire gateway hook
+        if: ${{ steps.hook-auth.outputs.enabled == 'true' }}
+        env:
+          HOOK_URL: ${{ secrets.OPENCLAW_HOOK_URL }}
+          HOOK_TOKEN: ${{ secrets.OPENCLAW_HOOKS_TOKEN }}
+          OIDC_TOKEN: ${{ steps.gcp-auth.outputs.id_token }}
+          EVENT_NAME: ${{ github.event_name }}
+          DELIVERY_ID: ${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${OIDC_TOKEN}" ]]; then
+            echo "Missing OIDC token output from auth step."
+            exit 1
+          fi
 
           http_code="$(curl -sS -o response.json -w "%{http_code}" \
             -X POST "${HOOK_URL}" \
             -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${id_token}" \
+            -H "Authorization: Bearer ${OIDC_TOKEN}" \
             -H "X-OpenClaw-Token: ${HOOK_TOKEN}" \
             -H "X-GitHub-Event: ${EVENT_NAME}" \
             -H "X-GitHub-Delivery: ${DELIVERY_ID}" \
