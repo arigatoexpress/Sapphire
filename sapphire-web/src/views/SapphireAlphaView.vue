@@ -42,6 +42,7 @@ const strategyIntake = ref([
 
 const alphaCandles = ref<OhlcCandle[]>([])
 const chartSourceLabel = ref('Waiting for live OHLC feed')
+const routingConfidencePct = ref<number | null>(null)
 const lastRefreshEpoch = ref(0)
 const nowEpoch = ref(Date.now())
 let refreshTimer: ReturnType<typeof setInterval> | null = null
@@ -60,6 +61,29 @@ const riskTone = computed(() => {
     return 'tone-guarded'
 })
 
+const readinessScore = computed(() => {
+    const confidence = routingConfidencePct.value ?? 0
+    const posture = insightCards.value.find((item) => item.title === 'Risk Posture')?.value.toLowerCase() || 'guarded'
+    const postureBias = posture.includes('offensive') ? 10 : posture.includes('balanced') ? 0 : -10
+    return Math.max(0, Math.min(100, Math.round(confidence + postureBias)))
+})
+
+const readinessTone = computed(() => {
+    if (readinessScore.value >= 70) return 'readiness-strong'
+    if (readinessScore.value >= 50) return 'readiness-balanced'
+    return 'readiness-guarded'
+})
+
+const strategyRail = computed(() => {
+    const score = readinessScore.value
+    return [
+        { label: 'Ingest', detail: 'Market + macro feeds', status: score >= 25 ? 'ready' : 'pending' },
+        { label: 'Synthesize', detail: 'Pattern + confidence fusion', status: score >= 45 ? 'ready' : 'pending' },
+        { label: 'Validate', detail: 'Risk and policy checks', status: score >= 60 ? 'ready' : 'pending' },
+        { label: 'Route', detail: 'Telegram-approved execution', status: score >= 70 ? 'ready' : 'pending' },
+    ]
+})
+
 const loadAlphaStatus = async () => {
     try {
         const [stats, routing, ohlc] = await Promise.all([
@@ -73,6 +97,7 @@ const loadAlphaStatus = async () => {
         const winRate = totalTrades > 0 ? Math.round((wins / totalTrades) * 100) : 0
 
         const confidenceRaw = routing?.confidence ?? routing?.data?.confidence ?? routing?.routing?.confidence
+        routingConfidencePct.value = typeof confidenceRaw === 'number' ? Math.max(0, Math.min(100, Math.round(confidenceRaw * 100))) : null
         const confidence = typeof confidenceRaw === 'number' ? `${Math.round(confidenceRaw * 100)}%` : 'n/a'
 
         const routePolicy = routing?.mode || routing?.strategy || 'Policy-driven'
@@ -164,6 +189,20 @@ onUnmounted(() => {
                 <strong class="font-mono">{{ card.value }}</strong>
                 <p>{{ card.detail }}</p>
             </article>
+        </section>
+
+        <section class="strategy-rail card glass-lift">
+            <header>
+                <h3 class="font-mono">Strategy Readiness Rail</h3>
+                <span class="rail-score" :class="readinessTone">{{ readinessScore }}%</span>
+            </header>
+            <div class="rail-grid">
+                <article v-for="stage in strategyRail" :key="stage.label" class="rail-stage" :class="`stage-${stage.status}`">
+                    <p class="font-mono">{{ stage.label }}</p>
+                    <strong>{{ stage.status === 'ready' ? 'READY' : 'PENDING' }}</strong>
+                    <small>{{ stage.detail }}</small>
+                </article>
+            </div>
         </section>
 
         <section class="grid">
@@ -291,6 +330,87 @@ onUnmounted(() => {
     gap: 0.8rem;
 }
 
+.strategy-rail {
+    background: rgba(8, 22, 40, 0.74);
+    border: 1px solid rgba(127, 188, 236, 0.32);
+}
+
+.strategy-rail header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.7rem;
+    margin-bottom: 0.72rem;
+}
+
+.strategy-rail h3 {
+    margin: 0;
+    font-size: 0.84rem;
+    letter-spacing: 0.05em;
+}
+
+.rail-score {
+    border-radius: 999px;
+    padding: 0.2rem 0.56rem;
+    font-size: 0.73rem;
+    border: 1px solid rgba(95, 181, 241, 0.55);
+    color: #9cdcff;
+}
+
+.readiness-strong {
+    border-color: rgba(23, 200, 136, 0.55);
+    color: #78efbf;
+}
+
+.readiness-balanced {
+    border-color: rgba(244, 180, 68, 0.56);
+    color: #ffd79a;
+}
+
+.readiness-guarded {
+    border-color: rgba(255, 116, 116, 0.58);
+    color: #ffb1b1;
+}
+
+.rail-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.56rem;
+}
+
+.rail-stage {
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(124, 184, 232, 0.28);
+    background: rgba(8, 22, 40, 0.7);
+    padding: 0.56rem;
+    display: grid;
+    gap: 0.2rem;
+}
+
+.rail-stage p {
+    margin: 0;
+    font-size: 0.64rem;
+    letter-spacing: 0.08em;
+    color: #98d8fb;
+}
+
+.rail-stage strong {
+    font-size: 0.78rem;
+}
+
+.rail-stage small {
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+}
+
+.stage-ready strong {
+    color: #7beec2;
+}
+
+.stage-pending strong {
+    color: #ffbbac;
+}
+
 .chart-panel,
 .panel {
     background: rgba(8, 22, 40, 0.74);
@@ -355,6 +475,10 @@ onUnmounted(() => {
 }
 
 @media (max-width: 1240px) {
+    .rail-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
     .grid {
         grid-template-columns: 1fr;
     }

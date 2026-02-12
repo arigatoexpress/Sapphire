@@ -55,6 +55,39 @@ const refreshAge = computed(() => {
     return `${Math.max(0, Math.round((nowEpoch.value - lastRefreshEpoch.value) / 1000))}s ago`
 })
 
+const latestMergedClose = computed(() => {
+    const tail = chartCandles.value[chartCandles.value.length - 1]
+    return tail ? Number(tail.close) : null
+})
+
+const mergedRangePct = computed(() => {
+    if (chartCandles.value.length < 2) return null
+    const highs = chartCandles.value.map((item) => Number(item.high))
+    const lows = chartCandles.value.map((item) => Number(item.low))
+    const tail = chartCandles.value[chartCandles.value.length - 1]
+    const close = Number(tail?.close || 0)
+    if (!Number.isFinite(close) || close <= 0) return null
+    const spread = Math.max(...highs) - Math.min(...lows)
+    return (spread / close) * 100
+})
+
+const momentumPct = computed(() => {
+    if (chartCandles.value.length < 8) return null
+    const head = chartCandles.value[0]
+    const tail = chartCandles.value[chartCandles.value.length - 1]
+    const first = Number(head?.close || 0)
+    const last = Number(tail?.close || 0)
+    if (!Number.isFinite(first) || first <= 0 || !Number.isFinite(last)) return null
+    return ((last - first) / first) * 100
+})
+
+const volatilityTone = computed(() => {
+    const range = mergedRangePct.value ?? 0
+    if (range >= 4) return 'tone-hot'
+    if (range >= 2) return 'tone-warm'
+    return 'tone-calm'
+})
+
 const normalizeCandles = (candles: OhlcCandle[] | null | undefined): OhlcCandle[] =>
     (candles || [])
         .filter((item) => Number.isFinite(Number(item.time)))
@@ -211,6 +244,26 @@ onUnmounted(() => {
             </div>
         </section>
 
+        <section class="metric-strip">
+            <article class="metric card glass-lift">
+                <p class="font-mono">Merged Mark</p>
+                <strong>{{ latestMergedClose === null ? 'n/a' : `$${latestMergedClose.toFixed(3)}` }}</strong>
+                <small>Cross-venue weighted close from live OHLC merge.</small>
+            </article>
+            <article class="metric card glass-lift">
+                <p class="font-mono">Range (Window)</p>
+                <strong :class="volatilityTone">{{ mergedRangePct === null ? 'n/a' : `${mergedRangePct.toFixed(2)}%` }}</strong>
+                <small>High/low spread over the active telemetry window.</small>
+            </article>
+            <article class="metric card glass-lift">
+                <p class="font-mono">Momentum Drift</p>
+                <strong :class="{ bullish: (momentumPct || 0) > 0, bearish: (momentumPct || 0) < 0 }">
+                    {{ momentumPct === null ? 'n/a' : `${momentumPct.toFixed(2)}%` }}
+                </strong>
+                <small>Directional delta across the current merged series.</small>
+            </article>
+        </section>
+
         <section class="grid">
             <article class="chart-panel card glass-lift">
                 <header>
@@ -310,6 +363,56 @@ onUnmounted(() => {
     display: grid;
     grid-template-columns: 1.15fr 1fr;
     gap: 0.8rem;
+}
+
+.metric-strip {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.metric {
+    background: rgba(8, 22, 40, 0.74);
+    border: 1px solid rgba(127, 188, 236, 0.3);
+    display: grid;
+    gap: 0.24rem;
+}
+
+.metric p {
+    margin: 0;
+    color: #98d8fb;
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+}
+
+.metric strong {
+    font-size: 1.08rem;
+    color: #dff2ff;
+}
+
+.metric small {
+    color: var(--text-secondary);
+    font-size: 0.74rem;
+}
+
+.tone-hot {
+    color: #ffbe9f;
+}
+
+.tone-warm {
+    color: #ffd898;
+}
+
+.tone-calm {
+    color: #84f0cf;
+}
+
+.bullish {
+    color: #7deec2;
+}
+
+.bearish {
+    color: #ffb2b2;
 }
 
 .chart-panel,
@@ -440,6 +543,10 @@ onUnmounted(() => {
 }
 
 @media (max-width: 1120px) {
+    .metric-strip {
+        grid-template-columns: 1fr;
+    }
+
     .grid {
         grid-template-columns: 1fr;
     }

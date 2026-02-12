@@ -76,6 +76,31 @@ const stats = computed(() => ({
     blocked: threads.value.filter((thread) => thread.state === 'blocked').length,
 }))
 
+const autonomyScore = computed(() => {
+    if (threads.value.length === 0) return 0
+    const weighted = stats.value.active * 1.2 + stats.value.queued * 0.6 - stats.value.blocked * 1.4
+    const normalized = Math.round((weighted / threads.value.length) * 40 + 52)
+    return Math.max(5, Math.min(99, normalized))
+})
+
+const leadLane = computed(() => {
+    const top = laneStats.value.slice().sort((a, b) => b.count - a.count)[0]
+    return top?.label || 'SAPPHIRE'
+})
+
+const queuePressure = computed(() => {
+    const blocked = stats.value.blocked
+    if (blocked >= 2) return 'High'
+    if (blocked === 1) return 'Moderate'
+    return 'Low'
+})
+
+const scoreToneClass = computed(() => {
+    if (autonomyScore.value >= 75) return 'tone-strong'
+    if (autonomyScore.value >= 55) return 'tone-balanced'
+    return 'tone-fragile'
+})
+
 const laneStats = computed(() => {
     const counts: Record<Lane, number> = { security: 0, deploy: 0, research: 0 }
     for (const thread of threads.value) counts[thread.lane] += 1
@@ -109,6 +134,24 @@ const decisionQueue = ref([
                 <span class="chip queued">Queued {{ stats.queued }}</span>
                 <span class="chip blocked">Blocked {{ stats.blocked }}</span>
             </div>
+        </section>
+
+        <section class="snapshot-strip">
+            <article class="snapshot card glass-lift">
+                <p class="font-mono">Autonomy Score</p>
+                <strong :class="scoreToneClass">{{ autonomyScore }}%</strong>
+                <small>Composite from active, queued, and blocked execution threads.</small>
+            </article>
+            <article class="snapshot card glass-lift">
+                <p class="font-mono">Lead Lane</p>
+                <strong>{{ leadLane }}</strong>
+                <small>Current highest-thread concentration across operational lanes.</small>
+            </article>
+            <article class="snapshot card glass-lift">
+                <p class="font-mono">Queue Pressure</p>
+                <strong>{{ queuePressure }}</strong>
+                <small>Backlog pressure requiring heartbeat steering decisions.</small>
+            </article>
         </section>
 
         <section class="grid">
@@ -232,6 +275,48 @@ const decisionQueue = ref([
     display: grid;
     grid-template-columns: 1.7fr 1fr;
     gap: 0.8rem;
+}
+
+.snapshot-strip {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.snapshot {
+    background: rgba(8, 22, 40, 0.74);
+    border: 1px solid rgba(120, 185, 231, 0.28);
+    display: grid;
+    gap: 0.28rem;
+}
+
+.snapshot p {
+    margin: 0;
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    color: #98d8fb;
+}
+
+.snapshot strong {
+    font-size: 1.1rem;
+    color: #e2f2ff;
+}
+
+.snapshot small {
+    color: var(--text-secondary);
+    font-size: 0.74rem;
+}
+
+.tone-strong {
+    color: #75edbf;
+}
+
+.tone-balanced {
+    color: #ffd89f;
+}
+
+.tone-fragile {
+    color: #ffb6b6;
 }
 
 .threads header {
@@ -388,6 +473,10 @@ const decisionQueue = ref([
 }
 
 @media (max-width: 1100px) {
+    .snapshot-strip {
+        grid-template-columns: 1fr;
+    }
+
     .grid {
         grid-template-columns: 1fr;
     }
