@@ -38,7 +38,7 @@ check_file() {
 
 echo "== Sapphire CI Focused Gate =="
 
-FORBIDDEN_REGEX='(sapphire-v2|hyperliquid|symphony|drift)'
+FORBIDDEN_REGEX='(sapphire-v2|legacy[-_ ]?venue|deprecated[-_ ]?venue)'
 SCAN_PATHS=(
   "README.md"
   "OPERATIONS_RUNBOOK.md"

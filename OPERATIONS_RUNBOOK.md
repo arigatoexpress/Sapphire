@@ -201,8 +201,6 @@ Full-autonomy env controls are applied by deploy defaults:
 Wire true external Moltbook bridge when endpoint/token credentials are ready:
 
 ```bash
-MOLTBOOK_REGISTER_URL='https://<your-moltbook>/api/scout/register' \
-MOLTBOOK_POST_URL='https://<your-moltbook>/api/scout/post' \
 MOLTBOOK_API_TOKEN='<external-api-token>' \
 ./scripts/wire_moltbook_bridge.sh
 ```
@@ -211,6 +209,24 @@ This creates/updates and binds:
 - `SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL`
 - `SAPPHIRE_SCOUT_EXTERNAL_POST_URL`
 - `SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN`
+
+Defaults target official Moltbook endpoints:
+- `https://www.moltbook.com/api/v1/agents/register`
+- `https://www.moltbook.com/api/v1/posts`
+- Set `STRICT_STATUS_CHECK=true` only when you want the script to fail hard on status/smoke errors.
+
+Bootstrap a fresh scout agent directly on Moltbook and wire secrets automatically:
+
+```bash
+AGENT_NAME='SAPPHIRE_SCOUT' \
+AGENT_DESCRIPTION='Least-privilege Sapphire scout for external collaboration.' \
+./scripts/bootstrap_moltbook_scout.sh
+```
+
+Bootstrap resilience controls:
+- `REGISTER_RETRIES=4` (default) retries registration on transient errors.
+- `REGISTER_BASE_BACKOFF_SECONDS=2` controls linear retry backoff.
+- `ALLOW_FALLBACK_TO_EXISTING_TOKEN=true` reuses existing token secret when Moltbook register is down.
 
 Execution safety controls:
 

@@ -38,6 +38,7 @@ class SapphireForumService:
         r"(?i)([?&](?:token|access_token|api_key|key|secret)=)([^&\s]+)"
     )
     _GOOGLE_KEY_RE = re.compile(r"AIza[0-9A-Za-z\-_]{20,}")
+    _MOLTBOOK_KEY_RE = re.compile(r"\bmoltbook_[A-Za-z0-9\-_]{8,}\b", flags=re.IGNORECASE)
     _JWT_RE = re.compile(r"\beyJ[a-zA-Z0-9_\-]{8,}\.[a-zA-Z0-9_\-]{8,}\.[a-zA-Z0-9_\-]{8,}\b")
 
     def __init__(self):
@@ -192,8 +193,9 @@ class SapphireForumService:
         text = cls._SENSITIVE_INLINE_RE.sub(inline_replacer, text)
         text = cls._SENSITIVE_QUERY_RE.sub(query_replacer, text)
         text, c1 = cls._GOOGLE_KEY_RE.subn("[REDACTED_API_KEY]", text)
-        text, c2 = cls._JWT_RE.subn("[REDACTED_JWT]", text)
-        redactions += c1 + c2
+        text, c2 = cls._MOLTBOOK_KEY_RE.subn("[REDACTED_MOLTBOOK_KEY]", text)
+        text, c3 = cls._JWT_RE.subn("[REDACTED_JWT]", text)
+        redactions += c1 + c2 + c3
 
         if len(text) > max_len:
             text = text[: max_len - 3] + "..."
@@ -528,20 +530,87 @@ class SapphireForumService:
         if token:
             headers["Authorization"] = f"Bearer {token}"
 
-        timeout = aiohttp.ClientTimeout(total=15)
+        timeout_seconds = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_TIMEOUT_SECONDS", "15")).strip()
+        max_retries_raw = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_MAX_RETRIES", "3")).strip()
         try:
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.post(url, json=payload, headers=headers) as response:
-                    response_text = (await response.text())[:600]
-                    ok = 200 <= response.status < 300
-                    return {
-                        "dispatched": ok,
-                        "status": response.status,
-                        "reason": "ok" if ok else "http_error",
-                        "response_excerpt": response_text,
-                    }
-        except Exception as exc:
-            return {"dispatched": False, "reason": f"request_failed:{exc}"}
+            timeout_value = max(5, min(int(timeout_seconds), 60))
+        except ValueError:
+            timeout_value = 15
+        try:
+            max_retries = max(1, min(int(max_retries_raw), 6))
+        except ValueError:
+            max_retries = 3
+
+        timeout = aiohttp.ClientTimeout(total=timeout_value)
+        last_result: Dict[str, Any] = {"dispatched": False, "reason": "request_failed:unknown"}
+        for attempt in range(1, max_retries + 1):
+            try:
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.post(url, json=payload, headers=headers) as response:
+                        response_text = await response.text()
+                        safe_excerpt = self._sanitize_text(response_text, max_len=600)["text"]
+
+                        parsed: Dict[str, Any] = {}
+                        try:
+                            maybe = json.loads(response_text)
+                            if isinstance(maybe, dict):
+                                parsed = maybe
+                        except Exception:
+                            parsed = {}
+
+                        api_success = parsed.get("success")
+                        ok = 200 <= response.status < 300 and (
+                            not isinstance(api_success, bool) or bool(api_success)
+                        )
+                        metadata: Dict[str, Any] = {}
+                        if parsed:
+                            if "success" in parsed:
+                                metadata["success"] = bool(parsed.get("success"))
+                            if isinstance(parsed.get("agent"), dict):
+                                agent_obj = parsed.get("agent", {})
+                                metadata["agent_name"] = str(agent_obj.get("name", "")).strip()
+                                metadata["claim_url"] = str(agent_obj.get("claim_url", "")).strip()[:220]
+                                metadata["verification_code"] = (
+                                    str(agent_obj.get("verification_code", "")).strip()[:80]
+                                )
+                                metadata["api_key_present"] = bool(str(agent_obj.get("api_key", "")).strip())
+                            if isinstance(parsed.get("error"), str):
+                                metadata["api_error"] = str(parsed.get("error", ""))[:160]
+
+                        result = {
+                            "dispatched": ok,
+                            "status": int(response.status),
+                            "reason": "ok" if ok else ("api_error" if parsed else "http_error"),
+                            "response_excerpt": safe_excerpt,
+                            "metadata": metadata,
+                            "attempt": attempt,
+                        }
+                        if ok:
+                            return result
+
+                        last_result = result
+                        retryable_http = int(response.status) >= 500 or int(response.status) in {408, 429}
+                        retryable_api = result["reason"] == "api_error" and metadata.get("api_error") in {
+                            "Failed to fetch posts",
+                            "Internal Server Error",
+                        }
+                        if not (retryable_http or retryable_api) or attempt >= max_retries:
+                            return result
+            except Exception as exc:
+                last_result = {"dispatched": False, "reason": f"request_failed:{exc}", "attempt": attempt}
+                if attempt >= max_retries:
+                    return last_result
+
+            await asyncio.sleep(min(3.0, 0.4 * attempt))
+
+        return last_result
+
+    @staticmethod
+    def _is_moltbook_api_url(url: str) -> bool:
+        parsed = urlparse(str(url or "").strip())
+        if not parsed.netloc:
+            return False
+        return parsed.netloc.lower() == "www.moltbook.com" and parsed.path.startswith("/api/v1")
 
     def _openclaw_fallback_config(self) -> Dict[str, str]:
         hook_url = str(
@@ -761,6 +830,12 @@ class SapphireForumService:
         dispatch_mode = "external_http" if external_register_url or external_post_url else "openclaw_hook"
         if dispatch_mode == "openclaw_hook" and not fallback_ready:
             dispatch_mode = "none"
+        provider = (
+            "moltbook"
+            if self._is_moltbook_api_url(external_register_url)
+            or self._is_moltbook_api_url(external_post_url)
+            else "generic"
+        )
 
         with self._lock:
             return {
@@ -774,6 +849,7 @@ class SapphireForumService:
                     "fallback_hook_token_configured": bool(fallback.get("hook_token")),
                     "fallback_chat_id_configured": bool(fallback.get("chat_id")),
                     "dispatch_mode": dispatch_mode,
+                    "provider": provider,
                 },
                 "timestamp": self._now(),
             }
@@ -791,7 +867,7 @@ class SapphireForumService:
             }
 
         profile = self._scout_profile()
-        outbound_payload = {
+        outbound_payload: Dict[str, Any] = {
             "requested_at": self._now(),
             "username": username,
             "display_name": display_name[:60],
@@ -806,6 +882,13 @@ class SapphireForumService:
 
         register_url = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL", "")).strip()
         token = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN", "")).strip()
+        token_for_dispatch = token
+        if self._is_moltbook_api_url(register_url):
+            outbound_payload = {
+                "name": display_name[:60] or username,
+                "description": bio_safe["text"][:280] or "Sapphire external collaboration scout",
+            }
+            token_for_dispatch = ""
         note = (
             "Register least-privilege Sapphire scout account for external collaboration. "
             "No secrets, no trade execution, and no cloud mutations. "
@@ -815,7 +898,7 @@ class SapphireForumService:
             action="register",
             outbound_payload=outbound_payload,
             external_url=register_url,
-            external_token=token,
+            external_token=token_for_dispatch,
             note=note,
         )
 
@@ -830,11 +913,18 @@ class SapphireForumService:
                 }
             )
 
+            metadata = dispatch_result.get("metadata", {}) if isinstance(dispatch_result, dict) else {}
+            claim_url = str(metadata.get("claim_url", "")).strip()
+            verification_code = str(metadata.get("verification_code", "")).strip()
             topic_body = (
                 f"Scout registration requested for @{username}. "
                 f"Dispatch={'ok' if dispatch_result.get('dispatched') else 'pending/manual'} "
                 f"via {dispatch_result.get('mode', 'none')}."
             )
+            if claim_url:
+                topic_body += f" Claim URL: {claim_url}"
+            if verification_code:
+                topic_body += f" Verification code: {verification_code}"
             self._create_topic_locked(
                 {
                     "title": f"Scout registration: @{username}",
@@ -922,6 +1012,15 @@ class SapphireForumService:
 
         post_url = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_POST_URL", "")).strip()
         token = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN", "")).strip()
+        if self._is_moltbook_api_url(post_url):
+            outbound_payload = {
+                "submolt": (
+                    str(payload.get("submolt", payload.get("community", "general"))).strip().lower()
+                    or "general"
+                ),
+                "title": title_safe["text"] or f"Sapphire Scout Update ({topic_id})",
+                "content": body_safe["text"],
+            }
         note = (
             "Publish sanitized external scout note from SapphireBook collaboration thread. "
             f"Topic: {topic_id}. Author: {outbound_payload.get('author', 'SAPPHIRE_SCOUT')}."
