@@ -44,6 +44,7 @@ const statusText = computed(() => {
     if (systemStatus.value === 'connecting') return 'CONNECTING'
     return 'OFFLINE'
 })
+const runtimeHost = computed(() => (typeof window === 'undefined' ? 'local' : window.location.hostname))
 
 const syncAgeSeconds = computed(() => {
     if (!lastSyncEpoch.value) return null
@@ -98,7 +99,7 @@ onUnmounted(() => {
                     <ShieldCheck :size="20" />
                 </div>
                 <div class="brand-copy">
-                    <h1 class="font-mono">SAPPHIRE INC</h1>
+                    <h1>SAPPHIRE COMMAND DECK</h1>
                     <p>Autonomous Operations Grid</p>
                 </div>
             </div>
@@ -136,7 +137,7 @@ onUnmounted(() => {
         <main class="main-panel">
             <header class="topbar fade-in">
                 <div class="surface-title">
-                    <span class="kicker font-mono">SAPPHIRE COMMAND SURFACE</span>
+                    <span class="kicker font-mono">SAPPHIRE LIVE SURFACE</span>
                     <h2>{{ activeLabel }}</h2>
                 </div>
                 <div class="status-cluster">
@@ -145,6 +146,7 @@ onUnmounted(() => {
                     </span>
                     <span class="meta-chip font-mono">{{ formatUptime(uptime) }}</span>
                     <span class="meta-chip font-mono">{{ formatUtcClock() }}</span>
+                    <span class="meta-chip font-mono">{{ runtimeHost }}</span>
                 </div>
             </header>
 
@@ -155,7 +157,7 @@ onUnmounted(() => {
                 </article>
                 <article class="quick-card glass-lift">
                     <p class="font-mono">Scope</p>
-                    <strong>Sapphire-Only Runtime</strong>
+                    <strong>Sapphire Unified Runtime</strong>
                 </article>
                 <article class="quick-card glass-lift">
                     <p class="font-mono">Policy</p>
@@ -248,6 +250,9 @@ onUnmounted(() => {
     margin: 0;
     font-size: 0.92rem;
     letter-spacing: 0.06em;
+    font-family: var(--font-display);
+    font-weight: 600;
+    color: #d8f3ff;
 }
 
 .brand-copy p {

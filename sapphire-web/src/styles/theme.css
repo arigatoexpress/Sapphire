@@ -1,22 +1,23 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&family=Unbounded:wght@500;700&display=swap');
 
 :root {
-    --bg-app: #030a18;
-    --bg-ink: #081427;
-    --bg-panel: rgba(8, 20, 38, 0.78);
-    --bg-elevated: rgba(12, 27, 49, 0.88);
-    --bg-hover: rgba(116, 211, 255, 0.16);
+    --bg-app: #071226;
+    --bg-ink: #0a1730;
+    --bg-panel: rgba(10, 23, 44, 0.8);
+    --bg-elevated: rgba(14, 31, 57, 0.9);
+    --bg-hover: rgba(129, 215, 255, 0.16);
 
-    --text-primary: #e9f3ff;
-    --text-secondary: #9eb6cf;
-    --text-tertiary: #6c87a4;
+    --text-primary: #ecf5ff;
+    --text-secondary: #a8bfd9;
+    --text-tertiary: #718daa;
 
     --font-ui: 'Space Grotesk', 'Trebuchet MS', sans-serif;
     --font-mono: 'JetBrains Mono', 'SFMono-Regular', monospace;
+    --font-display: 'Unbounded', 'Avenir Next', sans-serif;
 
-    --color-sapphire: #36b5ff;
-    --color-sapphire-deep: #0e7ec5;
-    --color-glow: #77ddff;
+    --color-sapphire: #4cc2ff;
+    --color-sapphire-deep: #157ec9;
+    --color-glow: #8be6ff;
     --color-success: #17c888;
     --color-warning: #f4b444;
     --color-error: #ff7474;
@@ -51,9 +52,9 @@ body {
     font-family: var(--font-ui);
     line-height: 1.45;
     background:
-        radial-gradient(circle at 12% 10%, rgba(52, 148, 252, 0.24), transparent 33%),
-        radial-gradient(circle at 88% 2%, rgba(61, 222, 194, 0.16), transparent 30%),
-        radial-gradient(circle at 50% 120%, rgba(36, 114, 255, 0.2), transparent 44%),
+        radial-gradient(circle at 12% 10%, rgba(76, 194, 255, 0.24), transparent 33%),
+        radial-gradient(circle at 88% 2%, rgba(84, 228, 208, 0.16), transparent 30%),
+        radial-gradient(circle at 50% 120%, rgba(74, 132, 255, 0.2), transparent 44%),
         repeating-linear-gradient(
             135deg,
             rgba(96, 133, 173, 0.03) 0px,
@@ -61,7 +62,7 @@ body {
             transparent 1px,
             transparent 6px
         ),
-        linear-gradient(180deg, #051126 0%, var(--bg-app) 100%);
+        linear-gradient(180deg, #0a1a36 0%, var(--bg-app) 100%);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
