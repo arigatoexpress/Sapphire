@@ -24,6 +24,9 @@ Gateway access policy:
 
 - `sapphire-gateway` has Cloud Run invoker IAM check enabled.
 - Unauthenticated requests are denied (`403`), reducing public prompt surface.
+- GitHub workflow `OpenClaw Hook Forwarder` uses WIF + OIDC bearer auth for webhook delivery.
+  - Required repo secrets: `OPENCLAW_HOOK_URL`, `OPENCLAW_HOOKS_TOKEN`, `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT`
+  - Optional override: `OPENCLAW_HOOK_AUDIENCE` (defaults to scheme+host from `OPENCLAW_HOOK_URL`)
 
 ## Telegram Control Channel
 

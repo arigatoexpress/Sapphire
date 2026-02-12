@@ -16,31 +16,83 @@ jobs:
   forward-to-openclaw:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
     steps:
+      - name: Detect hook forwarding auth availability
+        id: hook-auth
+        env:
+          HOOK_URL: ${{ secrets.OPENCLAW_HOOK_URL }}
+          HOOK_TOKEN: ${{ secrets.OPENCLAW_HOOKS_TOKEN }}
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+
+          missing=()
+          [[ -n "${HOOK_URL}" ]] || missing+=("OPENCLAW_HOOK_URL")
+          [[ -n "${HOOK_TOKEN}" ]] || missing+=("OPENCLAW_HOOKS_TOKEN")
+          [[ -n "${GCP_WORKLOAD_IDENTITY_PROVIDER}" ]] || missing+=("GCP_WORKLOAD_IDENTITY_PROVIDER")
+          [[ -n "${GCP_SERVICE_ACCOUNT}" ]] || missing+=("GCP_SERVICE_ACCOUNT")
+
+          if [[ "${#missing[@]}" -gt 0 ]]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "missing=${missing[*]}" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "missing=" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Write event payload
+        if: ${{ steps.hook-auth.outputs.enabled == 'true' }}
         run: |
           cat > event.json <<'JSON'
           ${{ toJson(github.event) }}
           JSON
 
+      - name: Authenticate to Google Cloud (WIF)
+        if: ${{ steps.hook-auth.outputs.enabled == 'true' }}
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        if: ${{ steps.hook-auth.outputs.enabled == 'true' }}
+        uses: google-github-actions/setup-gcloud@v2
+
       - name: Forward event to Sapphire gateway hook
+        if: ${{ steps.hook-auth.outputs.enabled == 'true' }}
         env:
           HOOK_URL: ${{ secrets.OPENCLAW_HOOK_URL }}
           HOOK_TOKEN: ${{ secrets.OPENCLAW_HOOKS_TOKEN }}
+          HOOK_AUDIENCE: ${{ secrets.OPENCLAW_HOOK_AUDIENCE }}
           EVENT_NAME: ${{ github.event_name }}
           DELIVERY_ID: ${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
         run: |
           set -euo pipefail
 
-          # Secrets are unavailable on fork PRs; skip rather than hard-fail.
-          if [[ -z "${HOOK_URL}" || -z "${HOOK_TOKEN}" ]]; then
-            echo "OpenClaw hook secrets unavailable in this context; skipping."
-            exit 0
+          audience="${HOOK_AUDIENCE}"
+          if [[ -z "${audience}" ]]; then
+            audience="$(python3 - "${HOOK_URL}" <<'PY'
+import sys
+from urllib.parse import urlparse
+
+url = urlparse(sys.argv[1])
+if not url.scheme or not url.netloc:
+    raise SystemExit("Invalid OPENCLAW_HOOK_URL; expected absolute URL.")
+print(f"{url.scheme}://{url.netloc}")
+PY
+)"
           fi
+
+          id_token="$(gcloud auth print-identity-token --audiences="${audience}")"
 
           http_code="$(curl -sS -o response.json -w "%{http_code}" \
             -X POST "${HOOK_URL}" \
             -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${id_token}" \
             -H "X-OpenClaw-Token: ${HOOK_TOKEN}" \
             -H "X-GitHub-Event: ${EVENT_NAME}" \
             -H "X-GitHub-Delivery: ${DELIVERY_ID}" \
@@ -52,17 +104,12 @@ jobs:
             exit 0
           fi
 
-          # Cloud Run IAM blocks unauthenticated callers before app-level token checks.
-          # Keep workflow green while preserving signal in logs for operator action.
-          if [[ "${http_code}" == "401" || "${http_code}" == "403" ]]; then
-            echo "OpenClaw hook endpoint denied request (HTTP ${http_code}); skipping hard failure."
-            echo "Verify OPENCLAW_HOOK_URL points to an endpoint accessible from GitHub Actions."
-            cat response.json || true
-            exit 0
-          fi
+          echo "OpenClaw hook forward failed. Response:"
+          cat response.json
+          exit 1
 
-          if [[ "${http_code}" != "202" ]]; then
-            echo "OpenClaw hook forward failed. Response:"
-            cat response.json
-            exit 1
-          fi
+      - name: Skip hook forward when secrets are unavailable
+        if: ${{ steps.hook-auth.outputs.enabled != 'true' }}
+        run: |
+          echo "Skipping OpenClaw hook forward."
+          echo "Missing required secrets: ${{ steps.hook-auth.outputs.missing }}"
