@@ -449,7 +449,7 @@ export const runSecuritySkillsScan = async (params?: {
 }): Promise<Record<string, unknown> | null> =>
     safeGet<Record<string, unknown>>('/api/v2/security/skills/scan', {
         skill: params?.skill || 'all',
-        upload_if_missing: params?.upload_if_missing ?? true,
+        upload_if_missing: params?.upload_if_missing ?? false,
     })
 
 export default api

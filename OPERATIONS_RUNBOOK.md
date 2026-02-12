@@ -248,7 +248,10 @@ This binds:
 And enables:
 - `SAPPHIRE_VT_ENABLED=true`
 - `SAPPHIRE_VT_ENFORCEMENT_MODE=block_malicious` (`off|warn|block_malicious|block_suspicious`)
-- `SAPPHIRE_VT_UPLOAD_IF_MISSING=true`
+- `SAPPHIRE_VT_UPLOAD_IF_MISSING=false` (safe default for free-tier quotas)
+- `SAPPHIRE_VT_MAX_SKILLS_PER_SCAN=4`
+- `SAPPHIRE_VT_MAX_REQUESTS_PER_MINUTE=4`
+- `SAPPHIRE_VT_MAX_REQUESTS_PER_DAY=500`
 
 Control endpoints:
 - `GET /api/v2/security/skills/status`
@@ -256,7 +259,7 @@ Control endpoints:
 
 Telegram controls:
 - `/security status`
-- `/security scan [skill|all] [upload|no-upload]`
+- `/security scan [skill|all] [no-upload|upload]` (default: no-upload)
 
 Execution safety controls:
 

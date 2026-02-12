@@ -1,4 +1,5 @@
 import asyncio
+from collections import deque
 import hashlib
 import io
 import json
@@ -7,7 +8,7 @@ import re
 import time
 import zipfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Deque, Dict, List, Optional
 
 import aiohttp
 from loguru import logger
@@ -25,16 +26,22 @@ class VirusTotalSkillScanner:
         self.api_base = str(os.getenv("SAPPHIRE_VT_API_BASE", self._DEFAULT_API_BASE)).rstrip("/")
         skills_dir = str(os.getenv("SAPPHIRE_SKILLS_DIR", "/app/skills")).strip()
         self.skills_dir = Path(skills_dir).expanduser()
+        self.max_requests_per_minute = max(
+            1, min(int(os.getenv("SAPPHIRE_VT_MAX_REQUESTS_PER_MINUTE", "4")), 60)
+        )
+        self.max_requests_per_day = max(
+            1, min(int(os.getenv("SAPPHIRE_VT_MAX_REQUESTS_PER_DAY", "500")), 50000)
+        )
         self.bundle_timeout_seconds = max(5, min(int(os.getenv("SAPPHIRE_VT_TIMEOUT_SECONDS", "25")), 120))
         self.poll_interval_seconds = max(
             2, min(int(os.getenv("SAPPHIRE_VT_POLL_INTERVAL_SECONDS", "5")), 30)
         )
         self.max_poll_attempts = max(1, min(int(os.getenv("SAPPHIRE_VT_MAX_POLL_ATTEMPTS", "12")), 60))
         self.max_skills_per_scan = max(
-            1, min(int(os.getenv("SAPPHIRE_VT_MAX_SKILLS_PER_SCAN", "50")), 200)
+            1, min(int(os.getenv("SAPPHIRE_VT_MAX_SKILLS_PER_SCAN", "4")), 200)
         )
         self.upload_if_missing_default = self._env_flag(
-            "SAPPHIRE_VT_UPLOAD_IF_MISSING", default=True
+            "SAPPHIRE_VT_UPLOAD_IF_MISSING", default=False
         )
         self.enforcement_mode = str(
             os.getenv("SAPPHIRE_VT_ENFORCEMENT_MODE", "warn")
@@ -54,6 +61,9 @@ class VirusTotalSkillScanner:
         self._ignore_names = {".DS_Store"}
 
         self._last_scan_snapshot: Dict[str, Any] = {}
+        self._request_timestamps: Deque[float] = deque()
+        self._quota_day = int(time.time() // 86400)
+        self._quota_day_count = 0
 
     @staticmethod
     def _env_flag(name: str, default: bool = False) -> bool:
@@ -75,11 +85,34 @@ class VirusTotalSkillScanner:
             "skills_dir_exists": self.skills_dir.exists() and self.skills_dir.is_dir(),
             "upload_if_missing_default": bool(self.upload_if_missing_default),
             "enforcement_mode": self.enforcement_mode,
+            "rate_limit_per_minute": int(self.max_requests_per_minute),
+            "rate_limit_per_day": int(self.max_requests_per_day),
+            "requests_in_last_minute": len(self._request_timestamps),
+            "requests_today": int(self._quota_day_count),
             "max_poll_attempts": int(self.max_poll_attempts),
             "poll_interval_seconds": int(self.poll_interval_seconds),
             "last_scan": dict(self._last_scan_snapshot),
             "timestamp": self._now(),
         }
+
+    def _consume_quota(self) -> Optional[str]:
+        now = time.time()
+        quota_day = int(now // 86400)
+        if quota_day != self._quota_day:
+            self._quota_day = quota_day
+            self._quota_day_count = 0
+
+        while self._request_timestamps and now - self._request_timestamps[0] >= 60:
+            self._request_timestamps.popleft()
+
+        if len(self._request_timestamps) >= self.max_requests_per_minute:
+            return "rate_limit_per_minute"
+        if self._quota_day_count >= self.max_requests_per_day:
+            return "rate_limit_per_day"
+
+        self._request_timestamps.append(now)
+        self._quota_day_count += 1
+        return None
 
     def _resolve_skill_dir(self, skill_name: str) -> Path:
         candidate = str(skill_name or "").strip()
@@ -182,6 +215,9 @@ class VirusTotalSkillScanner:
     ) -> Dict[str, Any]:
         if not self.api_key:
             return {"ok": False, "status": 0, "error": "vt_api_key_missing"}
+        quota_error = self._consume_quota()
+        if quota_error:
+            return {"ok": False, "status": 429, "error": quota_error}
 
         headers = {"x-apikey": self.api_key}
         if payload is not None:
@@ -429,12 +465,26 @@ class VirusTotalSkillScanner:
 
         sha256 = str(bundle.get("sha256", ""))
         lookup = await self._lookup_file(sha256)
+        if not lookup.get("ok") and int(lookup.get("status", 0) or 0) == 429:
+            return {
+                "ok": False,
+                "error": "vt_rate_limited",
+                "detail": str(lookup.get("error", "")),
+                "timestamp": started,
+            }
         upload_result: Dict[str, Any] = {}
         analysis_result: Dict[str, Any] = {}
         file_report = lookup.get("report", {}) if lookup.get("found") else {}
 
         if lookup.get("ok") and not lookup.get("found") and upload_enabled:
             upload_result = await self._upload_bundle(skill_name, bundle.get("bytes", b""))
+            if int(upload_result.get("status", 0) or 0) == 429:
+                return {
+                    "ok": False,
+                    "error": "vt_rate_limited",
+                    "detail": str(upload_result.get("error", "")),
+                    "timestamp": started,
+                }
             if upload_result.get("ok"):
                 analysis_result = await self._poll_analysis(str(upload_result.get("analysis_id", "")))
                 refreshed_lookup = await self._lookup_file(sha256)

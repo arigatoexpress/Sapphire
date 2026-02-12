@@ -400,7 +400,7 @@ class TelegramPlatformBot:
             "- `/scout register <username> [display_name]`\n"
             "- `/scout publish <note>`\n"
             "- `/security status`\n"
-            "- `/security scan [skill|all] [upload|no-upload]`\n"
+            "- `/security scan [skill|all] [no-upload|upload]` (default: no-upload)\n"
             "- `/deallocate <venue>`\n"
             "- `/allocate <venue> <percent>`\n\n"
             "Owner steering:\n"
@@ -575,7 +575,7 @@ class TelegramPlatformBot:
                 await self._dispatch_callback("CONTROL", "ALL", "SECURITY_STATUS", 0.0)
                 return
 
-            upload_if_missing = upload_token != "no-upload"
+            upload_if_missing = upload_token == "upload"
             payload = json.dumps(
                 {
                     "skill": skill or "all",

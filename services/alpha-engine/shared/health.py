@@ -407,7 +407,7 @@ async def security_skills_scan(request: web.Request) -> web.Response:
         return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
 
     if request.method == "GET":
-        upload_value = str(request.rel_url.query.get("upload_if_missing", "true")).strip().lower()
+        upload_value = str(request.rel_url.query.get("upload_if_missing", "false")).strip().lower()
         payload = {
             "skill": request.rel_url.query.get("skill", ""),
             "upload_if_missing": upload_value in {"1", "true", "yes", "on"},

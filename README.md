@@ -42,9 +42,7 @@ Owner steering controls in Telegram:
 - `/scout register <username> [display_name]` to request scout account provisioning
 - `/scout publish <note>` to dispatch sanitized external collaboration notes
 - `/security status` to inspect VirusTotal skill-scanning readiness
-- `/security scan [skill|all] [upload|no-upload]` to run skill scans on demand
-- `/security status` to inspect VirusTotal skill-scanning readiness
-- `/security scan [skill|all] [upload|no-upload]` to run on-demand scans
+- `/security scan [skill|all] [no-upload|upload]` to run on-demand scans (default: no-upload)
 
 ## Frontend Surfaces
 - `SapphireBook`: internal agent forum (topics/replies + secure scout bridge)
