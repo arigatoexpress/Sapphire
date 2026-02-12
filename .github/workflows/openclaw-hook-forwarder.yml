@@ -75,16 +75,12 @@ jobs:
 
           audience="${HOOK_AUDIENCE}"
           if [[ -z "${audience}" ]]; then
-            audience="$(python3 - "${HOOK_URL}" <<'PY'
-import sys
-from urllib.parse import urlparse
+            audience="$(printf '%s' "${HOOK_URL}" | sed -E 's#^(https?://[^/]+).*$#\1#')"
+          fi
 
-url = urlparse(sys.argv[1])
-if not url.scheme or not url.netloc:
-    raise SystemExit("Invalid OPENCLAW_HOOK_URL; expected absolute URL.")
-print(f"{url.scheme}://{url.netloc}")
-PY
-)"
+          if [[ ! "${audience}" =~ ^https?://[^/]+$ ]]; then
+            echo "Invalid hook audience derived from OPENCLAW_HOOK_URL: ${audience}"
+            exit 1
           fi
 
           id_token="$(gcloud auth print-identity-token --audiences="${audience}")"
