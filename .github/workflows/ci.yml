@@ -43,7 +43,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: focused-gate
-    if: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && secrets.GCP_SERVICE_ACCOUNT != '' }}
     permissions:
       contents: read
       id-token: write
@@ -51,19 +50,36 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Detect GCP auth availability
+        id: gcp-auth
+        run: |
+          if [[ -n "${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}" && -n "${{ secrets.GCP_SERVICE_ACCOUNT }}" ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Authenticate to Google Cloud
+        if: ${{ steps.gcp-auth.outputs.enabled == 'true' }}
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       - name: Set up Cloud SDK
+        if: ${{ steps.gcp-auth.outputs.enabled == 'true' }}
         uses: google-github-actions/setup-gcloud@v2
 
       - name: Install runtime utilities
+        if: ${{ steps.gcp-auth.outputs.enabled == 'true' }}
         run: |
           sudo apt-get update
           sudo apt-get install -y jq curl ripgrep
 
       - name: Run holistic ops check
+        if: ${{ steps.gcp-auth.outputs.enabled == 'true' }}
         run: ./scripts/holistic_ops_check.sh
+
+      - name: Skip cloud check when GCP secrets are unavailable
+        if: ${{ steps.gcp-auth.outputs.enabled != 'true' }}
+        run: echo "Skipping holistic cloud check because GCP auth secrets are not configured."
