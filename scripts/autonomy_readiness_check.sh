@@ -124,7 +124,7 @@ fi
 pubsub_subscriber_role=$(gcloud projects get-iam-policy "$PROJECT_ID" \
   --flatten="bindings[]" \
   --filter="bindings.role=roles/pubsub.subscriber AND bindings.members:serviceAccount:${AUTONOMY_SA}" \
-  --format='value(bindings.role)' 2>/dev/null | head -n1)
+  --format='value(bindings.role)' 2>/dev/null | head -n1 || true)
 if [[ "$pubsub_subscriber_role" == "roles/pubsub.subscriber" ]]; then
   pass "autonomy service account has Pub/Sub subscriber role"
 else
