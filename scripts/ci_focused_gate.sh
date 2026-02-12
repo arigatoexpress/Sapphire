@@ -73,6 +73,8 @@ done
 
 if "${PYTHON_BIN}" -m py_compile \
   services/alpha-engine/shared/telegram_bot.py \
+  services/alpha-engine/shared/health.py \
+  services/alpha-engine/src/collaboration/forum.py \
   services/alpha-engine/src/integrations/tradingview_autonomy.py \
   services/alpha-engine/src/main.py; then
   pass "alpha-engine syntax compile"

@@ -259,6 +259,133 @@ async def tradingview_workspace(request: web.Request) -> web.Response:
     return web.json_response({"ok": True}, status=200)
 
 
+async def _read_json_payload(request: web.Request) -> dict[str, Any]:
+    try:
+        payload = await request.json()
+    except Exception:
+        return {}
+    if isinstance(payload, dict):
+        return payload
+    return {}
+
+
+async def forum_topics(request: web.Request) -> web.Response:
+    if request.method == "GET":
+        handler = request.app.get("forum_topics_handler")
+        if handler is None:
+            return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
+        payload: dict[str, Any] = {
+            "lane": request.rel_url.query.get("lane", ""),
+            "state": request.rel_url.query.get("state", ""),
+            "tag": request.rel_url.query.get("tag", ""),
+            "q": request.rel_url.query.get("q", ""),
+            "limit": request.rel_url.query.get("limit", "80"),
+        }
+    else:
+        handler = request.app.get("forum_create_topic_handler")
+        if handler is None:
+            return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
+        payload = await _read_json_payload(request)
+
+    try:
+        result = await handler(payload)
+    except Exception as exc:
+        logger.error(f"Forum topics handler error: {exc}")
+        return web.json_response({"ok": False, "error": "handler_failed"}, status=500)
+
+    if isinstance(result, dict):
+        status = 400 if result.get("error") else 200
+        return web.json_response({"ok": status == 200, **result}, status=status)
+    return web.json_response({"ok": True}, status=200)
+
+
+async def forum_topic_detail(request: web.Request) -> web.Response:
+    handler = request.app.get("forum_topic_detail_handler")
+    if handler is None:
+        return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
+
+    topic_id = str(request.match_info.get("topic_id", "")).strip()
+    payload = {"topic_id": topic_id}
+    try:
+        result = await handler(payload)
+    except Exception as exc:
+        logger.error(f"Forum topic detail handler error: {exc}")
+        return web.json_response({"ok": False, "error": "handler_failed"}, status=500)
+
+    if isinstance(result, dict):
+        status = 400 if result.get("error") else 200
+        return web.json_response({"ok": status == 200, **result}, status=status)
+    return web.json_response({"ok": True}, status=200)
+
+
+async def forum_replies(request: web.Request) -> web.Response:
+    handler = request.app.get("forum_replies_handler")
+    if handler is None:
+        return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
+
+    payload = await _read_json_payload(request)
+    payload["topic_id"] = str(request.match_info.get("topic_id", "")).strip()
+    try:
+        result = await handler(payload)
+    except Exception as exc:
+        logger.error(f"Forum replies handler error: {exc}")
+        return web.json_response({"ok": False, "error": "handler_failed"}, status=500)
+
+    if isinstance(result, dict):
+        status = 400 if result.get("error") else 200
+        return web.json_response({"ok": status == 200, **result}, status=status)
+    return web.json_response({"ok": True}, status=200)
+
+
+async def forum_scout_status(request: web.Request) -> web.Response:
+    handler = request.app.get("forum_scout_status_handler")
+    if handler is None:
+        return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
+    try:
+        result = await handler({})
+    except Exception as exc:
+        logger.error(f"Forum scout status handler error: {exc}")
+        return web.json_response({"ok": False, "error": "handler_failed"}, status=500)
+    if isinstance(result, dict):
+        status = 400 if result.get("error") else 200
+        return web.json_response({"ok": status == 200, **result}, status=status)
+    return web.json_response({"ok": True}, status=200)
+
+
+async def forum_scout_register(request: web.Request) -> web.Response:
+    handler = request.app.get("forum_scout_register_handler")
+    if handler is None:
+        return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
+
+    payload = await _read_json_payload(request)
+    try:
+        result = await handler(payload)
+    except Exception as exc:
+        logger.error(f"Forum scout register handler error: {exc}")
+        return web.json_response({"ok": False, "error": "handler_failed"}, status=500)
+    if isinstance(result, dict):
+        status = 400 if result.get("error") else 200
+        return web.json_response({"ok": status == 200, **result}, status=status)
+    return web.json_response({"ok": True}, status=200)
+
+
+async def forum_scout_publish(request: web.Request) -> web.Response:
+    handler = request.app.get("forum_scout_publish_handler")
+    if handler is None:
+        return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
+
+    payload = await _read_json_payload(request)
+    try:
+        result = await handler(payload)
+    except Exception as exc:
+        logger.error(f"Forum scout publish handler error: {exc}")
+        return web.json_response({"ok": False, "error": "handler_failed"}, status=500)
+    if isinstance(result, dict):
+        status = 400 if result.get("error") else 200
+        return web.json_response({"ok": status == 200, **result}, status=status)
+    return web.json_response({"ok": True}, status=200)
+
+
 async def start_health_server(
     telegram_update_handler: Optional[Callable[[dict[str, Any]], Awaitable[None]]] = None,
     telegram_webhook_secret: str = "",
@@ -273,6 +400,15 @@ async def start_health_server(
     performance_stats_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
     system_logs_handler: Optional[Callable[[dict[str, Any]], Awaitable[Any]]] = None,
     tradingview_workspace_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
+    forum_topics_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
+    forum_create_topic_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
+    forum_topic_detail_handler: Optional[
+        Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]
+    ] = None,
+    forum_replies_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
+    forum_scout_status_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
+    forum_scout_register_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
+    forum_scout_publish_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
 ):
     """Start a lightweight HTTP server for Cloud Run health checks."""
     port = int(os.getenv("PORT", "8080"))
@@ -311,6 +447,27 @@ async def start_health_server(
     if tradingview_workspace_handler is not None:
         app["tradingview_workspace_handler"] = tradingview_workspace_handler
         app.router.add_get("/api/v2/tradingview/workspace", tradingview_workspace)
+    if forum_topics_handler is not None:
+        app["forum_topics_handler"] = forum_topics_handler
+        app.router.add_get("/api/v2/forum/topics", forum_topics)
+    if forum_create_topic_handler is not None:
+        app["forum_create_topic_handler"] = forum_create_topic_handler
+        app.router.add_post("/api/v2/forum/topics", forum_topics)
+    if forum_topic_detail_handler is not None:
+        app["forum_topic_detail_handler"] = forum_topic_detail_handler
+        app.router.add_get("/api/v2/forum/topics/{topic_id}", forum_topic_detail)
+    if forum_replies_handler is not None:
+        app["forum_replies_handler"] = forum_replies_handler
+        app.router.add_post("/api/v2/forum/topics/{topic_id}/replies", forum_replies)
+    if forum_scout_status_handler is not None:
+        app["forum_scout_status_handler"] = forum_scout_status_handler
+        app.router.add_get("/api/v2/forum/scout/status", forum_scout_status)
+    if forum_scout_register_handler is not None:
+        app["forum_scout_register_handler"] = forum_scout_register_handler
+        app.router.add_post("/api/v2/forum/scout/register", forum_scout_register)
+    if forum_scout_publish_handler is not None:
+        app["forum_scout_publish_handler"] = forum_scout_publish_handler
+        app.router.add_post("/api/v2/forum/scout/publish", forum_scout_publish)
 
     runner = web.AppRunner(app)
     await runner.setup()

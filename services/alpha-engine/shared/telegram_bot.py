@@ -392,8 +392,9 @@ class TelegramPlatformBot:
             "- `/approve <session_key> [note]`\n"
             "- `/approve_all [note]`\n"
             "- `/reject <session_key> [reason]`\n"
-            "- `/trade on [qty]` / `/trade off`\n"
-            "- `/qty <amount>`\n"
+            "- `/trade on [qty]` / `/trade off` (TradingView signal mode)\n"
+            "- `/qty <amount>` (TradingView signal qty)\n"
+            "- `/stage <paper|staged_live|full_live>`\n"
             "- `/deallocate <venue>`\n"
             "- `/allocate <venue> <percent>`\n\n"
             "Owner steering:\n"
@@ -532,12 +533,12 @@ class TelegramPlatformBot:
 
         # Trading execution mode commands
         slash_trade_mode_match = re.search(
-            r"^/(trade|execution)\s+(on|off)(?:\s+([\d.]+))?$",
+            r"^/(trade|execution|tv)\s+(on|off)(?:\s+([\d.]+))?$",
             text,
             flags=re.IGNORECASE,
         )
         mention_trade_mode_match = re.search(
-            r"@(alpha|control)\s+(trade|execution)\s+(on|off)(?:\s+([\d.]+))?$",
+            r"@(alpha|control)\s+(trade|execution|tv)\s+(on|off)(?:\s+([\d.]+))?$",
             text,
             flags=re.IGNORECASE,
         )
@@ -563,12 +564,36 @@ class TelegramPlatformBot:
             enabled = mode_text == "ON"
             await self.send_message(
                 (
-                    f"🧭 Trade execution mode requested: `{'LIVE' if enabled else 'PAUSED'}`"
+                    f"🧭 TradingView signal mode requested: `{'LIVE' if enabled else 'WORKBENCH_DRY-RUN'}`"
                     + (f" | qty `{qty_value}`" if qty_value > 0 else "")
                 ),
                 priority=NotificationPriority.HIGH,
             )
             await self._dispatch_callback("CONTROL", mode_text, "SET_TRADING_EXECUTION", qty_value)
+            return
+
+        # DEX execution stage command
+        slash_stage_match = re.search(
+            r"^/(stage|promotion_stage)\s+(paper|staged_live|staged|full_live|full|live)$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        mention_stage_match = re.search(
+            r"@(alpha|control)\s+(stage|promotion_stage)\s+(paper|staged_live|staged|full_live|full|live)$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if slash_stage_match or mention_stage_match:
+            requested_stage = (
+                str(slash_stage_match.group(2) or "").strip()
+                if slash_stage_match
+                else str(mention_stage_match.group(3) or "").strip()
+            )
+            await self.send_message(
+                f"🚀 DEX stage update requested: `{requested_stage}`",
+                priority=NotificationPriority.HIGH,
+            )
+            await self._dispatch_callback("CONTROL", requested_stage, "SET_EXECUTION_STAGE", 0.0)
             return
 
         # Default TradingView quantity command

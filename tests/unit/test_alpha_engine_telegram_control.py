@@ -173,6 +173,34 @@ def test_trade_mode_command_dispatches_execution_toggle(telegram_module):
     assert quantity == 0.03
 
 
+def test_stage_command_dispatches_execution_stage_update(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {
+                "message": {
+                    "chat": {"id": "12345"},
+                    "text": "/stage staged_live",
+                }
+            }
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert symbol == "staged_live"
+    assert action == "SET_EXECUTION_STAGE"
+    assert quantity == 0.0
+
+
 def test_qty_command_dispatches_default_quantity_update(telegram_module):
     callback = AsyncMock()
     bot = telegram_module.TelegramPlatformBot(

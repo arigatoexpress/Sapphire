@@ -10,6 +10,7 @@ from typing import Any, Deque, Dict, List, Optional, Set
 
 import uvloop
 from src.ai.gemini_guard import GeminiGuard
+from src.collaboration.forum import SapphireForumService
 from src.execution.dispatcher import dispatcher
 from src.feeds.market_data import MarketDataAggregator
 from src.integrations.tradingview_autonomy import TradingViewAutonomyPlugin
@@ -36,6 +37,12 @@ class AlphaEngine:
         self.running = False
         self.market_data = MarketDataAggregator()
         self.strategy = AlphaStrategyEngine(self.market_data)
+        requested_stage = self._parse_execution_stage_token(
+            os.getenv("SAPPHIRE_DEX_EXECUTION_STAGE", "paper")
+        )
+        self._dex_execution_stage = requested_stage or "paper"
+        self.strategy.set_execution_stage(self._dex_execution_stage)
+        self._dex_stage_updated_at = int(time.time())
 
         # Telegram Bot for Notifications & Commands
         from telegram_bot import TelegramPlatformBot
@@ -140,6 +147,7 @@ class AlphaEngine:
         self._started_at = time.time()
         self._system_log_max_entries = max(100, int(os.getenv("SYSTEM_LOG_MAX_ENTRIES", "500")))
         self._system_logs: Deque[Dict[str, Any]] = deque(maxlen=self._system_log_max_entries)
+        self.forum = SapphireForumService()
         self._trade_metrics: Dict[str, float] = {
             "total_trades": 0.0,
             "wins": 0.0,
@@ -199,6 +207,43 @@ class AlphaEngine:
             "ALL": "ALL",
         }
         return aliases.get(value, value)
+
+    @staticmethod
+    def _parse_execution_stage_token(raw: Any) -> str:
+        value = str(raw or "").strip().lower().replace("-", "_")
+        aliases = {
+            "paper": "paper",
+            "observe": "paper",
+            "dry": "paper",
+            "dry_run": "paper",
+            "staged": "staged_live",
+            "staged_live": "staged_live",
+            "stage": "staged_live",
+            "live": "full_live",
+            "full": "full_live",
+            "full_live": "full_live",
+            "production": "full_live",
+        }
+        return aliases.get(value, "")
+
+    def _set_execution_stage(self, stage: str, source: str = "manual") -> Dict[str, Any]:
+        previous = self._dex_execution_stage
+        applied = self.strategy.set_execution_stage(stage)
+        self._dex_execution_stage = str(applied.get("dex_execution_stage", previous) or previous)
+        self._dex_stage_updated_at = int(time.time())
+        self._record_system_log(
+            f"DEX execution stage set to {self._dex_execution_stage}",
+            level="warning",
+            tags=["control", "dex_stage"],
+            metadata={
+                "source": source,
+                "previous_stage": previous,
+                "applied_stage": self._dex_execution_stage,
+                "effective_live_dispatch": bool(applied.get("effective_live_dispatch", False)),
+                "effective_quantity": float(applied.get("effective_quantity", 0.0)),
+            },
+        )
+        return applied
 
     @staticmethod
     def _parse_tradingview_message(message: str) -> Dict[str, Any]:
@@ -376,6 +421,7 @@ class AlphaEngine:
 
     async def _send_promotion_gate_report(self, reason: str = "manual") -> None:
         state = dispatcher.get_control_state()
+        strategy_state = self.strategy.execution_state()
         active_venues = [
             venue for venue, item in state.items() if not item["paused"] and item["allocation"] > 0
         ]
@@ -398,9 +444,15 @@ class AlphaEngine:
                 f"Failure pressure is {total_failures}",
             ),
             (
-                "TradingView rules enforced",
-                self._tradingview_enforce_strategy_rules and bool(self._tradingview_strategy_rules),
-                "Strategy rules not enforced or missing",
+                "TradingView strategy rules optional in workbench mode",
+                (not self._tradingview_execution_enabled)
+                or (self._tradingview_enforce_strategy_rules and bool(self._tradingview_strategy_rules)),
+                "Enable strategy rules if turning TradingView live mode on",
+            ),
+            (
+                "DEX execution stage configured",
+                strategy_state.get("dex_execution_stage") in {"paper", "staged_live", "full_live"},
+                "SAPPHIRE_DEX_EXECUTION_STAGE is invalid",
             ),
             (
                 "TradingView autonomy plugin enabled",
@@ -453,6 +505,9 @@ class AlphaEngine:
                 "",
                 f"Active venues: `{', '.join(active_venues) if active_venues else 'none'}`",
                 f"Failure pressure: `{total_failures}`",
+                f"DEX stage: `{strategy_state.get('dex_execution_stage', 'paper')}`",
+                f"DEX live dispatch: `{bool(strategy_state.get('effective_live_dispatch', False))}`",
+                f"DEX effective qty: `{strategy_state.get('effective_quantity', 0.0)}`",
                 f"Rules configured: `{len(self._tradingview_strategy_rules)}`",
                 f"TV autonomy enabled: `{self.tv_autonomy.enabled}`",
                 (
@@ -629,6 +684,9 @@ class AlphaEngine:
             f"Kill switch: `{'ACTIVE' if snapshot['kill_switch_active'] else 'INACTIVE'}`",
             f"Full autonomy: `{'ON' if snapshot['full_autonomy_enabled'] else 'OFF'}`",
             f"Primary execution: `DEX_NATIVE ({primary_venues})`",
+            f"DEX stage: `{snapshot['dex_execution_stage']}`",
+            f"DEX live dispatch: `{'ON' if snapshot['dex_live_dispatch_enabled'] else 'OFF'}`",
+            f"DEX effective qty: `{snapshot['dex_effective_quantity']}`",
             f"TradingView signal mode: `{tv_signal_mode}`",
             f"Signal default quantity: `{snapshot['tradingview_default_quantity']}`",
             f"Autonomy dispatches: `{snapshot['autonomy_dispatch_count']}`",
@@ -647,6 +705,7 @@ class AlphaEngine:
 
     def _control_snapshot(self) -> Dict[str, Any]:
         state = dispatcher.get_control_state()
+        strategy_state = self.strategy.execution_state()
         pending_sessions = [
             session
             for session in self._autonomy_sessions.values()
@@ -680,6 +739,11 @@ class AlphaEngine:
             "owner_approval_required": self._autonomy_require_owner_approval,
             "primary_execution_plane": "dex_venues",
             "primary_execution_venues": sorted(venues.keys()),
+            "dex_execution_stage": strategy_state.get("dex_execution_stage", "paper"),
+            "dex_live_dispatch_enabled": bool(strategy_state.get("effective_live_dispatch", False)),
+            "dex_stage_multiplier": float(strategy_state.get("stage_multiplier", 0.0)),
+            "dex_effective_quantity": float(strategy_state.get("effective_quantity", 0.0)),
+            "dex_base_quantity": float(strategy_state.get("base_quantity", 0.0)),
             "tradingview_execution_enabled": self._tradingview_execution_enabled,
             "tradingview_signal_mode": "live" if self._tradingview_execution_enabled else "workbench_dry_run",
             "tradingview_default_quantity": float(self._tradingview_default_quantity),
@@ -694,6 +758,7 @@ class AlphaEngine:
 
     async def _send_focus_snapshot(self) -> None:
         state = dispatcher.get_control_state()
+        strategy_state = self.strategy.execution_state()
         venue_summary = ", ".join(sorted(state.keys())) if state else "none"
 
         directive = self._owner_directive.strip() or "none"
@@ -715,6 +780,11 @@ class AlphaEngine:
                 f"Owner approval gate: `{'ON' if self._autonomy_require_owner_approval else 'AUTO-APPROVE'}`"
             ),
             "Primary execution plane: `DEX_NATIVE (ASTER/LIGHTER)`",
+            f"DEX stage: `{strategy_state.get('dex_execution_stage', 'paper')}`",
+            (
+                f"DEX live dispatch: `{'ON' if strategy_state.get('effective_live_dispatch', False) else 'OFF'}`"
+            ),
+            f"DEX effective qty: `{strategy_state.get('effective_quantity', 0.0)}`",
             (
                 "TradingView signal mode: `LIVE`"
                 if self._tradingview_execution_enabled
@@ -731,6 +801,7 @@ class AlphaEngine:
 
     async def _send_heartbeat(self, reason: str) -> None:
         state = dispatcher.get_control_state()
+        strategy_state = self.strategy.execution_state()
         live = [venue for venue, item in state.items() if not item["paused"] and item["allocation"] > 0]
         paused = [venue for venue, item in state.items() if item["paused"] or item["allocation"] <= 0]
         total_failures = sum(self._failure_counts.values())
@@ -744,6 +815,9 @@ class AlphaEngine:
             f"Active: `{', '.join(live) if live else 'none'}` | "
             f"Paused: `{', '.join(paused) if paused else 'none'}`\n"
             "Primary execution: `DEX_NATIVE (ASTER/LIGHTER)`\n"
+            f"DEX stage: `{strategy_state.get('dex_execution_stage', 'paper')}` | "
+            f"DEX live dispatch: `{'ON' if strategy_state.get('effective_live_dispatch', False) else 'OFF'}` | "
+            f"DEX qty: `{strategy_state.get('effective_quantity', 0.0)}`\n"
             f"Kill switch: `{'ACTIVE' if self._kill_switch_active else 'OFF'}` | "
             f"Autonomy: `{'ON' if self._full_autonomy_enabled else 'OFF'}` | "
             f"Approvals: `{'OWNER' if self._autonomy_require_owner_approval else 'AUTO'}`\n"
@@ -758,6 +832,7 @@ class AlphaEngine:
 
     def _autonomy_context_snapshot(self) -> Dict[str, Any]:
         state = dispatcher.get_control_state()
+        strategy_state = self.strategy.execution_state()
         active_venues = [
             venue for venue, item in state.items() if not item.get("paused") and item.get("allocation", 0) > 0
         ]
@@ -776,6 +851,9 @@ class AlphaEngine:
             "autonomy_dispatch_count": self._autonomy_dispatch_count,
             "allowed_repo_scope": sorted(list(getattr(self.tv_autonomy, "allowed_repo_scope", set()))),
             "allowed_project_scope": sorted(list(getattr(self.tv_autonomy, "allowed_project_scope", set()))),
+            "dex_execution_stage": strategy_state.get("dex_execution_stage", "paper"),
+            "dex_live_dispatch": bool(strategy_state.get("effective_live_dispatch", False)),
+            "dex_effective_quantity": float(strategy_state.get("effective_quantity", 0.0)),
             "pending_autonomy_sessions": len(
                 [
                     session
@@ -1061,6 +1139,26 @@ class AlphaEngine:
     async def _handle_control_command(self, target: str, action: str, value: float) -> None:
         normalized_action = action.upper()
 
+        if normalized_action in {"SET_EXECUTION_STAGE", "SET_DEX_EXECUTION_STAGE", "PROMOTION_STAGE"}:
+            requested = self._parse_execution_stage_token(target)
+            if not requested:
+                await self.telegram.send_message(
+                    "❌ Invalid stage. Use one of: `paper`, `staged_live`, `full_live`.",
+                    priority="high",
+                )
+                return
+
+            applied = self._set_execution_stage(requested, source="telegram")
+            await self.telegram.send_message(
+                (
+                    f"✅ DEX execution stage set to `{applied.get('dex_execution_stage', requested)}`.\n"
+                    f"Live dispatch: `{'ON' if applied.get('effective_live_dispatch', False) else 'OFF'}` | "
+                    f"Effective qty: `{applied.get('effective_quantity', 0.0)}`"
+                ),
+                priority="high",
+            )
+            return
+
         if normalized_action in {"SET_TRADING_EXECUTION", "SET_EXECUTION"}:
             mode = str(target or "").strip().upper()
             if mode not in {"ON", "OFF", "TRUE", "FALSE", "1", "0"}:
@@ -1259,7 +1357,22 @@ class AlphaEngine:
             return
 
         if normalized_action in {"PROMOTION_GATE", "STRATEGY_GATE", "PROMOTION", "GATE"}:
-            await self._send_promotion_gate_report("manual")
+            requested_stage = self._parse_execution_stage_token(target)
+            if requested_stage:
+                applied = self._set_execution_stage(requested_stage, source="promotion_gate")
+                await self.telegram.send_message(
+                    (
+                        f"🚀 Promotion stage updated to `{applied.get('dex_execution_stage', requested_stage)}`.\n"
+                        f"Live dispatch: `{'ON' if applied.get('effective_live_dispatch', False) else 'OFF'}` | "
+                        f"Effective qty: `{applied.get('effective_quantity', 0.0)}`"
+                    ),
+                    priority="high",
+                )
+                await self._send_promotion_gate_report(
+                    f"promotion:{applied.get('dex_execution_stage', requested_stage)}"
+                )
+            else:
+                await self._send_promotion_gate_report("manual")
             return
 
         if normalized_action in {"AUTONOMY", "AUTONOMY_CYCLE"}:
@@ -1794,6 +1907,13 @@ class AlphaEngine:
                 performance_stats_handler=self._handle_performance_stats_request,
                 system_logs_handler=self._handle_system_logs_request,
                 tradingview_workspace_handler=self._handle_tradingview_workspace_request,
+                forum_topics_handler=self._handle_forum_topics_request,
+                forum_create_topic_handler=self._handle_forum_create_topic_request,
+                forum_topic_detail_handler=self._handle_forum_topic_detail_request,
+                forum_replies_handler=self._handle_forum_replies_request,
+                forum_scout_status_handler=self._handle_forum_scout_status_request,
+                forum_scout_register_handler=self._handle_forum_scout_register_request,
+                forum_scout_publish_handler=self._handle_forum_scout_publish_request,
             )
         else:
             await start_health_server(
@@ -1806,6 +1926,13 @@ class AlphaEngine:
                 performance_stats_handler=self._handle_performance_stats_request,
                 system_logs_handler=self._handle_system_logs_request,
                 tradingview_workspace_handler=self._handle_tradingview_workspace_request,
+                forum_topics_handler=self._handle_forum_topics_request,
+                forum_create_topic_handler=self._handle_forum_create_topic_request,
+                forum_topic_detail_handler=self._handle_forum_topic_detail_request,
+                forum_replies_handler=self._handle_forum_replies_request,
+                forum_scout_status_handler=self._handle_forum_scout_status_request,
+                forum_scout_register_handler=self._handle_forum_scout_register_request,
+                forum_scout_publish_handler=self._handle_forum_scout_publish_request,
             )
 
         # 1. Start Telegram FIRST for immediate status
@@ -1950,6 +2077,7 @@ class AlphaEngine:
     async def _handle_platform_status_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
         snapshot = self.market_data.get_market_snapshot(symbol="SOL")
         control_state = dispatcher.get_control_state()
+        strategy_state = self.strategy.execution_state()
         platforms: Dict[str, Dict[str, Any]] = {}
 
         for venue in ("ASTER", "LIGHTER"):
@@ -1991,6 +2119,9 @@ class AlphaEngine:
         return {
             "platforms": platforms,
             "kill_switch_active": self._kill_switch_active,
+            "dex_execution_stage": strategy_state.get("dex_execution_stage", "paper"),
+            "dex_live_dispatch": bool(strategy_state.get("effective_live_dispatch", False)),
+            "dex_effective_quantity": float(strategy_state.get("effective_quantity", 0.0)),
             "timestamp": int(time.time()),
         }
 
@@ -1999,6 +2130,7 @@ class AlphaEngine:
 
     async def _handle_routing_info_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
         state = dispatcher.get_control_state()
+        strategy_state = self.strategy.execution_state()
         active = [venue for venue, item in state.items() if not item.get("paused") and item.get("allocation", 0) > 0]
         paused = [venue for venue, item in state.items() if item.get("paused") or item.get("allocation", 0) <= 0]
         failure_pressure = int(sum(self._failure_counts.values()))
@@ -2035,6 +2167,8 @@ class AlphaEngine:
                 "paused_venues": paused,
                 "failure_pressure": failure_pressure,
                 "kill_switch_active": self._kill_switch_active,
+                "dex_execution_stage": strategy_state.get("dex_execution_stage", "paper"),
+                "dex_live_dispatch": bool(strategy_state.get("effective_live_dispatch", False)),
             },
             "timestamp": int(time.time()),
         }
@@ -2078,6 +2212,126 @@ class AlphaEngine:
             "workspace": snapshot,
             "timestamp": int(time.time()),
         }
+
+    async def _handle_forum_topics_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        board = self.forum.list_topics(payload)
+        control = self._control_snapshot()
+        return {
+            **board,
+            "control": {
+                "pending_autonomy_decisions": int(control.get("pending_autonomy_decisions", 0)),
+                "owner_directive": str(control.get("owner_directive", "") or ""),
+                "failure_pressure": int(control.get("failure_pressure", 0)),
+            },
+            "timestamp": int(time.time()),
+        }
+
+    async def _handle_forum_topic_detail_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        topic_id = str(payload.get("topic_id", "")).strip()
+        if not topic_id:
+            return {"error": "topic_id_required"}
+        topic = self.forum.get_topic_detail(topic_id)
+        if not topic:
+            return {"error": "topic_not_found", "topic_id": topic_id}
+        return {"topic": topic, "timestamp": int(time.time())}
+
+    async def _handle_forum_create_topic_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            topic = self.forum.create_topic(
+                {
+                    "title": payload.get("title", ""),
+                    "body": payload.get("body", ""),
+                    "lane": payload.get("lane", "research"),
+                    "state": payload.get("state", "open"),
+                    "priority": payload.get("priority", "medium"),
+                    "author": payload.get("author", "SAPPHIRE"),
+                    "tags": payload.get("tags", []),
+                    "source": payload.get("source", "internal"),
+                }
+            )
+        except ValueError as exc:
+            return {"error": str(exc)}
+
+        self._record_system_log(
+            f"Forum topic created: {topic.get('topic_id', 'unknown')}",
+            level="info",
+            tags=["forum", "topic"],
+            metadata={
+                "topic_id": topic.get("topic_id", ""),
+                "lane": topic.get("lane", ""),
+                "priority": topic.get("priority", ""),
+            },
+        )
+        return {"topic": topic, "timestamp": int(time.time())}
+
+    async def _handle_forum_replies_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        topic_id = str(payload.get("topic_id", "")).strip()
+        if not topic_id:
+            return {"error": "topic_id_required"}
+
+        body = str(payload.get("body", "")).strip()
+        if not body:
+            return {"error": "body_required"}
+
+        try:
+            reply = self.forum.add_reply(
+                topic_id,
+                {
+                    "body": body,
+                    "author": payload.get("author", "SAPPHIRE"),
+                    "kind": payload.get("kind", "comment"),
+                    "state": payload.get("state", ""),
+                    "source": payload.get("source", "internal"),
+                },
+            )
+        except ValueError as exc:
+            return {"error": str(exc)}
+
+        self._record_system_log(
+            f"Forum reply added to {topic_id}",
+            level="info",
+            tags=["forum", "reply"],
+            metadata={"topic_id": topic_id, "reply_id": reply.get("reply_id", "")},
+        )
+        return {"reply": reply, "timestamp": int(time.time())}
+
+    async def _handle_forum_scout_status_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
+        return self.forum.scout_status()
+
+    async def _handle_forum_scout_register_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        result = await self.forum.register_scout_account(payload)
+        if result.get("ok"):
+            dispatch = result.get("dispatch", {}) or {}
+            if dispatch.get("dispatched"):
+                await self.telegram.send_message(
+                    (
+                        "🛰️ Scout registration dispatched to external collaboration bridge.\n"
+                        f"User: `@{result.get('registration', {}).get('username', 'unknown')}`"
+                    ),
+                    priority="medium",
+                )
+            else:
+                await self.telegram.send_message(
+                    (
+                        "🛰️ Scout registration prepared locally; external bridge pending.\n"
+                        f"Reason: `{dispatch.get('reason', 'not_configured')}`"
+                    ),
+                    priority="medium",
+                )
+        return result
+
+    async def _handle_forum_scout_publish_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        result = await self.forum.publish_scout_note(payload)
+        if result.get("ok"):
+            dispatch = result.get("dispatch", {}) or {}
+            if not dispatch.get("dispatched"):
+                self._record_system_log(
+                    "Scout outbound note stored locally; external publish pending",
+                    level="warning",
+                    tags=["forum", "scout"],
+                    metadata={"reason": dispatch.get("reason", "not_configured")},
+                )
+        return result
 
     async def stop(self):
         logger.info("🛑 Stopping Alpha Engine...")

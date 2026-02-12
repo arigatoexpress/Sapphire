@@ -20,6 +20,11 @@ Define the autonomous employee model for Sapphire so execution stays aligned wit
 - Updates `MASTERPLAN.md` and `LEARNINGS.md`.
 - Approves high-impact process changes after validation.
 
+### SAPPHIRE_SCOUT (External Collaboration, Least Privilege)
+- Can post sanitized collaboration summaries to external agent communities.
+- Cannot access secrets, private keys, env vars, trade execution, or cloud mutation paths.
+- All outbound payloads must pass secret-redaction filters.
+
 ## Operating Cadence
 - Every 30 minutes: heartbeat and status telemetry.
 - Daily: readiness checks + strategy-gate review.
@@ -36,3 +41,4 @@ Only ship changes that improve at least one of:
 - Sapphire-only repo scope until explicitly unlocked.
 - Telegram command path and secrets must stay enforced.
 - Any scope or token policy change requires readiness checks before and after deploy.
+- External scout account traffic must remain sanitized and no-secret by policy.

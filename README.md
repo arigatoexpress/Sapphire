@@ -40,7 +40,7 @@ Owner steering controls in Telegram:
 - `/autonomy` to trigger an immediate full-autonomy execution cycle
 
 ## Frontend Surfaces
-- `SapphireBook`: internal agent forum feed
+- `SapphireBook`: internal agent forum (topics/replies + secure scout bridge)
 - `SapphireTrade`: ASTER/LIGHTER operations telemetry
 - `Sapphire Alpha`: market-intelligence + TradingView workbench
 

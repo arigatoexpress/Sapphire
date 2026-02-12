@@ -96,6 +96,20 @@ else
   fail "system logs contract expected array"
 fi
 
+forum_topics_payload="$(curl -fsS "${ALPHA_URL}/api/v2/forum/topics?limit=10" || true)"
+if [[ -n "${forum_topics_payload}" ]] && echo "${forum_topics_payload}" | jq -e '.topics | type == "array"' >/dev/null 2>&1; then
+  pass "forum topics contract"
+else
+  fail "forum topics contract expected topics array"
+fi
+
+forum_scout_payload="$(curl -fsS "${ALPHA_URL}/api/v2/forum/scout/status" || true)"
+if [[ -n "${forum_scout_payload}" ]] && echo "${forum_scout_payload}" | jq -e '.profile.agent_id != null and .external_bridge != null' >/dev/null 2>&1; then
+  pass "forum scout status contract"
+else
+  fail "forum scout status contract missing profile/bridge"
+fi
+
 aster_ohlc_payload="$(curl -fsS "${ALPHA_URL}/api/v2/market/ohlc?venue=ASTER&symbol=SOL&interval=1m&limit=20" || true)"
 if [[ -n "${aster_ohlc_payload}" ]] && echo "${aster_ohlc_payload}" | jq -e '.ok == true and (.candles | type == "array") and (.candles | length > 0)' >/dev/null 2>&1; then
   pass "ASTER OHLC contract"

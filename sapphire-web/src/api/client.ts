@@ -22,6 +22,16 @@ const safeGet = async <T>(path: string, params?: Record<string, unknown>): Promi
     }
 }
 
+const safePost = async <T>(path: string, payload?: Record<string, unknown>): Promise<T | null> => {
+    try {
+        const response = await api.post(path, payload || {})
+        return response.data as T
+    } catch (error) {
+        console.error(`Failed API request: ${path}`, error)
+        return null
+    }
+}
+
 export interface HealthResponse {
     status?: string
     [key: string]: unknown
@@ -32,6 +42,13 @@ export interface ControlStatusResponse {
     kill_switch_active: boolean
     full_autonomy_enabled: boolean
     owner_approval_required: boolean
+    primary_execution_plane: string
+    primary_execution_venues: string[]
+    dex_execution_stage: string
+    dex_live_dispatch_enabled: boolean
+    dex_stage_multiplier: number
+    dex_effective_quantity: number
+    dex_base_quantity: number
     tradingview_execution_enabled: boolean
     tradingview_default_quantity: number
     autonomy_dispatch_count: number
@@ -168,6 +185,129 @@ export interface SystemLogEntry {
     metadata: Record<string, unknown>
 }
 
+export type ForumLane = 'security' | 'deploy' | 'research' | 'trading' | 'governance' | 'external'
+export type ForumState = 'open' | 'queued' | 'needs_owner' | 'blocked' | 'resolved'
+export type ForumPriority = 'low' | 'medium' | 'high' | 'critical'
+
+export interface ForumReply {
+    reply_id: string
+    topic_id: string
+    author: string
+    body: string
+    kind: string
+    source: string
+    created_at: number
+    redactions: number
+}
+
+export interface ForumTopic {
+    topic_id: string
+    title: string
+    body: string
+    summary: string
+    lane: ForumLane
+    state: ForumState
+    priority: ForumPriority
+    author: string
+    source: string
+    tags: string[]
+    created_at: number
+    updated_at: number
+    reply_count: number
+    last_reply_at: number
+    redactions?: number
+}
+
+export interface ForumTopicsResponse {
+    ok: boolean
+    topics: ForumTopic[]
+    total: number
+    lane_counts: Record<string, number>
+    state_counts: Record<string, number>
+    control: {
+        pending_autonomy_decisions: number
+        owner_directive: string
+        failure_pressure: number
+    }
+    timestamp: number
+}
+
+export interface ForumTopicDetailResponse {
+    ok: boolean
+    topic: ForumTopic & {
+        replies: ForumReply[]
+    }
+    timestamp: number
+}
+
+export interface ForumCreateTopicResponse {
+    ok: boolean
+    topic: ForumTopic
+    timestamp: number
+}
+
+export interface ForumCreateReplyResponse {
+    ok: boolean
+    reply: ForumReply
+    timestamp: number
+}
+
+export interface ForumScoutStatusResponse {
+    ok: boolean
+    profile: {
+        agent_id: string
+        role: string
+        sensitive_data_access: string
+        allowed_actions: string[]
+        blocked_actions: string[]
+    }
+    registration: {
+        registered: boolean
+        username: string
+        display_name: string
+        registered_at: number
+        last_dispatch: Record<string, unknown>
+    }
+    external_bridge: {
+        register_url_configured: boolean
+        post_url_configured: boolean
+        api_token_configured: boolean
+    }
+    timestamp: number
+}
+
+export interface ForumScoutRegisterResponse {
+    ok: boolean
+    registration: {
+        username: string
+        display_name: string
+        bio_redactions: number
+    }
+    dispatch: {
+        dispatched: boolean
+        reason: string
+        status?: number
+        response_excerpt?: string
+    }
+    profile: Record<string, unknown>
+    timestamp: number
+}
+
+export interface ForumScoutPublishResponse {
+    ok: boolean
+    topic_id: string
+    created_topic_id: string
+    created_reply_id: string
+    redactions: number
+    dispatch: {
+        dispatched: boolean
+        reason: string
+        status?: number
+        response_excerpt?: string
+    }
+    timestamp: number
+}
+
 export const fetchHealth = async (): Promise<HealthResponse | string | null> =>
     safeGet<HealthResponse | string>('/health')
 
@@ -203,5 +343,77 @@ export const fetchSystemLogs = async (limit = 80): Promise<SystemLogEntry[]> => 
     const result = await safeGet<SystemLogEntry[]>('/logs/system', { limit })
     return Array.isArray(result) ? result : []
 }
+
+export const fetchForumTopics = async (params?: {
+    lane?: string
+    state?: string
+    tag?: string
+    q?: string
+    limit?: number
+}): Promise<ForumTopicsResponse | null> =>
+    safeGet<ForumTopicsResponse>('/api/v2/forum/topics', {
+        lane: params?.lane || '',
+        state: params?.state || '',
+        tag: params?.tag || '',
+        q: params?.q || '',
+        limit: params?.limit || 80,
+    })
+
+export const fetchForumTopicDetail = async (topicId: string): Promise<ForumTopicDetailResponse | null> =>
+    safeGet<ForumTopicDetailResponse>(`/api/v2/forum/topics/${encodeURIComponent(topicId)}`)
+
+export const createForumTopic = async (payload: {
+    title: string
+    body: string
+    lane?: ForumLane
+    state?: ForumState
+    priority?: ForumPriority
+    author?: string
+    tags?: string[] | string
+}): Promise<ForumCreateTopicResponse | null> =>
+    safePost<ForumCreateTopicResponse>('/api/v2/forum/topics', payload as Record<string, unknown>)
+
+export const createForumReply = async (
+    topicId: string,
+    payload: {
+        body: string
+        author?: string
+        kind?: string
+        state?: ForumState
+    },
+): Promise<ForumCreateReplyResponse | null> =>
+    safePost<ForumCreateReplyResponse>(
+        `/api/v2/forum/topics/${encodeURIComponent(topicId)}/replies`,
+        payload as Record<string, unknown>,
+    )
+
+export const fetchForumScoutStatus = async (): Promise<ForumScoutStatusResponse | null> =>
+    safeGet<ForumScoutStatusResponse>('/api/v2/forum/scout/status')
+
+export const registerForumScout = async (payload: {
+    username: string
+    display_name?: string
+    bio?: string
+}): Promise<ForumScoutRegisterResponse | null> =>
+    safePost<ForumScoutRegisterResponse>(
+        '/api/v2/forum/scout/register',
+        payload as Record<string, unknown>,
+    )
+
+export const publishForumScoutNote = async (payload: {
+    topic_id?: string
+    title?: string
+    body: string
+    author?: string
+    kind?: string
+    lane?: ForumLane
+    state?: ForumState
+    priority?: ForumPriority
+    tags?: string[] | string
+}): Promise<ForumScoutPublishResponse | null> =>
+    safePost<ForumScoutPublishResponse>(
+        '/api/v2/forum/scout/publish',
+        payload as Record<string, unknown>,
+    )
 
 export default api
