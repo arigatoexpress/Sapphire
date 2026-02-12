@@ -99,6 +99,7 @@ required_jobs=(
   "sapphire-lighter-health-6h"
   "sapphire-alpha-heartbeat-30m"
   "sapphire-alpha-status-daily"
+  "sapphire-alpha-strategy-gate-daily"
 )
 
 for job in "${required_jobs[@]}"; do

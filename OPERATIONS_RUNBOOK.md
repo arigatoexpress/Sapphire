@@ -72,6 +72,7 @@ Health and status jobs are configured in `us-central1`:
 - `sapphire-lighter-health-6h` -> lighter `/health` every 6 hours (10 min offset)
 - `sapphire-alpha-heartbeat-30m` -> sends synthetic `/heartbeat` through alpha webhook every 30 minutes
 - `sapphire-alpha-status-daily` -> sends synthetic `/status` update through alpha webhook daily at `14:15 UTC`
+- `sapphire-alpha-strategy-gate-daily` -> sends `@alpha report` through alpha webhook daily at `14:45 UTC`
 
 Idempotent job setup script:
 

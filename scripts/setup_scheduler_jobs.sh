@@ -29,6 +29,11 @@ HEARTBEAT_BODY="$(cat <<JSON
 JSON
 )"
 
+STRATEGY_GATE_BODY="$(cat <<JSON
+{"update_id":900000003,"message":{"chat":{"id":"${CHAT_ID}"},"text":"@alpha report"}}
+JSON
+)"
+
 upsert_http_job() {
   local name="$1"
   local schedule="$2"
@@ -99,6 +104,13 @@ upsert_http_job \
   "POST" \
   "Content-Type=application/json,X-Telegram-Bot-Api-Secret-Token=${WEBHOOK_SECRET}" \
   "${STATUS_BODY}"
+upsert_http_job \
+  "sapphire-alpha-strategy-gate-daily" \
+  "45 14 * * *" \
+  "${ALPHA_URL}/telegram/webhook" \
+  "POST" \
+  "Content-Type=application/json,X-Telegram-Bot-Api-Secret-Token=${WEBHOOK_SECRET}" \
+  "${STRATEGY_GATE_BODY}"
 
 echo
 echo "Cloud Scheduler jobs in ${PROJECT_ID}/${LOCATION}:"

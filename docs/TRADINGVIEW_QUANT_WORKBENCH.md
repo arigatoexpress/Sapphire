@@ -85,6 +85,9 @@ Reference docs:
 
 - Secret exists in GCP: `TRADINGVIEW_WEBHOOK_SECRET`.
 - Alpha env has `TRADINGVIEW_EXECUTION_ENABLED=false` during validation.
+- Alpha env has venue allowlists configured:
+  - `TRADINGVIEW_ALLOWED_SYMBOLS_ASTER=SOL;JUP;PYTH;BONK;WIF`
+  - `TRADINGVIEW_ALLOWED_SYMBOLS_LIGHTER=BTC;ETH;SOL;HYPE;DOGE;AVAX`
 - Telegram receives every accepted TradingView signal.
 - Scheduler heartbeat remains active for independent liveness checks.
 - Duplicate alerts are ignored (same signal in idempotency window).
