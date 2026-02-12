@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Build and deploy sapphire-web to Cloud Run service sapphirebook-web.
+
+set -euo pipefail
+
+PROJECT_ID="${PROJECT_ID:-sapphire-479610}"
+REGION="${REGION:-us-central1}"
+AR_REGION="${AR_REGION:-northamerica-northeast1}"
+AR_REPO="${AR_REPO:-sapphire-repo}"
+SERVICE_NAME="${SERVICE_NAME:-sapphirebook-web}"
+IMAGE_NAME="${IMAGE_NAME:-sapphirebook-web}"
+IMAGE_TAG="${IMAGE_TAG:-$(date -u +%Y%m%d%H%M)-web}"
+PLATFORM="${PLATFORM:-linux/amd64}"
+MEMORY="${MEMORY:-512Mi}"
+CPU="${CPU:-1}"
+MAX_INSTANCES="${MAX_INSTANCES:-20}"
+MIN_INSTANCES="${MIN_INSTANCES:-0}"
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+WEB_DIR="${ROOT_DIR}/sapphire-web"
+IMAGE_URI="${AR_REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${IMAGE_NAME}:${IMAGE_TAG}"
+IMAGE_LATEST="${AR_REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${IMAGE_NAME}:latest"
+
+echo "== Sapphirebook Web Deploy =="
+echo "Project: ${PROJECT_ID}"
+echo "Region: ${REGION}"
+echo "Image: ${IMAGE_URI}"
+echo
+
+cd "${WEB_DIR}"
+npm ci --no-audit --no-fund
+npm run build
+
+docker buildx build \
+  --platform "${PLATFORM}" \
+  -t "${IMAGE_URI}" \
+  -t "${IMAGE_LATEST}" \
+  -f Dockerfile \
+  --push .
+
+gcloud run deploy "${SERVICE_NAME}" \
+  --project "${PROJECT_ID}" \
+  --region "${REGION}" \
+  --image "${IMAGE_URI}" \
+  --platform managed \
+  --allow-unauthenticated \
+  --memory "${MEMORY}" \
+  --cpu "${CPU}" \
+  --min-instances "${MIN_INSTANCES}" \
+  --max-instances "${MAX_INSTANCES}" \
+  --port 8080
+
+SERVICE_URL="$(gcloud run services describe "${SERVICE_NAME}" --project "${PROJECT_ID}" --region "${REGION}" --format='value(status.url)')"
+echo
+echo "Service URL: ${SERVICE_URL}"
+echo "Health:"
+curl -fsS "${SERVICE_URL}/health" || true
+echo
+echo "Deployed image: ${IMAGE_URI}"

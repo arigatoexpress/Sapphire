@@ -49,6 +49,7 @@ Web UI is read-only for control actions. Agent prompting, approvals, and steerin
 ./scripts/gcp_scope_reconcile.sh
 ./scripts/setup_clawdbot_jobs.sh
 ./scripts/verify_focused_stack.sh
+./scripts/deploy_sapphirebook_web.sh
 ```
 
 ## Authoritative Operating Docs

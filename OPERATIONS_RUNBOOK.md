@@ -141,6 +141,16 @@ Run:
 ./scripts/verify_focused_stack.sh
 ```
 
+## Web Frontend Deploy
+
+Deploy the SapphireBook/SapphireTrade/Sapphire Alpha frontend to Cloud Run:
+
+```bash
+./scripts/deploy_sapphirebook_web.sh
+```
+
+This builds `sapphire-web` for `linux/amd64`, pushes to Artifact Registry, and deploys `sapphirebook-web`.
+
 Expected result for current scope:
 
 - `CONTROL_PLANE` ready
