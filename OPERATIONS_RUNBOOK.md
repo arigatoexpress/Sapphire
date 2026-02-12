@@ -49,6 +49,11 @@ Supported TradingView actions:
 - `heartbeat`, `status` (control telemetry)
 - `kill`, `resume`, `deallocate`, `allocate` (risk controls)
 - `buy`, `sell`, `close` (trade intents)
+- `tv_watchlist_add`, `tv_watchlist_remove`, `tv_watchlist_replace`
+- `tv_chart_set`, `tv_indicator_add`, `tv_indicator_remove`
+- `tv_strategy_add`, `tv_strategy_remove`
+- `tv_script_add`, `tv_script_remove`
+- `tv_scan_assets`, `tv_ta`, `tv_status`, `tv_custom`
 
 Safety default:
 
@@ -61,6 +66,13 @@ Risk controls for TradingView ingress (env-configured):
 - `TRADINGVIEW_IDEMPOTENCY_MAX_KEYS` (default `2000`)
 - `TRADINGVIEW_ENFORCE_STRATEGY_RULES` (`true` requires strategy labels and rule matches)
 - `TRADINGVIEW_STRATEGY_RULES_JSON` (strategy -> venues/symbols/max_quantity policy)
+- `TRADINGVIEW_AUTONOMY_ENABLED` (`true` enables OpenClaw dispatch for workspace actions)
+- `TRADINGVIEW_AUTONOMY_ALLOW_MUTATIONS` (allow watchlist/chart/indicator writes)
+- `TRADINGVIEW_AUTONOMY_HOOK_URL` (`/hooks/agent` endpoint for gateway dispatch)
+- `TRADINGVIEW_AUTONOMY_HOOK_TOKEN` (OpenClaw hook token; use Secret Manager)
+- `TRADINGVIEW_AUTONOMY_AGENT_ID` (default `sapphire`)
+- `TRADINGVIEW_ALLOW_ALL_ASSETS` (`true` enables full asset universe mode)
+- `TRADINGVIEW_COMMUNITY_ACCESS_ENABLED` (`true` enables community script actions)
 - `TRADINGVIEW_MAX_QUANTITY` (global cap, optional)
 - `TRADINGVIEW_MAX_QUANTITY_ASTER` / `TRADINGVIEW_MAX_QUANTITY_LIGHTER` (venue caps, optional)
 - `TRADINGVIEW_ALLOWED_SYMBOLS` (global allowlist, optional)

@@ -23,6 +23,7 @@ Reference docs:
 4. `sapphire-alpha` validates secret and maps signals to:
    - heartbeat/control commands, or
    - venue trade intents (`ASTER`, `LIGHTER`).
+5. Workspace actions are sent through the TradingView autonomy plugin and dispatched to OpenClaw gateway hooks for browser-level execution.
 5. Start in dry-run mode (`TRADINGVIEW_EXECUTION_ENABLED=false`), then enable live execution only after validation.
 
 ## Alert Payload Standards
@@ -66,6 +67,38 @@ Reference docs:
 When `TRADINGVIEW_ENFORCE_STRATEGY_RULES=true`, `strategy` is required and must match
 `TRADINGVIEW_STRATEGY_RULES_JSON`.
 
+### 4) Workspace Mutation (Watchlist + Community Script)
+
+```json
+{
+  "action": "tv_watchlist_add",
+  "watchlist": "SAPPHIRE",
+  "symbol": "ETH",
+  "strategy": "tv-lighter-momentum",
+  "secret": "${TRADINGVIEW_WEBHOOK_SECRET}"
+}
+```
+
+```json
+{
+  "action": "tv_script_add",
+  "script": "LuxAlgo - Signals & Overlays",
+  "secret": "${TRADINGVIEW_WEBHOOK_SECRET}"
+}
+```
+
+### 5) TA Request
+
+```json
+{
+  "action": "tv_ta",
+  "symbol": "SOL",
+  "venue": "ASTER",
+  "closes": [149.5,149.8,150.2,151.1,150.7,151.4,152.0],
+  "secret": "${TRADINGVIEW_WEBHOOK_SECRET}"
+}
+```
+
 ## Promotion Workflow
 
 1. Research strategy in TradingView with realistic fees/slippage assumptions.
@@ -84,6 +117,9 @@ When `TRADINGVIEW_ENFORCE_STRATEGY_RULES=true`, `strategy` is required and must 
 - Per-venue max quantity caps configured (`TRADINGVIEW_MAX_QUANTITY_*`).
 - Symbol allowlists configured for each venue (`TRADINGVIEW_ALLOWED_SYMBOLS_*`).
 - Strategy rules configured and enforced (`TRADINGVIEW_ENFORCE_STRATEGY_RULES=true`).
+- TradingView autonomy plugin enabled (`TRADINGVIEW_AUTONOMY_ENABLED=true`).
+- OpenClaw hook dispatch configured (`TRADINGVIEW_AUTONOMY_HOOK_URL` + token).
+- Full asset scope + community script access explicitly enabled.
 
 ## Operational Checklist
 
@@ -95,6 +131,11 @@ When `TRADINGVIEW_ENFORCE_STRATEGY_RULES=true`, `strategy` is required and must 
 - Alpha env enforces strategy rules:
   - `TRADINGVIEW_ENFORCE_STRATEGY_RULES=true`
   - `TRADINGVIEW_STRATEGY_RULES_JSON` maps strategy name to allowed venues/symbols/size caps
+- Alpha env enables workspace autonomy:
+  - `TRADINGVIEW_AUTONOMY_ENABLED=true`
+  - `TRADINGVIEW_ALLOW_ALL_ASSETS=true`
+  - `TRADINGVIEW_COMMUNITY_ACCESS_ENABLED=true`
+  - `TRADINGVIEW_AUTONOMY_HOOK_TOKEN` loaded from `OPENCLAW_GATEWAY_TOKEN`
 - Telegram receives every accepted TradingView signal.
 - Scheduler heartbeat remains active for independent liveness checks.
 - Duplicate alerts are ignored (same signal in idempotency window).

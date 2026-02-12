@@ -109,6 +109,46 @@ else
   fail "alpha TradingView strategy rules missing"
 fi
 
+tv_autonomy_enabled=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
+  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_AUTONOMY_ENABLED") | .value // empty')
+if [[ "$tv_autonomy_enabled" == "true" ]]; then
+  pass "alpha TradingView autonomy plugin enabled"
+else
+  fail "alpha TradingView autonomy plugin disabled: ${tv_autonomy_enabled:-<empty>}"
+fi
+
+tv_all_assets=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
+  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_ALLOW_ALL_ASSETS") | .value // empty')
+if [[ "$tv_all_assets" == "true" ]]; then
+  pass "alpha TradingView all-assets scope enabled"
+else
+  fail "alpha TradingView all-assets scope disabled: ${tv_all_assets:-<empty>}"
+fi
+
+tv_community_access=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
+  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_COMMUNITY_ACCESS_ENABLED") | .value // empty')
+if [[ "$tv_community_access" == "true" ]]; then
+  pass "alpha TradingView community scripts access enabled"
+else
+  fail "alpha TradingView community scripts access disabled: ${tv_community_access:-<empty>}"
+fi
+
+tv_hook_url=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
+  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_AUTONOMY_HOOK_URL") | .value // empty')
+if [[ -n "$tv_hook_url" ]]; then
+  pass "alpha TradingView autonomy hook URL configured"
+else
+  fail "alpha TradingView autonomy hook URL missing"
+fi
+
+tv_hook_token_present=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
+  | jq -r '[.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_AUTONOMY_HOOK_TOKEN")] | length')
+if [[ "$tv_hook_token_present" -ge 1 ]]; then
+  pass "alpha TradingView autonomy hook token configured"
+else
+  fail "alpha TradingView autonomy hook token missing"
+fi
+
 required_jobs=(
   "sapphire-alpha-health-6h"
   "sapphire-aster-health-6h"

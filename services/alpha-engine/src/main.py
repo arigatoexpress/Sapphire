@@ -12,6 +12,7 @@ import uvloop
 from src.ai.gemini_guard import GeminiGuard
 from src.execution.dispatcher import dispatcher
 from src.feeds.market_data import MarketDataAggregator
+from src.integrations.tradingview_autonomy import TradingViewAutonomyPlugin
 from src.strategy.engine import AlphaStrategyEngine
 
 # Add shared library to path
@@ -41,12 +42,17 @@ class AlphaEngine:
 
         token = os.getenv("TELEGRAM_BOT_TOKEN")
         chat_id = os.getenv("TELEGRAM_CHAT_ID")
+        self._telegram_chat_id = str(chat_id or "").strip()
         logger.info(f"Alpha Hub: TELEGRAM_BOT_TOKEN is {'set' if token else 'NOT SET'}")
         self.telegram = TelegramPlatformBot(
             bot_token=token, chat_id=chat_id, command_callback=self._handle_telegram_command
         )
         # Initialize Gemini Guard
         self.ai = GeminiGuard(telegram_bot=self.telegram)
+        self.tv_autonomy = TradingViewAutonomyPlugin(
+            market_data=self.market_data,
+            default_chat_id=self._telegram_chat_id,
+        )
         self._heartbeat_task = None
         self._kill_switch_active = False
         self._heartbeat_interval_seconds = int(os.getenv("TELEGRAM_HEARTBEAT_INTERVAL_SECONDS", "900"))
@@ -273,6 +279,21 @@ class AlphaEngine:
                 not self._tradingview_execution_enabled,
                 "TRADINGVIEW_EXECUTION_ENABLED=true",
             ),
+            (
+                "TradingView autonomy plugin enabled",
+                self.tv_autonomy.enabled,
+                "TRADINGVIEW_AUTONOMY_ENABLED is not true",
+            ),
+            (
+                "TradingView full asset access enabled",
+                self.tv_autonomy.allow_all_assets,
+                "TRADINGVIEW_ALLOW_ALL_ASSETS is not true",
+            ),
+            (
+                "TradingView community script access enabled",
+                self.tv_autonomy.community_access_enabled,
+                "TRADINGVIEW_COMMUNITY_ACCESS_ENABLED is not true",
+            ),
         ]
 
         failed_checks = [item for item in checks if not item[1]]
@@ -295,6 +316,8 @@ class AlphaEngine:
                 f"Active venues: `{', '.join(active_venues) if active_venues else 'none'}`",
                 f"Failure pressure: `{total_failures}`",
                 f"Rules configured: `{len(self._tradingview_strategy_rules)}`",
+                f"TV autonomy enabled: `{self.tv_autonomy.enabled}`",
+                f"TV hook configured: `{bool(self.tv_autonomy.hook_url and self.tv_autonomy.hook_token)}`",
             ]
         )
 
@@ -598,6 +621,27 @@ class AlphaEngine:
 
         normalized_action = action_raw.replace("-", "_")
         normalized_target = self._normalize_platform(venue_raw or "ALL")
+
+        if self.tv_autonomy.is_workspace_action(normalized_action):
+            workspace_result = await self.tv_autonomy.handle_action(normalized_action, merged_payload)
+            result_type = workspace_result.get("accepted", "unknown")
+            if result_type in {"workspace_updated", "workspace_noop", "scan_requested", "custom_requested"}:
+                dispatch = workspace_result.get("dispatch", {})
+                dispatch_status = "yes" if dispatch.get("dispatched") else f"no ({dispatch.get('reason', 'n/a')})"
+                await self.telegram.send_message(
+                    (
+                        f"🧩 TradingView workspace action `{normalized_action}` processed.\n"
+                        f"Result: `{result_type}`\n"
+                        f"OpenClaw dispatch: `{dispatch_status}`"
+                    ),
+                    priority="medium",
+                )
+            elif result_type == "blocked":
+                await self.telegram.send_message(
+                    f"⚠️ TradingView workspace action blocked: `{workspace_result.get('reason', 'unknown')}`.",
+                    priority="high",
+                )
+            return workspace_result
 
         if normalized_action in {"heartbeat", "ping"}:
             await self._send_heartbeat("tradingview")
