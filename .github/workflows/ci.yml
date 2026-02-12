@@ -1,14 +1,17 @@
-name: CI
+name: Sapphire Focused CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
-  build-test:
+  focused-gate:
+    name: Focused Gate
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -16,23 +19,51 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
-      - name: Install dependencies
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: sapphire-web/package-lock.json
+
+      - name: Install CI dependencies
         run: |
+          sudo apt-get update
+          sudo apt-get install -y ripgrep
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          python -m pip install pytest aiohttp loguru
 
-      - name: Syntax Check
-        run: |
-          python -m py_compile cloud_trader/trading_service.py
-          python -m py_compile cloud_trader/definitions.py
-          python -m py_compile cloud_trader/api.py
-          echo "✅ Python syntax OK"
+      - name: Run focused CI gate
+        run: ./scripts/ci_focused_gate.sh
 
-      - name: Build Frontend
+  holistic-cloud-check:
+    name: Holistic Cloud Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: focused-gate
+    if: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && secrets.GCP_SERVICE_ACCOUNT != '' }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Install runtime utilities
         run: |
-          cd trading-dashboard
-          npm ci
-          npm run build
-          echo "✅ Frontend build OK"
+          sudo apt-get update
+          sudo apt-get install -y jq curl ripgrep
+
+      - name: Run holistic ops check
+        run: ./scripts/holistic_ops_check.sh
