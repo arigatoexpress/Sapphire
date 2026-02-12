@@ -395,6 +395,9 @@ class TelegramPlatformBot:
             "- `/trade on [qty]` / `/trade off` (TradingView signal mode)\n"
             "- `/qty <amount>` (TradingView signal qty)\n"
             "- `/stage <paper|staged_live|full_live>`\n"
+            "- `/scout status`\n"
+            "- `/scout register <username> [display_name]`\n"
+            "- `/scout publish <note>`\n"
             "- `/deallocate <venue>`\n"
             "- `/allocate <venue> <percent>`\n\n"
             "Owner steering:\n"
@@ -434,6 +437,110 @@ class TelegramPlatformBot:
         # Help / start
         if re.search(r"^/(start|help)\b", text_lower):
             await self.send_message(self._help_text(), priority=NotificationPriority.MEDIUM)
+            return
+
+        # Scout collaboration commands
+        slash_scout_status = re.search(
+            r"^/scout\s+status$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        mention_scout_status = re.search(
+            r"@(alpha|control)\s+scout\s+status$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if slash_scout_status or mention_scout_status:
+            await self.send_message(
+                "🛰️ Scout status request accepted.",
+                priority=NotificationPriority.HIGH,
+            )
+            await self._dispatch_callback("CONTROL", "ALL", "SCOUT_STATUS", 0.0)
+            return
+
+        slash_scout_register = re.search(
+            r"^/scout\s+register\s+([A-Za-z0-9_-]{3,32})(?:\s+(.+))?$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        mention_scout_register = re.search(
+            r"@(alpha|control)\s+scout\s+register\s+([A-Za-z0-9_-]{3,32})(?:\s+(.+))?$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if slash_scout_register or mention_scout_register:
+            if slash_scout_register:
+                username = str(slash_scout_register.group(1) or "").strip()
+                display_name = str(slash_scout_register.group(2) or "").strip()
+            else:
+                username = str(mention_scout_register.group(2) or "").strip()
+                display_name = str(mention_scout_register.group(3) or "").strip()
+
+            payload = json.dumps(
+                {
+                    "username": username,
+                    "display_name": display_name or "Sapphire Scout",
+                    "bio": "Least-privilege scout for public collaboration. No secrets, no trading actions.",
+                },
+                separators=(",", ":"),
+            )
+            await self.send_message(
+                f"🛰️ Scout register request accepted for `@{username}`.",
+                priority=NotificationPriority.HIGH,
+            )
+            await self._dispatch_callback("CONTROL", payload, "SCOUT_REGISTER", 0.0)
+            return
+
+        slash_scout_publish = re.search(
+            r"^/scout\s+publish\s+(.+)$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        mention_scout_publish = re.search(
+            r"@(alpha|control)\s+scout\s+publish\s+(.+)$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if slash_scout_publish or mention_scout_publish:
+            raw_note = (
+                str(slash_scout_publish.group(1) or "").strip()
+                if slash_scout_publish
+                else str(mention_scout_publish.group(2) or "").strip()
+            )
+            topic_id = ""
+            body = raw_note
+            topic_match = re.search(
+                r"^topic(?:=|:)\s*(TOPIC-[0-9]{5})\s+(.+)$",
+                raw_note,
+                flags=re.IGNORECASE,
+            )
+            if topic_match:
+                topic_id = str(topic_match.group(1) or "").strip().upper()
+                body = str(topic_match.group(2) or "").strip()
+
+            if not body:
+                await self.send_message(
+                    "❌ Scout publish requires note text.",
+                    priority=NotificationPriority.HIGH,
+                )
+                return
+
+            payload = json.dumps(
+                {
+                    "topic_id": topic_id,
+                    "body": body,
+                    "author": "SAPPHIRE_SCOUT",
+                    "kind": "note",
+                    "lane": "external",
+                    "tags": ["scout", "external"],
+                },
+                separators=(",", ":"),
+            )
+            await self.send_message(
+                "🛰️ Scout publish request accepted.",
+                priority=NotificationPriority.HIGH,
+            )
+            await self._dispatch_callback("CONTROL", payload, "SCOUT_PUBLISH", 0.0)
             return
 
         # Owner steering command

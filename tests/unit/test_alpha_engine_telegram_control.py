@@ -201,6 +201,94 @@ def test_stage_command_dispatches_execution_stage_update(telegram_module):
     assert quantity == 0.0
 
 
+def test_scout_status_command_dispatches_status_action(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {
+                "message": {
+                    "chat": {"id": "12345"},
+                    "text": "/scout status",
+                }
+            }
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert symbol == "ALL"
+    assert action == "SCOUT_STATUS"
+    assert quantity == 0.0
+
+
+def test_scout_register_command_dispatches_payload(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {
+                "message": {
+                    "chat": {"id": "12345"},
+                    "text": "/scout register sapphire_scout Sapphire Scout",
+                }
+            }
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert action == "SCOUT_REGISTER"
+    assert quantity == 0.0
+    payload = json.loads(symbol)
+    assert payload["username"] == "sapphire_scout"
+    assert payload["display_name"] == "Sapphire Scout"
+
+
+def test_scout_publish_command_dispatches_payload(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {
+                "message": {
+                    "chat": {"id": "12345"},
+                    "text": "/scout publish topic:TOPIC-00003 Push sanitized summary to external forum",
+                }
+            }
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert action == "SCOUT_PUBLISH"
+    assert quantity == 0.0
+    payload = json.loads(symbol)
+    assert payload["topic_id"] == "TOPIC-00003"
+    assert "sanitized summary" in payload["body"]
+
+
 def test_qty_command_dispatches_default_quantity_update(telegram_module):
     callback = AsyncMock()
     bot = telegram_module.TelegramPlatformBot(

@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import re
@@ -6,6 +7,7 @@ import threading
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 import aiohttp
 from loguru import logger
@@ -52,6 +54,7 @@ class SapphireForumService:
             "registered_at": 0,
             "last_dispatch": {},
         }
+        self._serverless_token_cache: Dict[str, Dict[str, Any]] = {}
 
         self._load_or_bootstrap()
 
@@ -540,10 +543,224 @@ class SapphireForumService:
         except Exception as exc:
             return {"dispatched": False, "reason": f"request_failed:{exc}"}
 
+    def _openclaw_fallback_config(self) -> Dict[str, str]:
+        hook_url = str(
+            os.getenv(
+                "SAPPHIRE_SCOUT_OPENCLAW_HOOK_URL",
+                os.getenv("TRADINGVIEW_AUTONOMY_HOOK_URL", ""),
+            )
+        ).strip()
+        hook_token = str(
+            os.getenv(
+                "SAPPHIRE_SCOUT_OPENCLAW_HOOK_TOKEN",
+                os.getenv(
+                    "TRADINGVIEW_AUTONOMY_HOOK_TOKEN",
+                    os.getenv("OPENCLAW_HOOKS_TOKEN", ""),
+                ),
+            )
+        ).strip()
+        chat_id = str(
+            os.getenv(
+                "SAPPHIRE_SCOUT_OPENCLAW_CHAT_ID",
+                os.getenv("TRADINGVIEW_AUTONOMY_CHAT_ID", os.getenv("TELEGRAM_CHAT_ID", "")),
+            )
+        ).strip()
+        agent_id = (
+            str(
+                os.getenv(
+                    "SAPPHIRE_SCOUT_DISPATCH_AGENT_ID",
+                    os.getenv("TRADINGVIEW_AUTONOMY_AGENT_ID", "sapphire"),
+                )
+            )
+            .strip()
+            .lower()
+            or "sapphire"
+        )
+        return {
+            "hook_url": hook_url,
+            "hook_token": hook_token,
+            "chat_id": chat_id,
+            "agent_id": agent_id,
+        }
+
+    async def _get_serverless_auth_headers(self, hook_url: str) -> Dict[str, str]:
+        if not os.getenv("K_SERVICE"):
+            return {}
+
+        parsed = urlparse(str(hook_url or "").strip())
+        if not parsed.scheme or not parsed.netloc:
+            return {}
+        audience = f"{parsed.scheme}://{parsed.netloc}"
+
+        now = time.time()
+        cached = self._serverless_token_cache.get(audience, {})
+        if cached and now < float(cached.get("expires_at", 0)):
+            token = str(cached.get("token", "")).strip()
+            if token:
+                return {"X-Serverless-Authorization": f"Bearer {token}"}
+
+        token_url = (
+            "http://metadata.google.internal/computeMetadata/v1/instance/"
+            f"service-accounts/default/identity?audience={audience}"
+        )
+
+        token = ""
+        last_error = ""
+        for attempt in range(1, 4):
+            try:
+                timeout = aiohttp.ClientTimeout(total=8)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.get(
+                        token_url,
+                        headers={"Metadata-Flavor": "Google"},
+                    ) as response:
+                        if response.status == 200:
+                            token = (await response.text()).strip()
+                            if token:
+                                break
+                            last_error = "empty_token"
+                        else:
+                            body = (await response.text())[:200]
+                            last_error = f"status={response.status} body={body}"
+            except Exception as exc:
+                last_error = str(exc)
+
+            if attempt < 3:
+                await asyncio.sleep(0.35 * attempt)
+
+        if not token:
+            logger.warning(f"Scout fallback metadata token fetch failed: {last_error}")
+            return {}
+
+        self._serverless_token_cache[audience] = {
+            "token": token,
+            "expires_at": now + 55 * 60,
+        }
+        return {"X-Serverless-Authorization": f"Bearer {token}"}
+
+    async def _dispatch_openclaw_fallback(
+        self,
+        action: str,
+        payload: Dict[str, Any],
+        note: str,
+    ) -> Dict[str, Any]:
+        config = self._openclaw_fallback_config()
+        hook_url = config["hook_url"]
+        hook_token = config["hook_token"]
+        chat_id = config["chat_id"]
+        agent_id = config["agent_id"]
+
+        if not hook_url:
+            return {"dispatched": False, "reason": "fallback_hook_url_missing", "mode": "openclaw_hook"}
+        if not hook_token:
+            return {"dispatched": False, "reason": "fallback_hook_token_missing", "mode": "openclaw_hook"}
+        if not chat_id:
+            return {"dispatched": False, "reason": "fallback_chat_id_missing", "mode": "openclaw_hook"}
+
+        session_key = f"hook:scout:{action}:{int(time.time() * 1000)}"
+        hook_payload = {
+            "name": f"Sapphire Scout {action}",
+            "agentId": agent_id,
+            "wakeMode": "now",
+            "sessionKey": session_key,
+            "deliver": True,
+            "channel": "telegram",
+            "to": chat_id,
+            "message": note,
+            "payload": payload,
+        }
+
+        headers = {
+            "Content-Type": "application/json",
+            "X-OpenClaw-Token": hook_token,
+        }
+        headers.update(await self._get_serverless_auth_headers(hook_url))
+
+        try:
+            timeout = aiohttp.ClientTimeout(total=20)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(hook_url, json=hook_payload, headers=headers) as response:
+                    body = (await response.text())[:400]
+                    if response.status >= 400:
+                        return {
+                            "dispatched": False,
+                            "reason": f"fallback_hook_http_{response.status}",
+                            "body": body,
+                            "mode": "openclaw_hook",
+                        }
+        except Exception as exc:
+            return {
+                "dispatched": False,
+                "reason": f"fallback_hook_request_failed:{exc}",
+                "mode": "openclaw_hook",
+            }
+
+        return {
+            "dispatched": True,
+            "reason": "ok",
+            "session_key": session_key,
+            "mode": "openclaw_hook",
+        }
+
+    async def _dispatch_scout_bridge(
+        self,
+        *,
+        action: str,
+        outbound_payload: Dict[str, Any],
+        external_url: str,
+        external_token: str,
+        note: str,
+    ) -> Dict[str, Any]:
+        url = str(external_url or "").strip()
+        token = str(external_token or "").strip()
+        if url:
+            external_result = await self._dispatch_external(url, outbound_payload, token=token)
+            external_result["mode"] = "external_http"
+            if external_result.get("dispatched"):
+                return external_result
+
+            fallback_result = await self._dispatch_openclaw_fallback(
+                action=action,
+                payload=outbound_payload,
+                note=note,
+            )
+            if fallback_result.get("dispatched"):
+                fallback_result["fallback_from"] = external_result.get("reason", "external_failed")
+                return fallback_result
+            return {
+                "dispatched": False,
+                "reason": "external_and_fallback_failed",
+                "mode": "hybrid_failed",
+                "external": external_result,
+                "fallback": fallback_result,
+            }
+
+        fallback_result = await self._dispatch_openclaw_fallback(
+            action=action,
+            payload=outbound_payload,
+            note=note,
+        )
+        if fallback_result.get("dispatched"):
+            return fallback_result
+
+        return {
+            "dispatched": False,
+            "reason": "external_url_not_configured",
+            "mode": "none",
+            "fallback": fallback_result,
+        }
+
     def scout_status(self) -> Dict[str, Any]:
         external_register_url = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL", "")).strip()
         external_post_url = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_POST_URL", "")).strip()
         external_token_set = bool(str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN", "")).strip())
+        fallback = self._openclaw_fallback_config()
+        fallback_ready = bool(
+            fallback.get("hook_url") and fallback.get("hook_token") and fallback.get("chat_id")
+        )
+        dispatch_mode = "external_http" if external_register_url or external_post_url else "openclaw_hook"
+        if dispatch_mode == "openclaw_hook" and not fallback_ready:
+            dispatch_mode = "none"
 
         with self._lock:
             return {
@@ -553,6 +770,10 @@ class SapphireForumService:
                     "register_url_configured": bool(external_register_url),
                     "post_url_configured": bool(external_post_url),
                     "api_token_configured": external_token_set,
+                    "fallback_hook_url_configured": bool(fallback.get("hook_url")),
+                    "fallback_hook_token_configured": bool(fallback.get("hook_token")),
+                    "fallback_chat_id_configured": bool(fallback.get("chat_id")),
+                    "dispatch_mode": dispatch_mode,
                 },
                 "timestamp": self._now(),
             }
@@ -585,7 +806,18 @@ class SapphireForumService:
 
         register_url = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL", "")).strip()
         token = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN", "")).strip()
-        dispatch_result = await self._dispatch_external(register_url, outbound_payload, token=token)
+        note = (
+            "Register least-privilege Sapphire scout account for external collaboration. "
+            "No secrets, no trade execution, and no cloud mutations. "
+            f"Username: @{username}. Display: {display_name[:60]}."
+        )
+        dispatch_result = await self._dispatch_scout_bridge(
+            action="register",
+            outbound_payload=outbound_payload,
+            external_url=register_url,
+            external_token=token,
+            note=note,
+        )
 
         with self._lock:
             self._scout_registration.update(
@@ -600,7 +832,8 @@ class SapphireForumService:
 
             topic_body = (
                 f"Scout registration requested for @{username}. "
-                f"External dispatch={'ok' if dispatch_result.get('dispatched') else 'pending/manual'}."
+                f"Dispatch={'ok' if dispatch_result.get('dispatched') else 'pending/manual'} "
+                f"via {dispatch_result.get('mode', 'none')}."
             )
             self._create_topic_locked(
                 {
@@ -689,7 +922,17 @@ class SapphireForumService:
 
         post_url = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_POST_URL", "")).strip()
         token = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN", "")).strip()
-        dispatch_result = await self._dispatch_external(post_url, outbound_payload, token=token)
+        note = (
+            "Publish sanitized external scout note from SapphireBook collaboration thread. "
+            f"Topic: {topic_id}. Author: {outbound_payload.get('author', 'SAPPHIRE_SCOUT')}."
+        )
+        dispatch_result = await self._dispatch_scout_bridge(
+            action="publish",
+            outbound_payload=outbound_payload,
+            external_url=post_url,
+            external_token=token,
+            note=note,
+        )
 
         return {
             "ok": True,

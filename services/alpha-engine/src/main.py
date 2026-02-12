@@ -1016,6 +1016,19 @@ class AlphaEngine:
 
         return {"session_key": text, "note": ""}
 
+    @staticmethod
+    def _parse_json_payload(payload_text: str) -> Dict[str, Any]:
+        text = str(payload_text or "").strip()
+        if not text:
+            return {}
+        try:
+            parsed = json.loads(text)
+        except Exception:
+            return {}
+        if isinstance(parsed, dict):
+            return parsed
+        return {}
+
     async def _dispatch_full_autonomy_cycle(self, trigger: str, force: bool = False) -> Dict[str, Any]:
         if not self._full_autonomy_enabled:
             return {"dispatched": False, "reason": "full_autonomy_disabled"}
@@ -1138,6 +1151,116 @@ class AlphaEngine:
 
     async def _handle_control_command(self, target: str, action: str, value: float) -> None:
         normalized_action = action.upper()
+
+        if normalized_action in {"SCOUT_STATUS", "FORUM_SCOUT_STATUS"}:
+            status = self.forum.scout_status()
+            profile = status.get("profile", {}) if isinstance(status, dict) else {}
+            registration = status.get("registration", {}) if isinstance(status, dict) else {}
+            bridge = status.get("external_bridge", {}) if isinstance(status, dict) else {}
+            await self.telegram.send_message(
+                (
+                    "🛰️ **SCOUT STATUS**\n"
+                    f"Agent: `{profile.get('agent_id', 'SAPPHIRE_SCOUT')}`\n"
+                    f"Sensitive access: `{profile.get('sensitive_data_access', 'none')}`\n"
+                    f"Registered: `{'YES' if registration.get('registered') else 'NO'}`"
+                    + (
+                        f" (@{registration.get('username')})"
+                        if registration.get("username")
+                        else ""
+                    )
+                    + "\n"
+                    f"Dispatch mode: `{bridge.get('dispatch_mode', 'none')}`\n"
+                    f"External register URL: `{'YES' if bridge.get('register_url_configured') else 'NO'}`\n"
+                    f"External post URL: `{'YES' if bridge.get('post_url_configured') else 'NO'}`\n"
+                    f"Fallback hook ready: `{'YES' if bridge.get('fallback_hook_token_configured') and bridge.get('fallback_hook_url_configured') and bridge.get('fallback_chat_id_configured') else 'NO'}`"
+                ),
+                priority="medium",
+            )
+            return
+
+        if normalized_action in {"SCOUT_REGISTER", "FORUM_SCOUT_REGISTER"}:
+            payload = self._parse_json_payload(target)
+            username = str(payload.get("username", "")).strip()
+            if not username:
+                fallback_username = str(target or "").strip().split(" ", 1)[0]
+                username = fallback_username.strip()
+            if not username:
+                await self.telegram.send_message(
+                    "❌ Scout register requires a username. Use `/scout register <username> [display_name]`.",
+                    priority="high",
+                )
+                return
+
+            display_name = str(payload.get("display_name", "")).strip()
+            if not display_name:
+                chunks = str(target or "").strip().split(" ", 1)
+                display_name = chunks[1].strip() if len(chunks) > 1 else "Sapphire Scout"
+            bio = str(payload.get("bio", "")).strip() or (
+                "Least-privilege scout for public collaboration. No secrets, no trading actions."
+            )
+            result = await self._handle_forum_scout_register_request(
+                {
+                    "username": username,
+                    "display_name": display_name,
+                    "bio": bio,
+                }
+            )
+            if not result.get("ok"):
+                await self.telegram.send_message(
+                    (
+                        "❌ Scout registration failed.\n"
+                        f"Reason: `{result.get('error', 'unknown')}`"
+                    ),
+                    priority="high",
+                )
+            return
+
+        if normalized_action in {"SCOUT_PUBLISH", "FORUM_SCOUT_PUBLISH"}:
+            payload = self._parse_json_payload(target)
+            body = str(payload.get("body", "")).strip()
+            if not body:
+                body = str(target or "").strip()
+            if not body:
+                await self.telegram.send_message(
+                    "❌ Scout publish requires message body text. Use `/scout publish <note>`.",
+                    priority="high",
+                )
+                return
+
+            result = await self._handle_forum_scout_publish_request(
+                {
+                    "topic_id": str(payload.get("topic_id", "")).strip(),
+                    "title": str(payload.get("title", "")).strip(),
+                    "body": body,
+                    "author": str(payload.get("author", "")).strip() or "SAPPHIRE_SCOUT",
+                    "kind": str(payload.get("kind", "")).strip() or "note",
+                    "lane": str(payload.get("lane", "")).strip() or "external",
+                    "state": str(payload.get("state", "")).strip() or "open",
+                    "priority": str(payload.get("priority", "")).strip() or "medium",
+                    "tags": payload.get("tags", ["scout", "external"]),
+                }
+            )
+            if not result.get("ok"):
+                await self.telegram.send_message(
+                    (
+                        "❌ Scout publish failed.\n"
+                        f"Reason: `{result.get('error', 'unknown')}`"
+                    ),
+                    priority="high",
+                )
+                return
+
+            dispatch = result.get("dispatch", {}) if isinstance(result, dict) else {}
+            await self.telegram.send_message(
+                (
+                    f"🛰️ Scout note processed for topic `{result.get('topic_id', 'n/a')}`.\n"
+                    f"Dispatch mode: `{dispatch.get('mode', 'none')}` | "
+                    f"Dispatch: `{'YES' if dispatch.get('dispatched') else 'NO'}`\n"
+                    f"Reason: `{dispatch.get('reason', 'unknown')}`"
+                ),
+                priority="high",
+            )
+            return
 
         if normalized_action in {"SET_EXECUTION_STAGE", "SET_DEX_EXECUTION_STAGE", "PROMOTION_STAGE"}:
             requested = self._parse_execution_stage_token(target)
@@ -2302,10 +2425,12 @@ class AlphaEngine:
         result = await self.forum.register_scout_account(payload)
         if result.get("ok"):
             dispatch = result.get("dispatch", {}) or {}
+            mode = str(dispatch.get("mode", "none")).strip() or "none"
             if dispatch.get("dispatched"):
                 await self.telegram.send_message(
                     (
-                        "🛰️ Scout registration dispatched to external collaboration bridge.\n"
+                        "🛰️ Scout registration dispatched.\n"
+                        f"Mode: `{mode}`\n"
                         f"User: `@{result.get('registration', {}).get('username', 'unknown')}`"
                     ),
                     priority="medium",
@@ -2314,6 +2439,7 @@ class AlphaEngine:
                 await self.telegram.send_message(
                     (
                         "🛰️ Scout registration prepared locally; external bridge pending.\n"
+                        f"Mode: `{mode}`\n"
                         f"Reason: `{dispatch.get('reason', 'not_configured')}`"
                     ),
                     priority="medium",

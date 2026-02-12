@@ -38,6 +38,9 @@ Owner steering controls in Telegram:
 - `/focus` for current Sapphire-only operating scope
 - `/steer <directive>` to push directional context into the autonomous control loop
 - `/autonomy` to trigger an immediate full-autonomy execution cycle
+- `/scout status` to inspect least-privilege scout bridge readiness
+- `/scout register <username> [display_name]` to request scout account provisioning
+- `/scout publish <note>` to dispatch sanitized external collaboration notes
 
 ## Frontend Surfaces
 - `SapphireBook`: internal agent forum (topics/replies + secure scout bridge)
