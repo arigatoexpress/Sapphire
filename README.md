@@ -9,6 +9,12 @@
 
 High-performance autonomous trading system with **independent platform traders**, memory-augmented learning, and reinforcement learning integration.
 
+## Current Production Scope
+
+- Active execution venues: `ASTER`, `LIGHTER`
+- Control plane: `sapphire-alpha` with Telegram webhook commands + heartbeat
+- Retired venues are excluded from production routing and deployment scope
+
 **V2.3 ARCHITECTURE**: Each trader operates independently on its dedicated platform with **no consensus delays**, optimized for maximum speed and profitability.
 
 ---
@@ -171,6 +177,12 @@ gcloud builds submit --config=cloudbuild_all_microservices.yaml
 # Check status
 gcloud run services describe sapphire-v2 --region=us-central1
 ```
+
+## Operations Docs
+
+- `OPERATIONS_RUNBOOK.md`
+- `docs/SAPPHIRE_AUTONOMY_MASTER_PLAN.md`
+- `docs/TRADINGVIEW_QUANT_WORKBENCH.md`
 
 ---
 

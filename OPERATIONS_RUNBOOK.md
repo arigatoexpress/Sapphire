@@ -35,6 +35,25 @@ Supported operator commands in Telegram:
 - `/allocate <venue> <percent>`
 - `@alpha` / `@all` command forms for manual overrides
 
+## TradingView Signal Ingress
+
+TradingView alerts can be sent to:
+
+- `POST /tradingview/webhook` on `sapphire-alpha`
+- secret (recommended): `X-Sapphire-Webhook-Secret` header
+  - accepted fallback keys in payload: `secret`, `passphrase`, `token`
+
+Supported TradingView actions:
+
+- `heartbeat`, `status` (control telemetry)
+- `kill`, `resume`, `deallocate`, `allocate` (risk controls)
+- `buy`, `sell`, `close` (trade intents)
+
+Safety default:
+
+- `TRADINGVIEW_EXECUTION_ENABLED=false` means alerts are notify-only (dry-run).
+- set `TRADINGVIEW_EXECUTION_ENABLED=true` only after paper validation.
+
 ## Cloud Scheduler Jobs
 
 Health and status jobs are configured in `us-central1`:
@@ -42,6 +61,7 @@ Health and status jobs are configured in `us-central1`:
 - `sapphire-alpha-health-6h` -> alpha `/health` every 6 hours
 - `sapphire-aster-health-6h` -> aster `/health` every 6 hours (5 min offset)
 - `sapphire-lighter-health-6h` -> lighter `/health` every 6 hours (10 min offset)
+- `sapphire-alpha-heartbeat-30m` -> sends synthetic `/heartbeat` through alpha webhook every 30 minutes
 - `sapphire-alpha-status-daily` -> sends synthetic `/status` update through alpha webhook daily at `14:15 UTC`
 
 Idempotent job setup script:
@@ -56,10 +76,12 @@ Run:
 
 ```bash
 ./scripts/check_required_secrets.sh
+./scripts/autonomy_readiness_check.sh
 ```
 
 Expected result for current scope:
 
+- `CONTROL_PLANE` ready
 - `ASTER` ready
 - `LIGHTER` ready
 

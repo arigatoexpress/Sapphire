@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Configure Sapphire Cloud Scheduler jobs for health checks and daily control status.
+# Configure Sapphire Cloud Scheduler jobs for health checks and control heartbeats.
 #
 # This script is idempotent: existing jobs are updated, missing jobs are created.
 
@@ -21,6 +21,11 @@ WEBHOOK_SECRET="$(
 
 STATUS_BODY="$(cat <<JSON
 {"update_id":900000001,"message":{"chat":{"id":"${CHAT_ID}"},"text":"/status"}}
+JSON
+)"
+
+HEARTBEAT_BODY="$(cat <<JSON
+{"update_id":900000002,"message":{"chat":{"id":"${CHAT_ID}"},"text":"/heartbeat"}}
 JSON
 )"
 
@@ -80,6 +85,13 @@ upsert_http_job() {
 upsert_http_job "sapphire-alpha-health-6h" "0 */6 * * *" "${ALPHA_URL}/health" "GET" "" ""
 upsert_http_job "sapphire-aster-health-6h" "5 */6 * * *" "${ASTER_URL}/health" "GET" "" ""
 upsert_http_job "sapphire-lighter-health-6h" "10 */6 * * *" "${LIGHTER_URL}/health" "GET" "" ""
+upsert_http_job \
+  "sapphire-alpha-heartbeat-30m" \
+  "*/30 * * * *" \
+  "${ALPHA_URL}/telegram/webhook" \
+  "POST" \
+  "Content-Type=application/json,X-Telegram-Bot-Api-Secret-Token=${WEBHOOK_SECRET}" \
+  "${HEARTBEAT_BODY}"
 upsert_http_job \
   "sapphire-alpha-status-daily" \
   "15 14 * * *" \

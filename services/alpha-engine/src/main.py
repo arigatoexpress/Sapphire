@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import signal
 import sys
@@ -56,6 +57,14 @@ class AlphaEngine:
         self._telegram_webhook_url = os.getenv("TELEGRAM_WEBHOOK_URL", "").strip()
         self._telegram_webhook_secret = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
         self._telegram_webhook_mode = bool(self._telegram_webhook_url)
+        self._tradingview_webhook_secret = os.getenv("TRADINGVIEW_WEBHOOK_SECRET", "").strip()
+        self._tradingview_execution_enabled = (
+            os.getenv("TRADINGVIEW_EXECUTION_ENABLED", "false").strip().lower()
+            in {"1", "true", "yes", "on"}
+        )
+        self._tradingview_default_quantity = max(
+            0.0, float(os.getenv("TRADINGVIEW_DEFAULT_QUANTITY", "0.0"))
+        )
         self._failure_counts: Dict[str, int] = defaultdict(int)
         self._auto_deallocated: Set[str] = set()
 
@@ -68,6 +77,52 @@ class AlphaEngine:
             "ALL": "ALL",
         }
         return aliases.get(value, value)
+
+    @staticmethod
+    def _parse_tradingview_message(message: str) -> Dict[str, Any]:
+        message = str(message or "").strip()
+        if not message:
+            return {}
+
+        try:
+            parsed = json.loads(message)
+            if isinstance(parsed, dict):
+                return parsed
+        except Exception:
+            pass
+
+        # Lightweight parser for key=value,key2=value2 style alert bodies.
+        parsed: Dict[str, Any] = {}
+        chunks = [chunk.strip() for chunk in message.replace("\n", ",").split(",") if chunk.strip()]
+        for chunk in chunks:
+            if "=" in chunk:
+                key, value = chunk.split("=", 1)
+            elif ":" in chunk:
+                key, value = chunk.split(":", 1)
+            else:
+                continue
+            parsed[key.strip()] = value.strip()
+        return parsed
+
+    @staticmethod
+    def _extract_float_value(data: Dict[str, Any], keys: List[str], default: float = 0.0) -> float:
+        for key in keys:
+            value = data.get(key)
+            if value is None:
+                continue
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                continue
+        return default
+
+    @staticmethod
+    def _extract_text_value(data: Dict[str, Any], keys: List[str], default: str = "") -> str:
+        for key in keys:
+            value = data.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return default
 
     async def _publish_risk_alert(
         self,
@@ -269,6 +324,126 @@ class AlphaEngine:
             f"❌ Unknown control action `{normalized_action}`", priority="high"
         )
 
+    async def _handle_tradingview_signal(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Process TradingView alerts into heartbeat/control/trade actions."""
+        merged_payload: Dict[str, Any] = dict(payload or {})
+        message_payload = self._parse_tradingview_message(merged_payload.get("message", ""))
+        if isinstance(message_payload, dict):
+            merged_payload.update({k: v for k, v in message_payload.items() if k not in merged_payload})
+
+        action_raw = self._extract_text_value(
+            merged_payload,
+            ["action", "side", "command", "signal", "event", "type"],
+        ).lower()
+        venue_raw = self._extract_text_value(
+            merged_payload,
+            ["venue", "platform", "exchange", "target", "bot"],
+            default="ALL",
+        )
+        symbol = self._extract_text_value(
+            merged_payload,
+            ["symbol", "ticker", "pair", "instrument"],
+            default="USDC",
+        ).upper()
+        quantity = self._extract_float_value(
+            merged_payload,
+            ["quantity", "qty", "size", "contracts", "notional"],
+            default=self._tradingview_default_quantity,
+        )
+        allocation_percent = self._extract_float_value(
+            merged_payload,
+            ["allocation", "allocation_percent", "percent"],
+            default=100.0,
+        )
+
+        normalized_action = action_raw.replace("-", "_")
+        normalized_target = self._normalize_platform(venue_raw or "ALL")
+
+        if normalized_action in {"heartbeat", "ping"}:
+            await self._send_heartbeat("tradingview")
+            return {"accepted": "heartbeat"}
+
+        if normalized_action in {"status", "control_status"}:
+            await self._send_control_status()
+            return {"accepted": "status"}
+
+        if normalized_action in {"kill", "halt", "halt_trading"}:
+            await self._handle_control_command(normalized_target, "HALT_TRADING", 0.0)
+            return {"accepted": "kill"}
+
+        if normalized_action in {"resume", "resume_trading"}:
+            await self._handle_control_command(normalized_target, "RESUME_TRADING", 0.0)
+            return {"accepted": "resume"}
+
+        if normalized_action in {"deallocate", "pause"}:
+            await self._handle_control_command(normalized_target, "SET_ALLOCATION", 0.0)
+            return {"accepted": "deallocate", "target": normalized_target}
+
+        if normalized_action in {"allocate", "set_allocation"}:
+            bounded = max(0.0, min(1.0, allocation_percent / 100.0))
+            await self._handle_control_command(normalized_target, "SET_ALLOCATION", bounded)
+            return {"accepted": "allocate", "target": normalized_target, "allocation": bounded}
+
+        if normalized_action not in {"buy", "sell", "close"}:
+            await self.telegram.send_message(
+                f"⚠️ TradingView alert ignored: unsupported action `{action_raw or 'missing'}`.",
+                priority="medium",
+            )
+            return {"accepted": "ignored", "reason": "unsupported_action"}
+
+        if normalized_target == "ALL":
+            targets = list(dispatcher.bot_urls.keys())
+        else:
+            targets = [normalized_target]
+
+        unknown = [venue for venue in targets if venue not in dispatcher.bot_urls]
+        if unknown:
+            await self.telegram.send_message(
+                f"❌ TradingView target not enabled: `{', '.join(unknown)}`", priority="high"
+            )
+            return {"accepted": "rejected", "reason": "unknown_target"}
+
+        if self._kill_switch_active:
+            await self.telegram.send_message(
+                "🛑 TradingView alert blocked because kill switch is active.",
+                priority="high",
+            )
+            return {"accepted": "blocked", "reason": "kill_switch"}
+
+        if quantity <= 0:
+            await self.telegram.send_message(
+                "⚠️ TradingView alert ignored: quantity missing or invalid.",
+                priority="medium",
+            )
+            return {"accepted": "ignored", "reason": "invalid_quantity"}
+
+        if not self._tradingview_execution_enabled:
+            await self.telegram.send_message(
+                (
+                    f"📥 TradingView signal captured (dry-run): `{normalized_action.upper()} {quantity} {symbol}` "
+                    f"on `{', '.join(targets)}`. Set `TRADINGVIEW_EXECUTION_ENABLED=true` to execute."
+                ),
+                priority="medium",
+            )
+            return {"accepted": "dry_run", "targets": targets}
+
+        for venue in targets:
+            await dispatcher.send_command(
+                venue,
+                {
+                    "action": normalized_action.upper(),
+                    "symbol": symbol,
+                    "quantity": quantity,
+                    "source": "tradingview_webhook",
+                },
+            )
+
+        await self.telegram.send_message(
+            f"✅ TradingView executed: `{normalized_action.upper()} {quantity} {symbol}` on `{', '.join(targets)}`.",
+            priority="high",
+        )
+        return {"accepted": "executed", "targets": targets}
+
     async def _record_trade_outcome(self, platform: str, success: bool, error_message: str = "") -> None:
         venue = self._normalize_platform(platform)
         if venue not in dispatcher.bot_urls:
@@ -389,9 +564,14 @@ class AlphaEngine:
             await start_health_server(
                 telegram_update_handler=self.telegram._process_update,
                 telegram_webhook_secret=self._telegram_webhook_secret,
+                tradingview_update_handler=self._handle_tradingview_signal,
+                tradingview_webhook_secret=self._tradingview_webhook_secret,
             )
         else:
-            await start_health_server()
+            await start_health_server(
+                tradingview_update_handler=self._handle_tradingview_signal,
+                tradingview_webhook_secret=self._tradingview_webhook_secret,
+            )
 
         # 1. Start Telegram FIRST for immediate status
         logger.info("📡 Initializing Telegram Notification Task...")
