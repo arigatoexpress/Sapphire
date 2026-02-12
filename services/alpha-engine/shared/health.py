@@ -163,6 +163,72 @@ async def market_ohlc(request: web.Request) -> web.Response:
     return web.json_response({"ok": True}, status=200)
 
 
+async def platform_status(request: web.Request) -> web.Response:
+    handler = request.app.get("platform_status_handler")
+    if handler is None:
+        return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
+    try:
+        result = await handler({})
+    except Exception as exc:
+        logger.error(f"Platform status handler error: {exc}")
+        return web.json_response({"ok": False, "error": "handler_failed"}, status=500)
+    if isinstance(result, dict):
+        status = 400 if result.get("error") else 200
+        return web.json_response({"ok": status == 200, **result}, status=status)
+    return web.json_response({"ok": True}, status=200)
+
+
+async def routing_info(request: web.Request) -> web.Response:
+    handler = request.app.get("routing_info_handler")
+    if handler is None:
+        return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
+    try:
+        result = await handler({})
+    except Exception as exc:
+        logger.error(f"Routing handler error: {exc}")
+        return web.json_response({"ok": False, "error": "handler_failed"}, status=500)
+    if isinstance(result, dict):
+        status = 400 if result.get("error") else 200
+        return web.json_response({"ok": status == 200, **result}, status=status)
+    return web.json_response({"ok": True}, status=200)
+
+
+async def performance_stats(request: web.Request) -> web.Response:
+    handler = request.app.get("performance_stats_handler")
+    if handler is None:
+        return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
+    try:
+        result = await handler({})
+    except Exception as exc:
+        logger.error(f"Performance stats handler error: {exc}")
+        return web.json_response({"ok": False, "error": "handler_failed"}, status=500)
+    if isinstance(result, dict):
+        status = 400 if result.get("error") else 200
+        return web.json_response({"ok": status == 200, **result}, status=status)
+    return web.json_response({"ok": True}, status=200)
+
+
+async def system_logs(request: web.Request) -> web.Response:
+    handler = request.app.get("system_logs_handler")
+    if handler is None:
+        return web.json_response([], status=200)
+
+    limit = request.rel_url.query.get("limit", "80")
+    try:
+        result = await handler({"limit": limit})
+    except Exception as exc:
+        logger.error(f"System logs handler error: {exc}")
+        return web.json_response([], status=200)
+
+    if isinstance(result, list):
+        return web.json_response(result, status=200)
+    if isinstance(result, dict):
+        payload = result.get("logs")
+        if isinstance(payload, list):
+            return web.json_response(payload, status=200)
+    return web.json_response([], status=200)
+
+
 async def start_health_server(
     telegram_update_handler: Optional[Callable[[dict[str, Any]], Awaitable[None]]] = None,
     telegram_webhook_secret: str = "",
@@ -171,6 +237,10 @@ async def start_health_server(
     ] = None,
     tradingview_webhook_secret: str = "",
     market_ohlc_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
+    platform_status_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
+    routing_info_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
+    performance_stats_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
+    system_logs_handler: Optional[Callable[[dict[str, Any]], Awaitable[Any]]] = None,
 ):
     """Start a lightweight HTTP server for Cloud Run health checks."""
     port = int(os.getenv("PORT", "8080"))
@@ -191,6 +261,18 @@ async def start_health_server(
     if market_ohlc_handler is not None:
         app["market_ohlc_handler"] = market_ohlc_handler
         app.router.add_get("/api/v2/market/ohlc", market_ohlc)
+    if platform_status_handler is not None:
+        app["platform_status_handler"] = platform_status_handler
+        app.router.add_get("/api/v2/platforms/status", platform_status)
+    if routing_info_handler is not None:
+        app["routing_info_handler"] = routing_info_handler
+        app.router.add_get("/api/v2/trade/routing", routing_info)
+    if performance_stats_handler is not None:
+        app["performance_stats_handler"] = performance_stats_handler
+        app.router.add_get("/api/analytics/performance/stats", performance_stats)
+    if system_logs_handler is not None:
+        app["system_logs_handler"] = system_logs_handler
+        app.router.add_get("/logs/system", system_logs)
 
     runner = web.AppRunner(app)
     await runner.setup()

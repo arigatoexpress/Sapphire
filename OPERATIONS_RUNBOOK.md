@@ -141,6 +141,7 @@ Run:
 ./scripts/check_required_secrets.sh
 ./scripts/enable_full_autonomy.sh
 ./scripts/autonomy_readiness_check.sh
+./scripts/frontend_contract_check.sh
 ./scripts/focus_guard.sh
 ./scripts/verify_focused_stack.sh
 ```

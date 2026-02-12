@@ -6,6 +6,8 @@
 - Telegram heartbeat + command webhook is the highest-leverage human override path and must stay authenticated and monitored.
 - Frontend command inputs create unnecessary attack surface; web should stay telemetry/research only.
 - `./scripts/autonomy_readiness_check.sh` is the canonical quick gate for cloud/runtime health across alpha, venue bots, gateway, and scheduler jobs.
+- UI reliability depends on API contract parity: frontend-read endpoints (`/api/v2/platforms/status`, `/api/v2/trade/routing`, `/api/analytics/performance/stats`, `/logs/system`) must be kept live in `sapphire-alpha`.
+- `./scripts/frontend_contract_check.sh` should run before web/control-plane deploys to catch UI-breaking API regressions.
 - Strategy-gated TradingView autonomy (`TRADINGVIEW_ENFORCE_STRATEGY_RULES=true`) is required to keep autonomous actions bounded.
 - Deprecated surfaces (`trading-dashboard-legacy`, `services/bot-retired_*`) should be removed to reduce operational entropy.
 

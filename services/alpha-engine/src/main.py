@@ -5,8 +5,8 @@ import os
 import signal
 import sys
 import time
-from collections import defaultdict
-from typing import Any, Dict, List, Optional, Set
+from collections import defaultdict, deque
+from typing import Any, Deque, Dict, List, Optional, Set
 
 import uvloop
 from src.ai.gemini_guard import GeminiGuard
@@ -129,6 +129,15 @@ class AlphaEngine:
         self._autonomy_last_dispatch_at = 0.0
         self._autonomy_last_trigger = ""
         self._autonomy_dispatch_count = 0
+        self._started_at = time.time()
+        self._system_log_max_entries = max(100, int(os.getenv("SYSTEM_LOG_MAX_ENTRIES", "500")))
+        self._system_logs: Deque[Dict[str, Any]] = deque(maxlen=self._system_log_max_entries)
+        self._trade_metrics: Dict[str, float] = {
+            "total_trades": 0.0,
+            "wins": 0.0,
+            "losses": 0.0,
+            "realized_pnl": 0.0,
+        }
 
     @staticmethod
     def _env_flag(name: str, default: bool = False) -> bool:
@@ -136,6 +145,42 @@ class AlphaEngine:
         if value is None:
             return default
         return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+    @staticmethod
+    def _as_float(value: Any) -> Optional[float]:
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return None
+        if not number == number:  # NaN guard
+            return None
+        return number
+
+    def _record_system_log(
+        self,
+        message: str,
+        level: str = "info",
+        tags: Optional[List[str]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        text = str(message or "").strip()
+        if not text:
+            return
+        event = {
+            "timestamp": int(time.time()),
+            "level": str(level or "info").lower(),
+            "message": text,
+            "tags": list(tags or []),
+            "metadata": metadata or {},
+        }
+        self._system_logs.append(event)
+
+    def _extract_trade_pnl(self, payload: Dict[str, Any]) -> Optional[float]:
+        for key in ("realized_pnl", "pnl", "net_pnl", "profit", "realizedPnl", "netPnl"):
+            value = self._as_float(payload.get(key))
+            if value is not None:
+                return value
+        return None
 
     def _normalize_platform(self, platform: str) -> str:
         value = str(platform or "").strip().upper()
@@ -451,6 +496,11 @@ class AlphaEngine:
     async def _activate_kill_switch(self, reason: str) -> None:
         self._kill_switch_active = True
         reason = reason.strip() or "Manual kill switch requested via Telegram"
+        self._record_system_log(
+            f"Kill switch activated: {reason}",
+            level="warning",
+            tags=["risk", "kill_switch"],
+        )
 
         for venue in dispatcher.bot_urls:
             dispatcher.set_venue_allocation(venue, 0.0)
@@ -485,6 +535,11 @@ class AlphaEngine:
     async def _resume_from_kill_switch(self, reason: str) -> None:
         self._kill_switch_active = False
         reason = reason.strip() or "Manual resume requested via Telegram"
+        self._record_system_log(
+            f"Trading resumed: {reason}",
+            level="info",
+            tags=["risk", "resume"],
+        )
 
         for venue in dispatcher.bot_urls:
             dispatcher.resume_venue(venue)
@@ -651,6 +706,12 @@ class AlphaEngine:
             self._autonomy_last_dispatch_at = now
             self._autonomy_last_trigger = trigger
             self._autonomy_dispatch_count += 1
+            self._record_system_log(
+                f"Full autonomy cycle dispatched ({trigger})",
+                level="info",
+                tags=["autonomy", "dispatch"],
+                metadata={"session_key": hook_result.get("session_key", "")},
+            )
             await self.telegram.send_message(
                 (
                     "🤖 Full autonomy cycle dispatched.\n"
@@ -660,6 +721,11 @@ class AlphaEngine:
                 priority="high",
             )
         else:
+            self._record_system_log(
+                f"Full autonomy dispatch unavailable ({trigger}): {hook_result.get('reason', 'unknown')}",
+                level="warning",
+                tags=["autonomy", "dispatch"],
+            )
             await self.telegram.send_message(
                 (
                     "⚠️ Full autonomy dispatch unavailable.\n"
@@ -778,6 +844,12 @@ class AlphaEngine:
                     self._auto_deallocated.discard(venue)
 
             if allocation <= 0:
+                self._record_system_log(
+                    f"Manual deallocation applied to {', '.join(targets)}",
+                    level="warning",
+                    tags=["control", "allocation"],
+                    metadata={"allocation": allocation},
+                )
                 await self._publish_risk_alert(
                     action="halt_trading",
                     severity="warning",
@@ -791,6 +863,12 @@ class AlphaEngine:
                     priority="high",
                 )
             else:
+                self._record_system_log(
+                    f"Manual allocation set for {', '.join(targets)} to {allocation*100:.0f}%",
+                    level="info",
+                    tags=["control", "allocation"],
+                    metadata={"allocation": allocation},
+                )
                 await self._publish_risk_alert(
                     action="resume_trading",
                     severity="warning",
@@ -1104,6 +1182,12 @@ class AlphaEngine:
             cooldown_seconds=self._deallocation_cooldown_seconds,
         )
         self._auto_deallocated.add(venue)
+        self._record_system_log(
+            f"{venue} auto-deallocated after {failures} failures",
+            level="error",
+            tags=["risk", "auto_deallocation"],
+            metadata={"failures": failures},
+        )
 
         await self._publish_risk_alert(
             action="halt_trading",
@@ -1138,6 +1222,11 @@ class AlphaEngine:
                         dispatcher.set_venue_allocation(venue, self._default_venue_allocation)
                         self._auto_deallocated.discard(venue)
                         self._failure_counts[venue] = 0
+                        self._record_system_log(
+                            f"{venue} resumed after cooldown",
+                            level="info",
+                            tags=["risk", "auto_resume"],
+                        )
                         await self._publish_risk_alert(
                             action="resume_trading",
                             severity="warning",
@@ -1194,6 +1283,11 @@ class AlphaEngine:
     async def start(self):
         logger.info("🚀 Sapphire Alpha Engine Starting (uvloop enabled)")
         self.running = True
+        self._record_system_log(
+            "Sapphire Alpha Engine starting",
+            level="info",
+            tags=["system", "startup"],
+        )
 
         # Start Health Server (Cloud Run)
         if self._telegram_webhook_mode:
@@ -1203,12 +1297,20 @@ class AlphaEngine:
                 tradingview_update_handler=self._handle_tradingview_signal,
                 tradingview_webhook_secret=self._tradingview_webhook_secret,
                 market_ohlc_handler=self._handle_market_ohlc_request,
+                platform_status_handler=self._handle_platform_status_request,
+                routing_info_handler=self._handle_routing_info_request,
+                performance_stats_handler=self._handle_performance_stats_request,
+                system_logs_handler=self._handle_system_logs_request,
             )
         else:
             await start_health_server(
                 tradingview_update_handler=self._handle_tradingview_signal,
                 tradingview_webhook_secret=self._tradingview_webhook_secret,
                 market_ohlc_handler=self._handle_market_ohlc_request,
+                platform_status_handler=self._handle_platform_status_request,
+                routing_info_handler=self._handle_routing_info_request,
+                performance_stats_handler=self._handle_performance_stats_request,
+                system_logs_handler=self._handle_system_logs_request,
             )
 
         # 1. Start Telegram FIRST for immediate status
@@ -1266,12 +1368,31 @@ class AlphaEngine:
                 qty = message_data.get("filled_quantity", 0)
 
                 if success:
+                    self._trade_metrics["total_trades"] += 1
+                    pnl = self._extract_trade_pnl(message_data)
+                    if pnl is not None:
+                        self._trade_metrics["realized_pnl"] += pnl
+                        if pnl > 0:
+                            self._trade_metrics["wins"] += 1
+                        elif pnl < 0:
+                            self._trade_metrics["losses"] += 1
+                    else:
+                        self._trade_metrics["wins"] += 1
+
                     msg = f"✅ TRADE EXECUTED: {platform} | {side} {qty} {symbol}"
+                    self._record_system_log(
+                        msg,
+                        level="info",
+                        tags=["trade", "execution", platform.lower()],
+                        metadata={"side": side, "symbol": symbol, "quantity": qty},
+                    )
                     # Use LOW priority to batch execution updates
                     await self.telegram.send_message(msg, priority="low")
                     await self._record_trade_outcome(platform, success=True)
                 else:
                     err = message_data.get("error_message", "Unknown")
+                    self._trade_metrics["total_trades"] += 1
+                    self._trade_metrics["losses"] += 1
                     await self._record_trade_outcome(platform, success=False, error_message=err)
 
                     # Classify the error
@@ -1282,6 +1403,12 @@ class AlphaEngine:
 
                     if should_notify:
                         msg = f"❌ TRADE FAILED: {platform} | {side} {symbol} | Error: {err}"
+                        self._record_system_log(
+                            msg,
+                            level="error",
+                            tags=["trade", "failure", platform.lower()],
+                            metadata={"side": side, "symbol": symbol},
+                        )
 
                         # Use appropriate priority based on severity
                         priority = "high" if severity >= ErrorSeverity.ERROR else "medium"
@@ -1324,6 +1451,128 @@ class AlphaEngine:
         )
         ohlc["generated_at"] = int(time.time())
         return ohlc
+
+    async def _handle_platform_status_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
+        snapshot = self.market_data.get_market_snapshot(symbol="SOL")
+        control_state = dispatcher.get_control_state()
+        platforms: Dict[str, Dict[str, Any]] = {}
+
+        for venue in ("ASTER", "LIGHTER"):
+            venue_state = control_state.get(venue, {"paused": True, "allocation": 0.0, "cooldown_until": 0.0})
+            market = snapshot.get(
+                venue,
+                {"price": 0.0, "status": "offline", "age_seconds": None, "last_tick_ts": None},
+            )
+            paused = bool(venue_state.get("paused", False) or venue_state.get("allocation", 0.0) <= 0)
+            feed_status = str(market.get("status", "offline")).lower()
+
+            if self._kill_switch_active:
+                status = "degraded"
+                mode = "Kill-switch halted"
+            elif paused:
+                status = "degraded" if feed_status in {"healthy", "degraded"} else "offline"
+                mode = "Paused allocation"
+            else:
+                status = "healthy" if feed_status == "healthy" else "degraded"
+                mode = "Autonomous ready" if status == "healthy" else "Awaiting fresh market ticks"
+
+            note = (
+                f"Allocation {float(venue_state.get('allocation', 0.0)) * 100:.0f}% | "
+                f"Tick age {market.get('age_seconds', 'n/a')}s"
+            )
+            platforms[venue.lower()] = {
+                "status": status,
+                "health": status,
+                "mode": mode,
+                "routing": "autonomous",
+                "note": note,
+                "price": market.get("price", 0.0),
+                "last_tick_ts": market.get("last_tick_ts"),
+                "age_seconds": market.get("age_seconds"),
+                "allocation": float(venue_state.get("allocation", 0.0)),
+                "paused": paused,
+            }
+
+        return {
+            "platforms": platforms,
+            "kill_switch_active": self._kill_switch_active,
+            "timestamp": int(time.time()),
+        }
+
+    async def _handle_routing_info_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
+        state = dispatcher.get_control_state()
+        active = [venue for venue, item in state.items() if not item.get("paused") and item.get("allocation", 0) > 0]
+        paused = [venue for venue, item in state.items() if item.get("paused") or item.get("allocation", 0) <= 0]
+        failure_pressure = int(sum(self._failure_counts.values()))
+        snapshot = self.market_data.get_market_snapshot(symbol="SOL")
+
+        if self._kill_switch_active:
+            confidence = 0.0
+            mode = "halted"
+        else:
+            healthy_active = sum(
+                1 for venue in active if snapshot.get(venue, {}).get("status") == "healthy"
+            )
+            confidence = 0.92
+            confidence -= min(0.45, failure_pressure * 0.08)
+            if len(active) < max(1, self._trading_gate_min_active_venues):
+                confidence -= 0.25
+            elif len(active) < 2:
+                confidence -= 0.08
+            if active and healthy_active < len(active):
+                confidence -= 0.15
+            confidence = max(0.05, min(0.99, confidence))
+            mode = "autonomous" if confidence >= 0.7 else "guarded"
+
+        return {
+            "mode": mode,
+            "strategy": "policy-gated",
+            "confidence": float(round(confidence, 4)),
+            "data": {
+                "confidence": float(round(confidence, 4)),
+            },
+            "routing": {
+                "confidence": float(round(confidence, 4)),
+                "active_venues": active,
+                "paused_venues": paused,
+                "failure_pressure": failure_pressure,
+                "kill_switch_active": self._kill_switch_active,
+            },
+            "timestamp": int(time.time()),
+        }
+
+    async def _handle_performance_stats_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
+        total_trades = int(self._trade_metrics["total_trades"])
+        wins = int(self._trade_metrics["wins"])
+        losses = int(self._trade_metrics["losses"])
+        win_rate = float((wins / total_trades) * 100.0) if total_trades > 0 else 0.0
+        uptime_seconds = int(max(0, time.time() - self._started_at))
+        failure_pressure = int(sum(self._failure_counts.values()))
+
+        return {
+            "metrics": {
+                "system": {
+                    "total_trades": total_trades,
+                    "wins": wins,
+                    "losses": losses,
+                    "win_rate": round(win_rate, 2),
+                    "realized_pnl": float(round(self._trade_metrics["realized_pnl"], 6)),
+                    "uptime_seconds": uptime_seconds,
+                    "failure_pressure": failure_pressure,
+                    "autonomy_dispatch_count": int(self._autonomy_dispatch_count),
+                }
+            },
+            "timestamp": int(time.time()),
+        }
+
+    async def _handle_system_logs_request(self, payload: Dict[str, Any]) -> List[Dict[str, Any]]:
+        limit_raw = payload.get("limit", 80)
+        try:
+            limit = int(limit_raw)
+        except (TypeError, ValueError):
+            limit = 80
+        limit = max(1, min(limit, self._system_log_max_entries))
+        return list(self._system_logs)[-limit:]
 
     async def stop(self):
         logger.info("🛑 Stopping Alpha Engine...")

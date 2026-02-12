@@ -50,6 +50,7 @@ Web UI is read-only for control actions. Agent prompting, approvals, and steerin
 ```bash
 ./scripts/check_required_secrets.sh
 ./scripts/autonomy_readiness_check.sh
+./scripts/frontend_contract_check.sh
 ./scripts/focus_guard.sh
 ./scripts/gcp_scope_reconcile.sh
 ./scripts/setup_clawdbot_jobs.sh

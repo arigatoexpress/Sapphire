@@ -131,6 +131,33 @@ class MarketDataAggregator:
         venue_prices = self.prices.get(venue, {})
         return venue_prices.get(symbol, venue_prices.get(self._chart_symbol, 0.0))
 
+    def get_market_snapshot(self, symbol: str = "SOL") -> Dict[str, Dict[str, Any]]:
+        symbol_key = str(symbol or "").strip().upper() or self._chart_symbol
+        now = time.time()
+        snapshot: Dict[str, Dict[str, Any]] = {}
+
+        for venue in ("ASTER", "LIGHTER"):
+            price = self.get_price(venue, symbol_key)
+            ticks = self._tick_history.get(venue, {}).get(symbol_key, deque())
+            last_tick_ts = float(ticks[-1][0]) if ticks else 0.0
+            age_seconds = int(max(0.0, now - last_tick_ts)) if last_tick_ts > 0 else None
+
+            if price > 0 and age_seconds is not None and age_seconds <= 120:
+                status = "healthy"
+            elif price > 0:
+                status = "degraded"
+            else:
+                status = "offline"
+
+            snapshot[venue] = {
+                "price": float(price) if price > 0 else 0.0,
+                "status": status,
+                "last_tick_ts": int(last_tick_ts) if last_tick_ts > 0 else None,
+                "age_seconds": age_seconds,
+                "symbol": symbol_key,
+            }
+        return snapshot
+
     def _record_tick(
         self,
         venue: str,
