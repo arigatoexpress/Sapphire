@@ -1,0 +1,86 @@
+# Sapphire Operations Runbook
+
+This runbook is for operating Sapphire in the current cloud setup with a strict scope on the `arigatoexpress/Sapphire` repository.
+
+## Production Services
+
+- `sapphire-alpha` (control plane): `https://sapphire-alpha-267358751314.us-central1.run.app`
+- `sapphire-aster` (venue bot): `https://sapphire-aster-267358751314.us-central1.run.app`
+- `sapphire-lighter` (venue bot): `https://sapphire-lighter-267358751314.europe-west1.run.app`
+- `sapphire-gateway` (OpenClaw gateway): `https://sapphire-gateway-267358751314.us-central1.run.app`
+
+## Active Control Scope
+
+Current alpha deployment only routes commands to:
+
+- `ASTER`
+- `LIGHTER`
+
+This is enforced by the `ENABLED_VENUES=ASTER;LIGHTER` environment variable in `sapphire-alpha`.
+
+## Telegram Control Channel
+
+Inbound commands are handled in webhook mode by:
+
+- `POST /telegram/webhook` on `sapphire-alpha`
+- webhook secret header: `X-Telegram-Bot-Api-Secret-Token`
+
+Supported operator commands in Telegram:
+
+- `/status`
+- `/heartbeat`
+- `/kill`
+- `/resume`
+- `/deallocate <venue>`
+- `/allocate <venue> <percent>`
+- `@alpha` / `@all` command forms for manual overrides
+
+## Cloud Scheduler Jobs
+
+Health and status jobs are configured in `us-central1`:
+
+- `sapphire-alpha-health-6h` -> alpha `/health` every 6 hours
+- `sapphire-aster-health-6h` -> aster `/health` every 6 hours (5 min offset)
+- `sapphire-lighter-health-6h` -> lighter `/health` every 6 hours (10 min offset)
+- `sapphire-alpha-status-daily` -> sends synthetic `/status` update through alpha webhook daily at `14:15 UTC`
+
+Idempotent job setup script:
+
+```bash
+./scripts/setup_scheduler_jobs.sh
+```
+
+## Secret Readiness Check
+
+Before expanding to additional venues, run:
+
+```bash
+./scripts/check_required_secrets.sh
+```
+
+Expected blockers (until secrets are added):
+
+- `DRIFT`: `SOLANA_PRIVATE_KEY`
+- `HYPERLIQUID`: `HL_SECRET_KEY`, `HL_ACCOUNT_ADDRESS`
+- `SYMPHONY`: `SYMPHONY_API_KEY`
+
+## Incident Commands
+
+Immediate safety actions:
+
+1. `/kill` in Telegram to halt and deallocate all enabled venues.
+2. Verify:
+   - `GET /health` for `sapphire-alpha`, `sapphire-aster`, `sapphire-lighter`
+   - latest Cloud Run revision status is `Ready=True`
+3. Resume only after issue triage:
+   - `/resume`
+   - optionally `/allocate <venue> <percent>`
+
+## Quick Verification Commands
+
+```bash
+gcloud run services list --project sapphire-479610 --platform managed
+curl -sS https://sapphire-alpha-267358751314.us-central1.run.app/health
+curl -sS https://sapphire-aster-267358751314.us-central1.run.app/health
+curl -sS https://sapphire-lighter-267358751314.europe-west1.run.app/health
+```
