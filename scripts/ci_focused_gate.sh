@@ -88,7 +88,8 @@ fi
 
 if [[ -d "sapphire-web" ]]; then
   pushd sapphire-web >/dev/null
-  if npm ci && npm run build; then
+  # package-lock.json is intentionally not tracked in this repo.
+  if npm install --no-audit --no-fund && npm run build; then
     pass "sapphire-web production build"
   else
     fail "sapphire-web production build"
