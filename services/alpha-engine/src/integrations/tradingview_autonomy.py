@@ -4,6 +4,7 @@ import re
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
+from urllib.parse import urlparse
 
 import aiohttp
 from loguru import logger
@@ -91,6 +92,7 @@ class TradingViewAutonomyPlugin:
                 os.getenv("SAPPHIRE_BLOCKED_SCOPE_TERMS", "sapphireai,sapphire-inc,sapphire inc")
             )
         }
+        self._serverless_token_cache: Dict[str, Dict[str, Any]] = {}
         self.state_path = Path(
             os.getenv("TRADINGVIEW_WORKSPACE_STATE_FILE", "/tmp/tradingview_workspace_state.json").strip()
         )
@@ -209,6 +211,19 @@ class TradingViewAutonomyPlugin:
             return [token.strip() for token in cleaned.split(",") if token.strip()]
         return []
 
+    def _resolve_agent_id(self, payload: Dict[str, Any]) -> str:
+        for key in ("agent_id", "agentId", "agent", "target_agent"):
+            candidate = str(payload.get(key, "")).strip().lower()
+            if candidate in {"sapphire", "obsidian", "emerald"}:
+                return candidate
+            if candidate:
+                logger.warning(
+                    "Ignoring unsupported agent override '{}' for TradingView autonomy dispatch",
+                    candidate,
+                )
+                break
+        return self.autonomy_agent_id
+
     @staticmethod
     def _compute_sma(values: List[float], period: int) -> Optional[float]:
         if len(values) < period:
@@ -276,6 +291,7 @@ class TradingViewAutonomyPlugin:
             "Content-Type": "application/json",
             "X-OpenClaw-Token": self.hook_token,
         }
+        headers.update(await self._get_serverless_auth_headers())
         try:
             timeout = aiohttp.ClientTimeout(total=20)
             async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -291,6 +307,62 @@ class TradingViewAutonomyPlugin:
             return {"dispatched": False, "reason": "hook_request_error", "error": str(exc)}
 
         return {"dispatched": True, "session_key": session_key}
+
+    async def _get_serverless_auth_headers(self) -> Dict[str, str]:
+        """
+        Add Cloud Run IAM auth for cross-service hook calls.
+
+        OpenClaw hook endpoints use app-level token auth in `X-OpenClaw-Token`,
+        while Cloud Run IAM expects an identity token. We provide IAM auth via
+        `X-Serverless-Authorization` to avoid clobbering app-level auth.
+        """
+        if not os.getenv("K_SERVICE"):
+            return {}
+
+        parsed = urlparse(self.hook_url)
+        if not parsed.scheme or not parsed.netloc:
+            return {}
+        audience = f"{parsed.scheme}://{parsed.netloc}"
+
+        now = time.time()
+        cached = self._serverless_token_cache.get(audience)
+        if cached and now < float(cached.get("expires_at", 0)):
+            token = str(cached.get("token", "")).strip()
+            if token:
+                return {"X-Serverless-Authorization": f"Bearer {token}"}
+
+        token_url = (
+            "http://metadata.google.internal/computeMetadata/v1/instance/"
+            f"service-accounts/default/identity?audience={audience}"
+        )
+
+        try:
+            timeout = aiohttp.ClientTimeout(total=8)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(
+                    token_url,
+                    headers={"Metadata-Flavor": "Google"},
+                ) as resp:
+                    if resp.status != 200:
+                        logger.warning(
+                            "Serverless token fetch failed status={} body={}",
+                            resp.status,
+                            (await resp.text())[:200],
+                        )
+                        return {}
+                    token = (await resp.text()).strip()
+                    if not token:
+                        return {}
+        except Exception as exc:
+            logger.warning(f"Serverless token fetch error: {exc}")
+            return {}
+
+        # Metadata tokens are typically valid for ~1h; refresh proactively.
+        self._serverless_token_cache[audience] = {
+            "token": token,
+            "expires_at": now + 55 * 60,
+        }
+        return {"X-Serverless-Authorization": f"Bearer {token}"}
 
     async def dispatch_owner_instruction(self, instruction: str, agent_id: str = "") -> Dict[str, Any]:
         instruction = str(instruction or "").strip()
@@ -472,6 +544,7 @@ class TradingViewAutonomyPlugin:
     async def handle_action(self, action: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         action = str(action or "").strip().lower()
         payload = dict(payload or {})
+        target_agent = self._resolve_agent_id(payload)
 
         if action not in self.WORKSPACE_ACTIONS:
             return {"accepted": "ignored", "reason": "unknown_workspace_action"}
@@ -615,14 +688,24 @@ class TradingViewAutonomyPlugin:
         elif action == "tv_scan_assets":
             scan_scope = state.get("assets_scope", "ALL")
             note = f"Scan requested for scope={scan_scope} across full TradingView universe."
-            dispatch = await self._dispatch_to_openclaw(action, payload, self._make_openclaw_instruction(action, payload))
+            dispatch = await self._dispatch_to_openclaw(
+                action,
+                payload,
+                self._make_openclaw_instruction(action, payload),
+                agent_id=target_agent,
+            )
             return {"accepted": "scan_requested", "dispatch": dispatch, "note": note, "workspace": self.status_snapshot()}
 
         elif action == "tv_custom":
             instruction = str(payload.get("instruction", "")).strip()
             if not instruction:
                 return {"accepted": "blocked", "reason": "instruction_required"}
-            dispatch = await self._dispatch_to_openclaw(action, payload, self._make_openclaw_instruction(action, payload))
+            dispatch = await self._dispatch_to_openclaw(
+                action,
+                payload,
+                self._make_openclaw_instruction(action, payload),
+                agent_id=target_agent,
+            )
             return {"accepted": "custom_requested", "dispatch": dispatch, "workspace": self.status_snapshot()}
 
         state["last_action"] = action
@@ -630,7 +713,12 @@ class TradingViewAutonomyPlugin:
         if changed:
             self._save_state()
 
-        dispatch = await self._dispatch_to_openclaw(action, payload, self._make_openclaw_instruction(action, payload))
+        dispatch = await self._dispatch_to_openclaw(
+            action,
+            payload,
+            self._make_openclaw_instruction(action, payload),
+            agent_id=target_agent,
+        )
         return {
             "accepted": "workspace_updated" if changed else "workspace_noop",
             "action": action,
