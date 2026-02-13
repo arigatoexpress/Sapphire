@@ -1349,6 +1349,42 @@ class AlphaEngine:
 
         await self.telegram.send_message("\n".join(lines), priority="medium")
 
+    async def _send_market_prices(self) -> None:
+        """Send multi-symbol price snapshot across all venues."""
+        snapshot = self.market_data.get_multi_symbol_snapshot()
+        preferred = self.strategy.preferred_symbols
+        lines = ["💹 **MARKET PRICES**"]
+        for venue in ("ASTER", "LIGHTER"):
+            venue_data = snapshot.get(venue, {})
+            profile = self.strategy.venue_profiles.get(venue, {})
+            role = profile.get("role", "")
+            lines.append(f"\n**{venue}** — _{role}_")
+            # Show preferred symbols first, then any extra tracked ones
+            shown: set = set()
+            for sym in preferred:
+                info = venue_data.get(sym, {})
+                price = info.get("price", 0.0)
+                status = info.get("status", "offline")
+                if price > 0:
+                    age = info.get("age_seconds")
+                    age_text = f"{age}s" if age is not None else "?"
+                    if price >= 1.0:
+                        lines.append(f"  `{sym}`: **${price:,.2f}** ({age_text})")
+                    else:
+                        lines.append(f"  `{sym}`: **${price:.6f}** ({age_text})")
+                else:
+                    lines.append(f"  `{sym}`: _no data_")
+                shown.add(sym)
+            # Any extra tracked symbols not in preferred
+            for sym, info in sorted(venue_data.items()):
+                if sym not in shown and info.get("price", 0) > 0:
+                    price = info["price"]
+                    if price >= 1.0:
+                        lines.append(f"  `{sym}`: ${price:,.2f}")
+                    else:
+                        lines.append(f"  `{sym}`: ${price:.6f}")
+        await self.telegram.send_as(SAPPHIRE, "\n".join(lines))
+
     def _control_snapshot(self) -> Dict[str, Any]:
         state = dispatcher.get_control_state()
         strategy_state = self.strategy.execution_state()
@@ -2850,6 +2886,10 @@ class AlphaEngine:
 
         if normalized_action in {"STATUS", "CONTROL_STATUS"}:
             await self._send_control_status()
+            return
+
+        if normalized_action in {"MARKET_PRICES", "PRICES"}:
+            await self._send_market_prices()
             return
 
         if normalized_action in {"FOCUS", "CONTROL_FOCUS"}:
