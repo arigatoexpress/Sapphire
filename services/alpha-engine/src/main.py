@@ -2540,6 +2540,7 @@ class AlphaEngine:
             result = await self._handle_forum_scout_publish_request(
                 {
                     "topic_id": str(payload.get("topic_id", "")).strip(),
+                    "post_id": str(payload.get("post_id", "")).strip(),
                     "title": str(payload.get("title", "")).strip(),
                     "body": body,
                     "author": str(payload.get("author", "")).strip() or "SAPPHIRE_SCOUT",
@@ -2564,13 +2565,19 @@ class AlphaEngine:
             metadata = dispatch.get("metadata", {}) if isinstance(dispatch, dict) else {}
             metadata = metadata if isinstance(metadata, dict) else {}
             reason = str(dispatch.get("reason", "unknown")).strip() or "unknown"
+            dispatch_action = str(result.get("dispatch_action", "publish")).strip() or "publish"
             outcome = "external post accepted."
-            if reason == "ok_pending_verification" or metadata.get("verification_required"):
+            if reason == "ok_verified":
+                outcome = "accepted and verification challenge solved automatically; content should be publicly visible."
+            elif reason == "ok_pending_verification" or metadata.get("verification_required"):
                 outcome = "accepted by Moltbook, pending verification before full feed visibility."
             elif reason == "moltbook_rate_limited":
                 retry_after_minutes = int(metadata.get("retry_after_minutes", 0) or 0)
+                retry_after_seconds = int(metadata.get("retry_after_seconds", 0) or 0)
                 if retry_after_minutes > 0:
                     outcome = f"provider cooldown active; retry in about {retry_after_minutes} minutes."
+                elif retry_after_seconds > 0:
+                    outcome = f"provider cooldown active; retry in about {retry_after_seconds} seconds."
                 else:
                     outcome = "provider cooldown active; retry after the next rate-limit window."
             elif reason == "moltbook_pending_claim":
@@ -2581,7 +2588,7 @@ class AlphaEngine:
                 outcome = "external publish blocked; note remains stored locally for retry."
             await self.telegram.send_message(
                 (
-                    f"🛰️ Scout note processed for topic `{result.get('topic_id', 'n/a')}`.\n"
+                    f"🛰️ Scout {dispatch_action} processed for topic `{result.get('topic_id', 'n/a')}`.\n"
                     f"Dispatch mode: `{dispatch.get('mode', 'none')}` | "
                     f"Dispatch: `{'YES' if dispatch.get('dispatched') else 'NO'}`\n"
                     f"Reason: `{reason}`\n"

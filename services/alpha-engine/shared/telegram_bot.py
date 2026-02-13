@@ -639,7 +639,7 @@ class TelegramPlatformBot:
             "- `/stage <paper|staged_live|full_live>`\n"
             "- `/scout status`\n"
             "- `/scout register <username> [display_name]`\n"
-            "- `/scout publish <note>`\n"
+            "- `/scout publish [topic:TOPIC-xxxxx] [post:<post_id>] <note>`\n"
             "- `/security status`\n"
             "- `/security scan [skill|all] [no-upload|upload]` (default: no-upload)\n"
             "- `/media status`\n"
@@ -722,9 +722,40 @@ class TelegramPlatformBot:
             flags=re.IGNORECASE,
         )
         if scout_publish:
+            publish_note = str(scout_publish.group(1) or "").strip()
+            topic_id = ""
+            post_id = ""
+
+            topic_match = re.search(r"\btopic(?:=|:)\s*(TOPIC-[0-9]{5})\b", publish_note, flags=re.IGNORECASE)
+            if topic_match:
+                topic_id = str(topic_match.group(1) or "").strip().upper()
+                publish_note = re.sub(
+                    r"\btopic(?:=|:)\s*TOPIC-[0-9]{5}\b",
+                    " ",
+                    publish_note,
+                    flags=re.IGNORECASE,
+                )
+
+            post_match = re.search(
+                r"\bpost(?:=|:)\s*([A-Za-z0-9_\-]{3,80})\b",
+                publish_note,
+                flags=re.IGNORECASE,
+            )
+            if post_match:
+                post_id = str(post_match.group(1) or "").strip()
+                publish_note = re.sub(
+                    r"\bpost(?:=|:)\s*[A-Za-z0-9_\-]{3,80}\b",
+                    " ",
+                    publish_note,
+                    flags=re.IGNORECASE,
+                )
+
+            publish_note = re.sub(r"\s+", " ", publish_note).strip()
             payload = json.dumps(
                 {
-                    "body": str(scout_publish.group(1) or "").strip(),
+                    "topic_id": topic_id,
+                    "post_id": post_id,
+                    "body": publish_note,
                     "author": "SAPPHIRE_SCOUT",
                     "kind": "note",
                     "lane": "external",
@@ -737,7 +768,10 @@ class TelegramPlatformBot:
                 "symbol": payload,
                 "action": "SCOUT_PUBLISH",
                 "quantity": 0.0,
-                "ack": "🛰️ Scout publish request queued from plain-text chat.",
+                "ack": (
+                    f"🛰️ Scout {'comment' if post_id else 'publish'} request queued from plain-text chat."
+                    + (f" Target post `{post_id}`." if post_id else "")
+                ),
             }
 
         if re.search(r"\b(what'?s\s+status|status)\b", normalized):
@@ -1015,15 +1049,33 @@ class TelegramPlatformBot:
                 else str(mention_scout_publish.group(2) or "").strip()
             )
             topic_id = ""
+            post_id = ""
             body = raw_note
-            topic_match = re.search(
-                r"^topic(?:=|:)\s*(TOPIC-[0-9]{5})\s+(.+)$",
-                raw_note,
-                flags=re.IGNORECASE,
-            )
+            topic_match = re.search(r"\btopic(?:=|:)\s*(TOPIC-[0-9]{5})\b", raw_note, flags=re.IGNORECASE)
             if topic_match:
                 topic_id = str(topic_match.group(1) or "").strip().upper()
-                body = str(topic_match.group(2) or "").strip()
+                body = re.sub(
+                    r"\btopic(?:=|:)\s*TOPIC-[0-9]{5}\b",
+                    " ",
+                    body,
+                    flags=re.IGNORECASE,
+                )
+
+            post_match = re.search(
+                r"\bpost(?:=|:)\s*([A-Za-z0-9_\-]{3,80})\b",
+                body,
+                flags=re.IGNORECASE,
+            )
+            if post_match:
+                post_id = str(post_match.group(1) or "").strip()
+                body = re.sub(
+                    r"\bpost(?:=|:)\s*[A-Za-z0-9_\-]{3,80}\b",
+                    " ",
+                    body,
+                    flags=re.IGNORECASE,
+                )
+
+            body = re.sub(r"\s+", " ", body).strip()
 
             if not body:
                 await self.send_message(
@@ -1035,6 +1087,7 @@ class TelegramPlatformBot:
             payload = json.dumps(
                 {
                     "topic_id": topic_id,
+                    "post_id": post_id,
                     "body": body,
                     "author": "SAPPHIRE_SCOUT",
                     "kind": "note",
@@ -1047,7 +1100,12 @@ class TelegramPlatformBot:
                 (
                     "🛰️ Scout publish request queued.\n"
                     "Expected outcome: sanitized note is posted externally or retained locally with explicit reason.\n"
-                    "Benefit: keeps external collaboration auditable without exposing sensitive data."
+                    + (
+                        f"Target external post: `{post_id}` (comment mode).\n"
+                        if post_id
+                        else ""
+                    )
+                    + "Benefit: keeps external collaboration auditable without exposing sensitive data."
                 ),
                 priority=NotificationPriority.HIGH,
             )

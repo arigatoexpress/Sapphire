@@ -384,7 +384,7 @@ solders==0.21.0
 base58>=2.1.0
 eth-account>=0.11.0
 solana==0.34.2
-lighter-python-sdk>=0.21.0
+# lighter-python-sdk>=0.21.0  # REMOVED: package delisted from PyPI; lazy-imported with try/except
 
 # Aster Protocol (Solana Perpetuals) - DISABLED due to dependency conflicts
 # asterpy requires aiohttp==3.8.3 and aiosignal==1.3.1 which conflict with our aiohttp>=3.11

@@ -2,6 +2,8 @@
 .gitignore
 node_modules/
 trading-dashboard/node_modules/
+sapphire-web/node_modules/
+sapphire-web/dist/
 .venv/
 env/
 venv/
@@ -19,6 +21,7 @@ __pycache__/
 .agent/
 brain/
 artifacts/
+legacy/
 *.txt
 *.md
 !README.md
