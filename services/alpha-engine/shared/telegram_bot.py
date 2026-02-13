@@ -1616,6 +1616,19 @@ class TelegramPlatformBot:
             await self._dispatch_callback("CONTROL", "ALL", "MEMORY_STATUS", 0.0)
             return
 
+        # Skill security audit command: /audit <skill_content>
+        audit_match = re.search(r"^/audit\s+(.+)", text, re.DOTALL | re.IGNORECASE)
+        if audit_match:
+            await self.send_as(EMERALD, "Running security audit on skill content.")
+            await self._dispatch_callback("CONTROL", audit_match.group(1).strip(), "SKILL_AUDIT", 0.0)
+            return
+
+        # Security audit stats: /audits
+        if re.search(r"^/audits?\s*$", text_lower):
+            await self.send_as(EMERALD, "Pulling skill audit statistics.")
+            await self._dispatch_callback("CONTROL", "ALL", "SKILL_AUDIT_STATS", 0.0)
+            return
+
         # Allocation commands
         slash_allocation_match = re.search(
             r"^/(deallocate|allocate)\s+(\w+)(?:\s+([\d.]+))?$",
