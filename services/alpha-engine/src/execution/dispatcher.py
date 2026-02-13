@@ -1,3 +1,4 @@
+import asyncio
 import os
 import re
 import time
@@ -38,6 +39,8 @@ class ExecutionDispatcher:
         self._venue_paused_until: Dict[str, float] = {}
         self._venue_pause_reason: Dict[str, str] = {}
         self._last_dispatch_errors: Dict[str, Dict[str, Any]] = {}
+        # Fill confirmation: maps (VENUE, SYMBOL) → Future resolved by Pub/Sub listener
+        self._pending_confirmations: Dict[Tuple[str, str], asyncio.Future] = {}
 
     async def start(self):
         self.session = aiohttp.ClientSession()
@@ -259,6 +262,99 @@ class ExecutionDispatcher:
             logger.error(f"Dispatch Error ({normalized_venue}): {e}")
             self._record_dispatch_error(normalized_venue, "dispatch_exception", body=str(e))
             return False
+
+    # ── Fill Confirmation ─────────────────────────────────────────
+
+    async def send_and_confirm(
+        self,
+        venue: str,
+        command: Dict[str, Any],
+        timeout_seconds: float = 30.0,
+        retries: int = 1,
+    ) -> Dict[str, Any]:
+        """Send a command and wait for Pub/Sub fill confirmation.
+
+        Returns the fill message_data dict on success, or a dict with
+        {"success": False, "error_message": ...} on timeout/failure.
+
+        The Pub/Sub trade listener must call `resolve_fill()` when a
+        matching fill arrives to complete the handshake.
+        """
+        normalized_venue = self._normalize_venue(venue)
+        raw_symbol = str(command.get("symbol", "")).strip()
+        norm_symbol = self._normalize_symbol_for_venue(normalized_venue, raw_symbol)
+        # Use base symbol (strip USDT etc.) for matching
+        match_symbol = re.sub(r"(USDT|USDC|USD|PERP)$", "", norm_symbol.upper())
+        confirm_key = (normalized_venue, match_symbol)
+
+        for attempt in range(1, retries + 1):
+            loop = asyncio.get_running_loop()
+            future: asyncio.Future = loop.create_future()
+            self._pending_confirmations[confirm_key] = future
+
+            dispatched = await self.send_command(venue, command)
+            if not dispatched:
+                self._pending_confirmations.pop(confirm_key, None)
+                return {
+                    "success": False,
+                    "error_message": f"Dispatch to {normalized_venue} failed (attempt {attempt})",
+                    "platform": normalized_venue,
+                    "symbol": raw_symbol,
+                }
+
+            try:
+                fill_data = await asyncio.wait_for(future, timeout=timeout_seconds)
+                logger.info(
+                    f"✅ Fill confirmed for {confirm_key} in {timeout_seconds}s window"
+                )
+                return fill_data
+            except asyncio.TimeoutError:
+                self._pending_confirmations.pop(confirm_key, None)
+                if attempt < retries:
+                    logger.warning(
+                        f"⏳ Fill timeout for {confirm_key} (attempt {attempt}/{retries}), retrying..."
+                    )
+                else:
+                    logger.warning(
+                        f"⏳ Fill timeout for {confirm_key} after {retries} attempt(s)"
+                    )
+                    return {
+                        "success": False,
+                        "error_message": f"Fill confirmation timeout after {timeout_seconds}s x {retries}",
+                        "platform": normalized_venue,
+                        "symbol": raw_symbol,
+                    }
+
+        # Should not reach here, but just in case
+        return {
+            "success": False,
+            "error_message": "Unexpected confirmation loop exit",
+            "platform": normalized_venue,
+            "symbol": raw_symbol,
+        }
+
+    def resolve_fill(self, fill_data: Dict[str, Any]) -> bool:
+        """Called by the Pub/Sub trade listener to resolve a pending confirmation.
+
+        Returns True if a matching pending confirmation was resolved.
+        """
+        venue = str(fill_data.get("platform") or fill_data.get("venue") or "").strip().upper()
+        raw_symbol = str(fill_data.get("symbol") or "").strip().upper()
+        # Strip quote currency for consistent matching
+        match_symbol = re.sub(r"(USDT|USDC|USD|PERP)$", "", raw_symbol)
+
+        confirm_key = (venue, match_symbol)
+        future = self._pending_confirmations.pop(confirm_key, None)
+        if future and not future.done():
+            future.set_result(fill_data)
+            logger.debug(f"🔗 Fill confirmation resolved for {confirm_key}")
+            return True
+        return False
+
+    @property
+    def pending_confirmation_count(self) -> int:
+        """Number of commands waiting for fill confirmation."""
+        return len(self._pending_confirmations)
 
 
 # Singleton
