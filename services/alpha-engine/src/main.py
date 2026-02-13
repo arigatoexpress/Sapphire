@@ -16,6 +16,7 @@ from src.execution.dispatcher import dispatcher
 from src.execution.portfolio import PortfolioTracker
 from src.feeds.market_data import MarketDataAggregator
 from src.integrations.tradingview_autonomy import TradingViewAutonomyPlugin
+from src.security.skill_auditor import SkillAuditor
 from src.security.virustotal_scanner import VirusTotalSkillScanner
 from src.strategy.engine import AlphaStrategyEngine
 
@@ -55,6 +56,11 @@ class AlphaEngine:
         self._memory_enabled = bool(
             os.getenv("SAPPHIRE_EPISODIC_MEMORY_ENABLED", "true").strip().lower()
             in ("true", "1", "yes")
+        )
+
+        # Skill security auditor for Molthub supply-chain monitoring
+        self.skill_auditor = SkillAuditor(
+            auditor_id=os.getenv("SAPPHIRE_SCOUT_AGENT_ID", "SAPPHIRE_SCOUT")
         )
 
         requested_stage = self._parse_execution_stage_token(
@@ -3034,6 +3040,36 @@ class AlphaEngine:
 
         if normalized_action in {"MEMORY_STATUS", "COGNITION_STATUS"}:
             await self._send_cognitive_status()
+            return
+
+        if normalized_action == "SKILL_AUDIT":
+            content = str(target or "").strip()
+            if content:
+                report = self.skill_auditor.audit_skill("telegram_submitted", content)
+                formatted = self.skill_auditor.format_community_report(report)
+                await self.telegram.send_as(EMERALD, formatted)
+            else:
+                await self.telegram.send_as(EMERALD, "Usage: /audit <skill content to scan>")
+            return
+
+        if normalized_action == "SKILL_AUDIT_STATS":
+            stats = self.skill_auditor.get_stats()
+            lines = ["*Skill Audit Statistics*"]
+            lines.append(f"  Total audits: {stats.get('total_audits', 0)}")
+            sev = stats.get("severity_breakdown", {})
+            if sev:
+                lines.append("  *Severity breakdown:*")
+                for k, v in sorted(sev.items()):
+                    lines.append(f"    {k}: {v}")
+            cats = stats.get("category_breakdown", {})
+            if cats:
+                lines.append("  *Category breakdown:*")
+                for k, v in sorted(cats.items()):
+                    lines.append(f"    {k}: {v}")
+            critical = stats.get("critical_skills", [])
+            if critical:
+                lines.append(f"  Critical skills: {', '.join(critical[:5])}")
+            await self.telegram.send_as(EMERALD, "\n".join(lines))
             return
 
         if normalized_action in {"FOCUS", "CONTROL_FOCUS"}:
