@@ -1261,6 +1261,9 @@ class AlphaEngine:
             metadata={"source": "telegram", "kill_switch": True},
         )
 
+        self.telegram.record_activity(
+            OBSIDIAN, "system", f"Kill switch activated: {reason[:80]}",
+        )
         await self.telegram.send_message(
             f"🛑 **KILL SWITCH ACTIVE**\nReason: `{reason}`\nAll venues are halted and deallocated.",
             priority="high",
@@ -1291,6 +1294,9 @@ class AlphaEngine:
             metadata={"source": "telegram", "kill_switch": False},
         )
 
+        self.telegram.record_activity(
+            OBSIDIAN, "system", f"Trading resumed: {reason[:80]}",
+        )
         await self.telegram.send_message(
             f"✅ **TRADING RESUMED**\nReason: `{reason}`\nDefault allocations restored across all venues.",
             priority="high",
@@ -2336,6 +2342,10 @@ class AlphaEngine:
                 tags=["autonomy", "dispatch"],
                 metadata={"session_key": hook_result.get("session_key", "")},
             )
+            self.telegram.record_activity(
+                OBSIDIAN, "autonomy",
+                f"Dispatched cycle: {trigger}",
+            )
             if session_key and not self._autonomy_require_owner_approval:
                 auto_result = await self._apply_autonomy_session_decision(
                     session_key=session_key,
@@ -2377,15 +2387,32 @@ class AlphaEngine:
                     pending_metadata={"session_key": session_key},
                 )
         else:
+            reason = hook_result.get("reason", "unknown")
+            # Configuration-state reasons are not actionable — log quietly,
+            # don't spam Telegram on every scheduled cycle.
+            config_reasons = {
+                "autonomy_disabled",
+                "hook_url_missing",
+                "hook_token_missing",
+                "chat_id_missing",
+                "dry_run",
+                "full_autonomy_disabled",
+            }
             self._record_system_log(
-                f"Full autonomy dispatch unavailable ({trigger}): {hook_result.get('reason', 'unknown')}",
-                level="warning",
+                f"Full autonomy dispatch unavailable ({trigger}): {reason}",
+                level="info" if reason in config_reasons else "warning",
                 tags=["autonomy", "dispatch"],
             )
-            await self.telegram.send_as(
-                OBSIDIAN,
-                f"Autonomy dispatch unavailable — `{trigger}`: {hook_result.get('reason', 'unknown')}",
-            )
+            if reason not in config_reasons:
+                await self.telegram.send_as(
+                    OBSIDIAN,
+                    f"Autonomy dispatch unavailable — `{trigger}`: {reason}",
+                )
+            else:
+                logger.debug(
+                    f"Autonomy dispatch skipped ({trigger}): {reason} — "
+                    "configure TV autonomy plugin to enable."
+                )
         return hook_result
 
     async def _autonomy_ops_loop(self) -> None:
@@ -3047,6 +3074,10 @@ class AlphaEngine:
             if content:
                 report = self.skill_auditor.audit_skill("telegram_submitted", content)
                 formatted = self.skill_auditor.format_community_report(report)
+                self.telegram.record_activity(
+                    EMERALD, "audit",
+                    f"Audited skill: {report.overall_severity.name}",
+                )
                 await self.telegram.send_as(EMERALD, formatted)
             else:
                 await self.telegram.send_as(EMERALD, "Usage: /audit <skill content to scan>")
@@ -3619,6 +3650,10 @@ class AlphaEngine:
                     f"🧠 Cognition: {cog_result.decision} (conf={cog_result.confidence:.2f}, "
                     f"override={cog_result.was_overridden}, latency={cog_result.latency_ms:.0f}ms)"
                 )
+                self.telegram.record_activity(
+                    EMERALD, "cognition",
+                    f"{cog_result.decision} {symbol} (conf={cog_result.confidence:.0%}, {cog_result.latency_ms:.0f}ms)",
+                )
 
                 # If cognition says HOLD with high confidence, block the trade
                 if cog_result.decision == "HOLD" and cog_result.confidence >= 0.7:
@@ -3666,6 +3701,10 @@ class AlphaEngine:
                     "source": "tradingview_webhook",
                     "signal_key": signal_key,
                 },
+            )
+            self.telegram.record_activity(
+                SAPPHIRE, "trade",
+                f"Dispatched {normalized_action.upper()} {per_target_quantity[venue]} {symbol} → {venue}",
             )
 
         failed_targets = [venue for venue, ok in dispatch_results.items() if not ok]
@@ -4058,6 +4097,10 @@ class AlphaEngine:
         await dispatcher.start()
         await self.market_data.start()
         await self.strategy.start()
+        self.telegram.record_activity(
+            OBSIDIAN, "system",
+            f"Startup complete — venues: {', '.join(sorted(dispatcher.bot_urls.keys()))}",
+        )
         if self._full_autonomy_enabled:
             self._autonomy_task = asyncio.create_task(self._autonomy_ops_loop())
             await self._dispatch_full_autonomy_cycle(trigger="startup_bootstrap", force=True)
@@ -4086,6 +4129,10 @@ class AlphaEngine:
                         f"📊 Portfolio: closed {closed_trade.symbol} "
                         f"PnL: {closed_trade.realized_pnl:+.4f}"
                     )
+                    self.telegram.record_activity(
+                        SAPPHIRE, "portfolio",
+                        f"Closed {closed_trade.symbol} — PnL: {closed_trade.realized_pnl:+.4f}",
+                    )
 
                 # Resolve any pending fill confirmation
                 dispatcher.resolve_fill(message_data)
@@ -4094,6 +4141,10 @@ class AlphaEngine:
                 if self._memory_enabled:
                     try:
                         self.memory.record_trade(message_data)
+                        self.telegram.record_activity(
+                            EMERALD, "memory",
+                            f"Recorded trade: {message_data.get('side', '?')} {message_data.get('symbol', '?')}",
+                        )
                     except Exception:
                         pass  # Memory is non-critical
 
@@ -4123,6 +4174,10 @@ class AlphaEngine:
                         tags=["trade", "execution", platform.lower()],
                         metadata={"side": side, "symbol": symbol, "quantity": qty},
                     )
+                    self.telegram.record_activity(
+                        SAPPHIRE, "trade",
+                        f"Filled {side} {qty} {symbol} on {platform}",
+                    )
                     # Use LOW priority to batch execution updates
                     await self.telegram.send_message(msg, priority="low")
                     await self._record_trade_outcome(platform, success=True)
@@ -4139,6 +4194,10 @@ class AlphaEngine:
                     if category == ErrorCategory.CONFIGURATION:
                         dispatcher.set_venue_allocation(platform, 0.0)
                         dispatcher.pause_venue(platform, reason=err)
+                        self.telegram.record_activity(
+                            OBSIDIAN, "system",
+                            f"Auto-paused {platform}: {err[:80]}",
+                        )
                         await self.telegram.send_as(
                             OBSIDIAN,
                             f"🛑 Auto-paused **{platform}** — `{err}`. This won't fix itself with retries. Use `/resume` when resolved.",

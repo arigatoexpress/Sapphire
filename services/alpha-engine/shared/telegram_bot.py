@@ -194,12 +194,114 @@ class TelegramPlatformBot:
             int(os.getenv("TELEGRAM_SIGNATURE_CACHE_MAX", "800")),
         )
 
+        # ── Agent Activity Feed ────────────────────────────────────────
+        # Collects agent actions into periodic non-noisy digest summaries.
+        # Each entry: {"agent": str, "category": str, "detail": str, "ts": float}
+        self._activity_feed: List[Dict[str, Any]] = []
+        self._activity_feed_enabled = os.getenv(
+            "TELEGRAM_ACTIVITY_FEED_ENABLED", "true"
+        ).strip().lower() in {"1", "true", "yes", "on"}
+        self._activity_feed_interval = max(
+            60,
+            int(os.getenv("TELEGRAM_ACTIVITY_FEED_SECONDS", "300")),
+        )
+        self._activity_feed_task: Optional[asyncio.Task[Any]] = None
+        self._activity_feed_max = 200  # max buffered events before forced flush
+
         logger.info(
             "Initializing Telegram Bot | token={} chat={} allowed_targets={}",
             "set" if self.bot_token else "missing",
             "set" if self.chat_id else "missing",
             ",".join(sorted(self.allowed_targets)),
         )
+
+    # ── Agent Activity Feed ───────────────────────────────────────────
+
+    def record_activity(
+        self,
+        agent: "AgentPersona",
+        category: str,
+        detail: str,
+    ) -> None:
+        """Record an agent action for the periodic activity digest.
+
+        Categories should be short slugs like: ``trade``, ``cognition``,
+        ``memory``, ``portfolio``, ``market_data``, ``audit``, ``system``.
+        """
+        if not self._activity_feed_enabled:
+            return
+        self._activity_feed.append({
+            "agent": agent.name,
+            "emoji": agent.emoji,
+            "category": str(category or "misc").strip().lower(),
+            "detail": str(detail or "").strip()[:200],
+            "ts": time.time(),
+        })
+        # Hard cap to prevent unbounded memory growth
+        if len(self._activity_feed) > self._activity_feed_max:
+            self._activity_feed = self._activity_feed[-self._activity_feed_max:]
+
+    async def _activity_feed_loop(self) -> None:
+        """Periodically flush the activity feed as a grouped digest."""
+        while self.running:
+            await asyncio.sleep(self._activity_feed_interval)
+            await self._flush_activity_feed()
+
+    async def _flush_activity_feed(self) -> None:
+        """Build and send a grouped activity digest, then clear the buffer."""
+        if not self._activity_feed:
+            return
+
+        events = list(self._activity_feed)
+        self._activity_feed.clear()
+
+        # Group by (agent, category) → list of details with counts
+        groups: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
+        for evt in events:
+            key = f"{evt['emoji']}:{evt['category']}"
+            if key not in groups:
+                groups[key] = {
+                    "emoji": evt["emoji"],
+                    "agent": evt["agent"],
+                    "category": evt["category"],
+                    "details": OrderedDict(),
+                    "count": 0,
+                }
+            groups[key]["count"] += 1
+            # Collapse identical details
+            detail = evt["detail"]
+            if detail in groups[key]["details"]:
+                groups[key]["details"][detail] += 1
+            else:
+                groups[key]["details"][detail] = 1
+
+        # Format the digest
+        lines: List[str] = []
+        for group in groups.values():
+            emoji = group["emoji"]
+            agent = group["agent"]
+            cat = group["category"].replace("_", " ").title()
+            count = group["count"]
+            header = f"{emoji} *{agent}* — {cat}"
+            if count > 1:
+                header += f" ({count})"
+            lines.append(header)
+            # Show top 3 details for this group, collapsed
+            sorted_details = sorted(
+                group["details"].items(), key=lambda x: -x[1]
+            )
+            for detail, detail_count in sorted_details[:3]:
+                suffix = f" _(x{detail_count})_" if detail_count > 1 else ""
+                lines.append(f"  • {detail}{suffix}")
+            remaining = len(sorted_details) - 3
+            if remaining > 0:
+                lines.append(f"  • _…and {remaining} more_")
+
+        if not lines:
+            return
+
+        digest = "📊 *Agent Activity*\n" + "\n".join(lines)
+        await self._dispatch_message(digest, allow_markdown=True)
 
     @staticmethod
     def _parse_allowed_targets(value: str) -> Set[str]:
@@ -358,13 +460,18 @@ class TelegramPlatformBot:
         if self._flush_task:
             self._flush_task.cancel()
             self._flush_task = None
+        if self._activity_feed_task:
+            self._activity_feed_task.cancel()
+            self._activity_feed_task = None
         if self._session and not self._session.closed:
             await self._session.close()
 
     async def start(self):
-        """Start buffer flush loop and long-poll listener."""
+        """Start buffer flush loop, activity feed, and long-poll listener."""
         self.running = True
         self._flush_task = asyncio.create_task(self._flush_loop())
+        if self._activity_feed_enabled:
+            self._activity_feed_task = asyncio.create_task(self._activity_feed_loop())
         await self.start_listener()
 
     async def _flush_loop(self):
@@ -1627,6 +1734,14 @@ class TelegramPlatformBot:
         if re.search(r"^/audits?\s*$", text_lower):
             await self.send_as(EMERALD, "Pulling skill audit statistics.")
             await self._dispatch_callback("CONTROL", "ALL", "SKILL_AUDIT_STATS", 0.0)
+            return
+
+        # Activity feed: /activity — flush pending agent activities now
+        if re.search(r"^/(activity|feed|actions?)\b", text_lower):
+            if self._activity_feed:
+                await self._flush_activity_feed()
+            else:
+                await self.send_as(SAPPHIRE, "No pending agent activities to report.")
             return
 
         # Allocation commands
