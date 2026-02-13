@@ -21,15 +21,16 @@ _Get everything built into top-tier shape_
 _Fully secure platform with isolated agent boundaries_
 
 ### Scout Agent Isolation
-- [ ] Segment Scout from agents with access to secrets/sensitive data
-- [ ] Implement strict communication boundaries (Scout ↔ Forum only)
-- [ ] Remove any direct access Scout has to execution, portfolio, or credentials
-- [ ] Audit all agent permission boundaries
+- [x] Segment Scout from agents with access to secrets/sensitive data (PR #20)
+- [x] Implement strict communication boundaries (Scout ↔ Forum only) (PR #20)
+- [x] Remove any direct access Scout has to execution, portfolio, or credentials (PR #20)
+- [x] Audit all agent permission boundaries (PR #20)
+- [ ] Wire AgentGate.require() enforcement into main.py critical operations
 
 ### Prompt Injection Hardening
-- [ ] Audit all AI prompt paths for injection vulnerabilities
-- [ ] Implement input sanitization on all external data ingestion
-- [ ] Add injection detection to skill auditor patterns
+- [x] Audit all AI prompt paths for injection vulnerabilities (PR #20)
+- [x] Implement input sanitization on all external data ingestion (PR #20)
+- [x] Add injection detection to skill auditor patterns (PR #20)
 - [ ] Fuzz-test all Telegram command handlers
 - [ ] Harden forum post content against injection
 
@@ -123,4 +124,5 @@ Harden          Security    Forum       Tracking     Swarm       Social       On
 - ✅ PR #17: Cognitive Systems (episodic memory, dual-speed cognition)
 - ✅ PR #18: Skill Security Auditor (8 threat categories, isnad chains)
 - ✅ PR #19: Smart Notifications (autonomy spam fix, agent activity feed)
-- ✅ 131 tests passing | Deployed: sapphire-alpha-00150-46g
+- ✅ PR #20: Security Hardening Phase 2 (agent permissions, prompt injection defense, sanitizer)
+- ✅ 203 tests passing | Deployed: sapphire-alpha-00151-2xr
