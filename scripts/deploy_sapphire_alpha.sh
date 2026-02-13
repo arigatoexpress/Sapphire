@@ -72,6 +72,13 @@ SAPPHIRE_VT_MAX_SKILLS_PER_SCAN="${SAPPHIRE_VT_MAX_SKILLS_PER_SCAN:-4}"
 SAPPHIRE_VT_MAX_REQUESTS_PER_MINUTE="${SAPPHIRE_VT_MAX_REQUESTS_PER_MINUTE:-4}"
 SAPPHIRE_VT_MAX_REQUESTS_PER_DAY="${SAPPHIRE_VT_MAX_REQUESTS_PER_DAY:-500}"
 VIRUSTOTAL_API_KEY_SECRET="${VIRUSTOTAL_API_KEY_SECRET:-VIRUSTOTAL_API_KEY}"
+SAPPHIRE_MEDIA_MODE="${SAPPHIRE_MEDIA_MODE:-owner_approval}"
+SAPPHIRE_MEDIA_TWITTER_ENABLED="${SAPPHIRE_MEDIA_TWITTER_ENABLED:-true}"
+SAPPHIRE_MEDIA_SUBSTACK_ENABLED="${SAPPHIRE_MEDIA_SUBSTACK_ENABLED:-true}"
+SAPPHIRE_TWITTER_HANDLE="${SAPPHIRE_TWITTER_HANDLE:-}"
+SAPPHIRE_SUBSTACK_PUBLICATION_URL="${SAPPHIRE_SUBSTACK_PUBLICATION_URL:-}"
+TWITTER_API_TOKEN_SECRET="${TWITTER_API_TOKEN_SECRET:-SAPPHIRE_TWITTER_API_TOKEN}"
+SUBSTACK_API_TOKEN_SECRET="${SUBSTACK_API_TOKEN_SECRET:-SAPPHIRE_SUBSTACK_API_TOKEN}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ALPHA_DIR="${ROOT_DIR}/services/alpha-engine"
@@ -154,6 +161,11 @@ gcloud run deploy "${SERVICE_NAME}" \
   --update-env-vars "SAPPHIRE_VT_MAX_SKILLS_PER_SCAN=${SAPPHIRE_VT_MAX_SKILLS_PER_SCAN}" \
   --update-env-vars "SAPPHIRE_VT_MAX_REQUESTS_PER_MINUTE=${SAPPHIRE_VT_MAX_REQUESTS_PER_MINUTE}" \
   --update-env-vars "SAPPHIRE_VT_MAX_REQUESTS_PER_DAY=${SAPPHIRE_VT_MAX_REQUESTS_PER_DAY}" \
+  --update-env-vars "SAPPHIRE_MEDIA_MODE=${SAPPHIRE_MEDIA_MODE}" \
+  --update-env-vars "SAPPHIRE_MEDIA_TWITTER_ENABLED=${SAPPHIRE_MEDIA_TWITTER_ENABLED}" \
+  --update-env-vars "SAPPHIRE_MEDIA_SUBSTACK_ENABLED=${SAPPHIRE_MEDIA_SUBSTACK_ENABLED}" \
+  --update-env-vars "SAPPHIRE_TWITTER_HANDLE=${SAPPHIRE_TWITTER_HANDLE}" \
+  --update-env-vars "SAPPHIRE_SUBSTACK_PUBLICATION_URL=${SAPPHIRE_SUBSTACK_PUBLICATION_URL}" \
   --update-env-vars "SAPPHIRE_SCOUT_AGENT_ID=${SAPPHIRE_SCOUT_AGENT_ID}" \
   --update-env-vars "SAPPHIRE_SCOUT_DISPATCH_AGENT_ID=${SAPPHIRE_SCOUT_DISPATCH_AGENT_ID}" \
   --update-env-vars "SAPPHIRE_SCOUT_OPENCLAW_HOOK_URL=${SAPPHIRE_SCOUT_OPENCLAW_HOOK_URL}"
@@ -209,6 +221,28 @@ if has_secret "${VIRUSTOTAL_API_KEY_SECRET}"; then
   echo "VirusTotal secret binding applied."
 else
   echo "VirusTotal secret ${VIRUSTOTAL_API_KEY_SECRET} not found; VT scans will remain unavailable."
+fi
+
+if has_secret "${TWITTER_API_TOKEN_SECRET}"; then
+  echo "Applying Twitter API secret binding to ${SERVICE_NAME}."
+  gcloud run services update "${SERVICE_NAME}" \
+    --project "${PROJECT_ID}" \
+    --region "${REGION}" \
+    --update-secrets "SAPPHIRE_TWITTER_API_TOKEN=${TWITTER_API_TOKEN_SECRET}:latest" >/dev/null
+  echo "Twitter API secret binding applied."
+else
+  echo "Twitter secret ${TWITTER_API_TOKEN_SECRET} not found; X publish path remains not-ready."
+fi
+
+if has_secret "${SUBSTACK_API_TOKEN_SECRET}"; then
+  echo "Applying Substack API secret binding to ${SERVICE_NAME}."
+  gcloud run services update "${SERVICE_NAME}" \
+    --project "${PROJECT_ID}" \
+    --region "${REGION}" \
+    --update-secrets "SAPPHIRE_SUBSTACK_API_TOKEN=${SUBSTACK_API_TOKEN_SECRET}:latest" >/dev/null
+  echo "Substack API secret binding applied."
+else
+  echo "Substack secret ${SUBSTACK_API_TOKEN_SECRET} not found; Substack publish path remains not-ready."
 fi
 
 SERVICE_URL="$(gcloud run services describe "${SERVICE_NAME}" --project "${PROJECT_ID}" --region "${REGION}" --format='value(status.url)')"

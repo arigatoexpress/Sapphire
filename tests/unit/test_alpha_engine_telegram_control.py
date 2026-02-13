@@ -417,6 +417,77 @@ def test_security_scan_command_dispatches_payload(telegram_module):
     assert payload["upload_if_missing"] is False
 
 
+def test_media_status_command_dispatches_action(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/media status"}}
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert symbol == "ALL"
+    assert action == "MEDIA_STATUS"
+    assert quantity == 0.0
+
+
+def test_media_mode_command_dispatches_payload(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/media mode owner_approval"}}
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert action == "MEDIA_SET_MODE"
+    assert quantity == 0.0
+    payload = json.loads(symbol)
+    assert payload["mode"] == "owner_approval"
+
+
+def test_media_draft_command_dispatches_payload(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/media draft weekly execution insights"}}
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert action == "MEDIA_DRAFT"
+    assert quantity == 0.0
+    payload = json.loads(symbol)
+    assert payload["topic"] == "weekly execution insights"
+
+
 def test_digest_builder_summarizes_structured_ack_messages(telegram_module):
     lines = telegram_module.TelegramPlatformBot._build_digest_lines(
         [
