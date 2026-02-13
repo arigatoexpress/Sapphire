@@ -27,6 +27,27 @@ class NotificationPriority(Enum):
     CRITICAL = "critical"
 
 
+def _sanitize_markdown(text: str) -> str:
+    """Escape characters that break Telegram legacy Markdown parsing.
+
+    Telegram's legacy Markdown treats ``_`` as italic, ``*`` as bold, and
+    backtick as inline-code.  We only need to worry about *unmatched*
+    delimiters inside running text.  Dollar signs, parentheses, dots, etc.
+    are fine in legacy mode — the failures we've seen come from unmatched
+    underscores inside role descriptions and price strings.
+
+    Strategy: replace lone underscores that aren't part of a matched
+    ``_italic_`` pair with the Unicode full-width low line (＿) which
+    renders identically but doesn't trigger the parser.
+    """
+    # If the count of underscores is odd, we have an unmatched delimiter.
+    if text.count("_") % 2 != 0:
+        # Replace all underscores — they can't all be valid italic markers
+        # if the count is odd.
+        text = text.replace("_", "＿")
+    return text
+
+
 class AgentPersona:
     """Represents an OpenClaw agent's conversational identity."""
 
@@ -37,7 +58,8 @@ class AgentPersona:
 
     def speak(self, message: str) -> str:
         """Format a message as this agent speaking."""
-        return f"{self.emoji} **{self.name}**: {message}"
+        safe = _sanitize_markdown(message)
+        return f"{self.emoji} *{self.name}*: {safe}"
 
     def __repr__(self) -> str:
         return f"AgentPersona({self.name})"
@@ -612,9 +634,15 @@ class TelegramPlatformBot:
                         body[:200],
                     )
 
-                    # Retry once without markdown if formatting fails.
+                    # Retry without markdown if formatting fails.
                     if resp.status == 400 and payload.get("parse_mode"):
                         payload.pop("parse_mode", None)
+                        # Strip markdown formatting chars so the plain text reads cleanly.
+                        raw = payload["text"]
+                        raw = raw.replace("**", "").replace("__", "")
+                        raw = re.sub(r"(?<!\w)\*([^*]+)\*(?!\w)", r"\1", raw)
+                        raw = re.sub(r"(?<!\w)_([^_]+)_(?!\w)", r"\1", raw)
+                        payload["text"] = raw
                         continue
             except Exception as exc:
                 logger.warning("Telegram sendMessage exception attempt={} err={}", attempt, exc)

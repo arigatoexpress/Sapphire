@@ -1353,12 +1353,12 @@ class AlphaEngine:
         """Send multi-symbol price snapshot across all venues."""
         snapshot = self.market_data.get_multi_symbol_snapshot()
         preferred = self.strategy.preferred_symbols
-        lines = ["💹 **MARKET PRICES**"]
+        lines = ["Market Prices"]
         for venue in ("ASTER", "LIGHTER"):
             venue_data = snapshot.get(venue, {})
             profile = self.strategy.venue_profiles.get(venue, {})
             role = profile.get("role", "")
-            lines.append(f"\n**{venue}** — _{role}_")
+            lines.append(f"\n*{venue}* — {role}")
             # Show preferred symbols first, then any extra tracked ones
             shown: set = set()
             for sym in preferred:
@@ -1369,20 +1369,20 @@ class AlphaEngine:
                     age = info.get("age_seconds")
                     age_text = f"{age}s" if age is not None else "?"
                     if price >= 1.0:
-                        lines.append(f"  `{sym}`: **${price:,.2f}** ({age_text})")
+                        lines.append(f"  `{sym}` {price:,.2f} ({age_text})")
                     else:
-                        lines.append(f"  `{sym}`: **${price:.6f}** ({age_text})")
+                        lines.append(f"  `{sym}` {price:.6f} ({age_text})")
                 else:
-                    lines.append(f"  `{sym}`: _no data_")
+                    lines.append(f"  `{sym}` no data")
                 shown.add(sym)
             # Any extra tracked symbols not in preferred
             for sym, info in sorted(venue_data.items()):
                 if sym not in shown and info.get("price", 0) > 0:
                     price = info["price"]
                     if price >= 1.0:
-                        lines.append(f"  `{sym}`: ${price:,.2f}")
+                        lines.append(f"  `{sym}` {price:,.2f}")
                     else:
-                        lines.append(f"  `{sym}`: ${price:.6f}")
+                        lines.append(f"  `{sym}` {price:.6f}")
         await self.telegram.send_as(SAPPHIRE, "\n".join(lines))
 
     def _control_snapshot(self) -> Dict[str, Any]:
