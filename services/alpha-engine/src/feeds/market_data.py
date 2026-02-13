@@ -98,6 +98,36 @@ class MarketDataAggregator:
         self._lighter_last_issue = ""
         self._lighter_last_issue_ts = 0.0
 
+        # --- Multi-symbol feed configuration ---------------------------------
+        self._multi_symbol_enabled = str(
+            os.getenv("MARKET_MULTI_SYMBOL_ENABLED", "true")
+        ).strip().lower() in {"1", "true", "yes", "on"}
+        self._multi_symbol_poll_interval = self._env_float(
+            "MARKET_MULTI_SYMBOL_POLL_SECONDS", 10.0, minimum=3.0
+        )
+        self._extra_symbols: List[str] = self._parse_extra_symbols()
+        self._aster_batch_ticker_url = str(
+            os.getenv("ASTER_BATCH_TICKER_URL", "https://fapi.asterdex.com/fapi/v1/ticker/price")
+        ).strip()
+        self._lighter_base_logs_url = str(
+            os.getenv("LIGHTER_BASE_LOGS_URL", "https://explorer.elliot.ai/api/markets")
+        ).strip()
+
+    @staticmethod
+    def _parse_extra_symbols() -> List[str]:
+        """Parse SAPPHIRE_PREFERRED_SYMBOLS for multi-symbol feeds."""
+        import re as _re
+        raw = os.getenv("SAPPHIRE_PREFERRED_SYMBOLS", "BTC,ETH,SOL,ZEC,XMR,PENGU,MON,LIT,ASTER")
+        tokens = _re.split(r"[,;|\s]+", str(raw or "").strip())
+        seen: set[str] = set()
+        result: List[str] = []
+        for token in tokens:
+            sym = token.strip().upper()
+            if sym and sym not in seen:
+                seen.add(sym)
+                result.append(sym)
+        return result
+
     @staticmethod
     def _env_float(name: str, default: float, minimum: float = 0.0) -> float:
         raw = os.getenv(name, str(default))
@@ -126,9 +156,18 @@ class MarketDataAggregator:
 
     async def start(self):
         self.running = True
-        # Start market data connections in background.
+        # Primary single-symbol feeds (backward-compatible).
         asyncio.create_task(self._aster_feed())
         asyncio.create_task(self._lighter_feed())
+        # Multi-symbol price feeds for preferred symbols.
+        if self._multi_symbol_enabled and self._extra_symbols:
+            asyncio.create_task(self._aster_multi_symbol_feed())
+            asyncio.create_task(self._lighter_multi_symbol_feed())
+            logger.info(
+                "📊 Multi-symbol feeds enabled for {} symbols: {}",
+                len(self._extra_symbols),
+                ", ".join(self._extra_symbols[:6]) + ("..." if len(self._extra_symbols) > 6 else ""),
+            )
 
     async def stop(self):
         self.running = False
@@ -816,6 +855,87 @@ class MarketDataAggregator:
             return float(value)
         except (TypeError, ValueError):
             return None
+
+    # ------------------------------------------------------------------
+    # Multi-symbol feeds
+    # ------------------------------------------------------------------
+
+    async def _aster_multi_symbol_feed(self):
+        """Fetch all preferred symbols from Aster batch ticker endpoint."""
+        # Build a set of USDT-quoted symbols we care about
+        wanted = {self._normalize_aster_symbol(sym) for sym in self._extra_symbols}
+        logger.info(f"🌊 Aster multi-symbol feed starting ({len(wanted)} symbols)")
+        timeout = aiohttp.ClientTimeout(total=self._aster_http_timeout_seconds)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            while self.running:
+                try:
+                    async with session.get(self._aster_batch_ticker_url) as response:
+                        if response.status == 200:
+                            payload = await response.json(content_type=None)
+                            if isinstance(payload, list):
+                                for item in payload:
+                                    sym = str(item.get("symbol", "")).strip().upper()
+                                    if sym in wanted:
+                                        price = self._coerce_price(item.get("price"))
+                                        if price is not None and price > 0:
+                                            # Store under base symbol (strip USDT)
+                                            base = sym.replace("USDT", "").replace("USDC", "").replace("USD", "")
+                                            self._record_tick("ASTER", base, price)
+                except Exception as exc:
+                    logger.debug(f"Aster multi-symbol poll error: {exc}")
+                await asyncio.sleep(self._multi_symbol_poll_interval)
+
+    async def _lighter_multi_symbol_feed(self):
+        """Fetch preferred symbols from Lighter individual market endpoints."""
+        # Skip the primary chart symbol (already covered by main feed)
+        extra = [sym for sym in self._extra_symbols if sym != self._chart_symbol]
+        logger.info(f"💧 Lighter multi-symbol feed starting ({len(extra)} extra symbols)")
+        timeout = aiohttp.ClientTimeout(total=self._lighter_http_timeout_seconds)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            while self.running:
+                for sym in extra:
+                    if not self.running:
+                        break
+                    try:
+                        url = f"{self._lighter_base_logs_url}/{sym}/logs"
+                        async with session.get(url) as response:
+                            if response.status == 200:
+                                payload = await response.json(content_type=None)
+                                ticks = self._extract_lighter_ticks_from_logs(payload)
+                                if ticks:
+                                    for ts, price, volume in ticks:
+                                        self._record_tick(
+                                            "LIGHTER", sym, price, volume=volume, timestamp=ts
+                                        )
+                    except Exception:
+                        pass  # Individual symbol failures are non-critical
+                    # Stagger requests to avoid hammering the API
+                    await asyncio.sleep(1.0)
+                # Wait before next full cycle
+                remaining_wait = max(0.0, self._multi_symbol_poll_interval - len(extra))
+                if remaining_wait > 0:
+                    await asyncio.sleep(remaining_wait)
+
+    def get_multi_symbol_snapshot(self) -> Dict[str, Dict[str, Dict[str, Any]]]:
+        """Get current prices for all tracked symbols across all venues."""
+        now = time.time()
+        result: Dict[str, Dict[str, Dict[str, Any]]] = {}
+        for venue in ("ASTER", "LIGHTER"):
+            venue_data: Dict[str, Dict[str, Any]] = {}
+            venue_prices = self.prices.get(venue, {})
+            for symbol, price in venue_prices.items():
+                ticks = self._tick_history.get(venue, {}).get(symbol, deque())
+                last_ts = float(ticks[-1][0]) if ticks else 0.0
+                age = int(max(0.0, now - last_ts)) if last_ts > 0 else None
+                venue_data[symbol] = {
+                    "price": float(price) if price > 0 else 0.0,
+                    "status": "healthy" if price > 0 and age is not None and age <= 120 else (
+                        "degraded" if price > 0 else "offline"
+                    ),
+                    "age_seconds": age,
+                }
+            result[venue] = venue_data
+        return result
 
     def _log_lighter_issue(self, message: str) -> None:
         now = time.time()

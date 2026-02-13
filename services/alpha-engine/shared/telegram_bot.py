@@ -1570,6 +1570,12 @@ class TelegramPlatformBot:
             await self._dispatch_callback("CONTROL", target, mapped_action, 0.0)
             return
 
+        # Prices command: /prices
+        if re.search(r"^/prices?\b", text_lower):
+            await self.send_as(SAPPHIRE, "Fetching live prices across all venues.")
+            await self._dispatch_callback("CONTROL", "ALL", "MARKET_PRICES", 0.0)
+            return
+
         # Allocation commands
         slash_allocation_match = re.search(
             r"^/(deallocate|allocate)\s+(\w+)(?:\s+([\d.]+))?$",
