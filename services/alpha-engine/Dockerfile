@@ -7,15 +7,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY services/alpha-engine/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Shared lib (will be copied by deploy script)
-COPY shared /app/shared
-COPY src /app/src
+# Alpha control-plane code + Sapphire skills for security scanning.
+COPY services/alpha-engine/shared /app/shared
+COPY services/alpha-engine/src /app/src
+COPY skills /app/skills
 
 ENV PYTHONPATH=/app:/app/src:/app/shared
 ENV PYTHONUNBUFFERED=1
+ENV SAPPHIRE_SKILLS_DIR=/app/skills
 
 # Port for Health Check
 ENV PORT=8080

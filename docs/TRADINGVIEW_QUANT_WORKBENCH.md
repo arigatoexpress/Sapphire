@@ -1,7 +1,7 @@
 # TradingView Quant Workbench Integration (Sapphire)
 
 ## Objective
-Use your TradingView account as a strategy research and signal-generation workbench, then route validated alerts into Sapphire control plane.
+Use your TradingView account as a strategy research/backtest workbench, while live execution and analysis stay DEX-native on ASTER/LIGHTER.
 
 ## Reality Constraints (Official)
 
@@ -22,9 +22,9 @@ Reference docs:
 3. Send alerts to `POST /tradingview/webhook` on `sapphire-alpha`.
 4. `sapphire-alpha` validates secret and maps signals to:
    - heartbeat/control commands, or
-   - venue trade intents (`ASTER`, `LIGHTER`).
+   - venue trade intents (`ASTER`, `LIGHTER`) only when live signal mode is explicitly enabled.
 5. Workspace actions are sent through the TradingView autonomy plugin and dispatched to OpenClaw gateway hooks for browser-level execution.
-5. Start in dry-run mode (`TRADINGVIEW_EXECUTION_ENABLED=false`), then enable live execution only after validation.
+6. Keep default workbench mode (`TRADINGVIEW_EXECUTION_ENABLED=false`) and enable live signal execution only for controlled windows.
 
 ## Alert Payload Standards
 
@@ -95,6 +95,18 @@ When `TRADINGVIEW_ENFORCE_STRATEGY_RULES=true`, `strategy` is required and must 
   "symbol": "SOL",
   "venue": "ASTER",
   "closes": [149.5,149.8,150.2,151.1,150.7,151.4,152.0],
+  "secret": "${TRADINGVIEW_WEBHOOK_SECRET}"
+}
+```
+
+### 6) Backtest Request
+
+```json
+{
+  "action": "tv_backtest",
+  "strategy": "tv-aster-breakout",
+  "symbol": "SOL",
+  "timeframe": "15",
   "secret": "${TRADINGVIEW_WEBHOOK_SECRET}"
 }
 ```

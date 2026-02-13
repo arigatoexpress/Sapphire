@@ -182,51 +182,113 @@ class AsterBot:
     async def _gateway_loop(self):
         """Listen for Hub commands."""
         logger.info("Gateway Loop Started (Listening on /execute)")
-        import time
-
-        from models import SignalType, TradeSide, TradeSignal
 
         while self.running:
+            has_command = False
             try:
                 # Wait for command from Queue (pushed by Gateway Server)
                 command = await self.command_queue.get()
+                has_command = True
                 logger.info(f"📥 Processing Hub Command: {command}")
 
-                # Map command to Action
-                if command.get("type") == "ARB_EXECUTE":
-                    side = command.get("side", "BUY")
-                    symbol = command.get("symbol", "SOL")
-                    quantity = float(command.get("quantity", 0.1))
+                if not isinstance(command, dict):
+                    logger.warning(f"Ignoring non-dict gateway command: {type(command)}")
+                    continue
 
-                    logger.info(f"⚡ EXECUTING HUB COMMAND: {side} {quantity} {symbol}")
-
-                    # Convert to TradeSignal
-                    signal = TradeSignal(
-                        signal_id=f"hub-{int(time.time())}",
-                        symbol=symbol,
-                        side=TradeSide.BUY if side == "BUY" else TradeSide.SELL,
-                        signal_type=SignalType.ENTRY,
-                        confidence=1.0,
-                        source="alpha-hub",
-                        quantity=quantity,
+                action = str(command.get("action", "")).strip().upper()
+                if action in {"HALT_TRADING", "RESUME_TRADING", "CLOSE_ALL"}:
+                    await self._handle_risk_alert(
+                        {
+                            "action": action.lower(),
+                            "message": f"Gateway command: {action}",
+                        }
                     )
+                    logger.info(f"✅ Applied gateway risk command: {action}")
+                    continue
 
-                    # Execute
-                    result = await self._execute_trade(signal)
-                    logger.info(f"✅ Hub Command Executed: {result.success}")
+                if action in {"HEARTBEAT", "STATUS", "CONTROL_STATUS"}:
+                    logger.info(f"✅ Gateway control command acknowledged: {action}")
+                    continue
 
-                    # Notify
-                    await publish("trade-executed", result)
+                signal = self._build_signal_from_gateway_command(command)
+                if signal is None:
+                    logger.warning(f"Ignoring unsupported gateway command payload: {command}")
+                    continue
 
-                self.command_queue.task_done()
+                logger.info(
+                    f"⚡ EXECUTING HUB COMMAND: {signal.side} {signal.quantity} {signal.symbol}"
+                )
+                result = await self._execute_trade(signal)
+                logger.info(f"✅ Hub Command Executed: {result.success}")
+                await publish("trade-executed", result)
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 logger.error(f"Gateway Error: {e}")
                 await asyncio.sleep(1)
+            finally:
+                if has_command:
+                    self.command_queue.task_done()
 
         logger.info("🔌 Gateway Loop Ended")
         await self.user_stream.stop()
+
+    def _build_signal_from_gateway_command(self, command: Dict[str, Any]) -> Optional[TradeSignal]:
+        """Normalize legacy and action-style gateway payloads into TradeSignal objects."""
+        command_type = str(command.get("type", "")).strip().upper()
+        action = str(command.get("action", "")).strip().upper()
+        if command_type == "ARB_EXECUTE" and not action:
+            action = str(command.get("side", "BUY")).strip().upper()
+
+        if action not in {"BUY", "SELL", "LONG", "SHORT", "CLOSE"}:
+            return None
+
+        symbol = str(command.get("symbol", "SOL")).strip().upper() or "SOL"
+
+        raw_qty = command.get("quantity", 0.0)
+        try:
+            quantity = float(raw_qty)
+        except (TypeError, ValueError):
+            quantity = 0.0
+
+        signal_side: TradeSide
+        signal_type = SignalType.ENTRY
+
+        if action == "CLOSE":
+            position = self.positions.get(symbol)
+            if position is None:
+                logger.warning(f"Ignoring CLOSE command for {symbol}: no tracked position")
+                return None
+            if quantity <= 0:
+                quantity = float(position.quantity)
+            signal_side = (
+                TradeSide.SELL
+                if position.side in (TradeSide.BUY, TradeSide.LONG)
+                else TradeSide.BUY
+            )
+            signal_type = SignalType.EXIT
+        else:
+            if quantity <= 0:
+                logger.warning(f"Ignoring {action} command for {symbol}: invalid quantity {raw_qty}")
+                return None
+            signal_side = TradeSide.BUY if action in {"BUY", "LONG"} else TradeSide.SELL
+
+        signal_id = str(command.get("signal_key", "")).strip() or str(
+            command.get("signal_id", "")
+        ).strip()
+        if not signal_id:
+            signal_id = f"hub-{int(time.time() * 1000)}"
+
+        return TradeSignal(
+            signal_id=signal_id,
+            symbol=symbol,
+            side=signal_side,
+            signal_type=signal_type,
+            confidence=1.0,
+            source=str(command.get("source", "")).strip() or "alpha-hub",
+            quantity=quantity,
+            metadata={"gateway_action": action},
+        )
 
     async def stop(self):
         """Gracefully stop the bot."""

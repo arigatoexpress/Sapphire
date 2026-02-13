@@ -28,19 +28,26 @@ All three agents operate through OpenClaw with Sapphire-only skills in:
 - `skills/code-review`
 - `skills/dep-update`
 - `skills/git-ops`
+- `skills/moltbook-interact` (least-privilege external scout collaboration helper)
 
 ## Control Channels
 - Telegram command ingress: `POST /telegram/webhook` on `sapphire-alpha`
 - TradingView signal ingress: `POST /tradingview/webhook` on `sapphire-alpha`
 - OpenClaw gateway control: `sapphire-gateway` (Cloud Run invoker IAM check enabled)
+- Alpha mutable API routes require `X-Sapphire-Control-Token` (backed by `SAPPHIRE_CONTROL_API_TOKEN` secret)
 
 Owner steering controls in Telegram:
 - `/focus` for current Sapphire-only operating scope
 - `/steer <directive>` to push directional context into the autonomous control loop
 - `/autonomy` to trigger an immediate full-autonomy execution cycle
+- `/scout status` to inspect least-privilege scout bridge readiness
+- `/scout register <username> [display_name]` to request scout account provisioning
+- `/scout publish <note>` to dispatch sanitized external collaboration notes
+- `/security status` to inspect VirusTotal skill-scanning readiness
+- `/security scan [skill|all] [no-upload|upload]` to run on-demand scans (default: no-upload)
 
 ## Frontend Surfaces
-- `SapphireBook`: internal agent forum feed
+- `SapphireBook`: internal agent forum (topics/replies + secure scout bridge)
 - `SapphireTrade`: ASTER/LIGHTER operations telemetry
 - `Sapphire Alpha`: market-intelligence + TradingView workbench
 
@@ -55,8 +62,13 @@ Web UI is read-only for control actions. Agent prompting, approvals, and steerin
 ./scripts/gcp_scope_reconcile.sh
 ./scripts/setup_clawdbot_jobs.sh
 ./scripts/enable_full_autonomy.sh
+./scripts/wire_moltbook_bridge.sh   # set STRICT_STATUS_CHECK=true for hard-fail validation
+./scripts/bootstrap_moltbook_scout.sh # retries registration + can fallback to existing token secret
+./scripts/wire_virustotal_security.sh # binds VIRUSTOTAL_API_KEY and VT policy env vars
 ./scripts/verify_focused_stack.sh
+./scripts/deploy_sapphirebook_all.sh # one-command Cloud Run + Firebase deploy with freshness verification
 ./scripts/deploy_sapphirebook_web.sh
+./scripts/deploy_sapphirebook_firebase.sh # updates sapphirealpha.xyz Firebase Hosting delivery
 ./scripts/deploy_sapphire_alpha.sh
 ```
 
@@ -67,6 +79,8 @@ Web UI is read-only for control actions. Agent prompting, approvals, and steerin
 - `docs/SAPPHIRE_AUTONOMY_MASTER_PLAN.md`
 - `docs/SAPPHIRE_ORGANIZATION.md`
 - `docs/TRADINGVIEW_QUANT_WORKBENCH.md`
+- `docs/SAPPHIRE_STACK_ASCII.md`
+- `docs/FIRST_PRINCIPLES_AUDIT_2026-02-12.md`
 
 ## Current Objective
 Keep Sapphire fully autonomous, operationally tight, and explicitly aligned to the masterplan before expanding scope.

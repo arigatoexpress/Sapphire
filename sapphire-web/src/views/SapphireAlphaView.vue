@@ -1,7 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import TradingChart from '../components/TradingChart.vue'
-import { fetchMarketOHLC, fetchPerformanceStats, fetchRoutingInfo, type OhlcCandle } from '../api/client'
+import {
+    fetchControlStatus,
+    fetchMarketOHLC,
+    fetchPerformanceStats,
+    fetchRoutingInfo,
+    fetchSecuritySkillsStatus,
+    fetchTradingViewWorkspace,
+    type OhlcCandle,
+    type SecuritySkillsStatusResponse,
+} from '../api/client'
 
 interface InsightCard {
     title: string
@@ -9,40 +18,16 @@ interface InsightCard {
     detail: string
 }
 
-const insightCards = ref<InsightCard[]>([
-    {
-        title: 'Signal Throughput',
-        value: 'n/a',
-        detail: 'Awaiting alpha telemetry',
-    },
-    {
-        title: 'Routing Confidence',
-        value: 'n/a',
-        detail: 'Awaiting confidence payload',
-    },
-    {
-        title: 'Risk Posture',
-        value: 'Guarded',
-        detail: 'Fail-safe defaults are active',
-    },
-])
-
-const watchlists = ref([
-    { name: 'Core Majors', symbols: 'BTC, ETH, SOL, BNB, AVAX' },
-    { name: 'Execution Pair Focus', symbols: 'SOL, ETH, BTC, HYPE, DOGE' },
-    { name: 'Volatility Radar', symbols: 'LINK, JUP, PYTH, WIF, BONK' },
-])
-
-const strategyIntake = ref([
-    'Breakout compression strategy (community Pine)',
-    'Market structure and liquidity sweep detector',
-    'Volatility regime classifier with trend filter',
-    'Cross-venue divergence monitor with confidence gating',
-])
-
 const alphaCandles = ref<OhlcCandle[]>([])
 const chartSourceLabel = ref('Waiting for live OHLC feed')
 const routingConfidencePct = ref<number | null>(null)
+const totalTrades = ref(0)
+const winRate = ref(0)
+const realizedPnl = ref(0)
+const routingMode = ref('guarded')
+const control = ref<any>(null)
+const workspace = ref<any>(null)
+const security = ref<SecuritySkillsStatusResponse | null>(null)
 const lastRefreshEpoch = ref(0)
 const nowEpoch = ref(Date.now())
 let refreshTimer: ReturnType<typeof setInterval> | null = null
@@ -53,19 +38,75 @@ const refreshAge = computed(() => {
     return `${Math.max(0, Math.round((nowEpoch.value - lastRefreshEpoch.value) / 1000))}s ago`
 })
 
+const executionMode = computed(() =>
+    control.value?.tradingview_execution_enabled ? 'TV signals live' : 'TV workbench dry-run',
+)
+
+const pendingDecisions = computed(() => Number(control.value?.pending_autonomy_decisions || 0))
+
+const workspaceState = computed(() => workspace.value?.workspace?.state || {})
+
+const watchlists = computed(() => {
+    const raw = workspaceState.value?.watchlists || {}
+    return Object.entries(raw).map(([name, symbols]) => ({
+        name,
+        symbols: Array.isArray(symbols) ? symbols.join(', ') : '',
+    }))
+})
+
+const strategyIntake = computed(() => {
+    const indicators = Array.isArray(workspaceState.value?.indicators) ? workspaceState.value.indicators : []
+    const strategies = Array.isArray(workspaceState.value?.strategies) ? workspaceState.value.strategies : []
+    const scripts = Array.isArray(workspaceState.value?.community_scripts) ? workspaceState.value.community_scripts : []
+    const merged = [
+        ...strategies.map((name: string) => `Strategy: ${name}`),
+        ...indicators.map((name: string) => `Indicator: ${name}`),
+        ...scripts.map((name: string) => `Community script: ${name}`),
+    ]
+    return merged.length > 0 ? merged : ['No active strategy assets in workspace state']
+})
+
+const insightCards = computed<InsightCard[]>(() => [
+    {
+        title: 'Signal Throughput',
+        value: `${totalTrades.value} trades`,
+        detail: `Win rate ${winRate.value}% · Realized PnL ${realizedPnl.value.toFixed(4)}`,
+    },
+    {
+        title: 'Routing Confidence',
+        value: routingConfidencePct.value === null ? 'n/a' : `${routingConfidencePct.value}%`,
+        detail: `Mode: ${routingMode.value}`,
+    },
+    {
+        title: 'TradingView Mode',
+        value: executionMode.value,
+        detail: `Pending decisions: ${pendingDecisions.value}`,
+    },
+    {
+        title: 'Skill Security',
+        value: security.value?.enabled
+            ? security.value?.api_key_configured
+                ? `VT ${security.value.enforcement_mode}`
+                : 'VT key missing'
+            : 'VT disabled',
+        detail: security.value?.enabled
+            ? `Skills dir ${security.value.skills_dir_exists ? 'ready' : 'missing'} · upload-on-miss ${security.value.upload_if_missing_default ? 'on' : 'off'}`
+            : 'Enable VT guardrail for ClawHub/OpenClaw skill scanning.',
+    },
+])
+
 const riskTone = computed(() => {
-    const posture = insightCards.value.find((item) => item.title === 'Risk Posture')?.value || 'Guarded'
-    const normalized = posture.toLowerCase()
-    if (normalized.includes('offensive')) return 'tone-offensive'
-    if (normalized.includes('balanced')) return 'tone-balanced'
+    if ((routingConfidencePct.value || 0) >= 70) return 'tone-offensive'
+    if ((routingConfidencePct.value || 0) >= 45) return 'tone-balanced'
     return 'tone-guarded'
 })
 
 const readinessScore = computed(() => {
     const confidence = routingConfidencePct.value ?? 0
-    const posture = insightCards.value.find((item) => item.title === 'Risk Posture')?.value.toLowerCase() || 'guarded'
-    const postureBias = posture.includes('offensive') ? 10 : posture.includes('balanced') ? 0 : -10
-    return Math.max(0, Math.min(100, Math.round(confidence + postureBias)))
+    const executionBoost = control.value?.tradingview_execution_enabled ? 5 : 0
+    const queuePenalty = Math.min(20, pendingDecisions.value * 4)
+    const composite = Math.round(confidence + executionBoost - queuePenalty)
+    return Math.max(0, Math.min(100, composite))
 })
 
 const readinessTone = computed(() => {
@@ -74,53 +115,55 @@ const readinessTone = computed(() => {
     return 'readiness-guarded'
 })
 
-const strategyRail = computed(() => {
-    const score = readinessScore.value
-    return [
-        { label: 'Ingest', detail: 'Market + macro feeds', status: score >= 25 ? 'ready' : 'pending' },
-        { label: 'Synthesize', detail: 'Pattern + confidence fusion', status: score >= 45 ? 'ready' : 'pending' },
-        { label: 'Validate', detail: 'Risk and policy checks', status: score >= 60 ? 'ready' : 'pending' },
-        { label: 'Route', detail: 'Telegram-approved execution', status: score >= 70 ? 'ready' : 'pending' },
-    ]
-})
+const strategyRail = computed(() => [
+    {
+        label: 'Ingest',
+        detail: `Assets scope ${workspaceState.value?.assets_scope || 'n/a'}`,
+        status: alphaCandles.value.length > 0 ? 'ready' : 'pending',
+    },
+    {
+        label: 'Synthesize',
+        detail: `${strategyIntake.value.length} active strategy assets`,
+        status: strategyIntake.value[0]?.startsWith('No ') ? 'pending' : 'ready',
+    },
+    {
+        label: 'Validate',
+        detail: `${pendingDecisions.value} decision(s) pending`,
+        status: pendingDecisions.value > 0 ? 'pending' : 'ready',
+    },
+    {
+        label: 'Route',
+        detail: executionMode.value,
+        status: control.value ? 'ready' : 'pending',
+    },
+])
 
 const loadAlphaStatus = async () => {
     try {
-        const [stats, routing, ohlc] = await Promise.all([
+        const [stats, routing, workspacePayload, controlPayload, securityPayload] = await Promise.all([
             fetchPerformanceStats(),
             fetchRoutingInfo(),
-            fetchMarketOHLC({ venue: 'ASTER', symbol: 'SOL', interval: '1m', limit: 180 }),
+            fetchTradingViewWorkspace(),
+            fetchControlStatus(),
+            fetchSecuritySkillsStatus(),
         ])
 
-        const totalTrades = Number(stats?.metrics?.system?.total_trades || 0)
-        const wins = Number(stats?.metrics?.system?.wins || 0)
-        const winRate = totalTrades > 0 ? Math.round((wins / totalTrades) * 100) : 0
+        if (workspacePayload?.ok) workspace.value = workspacePayload
+        if (controlPayload?.ok) control.value = controlPayload
+        if (securityPayload?.ok) security.value = securityPayload
 
-        const confidenceRaw = routing?.confidence ?? routing?.data?.confidence ?? routing?.routing?.confidence
-        routingConfidencePct.value = typeof confidenceRaw === 'number' ? Math.max(0, Math.min(100, Math.round(confidenceRaw * 100))) : null
-        const confidence = typeof confidenceRaw === 'number' ? `${Math.round(confidenceRaw * 100)}%` : 'n/a'
+        totalTrades.value = Number(stats?.metrics?.system?.total_trades || 0)
+        winRate.value = Number(stats?.metrics?.system?.win_rate || 0)
+        realizedPnl.value = Number(stats?.metrics?.system?.realized_pnl || 0)
 
-        const routePolicy = routing?.mode || routing?.strategy || 'Policy-driven'
-        const posture = winRate >= 60 ? 'Offensive' : winRate >= 50 ? 'Balanced' : 'Guarded'
+        const confidenceRaw = Number(routing?.confidence ?? 0)
+        routingConfidencePct.value = Number.isFinite(confidenceRaw)
+            ? Math.max(0, Math.min(100, Math.round(confidenceRaw * 100)))
+            : null
+        routingMode.value = String(routing?.mode || 'guarded')
 
-        insightCards.value = [
-            {
-                title: 'Signal Throughput',
-                value: `${totalTrades} trades`,
-                detail: 'Derived from system metrics snapshot',
-            },
-            {
-                title: 'Routing Confidence',
-                value: confidence,
-                detail: `Mode: ${routePolicy}`,
-            },
-            {
-                title: 'Risk Posture',
-                value: posture,
-                detail: `Win-rate baseline: ${winRate}%`,
-            },
-        ]
-
+        const preferredSymbol = String(workspaceState.value?.selected_symbol || 'SOL').toUpperCase()
+        const ohlc = await fetchMarketOHLC({ venue: 'ASTER', symbol: preferredSymbol, interval: '1m', limit: 180 })
         const candles = (ohlc?.candles || [])
             .map((item) => ({
                 time: Number(item.time),
@@ -142,8 +185,9 @@ const loadAlphaStatus = async () => {
         alphaCandles.value = candles
         chartSourceLabel.value =
             candles.length > 0
-                ? `Live OHLC · ${ohlc?.venue || 'ASTER'} (${ohlc?.source || 'market feed'})`
+                ? `Live OHLC · ${ohlc?.venue || 'ASTER'} · ${ohlc?.symbol || preferredSymbol} (${ohlc?.source || 'market feed'})`
                 : 'Waiting for live OHLC feed'
+
         lastRefreshEpoch.value = Date.now()
     } catch (error) {
         console.error('Failed to load alpha status:', error)
@@ -168,18 +212,17 @@ onUnmounted(() => {
     <div class="alpha-view fade-in">
         <section class="hero card glass-lift">
             <div class="hero-copy">
-                <span class="font-mono kicker">SAPPHIRE ALPHA</span>
-                <h2>Market intelligence suite powering strategy and routing confidence.</h2>
+                <span class="font-mono kicker">SAPPHIRE ALPHA LIVE</span>
+                <h2>Market-intelligence suite synchronized with runtime routing and TradingView workspace state.</h2>
                 <p>
-                    TradingView research is integrated into this alpha surface, while execution permissions stay owner-gated
-                    through Telegram heartbeat control.
+                    DEX-native market data drives live routing and execution context. TradingView remains the strategy workbench for
+                    testing, backtesting, and signal iteration.
                 </p>
             </div>
             <div class="meta-line">
                 <span class="chip">Last sync {{ refreshAge }}</span>
-                <span class="chip" :class="riskTone">
-                    {{ insightCards[2]?.value || 'Guarded' }}
-                </span>
+                <span class="chip">{{ executionMode }}</span>
+                <span class="chip" :class="riskTone">{{ routingMode }}</span>
             </div>
         </section>
 
@@ -218,16 +261,19 @@ onUnmounted(() => {
                 <h3 class="font-mono">Managed Watchlists</h3>
                 <div class="watchlist" v-for="item in watchlists" :key="item.name">
                     <span>{{ item.name }}</span>
-                    <small>{{ item.symbols }}</small>
+                    <small>{{ item.symbols || 'No symbols configured' }}</small>
                 </div>
             </article>
 
             <article class="panel card">
-                <h3 class="font-mono">Community Strategy Intake</h3>
+                <h3 class="font-mono">Strategy Asset Intake</h3>
                 <ol>
                     <li v-for="scriptName in strategyIntake" :key="scriptName">{{ scriptName }}</li>
                 </ol>
-                <p class="hint">New strategy approvals are captured through heartbeat prompts before live rollout.</p>
+                <p class="hint">
+                    Workspace: {{ workspace?.workspace?.workspace_label || 'n/a' }} · Active watchlist
+                    {{ workspaceState?.active_watchlist || 'n/a' }}
+                </p>
             </article>
         </section>
     </div>
@@ -243,8 +289,8 @@ onUnmounted(() => {
     display: grid;
     gap: 0.74rem;
     background:
-        radial-gradient(circle at 90% 6%, rgba(103, 208, 255, 0.2), transparent 40%),
-        linear-gradient(130deg, rgba(6, 22, 44, 0.9), rgba(8, 24, 43, 0.75));
+        radial-gradient(circle at 92% 6%, rgba(103, 208, 255, 0.24), transparent 40%),
+        linear-gradient(130deg, rgba(6, 22, 44, 0.92), rgba(8, 24, 43, 0.76));
 }
 
 .kicker {

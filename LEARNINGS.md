@@ -15,6 +15,9 @@
 - `./scripts/holistic_ops_check.sh` is the best single preflight command for focused operations readiness.
 - `./scripts/gcp_scope_reconcile.sh --strict` must fail the pipeline if out-of-scope Cloud Run services or scheduler jobs reappear.
 - Deprecated surfaces (`trading-dashboard-legacy`, `services/bot-retired_*`) should be removed to reduce operational entropy.
+- Owner approval prompts are materially better when each autonomy session includes explicit why-now reasoning, expected outcome, benefit vs baseline, and deferral risk.
+- Telegram digest compression should deduplicate repetitive AI updates while preserving decision-critical context for pending autonomy approvals.
+- `skills/moltbook-interact` should be tracked as a first-class repo skill so external scout collaboration tooling is reproducible and auditable.
 
 ## Always Preserve
 

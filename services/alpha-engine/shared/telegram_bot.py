@@ -11,6 +11,7 @@ import asyncio
 import json
 import os
 import re
+from collections import OrderedDict
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set
 
@@ -38,6 +39,7 @@ class TelegramPlatformBot:
         "gate": "PROMOTION_GATE",
         "focus": "CONTROL_FOCUS",
         "autonomy": "AUTONOMY_CYCLE",
+        "security": "SECURITY_STATUS",
     }
     TARGET_ALIASES = {
         "LIGHT": "LIGHTER",
@@ -133,9 +135,149 @@ class TelegramPlatformBot:
     async def _flush_buffer(self):
         if not self.message_buffer:
             return
-        batch_text = "📋 **Sapphire Activity Digest**\n" + "\n".join(self.message_buffer)
+        digest_lines = self._build_digest_lines(self.message_buffer)
         self.message_buffer.clear()
+        batch_text = "📋 **Sapphire Update Digest**\n" + "\n".join(digest_lines)
         await self._dispatch_message(batch_text, allow_markdown=True)
+
+    @staticmethod
+    def _clean_digest_text(text: str) -> str:
+        normalized = re.sub(r"\s+", " ", str(text or "").strip())
+        normalized = re.sub(r"Reply with /status.*$", "", normalized, flags=re.IGNORECASE)
+        return normalized.strip()
+
+    @staticmethod
+    def _extract_section(text: str, marker: str, stop_markers: List[str]) -> str:
+        source = str(text or "")
+        marker_idx = source.lower().find(marker.lower())
+        if marker_idx < 0:
+            return ""
+        tail = source[marker_idx + len(marker) :]
+        lower_tail = tail.lower()
+        stop_idx = len(tail)
+        for stop in stop_markers:
+            idx = lower_tail.find(stop.lower())
+            if idx >= 0:
+                stop_idx = min(stop_idx, idx)
+        return tail[:stop_idx].strip(" `:;,.")
+
+    @staticmethod
+    def _trim_summary(text: str, limit: int = 90) -> str:
+        value = str(text or "").strip()
+        if len(value) <= limit:
+            return value
+        return value[: max(0, limit - 3)].rstrip() + "..."
+
+    @classmethod
+    def _summarize_digest_text(cls, text: str) -> str:
+        cleaned = cls._clean_digest_text(text)
+        lowered = cleaned.lower()
+
+        if "autonomy decision brief" in lowered:
+            session = cls._extract_section(cleaned, "Session:", ["Trigger:", "Why now:"])
+            trigger = cls._extract_section(cleaned, "Trigger:", ["Why now:", "Current state:"])
+            outcome = cls._extract_section(
+                cleaned,
+                "Expected outcome:",
+                ["Benefit vs current state:", "Risk if deferred:", "Decision:", "Bulk option:"],
+            )
+            benefit = cls._extract_section(
+                cleaned,
+                "Benefit vs current state:",
+                ["Risk if deferred:", "Decision:", "Bulk option:"],
+            )
+            return (
+                f"🤖 Autonomy brief `{session or 'n/a'}` "
+                f"trigger `{trigger or 'n/a'}` | "
+                f"outcome {cls._trim_summary(outcome, 72) or 'n/a'} | "
+                f"benefit {cls._trim_summary(benefit, 72) or 'n/a'}"
+            )
+
+        if "gemini flash" in lowered:
+            insight = cls._extract_section(cleaned, "Gemini Flash", [])
+            if not insight and ":" in cleaned:
+                insight = cleaned.split(":", 1)[1].strip()
+            return f"⚡ Market pulse: {insight}" if insight else "⚡ Market pulse update"
+
+        if "sapphire heartbeat" in lowered:
+            active = cls._extract_section(
+                cleaned, "Active venues:", ["Paused/deallocated:", "Kill switch:"]
+            )
+            paused = cls._extract_section(cleaned, "Paused/deallocated:", ["Kill switch:"])
+            kill = cls._extract_section(cleaned, "Kill switch:", ["Full autonomy:", "Failure pressure:"])
+            autonomy = cls._extract_section(
+                cleaned, "Full autonomy:", ["Failure pressure:", "Owner directive:"]
+            )
+            failure = cls._extract_section(cleaned, "Failure pressure:", ["Owner directive:"])
+            return (
+                "💓 Heartbeat: "
+                f"active `{active or 'none'}` | paused `{paused or 'none'}` | "
+                f"kill `{kill or 'n/a'}` | autonomy `{autonomy or 'n/a'}` | pressure `{failure or 'n/a'}`"
+            )
+
+        if "tradingview workspace action" in lowered:
+            action_match = re.search(
+                r"workspace action\s+`?([a-z0-9_:-]+)`?",
+                cleaned,
+                flags=re.IGNORECASE,
+            )
+            action = str(action_match.group(1) if action_match else "unknown").strip()
+            result = cls._extract_section(cleaned, "Result:", ["OpenClaw dispatch:"])
+            dispatch = cls._extract_section(cleaned, "OpenClaw dispatch:", [])
+            return (
+                f"🧩 Workspace `{action}`: `{result or 'processed'}`"
+                + (f" (dispatch `{dispatch}`)" if dispatch else "")
+            )
+
+        return cleaned
+
+    @classmethod
+    def _digest_signature(cls, text: str) -> str:
+        cleaned = cls._clean_digest_text(text).lower()
+        # Collapse highly repetitive AI flash lines into one digest bucket.
+        if "gemini flash" in cleaned or "market pulse" in cleaned:
+            return "gemini_flash"
+        if "sapphire heartbeat" in cleaned or cleaned.startswith("💓 heartbeat"):
+            return "heartbeat"
+        if "tradingview workspace action" in cleaned or cleaned.startswith("🧩 workspace"):
+            action_match = re.search(r"(tv_[a-z0-9_:-]+)", cleaned)
+            result_match = re.search(r"result[:\s`]+([a-z_]+)", cleaned)
+            action_key = action_match.group(1) if action_match else "unknown"
+            result_key = result_match.group(1) if result_match else "unknown"
+            return f"workspace:{action_key}:{result_key}"
+        if "autonomy decision brief" in cleaned or cleaned.startswith("🤖 autonomy brief"):
+            session_match = re.search(r"session[:\s`]+([a-z0-9:._-]+)", cleaned)
+            trigger_match = re.search(r"trigger[:\s`]+([a-z0-9_:-]+)", cleaned)
+            session_key = session_match.group(1) if session_match else "latest"
+            trigger_key = trigger_match.group(1) if trigger_match else "unknown"
+            return f"autonomy_brief:{session_key}:{trigger_key}"
+        return cleaned
+
+    @classmethod
+    def _build_digest_lines(cls, raw_messages: List[str]) -> List[str]:
+        if not raw_messages:
+            return ["- no updates"]
+
+        grouped: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
+        for raw in raw_messages[-20:]:
+            cleaned = cls._clean_digest_text(raw)
+            if not cleaned:
+                continue
+            summary = cls._summarize_digest_text(cleaned)
+            signature = cls._digest_signature(summary)
+            if signature in grouped:
+                grouped[signature]["count"] += 1
+                grouped[signature]["text"] = summary
+            else:
+                grouped[signature] = {"text": summary, "count": 1}
+
+        lines: List[str] = []
+        for idx, item in enumerate(grouped.values(), start=1):
+            text = item["text"]
+            count = int(item["count"])
+            suffix = f" _(x{count})_" if count > 1 else ""
+            lines.append(f"{idx}. {text}{suffix}")
+        return lines
 
     async def send_message(
         self,
@@ -282,7 +424,16 @@ class TelegramPlatformBot:
             "- `/kill`\n"
             "- `/resume`\n"
             "- `/approve <session_key> [note]`\n"
+            "- `/approve_all [note]`\n"
             "- `/reject <session_key> [reason]`\n"
+            "- `/trade on [qty]` / `/trade off` (TradingView signal mode)\n"
+            "- `/qty <amount>` (TradingView signal qty)\n"
+            "- `/stage <paper|staged_live|full_live>`\n"
+            "- `/scout status`\n"
+            "- `/scout register <username> [display_name]`\n"
+            "- `/scout publish <note>`\n"
+            "- `/security status`\n"
+            "- `/security scan [skill|all] [no-upload|upload]` (default: no-upload)\n"
             "- `/deallocate <venue>`\n"
             "- `/allocate <venue> <percent>`\n\n"
             "Owner steering:\n"
@@ -324,6 +475,157 @@ class TelegramPlatformBot:
             await self.send_message(self._help_text(), priority=NotificationPriority.MEDIUM)
             return
 
+        # Scout collaboration commands
+        slash_scout_status = re.search(
+            r"^/scout\s+status$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        mention_scout_status = re.search(
+            r"@(alpha|control)\s+scout\s+status$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if slash_scout_status or mention_scout_status:
+            await self.send_message(
+                "🛰️ Scout status request accepted.",
+                priority=NotificationPriority.HIGH,
+            )
+            await self._dispatch_callback("CONTROL", "ALL", "SCOUT_STATUS", 0.0)
+            return
+
+        slash_scout_register = re.search(
+            r"^/scout\s+register\s+([A-Za-z0-9_-]{3,32})(?:\s+(.+))?$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        mention_scout_register = re.search(
+            r"@(alpha|control)\s+scout\s+register\s+([A-Za-z0-9_-]{3,32})(?:\s+(.+))?$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if slash_scout_register or mention_scout_register:
+            if slash_scout_register:
+                username = str(slash_scout_register.group(1) or "").strip()
+                display_name = str(slash_scout_register.group(2) or "").strip()
+            else:
+                username = str(mention_scout_register.group(2) or "").strip()
+                display_name = str(mention_scout_register.group(3) or "").strip()
+
+            payload = json.dumps(
+                {
+                    "username": username,
+                    "display_name": display_name or "Sapphire Scout",
+                    "bio": "Least-privilege scout for public collaboration. No secrets, no trading actions.",
+                },
+                separators=(",", ":"),
+            )
+            await self.send_message(
+                f"🛰️ Scout register request accepted for `@{username}`.",
+                priority=NotificationPriority.HIGH,
+            )
+            await self._dispatch_callback("CONTROL", payload, "SCOUT_REGISTER", 0.0)
+            return
+
+        slash_scout_publish = re.search(
+            r"^/scout\s+publish\s+(.+)$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        mention_scout_publish = re.search(
+            r"@(alpha|control)\s+scout\s+publish\s+(.+)$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if slash_scout_publish or mention_scout_publish:
+            raw_note = (
+                str(slash_scout_publish.group(1) or "").strip()
+                if slash_scout_publish
+                else str(mention_scout_publish.group(2) or "").strip()
+            )
+            topic_id = ""
+            body = raw_note
+            topic_match = re.search(
+                r"^topic(?:=|:)\s*(TOPIC-[0-9]{5})\s+(.+)$",
+                raw_note,
+                flags=re.IGNORECASE,
+            )
+            if topic_match:
+                topic_id = str(topic_match.group(1) or "").strip().upper()
+                body = str(topic_match.group(2) or "").strip()
+
+            if not body:
+                await self.send_message(
+                    "❌ Scout publish requires note text.",
+                    priority=NotificationPriority.HIGH,
+                )
+                return
+
+            payload = json.dumps(
+                {
+                    "topic_id": topic_id,
+                    "body": body,
+                    "author": "SAPPHIRE_SCOUT",
+                    "kind": "note",
+                    "lane": "external",
+                    "tags": ["scout", "external"],
+                },
+                separators=(",", ":"),
+            )
+            await self.send_message(
+                "🛰️ Scout publish request accepted.",
+                priority=NotificationPriority.HIGH,
+            )
+            await self._dispatch_callback("CONTROL", payload, "SCOUT_PUBLISH", 0.0)
+            return
+
+        # VirusTotal security commands
+        slash_security_cmd = re.search(
+            r"^/security\s+(status|scan)(?:\s+([A-Za-z0-9._-]+|all))?(?:\s+(upload|no-upload))?$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        mention_security_cmd = re.search(
+            r"@(alpha|control)\s+security\s+(status|scan)(?:\s+([A-Za-z0-9._-]+|all))?(?:\s+(upload|no-upload))?$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if slash_security_cmd or mention_security_cmd:
+            if slash_security_cmd:
+                command = str(slash_security_cmd.group(1) or "").strip().lower()
+                skill = str(slash_security_cmd.group(2) or "").strip()
+                upload_token = str(slash_security_cmd.group(3) or "").strip().lower()
+            else:
+                command = str(mention_security_cmd.group(2) or "").strip().lower()
+                skill = str(mention_security_cmd.group(3) or "").strip()
+                upload_token = str(mention_security_cmd.group(4) or "").strip().lower()
+
+            if command == "status":
+                await self.send_message(
+                    "🛡️ VirusTotal security status request accepted.",
+                    priority=NotificationPriority.HIGH,
+                )
+                await self._dispatch_callback("CONTROL", "ALL", "SECURITY_STATUS", 0.0)
+                return
+
+            upload_if_missing = upload_token == "upload"
+            payload = json.dumps(
+                {
+                    "skill": skill or "all",
+                    "upload_if_missing": upload_if_missing,
+                },
+                separators=(",", ":"),
+            )
+            await self.send_message(
+                (
+                    "🛡️ VirusTotal scan request accepted."
+                    f" Scope: `{skill or 'all'}` | upload-on-miss: `{'YES' if upload_if_missing else 'NO'}`"
+                ),
+                priority=NotificationPriority.HIGH,
+            )
+            await self._dispatch_callback("CONTROL", payload, "SECURITY_SCAN", 0.0)
+            return
+
         # Owner steering command
         steer_match = re.search(
             r"^/(steer|directive|note|answer|reply|respond)\s+(.+)$",
@@ -357,6 +659,31 @@ class TelegramPlatformBot:
             return
 
         # Session decision commands
+        slash_bulk_approve_match = re.search(
+            r"^/approve(?:[_-]?all|\s+all)(?:\s+(.+))?$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        mention_bulk_approve_match = re.search(
+            r"@(alpha|control)\s+approve(?:[_-]?all|\s+all)(?:\s+(.+))?$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if slash_bulk_approve_match or mention_bulk_approve_match:
+            if slash_bulk_approve_match:
+                note = str(slash_bulk_approve_match.group(1) or "").strip()
+            else:
+                note = str(mention_bulk_approve_match.group(2) or "").strip()
+            if len(note) > 400:
+                note = note[:400]
+            payload = json.dumps({"note": note}, separators=(",", ":"))
+            await self.send_message(
+                "✅ Bulk approval request received. Processing all pending autonomy sessions.",
+                priority=NotificationPriority.HIGH,
+            )
+            await self._dispatch_callback("CONTROL", payload, "APPROVE_ALL_SESSIONS", 0.0)
+            return
+
         slash_session_decision_match = re.search(
             r"^/(approve|reject)(?:\s+([A-Za-z0-9:._-]+|latest))?(?:\s+(.+))?$",
             text,
@@ -392,6 +719,106 @@ class TelegramPlatformBot:
                 priority=NotificationPriority.HIGH,
             )
             await self._dispatch_callback("CONTROL", decision_payload, decision_action, 0.0)
+            return
+
+        # Trading execution mode commands
+        slash_trade_mode_match = re.search(
+            r"^/(trade|execution|tv)\s+(on|off)(?:\s+([\d.]+))?$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        mention_trade_mode_match = re.search(
+            r"@(alpha|control)\s+(trade|execution|tv)\s+(on|off)(?:\s+([\d.]+))?$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if slash_trade_mode_match or mention_trade_mode_match:
+            if slash_trade_mode_match:
+                mode_text = str(slash_trade_mode_match.group(2) or "").strip().upper()
+                qty_text = str(slash_trade_mode_match.group(3) or "").strip()
+            else:
+                mode_text = str(mention_trade_mode_match.group(3) or "").strip().upper()
+                qty_text = str(mention_trade_mode_match.group(4) or "").strip()
+
+            qty_value = 0.0
+            if qty_text:
+                try:
+                    qty_value = float(qty_text)
+                except ValueError:
+                    await self.send_message(
+                        "❌ Trade mode quantity must be numeric.",
+                        priority=NotificationPriority.HIGH,
+                    )
+                    return
+
+            enabled = mode_text == "ON"
+            await self.send_message(
+                (
+                    f"🧭 TradingView signal mode requested: `{'LIVE' if enabled else 'WORKBENCH_DRY-RUN'}`"
+                    + (f" | qty `{qty_value}`" if qty_value > 0 else "")
+                ),
+                priority=NotificationPriority.HIGH,
+            )
+            await self._dispatch_callback("CONTROL", mode_text, "SET_TRADING_EXECUTION", qty_value)
+            return
+
+        # DEX execution stage command
+        slash_stage_match = re.search(
+            r"^/(stage|promotion_stage)\s+(paper|staged_live|staged|full_live|full|live)$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        mention_stage_match = re.search(
+            r"@(alpha|control)\s+(stage|promotion_stage)\s+(paper|staged_live|staged|full_live|full|live)$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if slash_stage_match or mention_stage_match:
+            requested_stage = (
+                str(slash_stage_match.group(2) or "").strip()
+                if slash_stage_match
+                else str(mention_stage_match.group(3) or "").strip()
+            )
+            await self.send_message(
+                f"🚀 DEX stage update requested: `{requested_stage}`",
+                priority=NotificationPriority.HIGH,
+            )
+            await self._dispatch_callback("CONTROL", requested_stage, "SET_EXECUTION_STAGE", 0.0)
+            return
+
+        # Default TradingView quantity command
+        slash_qty_match = re.search(
+            r"^/(qty|quantity)\s+([\d.]+)$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        mention_qty_match = re.search(
+            r"@(alpha|control)\s+(qty|quantity)\s+([\d.]+)$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if slash_qty_match or mention_qty_match:
+            raw_qty = slash_qty_match.group(2) if slash_qty_match else mention_qty_match.group(3)
+            try:
+                qty_value = float(raw_qty)
+            except (TypeError, ValueError):
+                await self.send_message(
+                    "❌ Quantity must be numeric.",
+                    priority=NotificationPriority.HIGH,
+                )
+                return
+            if qty_value <= 0:
+                await self.send_message(
+                    "❌ Quantity must be greater than zero.",
+                    priority=NotificationPriority.HIGH,
+                )
+                return
+
+            await self.send_message(
+                f"🧭 Default TradingView quantity update requested: `{qty_value}`",
+                priority=NotificationPriority.HIGH,
+            )
+            await self._dispatch_callback("CONTROL", "ALL", "SET_TRADINGVIEW_DEFAULT_QUANTITY", qty_value)
             return
 
         # Control commands: /status, /kill, etc.

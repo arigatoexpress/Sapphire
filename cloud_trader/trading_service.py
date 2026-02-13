@@ -808,8 +808,6 @@ class TradingService:
             feature_pipeline=self._feature_pipeline,
             exchange_client=self._exchange,
             aster_client=self.aster,
-            hl_client=self.hl_client,
-            aster_client=self.aster,
             lighter_client=getattr(self, "lighter_client", None),
             settings=self._settings,
         )
@@ -833,8 +831,7 @@ class TradingService:
 
             self.arbitrage_scanner = init_arbitrage_scanner(
                 aster_client=self._exchange_client,
-                hl_client=getattr(self, "hl_client", None),
-                aster_client=getattr(self, "aster", None),
+                lighter_client=getattr(self, "hl_client", None),
             )
         except Exception as e:
             logger.warning(f"Arbitrage scanner init failed (non-critical): {e}")

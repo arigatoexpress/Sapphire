@@ -2,13 +2,26 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { BookOpenText, LineChart, Radar, ShieldCheck } from 'lucide-vue-next'
-import { fetchHealth } from '../api/client'
+import { fetchControlStatus, fetchHealth } from '../api/client'
 
 const route = useRoute()
 const systemStatus = ref<'online' | 'offline' | 'connecting'>('connecting')
 const uptime = ref(0)
 const lastSyncEpoch = ref(0)
 const nowEpoch = ref(Date.now())
+const controlStatus = ref<{
+    tradingview_execution_enabled: boolean
+    tradingview_default_quantity: number
+    pending_autonomy_decisions: number
+    owner_approval_required: boolean
+    vt_security_enabled: boolean
+    vt_api_key_configured: boolean
+    vt_enforcement_mode: string
+    venues: Record<string, { allocation: number; paused: boolean }>
+} | null>(null)
+
+const buildId = String(import.meta.env.VITE_BUILD_ID || 'dev-local').trim() || 'dev-local'
+const buildTimeUtc = String(import.meta.env.VITE_BUILD_TIME_UTC || '').trim()
 
 let healthTimer: ReturnType<typeof setInterval> | null = null
 let clockTimer: ReturnType<typeof setInterval> | null = null
@@ -29,7 +42,7 @@ const navItems = [
     {
         to: '/sapphirealpha',
         label: 'Sapphire Alpha',
-        subtitle: 'Quant research + signal engine',
+        subtitle: 'Quant research + TV workbench',
         icon: Radar,
     },
 ]
@@ -51,6 +64,47 @@ const syncAgeSeconds = computed(() => {
     return Math.max(0, Math.round((nowEpoch.value - lastSyncEpoch.value) / 1000))
 })
 
+const executionModeLabel = computed(() =>
+    controlStatus.value?.tradingview_execution_enabled ? 'TV Signals Live' : 'TV Workbench Dry-Run',
+)
+
+const defaultQuantityLabel = computed(() => {
+    const qty = Number(controlStatus.value?.tradingview_default_quantity || 0)
+    return qty > 0 ? `${qty}` : 'n/a'
+})
+
+const pendingApprovals = computed(() => Number(controlStatus.value?.pending_autonomy_decisions || 0))
+
+const ownerApprovalLabel = computed(() =>
+    controlStatus.value?.owner_approval_required ? 'Owner approval required' : 'Auto-approve policy',
+)
+
+const vtSecurityLabel = computed(() => {
+    if (!controlStatus.value?.vt_security_enabled) return 'VT Security Off'
+    if (!controlStatus.value?.vt_api_key_configured) return 'VT Key Missing'
+    const mode = String(controlStatus.value?.vt_enforcement_mode || 'warn')
+    return `VT ${mode}`
+})
+
+const vtSecurityTone = computed(() => {
+    if (!controlStatus.value?.vt_security_enabled) return 'tone-off'
+    if (!controlStatus.value?.vt_api_key_configured) return 'tone-warn'
+    return 'tone-on'
+})
+
+const buildStamp = computed(() => (buildTimeUtc ? `${buildId} · ${buildTimeUtc}` : buildId))
+
+const activeVenueSummary = computed(() => {
+    const venues = controlStatus.value?.venues || {}
+    const all = Object.keys(venues)
+    if (all.length === 0) return 'venues n/a'
+    const active = all.filter((name) => {
+        const item = venues[name]
+        return Boolean(item && !item.paused && Number(item.allocation) > 0)
+    })
+    return `${active.length}/${all.length} venues active`
+})
+
 const formatUptime = (seconds: number) => {
     if (seconds < 60) return `${seconds}s`
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m`
@@ -64,10 +118,33 @@ const formatUtcClock = () => {
 
 const checkHealth = async () => {
     try {
-        const health = await fetchHealth()
-        if (health?.status === 'healthy') {
+        const [health, control] = await Promise.all([fetchHealth(), fetchControlStatus()])
+        const healthy =
+            (typeof health === 'string' && health.toUpperCase().includes('OK')) ||
+            (typeof health === 'object' &&
+                health !== null &&
+                (String((health as Record<string, unknown>).status || '').toLowerCase() === 'healthy' ||
+                    (health as Record<string, unknown>).ok === true))
+
+        if (healthy || control?.ok) {
             systemStatus.value = 'online'
-            uptime.value = Math.round(health.orchestrator?.uptime_seconds || 0)
+            if (control?.ok) {
+                controlStatus.value = {
+                    tradingview_execution_enabled: Boolean(control.tradingview_execution_enabled),
+                    tradingview_default_quantity: Number(control.tradingview_default_quantity || 0),
+                    pending_autonomy_decisions: Number(control.pending_autonomy_decisions || 0),
+                    owner_approval_required: Boolean(control.owner_approval_required),
+                    vt_security_enabled: Boolean(control.vt_security_enabled),
+                    vt_api_key_configured: Boolean(control.vt_api_key_configured),
+                    vt_enforcement_mode: String(control.vt_enforcement_mode || 'warn'),
+                    venues: control.venues || {},
+                }
+            }
+            const uptimeRaw =
+                typeof health === 'object' && health !== null
+                    ? Number((health as Record<string, any>).orchestrator?.uptime_seconds || 0)
+                    : 0
+            if (Number.isFinite(uptimeRaw) && uptimeRaw > 0) uptime.value = Math.round(uptimeRaw)
             lastSyncEpoch.value = Date.now()
             return
         }
@@ -75,6 +152,21 @@ const checkHealth = async () => {
     } catch {
         systemStatus.value = 'offline'
     }
+}
+
+const forceRefresh = async () => {
+    if (typeof window === 'undefined') return
+    try {
+        if ('caches' in window) {
+            const keys = await caches.keys()
+            await Promise.all(keys.map((key) => caches.delete(key)))
+        }
+    } catch (error) {
+        console.warn('Failed to clear browser caches before refresh.', error)
+    }
+    const url = new URL(window.location.href)
+    url.searchParams.set('refresh', String(Date.now()))
+    window.location.replace(url.toString())
 }
 
 onMounted(() => {
@@ -131,6 +223,11 @@ onUnmounted(() => {
                     <span>{{ syncAgeSeconds === null ? 'awaiting sync' : `last sync ${syncAgeSeconds}s ago` }}</span>
                     <small>Uptime: {{ formatUptime(uptime) }}</small>
                 </article>
+                <article class="control-card">
+                    <p class="font-mono">RELEASE STAMP</p>
+                    <span>{{ buildId }}</span>
+                    <small>{{ buildTimeUtc || 'build-time unavailable' }}</small>
+                </article>
             </div>
         </aside>
 
@@ -144,9 +241,12 @@ onUnmounted(() => {
                     <span class="status-pill" :class="systemStatus">
                         {{ statusText }}
                     </span>
+                    <span class="meta-chip font-mono">build {{ buildId }}</span>
+                    <span class="meta-chip font-mono">{{ activeVenueSummary }}</span>
                     <span class="meta-chip font-mono">{{ formatUptime(uptime) }}</span>
                     <span class="meta-chip font-mono">{{ formatUtcClock() }}</span>
                     <span class="meta-chip font-mono">{{ runtimeHost }}</span>
+                    <button class="refresh-btn font-mono" type="button" @click="forceRefresh">force refresh</button>
                 </div>
             </header>
 
@@ -154,14 +254,22 @@ onUnmounted(() => {
                 <article class="quick-card glass-lift">
                     <p class="font-mono">Command</p>
                     <strong>Telegram Heartbeat</strong>
+                    <small>Authenticated operator channel</small>
                 </article>
                 <article class="quick-card glass-lift">
-                    <p class="font-mono">Scope</p>
-                    <strong>Sapphire Unified Runtime</strong>
+                    <p class="font-mono">TV Workbench</p>
+                    <strong>{{ executionModeLabel }}</strong>
+                    <small>Signal qty {{ defaultQuantityLabel }}</small>
                 </article>
                 <article class="quick-card glass-lift">
-                    <p class="font-mono">Policy</p>
-                    <strong>Owner-Gated Autonomy</strong>
+                    <p class="font-mono">Autonomy</p>
+                    <strong>{{ ownerApprovalLabel }}</strong>
+                    <small>{{ pendingApprovals }} pending decisions</small>
+                </article>
+                <article class="quick-card glass-lift">
+                    <p class="font-mono">Skill Security</p>
+                    <strong :class="vtSecurityTone">{{ vtSecurityLabel }}</strong>
+                    <small>{{ buildStamp }}</small>
                 </article>
             </section>
 
@@ -404,10 +512,27 @@ onUnmounted(() => {
     background: rgba(255, 116, 116, 0.19);
 }
 
+.refresh-btn {
+    border-radius: 999px;
+    border: 1px solid rgba(131, 214, 255, 0.5);
+    background: rgba(21, 60, 89, 0.46);
+    color: #c8ecff;
+    font-size: 0.62rem;
+    letter-spacing: 0.04em;
+    padding: 0.28rem 0.62rem;
+    text-transform: uppercase;
+    cursor: pointer;
+}
+
+.refresh-btn:hover {
+    border-color: rgba(131, 214, 255, 0.82);
+    background: rgba(34, 90, 130, 0.56);
+}
+
 .quick-strip {
     margin-top: 0.9rem;
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0.65rem;
 }
 
@@ -430,6 +555,23 @@ onUnmounted(() => {
 .quick-card strong {
     font-size: 0.79rem;
     font-weight: 600;
+}
+
+.quick-card strong.tone-on {
+    color: #79ebbc;
+}
+
+.quick-card strong.tone-warn {
+    color: #ffd38d;
+}
+
+.quick-card strong.tone-off {
+    color: #ffb2b2;
+}
+
+.quick-card small {
+    color: var(--text-secondary);
+    font-size: 0.7rem;
 }
 
 .telegram-banner {
@@ -466,7 +608,7 @@ onUnmounted(() => {
 
 @media (max-width: 1080px) {
     .quick-strip {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
@@ -500,6 +642,10 @@ onUnmounted(() => {
 
     .surface-title h2 {
         font-size: 1rem;
+    }
+
+    .quick-strip {
+        grid-template-columns: 1fr;
     }
 }
 </style>

@@ -166,6 +166,12 @@ class ExecutionDispatcher:
         allocation = self._venue_allocations.get(normalized_venue, 1.0)
 
         command_payload = dict(command)
+        # Backward-compatible payload for legacy bot gateways that still consume ARB_EXECUTE.
+        action = str(command_payload.get("action", "")).strip().upper()
+        if "type" not in command_payload and action in {"BUY", "SELL"}:
+            command_payload["type"] = "ARB_EXECUTE"
+            command_payload["side"] = action
+
         quantity = command_payload.get("quantity")
         if allocation < 1.0 and isinstance(quantity, (int, float)) and quantity > 0:
             command_payload["quantity"] = round(float(quantity) * allocation, 8)

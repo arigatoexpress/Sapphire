@@ -30,7 +30,7 @@ def _apply_cors_headers(request: web.Request, response: web.StreamResponse) -> N
         response.headers["Vary"] = "Origin"
         response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
         response.headers["Access-Control-Allow-Headers"] = (
-            "Content-Type,Authorization,X-Sapphire-Webhook-Secret,X-Telegram-Bot-Api-Secret-Token"
+            "Content-Type,Authorization,X-Sapphire-Webhook-Secret,X-Sapphire-Control-Token,X-Telegram-Bot-Api-Secret-Token"
         )
 
 
@@ -75,6 +75,32 @@ async def telegram_webhook(request):
             logger.error(f"Telegram webhook handler error: {exc}")
 
     return web.Response(text="OK", status=200)
+
+
+def _extract_control_token(request: web.Request) -> str:
+    token = (request.headers.get("X-Sapphire-Control-Token") or "").strip()
+    if token:
+        return token
+
+    auth = (request.headers.get("Authorization") or "").strip()
+    if auth.lower().startswith("bearer "):
+        bearer_token = auth[7:].strip()
+        if bearer_token:
+            return bearer_token
+
+    return ""
+
+
+def _require_control_token(request: web.Request) -> Optional[web.Response]:
+    expected_token = str(request.app.get("control_api_token") or "").strip()
+    if not expected_token:
+        return web.json_response({"ok": False, "error": "control_token_unconfigured"}, status=503)
+
+    provided_token = _extract_control_token(request)
+    if provided_token != expected_token:
+        return web.json_response({"ok": False, "error": "forbidden"}, status=403)
+
+    return None
 
 
 def _extract_shared_secret(
@@ -178,6 +204,21 @@ async def platform_status(request: web.Request) -> web.Response:
     return web.json_response({"ok": True}, status=200)
 
 
+async def control_status(request: web.Request) -> web.Response:
+    handler = request.app.get("control_status_handler")
+    if handler is None:
+        return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
+    try:
+        result = await handler({})
+    except Exception as exc:
+        logger.error(f"Control status handler error: {exc}")
+        return web.json_response({"ok": False, "error": "handler_failed"}, status=500)
+    if isinstance(result, dict):
+        status = 400 if result.get("error") else 200
+        return web.json_response({"ok": status == 200, **result}, status=status)
+    return web.json_response({"ok": True}, status=200)
+
+
 async def routing_info(request: web.Request) -> web.Response:
     handler = request.app.get("routing_info_handler")
     if handler is None:
@@ -229,24 +270,238 @@ async def system_logs(request: web.Request) -> web.Response:
     return web.json_response([], status=200)
 
 
+async def tradingview_workspace(request: web.Request) -> web.Response:
+    handler = request.app.get("tradingview_workspace_handler")
+    if handler is None:
+        return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
+    try:
+        result = await handler({})
+    except Exception as exc:
+        logger.error(f"TradingView workspace handler error: {exc}")
+        return web.json_response({"ok": False, "error": "handler_failed"}, status=500)
+    if isinstance(result, dict):
+        status = 400 if result.get("error") else 200
+        return web.json_response({"ok": status == 200, **result}, status=status)
+    return web.json_response({"ok": True}, status=200)
+
+
+async def _read_json_payload(request: web.Request) -> dict[str, Any]:
+    try:
+        payload = await request.json()
+    except Exception:
+        return {}
+    if isinstance(payload, dict):
+        return payload
+    return {}
+
+
+async def forum_topics(request: web.Request) -> web.Response:
+    if request.method == "GET":
+        handler = request.app.get("forum_topics_handler")
+        if handler is None:
+            return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
+        payload: dict[str, Any] = {
+            "lane": request.rel_url.query.get("lane", ""),
+            "state": request.rel_url.query.get("state", ""),
+            "tag": request.rel_url.query.get("tag", ""),
+            "q": request.rel_url.query.get("q", ""),
+            "limit": request.rel_url.query.get("limit", "80"),
+        }
+    else:
+        handler = request.app.get("forum_create_topic_handler")
+        if handler is None:
+            return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
+        denied = _require_control_token(request)
+        if denied is not None:
+            return denied
+        payload = await _read_json_payload(request)
+
+    try:
+        result = await handler(payload)
+    except Exception as exc:
+        logger.error(f"Forum topics handler error: {exc}")
+        return web.json_response({"ok": False, "error": "handler_failed"}, status=500)
+
+    if isinstance(result, dict):
+        status = 400 if result.get("error") else 200
+        return web.json_response({"ok": status == 200, **result}, status=status)
+    return web.json_response({"ok": True}, status=200)
+
+
+async def forum_topic_detail(request: web.Request) -> web.Response:
+    handler = request.app.get("forum_topic_detail_handler")
+    if handler is None:
+        return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
+
+    topic_id = str(request.match_info.get("topic_id", "")).strip()
+    payload = {"topic_id": topic_id}
+    try:
+        result = await handler(payload)
+    except Exception as exc:
+        logger.error(f"Forum topic detail handler error: {exc}")
+        return web.json_response({"ok": False, "error": "handler_failed"}, status=500)
+
+    if isinstance(result, dict):
+        status = 400 if result.get("error") else 200
+        return web.json_response({"ok": status == 200, **result}, status=status)
+    return web.json_response({"ok": True}, status=200)
+
+
+async def forum_replies(request: web.Request) -> web.Response:
+    handler = request.app.get("forum_replies_handler")
+    if handler is None:
+        return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
+
+    denied = _require_control_token(request)
+    if denied is not None:
+        return denied
+    payload = await _read_json_payload(request)
+    payload["topic_id"] = str(request.match_info.get("topic_id", "")).strip()
+    try:
+        result = await handler(payload)
+    except Exception as exc:
+        logger.error(f"Forum replies handler error: {exc}")
+        return web.json_response({"ok": False, "error": "handler_failed"}, status=500)
+
+    if isinstance(result, dict):
+        status = 400 if result.get("error") else 200
+        return web.json_response({"ok": status == 200, **result}, status=status)
+    return web.json_response({"ok": True}, status=200)
+
+
+async def forum_scout_status(request: web.Request) -> web.Response:
+    handler = request.app.get("forum_scout_status_handler")
+    if handler is None:
+        return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
+    try:
+        result = await handler({})
+    except Exception as exc:
+        logger.error(f"Forum scout status handler error: {exc}")
+        return web.json_response({"ok": False, "error": "handler_failed"}, status=500)
+    if isinstance(result, dict):
+        status = 400 if result.get("error") else 200
+        return web.json_response({"ok": status == 200, **result}, status=status)
+    return web.json_response({"ok": True}, status=200)
+
+
+async def forum_scout_register(request: web.Request) -> web.Response:
+    handler = request.app.get("forum_scout_register_handler")
+    if handler is None:
+        return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
+
+    denied = _require_control_token(request)
+    if denied is not None:
+        return denied
+    payload = await _read_json_payload(request)
+    try:
+        result = await handler(payload)
+    except Exception as exc:
+        logger.error(f"Forum scout register handler error: {exc}")
+        return web.json_response({"ok": False, "error": "handler_failed"}, status=500)
+    if isinstance(result, dict):
+        status = 400 if result.get("error") else 200
+        return web.json_response({"ok": status == 200, **result}, status=status)
+    return web.json_response({"ok": True}, status=200)
+
+
+async def forum_scout_publish(request: web.Request) -> web.Response:
+    handler = request.app.get("forum_scout_publish_handler")
+    if handler is None:
+        return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
+
+    denied = _require_control_token(request)
+    if denied is not None:
+        return denied
+    payload = await _read_json_payload(request)
+    try:
+        result = await handler(payload)
+    except Exception as exc:
+        logger.error(f"Forum scout publish handler error: {exc}")
+        return web.json_response({"ok": False, "error": "handler_failed"}, status=500)
+    if isinstance(result, dict):
+        status = 400 if result.get("error") else 200
+        return web.json_response({"ok": status == 200, **result}, status=status)
+    return web.json_response({"ok": True}, status=200)
+
+
+async def security_skills_status(request: web.Request) -> web.Response:
+    handler = request.app.get("security_skills_status_handler")
+    if handler is None:
+        return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
+    try:
+        result = await handler({})
+    except Exception as exc:
+        logger.error(f"Security skills status handler error: {exc}")
+        return web.json_response({"ok": False, "error": "handler_failed"}, status=500)
+    if isinstance(result, dict):
+        status = 400 if result.get("error") else 200
+        return web.json_response({"ok": status == 200, **result}, status=status)
+    return web.json_response({"ok": True}, status=200)
+
+
+async def security_skills_scan(request: web.Request) -> web.Response:
+    handler = request.app.get("security_skills_scan_handler")
+    if handler is None:
+        return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
+
+    denied = _require_control_token(request)
+    if denied is not None:
+        return denied
+    if request.method == "GET":
+        upload_value = str(request.rel_url.query.get("upload_if_missing", "false")).strip().lower()
+        payload = {
+            "skill": request.rel_url.query.get("skill", ""),
+            "upload_if_missing": upload_value in {"1", "true", "yes", "on"},
+        }
+    else:
+        payload = await _read_json_payload(request)
+
+    try:
+        result = await handler(payload)
+    except Exception as exc:
+        logger.error(f"Security skills scan handler error: {exc}")
+        return web.json_response({"ok": False, "error": "handler_failed"}, status=500)
+    if isinstance(result, dict):
+        status = 400 if result.get("error") else 200
+        return web.json_response({"ok": status == 200, **result}, status=status)
+    return web.json_response({"ok": True}, status=200)
+
+
 async def start_health_server(
     telegram_update_handler: Optional[Callable[[dict[str, Any]], Awaitable[None]]] = None,
     telegram_webhook_secret: str = "",
+    control_api_token: str = "",
     tradingview_update_handler: Optional[
         Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]
     ] = None,
     tradingview_webhook_secret: str = "",
     market_ohlc_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
     platform_status_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
+    control_status_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
     routing_info_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
     performance_stats_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
     system_logs_handler: Optional[Callable[[dict[str, Any]], Awaitable[Any]]] = None,
+    tradingview_workspace_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
+    forum_topics_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
+    forum_create_topic_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
+    forum_topic_detail_handler: Optional[
+        Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]
+    ] = None,
+    forum_replies_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
+    forum_scout_status_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
+    forum_scout_register_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
+    forum_scout_publish_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
+    security_skills_status_handler: Optional[
+        Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]
+    ] = None,
+    security_skills_scan_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
 ):
     """Start a lightweight HTTP server for Cloud Run health checks."""
     port = int(os.getenv("PORT", "8080"))
 
     app = web.Application(middlewares=[cors_middleware])
     app["cors_allowlist"] = _build_cors_allowlist()
+    app["control_api_token"] = (control_api_token or "").strip()
     app.router.add_get("/", health_check)
     app.router.add_get("/health", health_check)
     app.router.add_get("/readiness", readiness_check)
@@ -264,6 +519,9 @@ async def start_health_server(
     if platform_status_handler is not None:
         app["platform_status_handler"] = platform_status_handler
         app.router.add_get("/api/v2/platforms/status", platform_status)
+    if control_status_handler is not None:
+        app["control_status_handler"] = control_status_handler
+        app.router.add_get("/api/v2/control/status", control_status)
     if routing_info_handler is not None:
         app["routing_info_handler"] = routing_info_handler
         app.router.add_get("/api/v2/trade/routing", routing_info)
@@ -273,6 +531,37 @@ async def start_health_server(
     if system_logs_handler is not None:
         app["system_logs_handler"] = system_logs_handler
         app.router.add_get("/logs/system", system_logs)
+    if tradingview_workspace_handler is not None:
+        app["tradingview_workspace_handler"] = tradingview_workspace_handler
+        app.router.add_get("/api/v2/tradingview/workspace", tradingview_workspace)
+    if forum_topics_handler is not None:
+        app["forum_topics_handler"] = forum_topics_handler
+        app.router.add_get("/api/v2/forum/topics", forum_topics)
+    if forum_create_topic_handler is not None:
+        app["forum_create_topic_handler"] = forum_create_topic_handler
+        app.router.add_post("/api/v2/forum/topics", forum_topics)
+    if forum_topic_detail_handler is not None:
+        app["forum_topic_detail_handler"] = forum_topic_detail_handler
+        app.router.add_get("/api/v2/forum/topics/{topic_id}", forum_topic_detail)
+    if forum_replies_handler is not None:
+        app["forum_replies_handler"] = forum_replies_handler
+        app.router.add_post("/api/v2/forum/topics/{topic_id}/replies", forum_replies)
+    if forum_scout_status_handler is not None:
+        app["forum_scout_status_handler"] = forum_scout_status_handler
+        app.router.add_get("/api/v2/forum/scout/status", forum_scout_status)
+    if forum_scout_register_handler is not None:
+        app["forum_scout_register_handler"] = forum_scout_register_handler
+        app.router.add_post("/api/v2/forum/scout/register", forum_scout_register)
+    if forum_scout_publish_handler is not None:
+        app["forum_scout_publish_handler"] = forum_scout_publish_handler
+        app.router.add_post("/api/v2/forum/scout/publish", forum_scout_publish)
+    if security_skills_status_handler is not None:
+        app["security_skills_status_handler"] = security_skills_status_handler
+        app.router.add_get("/api/v2/security/skills/status", security_skills_status)
+    if security_skills_scan_handler is not None:
+        app["security_skills_scan_handler"] = security_skills_scan_handler
+        app.router.add_get("/api/v2/security/skills/scan", security_skills_scan)
+        app.router.add_post("/api/v2/security/skills/scan", security_skills_scan)
 
     runner = web.AppRunner(app)
     await runner.setup()

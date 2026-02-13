@@ -68,6 +68,13 @@ else
   fail "platform status contract missing aster/lighter"
 fi
 
+control_payload="$(curl -fsS "${ALPHA_URL}/api/v2/control/status" || true)"
+if [[ -n "${control_payload}" ]] && echo "${control_payload}" | jq -e '.tradingview_execution_enabled != null and .pending_autonomy_decisions != null and .venues != null' >/dev/null 2>&1; then
+  pass "control status contract"
+else
+  fail "control status contract missing execution/decision/venues fields"
+fi
+
 routing_payload="$(curl -fsS "${ALPHA_URL}/api/v2/trade/routing" || true)"
 if [[ -n "${routing_payload}" ]] && echo "${routing_payload}" | jq -e '.confidence != null' >/dev/null 2>&1; then
   pass "routing contract"
@@ -89,6 +96,20 @@ else
   fail "system logs contract expected array"
 fi
 
+forum_topics_payload="$(curl -fsS "${ALPHA_URL}/api/v2/forum/topics?limit=10" || true)"
+if [[ -n "${forum_topics_payload}" ]] && echo "${forum_topics_payload}" | jq -e '.topics | type == "array"' >/dev/null 2>&1; then
+  pass "forum topics contract"
+else
+  fail "forum topics contract expected topics array"
+fi
+
+forum_scout_payload="$(curl -fsS "${ALPHA_URL}/api/v2/forum/scout/status" || true)"
+if [[ -n "${forum_scout_payload}" ]] && echo "${forum_scout_payload}" | jq -e '.profile.agent_id != null and .external_bridge != null' >/dev/null 2>&1; then
+  pass "forum scout status contract"
+else
+  fail "forum scout status contract missing profile/bridge"
+fi
+
 aster_ohlc_payload="$(curl -fsS "${ALPHA_URL}/api/v2/market/ohlc?venue=ASTER&symbol=SOL&interval=1m&limit=20" || true)"
 if [[ -n "${aster_ohlc_payload}" ]] && echo "${aster_ohlc_payload}" | jq -e '.ok == true and (.candles | type == "array") and (.candles | length > 0)' >/dev/null 2>&1; then
   pass "ASTER OHLC contract"
@@ -101,6 +122,13 @@ if [[ -n "${lighter_ohlc_payload}" ]] && echo "${lighter_ohlc_payload}" | jq -e 
   pass "LIGHTER OHLC contract"
 else
   fail "LIGHTER OHLC contract missing array response"
+fi
+
+workspace_payload="$(curl -fsS "${ALPHA_URL}/api/v2/tradingview/workspace" || true)"
+if [[ -n "${workspace_payload}" ]] && echo "${workspace_payload}" | jq -e '.workspace.state.watchlists != null and .workspace.state.selected_symbol != null' >/dev/null 2>&1; then
+  pass "tradingview workspace contract"
+else
+  fail "tradingview workspace contract missing workspace state"
 fi
 
 cors_header="$(curl -si -H "Origin: ${WEB_URL}" "${ALPHA_URL}/api/v2/market/ohlc?venue=ASTER&symbol=SOL&interval=1m&limit=5" | tr -d '\r' | awk -F': ' 'tolower($1)=="access-control-allow-origin"{print $2; exit}')"
