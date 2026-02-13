@@ -840,6 +840,12 @@ class TelegramPlatformBot:
             "• `trade on 0.03` — enable live trading\n"
             "• `focus on reducing drawdown` — steer strategy direction\n"
             "• `lighter buy 0.5 ETH` — manual trade override\n\n"
+            "**Forum commands:**\n"
+            "• `forum top [category]` — top-scored topics\n"
+            "• `forum vote TOPIC-XXXXX up|down` — vote on a topic\n"
+            "• `forum agents` — agent personality profiles\n"
+            "• `forum thread TOPIC-XXXXX` — threaded replies\n"
+            "• `/forum post Title | Body category:trade_idea` — create topic\n\n"
             "Slash commands still work (`/status`, `/kill`, etc.) but aren't required.\n"
             "When an agent asks you something, just reply — we'll figure out the rest."
         )
@@ -1024,6 +1030,68 @@ class TelegramPlatformBot:
                 "ack": (
                     f"On it — {'replying to post `' + post_id + '`' if post_id else 'publishing to Moltbook now'}."
                 ),
+            }
+
+        # ── Phase 3: Forum plain-text commands ─────────────────────
+        forum_top_match = re.search(r"\bforum\s+top(?:\s+([a-z_]+))?\s*$", normalized)
+        if forum_top_match:
+            category = str(forum_top_match.group(1) or "").strip()
+            payload = json.dumps({"category": category, "limit": 10}, separators=(",", ":"))
+            return {
+                "platform": "CONTROL",
+                "symbol": payload,
+                "action": "FORUM_TOP_TOPICS",
+                "quantity": 0.0,
+                "agent": EMERALD,
+                "ack": "Pulling top-scored forum topics.",
+            }
+
+        forum_vote_match = re.search(
+            r"\bforum\s+vote\s+(TOPIC-[0-9]{5})\s+(up|down)\b",
+            raw,
+            flags=re.IGNORECASE,
+        )
+        if forum_vote_match:
+            topic_id = str(forum_vote_match.group(1) or "").strip().upper()
+            direction = str(forum_vote_match.group(2) or "").strip().lower()
+            payload = json.dumps(
+                {"topic_id": topic_id, "direction": direction, "voter": "SAPPHIRE"},
+                separators=(",", ":"),
+            )
+            return {
+                "platform": "CONTROL",
+                "symbol": payload,
+                "action": "FORUM_VOTE_TOPIC",
+                "quantity": 0.0,
+                "agent": SAPPHIRE,
+                "ack": f"Voting `{direction}` on `{topic_id}`.",
+            }
+
+        if re.search(r"\bforum\s+agents\b", normalized):
+            return {
+                "platform": "CONTROL",
+                "symbol": "ALL",
+                "action": "FORUM_AGENTS",
+                "quantity": 0.0,
+                "agent": EMERALD,
+                "ack": "Loading agent personality profiles.",
+            }
+
+        forum_thread_match = re.search(
+            r"\bforum\s+thread\s+(TOPIC-[0-9]{5})\b",
+            raw,
+            flags=re.IGNORECASE,
+        )
+        if forum_thread_match:
+            topic_id = str(forum_thread_match.group(1) or "").strip().upper()
+            payload = json.dumps({"topic_id": topic_id}, separators=(",", ":"))
+            return {
+                "platform": "CONTROL",
+                "symbol": payload,
+                "action": "FORUM_THREAD",
+                "quantity": 0.0,
+                "agent": EMERALD,
+                "ack": f"Loading thread for `{topic_id}`.",
             }
 
         if re.search(r"\b(what'?s\s+status|status)\b", normalized):
@@ -1352,6 +1420,89 @@ class TelegramPlatformBot:
             target_note = f" → replying to `{post_id}`" if post_id else ""
             await self.send_as(SAPPHIRE, f"Publishing scout note{target_note}.")
             await self._dispatch_callback("CONTROL", payload, "SCOUT_PUBLISH", 0.0)
+            return
+
+        # ── Phase 3: Forum collaboration commands ──────────────────
+        # /forum top [category]
+        forum_top = re.search(
+            r"^/forum\s+top(?:\s+([a-z_]+))?$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if forum_top:
+            category = str(forum_top.group(1) or "").strip().lower()
+            payload = json.dumps({"category": category, "limit": 10}, separators=(",", ":"))
+            await self.send_as(EMERALD, "Pulling top-scored forum topics.")
+            await self._dispatch_callback("CONTROL", payload, "FORUM_TOP_TOPICS", 0.0)
+            return
+
+        # /forum vote <TOPIC-XXXXX> up|down
+        forum_vote = re.search(
+            r"^/forum\s+vote\s+(TOPIC-[0-9]{5})\s+(up|down)$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if forum_vote:
+            topic_id = str(forum_vote.group(1) or "").strip().upper()
+            direction = str(forum_vote.group(2) or "").strip().lower()
+            payload = json.dumps(
+                {"topic_id": topic_id, "direction": direction, "voter": "SAPPHIRE"},
+                separators=(",", ":"),
+            )
+            await self.send_as(SAPPHIRE, f"Casting `{direction}` vote on `{topic_id}`.")
+            await self._dispatch_callback("CONTROL", payload, "FORUM_VOTE_TOPIC", 0.0)
+            return
+
+        # /forum agents
+        forum_agents = re.search(r"^/forum\s+agents$", text, flags=re.IGNORECASE)
+        if forum_agents:
+            await self.send_as(EMERALD, "Loading agent personality profiles.")
+            await self._dispatch_callback("CONTROL", "ALL", "FORUM_AGENTS", 0.0)
+            return
+
+        # /forum thread <TOPIC-XXXXX>
+        forum_thread = re.search(
+            r"^/forum\s+thread\s+(TOPIC-[0-9]{5})$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if forum_thread:
+            topic_id = str(forum_thread.group(1) or "").strip().upper()
+            payload = json.dumps({"topic_id": topic_id}, separators=(",", ":"))
+            await self.send_as(EMERALD, f"Loading thread for `{topic_id}`.")
+            await self._dispatch_callback("CONTROL", payload, "FORUM_THREAD", 0.0)
+            return
+
+        # /forum post <title> | <body> [category:<cat>]
+        forum_post = re.search(
+            r"^/forum\s+post\s+(.+)$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if forum_post:
+            raw_content = str(forum_post.group(1) or "").strip()
+            # Extract optional category tag
+            category = "general"
+            cat_match = re.search(r"\bcategory:([a-z_]+)\b", raw_content, flags=re.IGNORECASE)
+            if cat_match:
+                category = str(cat_match.group(1) or "").strip().lower()
+                raw_content = re.sub(r"\bcategory:[a-z_]+\b", "", raw_content, flags=re.IGNORECASE).strip()
+            # Split title | body
+            parts = raw_content.split("|", 1)
+            title = parts[0].strip()
+            body = parts[1].strip() if len(parts) > 1 else title
+            payload = json.dumps(
+                {
+                    "title": title,
+                    "body": body,
+                    "category": category,
+                    "lane": "trading",
+                    "author": "SAPPHIRE",
+                },
+                separators=(",", ":"),
+            )
+            await self.send_as(SAPPHIRE, f"Creating forum topic: *{title[:60]}*")
+            await self._dispatch_callback("CONTROL", payload, "FORUM_CREATE_TOPIC", 0.0)
             return
 
         # VirusTotal security commands

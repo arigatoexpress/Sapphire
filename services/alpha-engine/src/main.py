@@ -2686,6 +2686,122 @@ class AlphaEngine:
                 )
             return
 
+        # ── Phase 3: Forum collaboration commands ──────────────────
+        if normalized_action == "FORUM_TOP_TOPICS":
+            payload = self._parse_json_payload(target)
+            category = str(payload.get("category", "")).strip()
+            limit = int(payload.get("limit", 10) or 10)
+            top = self.forum.get_top_topics(limit=limit, category=category)
+            if not top:
+                await self.telegram.send_as(
+                    EMERALD,
+                    "📭 No forum topics found" + (f" in category `{category}`" if category else "") + ".",
+                )
+            else:
+                cat_label = f" [{category}]" if category else ""
+                lines = [f"📊 **Top Forum Topics{cat_label}**\n"]
+                for i, t in enumerate(top[:10], 1):
+                    score = float(t.get("score", 0))
+                    tid = t.get("topic_id", "?")
+                    title = str(t.get("title", "Untitled"))[:50]
+                    author = t.get("author", "?")
+                    lines.append(f"{i}. `{tid}` ⬆{score:+.0f} — *{title}* ({author})")
+                await self.telegram.send_message("\n".join(lines), priority="medium")
+            return
+
+        if normalized_action == "FORUM_VOTE_TOPIC":
+            payload = self._parse_json_payload(target)
+            topic_id = str(payload.get("topic_id", "")).strip().upper()
+            direction = str(payload.get("direction", "")).strip().lower()
+            voter = str(payload.get("voter", "SAPPHIRE")).strip().upper()
+            if not topic_id or not direction:
+                await self.telegram.send_message(
+                    "❌ Usage: `forum vote TOPIC-XXXXX up|down`",
+                    priority="high",
+                )
+                return
+            gate.require(voter, Capability.FORUM_WRITE, f"vote_topic({topic_id}, {direction})")
+            result = self.forum.vote_topic(topic_id, voter, direction)
+            if result.get("ok"):
+                await self.telegram.send_message(
+                    f"✅ Voted `{direction}` on `{topic_id}` — score now **{result['score']:+.0f}** "
+                    f"(⬆{result.get('upvotes', 0)} ⬇{result.get('downvotes', 0)})",
+                    priority="medium",
+                )
+            else:
+                await self.telegram.send_message(
+                    f"❌ Vote failed: `{result.get('error', 'unknown')}`",
+                    priority="high",
+                )
+            return
+
+        if normalized_action == "FORUM_AGENTS":
+            profiles = self.forum.list_agent_profiles()
+            lines = ["🤖 **Agent Personality Profiles**\n"]
+            for agent_id, p in profiles.items():
+                lines.append(
+                    f"{p['emoji']} **{p['name']}** — {p['role']}\n"
+                    f"  Expertise: {', '.join(p['expertise'])}\n"
+                    f"  Voice: _{p['voice']}_\n"
+                    f"  Perspective: _{p['perspective']}_\n"
+                )
+            await self.telegram.send_message("\n".join(lines), priority="medium")
+            return
+
+        if normalized_action == "FORUM_THREAD":
+            payload = self._parse_json_payload(target)
+            topic_id = str(payload.get("topic_id", "")).strip().upper()
+            if not topic_id:
+                await self.telegram.send_message(
+                    "❌ Usage: `forum thread TOPIC-XXXXX`",
+                    priority="high",
+                )
+                return
+            detail = self.forum.get_topic_detail(topic_id)
+            if not detail:
+                await self.telegram.send_message(
+                    f"❌ Topic `{topic_id}` not found.",
+                    priority="high",
+                )
+                return
+            thread = self.forum.get_thread(topic_id)
+            lines = [
+                f"🧵 **Thread: {detail.get('title', 'Untitled')}** (`{topic_id}`)\n"
+                f"Author: {detail.get('author', '?')} | Score: {detail.get('score', 0):+.0f} | "
+                f"Category: `{detail.get('category', 'general')}`\n"
+            ]
+            if not thread:
+                lines.append("_No replies yet._")
+            else:
+                for r in thread[:15]:
+                    rid = r.get("reply_id", "?")
+                    author = r.get("author", "?")
+                    body_preview = str(r.get("body", ""))[:80]
+                    q = r.get("quality", {})
+                    quality_str = ""
+                    if q and q.get("ratings_count", 0) > 0:
+                        quality_str = f" | Q:{q.get('helpfulness', 0):.1f}/{q.get('accuracy', 0):.1f}"
+                    lines.append(f"  💬 `{rid}` ({author}){quality_str}: {body_preview}")
+            await self.telegram.send_message("\n".join(lines), priority="medium")
+            return
+
+        if normalized_action == "FORUM_CREATE_TOPIC":
+            payload = self._parse_json_payload(target)
+            result = await self._handle_forum_create_topic_request(payload)
+            if result.get("error"):
+                await self.telegram.send_message(
+                    f"❌ Topic creation failed: `{result['error']}`",
+                    priority="high",
+                )
+            else:
+                topic = result.get("topic", {})
+                await self.telegram.send_message(
+                    f"✅ Topic created: `{topic.get('topic_id', '?')}` — *{topic.get('title', 'Untitled')[:50]}*\n"
+                    f"Category: `{topic.get('category', 'general')}` | Author: {topic.get('author', '?')}",
+                    priority="medium",
+                )
+            return
+
         if normalized_action in {"SCOUT_STATUS", "FORUM_SCOUT_STATUS"}:
             status = self.forum.scout_status()
             profile = status.get("profile", {}) if isinstance(status, dict) else {}
@@ -4562,6 +4678,7 @@ class AlphaEngine:
                     "title": payload.get("title", ""),
                     "body": payload.get("body", ""),
                     "lane": payload.get("lane", "research"),
+                    "category": payload.get("category", "general"),
                     "state": payload.get("state", "open"),
                     "priority": payload.get("priority", "medium"),
                     "author": payload.get("author", "SAPPHIRE"),
@@ -4602,6 +4719,7 @@ class AlphaEngine:
                     "kind": payload.get("kind", "comment"),
                     "state": payload.get("state", ""),
                     "source": payload.get("source", "internal"),
+                    "parent_reply_id": payload.get("parent_reply_id", ""),
                 },
             )
         except ValueError as exc:
