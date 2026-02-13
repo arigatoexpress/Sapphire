@@ -18,6 +18,7 @@ from src.feeds.market_data import MarketDataAggregator
 from src.integrations.tradingview_autonomy import TradingViewAutonomyPlugin
 from src.security.skill_auditor import SkillAuditor
 from src.security.virustotal_scanner import VirusTotalSkillScanner
+from src.security.prompt_sanitizer import sanitize_for_prompt, log_injection_attempt
 from src.strategy.engine import AlphaStrategyEngine
 
 # Add shared library to path
@@ -3633,7 +3634,14 @@ class AlphaEngine:
                     f"Targets: {', '.join(executable_targets)}\n"
                 )
                 if memory_advice:
-                    cognition_prompt += f"Past experience: {memory_advice[:400]}\n"
+                    safe_advice, advice_detection = sanitize_for_prompt(
+                        memory_advice, max_length=400, wrap_boundary=False,
+                    )
+                    if advice_detection.is_suspicious:
+                        log_injection_attempt(
+                            "memory_recall", advice_detection, agent_id="cognition",
+                        )
+                    cognition_prompt += f"Past experience: {safe_advice}\n"
                 cognition_prompt += (
                     "Should we execute this trade? Consider risk and market conditions.\n"
                     "Respond with DECISION: BUY/SELL/HOLD, CONFIDENCE: 0-1, REASONING: <why>"
