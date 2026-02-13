@@ -420,9 +420,7 @@ class LighterBot:
             loop = asyncio.get_event_loop()
 
             # Get next nonce for transaction
-            nonce_response = await loop.run_in_executor(
-                None, lambda: self.transaction_api.next_nonce(account_index=self.account_index)
-            )
+            nonce_response = await loop.run_in_executor(None, self._fetch_next_nonce)
             nonce = nonce_response.nonce if hasattr(nonce_response, "nonce") else 0
 
             # Get current price for market order execution
@@ -520,6 +518,19 @@ class LighterBot:
                 error_message=str(e),
                 execution_time_ms=execution_time,
             )
+
+    def _fetch_next_nonce(self):
+        """
+        Support both SDK signatures:
+        - next_nonce(account_index=...)
+        - next_nonce(account_index=..., api_key_index=...)
+        """
+        try:
+            return self.transaction_api.next_nonce(
+                account_index=self.account_index, api_key_index=0
+            )
+        except TypeError:
+            return self.transaction_api.next_nonce(account_index=self.account_index)
 
     def _sign_transaction(self, tx_body: Dict) -> str:
         """Sign a transaction using the private key."""

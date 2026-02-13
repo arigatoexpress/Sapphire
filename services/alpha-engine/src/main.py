@@ -1471,12 +1471,32 @@ class AlphaEngine:
                 return
 
             dispatch = result.get("dispatch", {}) if isinstance(result, dict) else {}
+            metadata = dispatch.get("metadata", {}) if isinstance(dispatch, dict) else {}
+            metadata = metadata if isinstance(metadata, dict) else {}
+            reason = str(dispatch.get("reason", "unknown")).strip() or "unknown"
+            outcome = "external post accepted."
+            if reason == "ok_pending_verification" or metadata.get("verification_required"):
+                outcome = "accepted by Moltbook, pending verification before full feed visibility."
+            elif reason == "moltbook_rate_limited":
+                retry_after_minutes = int(metadata.get("retry_after_minutes", 0) or 0)
+                if retry_after_minutes > 0:
+                    outcome = f"provider cooldown active; retry in about {retry_after_minutes} minutes."
+                else:
+                    outcome = "provider cooldown active; retry after the next rate-limit window."
+            elif reason == "moltbook_pending_claim":
+                outcome = "account is pending claim; owner claim completion is required before publishing."
+            elif reason == "moltbook_already_registered":
+                outcome = "provider already has this scout account registered."
+            elif not dispatch.get("dispatched"):
+                outcome = "external publish blocked; note remains stored locally for retry."
             await self.telegram.send_message(
                 (
                     f"🛰️ Scout note processed for topic `{result.get('topic_id', 'n/a')}`.\n"
                     f"Dispatch mode: `{dispatch.get('mode', 'none')}` | "
                     f"Dispatch: `{'YES' if dispatch.get('dispatched') else 'NO'}`\n"
-                    f"Reason: `{dispatch.get('reason', 'unknown')}`"
+                    f"Reason: `{reason}`\n"
+                    f"Outcome: {outcome}\n"
+                    "Benefit: external collaboration remains sanitized and auditable."
                 ),
                 priority="high",
             )
@@ -2697,22 +2717,35 @@ class AlphaEngine:
         if result.get("ok"):
             dispatch = result.get("dispatch", {}) or {}
             mode = str(dispatch.get("mode", "none")).strip() or "none"
+            metadata = dispatch.get("metadata", {}) if isinstance(dispatch, dict) else {}
+            metadata = metadata if isinstance(metadata, dict) else {}
+            username = result.get("registration", {}).get("username", "unknown")
             if dispatch.get("dispatched"):
+                lines = [
+                    "🛰️ Scout registration processed.",
+                    f"Mode: `{mode}`",
+                    f"User: `@{username}`",
+                    "Outcome: least-privilege external collaboration scout is active.",
+                ]
+                if metadata.get("claim_url"):
+                    lines.append(f"Action: complete claim in Moltbook once using `{metadata.get('claim_url')}`.")
+                elif metadata.get("already_registered"):
+                    lines.append("Action: existing claimed scout account detected; no re-registration needed.")
                 await self.telegram.send_message(
-                    (
-                        "🛰️ Scout registration dispatched.\n"
-                        f"Mode: `{mode}`\n"
-                        f"User: `@{result.get('registration', {}).get('username', 'unknown')}`"
-                    ),
+                    "\n".join(lines),
                     priority="medium",
                 )
             else:
+                lines = [
+                    "🛰️ Scout registration prepared locally; external provider blocked dispatch.",
+                    f"Mode: `{mode}`",
+                    f"Reason: `{dispatch.get('reason', 'not_configured')}`",
+                    "Benefit preserved: local SapphireBook record exists for retry/audit without exposing sensitive data.",
+                ]
+                if metadata.get("hint"):
+                    lines.append(f"Hint: {metadata.get('hint')}")
                 await self.telegram.send_message(
-                    (
-                        "🛰️ Scout registration prepared locally; external bridge pending.\n"
-                        f"Mode: `{mode}`\n"
-                        f"Reason: `{dispatch.get('reason', 'not_configured')}`"
-                    ),
+                    "\n".join(lines),
                     priority="medium",
                 )
         return result

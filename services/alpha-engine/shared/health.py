@@ -13,7 +13,13 @@ def _build_cors_allowlist() -> set[str]:
     raw = str(
         os.getenv(
             "ALPHA_API_CORS_ORIGINS",
-            "https://sapphirebook-web-s77j6bxyra-uc.a.run.app,http://localhost:5173,http://127.0.0.1:5173",
+            (
+                "https://sapphirebook-web-s77j6bxyra-uc.a.run.app,"
+                "https://sapphirealpha.xyz,"
+                "https://sapphire-479610.web.app,"
+                "http://localhost:5173,"
+                "http://127.0.0.1:5173"
+            ),
         )
     ).strip()
     values = [entry.strip() for entry in raw.replace(";", ",").split(",")]

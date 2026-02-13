@@ -8,6 +8,7 @@ ALPHA_SERVICE="${ALPHA_SERVICE:-sapphire-alpha}"
 ALPHA_REGION="${ALPHA_REGION:-us-central1}"
 WEB_SERVICE="${WEB_SERVICE:-sapphirebook-web}"
 WEB_REGION="${WEB_REGION:-us-central1}"
+WEB_DOMAIN="${WEB_DOMAIN:-https://sapphirealpha.xyz}"
 
 FAILURES=0
 
@@ -48,6 +49,7 @@ fi
 echo "== Frontend Contract Check =="
 echo "Alpha URL: ${ALPHA_URL}"
 echo "Web URL: ${WEB_URL}"
+echo "Web Domain: ${WEB_DOMAIN}"
 
 if curl -fsS "${ALPHA_URL}/health" >/dev/null; then
   pass "alpha /health"
@@ -136,6 +138,13 @@ if [[ "${cors_header}" == "${WEB_URL}" ]]; then
   pass "CORS allow-origin for web URL"
 else
   fail "CORS allow-origin mismatch (expected ${WEB_URL}, got ${cors_header:-<empty>})"
+fi
+
+cors_domain_header="$(curl -si -H "Origin: ${WEB_DOMAIN}" "${ALPHA_URL}/api/v2/market/ohlc?venue=ASTER&symbol=SOL&interval=1m&limit=5" | tr -d '\r' | awk -F': ' 'tolower($1)=="access-control-allow-origin"{print $2; exit}')"
+if [[ "${cors_domain_header}" == "${WEB_DOMAIN}" ]]; then
+  pass "CORS allow-origin for web domain"
+else
+  fail "CORS allow-origin mismatch for web domain (expected ${WEB_DOMAIN}, got ${cors_domain_header:-<empty>})"
 fi
 
 echo

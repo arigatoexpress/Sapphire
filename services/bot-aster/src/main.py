@@ -9,6 +9,7 @@ import asyncio
 import logging
 import os
 import signal
+import time
 
 # Add shared library to path
 import sys
@@ -589,6 +590,7 @@ class AsterBot:
         except Exception as e:
             self.trades_failed += 1
             execution_time = (datetime.now() - start_time).total_seconds() * 1000
+            logger.error(f"Aster Execution Failed: {e}")
             return TradeResult(
                 trade_id="",
                 signal_id=signal.signal_id,
