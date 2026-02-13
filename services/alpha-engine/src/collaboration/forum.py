@@ -12,6 +12,8 @@ from urllib.parse import urlparse
 import aiohttp
 from loguru import logger
 
+from src.security.prompt_sanitizer import detect_injection, log_injection_attempt
+
 
 class SapphireForumService:
     VALID_LANES = {
@@ -204,10 +206,24 @@ class SapphireForumService:
         if len(text) > max_len:
             text = text[: max_len - 3] + "..."
 
+        # Prompt injection detection on forum content
+        injection = detect_injection(text)
+        injection_blocked = False
+        if injection.is_suspicious:
+            log_injection_attempt("forum_content", injection, agent_id="forum")
+            logger.warning(
+                f"⚠️ Injection detected in forum content (risk={injection.risk_score}): "
+                f"{[f['category'] for f in injection.findings]}"
+            )
+            if injection.risk_score >= 0.6:
+                text = "[CONTENT BLOCKED — prompt injection detected]"
+                injection_blocked = True
+
         return {
             "text": text,
             "redactions": redactions,
-            "blocked": False,
+            "blocked": injection_blocked,
+            "injection_risk": injection.risk_score if injection.is_suspicious else 0.0,
         }
 
     def _new_topic_id_locked(self) -> str:
