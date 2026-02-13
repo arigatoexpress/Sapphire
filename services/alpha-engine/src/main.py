@@ -19,6 +19,7 @@ from src.integrations.tradingview_autonomy import TradingViewAutonomyPlugin
 from src.security.skill_auditor import SkillAuditor
 from src.security.virustotal_scanner import VirusTotalSkillScanner
 from src.security.prompt_sanitizer import sanitize_for_prompt, log_injection_attempt
+from src.security.agent_permissions import gate, Capability, PermissionDenied
 from src.strategy.engine import AlphaStrategyEngine
 
 # Add shared library to path
@@ -759,7 +760,8 @@ class AlphaEngine:
             except Exception as exc:
                 logger.error(f"Media publish loop error: {exc}")
 
-    def _set_execution_stage(self, stage: str, source: str = "manual") -> Dict[str, Any]:
+    def _set_execution_stage(self, stage: str, source: str = "manual", agent_id: str = "OBSIDIAN") -> Dict[str, Any]:
+        gate.require(agent_id, Capability.SYSTEM_CONFIG, f"set_execution_stage({stage!r})")
         previous = self._dex_execution_stage
         applied = self.strategy.set_execution_stage(stage)
         self._dex_execution_stage = str(applied.get("dex_execution_stage", previous) or previous)
@@ -966,7 +968,8 @@ class AlphaEngine:
             return base
         return round(max(0.001, min(base, float(cap))), 8)
 
-    def _set_tradingview_default_quantity(self, requested_quantity: float) -> Dict[str, Any]:
+    def _set_tradingview_default_quantity(self, requested_quantity: float, agent_id: str = "SAPPHIRE") -> Dict[str, Any]:
+        gate.require(agent_id, Capability.SYSTEM_CONFIG, f"set_tv_quantity({requested_quantity})")
         requested = max(0.0, float(requested_quantity))
         if requested <= 0:
             return {
@@ -1228,7 +1231,8 @@ class AlphaEngine:
         )
         await publish("risk-alerts", alert)
 
-    async def _activate_kill_switch(self, reason: str) -> None:
+    async def _activate_kill_switch(self, reason: str, agent_id: str = "OBSIDIAN") -> None:
+        gate.require(agent_id, Capability.KILL_SWITCH, f"activate_kill_switch({reason!r})")
         self._kill_switch_active = True
         reason = reason.strip() or "Manual kill switch requested via Telegram"
         self._record_system_log(
@@ -1270,7 +1274,8 @@ class AlphaEngine:
             priority="high",
         )
 
-    async def _resume_from_kill_switch(self, reason: str) -> None:
+    async def _resume_from_kill_switch(self, reason: str, agent_id: str = "OBSIDIAN") -> None:
+        gate.require(agent_id, Capability.KILL_SWITCH, f"resume_from_kill_switch({reason!r})")
         self._kill_switch_active = False
         reason = reason.strip() or "Manual resume requested via Telegram"
         self._record_system_log(
@@ -1740,7 +1745,8 @@ class AlphaEngine:
             )
         await self.telegram.send_message("\n".join(lines), priority="medium")
 
-    def _set_media_mode(self, requested_mode: str, source: str = "manual") -> Dict[str, Any]:
+    def _set_media_mode(self, requested_mode: str, source: str = "manual", agent_id: str = "OBSIDIAN") -> Dict[str, Any]:
+        gate.require(agent_id, Capability.SYSTEM_CONFIG, f"set_media_mode({requested_mode!r})")
         normalized = self._normalize_media_mode(requested_mode)
         if not normalized:
             return {
@@ -2279,7 +2285,8 @@ class AlphaEngine:
             return parsed
         return {}
 
-    async def _dispatch_full_autonomy_cycle(self, trigger: str, force: bool = False) -> Dict[str, Any]:
+    async def _dispatch_full_autonomy_cycle(self, trigger: str, force: bool = False, agent_id: str = "OBSIDIAN") -> Dict[str, Any]:
+        gate.require(agent_id, Capability.AUTONOMY_DISPATCH, f"autonomy_cycle({trigger!r})")
         if not self._full_autonomy_enabled:
             return {"dispatched": False, "reason": "full_autonomy_disabled"}
 
@@ -3071,6 +3078,7 @@ class AlphaEngine:
             return
 
         if normalized_action == "SKILL_AUDIT":
+            gate.require("EMERALD", Capability.SKILL_AUDIT, "telegram_skill_audit")
             content = str(target or "").strip()
             if content:
                 report = self.skill_auditor.audit_skill("telegram_submitted", content)
@@ -3102,6 +3110,28 @@ class AlphaEngine:
             if critical:
                 lines.append(f"  Critical skills: {', '.join(critical[:5])}")
             await self.telegram.send_as(EMERALD, "\n".join(lines))
+            return
+
+        if normalized_action in {"GATE_STATS", "PERMISSIONS", "PERM_STATS"}:
+            stats = gate.stats()
+            denials = gate.recent_denials(limit=5)
+            lines = [
+                "*🔐 Agent Permission Gate*",
+                f"  Total checks: {stats.get('total_checks', 0)}",
+                f"  Granted: {stats.get('granted', 0)}",
+                f"  Denied: {stats.get('denied', 0)}",
+                f"  Agents: {', '.join(stats.get('registered_agents', []))}",
+            ]
+            breakdown = stats.get("denied_breakdown", {})
+            if breakdown:
+                lines.append("  *Denial breakdown:*")
+                for k, v in sorted(breakdown.items()):
+                    lines.append(f"    `{k}`: {v}")
+            if denials:
+                lines.append("  *Recent denials:*")
+                for d in denials:
+                    lines.append(f"    `{d['agent_id']}` → `{d['capability']}`")
+            await self.telegram.send_as(OBSIDIAN, "\n".join(lines))
             return
 
         if normalized_action in {"FOCUS", "CONTROL_FOCUS"}:
@@ -3203,6 +3233,9 @@ class AlphaEngine:
             # Pick the right agent to respond
             agent = self.telegram._route_agent(message)
 
+            # Permission gate: routed agent must have AI_PROMPT
+            gate.require(agent, Capability.AI_PROMPT, "chat_with_owner")
+
             # Ask Gemini for a conversational response
             reply = await self.ai.chat_with_owner(message, system_context=system_context)
             if reply:
@@ -3256,6 +3289,7 @@ class AlphaEngine:
             return
 
         if normalized_action == "SET_ALLOCATION":
+            gate.require("OBSIDIAN", Capability.VENUE_CONTROL, f"set_allocation({value})")
             allocation = max(0.0, min(1.0, float(value)))
             targets = (
                 list(dispatcher.bot_urls.keys())
@@ -3330,6 +3364,13 @@ class AlphaEngine:
 
     async def _handle_tradingview_signal(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Process TradingView alerts into heartbeat/control/trade actions."""
+        try:
+            return await self._handle_tradingview_signal_inner(payload)
+        except PermissionDenied as exc:
+            logger.error(f"🚫 TV signal blocked by AgentGate: {exc}")
+            return {"accepted": "denied", "reason": str(exc)}
+
+    async def _handle_tradingview_signal_inner(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         merged_payload: Dict[str, Any] = dict(payload or {})
         message_payload = self._parse_tradingview_message(merged_payload.get("message", ""))
         if isinstance(message_payload, dict):
@@ -3698,6 +3739,9 @@ class AlphaEngine:
             except Exception:
                 pass  # Memory is non-critical
 
+        # ── Permission gate: only SAPPHIRE may execute trades ────
+        gate.require("SAPPHIRE", Capability.TRADE_EXECUTE, f"tv_signal({normalized_action} {symbol})")
+
         dispatch_results: Dict[str, bool] = {}
         for venue in executable_targets:
             dispatch_results[venue] = await dispatcher.send_command(
@@ -3941,6 +3985,20 @@ class AlphaEngine:
     ):
         """Callback for Telegram @mentions to trigger manual overrides."""
         logger.warning(f"🚨 TELEGRAM OVERRIDE: {platform} {action} {quantity} {symbol}")
+
+        try:
+            await self._handle_telegram_command_inner(platform, symbol, action, quantity)
+        except PermissionDenied as exc:
+            logger.warning(f"🚫 Permission denied: {exc}")
+            await self.telegram.send_message(
+                f"🚫 *Permission Denied*\nAgent `{exc.agent_id}` lacks `{exc.capability.name}`.\n_{exc.detail}_",
+                priority="high",
+            )
+
+    async def _handle_telegram_command_inner(
+        self, platform: str, symbol: str, action: str, quantity: float
+    ):
+        """Inner handler — separated so PermissionDenied bubbles up cleanly."""
         normalized_platform = self._normalize_platform(platform)
 
         if normalized_platform == "CONTROL":
@@ -3990,6 +4048,9 @@ class AlphaEngine:
                 ),
                 priority="medium",
             )
+
+        # Permission gate: manual trades require TRADE_EXECUTE
+        gate.require("SAPPHIRE", Capability.TRADE_EXECUTE, f"manual_trade({action} {symbol} on {normalized_platform})")
 
         dispatched = await dispatcher.send_command(
             normalized_platform,
@@ -4493,6 +4554,8 @@ class AlphaEngine:
         return {"topic": topic, "timestamp": int(time.time())}
 
     async def _handle_forum_create_topic_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        author = str(payload.get("author", "SAPPHIRE")).strip().upper()
+        gate.require(author, Capability.FORUM_WRITE, f"create_topic(author={author})")
         try:
             topic = self.forum.create_topic(
                 {
