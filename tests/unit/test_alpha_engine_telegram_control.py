@@ -488,6 +488,114 @@ def test_media_draft_command_dispatches_payload(telegram_module):
     assert payload["topic"] == "weekly execution insights"
 
 
+def test_media_queue_command_dispatches_action(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/media queue"}}
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert symbol == "ALL"
+    assert action == "MEDIA_QUEUE_STATUS"
+    assert quantity == 0.0
+
+
+def test_media_publish_command_dispatches_payload(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {
+                "message": {
+                    "chat": {"id": "12345"},
+                    "text": "/media publish topic:weekly alpha report targets:twitter,substack",
+                }
+            }
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert action == "MEDIA_PUBLISH"
+    assert quantity == 0.0
+    payload = json.loads(symbol)
+    assert payload["topic"] == "weekly alpha report"
+    assert payload["targets"] == ["twitter", "substack"]
+
+
+def test_media_approve_command_dispatches_payload(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {
+                "message": {
+                    "chat": {"id": "12345"},
+                    "text": "/media approve media:1700000000:0001 ship now",
+                }
+            }
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert action == "MEDIA_APPROVE"
+    assert quantity == 0.0
+    payload = json.loads(symbol)
+    assert payload["request_id"] == "media:1700000000:0001"
+    assert payload["note"] == "ship now"
+
+
+def test_media_reject_command_dispatches_payload(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/media reject latest revise tone"}}
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert action == "MEDIA_REJECT"
+    assert quantity == 0.0
+    payload = json.loads(symbol)
+    assert payload["request_id"] == "latest"
+    assert payload["note"] == "revise tone"
+
+
 def test_digest_builder_summarizes_structured_ack_messages(telegram_module):
     lines = telegram_module.TelegramPlatformBot._build_digest_lines(
         [
