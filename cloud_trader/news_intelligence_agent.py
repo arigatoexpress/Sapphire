@@ -47,10 +47,10 @@ class NewsIntelligenceAgent:
     AI-powered news analysis agent that converts raw Telegram messages
     into actionable trading insights
 
-    Uses Gemini 2.0 Flash Experimental for real-time news analysis
+    Uses Gemini 3 Flash for real-time news analysis
     """
 
-    def __init__(self, gemini_model: str = "gemini-2.0-flash-exp"):
+    def __init__(self, gemini_model: str = "gemini-3-flash-preview"):
         """
         Initialize News Intelligence Agent
 

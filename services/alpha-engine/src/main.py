@@ -20,7 +20,7 @@ from src.strategy.engine import AlphaStrategyEngine
 
 # Add shared library to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from error_classifier import ErrorSeverity, classify_error
+from shared.error_classifier import ErrorSeverity, classify_error
 from health import start_health_server
 from smart_notifications import notification_manager
 
@@ -855,9 +855,9 @@ class AlphaEngine:
         reference_price = self._resolve_reference_price(venue_key, symbol)
         if reference_price <= 0:
             return {
-                "blocked": False,
+                "blocked": True,
                 "adjusted": False,
-                "quantity": base_qty,
+                "quantity": 0.0,
                 "reason": "reference_price_unavailable",
                 "venue": venue_key,
                 "min_notional": min_notional,
@@ -3570,8 +3570,18 @@ class AlphaEngine:
                             metadata={"side": side, "symbol": symbol},
                         )
 
-                        # Use appropriate priority based on severity
-                        priority = "high" if severity >= ErrorSeverity.ERROR else "medium"
+                        # Severity can come from different enum classes across services.
+                        # Compare by numeric value to avoid cross-class TypeError.
+                        severity_value = getattr(severity, "value", severity)
+                        error_threshold = getattr(ErrorSeverity.ERROR, "value", ErrorSeverity.ERROR)
+                        try:
+                            priority = (
+                                "high"
+                                if int(severity_value) >= int(error_threshold)
+                                else "medium"
+                            )
+                        except (TypeError, ValueError):
+                            priority = "medium"
                         await self.telegram.send_message(msg, priority=priority)
                         logger.warning(msg)
                     else:

@@ -6,6 +6,7 @@ Lighter is a decentralized L2 order book exchange built on ZK-rollups.
 """
 
 import asyncio
+import inspect
 import logging
 import os
 import signal
@@ -88,6 +89,21 @@ class LighterBot:
         self.trades_failed = 0
         self.avg_latency_ms = 0.0
 
+    @staticmethod
+    async def _call_lighter_api(api_callable, *args, **kwargs):
+        """Invoke Lighter SDK methods that may be sync or async across SDK versions."""
+        if api_callable is None:
+            return None
+
+        if inspect.iscoroutinefunction(api_callable):
+            return await api_callable(*args, **kwargs)
+
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(None, lambda: api_callable(*args, **kwargs))
+        if inspect.isawaitable(result):
+            return await result
+        return result
+
     async def initialize(self):
         """Initialize the Lighter SDK clients."""
         logger.info(f"Initializing {SERVICE_NAME}...")
@@ -139,8 +155,7 @@ class LighterBot:
     async def _load_market_info(self):
         """Load order book metadata from API."""
         try:
-            loop = asyncio.get_event_loop()
-            order_books = await loop.run_in_executor(None, lambda: self.order_api.order_books())
+            order_books = await self._call_lighter_api(self.order_api.order_books)
 
             if order_books and hasattr(order_books, "order_books"):
                 for ob in order_books.order_books:
@@ -160,14 +175,10 @@ class LighterBot:
     async def _load_account_info(self):
         """Load account information and get account index."""
         try:
-            loop = asyncio.get_event_loop()
-
             # Query accounts by the public key (L1 address)
-            accounts = await loop.run_in_executor(
-                None,
-                lambda: self.account_api.accounts_by_l1_address(
-                    l1_address=self._pub_key[:42] if len(self._pub_key) > 42 else self._pub_key
-                ),
+            accounts = await self._call_lighter_api(
+                self.account_api.accounts_by_l1_address,
+                l1_address=self._pub_key[:42] if len(self._pub_key) > 42 else self._pub_key,
             )
 
             if accounts and hasattr(accounts, "accounts") and len(accounts.accounts) > 0:
@@ -257,6 +268,22 @@ class LighterBot:
                 if has_command:
                     self.command_queue.task_done()
 
+    @staticmethod
+    def _normalize_coin_symbol(value: str) -> str:
+        symbol = str(value or "").strip().upper()
+        if not symbol:
+            return "WETH"
+        for suffix in ("-PERP", "-USDC", "-USD", "_PERP", "_USDC", "_USD"):
+            if symbol.endswith(suffix):
+                symbol = symbol[: -len(suffix)]
+                break
+        for suffix in ("USDT", "USDC", "USD", "PERP"):
+            if symbol.endswith(suffix):
+                symbol = symbol[: -len(suffix)]
+                break
+        symbol = symbol.replace("-", "").replace("_", "")
+        return symbol or "WETH"
+
     def _build_signal_from_gateway_command(self, command: Dict[str, Any]) -> Optional[TradeSignal]:
         """Normalize legacy and action-style gateway payloads into TradeSignal objects."""
         command_type = str(command.get("type", "")).strip().upper()
@@ -267,7 +294,7 @@ class LighterBot:
         if action not in {"BUY", "SELL", "LONG", "SHORT", "CLOSE"}:
             return None
 
-        symbol = str(command.get("symbol", "WETH")).strip().upper() or "WETH"
+        symbol = self._normalize_coin_symbol(str(command.get("symbol", "WETH")))
 
         raw_qty = command.get("quantity", 0.0)
         try:
@@ -339,10 +366,10 @@ class LighterBot:
         while self.running:
             try:
                 if self.account_api and self.account_index is not None:
-                    loop = asyncio.get_event_loop()
-                    account = await loop.run_in_executor(
-                        None,
-                        lambda: self.account_api.account(by="index", value=str(self.account_index)),
+                    account = await self._call_lighter_api(
+                        self.account_api.account,
+                        by="index",
+                        value=str(self.account_index),
                     )
 
                     if account:
@@ -402,7 +429,7 @@ class LighterBot:
                 raise Exception("Transaction API not initialized")
 
             # Normalize symbol
-            coin = signal.symbol.upper().replace("-PERP", "").replace("-USDC", "").replace("_", "")
+            coin = self._normalize_coin_symbol(signal.symbol)
 
             # Get market info
             market = self.market_info.get(coin, {})
@@ -417,10 +444,8 @@ class LighterBot:
                 f"Placing {signal.side} order | Symbol: {coin} | Qty: {quantity} | OrderBookId: {order_book_id}"
             )
 
-            loop = asyncio.get_event_loop()
-
             # Get next nonce for transaction
-            nonce_response = await loop.run_in_executor(None, self._fetch_next_nonce)
+            nonce_response = await self._fetch_next_nonce()
             nonce = nonce_response.nonce if hasattr(nonce_response, "nonce") else 0
 
             # Get current price for market order execution
@@ -445,13 +470,11 @@ class LighterBot:
             # Sign and send transaction
             signature = self._sign_transaction(order_params)
 
-            result = await loop.run_in_executor(
-                None,
-                lambda: self.transaction_api.send_tx(
-                    tx_type="CreateOrder",
-                    body=order_params,
-                    signature=signature,
-                ),
+            result = await self._call_lighter_api(
+                self.transaction_api.send_tx,
+                tx_type="CreateOrder",
+                body=order_params,
+                signature=signature,
             )
 
             execution_time = (datetime.now() - start_time).total_seconds() * 1000
@@ -519,18 +542,31 @@ class LighterBot:
                 execution_time_ms=execution_time,
             )
 
-    def _fetch_next_nonce(self):
+    async def _fetch_next_nonce(self):
         """
         Support both SDK signatures:
         - next_nonce(account_index=...)
         - next_nonce(account_index=..., api_key_index=...)
         """
-        try:
-            return self.transaction_api.next_nonce(
-                account_index=self.account_index, api_key_index=0
-            )
-        except TypeError:
-            return self.transaction_api.next_nonce(account_index=self.account_index)
+        attempts = [
+            ((), {"account_index": self.account_index, "api_key_index": 0}),
+            ((self.account_index, 0), {}),
+            ((), {"api_key_index": 0, "account_index": self.account_index}),
+            ((), {"account_index": self.account_index}),
+            ((self.account_index,), {}),
+            ((), {"api_key_index": 0}),
+            ((0,), {}),
+        ]
+        last_error: Optional[Exception] = None
+        for args, kwargs in attempts:
+            try:
+                return await self._call_lighter_api(self.transaction_api.next_nonce, *args, **kwargs)
+            except TypeError as exc:
+                last_error = exc
+                continue
+        if last_error:
+            raise last_error
+        raise RuntimeError("Unable to resolve Lighter nonce signature")
 
     def _sign_transaction(self, tx_body: Dict) -> str:
         """Sign a transaction using the private key."""
@@ -550,13 +586,13 @@ class LighterBot:
             return None
 
         try:
-            coin = symbol.upper().replace("-PERP", "").replace("-USDC", "")
+            coin = self._normalize_coin_symbol(symbol)
             market = self.market_info.get(coin, {})
             order_book_id = market.get("order_book_id", 0)
 
-            loop = asyncio.get_event_loop()
-            details = await loop.run_in_executor(
-                None, lambda: self.order_api.order_book_details(order_book_id=order_book_id)
+            details = await self._call_lighter_api(
+                self.order_api.order_book_details,
+                order_book_id=order_book_id,
             )
 
             if details and hasattr(details, "mid_price"):
@@ -596,10 +632,10 @@ class LighterBot:
             return
 
         try:
-            loop = asyncio.get_event_loop()
-            account = await loop.run_in_executor(
-                None,
-                lambda: self.account_api.account(by="index", value=str(self.account_index)),
+            account = await self._call_lighter_api(
+                self.account_api.account,
+                by="index",
+                value=str(self.account_index),
             )
 
             if account and hasattr(account, "positions"):

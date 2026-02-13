@@ -79,17 +79,17 @@ class VertexAIClient:
 
         # Model mapping for Direct API Mode
         self._model_map = {
-            "trend-momentum-agent": "gemini-2.5-flash",
-            "strategy-optimization-agent": "gemini-2.5-flash",
-            "financial-sentiment-agent": "gemini-2.5-flash",
-            "market-prediction-agent": "gemini-2.5-flash",
-            "volume-microstructure-agent": "gemini-2.5-flash",
-            "vpin-hft": "gemini-2.5-flash",
-            "deep-logic-special-ops": "gemini-2.5-flash",
-            "market-analysis": "gemini-2.5-flash",
+            "trend-momentum-agent": "gemini-3-flash-preview",
+            "strategy-optimization-agent": "gemini-3-flash-preview",
+            "financial-sentiment-agent": "gemini-3-flash-preview",
+            "market-prediction-agent": "gemini-3-flash-preview",
+            "volume-microstructure-agent": "gemini-3-flash-preview",
+            "vpin-hft": "gemini-3-flash-preview",
+            "deep-logic-special-ops": "gemini-3-flash-preview",
+            "market-analysis": "gemini-3-flash-preview",
         }
 
-        # Dynamic model override map: agent_id -> "gemini-3.0-flash-001"
+        # Dynamic model override map: agent_id -> "gemini-3-flash-preview"
         self._dynamic_model_overrides = {}
 
         # Prediction Cache (Elite Optimization)
@@ -192,7 +192,7 @@ class VertexAIClient:
 
     async def _predict_with_api_key(self, agent_id: str, prompt: str, **kwargs) -> Dict[str, Any]:
         """Make prediction using Google AI Studio API Key."""
-        model_name = self._model_map.get(agent_id, "gemini-flash-latest")
+        model_name = self._model_map.get(agent_id, "gemini-3-flash-preview")
 
         try:
             model = genai.GenerativeModel(model_name)
@@ -291,9 +291,9 @@ class VertexAIClient:
                 # FALLBACK LOGIC: Gemini 3 -> Gemini 2.5
                 if "404" in str(e) and "gemini-3" in model_name:
                     logger.warning(
-                        f"⚠️ {model_name} not found for {agent_id}. Fallback to gemini-2.5-flash-001..."
+                        f"⚠️ {model_name} not found for {agent_id}. Fallback to gemini-2.5-flash..."
                     )
-                    fallback_model = "gemini-2.5-flash-001"
+                    fallback_model = "gemini-2.5-flash"
                     try:
                         # Retry with fallback model
                         model = GenerativeModel(fallback_model)

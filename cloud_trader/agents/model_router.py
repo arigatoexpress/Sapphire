@@ -3,7 +3,7 @@ Sapphire V2 Model Router
 AI model integration using Gemini.
 
 Currently configured for:
-- Gemini 2.0 Flash (primary AI for all analysis)
+- Gemini 3 Flash (primary AI for all analysis)
 
 Architecture supports future expansion to:
 - OpenAI GPT-4
@@ -90,8 +90,13 @@ class MultiModelRouter:
 
                 genai.configure(api_key=gemini_key)
 
-                # Try multiple model names (gemini-1.5-flash is most reliable)
-                model_names = ["gemini-1.5-flash", "gemini-2.0-flash-exp", "gemini-pro"]
+                # Prefer Gemini 3 and gracefully fall back when unavailable.
+                model_names = [
+                    "gemini-3-flash-preview",
+                    "gemini-2.5-flash",
+                    "gemini-2.0-flash-exp",
+                    "gemini-1.5-flash",
+                ]
 
                 for model_name in model_names:
                     try:

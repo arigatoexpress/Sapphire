@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 class GeminiGuard:
     """
-    AI Sentinel using Gemini 1.5 Flash to validate market conditions.
+    AI Sentinel using Gemini 3 models to validate market conditions.
     """
 
     def __init__(self, telegram_bot=None):
@@ -20,6 +20,10 @@ class GeminiGuard:
         self.telegram = telegram_bot
         self.model = None
         self.running = False
+        self.pro_model = None
+        self.flash_model = None
+        self._pro_model_name = ""
+        self._flash_model_name = ""
         self._flash_min_interval_seconds = max(
             300, int(os.getenv("GEMINI_FLASH_MIN_INTERVAL_SECONDS", "1800"))
         )
@@ -29,14 +33,53 @@ class GeminiGuard:
         if self.api_key:
             try:
                 genai.configure(api_key=self.api_key)
-                # Initialize Models
-                self.pro_model = genai.GenerativeModel("gemini-3-pro-preview")
-                self.flash_model = genai.GenerativeModel("gemini-3-flash-preview")
-                logger.info("✅ Gemini 3.0 (Pro & Flash) Initialized")
+                # Gemini 3 defaults with graceful fallback for regional availability.
+                pro_candidates = [
+                    model.strip()
+                    for model in os.getenv(
+                        "GEMINI_PRO_MODEL",
+                        "gemini-3-pro-preview,gemini-2.5-pro",
+                    ).split(",")
+                    if model.strip()
+                ]
+                flash_candidates = [
+                    model.strip()
+                    for model in os.getenv(
+                        "GEMINI_FLASH_MODEL",
+                        "gemini-3-flash-preview,gemini-2.5-flash",
+                    ).split(",")
+                    if model.strip()
+                ]
+
+                self.pro_model, self._pro_model_name = self._init_first_available_model(
+                    pro_candidates
+                )
+                self.flash_model, self._flash_model_name = self._init_first_available_model(
+                    flash_candidates
+                )
+                logger.info(
+                    "✅ Gemini initialized | pro=%s flash=%s",
+                    self._pro_model_name or "disabled",
+                    self._flash_model_name or "disabled",
+                )
             except Exception as e:
                 logger.error(f"❌ Failed to init Gemini: {e}")
         else:
             logger.warning("⚠️ GEMINI_API_KEY not found. AI features disabled.")
+
+    @staticmethod
+    def _init_first_available_model(candidates):
+        last_error = None
+        for model_name in candidates:
+            try:
+                model = genai.GenerativeModel(model_name)
+                return model, model_name
+            except Exception as exc:
+                last_error = exc
+                continue
+        if last_error:
+            logger.warning(f"⚠️ No Gemini model candidate available: {last_error}")
+        return None, ""
 
     async def force_analyze(self, analysis_type: str = "recap"):
         """Force an immediate AI analysis (public method)."""
@@ -58,7 +101,11 @@ class GeminiGuard:
             return
 
         self.running = True
-        logger.info("🧠 Gemini Guard Active - Monitoring Market with Gemini 3.0...")
+        logger.info(
+            "🧠 Gemini Guard Active - Monitoring Market (flash=%s pro=%s)...",
+            self._flash_model_name or "disabled",
+            self._pro_model_name or "disabled",
+        )
 
         self.trade_history = []
         self.last_hourly_recap = datetime.now()
