@@ -252,5 +252,40 @@ class GeminiGuard:
         prompt = "You are a strategic trading orchestrator. Analyze the concept of cross-exchange arbitrage in current crypto markets and provide one strategic recommendation for risk management. One sentence."
         return self.pro_model.generate_content(prompt)
 
+    async def chat_with_owner(self, message: str, system_context: str = "") -> str | None:
+        """Generate a conversational response to an owner message.
+
+        Uses the Flash model for low-latency responses.  Falls back to Pro if
+        Flash is unavailable.
+        """
+        model = self.flash_model or self.pro_model
+        if not model:
+            return None
+
+        prompt = (
+            "You are part of a trio of AI trading agents called Sapphire, Obsidian, "
+            "and Emerald.  Sapphire handles trading & scouting, Obsidian handles "
+            "infrastructure & deployments, and Emerald handles strategy & improvement.\n"
+            "Respond to the owner's message in a direct, conversational tone — "
+            "like a smart colleague on Slack. Keep it concise (2-4 sentences max). "
+            "If the message looks like a command or instruction, acknowledge it and "
+            "explain what you'll do. If it's a question, answer it using the system "
+            "context below. Don't use markdown headers or bullet points — just talk.\n\n"
+        )
+        if system_context:
+            prompt += f"Current system state:\n{system_context}\n\n"
+        prompt += f"Owner says: {message}"
+
+        try:
+            loop = asyncio.get_running_loop()
+            response = await loop.run_in_executor(
+                None, lambda: model.generate_content(prompt)
+            )
+            text = (response.text or "").strip() if response else None
+            return text[:800] if text else None
+        except Exception as e:
+            logger.error(f"Chat generation failed: {e}")
+            return None
+
     async def stop(self):
         self.running = False

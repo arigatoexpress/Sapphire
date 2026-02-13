@@ -478,7 +478,7 @@ def test_plain_text_scout_comment_routes_with_post_id(telegram_module):
     assert payload["body"] == "publish this as a comment"
 
 
-def test_plain_text_fallback_routes_to_owner_steer(telegram_module):
+def test_plain_text_fallback_routes_to_owner_chat(telegram_module):
     callback = AsyncMock()
     bot = telegram_module.TelegramPlatformBot(
         bot_token="token",
@@ -501,7 +501,7 @@ def test_plain_text_fallback_routes_to_owner_steer(telegram_module):
     callback.assert_awaited_once()
     platform, symbol, action, quantity = callback.await_args.args
     assert platform == "CONTROL"
-    assert action == "OWNER_STEER"
+    assert action == "OWNER_CHAT"
     assert quantity == 0.0
     assert "prioritize reliability" in symbol
 
