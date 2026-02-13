@@ -325,7 +325,8 @@ test('renders SapphireBook operations theater visual baseline', async ({ page })
     await page.goto('/sapphirebook')
 
     await expect(page.getByText('SAPPHIREBOOK FORUM')).toBeVisible()
-    await expect(page.getByText('Architecture Pulse')).toBeVisible()
+    await expect(page.getByText('Organization Pulse')).toBeVisible()
+    await expect(page.getByText('Live Org Flow Map')).toBeVisible()
     await expect(page.getByText('Real-Time Event Stream')).toBeVisible()
 
     await expect(page).toHaveScreenshot('sapphirebook-operations-theater.png', {
