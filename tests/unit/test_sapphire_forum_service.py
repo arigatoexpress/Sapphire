@@ -170,6 +170,39 @@ def test_register_scout_maps_payload_for_moltbook(monkeypatch, tmp_path):
     assert "username" not in outbound
 
 
+def test_register_scout_maps_payload_for_moltbook_root_domain(monkeypatch, tmp_path):
+    module = _load_forum_module()
+    monkeypatch.setenv("SAPPHIRE_FORUM_STORE_PATH", str(tmp_path / "forum.json"))
+    monkeypatch.setenv("SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL", "https://moltbook.com/api/v1/agents/register")
+    monkeypatch.setenv("SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN", "moltbook_existing_token")
+
+    service = module.SapphireForumService()
+    captured = {}
+
+    async def fake_dispatch(**kwargs):
+        captured.update(kwargs)
+        return {"dispatched": True, "reason": "ok", "mode": "external_http"}
+
+    monkeypatch.setattr(service, "_dispatch_scout_bridge", fake_dispatch)
+
+    result = asyncio.run(
+        service.register_scout_account(
+            {
+                "username": "sapphire_scout",
+                "display_name": "Sapphire Scout",
+                "bio": "Least privilege scout",
+            }
+        )
+    )
+
+    assert result["ok"] is True
+    assert captured["external_url"] == "https://moltbook.com/api/v1/agents/register"
+    assert captured["external_token"] == ""
+    outbound = captured["outbound_payload"]
+    assert outbound["name"] == "Sapphire Scout"
+    assert "username" not in outbound
+
+
 def test_publish_scout_maps_payload_for_moltbook(monkeypatch, tmp_path):
     module = _load_forum_module()
     monkeypatch.setenv("SAPPHIRE_FORUM_STORE_PATH", str(tmp_path / "forum.json"))

@@ -23,6 +23,7 @@ RUN_REGISTER_SMOKE="${RUN_REGISTER_SMOKE:-false}"
 REGISTER_RETRIES="${REGISTER_RETRIES:-4}"
 REGISTER_BASE_BACKOFF_SECONDS="${REGISTER_BASE_BACKOFF_SECONDS:-2}"
 ALLOW_FALLBACK_TO_EXISTING_TOKEN="${ALLOW_FALLBACK_TO_EXISTING_TOKEN:-true}"
+ALLOW_URL_ONLY_ON_REGISTER_FAILURE="${ALLOW_URL_ONLY_ON_REGISTER_FAILURE:-true}"
 
 usage() {
   cat <<USAGE
@@ -41,6 +42,7 @@ Optional env vars:
   REGISTER_RETRIES=1..6
   REGISTER_BASE_BACKOFF_SECONDS=1..15
   ALLOW_FALLBACK_TO_EXISTING_TOKEN=true|false
+  ALLOW_URL_ONLY_ON_REGISTER_FAILURE=true|false
 USAGE
 }
 
@@ -120,7 +122,7 @@ else
   fi
 
   for attempt in $(seq 1 "$retries"); do
-    bundle="$(curl -sS --connect-timeout 10 --max-time 35 -X POST "$MOLTBOOK_REGISTER_URL" \
+    bundle="$(curl -sSL --connect-timeout 10 --max-time 35 -X POST "$MOLTBOOK_REGISTER_URL" \
       -H 'Content-Type: application/json' \
       -d "$register_payload" \
       -w $'\n%{http_code}' || true)"
@@ -154,6 +156,9 @@ else
     if [[ "$ALLOW_FALLBACK_TO_EXISTING_TOKEN" == "true" ]] && [[ -n "$existing_token" ]]; then
       echo "Falling back to existing token from ${TOKEN_SECRET} because registration endpoint is unavailable."
       auth_token="$existing_token"
+    elif [[ "$ALLOW_URL_ONLY_ON_REGISTER_FAILURE" == "true" ]]; then
+      echo "WARN: Moltbook registration unavailable and no token fallback. Proceeding with URL-only bridge wiring."
+      auth_token=""
     else
       echo "ERROR: Moltbook registration failed and no fallback token is available."
       if [[ -n "$last_register_error" ]]; then
@@ -168,11 +173,17 @@ else
   fi
 fi
 
-upsert_secret_version "$TOKEN_SECRET" "$auth_token"
+if [[ -n "$auth_token" ]]; then
+  upsert_secret_version "$TOKEN_SECRET" "$auth_token"
+fi
 upsert_secret_version "$REGISTER_SECRET" "$MOLTBOOK_REGISTER_URL"
 upsert_secret_version "$POST_SECRET" "$MOLTBOOK_POST_URL"
 
-echo "Secrets updated: ${TOKEN_SECRET}, ${REGISTER_SECRET}, ${POST_SECRET}"
+if [[ -n "$auth_token" ]]; then
+  echo "Secrets updated: ${TOKEN_SECRET}, ${REGISTER_SECRET}, ${POST_SECRET}"
+else
+  echo "Secrets updated (URL-only): ${REGISTER_SECRET}, ${POST_SECRET}"
+fi
 
 echo "Wiring Cloud Run secret bindings and validating bridge..."
 MOLTBOOK_API_TOKEN="$auth_token" \
@@ -186,6 +197,7 @@ POST_SECRET="$POST_SECRET" \
 TOKEN_SECRET="$TOKEN_SECRET" \
 RUN_SMOKE_TESTS="$RUN_SMOKE_TESTS" \
 RUN_REGISTER_SMOKE="$RUN_REGISTER_SMOKE" \
+ALLOW_URL_ONLY="true" \
 "$(cd "$(dirname "$0")" && pwd)/wire_moltbook_bridge.sh"
 
 if [[ -n "$claim_url" ]]; then

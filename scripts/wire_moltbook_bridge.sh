@@ -10,10 +10,12 @@ SERVICE_NAME="${SERVICE_NAME:-sapphire-alpha}"
 REGISTER_SECRET="${REGISTER_SECRET:-SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL}"
 POST_SECRET="${POST_SECRET:-SAPPHIRE_SCOUT_EXTERNAL_POST_URL}"
 TOKEN_SECRET="${TOKEN_SECRET:-SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN}"
+CONTROL_TOKEN_SECRET="${CONTROL_TOKEN_SECRET:-SAPPHIRE_CONTROL_API_TOKEN}"
 
 MOLTBOOK_REGISTER_URL="${MOLTBOOK_REGISTER_URL:-}"
 MOLTBOOK_POST_URL="${MOLTBOOK_POST_URL:-}"
 MOLTBOOK_API_TOKEN="${MOLTBOOK_API_TOKEN:-}"
+CONTROL_API_TOKEN="${CONTROL_API_TOKEN:-}"
 MOLTBOOK_REGISTER_URL="${MOLTBOOK_REGISTER_URL:-https://www.moltbook.com/api/v1/agents/register}"
 MOLTBOOK_POST_URL="${MOLTBOOK_POST_URL:-https://www.moltbook.com/api/v1/posts}"
 
@@ -22,6 +24,7 @@ TEST_SCOUT_DISPLAY_NAME="${TEST_SCOUT_DISPLAY_NAME:-Sapphire Scout}"
 RUN_SMOKE_TESTS="${RUN_SMOKE_TESTS:-true}"
 RUN_REGISTER_SMOKE="${RUN_REGISTER_SMOKE:-false}"
 STRICT_STATUS_CHECK="${STRICT_STATUS_CHECK:-false}"
+ALLOW_URL_ONLY="${ALLOW_URL_ONLY:-true}"
 
 usage() {
   cat <<USAGE
@@ -34,10 +37,12 @@ Optional env vars:
   MOLTBOOK_POST_URL (default: https://www.moltbook.com/api/v1/posts)
   PROJECT_ID, REGION, SERVICE_NAME
   REGISTER_SECRET, POST_SECRET, TOKEN_SECRET
+  CONTROL_TOKEN_SECRET, CONTROL_API_TOKEN
   TEST_SCOUT_USERNAME, TEST_SCOUT_DISPLAY_NAME
   RUN_SMOKE_TESTS=true|false (publish/status smoke)
   RUN_REGISTER_SMOKE=true|false (creates/registers a scout externally)
   STRICT_STATUS_CHECK=true|false (fail script on status/smoke errors)
+  ALLOW_URL_ONLY=true|false (allow wiring without API token)
 USAGE
 }
 
@@ -76,12 +81,20 @@ if [[ -z "$MOLTBOOK_API_TOKEN" ]] && gcloud secrets describe "$TOKEN_SECRET" --p
   MOLTBOOK_API_TOKEN="$(gcloud secrets versions access latest --secret="$TOKEN_SECRET" --project "$PROJECT_ID")"
 fi
 
+if [[ -z "$CONTROL_API_TOKEN" ]] && gcloud secrets describe "$CONTROL_TOKEN_SECRET" --project "$PROJECT_ID" >/dev/null 2>&1; then
+  CONTROL_API_TOKEN="$(gcloud secrets versions access latest --secret="$CONTROL_TOKEN_SECRET" --project "$PROJECT_ID" || true)"
+fi
+
 if [[ -z "$MOLTBOOK_API_TOKEN" ]]; then
-  echo "Moltbook bridge is not ready: missing one or more required values."
-  echo "Required: MOLTBOOK_API_TOKEN (or an existing ${TOKEN_SECRET} secret)"
-  echo
-  usage
-  exit 2
+  if [[ "$ALLOW_URL_ONLY" == "true" ]]; then
+    echo "WARN: no Moltbook API token configured; wiring URL-only bridge with OpenClaw fallback."
+  else
+    echo "Moltbook bridge is not ready: missing one or more required values."
+    echo "Required: MOLTBOOK_API_TOKEN (or an existing ${TOKEN_SECRET} secret)"
+    echo
+    usage
+    exit 2
+  fi
 fi
 
 echo "== Wiring Moltbook Scout Bridge =="
@@ -90,13 +103,23 @@ echo "Service: ${SERVICE_NAME} (${REGION})"
 echo "Register URL secret: ${REGISTER_SECRET}"
 echo "Post URL secret: ${POST_SECRET}"
 echo "Token secret: ${TOKEN_SECRET}"
+if [[ -n "$CONTROL_API_TOKEN" ]]; then
+  echo "Control token: configured for protected scout smoke routes."
+else
+  echo "Control token: not configured; protected scout smoke routes may fail with 403."
+fi
 echo
 
 upsert_secret_version "$REGISTER_SECRET" "$MOLTBOOK_REGISTER_URL"
 upsert_secret_version "$POST_SECRET" "$MOLTBOOK_POST_URL"
-upsert_secret_version "$TOKEN_SECRET" "$MOLTBOOK_API_TOKEN"
+if [[ -n "$MOLTBOOK_API_TOKEN" ]]; then
+  upsert_secret_version "$TOKEN_SECRET" "$MOLTBOOK_API_TOKEN"
+fi
 
-SECRET_BINDINGS="SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL=${REGISTER_SECRET}:latest,SAPPHIRE_SCOUT_EXTERNAL_POST_URL=${POST_SECRET}:latest,SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN=${TOKEN_SECRET}:latest"
+SECRET_BINDINGS="SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL=${REGISTER_SECRET}:latest,SAPPHIRE_SCOUT_EXTERNAL_POST_URL=${POST_SECRET}:latest"
+if [[ -n "$MOLTBOOK_API_TOKEN" ]]; then
+  SECRET_BINDINGS="${SECRET_BINDINGS},SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN=${TOKEN_SECRET}:latest"
+fi
 
 echo "Applying Cloud Run secret bindings..."
 gcloud run services update "$SERVICE_NAME" \
@@ -110,7 +133,7 @@ ALPHA_URL="$(gcloud run services describe "$SERVICE_NAME" --project "$PROJECT_ID
 echo "Alpha URL: ${ALPHA_URL}"
 
 STATUS_JSON=""
-if STATUS_JSON="$(curl -fsS "${ALPHA_URL}/api/v2/forum/scout/status" 2>/tmp/sapphire_scout_status_err.txt)"; then
+if STATUS_JSON="$(curl -fsSL "${ALPHA_URL}/api/v2/forum/scout/status" 2>/tmp/sapphire_scout_status_err.txt)"; then
   DISPATCH_MODE="$(echo "$STATUS_JSON" | jq -r '.external_bridge.dispatch_mode // "unknown"')"
   echo "Scout dispatch mode: ${DISPATCH_MODE}"
 else
@@ -124,10 +147,14 @@ fi
 if [[ "$RUN_SMOKE_TESTS" == "true" ]]; then
   echo
   echo "Running scout bridge smoke tests..."
+  control_headers=()
+  if [[ -n "$CONTROL_API_TOKEN" ]]; then
+    control_headers=(-H "X-Sapphire-Control-Token: ${CONTROL_API_TOKEN}")
+  fi
 
   if [[ "$RUN_REGISTER_SMOKE" == "true" ]]; then
     REGISTER_PAYLOAD="$(jq -nc --arg u "$TEST_SCOUT_USERNAME" --arg d "$TEST_SCOUT_DISPLAY_NAME" '{username:$u,display_name:$d,bio:"Least-privilege external scout account."}')"
-    if REGISTER_RESPONSE="$(curl -fsS -X POST "${ALPHA_URL}/api/v2/forum/scout/register" -H 'Content-Type: application/json' -d "$REGISTER_PAYLOAD" 2>/tmp/sapphire_scout_register_smoke_err.txt)"; then
+    if REGISTER_RESPONSE="$(curl -fsSL -X POST "${ALPHA_URL}/api/v2/forum/scout/register" "${control_headers[@]}" -H 'Content-Type: application/json' -d "$REGISTER_PAYLOAD" 2>/tmp/sapphire_scout_register_smoke_err.txt)"; then
       echo "Register response: $(echo "$REGISTER_RESPONSE" | jq -c '{ok,dispatch:(.dispatch|{dispatched,reason,mode,status}),registration:.registration}')"
     else
       echo "WARN: register smoke test failed."
@@ -140,12 +167,12 @@ if [[ "$RUN_SMOKE_TESTS" == "true" ]]; then
     echo "Register smoke test skipped (RUN_REGISTER_SMOKE=false)."
   fi
 
-  TOPIC_ID="$(curl -fsS "${ALPHA_URL}/api/v2/forum/topics?lane=external&limit=1" 2>/tmp/sapphire_scout_topics_smoke_err.txt | jq -r '.topics[0].topic_id // ""' || true)"
+  TOPIC_ID="$(curl -fsSL "${ALPHA_URL}/api/v2/forum/topics?lane=external&limit=1" 2>/tmp/sapphire_scout_topics_smoke_err.txt | jq -r '.topics[0].topic_id // ""' || true)"
   if [[ -z "$TOPIC_ID" ]]; then
     TOPIC_ID="TOPIC-00003"
   fi
   PUBLISH_PAYLOAD="$(jq -nc --arg t "$TOPIC_ID" '{topic_id:$t,body:"Scout smoke test note via true external bridge.",author:"SAPPHIRE_SCOUT",kind:"note"}')"
-  if PUBLISH_RESPONSE="$(curl -fsS -X POST "${ALPHA_URL}/api/v2/forum/scout/publish" -H 'Content-Type: application/json' -d "$PUBLISH_PAYLOAD" 2>/tmp/sapphire_scout_publish_smoke_err.txt)"; then
+  if PUBLISH_RESPONSE="$(curl -fsSL -X POST "${ALPHA_URL}/api/v2/forum/scout/publish" "${control_headers[@]}" -H 'Content-Type: application/json' -d "$PUBLISH_PAYLOAD" 2>/tmp/sapphire_scout_publish_smoke_err.txt)"; then
     echo "Publish response: $(echo "$PUBLISH_RESPONSE" | jq -c '{ok,topic_id,dispatch:(.dispatch|{dispatched,reason,mode,status})}')"
   else
     echo "WARN: publish smoke test failed."

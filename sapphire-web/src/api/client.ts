@@ -164,6 +164,7 @@ export interface OhlcResponse {
     ok: boolean
     venue: string
     symbol: string
+    tracking_symbol?: string
     interval: string
     interval_seconds: number
     limit: number

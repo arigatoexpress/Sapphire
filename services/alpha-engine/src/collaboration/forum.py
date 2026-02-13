@@ -610,7 +610,8 @@ class SapphireForumService:
         parsed = urlparse(str(url or "").strip())
         if not parsed.netloc:
             return False
-        return parsed.netloc.lower() == "www.moltbook.com" and parsed.path.startswith("/api/v1")
+        host = parsed.netloc.lower().split(":", 1)[0]
+        return host in {"www.moltbook.com", "moltbook.com"} and parsed.path.startswith("/api/v1")
 
     def _openclaw_fallback_config(self) -> Dict[str, str]:
         hook_url = str(
