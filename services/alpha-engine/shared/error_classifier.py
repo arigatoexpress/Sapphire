@@ -53,6 +53,8 @@ ERROR_PATTERNS = {
     # Configuration errors - immediate alert
     "Environment variable": (ErrorCategory.CONFIGURATION, ErrorSeverity.CRITICAL),
     "Missing configuration": (ErrorCategory.CONFIGURATION, ErrorSeverity.CRITICAL),
+    "Service not available in your region": (ErrorCategory.CONFIGURATION, ErrorSeverity.CRITICAL),
+    "-5019": (ErrorCategory.CONFIGURATION, ErrorSeverity.CRITICAL),
     # Exchange-specific errors - expected, don't notify
     "Could not get price": (ErrorCategory.EXCHANGE, ErrorSeverity.WARNING),
     "Symbol not found": (ErrorCategory.EXCHANGE, ErrorSeverity.WARNING),

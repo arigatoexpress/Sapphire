@@ -20,7 +20,7 @@ from src.strategy.engine import AlphaStrategyEngine
 
 # Add shared library to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from shared.error_classifier import ErrorSeverity, classify_error
+from shared.error_classifier import ErrorCategory, ErrorSeverity, classify_error
 from health import start_health_server
 from smart_notifications import notification_manager
 
@@ -126,6 +126,11 @@ class AlphaEngine:
         self._tradingview_signal_seen_at: Dict[str, float] = {}
         self._failure_counts: Dict[str, int] = defaultdict(int)
         self._auto_deallocated: Set[str] = set()
+        self._manual_review_venues: Set[str] = set()
+        self._hard_failure_cooldown_seconds = max(
+            self._deallocation_cooldown_seconds,
+            int(os.getenv("SAPPHIRE_HARD_FAILURE_COOLDOWN_SECONDS", "21600")),
+        )
         self._owner_directive = str(os.getenv("SAPPHIRE_OWNER_DIRECTIVE", "")).strip()
         self._owner_directive_updated_at = int(time.time()) if self._owner_directive else 0
         self._full_autonomy_enabled = self._env_flag("SAPPHIRE_FULL_AUTONOMY_ENABLED", default=True)
@@ -254,6 +259,17 @@ class AlphaEngine:
             if value is not None:
                 return value
         return None
+
+    @staticmethod
+    def _hard_failure_reason(error_message: str) -> str:
+        text = str(error_message or "").strip().lower()
+        if not text:
+            return ""
+        if "-5019" in text or "service not available in your region" in text:
+            return "region_not_supported"
+        if "-2015" in text or "invalid api-key" in text or "unauthorized" in text:
+            return "auth_rejected"
+        return ""
 
     def _normalize_platform(self, platform: str) -> str:
         value = str(platform or "").strip().upper()
@@ -1240,6 +1256,7 @@ class AlphaEngine:
             dispatcher.set_venue_allocation(venue, self._default_venue_allocation)
             self._failure_counts[venue] = 0
             self._auto_deallocated.discard(venue)
+            self._manual_review_venues.discard(venue)
 
         await self._publish_risk_alert(
             action="resume_trading",
@@ -1310,6 +1327,11 @@ class AlphaEngine:
                 f"`{media_snapshot.get('queue', {}).get('pending_count', 0)}` | "
                 f"queued `{media_snapshot.get('queue', {}).get('queued_count', 0)}`"
             ),
+            (
+                "Manual-review holds: `none`"
+                if not snapshot.get("manual_review_venues")
+                else f"Manual-review holds: `{', '.join(snapshot.get('manual_review_venues', []))}`"
+            ),
             f"Autonomy dispatches: `{snapshot['autonomy_dispatch_count']}`",
             f"Pending autonomy decisions: `{snapshot['pending_autonomy_decisions']}`",
             f"Operational read: {status_read}",
@@ -1321,6 +1343,7 @@ class AlphaEngine:
             fail_count = item.get("failure_count", 0)
             lines.append(
                 f"- `{venue}` | {status} | alloc `{item['allocation']*100:.0f}%` | failures `{fail_count}`"
+                + (" | `MANUAL_REVIEW_HOLD`" if item.get("manual_review_required") else "")
             )
 
         await self.telegram.send_message("\n".join(lines), priority="medium")
@@ -1354,6 +1377,7 @@ class AlphaEngine:
                 "paused_until": venue_state.get("paused_until"),
                 "pause_reason": venue_state.get("pause_reason", ""),
                 "failure_count": int(self._failure_counts.get(venue, 0)),
+                "manual_review_required": venue in self._manual_review_venues,
             }
 
         return {
@@ -1382,6 +1406,7 @@ class AlphaEngine:
             "pending_sessions": pending_summary,
             "owner_directive": self._owner_directive or "",
             "failure_pressure": int(sum(self._failure_counts.values())),
+            "manual_review_venues": sorted(list(self._manual_review_venues)),
             "vt_security_enabled": bool(self.vt_scanner.enabled),
             "vt_api_key_configured": bool(self.vt_scanner.api_key),
             "vt_enforcement_mode": self.vt_scanner.enforcement_mode,
@@ -2905,6 +2930,7 @@ class AlphaEngine:
                     dispatcher.resume_venue(venue)
                     self._failure_counts[venue] = 0
                     self._auto_deallocated.discard(venue)
+                    self._manual_review_venues.discard(venue)
 
             if allocation <= 0:
                 self._record_system_log(
@@ -3313,48 +3339,101 @@ class AlphaEngine:
 
         if success:
             self._failure_counts[venue] = 0
+            self._manual_review_venues.discard(venue)
             return
+
+        category, severity = classify_error(error_message or "")
+        hard_reason = self._hard_failure_reason(error_message)
+        hard_failure = bool(hard_reason) or category in {
+            ErrorCategory.CONFIGURATION,
+            ErrorCategory.AUTHENTICATION,
+        }
 
         self._failure_counts[venue] += 1
         failures = self._failure_counts[venue]
+        if hard_failure:
+            failures = max(failures, self._deallocation_failure_threshold)
+            self._failure_counts[venue] = failures
 
         if failures < self._deallocation_failure_threshold:
             return
         if venue in self._auto_deallocated:
             return
 
+        hold_reason = f"auto-deallocated after {failures} failures"
+        cooldown_seconds = self._deallocation_cooldown_seconds
+        alert_type = "auto_deallocation"
+        if hard_failure:
+            hold_reason = (
+                f"manual-review hold ({hard_reason})"
+                if hard_reason
+                else f"manual-review hold ({category.value})"
+            )
+            cooldown_seconds = max(
+                self._deallocation_cooldown_seconds,
+                self._hard_failure_cooldown_seconds,
+            )
+            alert_type = "hard_failure_hold"
+            self._manual_review_venues.add(venue)
+
         dispatcher.set_venue_allocation(venue, 0.0)
         dispatcher.pause_venue(
             venue,
-            reason=f"auto-deallocated after {failures} failures",
-            cooldown_seconds=self._deallocation_cooldown_seconds,
+            reason=hold_reason,
+            cooldown_seconds=cooldown_seconds,
         )
         self._auto_deallocated.add(venue)
         self._record_system_log(
-            f"{venue} auto-deallocated after {failures} failures",
+            (
+                f"{venue} manual-review hold after hard failure ({hard_reason or category.value})"
+                if hard_failure
+                else f"{venue} auto-deallocated after {failures} failures"
+            ),
             level="error",
             tags=["risk", "auto_deallocation"],
-            metadata={"failures": failures},
+            metadata={
+                "failures": failures,
+                "hard_failure": hard_failure,
+                "hard_reason": hard_reason,
+                "error_category": category.value,
+                "error_severity": int(severity),
+            },
         )
 
         await self._publish_risk_alert(
             action="halt_trading",
-            severity="critical",
-            alert_type="auto_deallocation",
+            severity="critical" if hard_failure else "critical",
+            alert_type=alert_type,
             message=(
-                f"{venue} auto-deallocated after {failures} consecutive failures. "
-                f"Cooldown {self._deallocation_cooldown_seconds}s."
+                (
+                    f"{venue} placed in manual-review hold due to hard failure "
+                    f"({hard_reason or category.value})."
+                )
+                if hard_failure
+                else f"{venue} auto-deallocated after {failures} consecutive failures."
+            )
+            + (
+                f" Cooldown {cooldown_seconds}s."
             ),
             platforms=[venue],
             metadata={
                 "source": "alpha-engine",
                 "failure_count": failures,
                 "last_error": error_message[:200],
+                "hard_failure": hard_failure,
+                "hard_reason": hard_reason,
+                "error_category": category.value,
             },
         )
 
         await self.telegram.send_message(
-            f"🛑 **AUTO DEALLOCATION**\nVenue: `{venue}`\nFailures: `{failures}`\nCooldown: `{self._deallocation_cooldown_seconds}s`",
+            (
+                f"🛑 **MANUAL REVIEW HOLD**\nVenue: `{venue}`\nReason: `{hard_reason or category.value}`\n"
+                f"Failures: `{failures}`\nCooldown: `{cooldown_seconds}s`\n"
+                "Trading will remain paused until owner resume/allocation command."
+                if hard_failure
+                else f"🛑 **AUTO DEALLOCATION**\nVenue: `{venue}`\nFailures: `{failures}`\nCooldown: `{cooldown_seconds}s`"
+            ),
             priority="high",
         )
 
@@ -3366,6 +3445,27 @@ class AlphaEngine:
 
                 resumed = dispatcher.resume_expired_venues()
                 for venue in resumed:
+                    if venue in self._manual_review_venues:
+                        dispatcher.set_venue_allocation(venue, 0.0)
+                        dispatcher.pause_venue(
+                            venue,
+                            reason="manual-review hold persists",
+                            cooldown_seconds=self._hard_failure_cooldown_seconds,
+                        )
+                        self._record_system_log(
+                            f"{venue} remained paused (manual-review hold)",
+                            level="warning",
+                            tags=["risk", "manual_review_hold"],
+                        )
+                        await self.telegram.send_message(
+                            (
+                                f"⏸️ `{venue}` remains paused under manual-review hold.\n"
+                                "Use `/status` to inspect state, then `/allocation <venue> 1` or `/resume` to release."
+                            ),
+                            priority="medium",
+                        )
+                        continue
+
                     if venue in self._auto_deallocated:
                         dispatcher.set_venue_allocation(venue, self._default_venue_allocation)
                         self._auto_deallocated.discard(venue)
