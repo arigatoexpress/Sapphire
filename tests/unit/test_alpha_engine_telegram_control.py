@@ -839,3 +839,165 @@ def test_tradingview_backtest_action_dispatches_workbench_request(autonomy_modul
     assert result["dispatch"]["dispatched"] is True
     assert result["dispatch"]["action"] == "tv_backtest"
     assert "workspace" in result
+
+
+# ── Phase 3: Forum Telegram command parsing ────────────────────
+
+
+def test_forum_top_slash_command(telegram_module):
+    """'/forum top' dispatches FORUM_TOP_TOPICS."""
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/forum top"}}
+        )
+    )
+    callback.assert_awaited_once()
+    _, symbol, action, _ = callback.await_args.args
+    assert action == "FORUM_TOP_TOPICS"
+    payload = json.loads(symbol)
+    assert payload["limit"] == 10
+
+
+def test_forum_top_with_category(telegram_module):
+    """'/forum top trade_idea' passes category filter."""
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/forum top trade_idea"}}
+        )
+    )
+    callback.assert_awaited_once()
+    _, symbol, action, _ = callback.await_args.args
+    assert action == "FORUM_TOP_TOPICS"
+    payload = json.loads(symbol)
+    assert payload["category"] == "trade_idea"
+
+
+def test_forum_vote_slash_command(telegram_module):
+    """'/forum vote TOPIC-00001 up' dispatches FORUM_VOTE_TOPIC."""
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/forum vote TOPIC-00001 up"}}
+        )
+    )
+    callback.assert_awaited_once()
+    _, symbol, action, _ = callback.await_args.args
+    assert action == "FORUM_VOTE_TOPIC"
+    payload = json.loads(symbol)
+    assert payload["topic_id"] == "TOPIC-00001"
+    assert payload["direction"] == "up"
+
+
+def test_forum_agents_slash_command(telegram_module):
+    """'/forum agents' dispatches FORUM_AGENTS."""
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/forum agents"}}
+        )
+    )
+    callback.assert_awaited_once()
+    _, _, action, _ = callback.await_args.args
+    assert action == "FORUM_AGENTS"
+
+
+def test_forum_thread_slash_command(telegram_module):
+    """'/forum thread TOPIC-00005' dispatches FORUM_THREAD."""
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/forum thread TOPIC-00005"}}
+        )
+    )
+    callback.assert_awaited_once()
+    _, symbol, action, _ = callback.await_args.args
+    assert action == "FORUM_THREAD"
+    payload = json.loads(symbol)
+    assert payload["topic_id"] == "TOPIC-00005"
+
+
+def test_forum_post_slash_command(telegram_module):
+    """'/forum post Title | Body category:trade_idea' dispatches FORUM_CREATE_TOPIC."""
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/forum post SOL breakout setup | BTC correlation divergence suggests SOL upside category:trade_idea"}}
+        )
+    )
+    callback.assert_awaited_once()
+    _, symbol, action, _ = callback.await_args.args
+    assert action == "FORUM_CREATE_TOPIC"
+    payload = json.loads(symbol)
+    assert payload["title"] == "SOL breakout setup"
+    assert "BTC correlation" in payload["body"]
+    assert payload["category"] == "trade_idea"
+
+
+def test_forum_top_plain_text(telegram_module):
+    """Plain text 'forum top' dispatches FORUM_TOP_TOPICS."""
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=AsyncMock(),
+    )
+    result = bot._parse_plain_text_command("forum top")
+    assert result is not None
+    assert result["action"] == "FORUM_TOP_TOPICS"
+
+
+def test_forum_vote_plain_text(telegram_module):
+    """Plain text 'forum vote TOPIC-00001 down' dispatches FORUM_VOTE_TOPIC."""
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=AsyncMock(),
+    )
+    result = bot._parse_plain_text_command("forum vote TOPIC-00001 down")
+    assert result is not None
+    assert result["action"] == "FORUM_VOTE_TOPIC"
+    payload = json.loads(result["symbol"])
+    assert payload["direction"] == "down"
+
+
+def test_forum_agents_plain_text(telegram_module):
+    """Plain text 'forum agents' dispatches FORUM_AGENTS."""
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=AsyncMock(),
+    )
+    result = bot._parse_plain_text_command("forum agents")
+    assert result is not None
+    assert result["action"] == "FORUM_AGENTS"
+
+
+def test_forum_thread_plain_text(telegram_module):
+    """Plain text 'forum thread TOPIC-00003' dispatches FORUM_THREAD."""
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=AsyncMock(),
+    )
+    result = bot._parse_plain_text_command("forum thread TOPIC-00003")
+    assert result is not None
+    assert result["action"] == "FORUM_THREAD"
+    payload = json.loads(result["symbol"])
+    assert payload["topic_id"] == "TOPIC-00003"
