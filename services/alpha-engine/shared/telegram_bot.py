@@ -40,6 +40,7 @@ class TelegramPlatformBot:
         "focus": "CONTROL_FOCUS",
         "autonomy": "AUTONOMY_CYCLE",
         "security": "SECURITY_STATUS",
+        "media": "MEDIA_STATUS",
     }
     TARGET_ALIASES = {
         "LIGHT": "LIGHTER",
@@ -484,6 +485,9 @@ class TelegramPlatformBot:
             "- `/scout publish <note>`\n"
             "- `/security status`\n"
             "- `/security scan [skill|all] [no-upload|upload]` (default: no-upload)\n"
+            "- `/media status`\n"
+            "- `/media mode <draft_only|owner_approval|auto_post>`\n"
+            "- `/media draft <topic>`\n"
             "- `/deallocate <venue>`\n"
             "- `/allocate <venue> <percent>`\n\n"
             "Owner steering:\n"
@@ -692,6 +696,70 @@ class TelegramPlatformBot:
                 priority=NotificationPriority.HIGH,
             )
             await self._dispatch_callback("CONTROL", payload, "SECURITY_SCAN", 0.0)
+            return
+
+        # Media workflow commands (Twitter + Substack automation plane)
+        slash_media_cmd = re.search(
+            r"^/media\s+(status|mode|draft)(?:\s+(.+))?$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        mention_media_cmd = re.search(
+            r"@(alpha|control)\s+media\s+(status|mode|draft)(?:\s+(.+))?$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if slash_media_cmd or mention_media_cmd:
+            if slash_media_cmd:
+                media_command = str(slash_media_cmd.group(1) or "").strip().lower()
+                media_arg = str(slash_media_cmd.group(2) or "").strip()
+            else:
+                media_command = str(mention_media_cmd.group(2) or "").strip().lower()
+                media_arg = str(mention_media_cmd.group(3) or "").strip()
+
+            if media_command == "status":
+                await self.send_message(
+                    (
+                        "📰 Sapphire media status request queued.\n"
+                        "Expected outcome: return posting mode, credential readiness, and recent draft/publish state.\n"
+                        "Benefit: keeps communication automation aligned with current runtime controls."
+                    ),
+                    priority=NotificationPriority.HIGH,
+                )
+                await self._dispatch_callback("CONTROL", "ALL", "MEDIA_STATUS", 0.0)
+                return
+
+            if media_command == "mode":
+                if not media_arg:
+                    await self.send_message(
+                        "❌ Media mode requires a value: `draft_only`, `owner_approval`, or `auto_post`.",
+                        priority=NotificationPriority.HIGH,
+                    )
+                    return
+
+                payload = json.dumps({"mode": media_arg}, separators=(",", ":"))
+                await self.send_message(
+                    (
+                        f"📰 Sapphire media mode update queued: `{media_arg}`.\n"
+                        "Expected outcome: publication workflow switches policy immediately.\n"
+                        "Benefit: controls automation speed vs owner oversight."
+                    ),
+                    priority=NotificationPriority.HIGH,
+                )
+                await self._dispatch_callback("CONTROL", payload, "MEDIA_SET_MODE", 0.0)
+                return
+
+            topic = media_arg or "weekly research update"
+            payload = json.dumps({"topic": topic}, separators=(",", ":"))
+            await self.send_message(
+                (
+                    f"📰 Sapphire media draft request queued for topic: `{topic}`.\n"
+                    "Expected outcome: generate structured draft content for X/Substack review or auto-publish path.\n"
+                    "Benefit: turns ops telemetry into consistent outbound narrative."
+                ),
+                priority=NotificationPriority.HIGH,
+            )
+            await self._dispatch_callback("CONTROL", payload, "MEDIA_DRAFT", 0.0)
             return
 
         # Owner steering command

@@ -151,6 +151,25 @@ class AlphaEngine:
         self._system_logs: Deque[Dict[str, Any]] = deque(maxlen=self._system_log_max_entries)
         self.forum = SapphireForumService()
         self.vt_scanner = VirusTotalSkillScanner()
+        requested_media_mode = self._normalize_media_mode(
+            os.getenv("SAPPHIRE_MEDIA_MODE", "owner_approval")
+        )
+        self._media_mode = requested_media_mode or "owner_approval"
+        self._media_twitter_enabled = self._env_flag("SAPPHIRE_MEDIA_TWITTER_ENABLED", default=True)
+        self._media_substack_enabled = self._env_flag("SAPPHIRE_MEDIA_SUBSTACK_ENABLED", default=True)
+        self._media_twitter_handle = str(os.getenv("SAPPHIRE_TWITTER_HANDLE", "")).strip()
+        self._media_substack_publication = str(
+            os.getenv("SAPPHIRE_SUBSTACK_PUBLICATION_URL", "")
+        ).strip()
+        self._media_twitter_api_token = str(os.getenv("SAPPHIRE_TWITTER_API_TOKEN", "")).strip()
+        self._media_substack_api_token = str(os.getenv("SAPPHIRE_SUBSTACK_API_TOKEN", "")).strip()
+        self._media_last_draft: Dict[str, Any] = {"topic": "", "title": "", "timestamp": 0}
+        self._media_last_publish: Dict[str, Any] = {
+            "target": "",
+            "status": "none",
+            "detail": "",
+            "timestamp": 0,
+        }
         self._trade_metrics: Dict[str, float] = {
             "total_trades": 0.0,
             "wins": 0.0,
@@ -226,6 +245,22 @@ class AlphaEngine:
             "full": "full_live",
             "full_live": "full_live",
             "production": "full_live",
+        }
+        return aliases.get(value, "")
+
+    @staticmethod
+    def _normalize_media_mode(raw: Any) -> str:
+        value = str(raw or "").strip().lower().replace("-", "_")
+        aliases = {
+            "draft": "draft_only",
+            "draft_only": "draft_only",
+            "owner": "owner_approval",
+            "owner_approval": "owner_approval",
+            "approval": "owner_approval",
+            "manual": "owner_approval",
+            "auto": "auto_post",
+            "auto_post": "auto_post",
+            "autopost": "auto_post",
         }
         return aliases.get(value, "")
 
@@ -682,6 +717,7 @@ class AlphaEngine:
             if snapshot["tradingview_signal_mode"] == "live"
             else "WORKBENCH_DRY_RUN"
         )
+        media_snapshot = snapshot.get("media", {}) if isinstance(snapshot, dict) else {}
         active_count = len([item for item in snapshot["venues"].values() if not item["paused"]])
         pressure = int(snapshot.get("failure_pressure", 0))
         if snapshot["kill_switch_active"]:
@@ -712,6 +748,11 @@ class AlphaEngine:
                 else "VT skill security: `OFF`"
             ),
             f"VT policy mode: `{snapshot.get('vt_enforcement_mode', 'warn')}`",
+            f"Media mode: `{snapshot.get('media_mode', 'owner_approval')}`",
+            (
+                f"Media channels: X `{'READY' if media_snapshot.get('twitter_ready') else 'NOT_READY'}` | "
+                f"Substack `{'READY' if media_snapshot.get('substack_ready') else 'NOT_READY'}`"
+            ),
             f"Autonomy dispatches: `{snapshot['autonomy_dispatch_count']}`",
             f"Pending autonomy decisions: `{snapshot['pending_autonomy_decisions']}`",
             f"Operational read: {status_read}",
@@ -730,6 +771,7 @@ class AlphaEngine:
     def _control_snapshot(self) -> Dict[str, Any]:
         state = dispatcher.get_control_state()
         strategy_state = self.strategy.execution_state()
+        media_snapshot = self._media_status_snapshot()
         pending_sessions = [
             session
             for session in self._autonomy_sessions.values()
@@ -779,13 +821,155 @@ class AlphaEngine:
             "vt_security_enabled": bool(self.vt_scanner.enabled),
             "vt_api_key_configured": bool(self.vt_scanner.api_key),
             "vt_enforcement_mode": self.vt_scanner.enforcement_mode,
+            "media_mode": media_snapshot.get("mode", "owner_approval"),
+            "media": media_snapshot,
             "venues": venues,
             "timestamp": int(time.time()),
+        }
+
+    def _media_status_snapshot(self) -> Dict[str, Any]:
+        twitter_ready = bool(
+            self._media_twitter_enabled and self._media_twitter_api_token and self._media_twitter_handle
+        )
+        substack_ready = bool(
+            self._media_substack_enabled
+            and self._media_substack_api_token
+            and self._media_substack_publication
+        )
+        return {
+            "mode": self._media_mode,
+            "twitter_enabled": bool(self._media_twitter_enabled),
+            "twitter_ready": twitter_ready,
+            "twitter_handle": self._media_twitter_handle or "",
+            "substack_enabled": bool(self._media_substack_enabled),
+            "substack_ready": substack_ready,
+            "substack_publication": self._media_substack_publication or "",
+            "last_draft": dict(self._media_last_draft),
+            "last_publish": dict(self._media_last_publish),
+            "timestamp": int(time.time()),
+        }
+
+    @staticmethod
+    def _fmt_unix_ts(timestamp: Any) -> str:
+        try:
+            value = int(timestamp or 0)
+        except (TypeError, ValueError):
+            value = 0
+        if value <= 0:
+            return "n/a"
+        return time.strftime("%Y-%m-%d %H:%M:%SZ", time.gmtime(value))
+
+    async def _send_media_status(self) -> None:
+        snapshot = self._media_status_snapshot()
+        last_draft = snapshot.get("last_draft", {}) if isinstance(snapshot, dict) else {}
+        last_publish = snapshot.get("last_publish", {}) if isinstance(snapshot, dict) else {}
+        mode = str(snapshot.get("mode", "owner_approval"))
+        policy_explainer = {
+            "draft_only": "generates drafts only; no outbound publishing.",
+            "owner_approval": "prepares drafts and waits for owner confirmation before publishing.",
+            "auto_post": "publishes automatically when channel credentials are ready.",
+        }
+        mode_note = policy_explainer.get(mode, "uses configured media policy.")
+
+        lines = [
+            "📰 **SAPPHIRE MEDIA STATUS**",
+            f"Mode: `{mode}` ({mode_note})",
+            (
+                f"X/Twitter: `{'READY' if snapshot.get('twitter_ready') else 'NOT_READY'}`"
+                f" | enabled `{'YES' if snapshot.get('twitter_enabled') else 'NO'}`"
+                f" | handle `{snapshot.get('twitter_handle') or 'n/a'}`"
+            ),
+            (
+                f"Substack: `{'READY' if snapshot.get('substack_ready') else 'NOT_READY'}`"
+                f" | enabled `{'YES' if snapshot.get('substack_enabled') else 'NO'}`"
+                f" | publication `{snapshot.get('substack_publication') or 'n/a'}`"
+            ),
+            (
+                f"Last draft: `{last_draft.get('title') or 'none'}`"
+                f" at `{self._fmt_unix_ts(last_draft.get('timestamp'))}`"
+            ),
+            (
+                f"Last publish: `{last_publish.get('status') or 'none'}`"
+                f" target `{last_publish.get('target') or 'n/a'}`"
+                f" at `{self._fmt_unix_ts(last_publish.get('timestamp'))}`"
+            ),
+            "",
+            "Commands: `/media mode <draft_only|owner_approval|auto_post>` and `/media draft <topic>`",
+        ]
+        await self.telegram.send_message("\n".join(lines), priority="medium")
+
+    def _set_media_mode(self, requested_mode: str, source: str = "manual") -> Dict[str, Any]:
+        normalized = self._normalize_media_mode(requested_mode)
+        if not normalized:
+            return {
+                "ok": False,
+                "error": "invalid_mode",
+                "allowed_modes": ["draft_only", "owner_approval", "auto_post"],
+            }
+
+        previous = self._media_mode
+        self._media_mode = normalized
+        self._record_system_log(
+            f"Media mode set to {normalized}",
+            level="warning",
+            tags=["media", "control"],
+            metadata={"source": source, "previous_mode": previous, "new_mode": normalized},
+        )
+        return {"ok": True, "previous_mode": previous, "new_mode": normalized}
+
+    def _build_media_draft(self, topic: str) -> Dict[str, Any]:
+        normalized_topic = str(topic or "").strip() or "weekly operations update"
+        snapshot = self._control_snapshot()
+        timestamp = int(time.time())
+        stage = str(snapshot.get("dex_execution_stage", "paper"))
+        failure_pressure = int(snapshot.get("failure_pressure", 0))
+        pending = int(snapshot.get("pending_autonomy_decisions", 0))
+        autonomy = "ON" if snapshot.get("full_autonomy_enabled") else "OFF"
+        tv_mode = str(snapshot.get("tradingview_signal_mode", "workbench_dry_run"))
+        vt_mode = str(snapshot.get("vt_enforcement_mode", "warn"))
+        title = f"Sapphire Weekly Lab Note: {normalized_topic}"
+        body_lines = [
+            f"# {title}",
+            "",
+            "## Experiment Context",
+            "- Scope: arigatoexpress/Sapphire only",
+            f"- DEX execution stage: {stage}",
+            f"- Full autonomy: {autonomy}",
+            f"- TradingView mode: {tv_mode}",
+            "",
+            "## Operational Snapshot",
+            f"- Failure pressure: {failure_pressure}",
+            f"- Pending autonomy decisions: {pending}",
+            f"- VirusTotal policy mode: {vt_mode}",
+            "",
+            "## Key Learnings",
+            "- Summarize changes that improved stability, security, or execution quality this period.",
+            "- Document incidents, observed root causes, and mitigations applied.",
+            "",
+            "## Next Experiments",
+            "- Define measurable hypotheses for reliability, execution quality, and autonomy throughput.",
+            "- Track expected benefit and stop conditions before promotion.",
+        ]
+        body = "\n".join(body_lines)
+        self._media_last_draft = {"topic": normalized_topic, "title": title, "timestamp": timestamp}
+        self._record_system_log(
+            f"Media draft generated for topic '{normalized_topic}'",
+            level="info",
+            tags=["media", "draft"],
+            metadata={"mode": self._media_mode, "topic": normalized_topic},
+        )
+        return {
+            "topic": normalized_topic,
+            "title": title,
+            "body": body,
+            "timestamp": timestamp,
+            "mode": self._media_mode,
         }
 
     async def _send_focus_snapshot(self) -> None:
         state = dispatcher.get_control_state()
         strategy_state = self.strategy.execution_state()
+        media_snapshot = self._media_status_snapshot()
         venue_summary = ", ".join(sorted(state.keys())) if state else "none"
 
         directive = self._owner_directive.strip() or "none"
@@ -820,6 +1004,11 @@ class AlphaEngine:
             f"TradingView autonomy: `{'ON' if self.tv_autonomy.enabled else 'OFF'}`",
             f"Community scripts: `{'ON' if self.tv_autonomy.community_access_enabled else 'OFF'}`",
             f"VT skill security: `{'ON' if self.vt_scanner.enabled else 'OFF'}` (`{self.vt_scanner.enforcement_mode}`)",
+            f"Media mode: `{media_snapshot.get('mode', 'owner_approval')}`",
+            (
+                f"Media channels: X `{'READY' if media_snapshot.get('twitter_ready') else 'NOT_READY'}` | "
+                f"Substack `{'READY' if media_snapshot.get('substack_ready') else 'NOT_READY'}`"
+            ),
             f"Owner directive: `{directive}`",
             f"Directive updated: `{directive_updated}`",
             "",
@@ -851,6 +1040,7 @@ class AlphaEngine:
             )
         else:
             why_now = "Execution and control state are inside configured guardrails."
+        media_snapshot = self._media_status_snapshot()
 
         lines = [
             f"💓 **SAPPHIRE HEARTBEAT** (`{reason}`)",
@@ -870,6 +1060,11 @@ class AlphaEngine:
             (
                 f"- TradingView mode: `{'LIVE' if self._tradingview_execution_enabled else 'WORKBENCH_DRY-RUN'}`"
                 f" | default qty `{self._tradingview_default_quantity}`"
+            ),
+            (
+                f"- Media mode: `{self._media_mode}`"
+                f" | X `{'READY' if media_snapshot.get('twitter_ready') else 'NOT_READY'}`"
+                f" | Substack `{'READY' if media_snapshot.get('substack_ready') else 'NOT_READY'}`"
             ),
             f"- Pending approvals: `{pending_count}` | Failure pressure: `{total_failures}`",
             f"- Owner directive: `{directive}`",
@@ -1332,6 +1527,63 @@ class AlphaEngine:
 
     async def _handle_control_command(self, target: str, action: str, value: float) -> None:
         normalized_action = action.upper()
+
+        if normalized_action in {"MEDIA_STATUS", "COMMUNICATION_STATUS"}:
+            await self._send_media_status()
+            return
+
+        if normalized_action in {"MEDIA_SET_MODE", "SET_MEDIA_MODE"}:
+            payload = self._parse_json_payload(target)
+            requested_mode = str(payload.get("mode", "")).strip() or str(target or "").strip()
+            result = self._set_media_mode(requested_mode, source="telegram")
+            if not result.get("ok"):
+                await self.telegram.send_message(
+                    (
+                        "❌ Invalid media mode.\n"
+                        "Use one of: `draft_only`, `owner_approval`, `auto_post`."
+                    ),
+                    priority="high",
+                )
+                return
+
+            snapshot = self._media_status_snapshot()
+            await self.telegram.send_message(
+                (
+                    f"✅ Media mode updated to `{result.get('new_mode', self._media_mode)}`.\n"
+                    f"Previous mode: `{result.get('previous_mode', 'unknown')}`\n"
+                    f"X ready: `{'YES' if snapshot.get('twitter_ready') else 'NO'}` | "
+                    f"Substack ready: `{'YES' if snapshot.get('substack_ready') else 'NO'}`\n"
+                    "Expected outcome: publication workflow now follows the updated automation policy."
+                ),
+                priority="high",
+            )
+            return
+
+        if normalized_action in {"MEDIA_DRAFT", "PREPARE_MEDIA_DRAFT"}:
+            payload = self._parse_json_payload(target)
+            topic = str(payload.get("topic", "")).strip() or str(target or "").strip()
+            draft = self._build_media_draft(topic)
+            snapshot = self._media_status_snapshot()
+            publish_note = {
+                "draft_only": "Draft created only; no publish attempts will run.",
+                "owner_approval": "Draft created; await owner approval before publishing.",
+                "auto_post": (
+                    "Draft created; auto-post is enabled when channel credentials are ready."
+                ),
+            }.get(draft.get("mode", "owner_approval"), "Draft created.")
+            await self.telegram.send_message(
+                (
+                    "📰 Sapphire media draft generated.\n"
+                    f"Title: `{draft.get('title', 'n/a')}`\n"
+                    f"Mode: `{draft.get('mode', 'owner_approval')}`\n"
+                    f"X ready: `{'YES' if snapshot.get('twitter_ready') else 'NO'}` | "
+                    f"Substack ready: `{'YES' if snapshot.get('substack_ready') else 'NO'}`\n"
+                    f"Policy: {publish_note}\n"
+                    "Use `/media status` to review channel readiness."
+                ),
+                priority="high",
+            )
+            return
 
         if normalized_action in {"SECURITY_STATUS", "VT_STATUS", "SKILL_SECURITY_STATUS"}:
             status = await self._handle_security_skills_status_request({})
