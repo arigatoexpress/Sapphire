@@ -33,6 +33,50 @@ class SapphireForumService:
     }
     VALID_PRIORITIES = {"low", "medium", "high", "critical"}
 
+    # ── Phase 3: Categories, Scoring, Agent Profiles ───────────────
+    VALID_CATEGORIES = {
+        "trade_idea",       # Actionable trade setups
+        "strategy",         # Strategy design & backtesting
+        "market_analysis",  # Market structure, sentiment, macro
+        "platform",         # Infrastructure, venues, deployment
+        "general",          # Default catch-all
+    }
+
+    AGENT_PROFILES = {
+        "SAPPHIRE": {
+            "emoji": "💎",
+            "name": "Sapphire",
+            "role": "Chief Execution Officer",
+            "expertise": ["trade execution", "venue management", "order routing", "fill analysis"],
+            "voice": "Direct, tactical, execution-focused. Speaks in short decisive sentences.",
+            "perspective": "Always evaluating: can we execute this? What's the fill risk?",
+        },
+        "OBSIDIAN": {
+            "emoji": "🖤",
+            "name": "Obsidian",
+            "role": "Chief Infrastructure Officer",
+            "expertise": ["cloud deployment", "system reliability", "monitoring", "security"],
+            "voice": "Methodical, cautious, systems-thinking. Asks about edge cases.",
+            "perspective": "Will this break production? What's the failure mode?",
+        },
+        "EMERALD": {
+            "emoji": "💚",
+            "name": "Emerald",
+            "role": "Chief Strategy Officer",
+            "expertise": ["strategy design", "performance analysis", "risk modeling", "cognition"],
+            "voice": "Analytical, thoughtful, data-driven. Cites evidence and patterns.",
+            "perspective": "What does the data say? How does this compare to historical performance?",
+        },
+        "SCOUT": {
+            "emoji": "🔭",
+            "name": "Scout",
+            "role": "External Collaboration Agent",
+            "expertise": ["community outreach", "idea gathering", "public communication"],
+            "voice": "Friendly, curious, community-oriented. Bridges internal and external.",
+            "perspective": "What are other agents saying? What ideas can we bring in?",
+        },
+    }
+
     _SENSITIVE_INLINE_RE = re.compile(
         r"(?i)\b(api[_-]?key|token|secret|password|private[_-]?key|access[_-]?key|refresh[_-]?token|authorization|cookie|session)\b\s*[:=]\s*([^\s,;]+)"
     )
@@ -134,6 +178,31 @@ class SapphireForumService:
         if value in cls.VALID_PRIORITIES:
             return value
         return "medium"
+
+    @classmethod
+    def _normalize_category(cls, category: Any) -> str:
+        candidate = str(category or "").strip().lower().replace(" ", "_").replace("-", "_")
+        aliases = {
+            "trade": "trade_idea",
+            "trade_ideas": "trade_idea",
+            "idea": "trade_idea",
+            "setup": "trade_idea",
+            "signal": "trade_idea",
+            "strat": "strategy",
+            "backtest": "strategy",
+            "market": "market_analysis",
+            "analysis": "market_analysis",
+            "macro": "market_analysis",
+            "sentiment": "market_analysis",
+            "infra": "platform",
+            "deploy": "platform",
+            "venue": "platform",
+            "ops": "platform",
+        }
+        value = aliases.get(candidate, candidate)
+        if value in cls.VALID_CATEGORIES:
+            return value
+        return "general"
 
     @staticmethod
     def _normalize_author(author: Any, default: str = "SAPPHIRE") -> str:
@@ -430,12 +499,15 @@ class SapphireForumService:
         tags = self._normalize_tags(payload.get("tags", []))
         source = str(payload.get("source", "internal") or "internal").strip().lower() or "internal"
 
+        category = self._normalize_category(payload.get("category", "general"))
+
         now = self._now()
         topic = {
             "topic_id": self._new_topic_id_locked(),
             "title": title,
             "body": body,
             "lane": lane,
+            "category": category,
             "state": state,
             "priority": priority,
             "author": author,
@@ -444,6 +516,11 @@ class SapphireForumService:
             "created_at": now,
             "updated_at": now,
             "redactions": int(title_safe["redactions"] + body_safe["redactions"]),
+            # Phase 3: scoring
+            "upvotes": 0,
+            "downvotes": 0,
+            "score": 0.0,
+            "voters": [],  # List of agent_ids that have voted
         }
         self._topics.append(topic)
 
@@ -471,15 +548,26 @@ class SapphireForumService:
         source = str(payload.get("source", "internal") or "internal").strip().lower() or "internal"
         author = self._normalize_author(payload.get("author", "SAPPHIRE"))
 
+        parent_reply_id = str(payload.get("parent_reply_id", "") or "").strip()
+
         reply = {
             "reply_id": self._new_reply_id_locked(),
             "topic_id": topic_id,
+            "parent_reply_id": parent_reply_id,  # Phase 3: threading
             "author": author,
             "body": body,
             "kind": reply_kind,
             "source": source,
             "created_at": self._now(),
             "redactions": int(body_safe["redactions"]),
+            # Phase 3: scoring & quality
+            "upvotes": 0,
+            "downvotes": 0,
+            "quality": {
+                "helpfulness": 0.0,
+                "accuracy": 0.0,
+                "ratings_count": 0,
+            },
         }
         bucket = self._replies.setdefault(topic_id, [])
         bucket.append(reply)
@@ -514,6 +602,90 @@ class SapphireForumService:
     def create_topic(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         with self._lock:
             return self._create_topic_locked(payload, persist=True)
+
+    # ── Phase 3: Voting, Quality, Agent Profiles ───────────────────
+
+    def vote_topic(self, topic_id: str, voter_id: str, direction: str) -> Dict[str, Any]:
+        """Upvote or downvote a topic. Each agent can vote once."""
+        with self._lock:
+            topic = next((t for t in self._topics if t.get("topic_id") == topic_id), None)
+            if not topic:
+                return {"ok": False, "error": "topic_not_found"}
+            voter = str(voter_id or "").strip().upper()
+            if voter in topic.get("voters", []):
+                return {"ok": False, "error": "already_voted"}
+            if direction == "up":
+                topic["upvotes"] = topic.get("upvotes", 0) + 1
+            elif direction == "down":
+                topic["downvotes"] = topic.get("downvotes", 0) + 1
+            else:
+                return {"ok": False, "error": "invalid_direction"}
+            topic.setdefault("voters", []).append(voter)
+            topic["score"] = float(topic.get("upvotes", 0)) - float(topic.get("downvotes", 0))
+            self._save_locked()
+            return {"ok": True, "score": topic["score"], "upvotes": topic["upvotes"], "downvotes": topic["downvotes"]}
+
+    def vote_reply(self, reply_id: str, voter_id: str, direction: str) -> Dict[str, Any]:
+        """Upvote or downvote a reply."""
+        with self._lock:
+            for bucket in self._replies.values():
+                for reply in bucket:
+                    if reply.get("reply_id") == reply_id:
+                        if direction == "up":
+                            reply["upvotes"] = reply.get("upvotes", 0) + 1
+                        elif direction == "down":
+                            reply["downvotes"] = reply.get("downvotes", 0) + 1
+                        else:
+                            return {"ok": False, "error": "invalid_direction"}
+                        self._save_locked()
+                        return {"ok": True, "upvotes": reply.get("upvotes", 0), "downvotes": reply.get("downvotes", 0)}
+            return {"ok": False, "error": "reply_not_found"}
+
+    def rate_reply_quality(self, reply_id: str, rater_id: str, helpfulness: float, accuracy: float) -> Dict[str, Any]:
+        """Rate a reply's quality (0.0–1.0 scale). Rolling average."""
+        with self._lock:
+            for bucket in self._replies.values():
+                for reply in bucket:
+                    if reply.get("reply_id") == reply_id:
+                        q = reply.setdefault("quality", {"helpfulness": 0.0, "accuracy": 0.0, "ratings_count": 0})
+                        n = q.get("ratings_count", 0)
+                        h = max(0.0, min(1.0, float(helpfulness)))
+                        a = max(0.0, min(1.0, float(accuracy)))
+                        # Rolling average
+                        q["helpfulness"] = (q["helpfulness"] * n + h) / (n + 1)
+                        q["accuracy"] = (q["accuracy"] * n + a) / (n + 1)
+                        q["ratings_count"] = n + 1
+                        self._save_locked()
+                        return {"ok": True, "quality": q}
+            return {"ok": False, "error": "reply_not_found"}
+
+    def get_agent_profile(self, agent_id: str) -> Optional[Dict[str, Any]]:
+        """Return the personality profile for an agent."""
+        key = str(agent_id or "").strip().upper()
+        return self.AGENT_PROFILES.get(key)
+
+    def list_agent_profiles(self) -> Dict[str, Dict[str, Any]]:
+        """Return all agent personality profiles."""
+        return dict(self.AGENT_PROFILES)
+
+    def get_thread(self, topic_id: str, parent_reply_id: str = "") -> List[Dict[str, Any]]:
+        """Return threaded replies for a topic, optionally under a parent reply."""
+        with self._lock:
+            all_replies = self._replies.get(topic_id, [])
+            if parent_reply_id:
+                return [r for r in all_replies if r.get("parent_reply_id") == parent_reply_id]
+            # Top-level replies (no parent)
+            return [r for r in all_replies if not r.get("parent_reply_id")]
+
+    def get_top_topics(self, limit: int = 10, category: str = "") -> List[Dict[str, Any]]:
+        """Return topics sorted by score, optionally filtered by category."""
+        with self._lock:
+            filtered = list(self._topics)
+            if category:
+                norm_cat = self._normalize_category(category)
+                filtered = [t for t in filtered if t.get("category") == norm_cat]
+            sorted_topics = sorted(filtered, key=lambda t: float(t.get("score", 0)), reverse=True)
+            return [self._topic_summary_locked(t) for t in sorted_topics[:limit]]
 
     def add_reply(self, topic_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         with self._lock:
