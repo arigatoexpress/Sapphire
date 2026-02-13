@@ -49,6 +49,7 @@ export interface ControlStatusResponse {
     dex_stage_multiplier: number
     dex_effective_quantity: number
     dex_base_quantity: number
+    tradingview_integration_enabled?: boolean
     tradingview_execution_enabled: boolean
     tradingview_default_quantity: number
     autonomy_dispatch_count: number

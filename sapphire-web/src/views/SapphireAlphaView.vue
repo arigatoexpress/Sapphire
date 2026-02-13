@@ -54,15 +54,21 @@ const refreshAge = computed(() => {
     return `${Math.max(0, Math.round((nowEpoch.value - lastRefreshEpoch.value) / 1000))}s ago`
 })
 
-const executionMode = computed(() =>
-    control.value?.tradingview_execution_enabled ? 'TV signals live' : 'TV workbench dry-run',
+const tradingWorkbenchEnabled = computed(() =>
+    Boolean(control.value?.tradingview_integration_enabled ?? false),
 )
+
+const executionMode = computed(() => {
+    if (!tradingWorkbenchEnabled.value) return 'Workbench disabled'
+    return control.value?.tradingview_execution_enabled ? 'TV signals live' : 'TV workbench dry-run'
+})
 
 const pendingDecisions = computed(() => Number(control.value?.pending_autonomy_decisions || 0))
 
 const workspaceState = computed(() => workspace.value?.workspace?.state || {})
 
 const watchlists = computed(() => {
+    if (!tradingWorkbenchEnabled.value) return []
     const raw = workspaceState.value?.watchlists || {}
     return Object.entries(raw).map(([name, symbols]) => ({
         name,
@@ -71,6 +77,9 @@ const watchlists = computed(() => {
 })
 
 const strategyIntake = computed(() => {
+    if (!tradingWorkbenchEnabled.value) {
+        return ['TradingView workbench is paused while DEX-native execution hardening is in progress.']
+    }
     const indicators = Array.isArray(workspaceState.value?.indicators) ? workspaceState.value.indicators : []
     const strategies = Array.isArray(workspaceState.value?.strategies) ? workspaceState.value.strategies : []
     const scripts = Array.isArray(workspaceState.value?.community_scripts) ? workspaceState.value.community_scripts : []
@@ -267,13 +276,17 @@ const readinessTone = computed(() => {
 const strategyRail = computed(() => [
     {
         label: 'Ingest',
-        detail: `Assets scope ${workspaceState.value?.assets_scope || 'n/a'}`,
+        detail: tradingWorkbenchEnabled.value
+            ? `Assets scope ${workspaceState.value?.assets_scope || 'n/a'}`
+            : 'DEX-native feeds only (workbench paused)',
         status: alphaCandles.value.length > 0 ? 'ready' : 'pending',
     },
     {
         label: 'Synthesize',
-        detail: `${strategyIntake.value.length} active strategy assets`,
-        status: strategyIntake.value[0]?.startsWith('No ') ? 'pending' : 'ready',
+        detail: tradingWorkbenchEnabled.value
+            ? `${strategyIntake.value.length} active strategy assets`
+            : 'Workbench assets intentionally disabled',
+        status: tradingWorkbenchEnabled.value && strategyIntake.value[0]?.startsWith('No ') ? 'pending' : 'ready',
     },
     {
         label: 'Validate',
@@ -289,21 +302,29 @@ const strategyRail = computed(() => [
 
 const loadAlphaStatus = async () => {
     try {
-        const [stats, routing, workspacePayload, controlPayload, securityPayload] = await Promise.all([
+        const [stats, routing, controlPayload, securityPayload] = await Promise.all([
             fetchPerformanceStats(),
             fetchRoutingInfo(),
-            fetchTradingViewWorkspace(),
             fetchControlStatus(),
             fetchSecuritySkillsStatus(),
         ])
 
-        if (workspacePayload?.ok) {
-            workspace.value = workspacePayload
-            const workspaceSymbol = String(workspacePayload.workspace?.state?.selected_symbol || '').toUpperCase()
-            if (workspaceSymbol && !selectedSymbol.value) selectedSymbol.value = workspaceSymbol
-        }
         if (controlPayload?.ok) control.value = controlPayload
         if (securityPayload?.ok) security.value = securityPayload
+        const workbenchEnabled = Boolean(controlPayload?.tradingview_integration_enabled ?? false)
+
+        if (workbenchEnabled) {
+            const workspacePayload = await fetchTradingViewWorkspace()
+            if (workspacePayload?.ok) {
+                workspace.value = workspacePayload
+                const workspaceSymbol = String(workspacePayload.workspace?.state?.selected_symbol || '').toUpperCase()
+                if (workspaceSymbol && !selectedSymbol.value) selectedSymbol.value = workspaceSymbol
+            } else {
+                workspace.value = null
+            }
+        } else {
+            workspace.value = null
+        }
 
         totalTrades.value = Number(stats?.metrics?.system?.total_trades || 0)
         winRate.value = Number(stats?.metrics?.system?.win_rate || 0)
@@ -395,8 +416,8 @@ onUnmounted(() => {
                 <span class="font-mono kicker">SAPPHIRE ALPHA LIVE</span>
                 <h2>Broad-market intelligence workbench for idea discovery and strategy validation.</h2>
                 <p>
-                    DEX-native feeds drive market context while TradingView remains the experimentation workbench. Alpha outputs now span
-                    BTC, ETH, SOL, AVAX, DOGE, and HYPE instead of a single-asset lens.
+                    DEX-native feeds currently drive the full analysis loop while external workbench integrations are paused. Alpha outputs
+                    span BTC, ETH, SOL, AVAX, DOGE, and HYPE for broader market context.
                 </p>
             </div>
             <div class="hero-controls">
@@ -483,7 +504,7 @@ onUnmounted(() => {
             </article>
         </section>
 
-        <section class="workspace-grid">
+        <section class="workspace-grid" v-if="tradingWorkbenchEnabled">
             <article class="panel card">
                 <h3 class="font-mono">Managed Watchlists</h3>
                 <div class="watchlist" v-for="item in watchlists" :key="item.name">
@@ -500,6 +521,16 @@ onUnmounted(() => {
                 <p class="hint">
                     Workspace: {{ workspace?.workspace?.workspace_label || 'n/a' }} · Active watchlist
                     {{ workspaceState?.active_watchlist || 'n/a' }}
+                </p>
+            </article>
+        </section>
+
+        <section class="workspace-grid" v-else>
+            <article class="panel card">
+                <h3 class="font-mono">Workbench Status</h3>
+                <p class="hint">
+                    TradingView integration is currently disabled by policy to focus on DEX-native execution reliability and autonomous
+                    runtime hardening.
                 </p>
             </article>
         </section>

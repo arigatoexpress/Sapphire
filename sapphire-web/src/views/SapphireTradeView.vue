@@ -79,6 +79,7 @@ const loading = ref(true)
 const lastRefreshEpoch = ref(0)
 const nowEpoch = ref(Date.now())
 const controlState = ref<{
+    tradingview_integration_enabled: boolean
     tradingview_execution_enabled: boolean
     tradingview_default_quantity: number
     pending_autonomy_decisions: number
@@ -101,11 +102,13 @@ const refreshAge = computed(() => {
     return `${Math.max(0, Math.round((nowEpoch.value - lastRefreshEpoch.value) / 1000))}s ago`
 })
 
-const executionModeLabel = computed(() =>
-    controlState.value?.tradingview_execution_enabled ? 'signals live' : 'workbench dry-run',
-)
+const executionModeLabel = computed(() => {
+    if (controlState.value?.tradingview_integration_enabled === false) return 'integration disabled'
+    return controlState.value?.tradingview_execution_enabled ? 'signals live' : 'workbench dry-run'
+})
 
 const defaultQtyLabel = computed(() => {
+    if (controlState.value?.tradingview_integration_enabled === false) return 'n/a'
     const qty = Number(controlState.value?.tradingview_default_quantity || 0)
     return qty > 0 ? qty.toString() : 'n/a'
 })
@@ -368,6 +371,8 @@ const loadOpsView = async () => {
 
         if (controlPayload?.ok) {
             controlState.value = {
+                tradingview_integration_enabled:
+                    Boolean(controlPayload.tradingview_integration_enabled ?? true),
                 tradingview_execution_enabled: Boolean(controlPayload.tradingview_execution_enabled),
                 tradingview_default_quantity: Number(controlPayload.tradingview_default_quantity || 0),
                 pending_autonomy_decisions: Number(controlPayload.pending_autonomy_decisions || 0),
@@ -424,7 +429,7 @@ onUnmounted(() => {
                 <span class="chip muted">Posture: {{ portfolioPosture }}</span>
                 <span class="chip muted">Market breadth: {{ marketBreadth.breadth }}%</span>
                 <span class="chip muted">Regime: {{ broadMarketPosture }}</span>
-                <span class="chip muted">TV: {{ executionModeLabel }} · qty {{ defaultQtyLabel }}</span>
+                <span class="chip muted">Signal lane: {{ executionModeLabel }} · qty {{ defaultQtyLabel }}</span>
                 <span class="chip muted">Pending decisions: {{ pendingDecisionCount }}</span>
                 <span class="chip muted">Sync: {{ refreshAge }}</span>
             </div>

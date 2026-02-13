@@ -76,9 +76,16 @@ class AlphaEngine:
         self._control_api_token = os.getenv("SAPPHIRE_CONTROL_API_TOKEN", "").strip()
         self._telegram_webhook_mode = bool(self._telegram_webhook_url)
         self._tradingview_webhook_secret = os.getenv("TRADINGVIEW_WEBHOOK_SECRET", "").strip()
+        self._tradingview_integration_enabled = self._env_flag(
+            "SAPPHIRE_TRADINGVIEW_INTEGRATION_ENABLED",
+            default=False,
+        )
         self._tradingview_execution_enabled = (
+            self._tradingview_integration_enabled
+            and (
             os.getenv("TRADINGVIEW_EXECUTION_ENABLED", "false").strip().lower()
             in {"1", "true", "yes", "on"}
+            )
         )
         self._tradingview_default_quantity = max(
             0.0, float(os.getenv("TRADINGVIEW_DEFAULT_QUANTITY", "0.0"))
@@ -1251,11 +1258,13 @@ class AlphaEngine:
     async def _send_control_status(self) -> None:
         snapshot = self._control_snapshot()
         primary_venues = ", ".join(sorted(snapshot["primary_execution_venues"])) or "none"
-        tv_signal_mode = (
-            "LIVE_SIGNAL_EXECUTION"
-            if snapshot["tradingview_signal_mode"] == "live"
-            else "WORKBENCH_DRY_RUN"
-        )
+        tv_signal_mode = "DISABLED"
+        if snapshot.get("tradingview_integration_enabled"):
+            tv_signal_mode = (
+                "LIVE_SIGNAL_EXECUTION"
+                if snapshot["tradingview_signal_mode"] == "live"
+                else "WORKBENCH_DRY_RUN"
+            )
         media_snapshot = snapshot.get("media", {}) if isinstance(snapshot, dict) else {}
         active_count = len([item for item in snapshot["venues"].values() if not item["paused"]])
         pressure = int(snapshot.get("failure_pressure", 0))
@@ -1280,7 +1289,11 @@ class AlphaEngine:
             f"DEX live dispatch: `{'ON' if snapshot['dex_live_dispatch_enabled'] else 'OFF'}`",
             f"DEX effective qty: `{snapshot['dex_effective_quantity']}`",
             f"TradingView signal mode: `{tv_signal_mode}`",
-            f"Signal default quantity: `{snapshot['tradingview_default_quantity']}`",
+            (
+                f"Signal default quantity: `{snapshot['tradingview_default_quantity']}`"
+                if snapshot.get("tradingview_integration_enabled")
+                else "Signal default quantity: `n/a (integration disabled)`"
+            ),
             (
                 "VT skill security: `ON`"
                 if snapshot.get("vt_security_enabled")
@@ -1354,8 +1367,15 @@ class AlphaEngine:
             "dex_stage_multiplier": float(strategy_state.get("stage_multiplier", 0.0)),
             "dex_effective_quantity": float(strategy_state.get("effective_quantity", 0.0)),
             "dex_base_quantity": float(strategy_state.get("base_quantity", 0.0)),
+            "tradingview_integration_enabled": bool(self._tradingview_integration_enabled),
             "tradingview_execution_enabled": self._tradingview_execution_enabled,
-            "tradingview_signal_mode": "live" if self._tradingview_execution_enabled else "workbench_dry_run",
+            "tradingview_signal_mode": (
+                "disabled"
+                if not self._tradingview_integration_enabled
+                else "live"
+                if self._tradingview_execution_enabled
+                else "workbench_dry_run"
+            ),
             "tradingview_default_quantity": float(self._tradingview_default_quantity),
             "autonomy_dispatch_count": int(self._autonomy_dispatch_count),
             "pending_autonomy_decisions": len(pending_summary),
@@ -1626,12 +1646,22 @@ class AlphaEngine:
             ),
             f"DEX effective qty: `{strategy_state.get('effective_quantity', 0.0)}`",
             (
-                "TradingView signal mode: `LIVE`"
+                "TradingView signal mode: `DISABLED`"
+                if not self._tradingview_integration_enabled
+                else "TradingView signal mode: `LIVE`"
                 if self._tradingview_execution_enabled
                 else "TradingView signal mode: `WORKBENCH_DRY_RUN`"
             ),
-            f"TradingView autonomy: `{'ON' if self.tv_autonomy.enabled else 'OFF'}`",
-            f"Community scripts: `{'ON' if self.tv_autonomy.community_access_enabled else 'OFF'}`",
+            (
+                f"TradingView autonomy: `{'ON' if self.tv_autonomy.enabled else 'OFF'}`"
+                if self._tradingview_integration_enabled
+                else "TradingView autonomy: `OFF (integration disabled)`"
+            ),
+            (
+                f"Community scripts: `{'ON' if self.tv_autonomy.community_access_enabled else 'OFF'}`"
+                if self._tradingview_integration_enabled
+                else "Community scripts: `OFF (integration disabled)`"
+            ),
             f"VT skill security: `{'ON' if self.vt_scanner.enabled else 'OFF'}` (`{self.vt_scanner.enforcement_mode}`)",
             f"Media mode: `{media_snapshot.get('mode', 'owner_approval')}`",
             (
@@ -1687,7 +1717,9 @@ class AlphaEngine:
                 f" | qty `{strategy_state.get('effective_quantity', 0.0)}`"
             ),
             (
-                f"- TradingView mode: `{'LIVE' if self._tradingview_execution_enabled else 'WORKBENCH_DRY-RUN'}`"
+                "- TradingView mode: `DISABLED`"
+                if not self._tradingview_integration_enabled
+                else f"- TradingView mode: `{'LIVE' if self._tradingview_execution_enabled else 'WORKBENCH_DRY-RUN'}`"
                 f" | default qty `{self._tradingview_default_quantity}`"
             ),
             (
@@ -2556,6 +2588,18 @@ class AlphaEngine:
             return
 
         if normalized_action in {"SET_TRADING_EXECUTION", "SET_EXECUTION"}:
+            if not self._tradingview_integration_enabled:
+                self._tradingview_execution_enabled = False
+                await self.telegram.send_message(
+                    (
+                        "ℹ️ TradingView integration is disabled by policy (`SAPPHIRE_TRADINGVIEW_INTEGRATION_ENABLED=false`).\n"
+                        "No TradingView signal mode changes were applied.\n"
+                        "Core runtime focus remains ASTER/LIGHTER execution + autonomy operations."
+                    ),
+                    priority="medium",
+                )
+                return
+
             mode = str(target or "").strip().upper()
             if mode not in {"ON", "OFF", "TRUE", "FALSE", "1", "0"}:
                 await self.telegram.send_message(
@@ -2612,6 +2656,16 @@ class AlphaEngine:
             return
 
         if normalized_action in {"SET_TRADINGVIEW_DEFAULT_QUANTITY", "SET_DEFAULT_QUANTITY"}:
+            if not self._tradingview_integration_enabled:
+                await self.telegram.send_message(
+                    (
+                        "ℹ️ TradingView integration is disabled, so default TradingView quantity is not active.\n"
+                        "To re-enable later, set `SAPPHIRE_TRADINGVIEW_INTEGRATION_ENABLED=true` and redeploy alpha."
+                    ),
+                    priority="medium",
+                )
+                return
+
             result = self._set_tradingview_default_quantity(float(value or 0.0))
             if not result.get("ok"):
                 await self.telegram.send_message(
@@ -2937,6 +2991,14 @@ class AlphaEngine:
 
         normalized_action = action_raw.replace("-", "_")
         normalized_target = self._normalize_platform(venue_raw or "ALL")
+
+        if not self._tradingview_integration_enabled:
+            return {
+                "accepted": "disabled",
+                "reason": "tradingview_integration_disabled",
+                "action": normalized_action or "unknown",
+                "target": normalized_target,
+            }
 
         if self.tv_autonomy.is_workspace_action(normalized_action):
             workspace_result = await self.tv_autonomy.handle_action(normalized_action, merged_payload)
@@ -3755,6 +3817,15 @@ class AlphaEngine:
         return list(self._system_logs)[-limit:]
 
     async def _handle_tradingview_workspace_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
+        if not self._tradingview_integration_enabled:
+            snapshot = self.tv_autonomy.status_snapshot()
+            snapshot["enabled"] = False
+            snapshot["reason"] = "tradingview_integration_disabled"
+            return {
+                "workspace": snapshot,
+                "timestamp": int(time.time()),
+            }
+
         snapshot = self.tv_autonomy.status_snapshot()
         return {
             "workspace": snapshot,

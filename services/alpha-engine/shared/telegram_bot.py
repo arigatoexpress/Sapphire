@@ -11,6 +11,7 @@ import asyncio
 import json
 import os
 import re
+import time
 from collections import OrderedDict
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set
@@ -69,6 +70,36 @@ class TelegramPlatformBot:
             os.getenv("TELEGRAM_ALLOWED_TARGETS", "ASTER,LIGHTER,ALL")
         )
         self.allowed_trade_targets = {target for target in self.allowed_targets if target != "ALL"}
+        self._noise_suppression_enabled = os.getenv(
+            "TELEGRAM_NOISE_SUPPRESSION_ENABLED",
+            "true",
+        ).strip().lower() in {"1", "true", "yes", "on"}
+        self._buffer_non_urgent_high = os.getenv(
+            "TELEGRAM_BUFFER_NON_URGENT_HIGH",
+            "true",
+        ).strip().lower() in {"1", "true", "yes", "on"}
+        self._generic_suppress_seconds = max(
+            15,
+            int(os.getenv("TELEGRAM_GENERIC_SUPPRESS_SECONDS", "120")),
+        )
+        self._heartbeat_suppress_seconds = max(
+            120,
+            int(os.getenv("TELEGRAM_HEARTBEAT_SUPPRESS_SECONDS", "720")),
+        )
+        self._workspace_suppress_seconds = max(
+            60,
+            int(os.getenv("TELEGRAM_WORKSPACE_SUPPRESS_SECONDS", "600")),
+        )
+        self._flash_suppress_seconds = max(
+            300,
+            int(os.getenv("TELEGRAM_FLASH_SUPPRESS_SECONDS", "1800")),
+        )
+        self._last_signature_sent_at: Dict[str, float] = {}
+        self._last_signature_suppressed: Dict[str, int] = {}
+        self._signature_cache_max = max(
+            100,
+            int(os.getenv("TELEGRAM_SIGNATURE_CACHE_MAX", "800")),
+        )
 
         logger.info(
             "Initializing Telegram Bot | token={} chat={} allowed_targets={}",
@@ -106,6 +137,67 @@ class TelegramPlatformBot:
             if candidate.value == as_text:
                 return candidate
         return NotificationPriority.MEDIUM
+
+    @staticmethod
+    def _is_urgent_message(message: str) -> bool:
+        text = str(message or "").strip()
+        lowered = text.lower()
+        if text.startswith(("🚨", "🚨🚨", "🛑", "❌")):
+            return True
+        urgent_markers = (
+            " kill switch",
+            " dispatch failed",
+            " handler_failed",
+            " forbidden",
+            " not ready",
+            " blocked",
+            " failed",
+            " exception",
+            " error",
+        )
+        return any(marker in lowered for marker in urgent_markers)
+
+    def _signature_window_seconds(self, signature: str) -> int:
+        key = str(signature or "").strip().lower()
+        if key == "gemini_flash":
+            return self._flash_suppress_seconds
+        if key == "heartbeat":
+            return self._heartbeat_suppress_seconds
+        if key.startswith("workspace:"):
+            return self._workspace_suppress_seconds
+        return self._generic_suppress_seconds
+
+    def _should_suppress(self, text: str, level: NotificationPriority) -> bool:
+        if not self._noise_suppression_enabled:
+            return False
+        if level == NotificationPriority.CRITICAL:
+            return False
+
+        cleaned = self._clean_digest_text(text)
+        summarized = self._summarize_digest_text(cleaned)
+        signature = self._digest_signature(summarized)
+        if not signature:
+            return False
+
+        now = time.time()
+        window = float(self._signature_window_seconds(signature))
+        last_sent_at = float(self._last_signature_sent_at.get(signature, 0.0))
+        if last_sent_at and now - last_sent_at < window:
+            self._last_signature_suppressed[signature] = int(
+                self._last_signature_suppressed.get(signature, 0)
+            ) + 1
+            return True
+
+        self._last_signature_sent_at[signature] = now
+        self._last_signature_suppressed.pop(signature, None)
+        if len(self._last_signature_sent_at) > self._signature_cache_max:
+            oldest = sorted(self._last_signature_sent_at.items(), key=lambda item: float(item[1]))[
+                : len(self._last_signature_sent_at) - self._signature_cache_max
+            ]
+            for old_key, _ in oldest:
+                self._last_signature_sent_at.pop(old_key, None)
+                self._last_signature_suppressed.pop(old_key, None)
+        return False
 
     @staticmethod
     def _parse_media_publish_arg(media_arg: str) -> Dict[str, Any]:
@@ -404,7 +496,15 @@ class TelegramPlatformBot:
         }[level]
         full_message = f"{prefix} {text}"
 
-        if level in {NotificationPriority.LOW, NotificationPriority.MEDIUM}:
+        if self._should_suppress(full_message, level):
+            return
+
+        non_urgent_high = (
+            level == NotificationPriority.HIGH
+            and self._buffer_non_urgent_high
+            and not self._is_urgent_message(full_message)
+        )
+        if level in {NotificationPriority.LOW, NotificationPriority.MEDIUM} or non_urgent_high:
             self.message_buffer.append(full_message)
             if len(self.message_buffer) >= 10:
                 await self._flush_buffer()

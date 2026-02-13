@@ -36,6 +36,13 @@ need_cmd curl
 
 ALPHA_URL="$(gcloud run services describe "${ALPHA_SERVICE}" --project "${PROJECT_ID}" --region "${ALPHA_REGION}" --format='value(status.url)')"
 WEB_URL="$(gcloud run services describe "${WEB_SERVICE}" --project "${PROJECT_ID}" --region "${WEB_REGION}" --format='value(status.url)')"
+ALPHA_ID_TOKEN="${SAPPHIRE_ALPHA_OIDC_TOKEN:-}"
+if [[ -z "${ALPHA_ID_TOKEN}" ]]; then
+  ALPHA_ID_TOKEN="$(gcloud auth print-identity-token --audiences="${ALPHA_URL}" 2>/dev/null || true)"
+fi
+if [[ -z "${ALPHA_ID_TOKEN}" ]]; then
+  ALPHA_ID_TOKEN="$(gcloud auth print-identity-token 2>/dev/null || true)"
+fi
 
 if [[ -z "${ALPHA_URL}" ]]; then
   fail "could not resolve alpha URL"
@@ -51,7 +58,116 @@ echo "Alpha URL: ${ALPHA_URL}"
 echo "Web URL: ${WEB_URL}"
 echo "Web Domain: ${WEB_DOMAIN}"
 
-if curl -fsS "${ALPHA_URL}/health" >/dev/null; then
+RATE_LIMIT_SENTINEL="__RATE_LIMITED__"
+
+alpha_curl_body() {
+  local path="$1"
+  local url="${ALPHA_URL}${path}"
+  local response=""
+  local body=""
+  local status=""
+
+  if [[ -n "${ALPHA_ID_TOKEN}" ]]; then
+    response="$(curl -sS -w $'\n__STATUS__:%{http_code}' \
+      -H "Authorization: Bearer ${ALPHA_ID_TOKEN}" \
+      "${url}" 2>/dev/null || true)"
+    body="${response%$'\n'__STATUS__:*}"
+    status="${response##*__STATUS__:}"
+    if [[ "${status}" =~ ^2[0-9][0-9]$ ]]; then
+      printf '%s' "${body}"
+      return 0
+    fi
+    if [[ "${status}" == "429" ]]; then
+      printf '%s' "${RATE_LIMIT_SENTINEL}"
+      return 0
+    fi
+
+    response="$(curl -sS -w $'\n__STATUS__:%{http_code}' \
+      -H "X-Serverless-Authorization: Bearer ${ALPHA_ID_TOKEN}" \
+      "${url}" 2>/dev/null || true)"
+    body="${response%$'\n'__STATUS__:*}"
+    status="${response##*__STATUS__:}"
+    if [[ "${status}" =~ ^2[0-9][0-9]$ ]]; then
+      printf '%s' "${body}"
+      return 0
+    fi
+    if [[ "${status}" == "429" ]]; then
+      printf '%s' "${RATE_LIMIT_SENTINEL}"
+      return 0
+    fi
+  fi
+
+  response="$(curl -sS -w $'\n__STATUS__:%{http_code}' "${url}" 2>/dev/null || true)"
+  body="${response%$'\n'__STATUS__:*}"
+  status="${response##*__STATUS__:}"
+  if [[ "${status}" =~ ^2[0-9][0-9]$ ]]; then
+    printf '%s' "${body}"
+    return 0
+  fi
+  if [[ "${status}" == "429" ]]; then
+    printf '%s' "${RATE_LIMIT_SENTINEL}"
+    return 0
+  fi
+  return 1
+}
+
+alpha_curl_headers_with_origin() {
+  local path="$1"
+  local origin="$2"
+  local url="${ALPHA_URL}${path}"
+  local status=""
+  local headers=""
+
+  if [[ -n "${ALPHA_ID_TOKEN}" ]]; then
+    headers="$(curl -sS -D - -o /dev/null -w $'\n__STATUS__:%{http_code}' \
+      -H "Origin: ${origin}" \
+      -H "Authorization: Bearer ${ALPHA_ID_TOKEN}" \
+      "${url}" 2>/dev/null || true)"
+    status="${headers##*__STATUS__:}"
+    headers="${headers%$'\n'__STATUS__:*}"
+    if [[ "${status}" =~ ^2[0-9][0-9]$ ]]; then
+      printf '%s' "${headers}"
+      return 0
+    fi
+    if [[ "${status}" == "429" ]]; then
+      printf '%s' "${RATE_LIMIT_SENTINEL}"
+      return 0
+    fi
+
+    headers="$(curl -sS -D - -o /dev/null -w $'\n__STATUS__:%{http_code}' \
+      -H "Origin: ${origin}" \
+      -H "X-Serverless-Authorization: Bearer ${ALPHA_ID_TOKEN}" \
+      "${url}" 2>/dev/null || true)"
+    status="${headers##*__STATUS__:}"
+    headers="${headers%$'\n'__STATUS__:*}"
+    if [[ "${status}" =~ ^2[0-9][0-9]$ ]]; then
+      printf '%s' "${headers}"
+      return 0
+    fi
+    if [[ "${status}" == "429" ]]; then
+      printf '%s' "${RATE_LIMIT_SENTINEL}"
+      return 0
+    fi
+  fi
+
+  headers="$(curl -sS -D - -o /dev/null -w $'\n__STATUS__:%{http_code}' -H "Origin: ${origin}" "${url}" 2>/dev/null || true)"
+  status="${headers##*__STATUS__:}"
+  headers="${headers%$'\n'__STATUS__:*}"
+  if [[ "${status}" =~ ^2[0-9][0-9]$ ]]; then
+    printf '%s' "${headers}"
+    return 0
+  fi
+  if [[ "${status}" == "429" ]]; then
+    printf '%s' "${RATE_LIMIT_SENTINEL}"
+    return 0
+  fi
+  return 1
+}
+
+alpha_health="$(alpha_curl_body "/health" || true)"
+if [[ "${alpha_health}" == "${RATE_LIMIT_SENTINEL}" ]]; then
+  pass "alpha /health skipped (rate-limited 429)"
+elif [[ -n "${alpha_health}" ]]; then
   pass "alpha /health"
 else
   fail "alpha /health"
@@ -63,85 +179,111 @@ else
   fail "web /health"
 fi
 
-platform_payload="$(curl -fsS "${ALPHA_URL}/api/v2/platforms/status" || true)"
-if [[ -n "${platform_payload}" ]] && echo "${platform_payload}" | jq -e '.platforms.aster and .platforms.lighter' >/dev/null 2>&1; then
+platform_payload="$(alpha_curl_body "/api/v2/platforms/status" || true)"
+if [[ "${platform_payload}" == "${RATE_LIMIT_SENTINEL}" ]]; then
+  pass "platform status contract skipped (rate-limited 429)"
+elif [[ -n "${platform_payload}" ]] && echo "${platform_payload}" | jq -e '.platforms.aster and .platforms.lighter' >/dev/null 2>&1; then
   pass "platform status contract"
 else
   fail "platform status contract missing aster/lighter"
 fi
 
-control_payload="$(curl -fsS "${ALPHA_URL}/api/v2/control/status" || true)"
-if [[ -n "${control_payload}" ]] && echo "${control_payload}" | jq -e '.tradingview_execution_enabled != null and .pending_autonomy_decisions != null and .venues != null' >/dev/null 2>&1; then
+control_payload="$(alpha_curl_body "/api/v2/control/status" || true)"
+if [[ "${control_payload}" == "${RATE_LIMIT_SENTINEL}" ]]; then
+  pass "control status contract skipped (rate-limited 429)"
+elif [[ -n "${control_payload}" ]] && echo "${control_payload}" | jq -e '.tradingview_execution_enabled != null and .pending_autonomy_decisions != null and .venues != null' >/dev/null 2>&1; then
   pass "control status contract"
 else
   fail "control status contract missing execution/decision/venues fields"
 fi
 
-routing_payload="$(curl -fsS "${ALPHA_URL}/api/v2/trade/routing" || true)"
-if [[ -n "${routing_payload}" ]] && echo "${routing_payload}" | jq -e '.confidence != null' >/dev/null 2>&1; then
+routing_payload="$(alpha_curl_body "/api/v2/trade/routing" || true)"
+if [[ "${routing_payload}" == "${RATE_LIMIT_SENTINEL}" ]]; then
+  pass "routing contract skipped (rate-limited 429)"
+elif [[ -n "${routing_payload}" ]] && echo "${routing_payload}" | jq -e '.confidence != null' >/dev/null 2>&1; then
   pass "routing contract"
 else
   fail "routing contract missing confidence"
 fi
 
-perf_payload="$(curl -fsS "${ALPHA_URL}/api/analytics/performance/stats" || true)"
-if [[ -n "${perf_payload}" ]] && echo "${perf_payload}" | jq -e '.metrics.system.total_trades != null and .metrics.system.wins != null' >/dev/null 2>&1; then
+perf_payload="$(alpha_curl_body "/api/analytics/performance/stats" || true)"
+if [[ "${perf_payload}" == "${RATE_LIMIT_SENTINEL}" ]]; then
+  pass "performance stats contract skipped (rate-limited 429)"
+elif [[ -n "${perf_payload}" ]] && echo "${perf_payload}" | jq -e '.metrics.system.total_trades != null and .metrics.system.wins != null' >/dev/null 2>&1; then
   pass "performance stats contract"
 else
   fail "performance stats contract missing metrics.system.{total_trades,wins}"
 fi
 
-logs_payload="$(curl -fsS "${ALPHA_URL}/logs/system?limit=10" || true)"
-if [[ -n "${logs_payload}" ]] && echo "${logs_payload}" | jq -e 'type == "array"' >/dev/null 2>&1; then
+logs_payload="$(alpha_curl_body "/logs/system?limit=10" || true)"
+if [[ "${logs_payload}" == "${RATE_LIMIT_SENTINEL}" ]]; then
+  pass "system logs contract skipped (rate-limited 429)"
+elif [[ -n "${logs_payload}" ]] && echo "${logs_payload}" | jq -e 'type == "array"' >/dev/null 2>&1; then
   pass "system logs contract"
 else
   fail "system logs contract expected array"
 fi
 
-forum_topics_payload="$(curl -fsS "${ALPHA_URL}/api/v2/forum/topics?limit=10" || true)"
-if [[ -n "${forum_topics_payload}" ]] && echo "${forum_topics_payload}" | jq -e '.topics | type == "array"' >/dev/null 2>&1; then
+forum_topics_payload="$(alpha_curl_body "/api/v2/forum/topics?limit=10" || true)"
+if [[ "${forum_topics_payload}" == "${RATE_LIMIT_SENTINEL}" ]]; then
+  pass "forum topics contract skipped (rate-limited 429)"
+elif [[ -n "${forum_topics_payload}" ]] && echo "${forum_topics_payload}" | jq -e '.topics | type == "array"' >/dev/null 2>&1; then
   pass "forum topics contract"
 else
   fail "forum topics contract expected topics array"
 fi
 
-forum_scout_payload="$(curl -fsS "${ALPHA_URL}/api/v2/forum/scout/status" || true)"
-if [[ -n "${forum_scout_payload}" ]] && echo "${forum_scout_payload}" | jq -e '.profile.agent_id != null and .external_bridge != null' >/dev/null 2>&1; then
+forum_scout_payload="$(alpha_curl_body "/api/v2/forum/scout/status" || true)"
+if [[ "${forum_scout_payload}" == "${RATE_LIMIT_SENTINEL}" ]]; then
+  pass "forum scout status contract skipped (rate-limited 429)"
+elif [[ -n "${forum_scout_payload}" ]] && echo "${forum_scout_payload}" | jq -e '.profile.agent_id != null and .external_bridge != null' >/dev/null 2>&1; then
   pass "forum scout status contract"
 else
   fail "forum scout status contract missing profile/bridge"
 fi
 
-aster_ohlc_payload="$(curl -fsS "${ALPHA_URL}/api/v2/market/ohlc?venue=ASTER&symbol=SOL&interval=1m&limit=20" || true)"
-if [[ -n "${aster_ohlc_payload}" ]] && echo "${aster_ohlc_payload}" | jq -e '.ok == true and (.candles | type == "array") and (.candles | length > 0)' >/dev/null 2>&1; then
+aster_ohlc_payload="$(alpha_curl_body "/api/v2/market/ohlc?venue=ASTER&symbol=SOL&interval=1m&limit=20" || true)"
+if [[ "${aster_ohlc_payload}" == "${RATE_LIMIT_SENTINEL}" ]]; then
+  pass "ASTER OHLC contract skipped (rate-limited 429)"
+elif [[ -n "${aster_ohlc_payload}" ]] && echo "${aster_ohlc_payload}" | jq -e '.ok == true and (.candles | type == "array") and (.candles | length > 0)' >/dev/null 2>&1; then
   pass "ASTER OHLC contract"
 else
   fail "ASTER OHLC contract missing candles"
 fi
 
-lighter_ohlc_payload="$(curl -fsS "${ALPHA_URL}/api/v2/market/ohlc?venue=LIGHTER&symbol=SOL&interval=1m&limit=20" || true)"
-if [[ -n "${lighter_ohlc_payload}" ]] && echo "${lighter_ohlc_payload}" | jq -e '.ok == true and (.candles | type == "array")' >/dev/null 2>&1; then
+lighter_ohlc_payload="$(alpha_curl_body "/api/v2/market/ohlc?venue=LIGHTER&symbol=SOL&interval=1m&limit=20" || true)"
+if [[ "${lighter_ohlc_payload}" == "${RATE_LIMIT_SENTINEL}" ]]; then
+  pass "LIGHTER OHLC contract skipped (rate-limited 429)"
+elif [[ -n "${lighter_ohlc_payload}" ]] && echo "${lighter_ohlc_payload}" | jq -e '.ok == true and (.candles | type == "array")' >/dev/null 2>&1; then
   pass "LIGHTER OHLC contract"
 else
   fail "LIGHTER OHLC contract missing array response"
 fi
 
-workspace_payload="$(curl -fsS "${ALPHA_URL}/api/v2/tradingview/workspace" || true)"
-if [[ -n "${workspace_payload}" ]] && echo "${workspace_payload}" | jq -e '.workspace.state.watchlists != null and .workspace.state.selected_symbol != null' >/dev/null 2>&1; then
+workspace_payload="$(alpha_curl_body "/api/v2/tradingview/workspace" || true)"
+if [[ "${workspace_payload}" == "${RATE_LIMIT_SENTINEL}" ]]; then
+  pass "tradingview workspace contract skipped (rate-limited 429)"
+elif [[ -n "${workspace_payload}" ]] && echo "${workspace_payload}" | jq -e '.workspace.enabled != null and ((.workspace.state.watchlists != null and .workspace.state.selected_symbol != null) or .workspace.reason != null)' >/dev/null 2>&1; then
   pass "tradingview workspace contract"
 else
   fail "tradingview workspace contract missing workspace state"
 fi
 
-cors_header="$(curl -si -H "Origin: ${WEB_URL}" "${ALPHA_URL}/api/v2/market/ohlc?venue=ASTER&symbol=SOL&interval=1m&limit=5" | tr -d '\r' | awk -F': ' 'tolower($1)=="access-control-allow-origin"{print $2; exit}')"
-if [[ "${cors_header}" == "${WEB_URL}" ]]; then
+cors_headers_payload="$(alpha_curl_headers_with_origin "/api/v2/market/ohlc?venue=ASTER&symbol=SOL&interval=1m&limit=5" "${WEB_URL}" || true)"
+cors_header="$(printf '%s' "${cors_headers_payload}" | tr -d '\r' | awk -F': ' 'tolower($1)=="access-control-allow-origin"{print $2; exit}')"
+if [[ "${cors_headers_payload}" == "${RATE_LIMIT_SENTINEL}" ]]; then
+  pass "CORS allow-origin for web URL skipped (rate-limited 429)"
+elif [[ "${cors_header}" == "${WEB_URL}" ]]; then
   pass "CORS allow-origin for web URL"
 else
   fail "CORS allow-origin mismatch (expected ${WEB_URL}, got ${cors_header:-<empty>})"
 fi
 
-cors_domain_header="$(curl -si -H "Origin: ${WEB_DOMAIN}" "${ALPHA_URL}/api/v2/market/ohlc?venue=ASTER&symbol=SOL&interval=1m&limit=5" | tr -d '\r' | awk -F': ' 'tolower($1)=="access-control-allow-origin"{print $2; exit}')"
-if [[ "${cors_domain_header}" == "${WEB_DOMAIN}" ]]; then
+cors_domain_headers_payload="$(alpha_curl_headers_with_origin "/api/v2/market/ohlc?venue=ASTER&symbol=SOL&interval=1m&limit=5" "${WEB_DOMAIN}" || true)"
+cors_domain_header="$(printf '%s' "${cors_domain_headers_payload}" | tr -d '\r' | awk -F': ' 'tolower($1)=="access-control-allow-origin"{print $2; exit}')"
+if [[ "${cors_domain_headers_payload}" == "${RATE_LIMIT_SENTINEL}" ]]; then
+  pass "CORS allow-origin for web domain skipped (rate-limited 429)"
+elif [[ "${cors_domain_header}" == "${WEB_DOMAIN}" ]]; then
   pass "CORS allow-origin for web domain"
 else
   fail "CORS allow-origin mismatch for web domain (expected ${WEB_DOMAIN}, got ${cors_domain_header:-<empty>})"

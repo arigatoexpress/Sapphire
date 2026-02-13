@@ -10,7 +10,6 @@ import {
     fetchPerformanceStats,
     fetchPlatformStatus,
     fetchSystemLogs,
-    fetchTradingViewWorkspace,
     publishForumScoutNote,
     registerForumScout,
     type ControlStatusResponse,
@@ -23,7 +22,6 @@ import {
     type PerformanceStatsResponse,
     type PlatformStatusResponse,
     type SystemLogEntry,
-    type TradingViewWorkspaceResponse,
 } from '../api/client'
 
 const loading = ref(true)
@@ -50,7 +48,6 @@ const control = ref<ControlStatusResponse | null>(null)
 const scout = ref<ForumScoutStatusResponse | null>(null)
 const platform = ref<PlatformStatusResponse | null>(null)
 const performance = ref<PerformanceStatsResponse | null>(null)
-const workspace = ref<TradingViewWorkspaceResponse | null>(null)
 const systemLogs = ref<SystemLogEntry[]>([])
 const venuePriceHistory = ref<Record<string, number[]>>({
     ASTER: [],
@@ -265,15 +262,6 @@ const realizedPnl = computed(() => Number(performance.value?.metrics?.system?.re
 const uptimeLabel = computed(() =>
     formatUptime(Number(performance.value?.metrics?.system?.uptime_seconds || 0)),
 )
-const workspaceModeLabel = computed(() => {
-    if (!workspace.value?.workspace?.enabled) return 'Workspace offline'
-    if (control.value?.tradingview_execution_enabled) return 'TV LIVE signals'
-    return 'TV Workbench dry-run'
-})
-const workspaceLastAction = computed(
-    () => String(workspace.value?.workspace?.state?.last_action || 'none').trim() || 'none',
-)
-
 const architectureHealthScore = computed(() => {
     const killPenalty = control.value?.kill_switch_active ? 35 : 0
     const failurePenalty = failurePressure.value * 7
@@ -531,7 +519,6 @@ const loadBoard = async () => {
             fetchPlatformStatus(),
             fetchPerformanceStats(),
             fetchSystemLogs(80),
-            fetchTradingViewWorkspace(),
         ])
         const pick = <T>(index: number): T | null => {
             const result = settled[index]
@@ -556,7 +543,6 @@ const loadBoard = async () => {
         const platformPayload = pick<PlatformStatusResponse>(3)
         const performancePayload = pick<PerformanceStatsResponse>(4)
         const systemLogPayload = pick<SystemLogEntry[] | null>(5)
-        const workspacePayload = pick<TradingViewWorkspaceResponse>(6)
 
         if (board?.ok) {
             topics.value = Array.isArray(board.topics) ? board.topics : []
@@ -589,7 +575,6 @@ const loadBoard = async () => {
             }
         }
         if (performancePayload?.ok) performance.value = performancePayload
-        if (workspacePayload?.ok) workspace.value = workspacePayload
         if (Array.isArray(systemLogPayload)) systemLogs.value = systemLogPayload
 
         await loadSelectedTopic()
