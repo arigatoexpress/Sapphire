@@ -918,14 +918,14 @@ class TelegramPlatformBot:
                 "agent": EMERALD,
                 "ack": "Here's where we're focused right now.",
             }
-        if "autonomy" in normalized:
+        if re.search(r"\b(autonomy|restart)\b", normalized):
             return {
                 "platform": "CONTROL",
                 "symbol": "ALL",
                 "action": "AUTONOMY_CYCLE",
                 "quantity": 0.0,
                 "agent": OBSIDIAN,
-                "ack": "Kicking off an autonomy cycle now.",
+                "ack": "Kicking off a fresh autonomy cycle now.",
             }
         if re.search(r"\b(kill|halt)\b", normalized):
             return {
@@ -1096,6 +1096,12 @@ class TelegramPlatformBot:
         # Help / start
         if re.search(r"^/(start|help)\b", text_lower):
             await self.send_message(self._help_text(), priority=NotificationPriority.MEDIUM)
+            return
+
+        # Restart — dispatch as a control command
+        if re.search(r"^/restart\b", text_lower):
+            await self.send_as(OBSIDIAN, "Restarting — kicking off a fresh autonomy cycle.")
+            await self._dispatch_callback("CONTROL", "ALL", "AUTONOMY_CYCLE", 0.0)
             return
 
         # Scout collaboration commands

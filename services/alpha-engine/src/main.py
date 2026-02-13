@@ -47,7 +47,7 @@ class AlphaEngine:
         self._dex_stage_updated_at = int(time.time())
 
         # Telegram Bot for Notifications & Commands
-        from telegram_bot import TelegramPlatformBot
+        from telegram_bot import TelegramPlatformBot, SAPPHIRE, OBSIDIAN, EMERALD
 
         token = os.getenv("TELEGRAM_BOT_TOKEN")
         chat_id = os.getenv("TELEGRAM_CHAT_ID")
@@ -2152,22 +2152,17 @@ class AlphaEngine:
                     approval_required=False,
                 )
                 if auto_result.get("dispatched"):
-                    await self.telegram.send_message(
-                        (
-                            "🤖 Full autonomy cycle dispatched + auto-approved.\n"
-                            f"{decision_brief}"
-                        ),
-                        priority="high",
+                    await self.telegram.send_as(
+                        OBSIDIAN,
+                        f"Autonomy cycle auto-approved (`{trigger}`).\n{decision_brief}",
                     )
                 else:
-                    await self.telegram.send_message(
+                    await self.telegram.send_as(
+                        OBSIDIAN,
                         (
-                            "⚠️ Full autonomy cycle dispatched and marked auto-approved locally,\n"
-                            f"but decision dispatch failed for `{session_key}`.\n"
-                            f"Reason: `{auto_result.get('reason', 'unknown')}`\n\n"
-                            f"{decision_brief}"
+                            f"⚠️ Autonomy cycle approved locally but dispatch failed for `{session_key}`.\n"
+                            f"Reason: `{auto_result.get('reason', 'unknown')}`"
                         ),
-                        priority="high",
                     )
             else:
                 decision_brief = self._format_autonomy_decision_brief(
@@ -2176,12 +2171,12 @@ class AlphaEngine:
                     context=context,
                     approval_required=self._autonomy_require_owner_approval,
                 )
-                await self.telegram.send_message(
-                    (
-                        "🤖 Full autonomy cycle dispatched.\n"
-                        f"{decision_brief}"
-                    ),
-                    priority="high",
+                await self.telegram.send_as(
+                    OBSIDIAN,
+                    f"Autonomy cycle needs your approval (`{trigger}`).\n{decision_brief}",
+                    expects_reply=True,
+                    pending_action="APPROVE_SESSION",
+                    pending_metadata={"session_key": session_key},
                 )
         else:
             self._record_system_log(
@@ -2189,13 +2184,9 @@ class AlphaEngine:
                 level="warning",
                 tags=["autonomy", "dispatch"],
             )
-            await self.telegram.send_message(
-                (
-                    "⚠️ Full autonomy dispatch unavailable.\n"
-                    f"Trigger: `{trigger}`\n"
-                    f"Reason: `{hook_result.get('reason', 'unknown')}`"
-                ),
-                priority="high",
+            await self.telegram.send_as(
+                OBSIDIAN,
+                f"Autonomy dispatch unavailable — `{trigger}`: {hook_result.get('reason', 'unknown')}",
             )
         return hook_result
 
@@ -2882,31 +2873,19 @@ class AlphaEngine:
             self._owner_directive = directive
             self._owner_directive_updated_at = int(time.time())
 
-            await self.telegram.send_message(
-                (
-                    f"🧠 Owner directive recorded: `{directive}`\n"
-                    "Expected outcome: next autonomy cycle and focus snapshots use this directive."
-                ),
-                priority="high",
-            )
+            agent = EMERALD if any(w in directive.lower() for w in ("strategy", "optimize", "improve", "review")) else SAPPHIRE
+            await self.telegram.send_as(agent, f"Got it — steering updated: *{directive[:100]}*")
 
             hook_result = await self.tv_autonomy.dispatch_owner_instruction(directive)
             if hook_result.get("dispatched"):
                 await self.telegram.send_message(
-                    (
-                        f"✅ OpenClaw steering dispatch queued (`{hook_result.get('session_key', 'n/a')}`).\n"
-                        "Benefit: direction reaches agents immediately without waiting for the next schedule."
-                    ),
+                    f"Dispatched to OpenClaw agents (`{hook_result.get('session_key', 'n/a')}`).",
                     priority="medium",
                 )
             else:
-                await self.telegram.send_message(
-                    (
-                        "⚠️ OpenClaw steering dispatch unavailable "
-                        f"(`{hook_result.get('reason', 'unknown')}`). Directive kept in focus context.\n"
-                        "Expected outcome: runtime remains aligned; dispatch retries can run later."
-                    ),
-                    priority="high",
+                await self.telegram.send_as(
+                    OBSIDIAN,
+                    f"OpenClaw dispatch unavailable ({hook_result.get('reason', 'unknown')}). Directive saved for next cycle.",
                 )
             return
 
@@ -3433,16 +3412,19 @@ class AlphaEngine:
             },
         )
 
-        await self.telegram.send_message(
-            (
-                f"🛑 **MANUAL REVIEW HOLD**\nVenue: `{venue}`\nReason: `{hard_reason or category.value}`\n"
-                f"Failures: `{failures}`\nCooldown: `{cooldown_seconds}s`\n"
-                "Trading will remain paused until owner resume/allocation command."
-                if hard_failure
-                else f"🛑 **AUTO DEALLOCATION**\nVenue: `{venue}`\nFailures: `{failures}`\nCooldown: `{cooldown_seconds}s`"
-            ),
-            priority="high",
-        )
+        if hard_failure:
+            await self.telegram.send_as(
+                OBSIDIAN,
+                f"🛑 Paused **{venue}** — `{hard_reason or category.value}` ({failures} failures). Needs your `/resume` to restart.",
+                expects_reply=True,
+                pending_action="RESUME_TRADING",
+                pending_metadata={"venue": venue},
+            )
+        else:
+            await self.telegram.send_as(
+                OBSIDIAN,
+                f"Auto-deallocated **{venue}** after {failures} failures. Cooldown: {cooldown_seconds}s.",
+            )
 
     async def _heartbeat_loop(self) -> None:
         while self.running:
@@ -3644,7 +3626,7 @@ class AlphaEngine:
         # 1. Start Telegram FIRST for immediate status
         logger.info("📡 Initializing Telegram Notification Task...")
         asyncio.create_task(
-            self.telegram.send_message("💎 Sapphire Alpha Hub Online & Listening", priority="high")
+            self.telegram.send_as(SAPPHIRE, "Online and listening. All systems initializing.")
         )
         if self._telegram_webhook_mode:
             logger.info("📡 Configuring Telegram webhook mode...")
@@ -3727,11 +3709,22 @@ class AlphaEngine:
                     # Classify the error
                     category, severity = classify_error(err)
 
+                    # Auto-pause venue on configuration/region errors — no point retrying
+                    if category == ErrorCategory.CONFIGURATION:
+                        dispatcher.set_venue_allocation(platform, 0.0)
+                        dispatcher.pause_venue(platform, reason=err)
+                        await self.telegram.send_as(
+                            OBSIDIAN,
+                            f"🛑 Auto-paused **{platform}** — `{err}`. This won't fix itself with retries. Use `/resume` when resolved.",
+                        )
+                        logger.warning(f"Auto-paused {platform} due to config error: {err}")
+                        return  # Don't send duplicate trade-failed notification
+
                     # Check if we should notify
                     should_notify = notification_manager.should_notify(err, category, severity)
 
                     if should_notify:
-                        msg = f"❌ TRADE FAILED: {platform} | {side} {symbol} | Error: {err}"
+                        msg = f"Trade failed on {platform}: `{side} {symbol}` — {err}"
                         self._record_system_log(
                             msg,
                             level="error",
@@ -3751,7 +3744,7 @@ class AlphaEngine:
                             )
                         except (TypeError, ValueError):
                             priority = "medium"
-                        await self.telegram.send_message(msg, priority=priority)
+                        await self.telegram.send_as(SAPPHIRE, msg)
                         logger.warning(msg)
                     else:
                         # Log but don't spam Telegram
