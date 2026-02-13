@@ -1,5 +1,6 @@
 import asyncio
 import importlib.util
+import json
 from pathlib import Path
 
 
@@ -138,7 +139,7 @@ def test_register_scout_maps_payload_for_moltbook(monkeypatch, tmp_path):
     module = _load_forum_module()
     monkeypatch.setenv("SAPPHIRE_FORUM_STORE_PATH", str(tmp_path / "forum.json"))
     monkeypatch.setenv("SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL", "https://www.moltbook.com/api/v1/agents/register")
-    monkeypatch.setenv("SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN", "moltbook_existing_token")
+    monkeypatch.delenv("SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN", raising=False)
 
     service = module.SapphireForumService()
     captured = {}
@@ -174,7 +175,7 @@ def test_register_scout_maps_payload_for_moltbook_root_domain(monkeypatch, tmp_p
     module = _load_forum_module()
     monkeypatch.setenv("SAPPHIRE_FORUM_STORE_PATH", str(tmp_path / "forum.json"))
     monkeypatch.setenv("SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL", "https://moltbook.com/api/v1/agents/register")
-    monkeypatch.setenv("SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN", "moltbook_existing_token")
+    monkeypatch.delenv("SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN", raising=False)
 
     service = module.SapphireForumService()
     captured = {}
@@ -245,3 +246,187 @@ def test_publish_scout_maps_payload_for_moltbook(monkeypatch, tmp_path):
     assert outbound["submolt"] == "general"
     assert outbound["content"] == "Scout note for Moltbook publishing"
     assert "title" in outbound
+
+
+def _fake_client_session_factory(status_code: int, payload: dict):
+    class _FakeResponse:
+        def __init__(self):
+            self.status = status_code
+
+        async def text(self):
+            return json.dumps(payload)
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    class _FakeClientSession:
+        def __init__(self, timeout=None):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def post(self, url, json=None, headers=None):
+            return _FakeResponse()
+
+    return _FakeClientSession
+
+
+def test_dispatch_external_detects_moltbook_rate_limit(monkeypatch, tmp_path):
+    module = _load_forum_module()
+    monkeypatch.setenv("SAPPHIRE_FORUM_STORE_PATH", str(tmp_path / "forum.json"))
+
+    response_payload = {
+        "success": False,
+        "error": "You can only post once every 2 hours",
+        "hint": "Wait 2 hours before posting again.",
+        "retry_after_minutes": 120,
+        "is_new_agent": True,
+        "new_agent_hours_remaining": 24,
+    }
+    monkeypatch.setattr(
+        module.aiohttp,
+        "ClientSession",
+        _fake_client_session_factory(429, response_payload),
+    )
+
+    service = module.SapphireForumService()
+    result = asyncio.run(
+        service._dispatch_external(
+            "https://www.moltbook.com/api/v1/posts",
+            {"submolt": "general", "title": "x", "content": "y"},
+            token="moltbook_token",
+        )
+    )
+
+    assert result["dispatched"] is False
+    assert result["reason"] == "moltbook_rate_limited"
+    assert result["attempt"] == 1
+    assert result["metadata"]["retry_after_minutes"] == 120
+    assert result["metadata"]["is_new_agent"] is True
+
+
+def test_dispatch_external_marks_pending_verification(monkeypatch, tmp_path):
+    module = _load_forum_module()
+    monkeypatch.setenv("SAPPHIRE_FORUM_STORE_PATH", str(tmp_path / "forum.json"))
+    monkeypatch.setattr(
+        module.aiohttp,
+        "ClientSession",
+        _fake_client_session_factory(
+            201,
+            {
+                "success": True,
+                "verification_required": True,
+                "verification": {"code": "abc123", "challenge": "challenge"},
+                "post": {"id": "post-123", "url": "/post/post-123", "verification_status": "pending"},
+            },
+        ),
+    )
+
+    service = module.SapphireForumService()
+    result = asyncio.run(
+        service._dispatch_external(
+            "https://www.moltbook.com/api/v1/posts",
+            {"submolt": "general", "title": "x", "content": "y"},
+            token="moltbook_token",
+        )
+    )
+
+    assert result["dispatched"] is True
+    assert result["reason"] == "ok_pending_verification"
+    assert result["metadata"]["verification_required"] is True
+    assert result["metadata"]["post_id"] == "post-123"
+    assert result["metadata"]["post_verification_status"] == "pending"
+
+
+def test_dispatch_bridge_skips_fallback_on_provider_constraints(monkeypatch, tmp_path):
+    module = _load_forum_module()
+    monkeypatch.setenv("SAPPHIRE_FORUM_STORE_PATH", str(tmp_path / "forum.json"))
+    service = module.SapphireForumService()
+
+    async def fake_external(url, payload, token=""):
+        return {"dispatched": False, "reason": "moltbook_rate_limited"}
+
+    async def fake_fallback(action, payload, note):
+        raise AssertionError("Fallback should not run for provider constraints")
+
+    monkeypatch.setattr(service, "_dispatch_external", fake_external)
+    monkeypatch.setattr(service, "_dispatch_openclaw_fallback", fake_fallback)
+
+    result = asyncio.run(
+        service._dispatch_scout_bridge(
+            action="publish",
+            outbound_payload={"x": "y"},
+            external_url="https://www.moltbook.com/api/v1/posts",
+            external_token="moltbook_token",
+            note="test",
+        )
+    )
+
+    assert result["dispatched"] is False
+    assert result["reason"] == "moltbook_rate_limited"
+    assert result["mode"] == "external_http"
+
+
+def test_register_scout_treats_already_registered_as_success(monkeypatch, tmp_path):
+    module = _load_forum_module()
+    monkeypatch.setenv("SAPPHIRE_FORUM_STORE_PATH", str(tmp_path / "forum.json"))
+    monkeypatch.setenv("SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL", "https://www.moltbook.com/api/v1/agents/register")
+    service = module.SapphireForumService()
+
+    async def fake_dispatch(**kwargs):
+        return {
+            "dispatched": False,
+            "reason": "moltbook_already_registered",
+            "mode": "external_http",
+            "metadata": {},
+        }
+
+    monkeypatch.setattr(service, "_dispatch_scout_bridge", fake_dispatch)
+    result = asyncio.run(
+        service.register_scout_account(
+            {
+                "username": "sapphire_scout",
+                "display_name": "Sapphire Scout",
+                "bio": "Least privilege scout",
+            }
+        )
+    )
+
+    assert result["ok"] is True
+    assert result["dispatch"]["dispatched"] is True
+    assert result["dispatch"]["reason"] == "moltbook_already_registered"
+    assert result["dispatch"]["metadata"]["already_registered"] is True
+
+
+def test_register_scout_uses_existing_moltbook_token_without_dispatch(monkeypatch, tmp_path):
+    module = _load_forum_module()
+    monkeypatch.setenv("SAPPHIRE_FORUM_STORE_PATH", str(tmp_path / "forum.json"))
+    monkeypatch.setenv("SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL", "https://www.moltbook.com/api/v1/agents/register")
+    monkeypatch.setenv("SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN", "moltbook_existing_token")
+    service = module.SapphireForumService()
+
+    async def fake_dispatch(**kwargs):
+        raise AssertionError("Dispatch should be skipped when a Moltbook token already exists")
+
+    monkeypatch.setattr(service, "_dispatch_scout_bridge", fake_dispatch)
+    result = asyncio.run(
+        service.register_scout_account(
+            {
+                "username": "sapphire_scout",
+                "display_name": "Sapphire Scout",
+                "bio": "Least privilege scout",
+            }
+        )
+    )
+
+    assert result["ok"] is True
+    assert result["dispatch"]["dispatched"] is True
+    assert result["dispatch"]["reason"] == "moltbook_token_present"
+    assert result["dispatch"]["metadata"]["already_registered"] is True

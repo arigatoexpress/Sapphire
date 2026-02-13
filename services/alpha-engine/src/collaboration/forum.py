@@ -529,6 +529,7 @@ class SapphireForumService:
         headers = {"Content-Type": "application/json"}
         if token:
             headers["Authorization"] = f"Bearer {token}"
+        is_moltbook_api = self._is_moltbook_api_url(url)
 
         timeout_seconds = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_TIMEOUT_SECONDS", "15")).strip()
         max_retries_raw = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_MAX_RETRIES", "3")).strip()
@@ -576,11 +577,71 @@ class SapphireForumService:
                                 metadata["api_key_present"] = bool(str(agent_obj.get("api_key", "")).strip())
                             if isinstance(parsed.get("error"), str):
                                 metadata["api_error"] = str(parsed.get("error", ""))[:160]
+                            if isinstance(parsed.get("hint"), str):
+                                metadata["hint"] = str(parsed.get("hint", ""))[:220]
+                            if "retry_after_minutes" in parsed:
+                                try:
+                                    metadata["retry_after_minutes"] = max(
+                                        0, int(float(parsed.get("retry_after_minutes", 0)))
+                                    )
+                                except (TypeError, ValueError):
+                                    pass
+                            if "retry_after_seconds" in parsed:
+                                try:
+                                    metadata["retry_after_seconds"] = max(
+                                        0, int(float(parsed.get("retry_after_seconds", 0)))
+                                    )
+                                except (TypeError, ValueError):
+                                    pass
+                            if "is_new_agent" in parsed:
+                                metadata["is_new_agent"] = bool(parsed.get("is_new_agent"))
+                            if "new_agent_hours_remaining" in parsed:
+                                try:
+                                    metadata["new_agent_hours_remaining"] = max(
+                                        0, int(float(parsed.get("new_agent_hours_remaining", 0)))
+                                    )
+                                except (TypeError, ValueError):
+                                    pass
+                            if bool(parsed.get("verification_required")):
+                                metadata["verification_required"] = True
+                            if isinstance(parsed.get("verification"), dict):
+                                verification_obj = parsed.get("verification", {})
+                                if verification_obj:
+                                    metadata["verification_required"] = True
+                                    metadata["verification_code_present"] = bool(
+                                        str(verification_obj.get("code", "")).strip()
+                                    )
+                                    metadata["verification_challenge_present"] = bool(
+                                        str(verification_obj.get("challenge", "")).strip()
+                                    )
+                            if isinstance(parsed.get("post"), dict):
+                                post_obj = parsed.get("post", {})
+                                metadata["post_id"] = str(post_obj.get("id", "")).strip()[:100]
+                                metadata["post_url"] = str(post_obj.get("url", "")).strip()[:180]
+                                metadata["post_verification_status"] = (
+                                    str(post_obj.get("verification_status", "")).strip()[:40]
+                                )
+
+                        reason = "ok" if ok else ("api_error" if parsed else "http_error")
+                        api_error_lower = str(metadata.get("api_error", "")).lower()
+                        if ok and metadata.get("verification_required"):
+                            reason = "ok_pending_verification"
+                        elif not ok and is_moltbook_api and api_error_lower:
+                            if "only post once every" in api_error_lower:
+                                reason = "moltbook_rate_limited"
+                            elif "pending_claim" in api_error_lower or "pending claim" in api_error_lower:
+                                reason = "moltbook_pending_claim"
+                            elif (
+                                "already registered" in api_error_lower
+                                or "already exists" in api_error_lower
+                                or "already taken" in api_error_lower
+                            ):
+                                reason = "moltbook_already_registered"
 
                         result = {
                             "dispatched": ok,
                             "status": int(response.status),
-                            "reason": "ok" if ok else ("api_error" if parsed else "http_error"),
+                            "reason": reason,
                             "response_excerpt": safe_excerpt,
                             "metadata": metadata,
                             "attempt": attempt,
@@ -589,7 +650,9 @@ class SapphireForumService:
                             return result
 
                         last_result = result
-                        retryable_http = int(response.status) >= 500 or int(response.status) in {408, 429}
+                        retryable_http = (
+                            int(response.status) >= 500 or int(response.status) in {408, 429}
+                        ) and reason != "moltbook_rate_limited"
                         retryable_api = result["reason"] == "api_error" and metadata.get("api_error") in {
                             "Failed to fetch posts",
                             "Internal Server Error",
@@ -788,6 +851,12 @@ class SapphireForumService:
             external_result["mode"] = "external_http"
             if external_result.get("dispatched"):
                 return external_result
+            if external_result.get("reason") in {
+                "moltbook_rate_limited",
+                "moltbook_pending_claim",
+                "moltbook_already_registered",
+            }:
+                return external_result
 
             fallback_result = await self._dispatch_openclaw_fallback(
                 action=action,
@@ -884,24 +953,56 @@ class SapphireForumService:
         register_url = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL", "")).strip()
         token = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN", "")).strip()
         token_for_dispatch = token
+        dispatch_result: Dict[str, Any]
         if self._is_moltbook_api_url(register_url):
             outbound_payload = {
                 "name": display_name[:60] or username,
                 "description": bio_safe["text"][:280] or "Sapphire external collaboration scout",
             }
             token_for_dispatch = ""
-        note = (
-            "Register least-privilege Sapphire scout account for external collaboration. "
-            "No secrets, no trade execution, and no cloud mutations. "
-            f"Username: @{username}. Display: {display_name[:60]}."
-        )
-        dispatch_result = await self._dispatch_scout_bridge(
-            action="register",
-            outbound_payload=outbound_payload,
-            external_url=register_url,
-            external_token=token_for_dispatch,
-            note=note,
-        )
+            if token:
+                dispatch_result = {
+                    "dispatched": True,
+                    "reason": "moltbook_token_present",
+                    "mode": "external_http",
+                    "metadata": {
+                        "already_registered": True,
+                        "token_present": True,
+                    },
+                }
+            else:
+                note = (
+                    "Register least-privilege Sapphire scout account for external collaboration. "
+                    "No secrets, no trade execution, and no cloud mutations. "
+                    f"Username: @{username}. Display: {display_name[:60]}."
+                )
+                dispatch_result = await self._dispatch_scout_bridge(
+                    action="register",
+                    outbound_payload=outbound_payload,
+                    external_url=register_url,
+                    external_token=token_for_dispatch,
+                    note=note,
+                )
+        else:
+            note = (
+                "Register least-privilege Sapphire scout account for external collaboration. "
+                "No secrets, no trade execution, and no cloud mutations. "
+                f"Username: @{username}. Display: {display_name[:60]}."
+            )
+            dispatch_result = await self._dispatch_scout_bridge(
+                action="register",
+                outbound_payload=outbound_payload,
+                external_url=register_url,
+                external_token=token_for_dispatch,
+                note=note,
+            )
+        if not dispatch_result.get("dispatched") and dispatch_result.get("reason") == "moltbook_already_registered":
+            dispatch_result = dict(dispatch_result)
+            dispatch_result["dispatched"] = True
+            metadata = dispatch_result.get("metadata", {})
+            metadata = dict(metadata) if isinstance(metadata, dict) else {}
+            metadata["already_registered"] = True
+            dispatch_result["metadata"] = metadata
 
         with self._lock:
             self._scout_registration.update(
