@@ -1604,6 +1604,12 @@ class TelegramPlatformBot:
             await self._dispatch_callback("CONTROL", "ALL", "MARKET_PRICES", 0.0)
             return
 
+        # Portfolio command: /portfolio or /positions
+        if re.search(r"^/(portfolio|positions?|pnl)\b", text_lower):
+            await self.send_as(SAPPHIRE, "Pulling portfolio status.")
+            await self._dispatch_callback("CONTROL", "ALL", "PORTFOLIO", 0.0)
+            return
+
         # Allocation commands
         slash_allocation_match = re.search(
             r"^/(deallocate|allocate)\s+(\w+)(?:\s+([\d.]+))?$",

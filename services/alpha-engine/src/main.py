@@ -13,6 +13,7 @@ import uvloop
 from src.ai.gemini_guard import GeminiGuard
 from src.collaboration.forum import SapphireForumService
 from src.execution.dispatcher import dispatcher
+from src.execution.portfolio import PortfolioTracker
 from src.feeds.market_data import MarketDataAggregator
 from src.integrations.tradingview_autonomy import TradingViewAutonomyPlugin
 from src.security.virustotal_scanner import VirusTotalSkillScanner
@@ -40,6 +41,7 @@ class AlphaEngine:
         self.running = False
         self.market_data = MarketDataAggregator()
         self.strategy = AlphaStrategyEngine(self.market_data)
+        self.portfolio = PortfolioTracker()
         requested_stage = self._parse_execution_stage_token(
             os.getenv("SAPPHIRE_DEX_EXECUTION_STAGE", "paper")
         )
@@ -1383,6 +1385,63 @@ class AlphaEngine:
                         lines.append(f"  `{sym}` {price:,.2f}")
                     else:
                         lines.append(f"  `{sym}` {price:.6f}")
+
+        # Update portfolio with latest market prices for unrealized P&L
+        self.portfolio.update_prices(snapshot)
+
+        await self.telegram.send_as(SAPPHIRE, "\n".join(lines))
+
+    async def _send_portfolio_status(self) -> None:
+        """Send portfolio snapshot via Telegram."""
+        snap = self.portfolio.snapshot()
+        lines = ["*Portfolio Status*"]
+
+        if snap["open_count"] == 0 and snap["total_trades"] == 0:
+            lines.append("No positions or trades recorded yet.")
+            await self.telegram.send_as(SAPPHIRE, "\n".join(lines))
+            return
+
+        # Open positions
+        if snap["open_positions"]:
+            lines.append(f"\n*Open Positions* ({snap['open_count']})")
+            for pos in snap["open_positions"]:
+                upnl = pos["unrealized_pnl"]
+                upnl_str = f"{upnl:+.2f}" if abs(upnl) >= 0.01 else "0.00"
+                emoji = "🟢" if upnl >= 0 else "🔴"
+                lines.append(
+                    f"  {emoji} {pos['venue']} {pos['side']} "
+                    f"{pos['quantity']:.4f} `{pos['symbol']}` "
+                    f"@ {pos['entry_price']:,.4f} | uPnL: {upnl_str}"
+                )
+        else:
+            lines.append("\nNo open positions.")
+
+        # Stats
+        lines.append(f"\n*Stats*")
+        lines.append(f"  Total fills: {snap['total_trades']}")
+        lines.append(
+            f"  Realized PnL: {snap['total_realized_pnl']:+.4f}"
+        )
+        lines.append(
+            f"  Unrealized PnL: {snap['total_unrealized_pnl']:+.4f}"
+        )
+        closed_count = snap["wins"] + snap["losses"]
+        if closed_count > 0:
+            lines.append(
+                f"  Win rate: {snap['win_rate']}% "
+                f"({snap['wins']}W / {snap['losses']}L)"
+            )
+
+        # Recent closed trades
+        if snap["recent_closed"]:
+            lines.append(f"\n*Recent Trades*")
+            for t in snap["recent_closed"][-5:]:
+                emoji = "✅" if t["pnl"] >= 0 else "❌"
+                lines.append(
+                    f"  {emoji} {t['venue']} {t['side']} `{t['symbol']}` "
+                    f"PnL: {t['pnl']:+.4f} ({t['duration_s']}s)"
+                )
+
         await self.telegram.send_as(SAPPHIRE, "\n".join(lines))
 
     def _control_snapshot(self) -> Dict[str, Any]:
@@ -1450,6 +1509,7 @@ class AlphaEngine:
             "media_mode": media_snapshot.get("mode", "owner_approval"),
             "media": media_snapshot,
             "venues": venues,
+            "portfolio": self.portfolio.snapshot(),
             "timestamp": int(time.time()),
         }
 
@@ -2892,6 +2952,10 @@ class AlphaEngine:
             await self._send_market_prices()
             return
 
+        if normalized_action in {"PORTFOLIO", "POSITIONS"}:
+            await self._send_portfolio_status()
+            return
+
         if normalized_action in {"FOCUS", "CONTROL_FOCUS"}:
             await self._send_focus_snapshot()
             return
@@ -2938,6 +3002,24 @@ class AlphaEngine:
                 context_lines.append(
                     f"Venue {venue}: {status}, allocation {info.get('allocation', 1.0)*100:.0f}%"
                 )
+
+            # Add portfolio context
+            port_snap = self.portfolio.snapshot()
+            if port_snap["open_count"] > 0 or port_snap["total_trades"] > 0:
+                context_lines.append(
+                    f"Portfolio: {port_snap['open_count']} open positions, "
+                    f"{port_snap['total_trades']} total fills"
+                )
+                context_lines.append(
+                    f"Realized PnL: {port_snap['total_realized_pnl']:+.4f}, "
+                    f"Unrealized PnL: {port_snap['total_unrealized_pnl']:+.4f}"
+                )
+                if port_snap["wins"] + port_snap["losses"] > 0:
+                    context_lines.append(
+                        f"Win rate: {port_snap['win_rate']}% "
+                        f"({port_snap['wins']}W / {port_snap['losses']}L)"
+                    )
+
             system_context = "\n".join(context_lines)
 
             # Pick the right agent to respond
@@ -3776,6 +3858,14 @@ class AlphaEngine:
             try:
                 # Log to AI for Recaps
                 self.ai.log_trade(message_data)
+
+                # Update portfolio tracker with fill
+                closed_trade = self.portfolio.process_fill(message_data)
+                if closed_trade:
+                    logger.info(
+                        f"📊 Portfolio: closed {closed_trade.symbol} "
+                        f"PnL: {closed_trade.realized_pnl:+.4f}"
+                    )
 
                 # Format notification
                 platform = message_data.get("platform", "Unknown")
