@@ -85,15 +85,34 @@ EXFIL_PATTERNS = [
 
 # Instruction injection: hidden prompts trying to override agent behavior
 INJECTION_PATTERNS = [
-    (r"ignore\s+(previous|all|your)\s+(instructions|rules|constraints)", "Instruction override attempt", ThreatSeverity.CRITICAL),
-    (r"you\s+are\s+now\s+", "Role reassignment injection", ThreatSeverity.CRITICAL),
-    (r"system\s*:\s*you\s+are", "System prompt injection", ThreatSeverity.CRITICAL),
-    (r"pretend\s+(you|to)\s+(are|be)", "Social engineering via pretending", ThreatSeverity.HIGH),
+    # Role override / instruction hijacking (comprehensive)
+    (r"ignore\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|rules?|context|prompts?|directives?)", "Instruction override attempt", ThreatSeverity.CRITICAL),
+    (r"disregard\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|rules?)", "Instruction disregard attempt", ThreatSeverity.CRITICAL),
+    (r"forget\s+(everything|all)\s+(you|that)\s+(know|were\s+told|learned)", "Memory wipe injection", ThreatSeverity.CRITICAL),
+    (r"you\s+are\s+now\s+(a|an|my)\s+", "Role reassignment injection", ThreatSeverity.CRITICAL),
+    (r"new\s+(instructions?|rules?|directives?)\s*:", "New instruction injection", ThreatSeverity.CRITICAL),
+    (r"system\s*:\s*you\s+(are|must|should|will)", "System prompt injection", ThreatSeverity.CRITICAL),
+    (r"<<\s*(system|override|admin|root)\s*>>", "Admin override tag injection", ThreatSeverity.CRITICAL),
+    (r"\[INST\]|\[/INST\]|\[SYSTEM\]", "Model instruction tag injection", ThreatSeverity.CRITICAL),
+    (r"from\s+now\s+on\s*,?\s*(you|your|act|behave|respond)", "Behavioral override injection", ThreatSeverity.CRITICAL),
+    (r"pretend\s+(you\s+are|to\s+be|that)\s+", "Social engineering via pretending", ThreatSeverity.HIGH),
+    (r"act\s+as\s+(if\s+you\s+are|a|an|my)\s+", "Role impersonation injection", ThreatSeverity.HIGH),
+    (r"switch\s+(to|into)\s+(a\s+)?(different|new)\s+(mode|role|persona)", "Mode switch injection", ThreatSeverity.HIGH),
+    (r"enter\s+(developer|debug|admin|god|sudo|root|jailbreak)\s+mode", "Privilege escalation injection", ThreatSeverity.CRITICAL),
+    # Boundary / delimiter attacks
+    (r"```\s*(system|assistant|user)\s*\n", "Code block delimiter attack", ThreatSeverity.CRITICAL),
+    (r"<\|?(system|im_start|im_end|endoftext)\|?>", "Model delimiter injection", ThreatSeverity.CRITICAL),
+    (r"human\s*:\s*\n|assistant\s*:\s*\n", "Conversation boundary injection", ThreatSeverity.HIGH),
+    # Hidden content
     (r"<\s*hidden\s*>|display:\s*none|visibility:\s*hidden", "Hidden content", ThreatSeverity.HIGH),
     (r"base64\.\s*(encode|decode)", "Base64 encoding (potential obfuscation)", ThreatSeverity.MEDIUM),
+    # Code execution
     (r"eval\s*\(", "Dynamic code evaluation", ThreatSeverity.HIGH),
     (r"exec\s*\(", "Dynamic code execution", ThreatSeverity.HIGH),
     (r"Function\s*\(", "Dynamic function creation (JS)", ThreatSeverity.HIGH),
+    (r"import\s+os\b|import\s+subprocess", "Python OS/subprocess import", ThreatSeverity.HIGH),
+    (r"__import__\s*\(|os\.system\s*\(|os\.popen\s*\(", "Python dangerous import/exec", ThreatSeverity.CRITICAL),
+    (r"subprocess\.(call|run|Popen|check_output)", "Python subprocess execution", ThreatSeverity.HIGH),
 ]
 
 # Excessive filesystem access
