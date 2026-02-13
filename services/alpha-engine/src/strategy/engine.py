@@ -1,40 +1,84 @@
 import asyncio
 import os
+import re
 import time
-from typing import Any, Dict
+from typing import Any, Dict, List, Set
 
 from loguru import logger
 from src.feeds.market_data import MarketDataAggregator
 
 
+# ---------------------------------------------------------------------------
+# Venue Profiles — each venue is a specialist, not an arb counter-party.
+# ---------------------------------------------------------------------------
+
+VENUE_PROFILES: Dict[str, Dict[str, Any]] = {
+    "ASTER": {
+        "name": "Aster",
+        "role": "High-leverage ultra-high-frequency trading",
+        "description": (
+            "Aster specialises in high-leverage perpetual futures with tight spreads "
+            "and rapid execution. Use Aster when market conditions favour aggressive, "
+            "short-duration trades with defined risk."
+        ),
+        "strengths": ["high leverage", "fast execution", "tight spreads", "futures"],
+        "constraints": ["region restrictions possible", "requires USDT-quoted symbols"],
+    },
+    "LIGHTER": {
+        "name": "Lighter",
+        "role": "Secure private perpetuals trading",
+        "description": (
+            "Lighter provides secure, privacy-preserving perpetual trading on zkLighter. "
+            "Use Lighter for steady, medium-frequency trades where privacy and security "
+            "are prioritised over raw speed."
+        ),
+        "strengths": ["privacy", "security", "zk-rollup settlement", "base-symbol perps"],
+        "constraints": ["lower leverage ceiling", "fewer trading pairs"],
+    },
+}
+
+# ---------------------------------------------------------------------------
+# Preferred Symbols — slight bias toward these when scanning for opportunities.
+# Agents may still trade any symbol at their discretion.
+# ---------------------------------------------------------------------------
+
+_DEFAULT_PREFERRED_SYMBOLS = "BTC,ETH,SOL,ZEC,XMR,PENGU,MON,LIT,ASTER"
+
+
+def _parse_preferred_symbols(raw: str) -> List[str]:
+    """Parse a comma/semicolon/space separated symbol list into unique uppercase tokens."""
+    tokens = re.split(r"[,;|\s]+", str(raw or "").strip())
+    seen: Set[str] = set()
+    result: List[str] = []
+    for token in tokens:
+        sym = token.strip().upper()
+        if sym and sym not in seen:
+            seen.add(sym)
+            result.append(sym)
+    return result
+
+
+PREFERRED_SYMBOLS: List[str] = _parse_preferred_symbols(
+    os.getenv("SAPPHIRE_PREFERRED_SYMBOLS", _DEFAULT_PREFERRED_SYMBOLS)
+)
+
+
 class AlphaStrategyEngine:
+    """
+    Strategy engine for Sapphire Alpha Hub.
+
+    Each venue operates as an independent specialist — there is no cross-venue
+    arbitrage.  The engine tracks execution stage, quantity guards, and exposes
+    venue profiles / preferred symbols for downstream autonomy decisions.
+    """
+
     STAGE_ORDER = ("paper", "staged_live", "full_live")
 
     def __init__(self, market_data: MarketDataAggregator):
         self.market_data = market_data
         self.running = False
-        self.min_spread_pct = 0.001  # 0.1%
-        self.last_execution_time = 0
-        self.internal_arb_execution_enabled = (
-            os.getenv("INTERNAL_ARB_EXECUTION_ENABLED", "false").strip().lower()
-            in {"1", "true", "yes", "on"}
-        )
-        self.internal_arb_quantity = max(
-            0.0,
-            float(os.getenv("INTERNAL_ARB_EXECUTION_QUANTITY", "0.02")),
-        )
-        self.internal_arb_min_notional = max(
-            0.0,
-            float(os.getenv("SAPPHIRE_INTERNAL_ARB_MIN_NOTIONAL", "5.0")),
-        )
-        self.internal_arb_notional_buffer_pct = max(
-            0.0,
-            float(os.getenv("SAPPHIRE_INTERNAL_ARB_NOTIONAL_BUFFER_PCT", "0.05")),
-        )
-        self.internal_arb_max_quantity = max(
-            0.0,
-            float(os.getenv("SAPPHIRE_INTERNAL_ARB_MAX_QUANTITY", "0.25")),
-        )
+
+        # --- Execution stage --------------------------------------------------
         self.staged_live_multiplier = self._bounded_multiplier(
             os.getenv("SAPPHIRE_STAGED_LIVE_SIZE_MULTIPLIER", "0.25"),
             fallback=0.25,
@@ -46,9 +90,36 @@ class AlphaStrategyEngine:
         self.dex_execution_stage = self._normalize_stage(
             os.getenv("SAPPHIRE_DEX_EXECUTION_STAGE", "paper")
         )
-        self._last_mode_log_at = 0.0
-        self._last_quantity_adjust_log_at = 0.0
-        self._last_quantity_block_log_at = 0.0
+
+        # --- Quantity guards (kept for TradingView signal dispatch) ------------
+        self.min_notional = max(
+            0.0,
+            float(os.getenv("SAPPHIRE_MIN_NOTIONAL", os.getenv("SAPPHIRE_INTERNAL_ARB_MIN_NOTIONAL", "5.0"))),
+        )
+        self.notional_buffer_pct = max(
+            0.0,
+            float(os.getenv("SAPPHIRE_NOTIONAL_BUFFER_PCT", os.getenv("SAPPHIRE_INTERNAL_ARB_NOTIONAL_BUFFER_PCT", "0.05"))),
+        )
+        self.max_quantity = max(
+            0.0,
+            float(os.getenv("SAPPHIRE_MAX_QUANTITY", os.getenv("SAPPHIRE_INTERNAL_ARB_MAX_QUANTITY", "0.25"))),
+        )
+        self.default_quantity = max(
+            0.0,
+            float(os.getenv("SAPPHIRE_DEFAULT_QUANTITY", os.getenv("INTERNAL_ARB_EXECUTION_QUANTITY", "0.02"))),
+        )
+
+        # --- Venue profiles & preferred symbols (immutable after init) --------
+        self.venue_profiles: Dict[str, Dict[str, Any]] = dict(VENUE_PROFILES)
+        self.preferred_symbols: List[str] = list(PREFERRED_SYMBOLS)
+
+        # --- Health monitoring loop -------------------------------------------
+        self._health_log_interval_seconds = 300  # log venue health every 5 min
+        self._last_health_log_at = 0.0
+
+    # ------------------------------------------------------------------
+    # Stage helpers
+    # ------------------------------------------------------------------
 
     @classmethod
     def _normalize_stage(cls, raw: Any) -> str:
@@ -90,10 +161,6 @@ class AlphaStrategyEngine:
         state.update({"previous_stage": previous, "changed": previous != normalized})
         return state
 
-    def set_internal_execution_enabled(self, enabled: bool) -> Dict[str, Any]:
-        self.internal_arb_execution_enabled = bool(enabled)
-        return self.execution_state()
-
     def _stage_multiplier(self) -> float:
         if self.dex_execution_stage == "full_live":
             return self.full_live_multiplier
@@ -101,42 +168,55 @@ class AlphaStrategyEngine:
             return self.staged_live_multiplier
         return 0.0
 
+    # ------------------------------------------------------------------
+    # Execution state
+    # ------------------------------------------------------------------
+
     def execution_state(self) -> Dict[str, Any]:
         multiplier = self._stage_multiplier()
-        live_dispatch = bool(self.internal_arb_execution_enabled and multiplier > 0)
-        effective_quantity = float(self.internal_arb_quantity * multiplier)
+        effective_quantity = float(self.default_quantity * multiplier)
         return {
             "dex_execution_stage": self.dex_execution_stage,
-            "internal_arb_execution_enabled": bool(self.internal_arb_execution_enabled),
             "stage_multiplier": float(multiplier),
-            "effective_live_dispatch": live_dispatch,
             "effective_quantity": float(round(effective_quantity, 8)),
-            "base_quantity": float(self.internal_arb_quantity),
-            "min_notional": float(self.internal_arb_min_notional),
-            "min_notional_buffer_pct": float(self.internal_arb_notional_buffer_pct),
-            "max_quantity": float(self.internal_arb_max_quantity),
+            "base_quantity": float(self.default_quantity),
+            "min_notional": float(self.min_notional),
+            "min_notional_buffer_pct": float(self.notional_buffer_pct),
+            "max_quantity": float(self.max_quantity),
+            "preferred_symbols": list(self.preferred_symbols),
+            "venue_profiles": {
+                venue: {
+                    "name": profile["name"],
+                    "role": profile["role"],
+                }
+                for venue, profile in self.venue_profiles.items()
+            },
         }
+
+    # ------------------------------------------------------------------
+    # Quantity resolution (used by TradingView signal dispatch)
+    # ------------------------------------------------------------------
 
     def _resolve_dispatch_quantity(self, reference_price: float, baseline_quantity: float) -> Dict[str, Any]:
         quantity = max(0.0, float(baseline_quantity))
         if quantity <= 0:
             return {"quantity": 0.0, "adjusted": False, "blocked": False, "reason": "non_positive_quantity"}
-        if reference_price <= 0 or self.internal_arb_min_notional <= 0:
+        if reference_price <= 0 or self.min_notional <= 0:
             return {"quantity": quantity, "adjusted": False, "blocked": False, "reason": "no_notional_check"}
 
-        target_notional = self.internal_arb_min_notional * (1.0 + self.internal_arb_notional_buffer_pct)
+        target_notional = self.min_notional * (1.0 + self.notional_buffer_pct)
         required_quantity = target_notional / reference_price
         if required_quantity <= quantity:
             return {"quantity": quantity, "adjusted": False, "blocked": False, "reason": "baseline_satisfies_notional"}
 
-        if self.internal_arb_max_quantity > 0 and required_quantity > self.internal_arb_max_quantity:
+        if self.max_quantity > 0 and required_quantity > self.max_quantity:
             return {
                 "quantity": 0.0,
                 "adjusted": False,
                 "blocked": True,
                 "reason": "required_quantity_exceeds_cap",
                 "required_quantity": float(round(required_quantity, 8)),
-                "cap_quantity": float(self.internal_arb_max_quantity),
+                "cap_quantity": float(self.max_quantity),
             }
         return {
             "quantity": float(round(required_quantity, 8)),
@@ -146,103 +226,48 @@ class AlphaStrategyEngine:
             "required_quantity": float(round(required_quantity, 8)),
         }
 
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
+
     async def start(self):
         self.running = True
-        asyncio.create_task(self._arb_loop())
+        asyncio.create_task(self._venue_health_loop())
         state = self.execution_state()
         logger.info(
-            (
-                "🧠 Alpha Strategy Engine Started | stage={} internal_arb_execution_enabled={} "
-                "stage_multiplier={} effective_live_dispatch={} base_qty={} effective_qty={}"
-            ),
+            "🧠 Alpha Strategy Engine Started | stage={} multiplier={} preferred_symbols={}",
             state["dex_execution_stage"],
-            state["internal_arb_execution_enabled"],
             state["stage_multiplier"],
-            state["effective_live_dispatch"],
-            state["base_quantity"],
-            state["effective_quantity"],
+            ",".join(self.preferred_symbols[:5]) + ("..." if len(self.preferred_symbols) > 5 else ""),
         )
+        for venue, profile in self.venue_profiles.items():
+            logger.info("  └─ {} → {}", venue, profile["role"])
 
     async def stop(self):
         self.running = False
 
-    async def _arb_loop(self):
-        """Core HFT Loop."""
+    # ------------------------------------------------------------------
+    # Venue health monitoring (replaces the old arb loop)
+    # ------------------------------------------------------------------
+
+    async def _venue_health_loop(self):
+        """Periodic venue health logger — no cross-venue trading."""
         while self.running:
             try:
-                aster_price = self.market_data.get_price("ASTER", "SOL")
-                lighter_price = self.market_data.get_price("LIGHTER", "SOL")
-
-                if aster_price > 0 and lighter_price > 0:
-                    spread = abs(aster_price - lighter_price)
-                    spread_pct = spread / min(aster_price, lighter_price)
-
-                    if spread_pct > self.min_spread_pct:
-                        now = time.time()
-                        if now - self.last_execution_time > 5.0:  # 5s cooldown for now (debug mode)
-                            logger.info(
-                                f"⚡ ARB OPPORTUNITY: Aster={aster_price} Lighter={lighter_price} Spread={spread_pct:.4f}"
-                            )
-
-                            state = self.execution_state()
-                            if state["effective_live_dispatch"] and state["effective_quantity"] > 0:
-                                quantity_resolution = self._resolve_dispatch_quantity(
-                                    aster_price, state["effective_quantity"]
-                                )
-                                dispatch_qty = float(quantity_resolution.get("quantity", 0.0))
-                                if quantity_resolution.get("blocked") or dispatch_qty <= 0:
-                                    now = time.time()
-                                    if now - self._last_quantity_block_log_at > 60:
-                                        logger.warning(
-                                            (
-                                                "Skipping ARB dispatch due notional/cap guard "
-                                                "(price={} baseline_qty={} reason={} required_qty={} cap={})"
-                                            ),
-                                            aster_price,
-                                            state["effective_quantity"],
-                                            quantity_resolution.get("reason"),
-                                            quantity_resolution.get("required_quantity"),
-                                            quantity_resolution.get("cap_quantity"),
-                                        )
-                                        self._last_quantity_block_log_at = now
-                                    continue
-                                if quantity_resolution.get("adjusted"):
-                                    now = time.time()
-                                    if now - self._last_quantity_adjust_log_at > 30:
-                                        logger.info(
-                                            "Adjusted ARB quantity from {} to {} to satisfy min notional guard",
-                                            state["effective_quantity"],
-                                            dispatch_qty,
-                                        )
-                                        self._last_quantity_adjust_log_at = now
-                                from src.execution.dispatcher import dispatcher
-
-                                cmd = {
-                                    "type": "ARB_EXECUTE",
-                                    "side": "BUY" if aster_price < lighter_price else "SELL",
-                                    "symbol": "SOL",
-                                    "quantity": dispatch_qty,
-                                    "spread": spread_pct,
-                                    "source": "alpha_internal_arb",
-                                    "execution_stage": state["dex_execution_stage"],
-                                }
-                                await dispatcher.send_command("ASTER", cmd)
-                            else:
-                                now = time.time()
-                                if now - self._last_mode_log_at > 60:
-                                    logger.info(
-                                        (
-                                            "Internal ARB in observe mode; opportunity logged only "
-                                            "(stage={} internal_enabled={})"
-                                        ),
-                                        state["dex_execution_stage"],
-                                        state["internal_arb_execution_enabled"],
-                                    )
-                                    self._last_mode_log_at = now
-                            self.last_execution_time = now
-
-                # Slower pace for Cloud Run stability (500ms)
-                await asyncio.sleep(0.5)
+                now = time.time()
+                if now - self._last_health_log_at >= self._health_log_interval_seconds:
+                    for venue in self.venue_profiles:
+                        symbol = self.preferred_symbols[0] if self.preferred_symbols else "SOL"
+                        price = self.market_data.get_price(venue, symbol)
+                        status = "online" if price > 0 else "no_price"
+                        logger.info(
+                            "📊 Venue health: {} | {} = {} | status={}",
+                            venue,
+                            symbol,
+                            f"${price:,.2f}" if price > 0 else "n/a",
+                            status,
+                        )
+                    self._last_health_log_at = now
             except Exception as e:
-                logger.error(f"Strategy Loop Error: {e}")
-                await asyncio.sleep(1)
+                logger.error(f"Venue health loop error: {e}")
+            await asyncio.sleep(30)

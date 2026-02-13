@@ -747,7 +747,7 @@ class AlphaEngine:
                 "source": source,
                 "previous_stage": previous,
                 "applied_stage": self._dex_execution_stage,
-                "effective_live_dispatch": bool(applied.get("effective_live_dispatch", False)),
+                "effective_live_dispatch": bool(applied.get("stage_multiplier", 0) > 0),
                 "effective_quantity": float(applied.get("effective_quantity", 0.0)),
             },
         )
@@ -1106,7 +1106,7 @@ class AlphaEngine:
                 f"Active venues: `{', '.join(active_venues) if active_venues else 'none'}`",
                 f"Failure pressure: `{total_failures}`",
                 f"DEX stage: `{strategy_state.get('dex_execution_stage', 'paper')}`",
-                f"DEX live dispatch: `{bool(strategy_state.get('effective_live_dispatch', False))}`",
+                f"DEX live dispatch: `{bool(strategy_state.get('stage_multiplier', 0) > 0)}`",
                 f"DEX effective qty: `{strategy_state.get('effective_quantity', 0.0)}`",
                 f"Rules configured: `{len(self._tradingview_strategy_rules)}`",
                 f"TV autonomy enabled: `{self.tv_autonomy.enabled}`",
@@ -1387,7 +1387,7 @@ class AlphaEngine:
             "primary_execution_plane": "dex_venues",
             "primary_execution_venues": sorted(venues.keys()),
             "dex_execution_stage": strategy_state.get("dex_execution_stage", "paper"),
-            "dex_live_dispatch_enabled": bool(strategy_state.get("effective_live_dispatch", False)),
+            "dex_live_dispatch_enabled": bool(strategy_state.get("stage_multiplier", 0) > 0),
             "dex_stage_multiplier": float(strategy_state.get("stage_multiplier", 0.0)),
             "dex_effective_quantity": float(strategy_state.get("effective_quantity", 0.0)),
             "dex_base_quantity": float(strategy_state.get("base_quantity", 0.0)),
@@ -1667,7 +1667,7 @@ class AlphaEngine:
             "Primary execution plane: `DEX_NATIVE (ASTER/LIGHTER)`",
             f"DEX stage: `{strategy_state.get('dex_execution_stage', 'paper')}`",
             (
-                f"DEX live dispatch: `{'ON' if strategy_state.get('effective_live_dispatch', False) else 'OFF'}`"
+                f"DEX live dispatch: `{'ON' if strategy_state.get('stage_multiplier', 0) > 0 else 'OFF'}`"
             ),
             f"DEX effective qty: `{strategy_state.get('effective_quantity', 0.0)}`",
             (
@@ -1738,7 +1738,7 @@ class AlphaEngine:
             ),
             (
                 f"- DEX mode: stage `{strategy_state.get('dex_execution_stage', 'paper')}`"
-                f" | live dispatch `{'ON' if strategy_state.get('effective_live_dispatch', False) else 'OFF'}`"
+                f" | live dispatch `{'ON' if strategy_state.get('stage_multiplier', 0) > 0 else 'OFF'}`"
                 f" | qty `{strategy_state.get('effective_quantity', 0.0)}`"
             ),
             (
@@ -1789,7 +1789,7 @@ class AlphaEngine:
             "allowed_repo_scope": sorted(list(getattr(self.tv_autonomy, "allowed_repo_scope", set()))),
             "allowed_project_scope": sorted(list(getattr(self.tv_autonomy, "allowed_project_scope", set()))),
             "dex_execution_stage": strategy_state.get("dex_execution_stage", "paper"),
-            "dex_live_dispatch": bool(strategy_state.get("effective_live_dispatch", False)),
+            "dex_live_dispatch": bool(strategy_state.get("stage_multiplier", 0) > 0),
             "dex_effective_quantity": float(strategy_state.get("effective_quantity", 0.0)),
             "pending_autonomy_sessions": len(
                 [
@@ -1799,6 +1799,8 @@ class AlphaEngine:
                 ]
             ),
             "latest_autonomy_session_key": self._latest_autonomy_session_key,
+            "venue_profiles": strategy_state.get("venue_profiles", {}),
+            "preferred_symbols": strategy_state.get("preferred_symbols", []),
         }
 
     def _autonomy_trigger_reason(self, context: Dict[str, Any]) -> str:
@@ -1905,20 +1907,29 @@ class AlphaEngine:
         dex_live = "ON" if bool(context.get("dex_live_dispatch", False)) else "OFF"
         key = str(session_key or "").strip() or "n/a"
 
+        # Venue profile summary
+        venue_profiles = context.get("venue_profiles", {})
+        venue_lines = []
+        for venue, profile in venue_profiles.items():
+            status = "active" if venue in active else "paused"
+            venue_lines.append(f"  • **{profile.get('name', venue)}** ({status}) — {profile.get('role', 'n/a')}")
+        venue_block = "\n".join(venue_lines) if venue_lines else "  (no venue profiles)"
+
+        preferred = context.get("preferred_symbols", [])
+        preferred_text = ", ".join(preferred[:6]) + ("…" if len(preferred) > 6 else "") if preferred else "none"
+
         lines = [
             "🤖 **AUTONOMY DECISION BRIEF**",
-            f"Session: `{key}`",
-            f"Trigger: `{trigger}`",
+            f"Session: `{key}` | Trigger: `{trigger}`",
             f"Why now: {brief['reasoning']}",
             (
-                "Current state: "
-                f"active `{active_text}` | paused `{paused_text}` | "
-                f"failure pressure `{failure_pressure}` | pending `{pending}` | "
-                f"DEX stage `{dex_stage}` | DEX live `{dex_live}`"
+                f"State: active `{active_text}` | paused `{paused_text}` | "
+                f"failures `{failure_pressure}` | stage `{dex_stage}` | live `{dex_live}`"
             ),
-            f"Expected outcome: {brief['expected_outcome']}",
-            f"Benefit vs current state: {brief['expected_benefit']}",
-            f"Risk if deferred: {brief['deferral_risk']}",
+            f"Preferred symbols: `{preferred_text}`",
+            "Venues:",
+            venue_block,
+            f"Outcome: {brief['expected_outcome']}",
         ]
         if approval_required and key != "n/a":
             lines.append("Decision: `/approve <session_key> <note>` or `/reject <session_key> <reason>`")
@@ -2097,9 +2108,17 @@ class AlphaEngine:
 
         context = self._autonomy_context_snapshot()
         directive = self._owner_directive.strip() or "Optimize Sapphire uptime, reliability, and execution quality."
+        venue_hints = "; ".join(
+            f"{v}: {p.get('role', '')}" for v, p in context.get("venue_profiles", {}).items()
+        )
+        preferred = ", ".join(context.get("preferred_symbols", [])[:6])
         instruction = (
             f"{directive} Execute an autonomous maintenance and improvement cycle for code + cloud. "
-            "Prioritize production safety first, then reliability, then performance."
+            "Prioritize production safety first, then reliability, then performance. "
+            "IMPORTANT: Venues are segregated specialists with no cross-venue arbitrage. "
+            f"Venue roles: {venue_hints}. "
+            f"Preferred symbols (slight bias): {preferred}. "
+            "Agents may trade any symbol but should favour the preferred list."
         )
         brief = self._autonomy_request_brief(trigger, context)
 
@@ -2603,7 +2622,7 @@ class AlphaEngine:
             await self.telegram.send_message(
                 (
                     f"✅ DEX execution stage set to `{applied.get('dex_execution_stage', requested)}`.\n"
-                    f"Live dispatch: `{'ON' if applied.get('effective_live_dispatch', False) else 'OFF'}` | "
+                    f"Live dispatch: `{'ON' if applied.get('stage_multiplier', 0) > 0 else 'OFF'}` | "
                     f"Effective qty: `{applied.get('effective_quantity', 0.0)}`"
                 ),
                 priority="high",
@@ -2843,7 +2862,7 @@ class AlphaEngine:
                 await self.telegram.send_message(
                     (
                         f"🚀 Promotion stage updated to `{applied.get('dex_execution_stage', requested_stage)}`.\n"
-                        f"Live dispatch: `{'ON' if applied.get('effective_live_dispatch', False) else 'OFF'}` | "
+                        f"Live dispatch: `{'ON' if applied.get('stage_multiplier', 0) > 0 else 'OFF'}` | "
                         f"Effective qty: `{applied.get('effective_quantity', 0.0)}`"
                     ),
                     priority="high",
@@ -3830,7 +3849,7 @@ class AlphaEngine:
             "platforms": platforms,
             "kill_switch_active": self._kill_switch_active,
             "dex_execution_stage": strategy_state.get("dex_execution_stage", "paper"),
-            "dex_live_dispatch": bool(strategy_state.get("effective_live_dispatch", False)),
+            "dex_live_dispatch": bool(strategy_state.get("stage_multiplier", 0) > 0),
             "dex_effective_quantity": float(strategy_state.get("effective_quantity", 0.0)),
             "timestamp": int(time.time()),
         }
@@ -3878,7 +3897,7 @@ class AlphaEngine:
                 "failure_pressure": failure_pressure,
                 "kill_switch_active": self._kill_switch_active,
                 "dex_execution_stage": strategy_state.get("dex_execution_stage", "paper"),
-                "dex_live_dispatch": bool(strategy_state.get("effective_live_dispatch", False)),
+                "dex_live_dispatch": bool(strategy_state.get("stage_multiplier", 0) > 0),
             },
             "timestamp": int(time.time()),
         }

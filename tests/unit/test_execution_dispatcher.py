@@ -73,7 +73,7 @@ def test_dispatcher_adds_legacy_trade_fields_and_scales_quantity(monkeypatch):
 
     payload = session.calls[0]["json"]
     assert payload["action"] == "BUY"
-    assert payload["type"] == "ARB_EXECUTE"
+    assert payload["type"] == "TRADE_EXECUTE"
     assert payload["side"] == "BUY"
     assert payload["quantity"] == 1.0
     assert payload["allocation_factor"] == 0.5
