@@ -25,14 +25,14 @@ _Fully secure platform with isolated agent boundaries_
 - [x] Implement strict communication boundaries (Scout ↔ Forum only) (PR #20)
 - [x] Remove any direct access Scout has to execution, portfolio, or credentials (PR #20)
 - [x] Audit all agent permission boundaries (PR #20)
-- [ ] Wire AgentGate.require() enforcement into main.py critical operations
+- [x] Wire AgentGate.require() enforcement into main.py critical operations (PR #21)
 
 ### Prompt Injection Hardening
 - [x] Audit all AI prompt paths for injection vulnerabilities (PR #20)
 - [x] Implement input sanitization on all external data ingestion (PR #20)
 - [x] Add injection detection to skill auditor patterns (PR #20)
-- [ ] Fuzz-test all Telegram command handlers
-- [ ] Harden forum post content against injection
+- [x] Fuzz-test all Telegram command handlers (PR #22)
+- [x] Harden forum post content against injection (PR #22)
 
 ### Cryptographic Security (Research)
 - [ ] Research Zama FHE (github.com/zama-ai) — encrypted computation
@@ -125,4 +125,6 @@ Harden          Security    Forum       Tracking     Swarm       Social       On
 - ✅ PR #18: Skill Security Auditor (8 threat categories, isnad chains)
 - ✅ PR #19: Smart Notifications (autonomy spam fix, agent activity feed)
 - ✅ PR #20: Security Hardening Phase 2 (agent permissions, prompt injection defense, sanitizer)
-- ✅ 203 tests passing | Deployed: sapphire-alpha-00151-2xr
+- ✅ PR #21: AgentGate Enforcement (12 critical operation gates, /permissions command)
+- ✅ PR #22: Forum Injection Hardening + Fuzz Tests (18 adversarial tests, forum content blocking)
+- ✅ 259 tests passing | Deployed: sapphire-alpha-00153-xvp
