@@ -2919,6 +2919,52 @@ class AlphaEngine:
             await self._dispatch_full_autonomy_cycle(trigger="manual_telegram", force=True)
             return
 
+        if normalized_action == "OWNER_CHAT":
+            message = str(target or "").strip()
+            if not message:
+                return
+
+            # Build concise system context for the AI
+            strategy_state = self.strategy.execution_state()
+            ctrl = self._control_snapshot()
+            context_lines = [
+                f"Execution stage: {strategy_state.get('dex_execution_stage', 'paper')}",
+                f"Stage multiplier: {strategy_state.get('stage_multiplier', 0)}",
+                f"Kill switch: {'ACTIVE' if ctrl.get('kill_switch_active') else 'inactive'}",
+                f"Preferred symbols: {', '.join(strategy_state.get('preferred_symbols', [])[:5])}",
+            ]
+            for venue, info in ctrl.get("venues", {}).items():
+                status = "PAUSED" if info.get("paused") else "LIVE"
+                context_lines.append(
+                    f"Venue {venue}: {status}, allocation {info.get('allocation', 1.0)*100:.0f}%"
+                )
+            system_context = "\n".join(context_lines)
+
+            # Pick the right agent to respond
+            agent = self.telegram._route_agent(message)
+
+            # Ask Gemini for a conversational response
+            reply = await self.ai.chat_with_owner(message, system_context=system_context)
+            if reply:
+                await self.telegram.send_as(agent, reply)
+            else:
+                # Gemini unavailable — fall back to steering
+                self._owner_directive = message[:500]
+                self._owner_directive_updated_at = int(time.time())
+                await self.telegram.send_as(
+                    agent, "Noted — I'll factor that into our next cycle."
+                )
+
+            # Also save as steering directive if it looks like an instruction
+            lowered = message.lower()
+            if any(kw in lowered for kw in (
+                "focus", "prioritize", "try", "make sure", "please", "want",
+                "should", "need", "let's", "stop", "start", "switch",
+            )):
+                self._owner_directive = message[:500]
+                self._owner_directive_updated_at = int(time.time())
+            return
+
         if normalized_action in {"OWNER_STEER", "STEER"}:
             directive = str(target or "").strip()
             if not directive:

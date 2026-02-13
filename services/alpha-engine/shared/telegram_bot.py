@@ -1755,13 +1755,10 @@ class TelegramPlatformBot:
             )
             return
 
-        # ── Freeform steering directive ───────────────────────────
+        # ── Freeform conversation / steering ──────────────────────
         if directive:
             if len(directive) > 500:
                 directive = directive[:500]
             agent = self._route_agent(directive)
-            await self.send_as(
-                agent,
-                "Noted — I'll factor that into our next cycle.",
-            )
-            await self._dispatch_callback("CONTROL", directive, "OWNER_STEER", 0.0)
+            # Route through AI chat so agents can respond conversationally.
+            await self._dispatch_callback("CONTROL", directive, "OWNER_CHAT", 0.0)
