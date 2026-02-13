@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from shared.error_classifier import ErrorCategory, ErrorSeverity, classify_error
 from health import start_health_server
 from smart_notifications import notification_manager
+from telegram_bot import SAPPHIRE, OBSIDIAN, EMERALD
 
 # Install uvloop as the default event loop policy
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
@@ -47,7 +48,7 @@ class AlphaEngine:
         self._dex_stage_updated_at = int(time.time())
 
         # Telegram Bot for Notifications & Commands
-        from telegram_bot import TelegramPlatformBot, SAPPHIRE, OBSIDIAN, EMERALD
+        from telegram_bot import TelegramPlatformBot
 
         token = os.getenv("TELEGRAM_BOT_TOKEN")
         chat_id = os.getenv("TELEGRAM_CHAT_ID")
