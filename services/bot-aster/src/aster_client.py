@@ -305,6 +305,10 @@ class AsterClient:
                 if not self._credentials.api_secret:
                     raise ValueError("API secret is not configured")
 
+                # Aster can reject requests under transient clock drift;
+                # widen recvWindow and regenerate timestamp/signature per retry.
+                params.setdefault("recvWindow", 10000)
+
                 # RE-SIGN REQUEST FOR EACH ATTEMPT (Timestamp freshness)
                 params["timestamp"] = int(time.time() * 1000)
                 sorted_params = sorted(params.items())
@@ -385,6 +389,10 @@ class AsterClient:
                     error_data = exc.response.json()
                     error_code = error_data.get("code")
                     error_msg = error_data.get("msg", content)
+
+                    if error_code == -1021 and attempt < retries:
+                        await asyncio.sleep(0.5 * (attempt + 1))
+                        continue
 
                     if error_code in ASTER_ERROR_CODES:
                         error_name, error_class = ASTER_ERROR_CODES[error_code]

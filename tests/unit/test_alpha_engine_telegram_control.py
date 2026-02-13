@@ -61,8 +61,7 @@ def test_approve_command_dispatches_session_payload(telegram_module):
     assert payload["note"] == "ship it"
 
     ack_text = bot.send_message.await_args.args[0]
-    assert "Session decision queued" in ack_text
-    assert "Expected outcome:" in ack_text
+    assert "Approved" in ack_text or "Obsidian" in ack_text
 
 
 def test_reject_command_dispatches_session_payload(telegram_module):
@@ -314,6 +313,37 @@ def test_scout_publish_command_dispatches_payload(telegram_module):
     assert "sanitized summary" in payload["body"]
 
 
+def test_scout_publish_comment_command_dispatches_post_id_payload(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {
+                "message": {
+                    "chat": {"id": "12345"},
+                    "text": "/scout publish topic:TOPIC-00003 post:abc123 Push follow-up comment",
+                }
+            }
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert action == "SCOUT_PUBLISH"
+    assert quantity == 0.0
+    payload = json.loads(symbol)
+    assert payload["topic_id"] == "TOPIC-00003"
+    assert payload["post_id"] == "abc123"
+    assert payload["body"] == "Push follow-up comment"
+
+
 def test_qty_command_dispatches_default_quantity_update(telegram_module):
     callback = AsyncMock()
     bot = telegram_module.TelegramPlatformBot(
@@ -365,8 +395,115 @@ def test_answer_alias_still_routes_to_owner_steer(telegram_module):
     assert "prioritize reliability" in symbol
 
     ack_text = bot.send_message.await_args.args[0]
-    assert "Heartbeat response captured and queued" in ack_text
-    assert "Expected outcome:" in ack_text
+    assert "reply" in ack_text.lower() or "cycle" in ack_text.lower()
+
+
+def test_plain_text_status_routes_to_control_status(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "status please"}}
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert symbol == "ALL"
+    assert action == "CONTROL_STATUS"
+    assert quantity == 0.0
+
+    ack_text = bot.send_message.await_args.args[0]
+    assert "sapphire" in ack_text.lower() or "status" in ack_text.lower()
+
+
+def test_plain_text_manual_trade_routes_to_venue(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "aster buy 0.6 btc"}}
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "ASTER"
+    assert symbol == "BTC"
+    assert action == "BUY"
+    assert quantity == 0.6
+
+
+def test_plain_text_scout_comment_routes_with_post_id(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {
+                "message": {
+                    "chat": {"id": "12345"},
+                    "text": "scout publish topic:TOPIC-00003 post:abc123 publish this as a comment",
+                }
+            }
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert action == "SCOUT_PUBLISH"
+    assert quantity == 0.0
+    payload = json.loads(symbol)
+    assert payload["topic_id"] == "TOPIC-00003"
+    assert payload["post_id"] == "abc123"
+    assert payload["body"] == "publish this as a comment"
+
+
+def test_plain_text_fallback_routes_to_owner_steer(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {
+                "message": {
+                    "chat": {"id": "12345"},
+                    "text": "let the agents prioritize reliability over speed this week",
+                }
+            }
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert action == "OWNER_STEER"
+    assert quantity == 0.0
+    assert "prioritize reliability" in symbol
 
 
 def test_security_status_command_dispatches_action(telegram_module):

@@ -11,6 +11,7 @@ import asyncio
 import json
 import os
 import re
+import time
 from collections import OrderedDict
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set
@@ -26,8 +27,38 @@ class NotificationPriority(Enum):
     CRITICAL = "critical"
 
 
+class AgentPersona:
+    """Represents an OpenClaw agent's conversational identity."""
+
+    def __init__(self, name: str, emoji: str, role: str):
+        self.name = name
+        self.emoji = emoji
+        self.role = role
+
+    def speak(self, message: str) -> str:
+        """Format a message as this agent speaking."""
+        return f"{self.emoji} **{self.name}**: {message}"
+
+    def __repr__(self) -> str:
+        return f"AgentPersona({self.name})"
+
+
+# The three OpenClaw agents
+SAPPHIRE = AgentPersona("Sapphire", "💎", "trading & scout ops")
+OBSIDIAN = AgentPersona("Obsidian", "🖤", "infrastructure & deployments")
+EMERALD = AgentPersona("Emerald", "💚", "strategy & improvement")
+
+
 class TelegramPlatformBot:
-    """Telegram bot with command parsing and notification batching."""
+    """Telegram bot with conversational plain-text interaction.
+
+    Messages from the system are attributed to one of three agent personas
+    (SAPPHIRE 💎, OBSIDIAN 🖤, EMERALD 💚) so the chat feels like a
+    conversation between the owner and their autonomous employees.
+    The owner can respond in plain text — "yes", "looks good", "hold off",
+    "approve that", etc. — and the bot routes intent correctly.
+    Slash commands still work for power-users but are not required.
+    """
 
     CONTROL_ACTION_MAP = {
         "kill": "HALT_TRADING",
@@ -48,6 +79,38 @@ class TelegramPlatformBot:
         "LT": "LIGHTER",
     }
 
+    # ── Conversational intent patterns ──────────────────────────────
+    # Affirmative: owner approves, agrees, or greenlights something
+    _AFFIRM_PATTERNS = re.compile(
+        r"^("
+        r"y(es|eah|ep|up)?|sure|ok(ay)?|go\s*(ahead|for\s*it)?|approved?|"
+        r"do\s*it|ship\s*it|lgtm|looks?\s*good|sounds?\s*good|fine|"
+        r"green\s*light|confirmed?|absolutely|affirmative|proceed|"
+        r"that\s*works?|perfect|love\s*it|let'?s\s*(go|do\s*(it|that))|"
+        r"makes?\s*sense|agreed?|roger|100|bet|send\s*it|"
+        r"thumbs?\s*up|all\s*good|nice|great|cool"
+        r")[\s!.]*$",
+        re.IGNORECASE,
+    )
+    # Negative: owner rejects, declines, or wants to hold off
+    _REJECT_PATTERNS = re.compile(
+        r"^("
+        r"n(o|ah|ope)?|reject(ed)?|decline[d]?|deny|denied|"
+        r"hold\s*(off|on)|wait|stop|don'?t|cancel|skip|pass|"
+        r"not?\s*(now|yet|that|this)|negative|nah|nay|hard\s*pass|"
+        r"back\s*off|stand\s*down|abort|scratch\s*that|never\s*mind"
+        r")[\s!.]*$",
+        re.IGNORECASE,
+    )
+    # Questioning: owner wants more info
+    _QUESTION_PATTERNS = re.compile(
+        r"^("
+        r"(what|how|why|when|where|which|who|can\s+you|could\s+you|"
+        r"tell\s+me|explain|show\s+me|what'?s|how'?s).*\??"
+        r")$",
+        re.IGNORECASE,
+    )
+
     def __init__(
         self,
         bot_token: str,
@@ -64,11 +127,50 @@ class TelegramPlatformBot:
         self._flush_task: Optional[asyncio.Task[Any]] = None
         self._session: Optional[aiohttp.ClientSession] = None
 
+        # ── Conversation context ──────────────────────────────────────
+        # Tracks which agent last sent a message that expects a reply
+        # so bare "yes"/"no" responses can be routed correctly.
+        self._pending_agent_context: Optional[Dict[str, Any]] = None
+        # Timestamp of last pending context to auto-expire stale ones.
+        self._pending_context_ts: float = 0.0
+        # Max age of pending context before it expires (5 minutes).
+        self._pending_context_ttl: float = 300.0
+
         # Restrict command targets to explicit venues for focused operations.
         self.allowed_targets = self._parse_allowed_targets(
             os.getenv("TELEGRAM_ALLOWED_TARGETS", "ASTER,LIGHTER,ALL")
         )
         self.allowed_trade_targets = {target for target in self.allowed_targets if target != "ALL"}
+        self._noise_suppression_enabled = os.getenv(
+            "TELEGRAM_NOISE_SUPPRESSION_ENABLED",
+            "true",
+        ).strip().lower() in {"1", "true", "yes", "on"}
+        self._buffer_non_urgent_high = os.getenv(
+            "TELEGRAM_BUFFER_NON_URGENT_HIGH",
+            "true",
+        ).strip().lower() in {"1", "true", "yes", "on"}
+        self._generic_suppress_seconds = max(
+            15,
+            int(os.getenv("TELEGRAM_GENERIC_SUPPRESS_SECONDS", "120")),
+        )
+        self._heartbeat_suppress_seconds = max(
+            120,
+            int(os.getenv("TELEGRAM_HEARTBEAT_SUPPRESS_SECONDS", "720")),
+        )
+        self._workspace_suppress_seconds = max(
+            60,
+            int(os.getenv("TELEGRAM_WORKSPACE_SUPPRESS_SECONDS", "600")),
+        )
+        self._flash_suppress_seconds = max(
+            300,
+            int(os.getenv("TELEGRAM_FLASH_SUPPRESS_SECONDS", "1800")),
+        )
+        self._last_signature_sent_at: Dict[str, float] = {}
+        self._last_signature_suppressed: Dict[str, int] = {}
+        self._signature_cache_max = max(
+            100,
+            int(os.getenv("TELEGRAM_SIGNATURE_CACHE_MAX", "800")),
+        )
 
         logger.info(
             "Initializing Telegram Bot | token={} chat={} allowed_targets={}",
@@ -106,6 +208,67 @@ class TelegramPlatformBot:
             if candidate.value == as_text:
                 return candidate
         return NotificationPriority.MEDIUM
+
+    @staticmethod
+    def _is_urgent_message(message: str) -> bool:
+        text = str(message or "").strip()
+        lowered = text.lower()
+        if text.startswith(("🚨", "🚨🚨", "🛑", "❌")):
+            return True
+        urgent_markers = (
+            " kill switch",
+            " dispatch failed",
+            " handler_failed",
+            " forbidden",
+            " not ready",
+            " blocked",
+            " failed",
+            " exception",
+            " error",
+        )
+        return any(marker in lowered for marker in urgent_markers)
+
+    def _signature_window_seconds(self, signature: str) -> int:
+        key = str(signature or "").strip().lower()
+        if key == "gemini_flash":
+            return self._flash_suppress_seconds
+        if key == "heartbeat":
+            return self._heartbeat_suppress_seconds
+        if key.startswith("workspace:"):
+            return self._workspace_suppress_seconds
+        return self._generic_suppress_seconds
+
+    def _should_suppress(self, text: str, level: NotificationPriority) -> bool:
+        if not self._noise_suppression_enabled:
+            return False
+        if level == NotificationPriority.CRITICAL:
+            return False
+
+        cleaned = self._clean_digest_text(text)
+        summarized = self._summarize_digest_text(cleaned)
+        signature = self._digest_signature(summarized)
+        if not signature:
+            return False
+
+        now = time.time()
+        window = float(self._signature_window_seconds(signature))
+        last_sent_at = float(self._last_signature_sent_at.get(signature, 0.0))
+        if last_sent_at and now - last_sent_at < window:
+            self._last_signature_suppressed[signature] = int(
+                self._last_signature_suppressed.get(signature, 0)
+            ) + 1
+            return True
+
+        self._last_signature_sent_at[signature] = now
+        self._last_signature_suppressed.pop(signature, None)
+        if len(self._last_signature_sent_at) > self._signature_cache_max:
+            oldest = sorted(self._last_signature_sent_at.items(), key=lambda item: float(item[1]))[
+                : len(self._last_signature_sent_at) - self._signature_cache_max
+            ]
+            for old_key, _ in oldest:
+                self._last_signature_sent_at.pop(old_key, None)
+                self._last_signature_suppressed.pop(old_key, None)
+        return False
 
     @staticmethod
     def _parse_media_publish_arg(media_arg: str) -> Dict[str, Any]:
@@ -404,7 +567,15 @@ class TelegramPlatformBot:
         }[level]
         full_message = f"{prefix} {text}"
 
-        if level in {NotificationPriority.LOW, NotificationPriority.MEDIUM}:
+        if self._should_suppress(full_message, level):
+            return
+
+        non_urgent_high = (
+            level == NotificationPriority.HIGH
+            and self._buffer_non_urgent_high
+            and not self._is_urgent_message(full_message)
+        )
+        if level in {NotificationPriority.LOW, NotificationPriority.MEDIUM} or non_urgent_high:
             self.message_buffer.append(full_message)
             if len(self.message_buffer) >= 10:
                 await self._flush_buffer()
@@ -519,43 +690,23 @@ class TelegramPlatformBot:
     def _help_text(self) -> str:
         targets = ", ".join(sorted(self.allowed_trade_targets))
         return (
-            "💎 **SAPPHIRE TELEGRAM CONTROL**\n"
-            f"Focused venues: `{targets}`\n\n"
-            "Control commands:\n"
-            "- `/status`\n"
-            "- `/heartbeat`\n"
-            "- `/focus`\n"
-            "- `/promotion`\n"
-            "- `/autonomy`\n"
-            "- `/kill`\n"
-            "- `/resume`\n"
-            "- `/approve <session_key> [note]`\n"
-            "- `/approve_all [note]`\n"
-            "- `/reject <session_key> [reason]`\n"
-            "- `/trade on [qty]` / `/trade off` (TradingView signal mode)\n"
-            "- `/qty <amount>` (TradingView signal qty)\n"
-            "- `/stage <paper|staged_live|full_live>`\n"
-            "- `/scout status`\n"
-            "- `/scout register <username> [display_name]`\n"
-            "- `/scout publish <note>`\n"
-            "- `/security status`\n"
-            "- `/security scan [skill|all] [no-upload|upload]` (default: no-upload)\n"
-            "- `/media status`\n"
-            "- `/media queue`\n"
-            "- `/media mode <draft_only|owner_approval|auto_post>`\n"
-            "- `/media draft <topic>`\n"
-            "- `/media publish [topic:<name>] [targets:<x|substack|both>]`\n"
-            "- `/media approve [request_id|latest] [note]`\n"
-            "- `/media reject [request_id|latest] [reason]`\n"
-            "- `/deallocate <venue>`\n"
-            "- `/allocate <venue> <percent>`\n\n"
-            "Owner steering:\n"
-            "- `/steer <directive>`\n"
-            "- `/answer <response>` (heartbeat reply)\n"
-            "- `@alpha steer <directive>`\n\n"
-            "Manual trade override:\n"
-            "- `@aster buy 1.0 BTC`\n"
-            "- `@lighter sell 0.5 ETH`\n"
+            "💎 **SAPPHIRE COMMAND DECK**\n"
+            f"Active venues: `{targets}`\n\n"
+            "**Just talk to us in plain text.** Your three agents are:\n"
+            "💎 **Sapphire** — trading ops, scout, execution\n"
+            "🖤 **Obsidian** — infra, deployments, autonomy\n"
+            "💚 **Emerald** — strategy, optimization, improvement\n\n"
+            "**Examples — just type normally:**\n"
+            "• `status` — get a status update\n"
+            "• `yes` / `no` / `looks good` — respond to pending requests\n"
+            "• `approve all` — greenlight all pending sessions\n"
+            "• `kill` / `resume` — emergency stop or restart trading\n"
+            "• `scout publish <message>` — post to Moltbook\n"
+            "• `trade on 0.03` — enable live trading\n"
+            "• `focus on reducing drawdown` — steer strategy direction\n"
+            "• `lighter buy 0.5 ETH` — manual trade override\n\n"
+            "Slash commands still work (`/status`, `/kill`, etc.) but aren't required.\n"
+            "When an agent asks you something, just reply — we'll figure out the rest."
         )
 
     async def _dispatch_callback(self, platform: str, symbol: str, action: str, quantity: float) -> bool:
@@ -569,6 +720,365 @@ class TelegramPlatformBot:
             logger.error(f"Telegram command callback error: {exc}")
             await self.send_message(f"❌ Command dispatch failed: {exc}", priority=NotificationPriority.HIGH)
             return False
+
+    @staticmethod
+    def _strip_control_mention(text: str) -> str:
+        value = str(text or "").strip()
+        return re.sub(r"^@(alpha|control)\s+", "", value, flags=re.IGNORECASE).strip()
+
+    # ── Conversation context management ────────────────────────────
+    def _set_pending_context(
+        self,
+        agent: "AgentPersona",
+        action: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Record that an agent just asked the owner something."""
+        self._pending_agent_context = {
+            "agent": agent,
+            "action": action,
+            "metadata": metadata or {},
+        }
+        self._pending_context_ts = time.time()
+
+    def _consume_pending_context(self) -> Optional[Dict[str, Any]]:
+        """Return and clear the pending context if it hasn't expired."""
+        if not self._pending_agent_context:
+            return None
+        age = time.time() - self._pending_context_ts
+        if age > self._pending_context_ttl:
+            self._pending_agent_context = None
+            return None
+        ctx = self._pending_agent_context
+        self._pending_agent_context = None
+        return ctx
+
+    def _classify_intent(self, text: str) -> str:
+        """Classify a short plain-text message as affirm/reject/question/other."""
+        cleaned = text.strip()
+        if self._AFFIRM_PATTERNS.match(cleaned):
+            return "affirm"
+        if self._REJECT_PATTERNS.match(cleaned):
+            return "reject"
+        if self._QUESTION_PATTERNS.match(cleaned):
+            return "question"
+        return "other"
+
+    def _route_agent(self, text: str) -> "AgentPersona":
+        """Pick which agent should respond based on message content."""
+        lowered = text.lower()
+        # Explicit agent addressing
+        if re.search(r"\b(obsidian|infra|deploy|cloud|server|docker|gcloud)\b", lowered):
+            return OBSIDIAN
+        if re.search(r"\b(emerald|strategy|improve|optimize|perf|review|masterplan)\b", lowered):
+            return EMERALD
+        # Scout, trade, and default go to Sapphire
+        return SAPPHIRE
+
+    async def send_as(
+        self,
+        agent: "AgentPersona",
+        message: str,
+        priority: str = "high",
+        expects_reply: bool = False,
+        pending_action: str = "",
+        pending_metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Send a message attributed to a specific agent persona."""
+        await self.send_message(
+            agent.speak(message),
+            priority=priority,
+        )
+        if expects_reply and pending_action:
+            self._set_pending_context(agent, pending_action, pending_metadata)
+
+    def _parse_plain_text_command(self, text: str) -> Optional[Dict[str, Any]]:
+        raw = self._strip_control_mention(text)
+        normalized = raw.lower().strip()
+        if not normalized:
+            return None
+        if normalized.startswith("/"):
+            return None
+
+        if re.search(r"\b(scout\s+status)\b", normalized):
+            return {
+                "platform": "CONTROL",
+                "symbol": "ALL",
+                "action": "SCOUT_STATUS",
+                "quantity": 0.0,
+                "agent": SAPPHIRE,
+                "ack": "Checking on our scout — one sec.",
+            }
+
+        scout_register = re.search(
+            r"\bscout\s+register\s+([A-Za-z0-9_-]{3,32})(?:\s+(.+))?$",
+            raw,
+            flags=re.IGNORECASE,
+        )
+        if scout_register:
+            payload = json.dumps(
+                {
+                    "username": str(scout_register.group(1) or "").strip(),
+                    "display_name": str(scout_register.group(2) or "").strip() or "Sapphire Scout",
+                    "bio": "Least-privilege scout for public collaboration. No secrets, no trading actions.",
+                },
+                separators=(",", ":"),
+            )
+            return {
+                "platform": "CONTROL",
+                "symbol": payload,
+                "action": "SCOUT_REGISTER",
+                "quantity": 0.0,
+                "agent": SAPPHIRE,
+                "ack": "Registering our scout identity now.",
+            }
+
+        scout_publish = re.search(
+            r"\bscout\s+publish\s+(.+)$",
+            raw,
+            flags=re.IGNORECASE,
+        )
+        if scout_publish:
+            publish_note = str(scout_publish.group(1) or "").strip()
+            topic_id = ""
+            post_id = ""
+
+            topic_match = re.search(r"\btopic(?:=|:)\s*(TOPIC-[0-9]{5})\b", publish_note, flags=re.IGNORECASE)
+            if topic_match:
+                topic_id = str(topic_match.group(1) or "").strip().upper()
+                publish_note = re.sub(
+                    r"\btopic(?:=|:)\s*TOPIC-[0-9]{5}\b",
+                    " ",
+                    publish_note,
+                    flags=re.IGNORECASE,
+                )
+
+            post_match = re.search(
+                r"\bpost(?:=|:)\s*([A-Za-z0-9_\-]{3,80})\b",
+                publish_note,
+                flags=re.IGNORECASE,
+            )
+            if post_match:
+                post_id = str(post_match.group(1) or "").strip()
+                publish_note = re.sub(
+                    r"\bpost(?:=|:)\s*[A-Za-z0-9_\-]{3,80}\b",
+                    " ",
+                    publish_note,
+                    flags=re.IGNORECASE,
+                )
+
+            publish_note = re.sub(r"\s+", " ", publish_note).strip()
+            payload = json.dumps(
+                {
+                    "topic_id": topic_id,
+                    "post_id": post_id,
+                    "body": publish_note,
+                    "author": "SAPPHIRE_SCOUT",
+                    "kind": "note",
+                    "lane": "external",
+                    "tags": ["scout", "external"],
+                },
+                separators=(",", ":"),
+            )
+            return {
+                "platform": "CONTROL",
+                "symbol": payload,
+                "action": "SCOUT_PUBLISH",
+                "quantity": 0.0,
+                "agent": SAPPHIRE,
+                "ack": (
+                    f"On it — {'replying to post `' + post_id + '`' if post_id else 'publishing to Moltbook now'}."
+                ),
+            }
+
+        if re.search(r"\b(what'?s\s+status|status)\b", normalized):
+            return {
+                "platform": "CONTROL",
+                "symbol": "ALL",
+                "action": "CONTROL_STATUS",
+                "quantity": 0.0,
+                "agent": SAPPHIRE,
+                "ack": "Pulling up the current status for you.",
+            }
+        if "heartbeat" in normalized or normalized == "ping":
+            return {
+                "platform": "CONTROL",
+                "symbol": "ALL",
+                "action": "HEARTBEAT",
+                "quantity": 0.0,
+                "agent": SAPPHIRE,
+                "ack": "Running a heartbeat check now.",
+            }
+        if "focus" in normalized:
+            return {
+                "platform": "CONTROL",
+                "symbol": "ALL",
+                "action": "CONTROL_FOCUS",
+                "quantity": 0.0,
+                "agent": EMERALD,
+                "ack": "Here's where we're focused right now.",
+            }
+        if "autonomy" in normalized:
+            return {
+                "platform": "CONTROL",
+                "symbol": "ALL",
+                "action": "AUTONOMY_CYCLE",
+                "quantity": 0.0,
+                "agent": OBSIDIAN,
+                "ack": "Kicking off an autonomy cycle now.",
+            }
+        if re.search(r"\b(kill|halt)\b", normalized):
+            return {
+                "platform": "CONTROL",
+                "symbol": "ALL",
+                "action": "HALT_TRADING",
+                "quantity": 0.0,
+                "agent": SAPPHIRE,
+                "ack": "🛑 Hitting the kill switch — all trading halted immediately.",
+            }
+        if "resume" in normalized:
+            return {
+                "platform": "CONTROL",
+                "symbol": "ALL",
+                "action": "RESUME_TRADING",
+                "quantity": 0.0,
+                "agent": SAPPHIRE,
+                "ack": "Resuming trading operations now.",
+            }
+        if "approve all" in normalized or "approve backlog" in normalized:
+            note = re.sub(r"^.*approve(?:\s+all|\s+backlog)\s*", "", raw, flags=re.IGNORECASE).strip()
+            payload = json.dumps({"note": note}, separators=(",", ":"))
+            return {
+                "platform": "CONTROL",
+                "symbol": payload,
+                "action": "APPROVE_ALL_SESSIONS",
+                "quantity": 0.0,
+                "agent": OBSIDIAN,
+                "ack": "Got it — approving all pending sessions now.",
+            }
+
+        approve_match = re.search(
+            r"\bapprove\s+([A-Za-z0-9:._-]+|latest)(?:\s+(.+))?$",
+            raw,
+            flags=re.IGNORECASE,
+        )
+        if approve_match:
+            payload = json.dumps(
+                {
+                    "session_key": str(approve_match.group(1) or "").strip(),
+                    "note": str(approve_match.group(2) or "").strip(),
+                },
+                separators=(",", ":"),
+            )
+            return {
+                "platform": "CONTROL",
+                "symbol": payload,
+                "action": "APPROVE_SESSION",
+                "quantity": 0.0,
+                "agent": OBSIDIAN,
+                "ack": "Approved — dispatching that session now.",
+            }
+
+        reject_match = re.search(
+            r"\breject\s+([A-Za-z0-9:._-]+|latest)(?:\s+(.+))?$",
+            raw,
+            flags=re.IGNORECASE,
+        )
+        if reject_match:
+            payload = json.dumps(
+                {
+                    "session_key": str(reject_match.group(1) or "").strip(),
+                    "note": str(reject_match.group(2) or "").strip(),
+                },
+                separators=(",", ":"),
+            )
+            return {
+                "platform": "CONTROL",
+                "symbol": payload,
+                "action": "REJECT_SESSION",
+                "quantity": 0.0,
+                "agent": OBSIDIAN,
+                "ack": "Understood — rejecting that session.",
+            }
+
+        trade_mode_match = re.search(
+            r"\b(?:trade|tradingview|tv)\s+(on|off)(?:\s+([0-9]*\.?[0-9]+))?",
+            normalized,
+        )
+        if trade_mode_match:
+            mode = str(trade_mode_match.group(1) or "").strip().upper()
+            qty_text = str(trade_mode_match.group(2) or "").strip()
+            qty = float(qty_text) if qty_text else 0.0
+            return {
+                "platform": "CONTROL",
+                "symbol": mode,
+                "action": "SET_TRADING_EXECUTION",
+                "quantity": qty,
+                "agent": SAPPHIRE,
+                "ack": f"Switching TradingView to `{'LIVE' if mode == 'ON' else 'DRY-RUN'}` mode.",
+            }
+
+        stage_match = re.search(
+            r"\b(?:stage|promotion)\s+(paper|staged_live|staged|full_live|full|live)\b",
+            normalized,
+        )
+        if stage_match:
+            return {
+                "platform": "CONTROL",
+                "symbol": str(stage_match.group(1) or "").strip(),
+                "action": "SET_EXECUTION_STAGE",
+                "quantity": 0.0,
+                "agent": SAPPHIRE,
+                "ack": f"Moving execution stage to `{str(stage_match.group(1) or '').strip()}`.",
+            }
+
+        allocate_match = re.search(
+            r"\ballocate\s+(all|aster|lighter|light)\s+([0-9]{1,3}(?:\.[0-9]+)?)\b",
+            normalized,
+        )
+        if allocate_match:
+            target = self._normalize_target(str(allocate_match.group(1) or "").strip())
+            percent = float(str(allocate_match.group(2) or "100").strip())
+            return {
+                "platform": "CONTROL",
+                "symbol": target,
+                "action": "SET_ALLOCATION",
+                "quantity": max(0.0, min(1.0, percent / 100.0)),
+                "agent": SAPPHIRE,
+                "ack": f"Setting `{target}` allocation to `{percent:.0f}%`.",
+            }
+
+        deallocate_match = re.search(r"\b(deallocate|pause)\s+(all|aster|lighter|light)\b", normalized)
+        if deallocate_match:
+            target = self._normalize_target(str(deallocate_match.group(2) or "").strip())
+            return {
+                "platform": "CONTROL",
+                "symbol": target,
+                "action": "SET_ALLOCATION",
+                "quantity": 0.0,
+                "agent": SAPPHIRE,
+                "ack": f"Pausing `{target}` — allocation set to 0%.",
+            }
+
+        manual_trade = re.search(
+            r"\b(aster|lighter|all)\s+(buy|sell|close)\s+([0-9]*\.?[0-9]+)\s+([A-Za-z0-9:_-]+)\b",
+            normalized,
+        )
+        if manual_trade:
+            platform = self._normalize_target(str(manual_trade.group(1) or "").strip())
+            action = str(manual_trade.group(2) or "").strip().upper()
+            qty = float(str(manual_trade.group(3) or "0").strip())
+            symbol = str(manual_trade.group(4) or "").strip().upper()
+            return {
+                "platform": platform,
+                "symbol": symbol,
+                "action": action,
+                "quantity": qty,
+                "agent": SAPPHIRE,
+                "ack": f"⚡ Executing: `{action}` `{qty}` `{symbol}` on `{platform}`.",
+            }
+
+        return None
 
     async def _process_update(self, update: Dict[str, Any]):
         message = update.get("message", {}) or update.get("edited_message", {})
@@ -600,14 +1110,7 @@ class TelegramPlatformBot:
             flags=re.IGNORECASE,
         )
         if slash_scout_status or mention_scout_status:
-            await self.send_message(
-                (
-                    "🛰️ Scout status request queued.\n"
-                    "Expected outcome: return current scout registration, bridge mode, and fallback readiness.\n"
-                    "Benefit: faster triage if external collaboration is blocked."
-                ),
-                priority=NotificationPriority.HIGH,
-            )
+            await self.send_as(SAPPHIRE, "Checking scout status — one sec.")
             await self._dispatch_callback("CONTROL", "ALL", "SCOUT_STATUS", 0.0)
             return
 
@@ -637,14 +1140,7 @@ class TelegramPlatformBot:
                 },
                 separators=(",", ":"),
             )
-            await self.send_message(
-                (
-                    f"🛰️ Scout register request queued for `@{username}`.\n"
-                    "Expected outcome: scout identity is created/updated with least-privilege defaults.\n"
-                    "Next update: registration result will include verification or retry guidance."
-                ),
-                priority=NotificationPriority.HIGH,
-            )
+            await self.send_as(SAPPHIRE, f"Registering scout as `@{username}` — stand by.")
             await self._dispatch_callback("CONTROL", payload, "SCOUT_REGISTER", 0.0)
             return
 
@@ -665,15 +1161,33 @@ class TelegramPlatformBot:
                 else str(mention_scout_publish.group(2) or "").strip()
             )
             topic_id = ""
+            post_id = ""
             body = raw_note
-            topic_match = re.search(
-                r"^topic(?:=|:)\s*(TOPIC-[0-9]{5})\s+(.+)$",
-                raw_note,
-                flags=re.IGNORECASE,
-            )
+            topic_match = re.search(r"\btopic(?:=|:)\s*(TOPIC-[0-9]{5})\b", raw_note, flags=re.IGNORECASE)
             if topic_match:
                 topic_id = str(topic_match.group(1) or "").strip().upper()
-                body = str(topic_match.group(2) or "").strip()
+                body = re.sub(
+                    r"\btopic(?:=|:)\s*TOPIC-[0-9]{5}\b",
+                    " ",
+                    body,
+                    flags=re.IGNORECASE,
+                )
+
+            post_match = re.search(
+                r"\bpost(?:=|:)\s*([A-Za-z0-9_\-]{3,80})\b",
+                body,
+                flags=re.IGNORECASE,
+            )
+            if post_match:
+                post_id = str(post_match.group(1) or "").strip()
+                body = re.sub(
+                    r"\bpost(?:=|:)\s*[A-Za-z0-9_\-]{3,80}\b",
+                    " ",
+                    body,
+                    flags=re.IGNORECASE,
+                )
+
+            body = re.sub(r"\s+", " ", body).strip()
 
             if not body:
                 await self.send_message(
@@ -685,6 +1199,7 @@ class TelegramPlatformBot:
             payload = json.dumps(
                 {
                     "topic_id": topic_id,
+                    "post_id": post_id,
                     "body": body,
                     "author": "SAPPHIRE_SCOUT",
                     "kind": "note",
@@ -693,14 +1208,8 @@ class TelegramPlatformBot:
                 },
                 separators=(",", ":"),
             )
-            await self.send_message(
-                (
-                    "🛰️ Scout publish request queued.\n"
-                    "Expected outcome: sanitized note is posted externally or retained locally with explicit reason.\n"
-                    "Benefit: keeps external collaboration auditable without exposing sensitive data."
-                ),
-                priority=NotificationPriority.HIGH,
-            )
+            target_note = f" → replying to `{post_id}`" if post_id else ""
+            await self.send_as(SAPPHIRE, f"Publishing scout note{target_note}.")
             await self._dispatch_callback("CONTROL", payload, "SCOUT_PUBLISH", 0.0)
             return
 
@@ -726,14 +1235,7 @@ class TelegramPlatformBot:
                 upload_token = str(mention_security_cmd.group(4) or "").strip().lower()
 
             if command == "status":
-                await self.send_message(
-                    (
-                        "🛡️ VirusTotal security status request queued.\n"
-                        "Expected outcome: return scanner availability, policy mode, and latest scan result.\n"
-                        "Benefit: confirms skill-ingestion risk posture before autonomous updates."
-                    ),
-                    priority=NotificationPriority.HIGH,
-                )
+                await self.send_as(OBSIDIAN, "Pulling VirusTotal security status.")
                 await self._dispatch_callback("CONTROL", "ALL", "SECURITY_STATUS", 0.0)
                 return
 
@@ -745,15 +1247,8 @@ class TelegramPlatformBot:
                 },
                 separators=(",", ":"),
             )
-            await self.send_message(
-                (
-                    "🛡️ VirusTotal scan request queued.\n"
-                    f"Scope: `{skill or 'all'}` | upload-on-miss: `{'YES' if upload_if_missing else 'NO'}`\n"
-                    "Expected outcome: skill verdict(s) with policy decision and report linkage.\n"
-                    "Benefit: blocks risky skill bundles before they impact autonomy."
-                ),
-                priority=NotificationPriority.HIGH,
-            )
+            upload_label = " (will upload if missing)" if upload_if_missing else ""
+            await self.send_as(OBSIDIAN, f"Scanning `{skill or 'all'}` with VirusTotal{upload_label}.")
             await self._dispatch_callback("CONTROL", payload, "SECURITY_SCAN", 0.0)
             return
 
@@ -777,26 +1272,12 @@ class TelegramPlatformBot:
                 media_arg = str(mention_media_cmd.group(3) or "").strip()
 
             if media_command == "status":
-                await self.send_message(
-                    (
-                        "📰 Sapphire media status request queued.\n"
-                        "Expected outcome: return posting mode, credential readiness, and recent draft/publish state.\n"
-                        "Benefit: keeps communication automation aligned with current runtime controls."
-                    ),
-                    priority=NotificationPriority.HIGH,
-                )
+                await self.send_as(EMERALD, "Checking media pipeline status.")
                 await self._dispatch_callback("CONTROL", "ALL", "MEDIA_STATUS", 0.0)
                 return
 
             if media_command == "queue":
-                await self.send_message(
-                    (
-                        "📰 Sapphire media queue status request queued.\n"
-                        "Expected outcome: return pending approvals, queued publishes, and recent publish outcomes.\n"
-                        "Benefit: makes outbound communications workflow auditable in real time."
-                    ),
-                    priority=NotificationPriority.HIGH,
-                )
+                await self.send_as(EMERALD, "Pulling up the media queue.")
                 await self._dispatch_callback("CONTROL", "ALL", "MEDIA_QUEUE_STATUS", 0.0)
                 return
 
@@ -809,14 +1290,7 @@ class TelegramPlatformBot:
                     return
 
                 payload = json.dumps({"mode": media_arg}, separators=(",", ":"))
-                await self.send_message(
-                    (
-                        f"📰 Sapphire media mode update queued: `{media_arg}`.\n"
-                        "Expected outcome: publication workflow switches policy immediately.\n"
-                        "Benefit: controls automation speed vs owner oversight."
-                    ),
-                    priority=NotificationPriority.HIGH,
-                )
+                await self.send_as(EMERALD, f"Switching media mode to `{media_arg}`.")
                 await self._dispatch_callback("CONTROL", payload, "MEDIA_SET_MODE", 0.0)
                 return
 
@@ -825,15 +1299,7 @@ class TelegramPlatformBot:
                 payload = json.dumps(payload_data, separators=(",", ":"))
                 targets = ", ".join(payload_data.get("targets", [])) or "twitter, substack"
                 topic = str(payload_data.get("topic", "")).strip() or "latest draft"
-                await self.send_message(
-                    (
-                        "📰 Sapphire media publish request queued.\n"
-                        f"Topic source: `{topic}` | targets: `{targets}`\n"
-                        "Expected outcome: draft is queued for owner approval or auto-post based on media mode.\n"
-                        "Benefit: creates consistent outward narrative with explicit governance."
-                    ),
-                    priority=NotificationPriority.HIGH,
-                )
+                await self.send_as(EMERALD, f"Publishing `{topic}` → `{targets}`.")
                 await self._dispatch_callback("CONTROL", payload, "MEDIA_PUBLISH", 0.0)
                 return
 
@@ -842,28 +1308,19 @@ class TelegramPlatformBot:
                 payload = json.dumps(parsed, separators=(",", ":"))
                 request_id = parsed.get("request_id", "latest") or "latest"
                 decision = "approve" if media_command == "approve" else "reject"
-                await self.send_message(
-                    (
-                        f"📰 Sapphire media {decision} request queued for `{request_id}`.\n"
-                        "Expected outcome: selected publish request is promoted to queue or removed.\n"
-                        "Benefit: keeps communication control tight without manual dashboard ops."
-                    ),
-                    priority=NotificationPriority.HIGH,
+                ack = (
+                    f"Approved media request `{request_id}` — queuing for publish."
+                    if decision == "approve"
+                    else f"Rejected media request `{request_id}`."
                 )
+                await self.send_as(EMERALD, ack)
                 action = "MEDIA_APPROVE" if media_command == "approve" else "MEDIA_REJECT"
                 await self._dispatch_callback("CONTROL", payload, action, 0.0)
                 return
 
             topic = media_arg or "weekly research update"
             payload = json.dumps({"topic": topic}, separators=(",", ":"))
-            await self.send_message(
-                (
-                    f"📰 Sapphire media draft request queued for topic: `{topic}`.\n"
-                    "Expected outcome: generate structured draft content for X/Substack review or auto-publish path.\n"
-                    "Benefit: turns ops telemetry into consistent outbound narrative."
-                ),
-                priority=NotificationPriority.HIGH,
-            )
+            await self.send_as(EMERALD, f"Drafting content on `{topic}`.")
             await self._dispatch_callback("CONTROL", payload, "MEDIA_DRAFT", 0.0)
             return
 
@@ -887,23 +1344,11 @@ class TelegramPlatformBot:
                 directive = str(mention_steer_match.group(3) or "").strip()
             if len(directive) > 500:
                 directive = directive[:500]
-            response_ack = (
-                (
-                    "💓 Heartbeat response captured and queued.\n"
-                    "Expected outcome: next autonomy cycle uses your response as steering context.\n"
-                    "Benefit: strategy stays aligned with your latest direction."
-                )
-                if intent in {"answer", "reply", "respond"}
-                else (
-                    "🧠 Owner directive captured and queued.\n"
-                    "Expected outcome: directive appears in focus snapshots and autonomy dispatch context.\n"
-                    "Benefit: reduces drift between system behavior and owner intent."
-                )
-            )
-            await self.send_message(
-                response_ack,
-                priority=NotificationPriority.HIGH,
-            )
+            agent = self._route_agent(directive)
+            if intent in {"answer", "reply", "respond"}:
+                await self.send_as(agent, f"Got your reply — feeding it into our next cycle.")
+            else:
+                await self.send_as(agent, "Noted — updating our direction accordingly.")
             await self._dispatch_callback("CONTROL", directive, "OWNER_STEER", 0.0)
             return
 
@@ -926,14 +1371,7 @@ class TelegramPlatformBot:
             if len(note) > 400:
                 note = note[:400]
             payload = json.dumps({"note": note}, separators=(",", ":"))
-            await self.send_message(
-                (
-                    "✅ Bulk approval request queued.\n"
-                    "Expected outcome: all pending autonomy sessions move to APPROVE and dispatch.\n"
-                    "Next update: you will receive a summary with approved count and failures (if any)."
-                ),
-                priority=NotificationPriority.HIGH,
-            )
+            await self.send_as(OBSIDIAN, "Approving all pending sessions now.")
             await self._dispatch_callback("CONTROL", payload, "APPROVE_ALL_SESSIONS", 0.0)
             return
 
@@ -967,14 +1405,12 @@ class TelegramPlatformBot:
             decision_action = "APPROVE_SESSION" if raw_action == "approve" else "REJECT_SESSION"
             decision_label = "APPROVE" if raw_action == "approve" else "REJECT"
 
-            await self.send_message(
-                (
-                    f"🗳️ Session decision queued: `{decision_label}` `{session_key or 'latest'}`.\n"
-                    "Expected outcome: session decision is recorded and dispatched to OpenClaw.\n"
-                    "Next update: dispatch confirmation includes session key and status."
-                ),
-                priority=NotificationPriority.HIGH,
+            ack = (
+                f"Approved `{session_key or 'latest'}` — dispatching now."
+                if raw_action == "approve"
+                else f"Rejected `{session_key or 'latest'}`."
             )
+            await self.send_as(OBSIDIAN, ack)
             await self._dispatch_callback("CONTROL", decision_payload, decision_action, 0.0)
             return
 
@@ -1009,15 +1445,9 @@ class TelegramPlatformBot:
                     return
 
             enabled = mode_text == "ON"
-            await self.send_message(
-                (
-                    f"🧭 TradingView signal mode change queued: `{'LIVE' if enabled else 'WORKBENCH_DRY-RUN'}`"
-                    + (f" | qty `{qty_value}`" if qty_value > 0 else "")
-                    + "\nExpected outcome: execution mode is updated with guardrails applied."
-                    + "\nBenefit: clear separation between live dispatch and research-only signal flow."
-                ),
-                priority=NotificationPriority.HIGH,
-            )
+            mode_label = "LIVE" if enabled else "DRY-RUN"
+            qty_note = f" at qty `{qty_value}`" if qty_value > 0 else ""
+            await self.send_as(SAPPHIRE, f"Switching TradingView to `{mode_label}`{qty_note}.")
             await self._dispatch_callback("CONTROL", mode_text, "SET_TRADING_EXECUTION", qty_value)
             return
 
@@ -1038,14 +1468,7 @@ class TelegramPlatformBot:
                 if slash_stage_match
                 else str(mention_stage_match.group(3) or "").strip()
             )
-            await self.send_message(
-                (
-                    f"🚀 DEX stage update queued: `{requested_stage}`.\n"
-                    "Expected outcome: stage gates and effective quantity are recalculated immediately.\n"
-                    "Benefit: controlled progression from paper to staged/live execution."
-                ),
-                priority=NotificationPriority.HIGH,
-            )
+            await self.send_as(SAPPHIRE, f"Moving execution stage to `{requested_stage}`.")
             await self._dispatch_callback("CONTROL", requested_stage, "SET_EXECUTION_STAGE", 0.0)
             return
 
@@ -1077,14 +1500,7 @@ class TelegramPlatformBot:
                 )
                 return
 
-            await self.send_message(
-                (
-                    f"🧭 Default TradingView quantity update queued: `{qty_value}`.\n"
-                    "Expected outcome: default signal quantity is updated with venue/rule caps enforced.\n"
-                    "Benefit: lowers risk of under-notional failures or oversizing."
-                ),
-                priority=NotificationPriority.HIGH,
-            )
+            await self.send_as(SAPPHIRE, f"Setting default trade quantity to `{qty_value}`.")
             await self._dispatch_callback("CONTROL", "ALL", "SET_TRADINGVIEW_DEFAULT_QUANTITY", qty_value)
             return
 
@@ -1115,13 +1531,35 @@ class TelegramPlatformBot:
                 )
                 return
 
-            await self.send_message(
-                (
-                    f"🧭 Control command queued: `{raw_action.upper()}` target `{target}`.\n"
-                    "Expected outcome: control action executes against the active Sapphire runtime state.\n"
-                    "Next update: command result is posted with status or remediation."
-                ),
-                priority=NotificationPriority.HIGH,
+            # Route to the right agent persona
+            _control_agent_map = {
+                "HALT_TRADING": SAPPHIRE,
+                "RESUME_TRADING": SAPPHIRE,
+                "CONTROL_STATUS": SAPPHIRE,
+                "HEARTBEAT": SAPPHIRE,
+                "PROMOTION_GATE": EMERALD,
+                "CONTROL_FOCUS": EMERALD,
+                "AUTONOMY_CYCLE": OBSIDIAN,
+                "SECURITY_STATUS": OBSIDIAN,
+                "MEDIA_STATUS": SAPPHIRE,
+            }
+            agent = _control_agent_map.get(mapped_action, SAPPHIRE)
+            _control_ack_map = {
+                "HALT_TRADING": "🛑 Trading halted immediately.",
+                "RESUME_TRADING": "Resuming trading operations.",
+                "CONTROL_STATUS": "Pulling up status now.",
+                "HEARTBEAT": "Running heartbeat check.",
+                "PROMOTION_GATE": "Checking promotion gate status.",
+                "CONTROL_FOCUS": "Here's our current focus.",
+                "AUTONOMY_CYCLE": "Kicking off an autonomy cycle.",
+                "SECURITY_STATUS": "Running security check.",
+                "MEDIA_STATUS": "Checking media pipeline status.",
+            }
+            ack = _control_ack_map.get(mapped_action, f"Running `{raw_action}`.")
+            if target != "ALL":
+                ack += f" (target: `{target}`)"
+            await self.send_as(
+                agent, ack,
             )
             await self._dispatch_callback("CONTROL", target, mapped_action, 0.0)
             return
@@ -1161,14 +1599,12 @@ class TelegramPlatformBot:
                     return
                 allocation = max(0.0, min(1.0, pct / 100.0))
 
-            await self.send_message(
-                (
-                    f"🧭 Allocation command queued: `{raw_action.upper()}` `{target}` -> `{allocation*100:.0f}%`.\n"
-                    "Expected outcome: venue allocation state updates immediately.\n"
-                    "Benefit: preserves execution continuity while rebalancing venue exposure."
-                ),
-                priority=NotificationPriority.HIGH,
+            ack = (
+                f"Setting `{target}` allocation to `{allocation*100:.0f}%`."
+                if raw_action == "allocate"
+                else f"Pausing `{target}` — allocation set to 0%."
             )
+            await self.send_as(SAPPHIRE, ack)
             await self._dispatch_callback("CONTROL", target, "SET_ALLOCATION", allocation)
             return
 
@@ -1199,9 +1635,9 @@ class TelegramPlatformBot:
                 )
                 return
 
-            await self.send_message(
-                f"⚡ **MANUAL OVERRIDE**\nVenue(s): `{', '.join(targets)}`\nAction: `{action} {quantity} {symbol}`",
-                priority=NotificationPriority.HIGH,
+            await self.send_as(
+                SAPPHIRE,
+                f"Manual override — `{action} {quantity} {symbol}` on `{', '.join(targets)}`.",
             )
             for target in targets:
                 await self._dispatch_callback(target, symbol, action, quantity)
@@ -1211,22 +1647,81 @@ class TelegramPlatformBot:
         ai_match = re.search(r"@(alpha|control)\s+(recap|analyze|report)", text_lower)
         if ai_match:
             action = ai_match.group(2).upper()
+            ai_ack_map = {
+                "RECAP": "Pulling together a recap now.",
+                "ANALYZE": "Running analysis — give me a moment.",
+                "REPORT": "Generating a report for you.",
+            }
+            await self.send_as(EMERALD, ai_ack_map.get(action, f"On it — running `{action}`."))
             await self._dispatch_callback("alpha", "AI", action, 0.0)
             return
 
-        # Fallback: @alpha <free-text> is treated as steering context.
-        fallback_steer = re.search(r"@(alpha|control)\s+(.+)$", text, flags=re.IGNORECASE)
-        if fallback_steer:
-            directive = fallback_steer.group(2).strip()
-            if directive:
-                if len(directive) > 500:
-                    directive = directive[:500]
-                await self.send_message(
-                    (
-                        "🧠 Owner note captured from @alpha and queued.\n"
-                        "Expected outcome: note is injected into autonomy context for the next cycle.\n"
-                        "Benefit: keeps long-form guidance synchronized with agent decisions."
-                    ),
-                    priority=NotificationPriority.HIGH,
-                )
-                await self._dispatch_callback("CONTROL", directive, "OWNER_STEER", 0.0)
+        # ── Conversational reply handling ──────────────────────────
+        # Short messages like "yes", "no", "looks good", "hold off"
+        # are routed to the agent that last asked a question.
+        directive = self._strip_control_mention(text)
+        intent = self._classify_intent(directive)
+
+        if intent in {"affirm", "reject"} and self._pending_agent_context:
+            ctx = self._consume_pending_context()
+            if ctx:
+                agent = ctx["agent"]
+                action = ctx["action"]
+                metadata = ctx.get("metadata", {})
+                if intent == "affirm":
+                    note = directive if len(directive) > 3 else ""
+                    if action == "APPROVE_SESSION":
+                        payload = json.dumps(
+                            {"session_key": metadata.get("session_key", "latest"), "note": note},
+                            separators=(",", ":"),
+                        )
+                        await self.send_as(agent, "Got it — approved.")
+                        await self._dispatch_callback("CONTROL", payload, "APPROVE_SESSION", 0.0)
+                    elif action == "APPROVE_ALL_SESSIONS":
+                        payload = json.dumps({"note": note}, separators=(",", ":"))
+                        await self.send_as(agent, "Approving all pending sessions.")
+                        await self._dispatch_callback("CONTROL", payload, "APPROVE_ALL_SESSIONS", 0.0)
+                    else:
+                        await self.send_as(agent, f"Confirmed — proceeding with `{action}`.")
+                        await self._dispatch_callback(
+                            "CONTROL",
+                            json.dumps({"note": note}, separators=(",", ":")),
+                            action,
+                            0.0,
+                        )
+                else:
+                    if action in {"APPROVE_SESSION", "APPROVE_ALL_SESSIONS"}:
+                        payload = json.dumps(
+                            {"session_key": metadata.get("session_key", "latest"), "note": directive},
+                            separators=(",", ":"),
+                        )
+                        await self.send_as(agent, "Understood — holding off on that.")
+                        await self._dispatch_callback("CONTROL", payload, "REJECT_SESSION", 0.0)
+                    else:
+                        await self.send_as(agent, "Okay, standing down on that.")
+                return
+
+        # ── Structured plain-text command parsing ─────────────────
+        parsed_plain = self._parse_plain_text_command(text)
+        if parsed_plain:
+            agent = parsed_plain.get("agent", SAPPHIRE)
+            ack = str(parsed_plain.get("ack") or "On it.")
+            await self.send_as(agent, ack)
+            await self._dispatch_callback(
+                str(parsed_plain.get("platform") or "CONTROL"),
+                str(parsed_plain.get("symbol") or "ALL"),
+                str(parsed_plain.get("action") or "OWNER_STEER"),
+                float(parsed_plain.get("quantity") or 0.0),
+            )
+            return
+
+        # ── Freeform steering directive ───────────────────────────
+        if directive:
+            if len(directive) > 500:
+                directive = directive[:500]
+            agent = self._route_agent(directive)
+            await self.send_as(
+                agent,
+                "Noted — I'll factor that into our next cycle.",
+            )
+            await self._dispatch_callback("CONTROL", directive, "OWNER_STEER", 0.0)

@@ -49,6 +49,7 @@ export interface ControlStatusResponse {
     dex_stage_multiplier: number
     dex_effective_quantity: number
     dex_base_quantity: number
+    tradingview_integration_enabled?: boolean
     tradingview_execution_enabled: boolean
     tradingview_default_quantity: number
     autonomy_dispatch_count: number
@@ -288,6 +289,9 @@ export interface ForumScoutStatusResponse {
     }
     registration: {
         registered: boolean
+        registered_runtime?: boolean
+        assumed_registered?: boolean
+        registered_source?: string
         username: string
         display_name: string
         registered_at: number
@@ -297,6 +301,15 @@ export interface ForumScoutStatusResponse {
         register_url_configured: boolean
         post_url_configured: boolean
         api_token_configured: boolean
+        fallback_hook_url_configured?: boolean
+        fallback_hook_token_configured?: boolean
+        fallback_chat_id_configured?: boolean
+        external_ready?: boolean
+        fallback_ready?: boolean
+        dispatch_mode?: string
+        provider?: string
+        provider_state?: string
+        operator_hint?: string
     }
     timestamp: number
 }
@@ -311,8 +324,10 @@ export interface ForumScoutRegisterResponse {
     dispatch: {
         dispatched: boolean
         reason: string
+        mode?: string
         status?: number
         response_excerpt?: string
+        metadata?: Record<string, unknown>
     }
     profile: Record<string, unknown>
     timestamp: number
@@ -327,8 +342,10 @@ export interface ForumScoutPublishResponse {
     dispatch: {
         dispatched: boolean
         reason: string
+        mode?: string
         status?: number
         response_excerpt?: string
+        metadata?: Record<string, unknown>
     }
     timestamp: number
 }

@@ -10,11 +10,12 @@ import logging
 import os
 import signal
 import time
+from decimal import ROUND_DOWN, Decimal
 
 # Add shared library to path
 import sys
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -99,9 +100,13 @@ class AsterBot:
 
             # Test API connection on startup
             try:
-                # Try to fetch server time as a basic connectivity test
-                server_time = await self.client.get_server_time()
-                logger.info(f"✅ Aster API accessible (server time: {server_time})")
+                account_info = await self.client.get_account_info()
+                wallet_balance = (
+                    account_info.get("availableBalance")
+                    or account_info.get("totalWalletBalance")
+                    or "n/a"
+                )
+                logger.info(f"✅ Aster API accessible (wallet balance: {wallet_balance})")
             except Exception as e:
                 error_msg = str(e)
                 logger.error(f"❌ Aster API Error: {error_msg}")
@@ -433,7 +438,7 @@ class AsterBot:
         try:
             signal = TradeSignal(**signal_data)
 
-            if PLATFORM not in signal.target_platforms and signal.target_platforms:
+            if not signal.should_execute_on(PLATFORM.value):
                 return
 
             if not self.config.trading_enabled:
@@ -465,10 +470,8 @@ class AsterBot:
             logger.info("🔍 STARTING DEEP VERIFICATION: ASTER")
 
             # Check Funds
-            # Use get_account_summary or similar
-            info = await self.client.get_account_summary()
-            # info usually has 'availableBalance'
-            balance = info.get("availableBalance", "N/A")
+            info = await self.client.get_account_info()
+            balance = info.get("availableBalance") or info.get("totalWalletBalance") or "N/A"
             logger.info(
                 f"📊 ASTER VERIFICATION_REPORT | BALANCE: {balance} | RAW_INFO_PARTIAL: {str(info)[:100]}..."
             )
@@ -487,6 +490,72 @@ class AsterBot:
         except Exception as e:
             logger.error(f"❌ ASTER VERIFICATION FAILED: {e}")
 
+    @staticmethod
+    def _to_decimal(value: Any, fallback: str = "0") -> Decimal:
+        try:
+            return Decimal(str(value))
+        except Exception:
+            return Decimal(fallback)
+
+    @classmethod
+    def _round_quantity(cls, quantity: float, step_size: Decimal, precision: int | None) -> float:
+        qty = cls._to_decimal(quantity, "0")
+        if step_size > 0:
+            qty = (qty / step_size).to_integral_value(rounding=ROUND_DOWN) * step_size
+        if isinstance(precision, int) and precision >= 0:
+            quant = Decimal("1").scaleb(-precision)
+            qty = qty.quantize(quant, rounding=ROUND_DOWN)
+        if qty < 0:
+            qty = Decimal("0")
+        return float(qty)
+
+    async def _prepare_aster_order(self, symbol: str, requested_quantity: float) -> Tuple[str, float]:
+        """Normalize symbol/quantity and enforce exchange notional constraints before submit."""
+        normalized_symbol = (
+            self.client._normalize_symbol(symbol)
+            if hasattr(self.client, "_normalize_symbol")
+            else str(symbol or "").strip().upper()
+        )
+        filters = await self.client.get_symbol_filters(normalized_symbol)
+        step_size = self._to_decimal(filters.get("step_size"), "1")
+        min_qty = self._to_decimal(filters.get("min_qty"), "0")
+        max_qty = self._to_decimal(filters.get("max_qty"), "0")
+        min_notional = self._to_decimal(filters.get("min_notional"), "0")
+        quantity_precision = filters.get("quantity_precision")
+
+        quantity = self._round_quantity(requested_quantity, step_size, quantity_precision)
+        if min_qty > 0 and Decimal(str(quantity)) < min_qty:
+            quantity = self._round_quantity(float(min_qty), step_size, quantity_precision)
+
+        if min_notional > 0:
+            ticker = await self.client.get_ticker_price(normalized_symbol)
+            mark_price = self._to_decimal((ticker or {}).get("price"), "0")
+            if mark_price <= 0:
+                raise ValueError(
+                    f"Preflight failed for {normalized_symbol}: ticker price unavailable for min-notional check"
+                )
+
+            current_notional = mark_price * self._to_decimal(quantity, "0")
+            if current_notional < min_notional:
+                # Keep a small buffer to avoid edge rejects after rounding.
+                required_qty = (min_notional * Decimal("1.02")) / mark_price
+                quantity = self._round_quantity(float(required_qty), step_size, quantity_precision)
+                if min_qty > 0 and Decimal(str(quantity)) < min_qty:
+                    quantity = self._round_quantity(float(min_qty), step_size, quantity_precision)
+                logger.info(
+                    f"🧮 ASTER preflight quantity raised for min-notional: "
+                    f"{requested_quantity} -> {quantity} ({normalized_symbol})"
+                )
+
+        if max_qty > 0 and Decimal(str(quantity)) > max_qty:
+            raise ValueError(
+                f"Preflight blocked for {normalized_symbol}: quantity {quantity} exceeds max {max_qty}"
+            )
+        if quantity <= 0:
+            raise ValueError(f"Preflight blocked for {normalized_symbol}: non-positive quantity {quantity}")
+
+        return normalized_symbol, quantity
+
     async def _execute_trade(self, signal: TradeSignal) -> TradeResult:
         """Execute trade on Aster with advanced order types."""
         start_time = datetime.now()
@@ -497,11 +566,13 @@ class AsterBot:
 
             # Calculate quantity
             quantity = signal.quantity or self._calculate_position_size(signal)
+            symbol = str(signal.symbol or "").strip().upper() or "SOLUSDT"
+            symbol, quantity = await self._prepare_aster_order(symbol, float(quantity))
 
             # Determine order side
             side = "BUY" if signal.side in (TradeSide.BUY, TradeSide.LONG) else "SELL"
 
-            logger.info(f"⚡ Executing on Aster: {signal.symbol} {side} {quantity}")
+            logger.info(f"⚡ Executing on Aster: {symbol} {side} {quantity}")
 
             start_time = datetime.now()
 
@@ -520,7 +591,7 @@ class AsterBot:
                 from aster_client import OrderType
 
                 order_result = await self.client.place_order(
-                    symbol=signal.symbol, side=side, order_type=OrderType.MARKET, quantity=quantity
+                    symbol=symbol, side=side, order_type=OrderType.MARKET, quantity=quantity
                 )
                 logger.info(f"✅ Aster Order Result: {order_result}")
 
@@ -533,10 +604,10 @@ class AsterBot:
                 avg_price = float(order_result.get("avgPrice", 0))
 
                 # Create position record
-                self.positions[signal.symbol] = Position(
+                self.positions[symbol] = Position(
                     position_id=order_result.get("orderId", ""),
                     platform=PLATFORM,
-                    symbol=signal.symbol,
+                    symbol=symbol,
                     side=signal.side,
                     quantity=filled_qty,
                     entry_price=avg_price,
@@ -546,7 +617,7 @@ class AsterBot:
 
                 # Set up trailing stop if configured
                 if signal.metadata.get("trailing_stop"):
-                    self.trailing_stops[signal.symbol] = {
+                    self.trailing_stops[symbol] = {
                         "trail_percent": signal.metadata.get("trail_percent", 0.02),
                         "stop_price": (
                             avg_price * (1 - 0.02) if side == "BUY" else avg_price * (1 + 0.02)
@@ -555,17 +626,15 @@ class AsterBot:
 
                 # Set TP/SL orders on exchange
                 if signal.stop_loss:
-                    await self._place_stop_loss(signal.symbol, signal.stop_loss, filled_qty, side)
+                    await self._place_stop_loss(symbol, signal.stop_loss, filled_qty, side)
                 if signal.take_profit:
-                    await self._place_take_profit(
-                        signal.symbol, signal.take_profit, filled_qty, side
-                    )
+                    await self._place_take_profit(symbol, signal.take_profit, filled_qty, side)
 
                 return TradeResult(
                     trade_id=order_result.get("orderId", ""),
                     signal_id=signal.signal_id,
                     platform=PLATFORM,
-                    symbol=signal.symbol,
+                    symbol=symbol,
                     side=signal.side,
                     success=True,
                     order_id=order_result.get("orderId"),
@@ -580,7 +649,7 @@ class AsterBot:
                     trade_id="",
                     signal_id=signal.signal_id,
                     platform=PLATFORM,
-                    symbol=signal.symbol,
+                    symbol=symbol,
                     side=signal.side,
                     success=False,
                     error_message=order_result.get("msg", "Order failed"),
@@ -595,7 +664,7 @@ class AsterBot:
                 trade_id="",
                 signal_id=signal.signal_id,
                 platform=PLATFORM,
-                symbol=signal.symbol,
+                symbol=str(signal.symbol or "").strip().upper() or "SOLUSDT",
                 side=signal.side,
                 success=False,
                 error_message=str(e),

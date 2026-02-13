@@ -40,6 +40,10 @@ class SapphireForumService:
     _GOOGLE_KEY_RE = re.compile(r"AIza[0-9A-Za-z\-_]{20,}")
     _MOLTBOOK_KEY_RE = re.compile(r"\bmoltbook_[A-Za-z0-9\-_]{8,}\b", flags=re.IGNORECASE)
     _JWT_RE = re.compile(r"\beyJ[a-zA-Z0-9_\-]{8,}\.[a-zA-Z0-9_\-]{8,}\.[a-zA-Z0-9_\-]{8,}\b")
+    _MOLTBOOK_NUMERIC_CHALLENGE_RE = re.compile(
+        r"(-?\d+(?:\.\d+)?)\s*(\+|-|\*|x|×|/|÷)\s*(-?\d+(?:\.\d+)?)",
+        flags=re.IGNORECASE,
+    )
 
     def __init__(self):
         self._lock = threading.RLock()
@@ -608,11 +612,17 @@ class SapphireForumService:
                                 verification_obj = parsed.get("verification", {})
                                 if verification_obj:
                                     metadata["verification_required"] = True
+                                    metadata["verification_code"] = (
+                                        str(verification_obj.get("code", "")).strip()[:80]
+                                    )
+                                    metadata["verification_challenge"] = (
+                                        str(verification_obj.get("challenge", "")).strip()[:220]
+                                    )
                                     metadata["verification_code_present"] = bool(
-                                        str(verification_obj.get("code", "")).strip()
+                                        metadata.get("verification_code", "")
                                     )
                                     metadata["verification_challenge_present"] = bool(
-                                        str(verification_obj.get("challenge", "")).strip()
+                                        metadata.get("verification_challenge", "")
                                     )
                             if isinstance(parsed.get("post"), dict):
                                 post_obj = parsed.get("post", {})
@@ -626,8 +636,56 @@ class SapphireForumService:
                         api_error_lower = str(metadata.get("api_error", "")).lower()
                         if ok and metadata.get("verification_required"):
                             reason = "ok_pending_verification"
+                            auto_verify_enabled = (
+                                str(os.getenv("SAPPHIRE_SCOUT_AUTO_VERIFY_ENABLED", "true")).strip().lower()
+                                in {"1", "true", "yes", "on"}
+                            )
+                            metadata["verification_auto_enabled"] = auto_verify_enabled
+                            if is_moltbook_api and auto_verify_enabled:
+                                verification_code = str(metadata.get("verification_code", "")).strip()
+                                verification_challenge = str(metadata.get("verification_challenge", "")).strip()
+                                if verification_code and verification_challenge:
+                                    verify_url = (
+                                        str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_VERIFY_URL", "")).strip()
+                                        or self._derive_moltbook_verify_url(url)
+                                    )
+                                    verify_result = await self._verify_moltbook_challenge(
+                                        verify_url=verify_url,
+                                        verification_code=verification_code,
+                                        challenge=verification_challenge,
+                                        token=token,
+                                        timeout_seconds=timeout_value,
+                                    )
+                                    metadata["verification_attempted"] = True
+                                    metadata["verification_reason"] = str(
+                                        verify_result.get("reason", "unknown")
+                                    ).strip()[:80]
+                                    if verify_result.get("answer"):
+                                        metadata["verification_answer"] = str(
+                                            verify_result.get("answer", "")
+                                        ).strip()[:40]
+                                    if isinstance(verify_result.get("status"), int):
+                                        metadata["verification_http_status"] = int(verify_result.get("status", 0))
+                                    if verify_result.get("response_excerpt"):
+                                        metadata["verification_response_excerpt"] = str(
+                                            verify_result.get("response_excerpt", "")
+                                        ).strip()[:240]
+                                    if verify_result.get("verified"):
+                                        reason = "ok_verified"
+                                        metadata["verification_status"] = "verified"
+                                    else:
+                                        metadata["verification_status"] = "pending"
+                                else:
+                                    metadata["verification_attempted"] = False
+                                    metadata["verification_reason"] = "challenge_missing"
+                                    metadata["verification_status"] = "pending"
                         elif not ok and is_moltbook_api and api_error_lower:
-                            if "only post once every" in api_error_lower:
+                            if (
+                                int(response.status) == 429
+                                or "only post once every" in api_error_lower
+                                or "slow down" in api_error_lower
+                                or "comment again in" in api_error_lower
+                            ):
                                 reason = "moltbook_rate_limited"
                             elif "pending_claim" in api_error_lower or "pending claim" in api_error_lower:
                                 reason = "moltbook_pending_claim"
@@ -675,6 +733,390 @@ class SapphireForumService:
             return False
         host = parsed.netloc.lower().split(":", 1)[0]
         return host in {"www.moltbook.com", "moltbook.com"} and parsed.path.startswith("/api/v1")
+
+    @staticmethod
+    def _derive_moltbook_verify_url(url: str) -> str:
+        parsed = urlparse(str(url or "").strip())
+        if not parsed.scheme or not parsed.netloc:
+            return ""
+        return f"{parsed.scheme}://{parsed.netloc}/api/v1/verify"
+
+    @staticmethod
+    def _compute_challenge_result(left: float, operator: str, right: float) -> Optional[float]:
+        op = str(operator or "").strip().lower()
+        if op in {"x", "×"}:
+            op = "*"
+        if op in {"÷"}:
+            op = "/"
+        if op == "+":
+            return left + right
+        if op == "-":
+            return left - right
+        if op == "*":
+            return left * right
+        if op == "/":
+            if right == 0:
+                return None
+            return left / right
+        return None
+
+    _ALL_NUMBER_WORDS = {
+        "zero", "one", "two", "three", "four", "five", "six", "seven",
+        "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen",
+        "fifteen", "sixteen", "seventeen", "eighteen", "nineteen",
+        "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty",
+        "ninety", "hundred", "thousand", "point", "and",
+    }
+    _ALL_OPERATOR_WORDS = {
+        "plus", "minus", "times", "add", "subtract", "over", "divide",
+        "divided", "multiplied", "another", "nother", "x",
+    }
+    _ALL_KNOWN_WORDS = _ALL_NUMBER_WORDS | _ALL_OPERATOR_WORDS
+
+    @staticmethod
+    def _normalize_word_token(token: str) -> str:
+        value = str(token or "").strip().lower()
+        if not value:
+            return ""
+        value = re.sub(r"(.)\1+", r"\1", value)
+        return value
+
+    @classmethod
+    def _normalize_word_token_safe(cls, token: str) -> str:
+        """Normalize an obfuscated word token while preserving naturally valid words."""
+        value = str(token or "").strip().lower()
+        if not value:
+            return ""
+        # If the token is already a known word, keep it as-is
+        if value in cls._ALL_KNOWN_WORDS:
+            return value
+        # Otherwise, collapse repeated chars to handle obfuscation (e.g. "eiigghht" -> "eight")
+        deduped = re.sub(r"(.)\1+", r"\1", value)
+        if deduped in cls._ALL_KNOWN_WORDS:
+            return deduped
+        return value
+
+    @classmethod
+    def _words_to_number(cls, tokens: List[str]) -> Optional[float]:
+        units = {
+            "zero": 0,
+            "one": 1,
+            "two": 2,
+            "three": 3,
+            "four": 4,
+            "five": 5,
+            "six": 6,
+            "seven": 7,
+            "eight": 8,
+            "nine": 9,
+            "ten": 10,
+            "eleven": 11,
+            "twelve": 12,
+            "thirteen": 13,
+            "fourteen": 14,
+            "fifteen": 15,
+            "sixteen": 16,
+            "seventeen": 17,
+            "eighteen": 18,
+            "nineteen": 19,
+        }
+        tens = {
+            "twenty": 20,
+            "thirty": 30,
+            "forty": 40,
+            "fifty": 50,
+            "sixty": 60,
+            "seventy": 70,
+            "eighty": 80,
+            "ninety": 90,
+        }
+        scales = {"hundred": 100, "thousand": 1000}
+        clean = [
+            cls._normalize_word_token_safe(str(token or "").strip().lower())
+            for token in tokens
+            if str(token or "").strip()
+        ]
+        if not clean:
+            return None
+
+        total = 0
+        current = 0
+        decimal_mode = False
+        decimal_digits = ""
+        consumed = False
+        for token in clean:
+            if token == "and":
+                continue
+            if token == "point":
+                decimal_mode = True
+                continue
+            if decimal_mode:
+                if token.isdigit():
+                    decimal_digits += token
+                    consumed = True
+                    continue
+                if token in units:
+                    decimal_digits += str(units[token])
+                    consumed = True
+                    continue
+                return None
+
+            if token.isdigit():
+                current += int(token)
+                consumed = True
+            elif token in units:
+                current += units[token]
+                consumed = True
+            elif token in tens:
+                current += tens[token]
+                consumed = True
+            elif token in scales:
+                factor = scales[token]
+                if factor == 100:
+                    current = max(1, current) * factor
+                else:
+                    total += max(1, current) * factor
+                    current = 0
+                consumed = True
+            else:
+                return None
+
+        if not consumed:
+            return None
+
+        value = float(total + current)
+        if decimal_digits:
+            value = float(f"{int(total + current)}.{decimal_digits}")
+        return value
+
+    @classmethod
+    def _solve_moltbook_challenge(cls, challenge: str) -> Optional[str]:
+        raw = str(challenge or "").strip().lower()
+        if not raw:
+            return None
+
+        direct = cls._MOLTBOOK_NUMERIC_CHALLENGE_RE.search(raw)
+        if direct:
+            left = float(direct.group(1))
+            operator = str(direct.group(2))
+            right = float(direct.group(3))
+            result = cls._compute_challenge_result(left, operator, right)
+            if result is None:
+                return None
+            return f"{result:.2f}"
+
+        # Strip noise characters (brackets, carets, tildes, pipes, braces, slashes, angle brackets, etc.)
+        # Keep only alphanumeric, whitespace, basic math operators (+, -, *, ×, ÷), and common punctuation
+        cleaned = re.sub(r"[^\w\s+\-*×÷.,?!:;']", " ", raw)
+        # Normalize hyphens to spaces for compound words like "thirty-two"
+        cleaned = cleaned.replace("-", " ")
+        # Leetspeak substitutions (only between alpha chars to avoid mangling real digits)
+        cleaned = re.sub(r"(?<=[a-z])0(?=[a-z])", "o", cleaned)
+        cleaned = re.sub(r"(?<=[a-z])1(?=[a-z])", "i", cleaned)
+        cleaned = re.sub(r"(?<=[a-z])3(?=[a-z])", "e", cleaned)
+        cleaned = re.sub(r"(?<=[a-z])4(?=[a-z])", "a", cleaned)
+        cleaned = re.sub(r"(?<=[a-z])5(?=[a-z])", "s", cleaned)
+        cleaned = re.sub(r"(?<=[a-z])7(?=[a-z])", "t", cleaned)
+        # Collapse whitespace
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+
+        # Normalize unicode math operators to ASCII
+        cleaned = cleaned.replace("×", " * ").replace("÷", " / ")
+
+        # Operator phrase replacements (before tokenizing)
+        replacements = [
+            ("multiplied by", " * "),
+            ("times", " * "),
+            ("divided by", " / "),
+            ("plus", " + "),
+            ("minus", " - "),
+            ("subtract", " - "),
+            ("over", " / "),
+        ]
+        for source, target in replacements:
+            cleaned = cleaned.replace(source, target)
+
+        raw_tokens = re.findall(r"[a-z]+|\d+(?:\.\d+)?|[+\-*/]", cleaned)
+        # Normalize tokens: try as-is first, only dedup repeated chars as fallback
+        tokens = [cls._normalize_word_token_safe(token) if token.isalpha() else token for token in raw_tokens]
+        if not tokens:
+            return None
+
+        parsed_tokens: List[Any] = []
+        number_words = {
+            "zero",
+            "one",
+            "two",
+            "three",
+            "four",
+            "five",
+            "six",
+            "seven",
+            "eight",
+            "nine",
+            "ten",
+            "eleven",
+            "twelve",
+            "thirteen",
+            "fourteen",
+            "fifteen",
+            "sixteen",
+            "seventeen",
+            "eighteen",
+            "nineteen",
+            "twenty",
+            "thirty",
+            "forty",
+            "fifty",
+            "sixty",
+            "seventy",
+            "eighty",
+            "ninety",
+            "hundred",
+            "thousand",
+            "point",
+            "and",
+        }
+
+        idx = 0
+        while idx < len(tokens):
+            token = tokens[idx]
+            if token in {"x", "times"}:
+                parsed_tokens.append("*")
+                idx += 1
+                continue
+            if token in {"another", "nother"}:
+                # "another N" means "+ N"; skip if previous token is already an operator
+                if not parsed_tokens or isinstance(parsed_tokens[-1], str):
+                    idx += 1
+                    continue
+                parsed_tokens.append("+")
+                idx += 1
+                continue
+            if token in {"plus", "add"}:
+                parsed_tokens.append("+")
+                idx += 1
+                continue
+            if token in {"minus", "subtract"}:
+                parsed_tokens.append("-")
+                idx += 1
+                continue
+            if token in {"over", "divide", "divided"}:
+                parsed_tokens.append("/")
+                idx += 1
+                continue
+            if token in {"+", "-", "*", "/"}:
+                parsed_tokens.append(token)
+                idx += 1
+                continue
+
+            if re.fullmatch(r"-?\d+(?:\.\d+)?", token):
+                parsed_tokens.append(float(token))
+                idx += 1
+                continue
+
+            if token in number_words:
+                end = idx
+                while end < len(tokens) and tokens[end] in number_words:
+                    end += 1
+                number_value = cls._words_to_number(tokens[idx:end])
+                if number_value is not None:
+                    parsed_tokens.append(number_value)
+                    idx = end
+                    continue
+            idx += 1
+
+        for offset in range(0, len(parsed_tokens) - 2):
+            left = parsed_tokens[offset]
+            operator = parsed_tokens[offset + 1]
+            right = parsed_tokens[offset + 2]
+            if isinstance(left, (int, float)) and isinstance(operator, str) and isinstance(right, (int, float)):
+                result = cls._compute_challenge_result(float(left), operator, float(right))
+                if result is not None:
+                    return f"{result:.2f}"
+
+        numeric_terms = [float(item) for item in parsed_tokens if isinstance(item, (int, float))]
+        operators = [item for item in parsed_tokens if isinstance(item, str) and item in {"+", "-", "*", "/"}]
+        if len(numeric_terms) >= 2 and not operators:
+            return f"{sum(numeric_terms):.2f}"
+
+        return None
+
+    async def _verify_moltbook_challenge(
+        self,
+        *,
+        verify_url: str,
+        verification_code: str,
+        challenge: str,
+        token: str = "",
+        timeout_seconds: int = 15,
+    ) -> Dict[str, Any]:
+        url = str(verify_url or "").strip()
+        code = str(verification_code or "").strip()
+        if not url or not code:
+            return {"verified": False, "reason": "verify_url_or_code_missing"}
+
+        answer = self._solve_moltbook_challenge(challenge)
+        if not answer:
+            return {"verified": False, "reason": "challenge_unsolved"}
+
+        headers = {"Content-Type": "application/json"}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        payload = {"verification_code": code, "answer": answer}
+
+        timeout = aiohttp.ClientTimeout(total=max(5, min(int(timeout_seconds or 15), 60)))
+        try:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(url, json=payload, headers=headers) as response:
+                    response_text = await response.text()
+                    safe_excerpt = self._sanitize_text(response_text, max_len=300)["text"]
+
+                    parsed: Dict[str, Any] = {}
+                    try:
+                        maybe = json.loads(response_text)
+                        if isinstance(maybe, dict):
+                            parsed = maybe
+                    except Exception:
+                        parsed = {}
+
+                    api_success = parsed.get("success")
+                    verified = bool(parsed.get("verified"))
+                    if not verified and isinstance(parsed.get("verification"), dict):
+                        verification_obj = parsed.get("verification", {})
+                        verified = (
+                            str(verification_obj.get("status", "")).strip().lower() in {"verified", "complete"}
+                        )
+                    if (
+                        not verified
+                        and 200 <= int(response.status) < 300
+                        and (not isinstance(api_success, bool) or bool(api_success))
+                    ):
+                        verified = True
+
+                    reason = "verified" if verified else "verify_failed"
+                    if not verified and int(response.status) == 429:
+                        reason = "verify_rate_limited"
+                    elif not verified and isinstance(parsed.get("error"), str):
+                        error_text = str(parsed.get("error", "")).lower()
+                        if "rate limit" in error_text:
+                            reason = "verify_rate_limited"
+                        elif "invalid" in error_text or "expired" in error_text:
+                            reason = "verify_rejected"
+
+                    return {
+                        "verified": verified,
+                        "reason": reason,
+                        "status": int(response.status),
+                        "answer": answer,
+                        "response_excerpt": safe_excerpt,
+                    }
+        except Exception as exc:
+            return {
+                "verified": False,
+                "reason": f"verify_request_failed:{exc}",
+                "answer": answer,
+            }
 
     def _openclaw_fallback_config(self) -> Dict[str, str]:
         hook_url = str(
@@ -897,6 +1339,7 @@ class SapphireForumService:
         fallback_ready = bool(
             fallback.get("hook_url") and fallback.get("hook_token") and fallback.get("chat_id")
         )
+        external_ready = bool(external_register_url and external_post_url and external_token_set)
         dispatch_mode = "external_http" if external_register_url or external_post_url else "openclaw_hook"
         if dispatch_mode == "openclaw_hook" and not fallback_ready:
             dispatch_mode = "none"
@@ -908,9 +1351,53 @@ class SapphireForumService:
         )
 
         with self._lock:
+            registration = dict(self._scout_registration)
+            runtime_registered = bool(registration.get("registered"))
+            assumed_registered = bool(
+                not runtime_registered and provider == "moltbook" and external_token_set
+            )
+            effective_registered = bool(runtime_registered or assumed_registered)
+            if assumed_registered:
+                registration["registered"] = True
+                registration["registered_source"] = "api_token"
+                if not str(registration.get("username", "")).strip():
+                    registration["username"] = (
+                        str(os.getenv("SAPPHIRE_SCOUT_USERNAME", "")).strip() or "sapphire_scout"
+                    )
+                if not str(registration.get("display_name", "")).strip():
+                    registration["display_name"] = (
+                        str(os.getenv("SAPPHIRE_SCOUT_DISPLAY_NAME", "")).strip() or "Sapphire Scout"
+                    )
+            else:
+                registration["registered_source"] = "runtime_state"
+            registration["registered_runtime"] = runtime_registered
+            registration["assumed_registered"] = assumed_registered
+
+            if dispatch_mode == "none":
+                provider_state = "bridge_unconfigured"
+                operator_hint = "Configure external bridge URLs or OpenClaw fallback hook settings."
+            elif dispatch_mode == "openclaw_hook":
+                provider_state = "fallback_only_ready" if fallback_ready else "fallback_not_ready"
+                operator_hint = (
+                    "OpenClaw fallback can deliver scout work; wire external Moltbook URLs to publish directly."
+                    if fallback_ready
+                    else "Configure fallback hook URL/token/chat to keep scout collaboration available."
+                )
+            elif provider == "moltbook" and not external_token_set:
+                provider_state = "missing_api_token"
+                operator_hint = "Add SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN so external publish can execute."
+            elif effective_registered:
+                provider_state = "registered_active"
+                operator_hint = (
+                    "Scout bridge is active. Use /scout publish to send sanitized external summaries."
+                )
+            else:
+                provider_state = "registration_required"
+                operator_hint = "Run /scout register <username> to activate least-privilege scout identity."
+
             return {
                 "profile": self._scout_profile(),
-                "registration": dict(self._scout_registration),
+                "registration": registration,
                 "external_bridge": {
                     "register_url_configured": bool(external_register_url),
                     "post_url_configured": bool(external_post_url),
@@ -918,8 +1405,12 @@ class SapphireForumService:
                     "fallback_hook_url_configured": bool(fallback.get("hook_url")),
                     "fallback_hook_token_configured": bool(fallback.get("hook_token")),
                     "fallback_chat_id_configured": bool(fallback.get("chat_id")),
+                    "external_ready": external_ready,
+                    "fallback_ready": fallback_ready,
                     "dispatch_mode": dispatch_mode,
                     "provider": provider,
+                    "provider_state": provider_state,
+                    "operator_hint": operator_hint,
                 },
                 "timestamp": self._now(),
             }
@@ -1056,6 +1547,10 @@ class SapphireForumService:
 
     async def publish_scout_note(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         topic_id = str(payload.get("topic_id", "")).strip()
+        external_post_id = str(
+            payload.get("post_id", payload.get("external_post_id", payload.get("moltbook_post_id", "")))
+        ).strip()
+        external_post_id = re.sub(r"[^A-Za-z0-9_\-]", "", external_post_id)[:80]
         title_safe = self._sanitize_text(payload.get("title", ""), max_len=120)
         body_safe = self._sanitize_text(payload.get("body", ""), max_len=4000)
 
@@ -1114,23 +1609,48 @@ class SapphireForumService:
 
         post_url = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_POST_URL", "")).strip()
         token = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN", "")).strip()
+        dispatch_action = "publish"
+        dispatch_url = post_url
         if self._is_moltbook_api_url(post_url):
-            outbound_payload = {
-                "submolt": (
-                    str(payload.get("submolt", payload.get("community", "general"))).strip().lower()
-                    or "general"
-                ),
-                "title": title_safe["text"] or f"Sapphire Scout Update ({topic_id})",
-                "content": body_safe["text"],
-            }
+            if external_post_id:
+                configured_comment_url = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_COMMENT_URL", "")).strip()
+                if configured_comment_url:
+                    if "{post_id}" in configured_comment_url:
+                        dispatch_url = configured_comment_url.replace("{post_id}", external_post_id)
+                    else:
+                        dispatch_url = configured_comment_url
+                else:
+                    parsed_post_url = urlparse(post_url)
+                    dispatch_url = (
+                        f"{parsed_post_url.scheme}://{parsed_post_url.netloc}"
+                        f"/api/v1/posts/{external_post_id}/comments"
+                    )
+                outbound_payload = {
+                    "content": body_safe["text"],
+                }
+                dispatch_action = "comment"
+            else:
+                outbound_payload = {
+                    "submolt": (
+                        str(payload.get("submolt", payload.get("community", "general"))).strip().lower()
+                        or "general"
+                    ),
+                    "title": title_safe["text"] or f"Sapphire Scout Update ({topic_id})",
+                    "content": body_safe["text"],
+                }
         note = (
             "Publish sanitized external scout note from SapphireBook collaboration thread. "
-            f"Topic: {topic_id}. Author: {outbound_payload.get('author', 'SAPPHIRE_SCOUT')}."
+            f"Topic: {topic_id}. Author: {outbound_payload.get('author', 'SAPPHIRE_SCOUT')}. "
+            + (
+                f"External action: comment on post {external_post_id}."
+                if dispatch_action == "comment"
+                else "External action: create post."
+            )
         )
         dispatch_result = await self._dispatch_scout_bridge(
-            action="publish",
+            action=dispatch_action,
             outbound_payload=outbound_payload,
-            external_url=post_url,
+            external_url=dispatch_url,
             external_token=token,
             note=note,
         )
@@ -1141,6 +1661,8 @@ class SapphireForumService:
             "created_topic_id": created_topic_id,
             "created_reply_id": created_reply_id,
             "redactions": int(title_safe["redactions"] + body_safe["redactions"]),
+            "dispatch_action": dispatch_action,
+            "external_post_id": external_post_id,
             "dispatch": dispatch_result,
             "timestamp": self._now(),
         }

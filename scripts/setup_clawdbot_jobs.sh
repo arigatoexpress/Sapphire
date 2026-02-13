@@ -8,6 +8,31 @@ set -euo pipefail
 PROJECT_ID="${PROJECT_ID:-sapphire-479610}"
 LOCATION="${LOCATION:-us-central1}"
 ALPHA_URL="${ALPHA_URL:-$(gcloud run services describe sapphire-alpha --project "${PROJECT_ID}" --region "${LOCATION}" --format='value(status.url)')}"
+ENABLE_TRADINGVIEW_JOB_WIRING="${ENABLE_TRADINGVIEW_JOB_WIRING:-false}"
+JOB_NAMES=(
+  "sapphire-heartbeat-30m"
+  "obsidian-heartbeat-30m"
+  "emerald-heartbeat-30m"
+  "sapphire-dep-audit-daily"
+  "sapphire-security-scan-weekly"
+)
+
+if [[ "${ENABLE_TRADINGVIEW_JOB_WIRING,,}" != "true" ]]; then
+  echo "TradingView integration is disabled by default. Pausing TradingView webhook scheduler jobs."
+  for job in "${JOB_NAMES[@]}"; do
+    if gcloud scheduler jobs describe "${job}" --project "${PROJECT_ID}" --location "${LOCATION}" >/dev/null 2>&1; then
+      gcloud scheduler jobs pause "${job}" --project "${PROJECT_ID}" --location "${LOCATION}" >/dev/null || true
+      echo "paused ${job}"
+    else
+      echo "missing ${job} (nothing to pause)"
+    fi
+  done
+  echo
+  echo "To re-enable TradingView webhook jobs later, run with:"
+  echo "  ENABLE_TRADINGVIEW_JOB_WIRING=true ./scripts/setup_clawdbot_jobs.sh"
+  exit 0
+fi
+
 WEBHOOK_SECRET="$(
   gcloud secrets versions access latest \
     --secret=TRADINGVIEW_WEBHOOK_SECRET \
@@ -103,27 +128,27 @@ upsert_hook_job() {
 }
 
 upsert_hook_job \
-  "sapphire-heartbeat-30m" \
+  "${JOB_NAMES[0]}" \
   "*/30 * * * *" \
   "${SAPPHIRE_HEARTBEAT_BODY}" \
   "SAPPHIRE (Security & Code Quality) heartbeat for Sapphire-only operations."
 upsert_hook_job \
-  "obsidian-heartbeat-30m" \
+  "${JOB_NAMES[1]}" \
   "5,35 * * * *" \
   "${OBSIDIAN_HEARTBEAT_BODY}" \
   "OBSIDIAN (CI/CD & Deployment Ops) heartbeat for Sapphire-only operations."
 upsert_hook_job \
-  "emerald-heartbeat-30m" \
+  "${JOB_NAMES[2]}" \
   "10,40 * * * *" \
   "${EMERALD_HEARTBEAT_BODY}" \
   "EMERALD (Innovation & Self-Improvement) heartbeat for Sapphire-only operations."
 upsert_hook_job \
-  "sapphire-dep-audit-daily" \
+  "${JOB_NAMES[3]}" \
   "0 14 * * *" \
   "${DEP_AUDIT_BODY}" \
   "Daily Sapphire dependency audit with owner delivery."
 upsert_hook_job \
-  "sapphire-security-scan-weekly" \
+  "${JOB_NAMES[4]}" \
   "0 15 * * 1" \
   "${SECURITY_SWEEP_BODY}" \
   "Weekly Sapphire security sweep with owner delivery."

@@ -68,7 +68,8 @@ DOM_BUNDLE="$(curl -fsS "https://${TARGET_DOMAIN}/assets/${DOM_JS}")"
 
 for marker in \
   "SAPPHIREBOOK FORUM" \
-  "Architecture Pulse" \
+  "Organization Pulse" \
+  "Live Org Flow Map" \
   "Real-Time Event Stream" \
   "${BUILD_ID}"
 do

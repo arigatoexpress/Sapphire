@@ -20,7 +20,7 @@ from src.strategy.engine import AlphaStrategyEngine
 
 # Add shared library to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from error_classifier import ErrorSeverity, classify_error
+from shared.error_classifier import ErrorCategory, ErrorSeverity, classify_error
 from health import start_health_server
 from smart_notifications import notification_manager
 
@@ -76,9 +76,16 @@ class AlphaEngine:
         self._control_api_token = os.getenv("SAPPHIRE_CONTROL_API_TOKEN", "").strip()
         self._telegram_webhook_mode = bool(self._telegram_webhook_url)
         self._tradingview_webhook_secret = os.getenv("TRADINGVIEW_WEBHOOK_SECRET", "").strip()
+        self._tradingview_integration_enabled = self._env_flag(
+            "SAPPHIRE_TRADINGVIEW_INTEGRATION_ENABLED",
+            default=False,
+        )
         self._tradingview_execution_enabled = (
+            self._tradingview_integration_enabled
+            and (
             os.getenv("TRADINGVIEW_EXECUTION_ENABLED", "false").strip().lower()
             in {"1", "true", "yes", "on"}
+            )
         )
         self._tradingview_default_quantity = max(
             0.0, float(os.getenv("TRADINGVIEW_DEFAULT_QUANTITY", "0.0"))
@@ -119,9 +126,14 @@ class AlphaEngine:
         self._tradingview_signal_seen_at: Dict[str, float] = {}
         self._failure_counts: Dict[str, int] = defaultdict(int)
         self._auto_deallocated: Set[str] = set()
+        self._manual_review_venues: Set[str] = set()
+        self._hard_failure_cooldown_seconds = max(
+            self._deallocation_cooldown_seconds,
+            int(os.getenv("SAPPHIRE_HARD_FAILURE_COOLDOWN_SECONDS", "21600")),
+        )
         self._owner_directive = str(os.getenv("SAPPHIRE_OWNER_DIRECTIVE", "")).strip()
         self._owner_directive_updated_at = int(time.time()) if self._owner_directive else 0
-        self._full_autonomy_enabled = self._env_flag("SAPPHIRE_FULL_AUTONOMY_ENABLED", default=False)
+        self._full_autonomy_enabled = self._env_flag("SAPPHIRE_FULL_AUTONOMY_ENABLED", default=True)
         self._autonomy_allow_code_changes = self._env_flag(
             "SAPPHIRE_AUTONOMY_ALLOW_CODE_CHANGES", default=True
         )
@@ -194,6 +206,16 @@ class AlphaEngine:
             "losses": 0.0,
             "realized_pnl": 0.0,
         }
+        self._min_notional_by_venue: Dict[str, float] = {
+            "ASTER": max(0.0, float(os.getenv("SAPPHIRE_MIN_NOTIONAL_ASTER", "5.0"))),
+            "LIGHTER": max(0.0, float(os.getenv("SAPPHIRE_MIN_NOTIONAL_LIGHTER", "10.0"))),
+        }
+        self._min_notional_buffer_pct = max(
+            0.0, float(os.getenv("SAPPHIRE_MIN_NOTIONAL_BUFFER_PCT", "0.05"))
+        )
+        self._min_trade_quantity_floor = max(
+            0.0, float(os.getenv("SAPPHIRE_MIN_TRADE_QUANTITY_FLOOR", "0.0001"))
+        )
 
     @staticmethod
     def _env_flag(name: str, default: bool = False) -> bool:
@@ -237,6 +259,17 @@ class AlphaEngine:
             if value is not None:
                 return value
         return None
+
+    @staticmethod
+    def _hard_failure_reason(error_message: str) -> str:
+        text = str(error_message or "").strip().lower()
+        if not text:
+            return ""
+        if "-5019" in text or "service not available in your region" in text:
+            return "region_not_supported"
+        if "-2015" in text or "invalid api-key" in text or "unauthorized" in text:
+            return "auth_rejected"
+        return ""
 
     def _normalize_platform(self, platform: str) -> str:
         value = str(platform or "").strip().upper()
@@ -795,6 +828,98 @@ class AlphaEngine:
             return self._tradingview_max_quantity_default
         return None
 
+    @staticmethod
+    def _normalize_symbol_base(symbol: str) -> str:
+        value = str(symbol or "").strip().upper()
+        if not value:
+            return value
+        cleaned = value.replace("-", "").replace("_", "")
+        for suffix in ("USDT", "USDC", "USD", "PERP"):
+            if cleaned.endswith(suffix):
+                cleaned = cleaned[: -len(suffix)]
+                break
+        return cleaned or value
+
+    def _resolve_reference_price(self, venue: str, symbol: str) -> float:
+        venue_key = self._normalize_platform(venue)
+        symbol_key = self._normalize_symbol_base(symbol)
+        price = self._as_float(self.market_data.get_price(venue_key, symbol_key))
+        if isinstance(price, float) and price > 0:
+            return price
+        # Fallback to SOL when a symbol tick is unavailable, to keep notional guard operational.
+        fallback = self._as_float(self.market_data.get_price(venue_key, "SOL"))
+        if isinstance(fallback, float) and fallback > 0:
+            return fallback
+        return 0.0
+
+    def _apply_min_notional_guard(self, venue: str, symbol: str, quantity: float) -> Dict[str, Any]:
+        venue_key = self._normalize_platform(venue)
+        base_qty = max(0.0, float(quantity or 0.0))
+        min_notional = float(self._min_notional_by_venue.get(venue_key, 0.0))
+        if base_qty <= 0:
+            return {
+                "blocked": True,
+                "adjusted": False,
+                "quantity": 0.0,
+                "reason": "non_positive_quantity",
+                "venue": venue_key,
+            }
+
+        if min_notional <= 0:
+            return {
+                "blocked": False,
+                "adjusted": False,
+                "quantity": base_qty,
+                "reason": "guard_disabled",
+                "venue": venue_key,
+                "min_notional": min_notional,
+            }
+
+        reference_price = self._resolve_reference_price(venue_key, symbol)
+        if reference_price <= 0:
+            return {
+                "blocked": True,
+                "adjusted": False,
+                "quantity": 0.0,
+                "reason": "reference_price_unavailable",
+                "venue": venue_key,
+                "min_notional": min_notional,
+            }
+
+        target_notional = min_notional * (1.0 + self._min_notional_buffer_pct)
+        required_qty = target_notional / reference_price
+        floor_qty = self._min_trade_quantity_floor if self._min_trade_quantity_floor > 0 else 0.0
+        adjusted_qty = max(base_qty, required_qty, floor_qty)
+
+        cap = self._max_quantity_for_venue(venue_key)
+        if cap is not None and cap > 0 and adjusted_qty > cap:
+            return {
+                "blocked": True,
+                "adjusted": False,
+                "quantity": 0.0,
+                "reason": "required_quantity_exceeds_cap",
+                "venue": venue_key,
+                "min_notional": min_notional,
+                "target_notional": float(round(target_notional, 6)),
+                "required_quantity": float(round(required_qty, 8)),
+                "cap_quantity": float(round(cap, 8)),
+                "reference_price": float(round(reference_price, 8)),
+            }
+
+        rounded_qty = float(round(adjusted_qty, 8))
+        adjusted = rounded_qty > (base_qty + 1e-10)
+        return {
+            "blocked": False,
+            "adjusted": adjusted,
+            "quantity": rounded_qty,
+            "reason": "raised_to_min_notional" if adjusted else "baseline_satisfies_notional",
+            "venue": venue_key,
+            "min_notional": min_notional,
+            "target_notional": float(round(target_notional, 6)),
+            "required_quantity": float(round(required_qty, 8)),
+            "reference_price": float(round(reference_price, 8)),
+        }
+
     def _effective_trade_quantity_cap(self) -> float | None:
         caps: List[float] = []
         for venue in dispatcher.bot_urls.keys():
@@ -1131,6 +1256,7 @@ class AlphaEngine:
             dispatcher.set_venue_allocation(venue, self._default_venue_allocation)
             self._failure_counts[venue] = 0
             self._auto_deallocated.discard(venue)
+            self._manual_review_venues.discard(venue)
 
         await self._publish_risk_alert(
             action="resume_trading",
@@ -1149,11 +1275,13 @@ class AlphaEngine:
     async def _send_control_status(self) -> None:
         snapshot = self._control_snapshot()
         primary_venues = ", ".join(sorted(snapshot["primary_execution_venues"])) or "none"
-        tv_signal_mode = (
-            "LIVE_SIGNAL_EXECUTION"
-            if snapshot["tradingview_signal_mode"] == "live"
-            else "WORKBENCH_DRY_RUN"
-        )
+        tv_signal_mode = "DISABLED"
+        if snapshot.get("tradingview_integration_enabled"):
+            tv_signal_mode = (
+                "LIVE_SIGNAL_EXECUTION"
+                if snapshot["tradingview_signal_mode"] == "live"
+                else "WORKBENCH_DRY_RUN"
+            )
         media_snapshot = snapshot.get("media", {}) if isinstance(snapshot, dict) else {}
         active_count = len([item for item in snapshot["venues"].values() if not item["paused"]])
         pressure = int(snapshot.get("failure_pressure", 0))
@@ -1178,7 +1306,11 @@ class AlphaEngine:
             f"DEX live dispatch: `{'ON' if snapshot['dex_live_dispatch_enabled'] else 'OFF'}`",
             f"DEX effective qty: `{snapshot['dex_effective_quantity']}`",
             f"TradingView signal mode: `{tv_signal_mode}`",
-            f"Signal default quantity: `{snapshot['tradingview_default_quantity']}`",
+            (
+                f"Signal default quantity: `{snapshot['tradingview_default_quantity']}`"
+                if snapshot.get("tradingview_integration_enabled")
+                else "Signal default quantity: `n/a (integration disabled)`"
+            ),
             (
                 "VT skill security: `ON`"
                 if snapshot.get("vt_security_enabled")
@@ -1195,6 +1327,11 @@ class AlphaEngine:
                 f"`{media_snapshot.get('queue', {}).get('pending_count', 0)}` | "
                 f"queued `{media_snapshot.get('queue', {}).get('queued_count', 0)}`"
             ),
+            (
+                "Manual-review holds: `none`"
+                if not snapshot.get("manual_review_venues")
+                else f"Manual-review holds: `{', '.join(snapshot.get('manual_review_venues', []))}`"
+            ),
             f"Autonomy dispatches: `{snapshot['autonomy_dispatch_count']}`",
             f"Pending autonomy decisions: `{snapshot['pending_autonomy_decisions']}`",
             f"Operational read: {status_read}",
@@ -1206,6 +1343,7 @@ class AlphaEngine:
             fail_count = item.get("failure_count", 0)
             lines.append(
                 f"- `{venue}` | {status} | alloc `{item['allocation']*100:.0f}%` | failures `{fail_count}`"
+                + (" | `MANUAL_REVIEW_HOLD`" if item.get("manual_review_required") else "")
             )
 
         await self.telegram.send_message("\n".join(lines), priority="medium")
@@ -1239,6 +1377,7 @@ class AlphaEngine:
                 "paused_until": venue_state.get("paused_until"),
                 "pause_reason": venue_state.get("pause_reason", ""),
                 "failure_count": int(self._failure_counts.get(venue, 0)),
+                "manual_review_required": venue in self._manual_review_venues,
             }
 
         return {
@@ -1252,14 +1391,22 @@ class AlphaEngine:
             "dex_stage_multiplier": float(strategy_state.get("stage_multiplier", 0.0)),
             "dex_effective_quantity": float(strategy_state.get("effective_quantity", 0.0)),
             "dex_base_quantity": float(strategy_state.get("base_quantity", 0.0)),
+            "tradingview_integration_enabled": bool(self._tradingview_integration_enabled),
             "tradingview_execution_enabled": self._tradingview_execution_enabled,
-            "tradingview_signal_mode": "live" if self._tradingview_execution_enabled else "workbench_dry_run",
+            "tradingview_signal_mode": (
+                "disabled"
+                if not self._tradingview_integration_enabled
+                else "live"
+                if self._tradingview_execution_enabled
+                else "workbench_dry_run"
+            ),
             "tradingview_default_quantity": float(self._tradingview_default_quantity),
             "autonomy_dispatch_count": int(self._autonomy_dispatch_count),
             "pending_autonomy_decisions": len(pending_summary),
             "pending_sessions": pending_summary,
             "owner_directive": self._owner_directive or "",
             "failure_pressure": int(sum(self._failure_counts.values())),
+            "manual_review_venues": sorted(list(self._manual_review_venues)),
             "vt_security_enabled": bool(self.vt_scanner.enabled),
             "vt_api_key_configured": bool(self.vt_scanner.api_key),
             "vt_enforcement_mode": self.vt_scanner.enforcement_mode,
@@ -1524,12 +1671,22 @@ class AlphaEngine:
             ),
             f"DEX effective qty: `{strategy_state.get('effective_quantity', 0.0)}`",
             (
-                "TradingView signal mode: `LIVE`"
+                "TradingView signal mode: `DISABLED`"
+                if not self._tradingview_integration_enabled
+                else "TradingView signal mode: `LIVE`"
                 if self._tradingview_execution_enabled
                 else "TradingView signal mode: `WORKBENCH_DRY_RUN`"
             ),
-            f"TradingView autonomy: `{'ON' if self.tv_autonomy.enabled else 'OFF'}`",
-            f"Community scripts: `{'ON' if self.tv_autonomy.community_access_enabled else 'OFF'}`",
+            (
+                f"TradingView autonomy: `{'ON' if self.tv_autonomy.enabled else 'OFF'}`"
+                if self._tradingview_integration_enabled
+                else "TradingView autonomy: `OFF (integration disabled)`"
+            ),
+            (
+                f"Community scripts: `{'ON' if self.tv_autonomy.community_access_enabled else 'OFF'}`"
+                if self._tradingview_integration_enabled
+                else "Community scripts: `OFF (integration disabled)`"
+            ),
             f"VT skill security: `{'ON' if self.vt_scanner.enabled else 'OFF'}` (`{self.vt_scanner.enforcement_mode}`)",
             f"Media mode: `{media_snapshot.get('mode', 'owner_approval')}`",
             (
@@ -1539,7 +1696,7 @@ class AlphaEngine:
             f"Owner directive: `{directive}`",
             f"Directive updated: `{directive_updated}`",
             "",
-            "Use `/steer <directive>` or `/answer <response>` to update direction.",
+            "Use plain text (or `/steer`/`/answer`) to update direction.",
         ]
         await self.telegram.send_message("\n".join(lines), priority="medium")
 
@@ -1585,7 +1742,9 @@ class AlphaEngine:
                 f" | qty `{strategy_state.get('effective_quantity', 0.0)}`"
             ),
             (
-                f"- TradingView mode: `{'LIVE' if self._tradingview_execution_enabled else 'WORKBENCH_DRY-RUN'}`"
+                "- TradingView mode: `DISABLED`"
+                if not self._tradingview_integration_enabled
+                else f"- TradingView mode: `{'LIVE' if self._tradingview_execution_enabled else 'WORKBENCH_DRY-RUN'}`"
                 f" | default qty `{self._tradingview_default_quantity}`"
             ),
             (
@@ -1603,8 +1762,8 @@ class AlphaEngine:
             ),
             "",
             "Quick actions:",
-            "`/status` `/focus` `/autonomy` `/approve_all`",
-            "Use `/help` for full command list.",
+            "`status` `focus` `autonomy` `approve all`",
+            "Plain-text chat is enabled; slash commands remain supported via `/help`.",
         ]
         await self.telegram.send_message("\n".join(lines), priority="medium")
 
@@ -2381,6 +2540,7 @@ class AlphaEngine:
             result = await self._handle_forum_scout_publish_request(
                 {
                     "topic_id": str(payload.get("topic_id", "")).strip(),
+                    "post_id": str(payload.get("post_id", "")).strip(),
                     "title": str(payload.get("title", "")).strip(),
                     "body": body,
                     "author": str(payload.get("author", "")).strip() or "SAPPHIRE_SCOUT",
@@ -2405,13 +2565,19 @@ class AlphaEngine:
             metadata = dispatch.get("metadata", {}) if isinstance(dispatch, dict) else {}
             metadata = metadata if isinstance(metadata, dict) else {}
             reason = str(dispatch.get("reason", "unknown")).strip() or "unknown"
+            dispatch_action = str(result.get("dispatch_action", "publish")).strip() or "publish"
             outcome = "external post accepted."
-            if reason == "ok_pending_verification" or metadata.get("verification_required"):
+            if reason == "ok_verified":
+                outcome = "accepted and verification challenge solved automatically; content should be publicly visible."
+            elif reason == "ok_pending_verification" or metadata.get("verification_required"):
                 outcome = "accepted by Moltbook, pending verification before full feed visibility."
             elif reason == "moltbook_rate_limited":
                 retry_after_minutes = int(metadata.get("retry_after_minutes", 0) or 0)
+                retry_after_seconds = int(metadata.get("retry_after_seconds", 0) or 0)
                 if retry_after_minutes > 0:
                     outcome = f"provider cooldown active; retry in about {retry_after_minutes} minutes."
+                elif retry_after_seconds > 0:
+                    outcome = f"provider cooldown active; retry in about {retry_after_seconds} seconds."
                 else:
                     outcome = "provider cooldown active; retry after the next rate-limit window."
             elif reason == "moltbook_pending_claim":
@@ -2422,7 +2588,7 @@ class AlphaEngine:
                 outcome = "external publish blocked; note remains stored locally for retry."
             await self.telegram.send_message(
                 (
-                    f"🛰️ Scout note processed for topic `{result.get('topic_id', 'n/a')}`.\n"
+                    f"🛰️ Scout {dispatch_action} processed for topic `{result.get('topic_id', 'n/a')}`.\n"
                     f"Dispatch mode: `{dispatch.get('mode', 'none')}` | "
                     f"Dispatch: `{'YES' if dispatch.get('dispatched') else 'NO'}`\n"
                     f"Reason: `{reason}`\n"
@@ -2454,6 +2620,18 @@ class AlphaEngine:
             return
 
         if normalized_action in {"SET_TRADING_EXECUTION", "SET_EXECUTION"}:
+            if not self._tradingview_integration_enabled:
+                self._tradingview_execution_enabled = False
+                await self.telegram.send_message(
+                    (
+                        "ℹ️ TradingView integration is disabled by policy (`SAPPHIRE_TRADINGVIEW_INTEGRATION_ENABLED=false`).\n"
+                        "No TradingView signal mode changes were applied.\n"
+                        "Core runtime focus remains ASTER/LIGHTER execution + autonomy operations."
+                    ),
+                    priority="medium",
+                )
+                return
+
             mode = str(target or "").strip().upper()
             if mode not in {"ON", "OFF", "TRUE", "FALSE", "1", "0"}:
                 await self.telegram.send_message(
@@ -2510,6 +2688,16 @@ class AlphaEngine:
             return
 
         if normalized_action in {"SET_TRADINGVIEW_DEFAULT_QUANTITY", "SET_DEFAULT_QUANTITY"}:
+            if not self._tradingview_integration_enabled:
+                await self.telegram.send_message(
+                    (
+                        "ℹ️ TradingView integration is disabled, so default TradingView quantity is not active.\n"
+                        "To re-enable later, set `SAPPHIRE_TRADINGVIEW_INTEGRATION_ENABLED=true` and redeploy alpha."
+                    ),
+                    priority="medium",
+                )
+                return
+
             result = self._set_tradingview_default_quantity(float(value or 0.0))
             if not result.get("ok"):
                 await self.telegram.send_message(
@@ -2749,6 +2937,7 @@ class AlphaEngine:
                     dispatcher.resume_venue(venue)
                     self._failure_counts[venue] = 0
                     self._auto_deallocated.discard(venue)
+                    self._manual_review_venues.discard(venue)
 
             if allocation <= 0:
                 self._record_system_log(
@@ -2835,6 +3024,14 @@ class AlphaEngine:
 
         normalized_action = action_raw.replace("-", "_")
         normalized_target = self._normalize_platform(venue_raw or "ALL")
+
+        if not self._tradingview_integration_enabled:
+            return {
+                "accepted": "disabled",
+                "reason": "tradingview_integration_disabled",
+                "action": normalized_action or "unknown",
+                "target": normalized_target,
+            }
 
         if self.tv_autonomy.is_workspace_action(normalized_action):
             workspace_result = await self.tv_autonomy.handle_action(normalized_action, merged_payload)
@@ -2992,6 +3189,8 @@ class AlphaEngine:
 
         per_target_quantity: Dict[str, float] = {}
         capped_targets: List[str] = []
+        notional_adjusted_targets: List[str] = []
+        notional_blocked_targets: Dict[str, Dict[str, Any]] = {}
         for venue in targets:
             venue_cap = self._max_quantity_for_venue(venue)
             strategy_cap = strategy_rule.get("max_quantity") if strategy_rule else None
@@ -3001,13 +3200,51 @@ class AlphaEngine:
             if venue_cap is not None and venue_qty > venue_cap:
                 venue_qty = venue_cap
                 capped_targets.append(venue)
-            per_target_quantity[venue] = venue_qty
+            quantity_guard = self._apply_min_notional_guard(venue, symbol, venue_qty)
+            if quantity_guard.get("blocked"):
+                notional_blocked_targets[venue] = quantity_guard
+                continue
+            if quantity_guard.get("adjusted"):
+                notional_adjusted_targets.append(venue)
+            per_target_quantity[venue] = float(quantity_guard.get("quantity", venue_qty))
+
+        executable_targets = [venue for venue in targets if venue not in notional_blocked_targets]
+        if not executable_targets:
+            blocked_fragments = [
+                f"{venue}:{details.get('reason', 'guard_blocked')}"
+                for venue, details in sorted(notional_blocked_targets.items())
+            ]
+            await self.telegram.send_message(
+                (
+                    "⚠️ TradingView alert blocked by min-notional guard on all targets.\n"
+                    f"Targets: `{'; '.join(blocked_fragments)}`"
+                ),
+                priority="high",
+            )
+            return {
+                "accepted": "blocked",
+                "reason": "min_notional_guard",
+                "targets": targets,
+                "blocked_targets": sorted(list(notional_blocked_targets.keys())),
+                "signal_key": signal_key,
+                "strategy": strategy_label or None,
+            }
 
         if not self._tradingview_execution_enabled:
-            qty_parts = [f"{venue}:{per_target_quantity[venue]}" for venue in sorted(targets)]
+            qty_parts = [f"{venue}:{per_target_quantity[venue]}" for venue in sorted(executable_targets)]
             cap_note = (
                 f" Caps applied on `{', '.join(sorted(set(capped_targets)))}`."
                 if capped_targets
+                else ""
+            )
+            adjust_note = (
+                f" Min-notional adjustment applied on `{', '.join(sorted(set(notional_adjusted_targets)))}`."
+                if notional_adjusted_targets
+                else ""
+            )
+            blocked_note = (
+                f" Guard-blocked targets `{', '.join(sorted(notional_blocked_targets.keys()))}`."
+                if notional_blocked_targets
                 else ""
             )
             await self.telegram.send_message(
@@ -3015,20 +3252,24 @@ class AlphaEngine:
                     f"📥 TradingView signal captured (workbench dry-run): `{normalized_action.upper()} {symbol}` "
                     f"with quantities `{', '.join(qty_parts)}`. Set `TRADINGVIEW_EXECUTION_ENABLED=true` to execute."
                     f"{cap_note}"
+                    f"{adjust_note}"
+                    f"{blocked_note}"
                 ),
                 priority="medium",
             )
             return {
                 "accepted": "dry_run",
-                "targets": targets,
+                "targets": executable_targets,
                 "signal_key": signal_key,
                 "quantities": per_target_quantity,
                 "capped_targets": sorted(set(capped_targets)),
+                "adjusted_targets": sorted(set(notional_adjusted_targets)),
+                "blocked_targets": sorted(list(notional_blocked_targets.keys())),
                 "strategy": strategy_label or None,
             }
 
         dispatch_results: Dict[str, bool] = {}
-        for venue in targets:
+        for venue in executable_targets:
             dispatch_results[venue] = await dispatcher.send_command(
                 venue,
                 {
@@ -3042,31 +3283,59 @@ class AlphaEngine:
 
         failed_targets = [venue for venue, ok in dispatch_results.items() if not ok]
         if failed_targets:
+            failed_details: List[str] = []
+            for venue in failed_targets:
+                dispatch_error = dispatcher.get_last_dispatch_error(venue)
+                failed_details.append(
+                    f"{venue}:{dispatch_error.get('reason', 'unknown')}:{dispatch_error.get('status', 'n/a')}"
+                )
+            if notional_blocked_targets:
+                failed_details.extend(
+                    [
+                        f"{venue}:{details.get('reason', 'guard_blocked')}:guard"
+                        for venue, details in sorted(notional_blocked_targets.items())
+                    ]
+                )
             await self.telegram.send_message(
-                f"❌ TradingView dispatch failed for `{', '.join(failed_targets)}` (`{signal_key}`).",
+                (
+                    f"❌ TradingView dispatch failed (`{signal_key}`).\n"
+                    f"Details: `{'; '.join(failed_details[:6])}`"
+                ),
                 priority="high",
             )
             return {
                 "accepted": "partial_failure",
-                "targets": targets,
+                "targets": executable_targets,
                 "failed_targets": failed_targets,
                 "signal_key": signal_key,
                 "quantities": per_target_quantity,
                 "capped_targets": sorted(set(capped_targets)),
+                "adjusted_targets": sorted(set(notional_adjusted_targets)),
+                "blocked_targets": sorted(list(notional_blocked_targets.keys())),
                 "strategy": strategy_label or None,
             }
 
-        qty_parts = [f"{venue}:{per_target_quantity[venue]}" for venue in sorted(targets)]
+        qty_parts = [f"{venue}:{per_target_quantity[venue]}" for venue in sorted(executable_targets)]
+        blocked_note = (
+            f" Blocked targets: `{', '.join(sorted(notional_blocked_targets.keys()))}`."
+            if notional_blocked_targets
+            else ""
+        )
         await self.telegram.send_message(
-            f"✅ TradingView executed: `{normalized_action.upper()} {symbol}` with `{', '.join(qty_parts)}` (`{signal_key}`).",
+            (
+                f"✅ TradingView executed: `{normalized_action.upper()} {symbol}` with "
+                f"`{', '.join(qty_parts)}` (`{signal_key}`).{blocked_note}"
+            ),
             priority="high",
         )
         return {
             "accepted": "executed",
-            "targets": targets,
+            "targets": executable_targets,
             "signal_key": signal_key,
             "quantities": per_target_quantity,
             "capped_targets": sorted(set(capped_targets)),
+            "adjusted_targets": sorted(set(notional_adjusted_targets)),
+            "blocked_targets": sorted(list(notional_blocked_targets.keys())),
             "strategy": strategy_label or None,
         }
 
@@ -3077,48 +3346,101 @@ class AlphaEngine:
 
         if success:
             self._failure_counts[venue] = 0
+            self._manual_review_venues.discard(venue)
             return
+
+        category, severity = classify_error(error_message or "")
+        hard_reason = self._hard_failure_reason(error_message)
+        hard_failure = bool(hard_reason) or category in {
+            ErrorCategory.CONFIGURATION,
+            ErrorCategory.AUTHENTICATION,
+        }
 
         self._failure_counts[venue] += 1
         failures = self._failure_counts[venue]
+        if hard_failure:
+            failures = max(failures, self._deallocation_failure_threshold)
+            self._failure_counts[venue] = failures
 
         if failures < self._deallocation_failure_threshold:
             return
         if venue in self._auto_deallocated:
             return
 
+        hold_reason = f"auto-deallocated after {failures} failures"
+        cooldown_seconds = self._deallocation_cooldown_seconds
+        alert_type = "auto_deallocation"
+        if hard_failure:
+            hold_reason = (
+                f"manual-review hold ({hard_reason})"
+                if hard_reason
+                else f"manual-review hold ({category.value})"
+            )
+            cooldown_seconds = max(
+                self._deallocation_cooldown_seconds,
+                self._hard_failure_cooldown_seconds,
+            )
+            alert_type = "hard_failure_hold"
+            self._manual_review_venues.add(venue)
+
         dispatcher.set_venue_allocation(venue, 0.0)
         dispatcher.pause_venue(
             venue,
-            reason=f"auto-deallocated after {failures} failures",
-            cooldown_seconds=self._deallocation_cooldown_seconds,
+            reason=hold_reason,
+            cooldown_seconds=cooldown_seconds,
         )
         self._auto_deallocated.add(venue)
         self._record_system_log(
-            f"{venue} auto-deallocated after {failures} failures",
+            (
+                f"{venue} manual-review hold after hard failure ({hard_reason or category.value})"
+                if hard_failure
+                else f"{venue} auto-deallocated after {failures} failures"
+            ),
             level="error",
             tags=["risk", "auto_deallocation"],
-            metadata={"failures": failures},
+            metadata={
+                "failures": failures,
+                "hard_failure": hard_failure,
+                "hard_reason": hard_reason,
+                "error_category": category.value,
+                "error_severity": int(severity),
+            },
         )
 
         await self._publish_risk_alert(
             action="halt_trading",
-            severity="critical",
-            alert_type="auto_deallocation",
+            severity="critical" if hard_failure else "critical",
+            alert_type=alert_type,
             message=(
-                f"{venue} auto-deallocated after {failures} consecutive failures. "
-                f"Cooldown {self._deallocation_cooldown_seconds}s."
+                (
+                    f"{venue} placed in manual-review hold due to hard failure "
+                    f"({hard_reason or category.value})."
+                )
+                if hard_failure
+                else f"{venue} auto-deallocated after {failures} consecutive failures."
+            )
+            + (
+                f" Cooldown {cooldown_seconds}s."
             ),
             platforms=[venue],
             metadata={
                 "source": "alpha-engine",
                 "failure_count": failures,
                 "last_error": error_message[:200],
+                "hard_failure": hard_failure,
+                "hard_reason": hard_reason,
+                "error_category": category.value,
             },
         )
 
         await self.telegram.send_message(
-            f"🛑 **AUTO DEALLOCATION**\nVenue: `{venue}`\nFailures: `{failures}`\nCooldown: `{self._deallocation_cooldown_seconds}s`",
+            (
+                f"🛑 **MANUAL REVIEW HOLD**\nVenue: `{venue}`\nReason: `{hard_reason or category.value}`\n"
+                f"Failures: `{failures}`\nCooldown: `{cooldown_seconds}s`\n"
+                "Trading will remain paused until owner resume/allocation command."
+                if hard_failure
+                else f"🛑 **AUTO DEALLOCATION**\nVenue: `{venue}`\nFailures: `{failures}`\nCooldown: `{cooldown_seconds}s`"
+            ),
             priority="high",
         )
 
@@ -3130,6 +3452,27 @@ class AlphaEngine:
 
                 resumed = dispatcher.resume_expired_venues()
                 for venue in resumed:
+                    if venue in self._manual_review_venues:
+                        dispatcher.set_venue_allocation(venue, 0.0)
+                        dispatcher.pause_venue(
+                            venue,
+                            reason="manual-review hold persists",
+                            cooldown_seconds=self._hard_failure_cooldown_seconds,
+                        )
+                        self._record_system_log(
+                            f"{venue} remained paused (manual-review hold)",
+                            level="warning",
+                            tags=["risk", "manual_review_hold"],
+                        )
+                        await self.telegram.send_message(
+                            (
+                                f"⏸️ `{venue}` remains paused under manual-review hold.\n"
+                                "Use `/status` to inspect state, then `/allocation <venue> 1` or `/resume` to release."
+                            ),
+                            priority="medium",
+                        )
+                        continue
+
                     if venue in self._auto_deallocated:
                         dispatcher.set_venue_allocation(venue, self._default_venue_allocation)
                         self._auto_deallocated.discard(venue)
@@ -3181,15 +3524,64 @@ class AlphaEngine:
             )
             return
 
-        # Dispatch command via ExecutionDispatcher
-        await dispatcher.send_command(
-            platform,
+        if not self._symbol_allowed_for_venue(normalized_platform, symbol):
+            await self.telegram.send_message(
+                f"⚠️ Manual trade blocked: `{symbol}` is outside allowed symbol scope for `{normalized_platform}`.",
+                priority="high",
+            )
+            return
+
+        quantity_guard = self._apply_min_notional_guard(normalized_platform, symbol, quantity)
+        if quantity_guard.get("blocked"):
+            await self.telegram.send_message(
+                (
+                    f"⚠️ Manual trade blocked on `{normalized_platform}` by min-notional guard.\n"
+                    f"Reason: `{quantity_guard.get('reason', 'guard_blocked')}`\n"
+                    f"Required qty: `{quantity_guard.get('required_quantity', 'n/a')}` | "
+                    f"Cap: `{quantity_guard.get('cap_quantity', 'n/a')}`"
+                ),
+                priority="high",
+            )
+            return
+
+        dispatch_quantity = float(quantity_guard.get("quantity", quantity))
+        if quantity_guard.get("adjusted"):
+            await self.telegram.send_message(
+                (
+                    f"🧮 Manual trade quantity auto-adjusted on `{normalized_platform}` to `{dispatch_quantity}` "
+                    f"to satisfy minimum notional guardrails."
+                ),
+                priority="medium",
+            )
+
+        dispatched = await dispatcher.send_command(
+            normalized_platform,
             {
                 "action": action,
                 "symbol": symbol,
-                "quantity": quantity,
+                "quantity": dispatch_quantity,
                 "source": "telegram_override",
             },
+        )
+        if dispatched:
+            await self.telegram.send_message(
+                (
+                    f"✅ Manual trade dispatched: `{normalized_platform}` "
+                    f"`{action}` `{dispatch_quantity}` `{symbol}`."
+                ),
+                priority="high",
+            )
+            return
+
+        dispatch_error = dispatcher.get_last_dispatch_error(normalized_platform)
+        await self.telegram.send_message(
+            (
+                f"❌ Manual trade dispatch failed on `{normalized_platform}`.\n"
+                f"Reason: `{dispatch_error.get('reason', 'unknown')}`\n"
+                f"Status: `{dispatch_error.get('status', 'n/a')}`\n"
+                f"Detail: `{str(dispatch_error.get('body', 'n/a'))[:160]}`"
+            ),
+            priority="high",
         )
 
     async def start(self):
@@ -3347,8 +3739,18 @@ class AlphaEngine:
                             metadata={"side": side, "symbol": symbol},
                         )
 
-                        # Use appropriate priority based on severity
-                        priority = "high" if severity >= ErrorSeverity.ERROR else "medium"
+                        # Severity can come from different enum classes across services.
+                        # Compare by numeric value to avoid cross-class TypeError.
+                        severity_value = getattr(severity, "value", severity)
+                        error_threshold = getattr(ErrorSeverity.ERROR, "value", ErrorSeverity.ERROR)
+                        try:
+                            priority = (
+                                "high"
+                                if int(severity_value) >= int(error_threshold)
+                                else "medium"
+                            )
+                        except (TypeError, ValueError):
+                            priority = "medium"
                         await self.telegram.send_message(msg, priority=priority)
                         logger.warning(msg)
                     else:
@@ -3522,6 +3924,15 @@ class AlphaEngine:
         return list(self._system_logs)[-limit:]
 
     async def _handle_tradingview_workspace_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
+        if not self._tradingview_integration_enabled:
+            snapshot = self.tv_autonomy.status_snapshot()
+            snapshot["enabled"] = False
+            snapshot["reason"] = "tradingview_integration_disabled"
+            return {
+                "workspace": snapshot,
+                "timestamp": int(time.time()),
+            }
+
         snapshot = self.tv_autonomy.status_snapshot()
         return {
             "workspace": snapshot,

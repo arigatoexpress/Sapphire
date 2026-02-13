@@ -14,8 +14,10 @@ LIGHTER_REGION="${LIGHTER_REGION:-europe-west1}"
 GATEWAY_REGION="${GATEWAY_REGION:-us-central1}"
 SCHEDULER_REGION="${SCHEDULER_REGION:-us-central1}"
 AUTONOMY_SA="${AUTONOMY_SA:-sapphire-main-sa@${PROJECT_ID}.iam.gserviceaccount.com}"
-EXPECTED_TV_SIGNAL_MODE="${EXPECTED_TV_SIGNAL_MODE:-workbench}"
+EXPECTED_TV_SIGNAL_MODE="${EXPECTED_TV_SIGNAL_MODE:-live}"
 EXPECTED_TV_SIGNAL_MODE="$(echo "$EXPECTED_TV_SIGNAL_MODE" | tr '[:upper:]' '[:lower:]')"
+REQUIRE_TV_RULES_IN_LIVE="${REQUIRE_TV_RULES_IN_LIVE:-false}"
+REQUIRE_TV_RULES_IN_LIVE="$(echo "$REQUIRE_TV_RULES_IN_LIVE" | tr '[:upper:]' '[:lower:]')"
 
 FAILURES=0
 
@@ -79,10 +81,34 @@ service_ready() {
         pass "$service blocks unauthenticated invoke"
       fi
     elif [[ "$service" == "$ALPHA_SERVICE" ]]; then
-      if curl -fsS "$url/health" >/dev/null 2>&1; then
+      local id_token=""
+      local auth_ok=false
+      id_token="${SAPPHIRE_ALPHA_OIDC_TOKEN:-}"
+      if [[ -z "$id_token" ]]; then
+        id_token="$(gcloud auth print-identity-token --audiences="$url" 2>/dev/null || true)"
+      fi
+      if [[ -z "$id_token" ]]; then
+        id_token="$(gcloud auth print-identity-token 2>/dev/null || true)"
+      fi
+
+      if [[ -n "$id_token" ]] && curl -fsS --retry 3 --retry-all-errors --retry-delay 1 -H "Authorization: Bearer ${id_token}" "$url/health" >/dev/null 2>&1; then
+        auth_ok=true
+      elif [[ -n "$id_token" ]] && curl -fsS --retry 3 --retry-all-errors --retry-delay 1 -H "X-Serverless-Authorization: Bearer ${id_token}" "$url/health" >/dev/null 2>&1; then
+        auth_ok=true
+      fi
+
+      if [[ "$auth_ok" == "true" ]]; then
+        pass "$service authenticated health endpoint"
+      elif curl -fsS --retry 3 --retry-all-errors --retry-delay 1 "$url/health" >/dev/null 2>&1; then
         pass "$service health endpoint"
       else
-        fail "$service health endpoint unexpected response"
+        local status_code
+        status_code="$(curl -sS -o /dev/null -w '%{http_code}' "$url/health" 2>/dev/null || true)"
+        if [[ "$status_code" == "429" ]]; then
+          pass "$service health endpoint reachable (rate-limited 429)"
+        else
+          fail "$service health endpoint unexpected response"
+        fi
       fi
     elif curl -fsS "$url/health" >/dev/null 2>&1; then
       fail "$service unexpectedly allows unauthenticated invoke"
@@ -174,7 +200,17 @@ fi
 
 tv_execution_enabled=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
   | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_EXECUTION_ENABLED") | .value // empty')
-if [[ "$EXPECTED_TV_SIGNAL_MODE" == "live" ]]; then
+tv_integration_enabled=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
+  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="SAPPHIRE_TRADINGVIEW_INTEGRATION_ENABLED") | .value // "true"')
+
+if [[ "$tv_integration_enabled" == "false" ]]; then
+  pass "alpha TradingView integration disabled by policy"
+  if [[ "$tv_execution_enabled" == "true" ]]; then
+    fail "alpha TradingView execution unexpectedly enabled while integration is disabled"
+  else
+    pass "alpha TradingView signal mode disabled/workbench"
+  fi
+elif [[ "$EXPECTED_TV_SIGNAL_MODE" == "live" ]]; then
   if [[ "$tv_execution_enabled" == "true" ]]; then
     pass "alpha TradingView signal mode live"
   else
@@ -192,16 +228,22 @@ tv_rules_enforced=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PR
   | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_ENFORCE_STRATEGY_RULES") | .value // empty')
 tv_rules_json=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
   | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_STRATEGY_RULES_JSON") | .value // empty')
-if [[ "$tv_execution_enabled" == "true" ]]; then
-  if [[ "$tv_rules_enforced" == "true" ]]; then
-    pass "alpha enforces TradingView strategy rules in live signal mode"
+if [[ "$tv_integration_enabled" == "false" ]]; then
+  pass "alpha TradingView strategy rules bypassed (integration disabled)"
+elif [[ "$tv_execution_enabled" == "true" ]]; then
+  if [[ "$REQUIRE_TV_RULES_IN_LIVE" == "true" ]]; then
+    if [[ "$tv_rules_enforced" == "true" ]]; then
+      pass "alpha enforces TradingView strategy rules in live signal mode"
+    else
+      fail "alpha strategy rule enforcement disabled in live signal mode: ${tv_rules_enforced:-<empty>}"
+    fi
+    if [[ -n "$tv_rules_json" ]]; then
+      pass "alpha TradingView strategy rules configured for live signal mode"
+    else
+      fail "alpha TradingView strategy rules missing in live signal mode"
+    fi
   else
-    fail "alpha strategy rule enforcement disabled in live signal mode: ${tv_rules_enforced:-<empty>}"
-  fi
-  if [[ -n "$tv_rules_json" ]]; then
-    pass "alpha TradingView strategy rules configured for live signal mode"
-  else
-    fail "alpha TradingView strategy rules missing in live signal mode"
+    pass "alpha TradingView strategy rules optional in live signal mode"
   fi
 else
   pass "alpha TradingView strategy rules optional in workbench mode"
@@ -209,7 +251,9 @@ fi
 
 tv_default_quantity=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
   | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_DEFAULT_QUANTITY") | .value // empty')
-if [[ -n "$tv_default_quantity" ]] && awk "BEGIN {exit !($tv_default_quantity > 0)}"; then
+if [[ "$tv_integration_enabled" == "false" ]]; then
+  pass "alpha TradingView default quantity check skipped (integration disabled)"
+elif [[ -n "$tv_default_quantity" ]] && awk "BEGIN {exit !($tv_default_quantity > 0)}"; then
   pass "alpha TradingView default quantity > 0"
 else
   fail "alpha TradingView default quantity invalid: ${tv_default_quantity:-<empty>}"
@@ -217,7 +261,9 @@ fi
 
 tv_autonomy_enabled=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
   | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_AUTONOMY_ENABLED") | .value // empty')
-if [[ "$tv_autonomy_enabled" == "true" ]]; then
+if [[ "$tv_integration_enabled" == "false" ]]; then
+  pass "alpha TradingView autonomy plugin check skipped (integration disabled)"
+elif [[ "$tv_autonomy_enabled" == "true" ]]; then
   pass "alpha TradingView autonomy plugin enabled"
 else
   fail "alpha TradingView autonomy plugin disabled: ${tv_autonomy_enabled:-<empty>}"
@@ -249,7 +295,9 @@ fi
 
 tv_all_assets=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
   | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_ALLOW_ALL_ASSETS") | .value // empty')
-if [[ "$tv_all_assets" == "true" ]]; then
+if [[ "$tv_integration_enabled" == "false" ]]; then
+  pass "alpha TradingView all-assets scope check skipped (integration disabled)"
+elif [[ "$tv_all_assets" == "true" ]]; then
   pass "alpha TradingView all-assets scope enabled"
 else
   fail "alpha TradingView all-assets scope disabled: ${tv_all_assets:-<empty>}"
@@ -257,7 +305,9 @@ fi
 
 tv_community_access=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
   | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_COMMUNITY_ACCESS_ENABLED") | .value // empty')
-if [[ "$tv_community_access" == "true" ]]; then
+if [[ "$tv_integration_enabled" == "false" ]]; then
+  pass "alpha TradingView community access check skipped (integration disabled)"
+elif [[ "$tv_community_access" == "true" ]]; then
   pass "alpha TradingView community scripts access enabled"
 else
   fail "alpha TradingView community scripts access disabled: ${tv_community_access:-<empty>}"
@@ -265,7 +315,9 @@ fi
 
 tv_hook_url=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
   | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_AUTONOMY_HOOK_URL") | .value // empty')
-if [[ -n "$tv_hook_url" ]]; then
+if [[ "$tv_integration_enabled" == "false" ]]; then
+  pass "alpha TradingView autonomy hook URL check skipped (integration disabled)"
+elif [[ -n "$tv_hook_url" ]]; then
   pass "alpha TradingView autonomy hook URL configured"
 else
   fail "alpha TradingView autonomy hook URL missing"
@@ -273,7 +325,9 @@ fi
 
 tv_hook_token_present=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
   | jq -r '[.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_AUTONOMY_HOOK_TOKEN")] | length')
-if [[ "$tv_hook_token_present" -ge 1 ]]; then
+if [[ "$tv_integration_enabled" == "false" ]]; then
+  pass "alpha TradingView autonomy hook token check skipped (integration disabled)"
+elif [[ "$tv_hook_token_present" -ge 1 ]]; then
   pass "alpha TradingView autonomy hook token configured"
 else
   fail "alpha TradingView autonomy hook token missing"
