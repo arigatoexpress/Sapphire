@@ -682,6 +682,20 @@ class AlphaEngine:
             if snapshot["tradingview_signal_mode"] == "live"
             else "WORKBENCH_DRY_RUN"
         )
+        active_count = len([item for item in snapshot["venues"].values() if not item["paused"]])
+        pressure = int(snapshot.get("failure_pressure", 0))
+        if snapshot["kill_switch_active"]:
+            status_read = "Trading is intentionally halted by kill switch."
+        elif active_count < self._trading_gate_min_active_venues:
+            status_read = (
+                f"Active venue count is below target ({active_count}/{self._trading_gate_min_active_venues})."
+            )
+        elif pressure > self._trading_gate_max_failure_pressure:
+            status_read = (
+                f"Failure pressure is elevated ({pressure}/{self._trading_gate_max_failure_pressure})."
+            )
+        else:
+            status_read = "Runtime is inside autonomy guardrails."
         lines = [
             "📊 **CONTROL STATUS**",
             f"Kill switch: `{'ACTIVE' if snapshot['kill_switch_active'] else 'INACTIVE'}`",
@@ -700,6 +714,7 @@ class AlphaEngine:
             f"VT policy mode: `{snapshot.get('vt_enforcement_mode', 'warn')}`",
             f"Autonomy dispatches: `{snapshot['autonomy_dispatch_count']}`",
             f"Pending autonomy decisions: `{snapshot['pending_autonomy_decisions']}`",
+            f"Operational read: {status_read}",
             "",
         ]
         for venue in sorted(snapshot["venues"].keys()):
@@ -822,26 +837,54 @@ class AlphaEngine:
         directive = self._owner_directive.strip() or "none"
         if len(directive) > 120:
             directive = directive[:117] + "..."
+        if self._kill_switch_active:
+            why_now = "Kill switch is active; runtime remains in safety-first containment mode."
+        elif total_failures > self._trading_gate_max_failure_pressure:
+            why_now = (
+                f"Failure pressure is elevated ({total_failures}/{self._trading_gate_max_failure_pressure}); "
+                "expect autonomous triage."
+            )
+        elif len(live) < self._trading_gate_min_active_venues:
+            why_now = (
+                f"Active venue count is below target ({len(live)}/{self._trading_gate_min_active_venues}); "
+                "autonomy will prioritize venue recovery."
+            )
+        else:
+            why_now = "Execution and control state are inside configured guardrails."
 
-        msg = (
-            f"💓 **SAPPHIRE HEARTBEAT** (`{reason}`)\n"
-            f"Active: `{', '.join(live) if live else 'none'}` | "
-            f"Paused: `{', '.join(paused) if paused else 'none'}`\n"
-            "Primary execution: `DEX_NATIVE (ASTER/LIGHTER)`\n"
-            f"DEX stage: `{strategy_state.get('dex_execution_stage', 'paper')}` | "
-            f"DEX live dispatch: `{'ON' if strategy_state.get('effective_live_dispatch', False) else 'OFF'}` | "
-            f"DEX qty: `{strategy_state.get('effective_quantity', 0.0)}`\n"
-            f"Kill switch: `{'ACTIVE' if self._kill_switch_active else 'OFF'}` | "
-            f"Autonomy: `{'ON' if self._full_autonomy_enabled else 'OFF'}` | "
-            f"Approvals: `{'OWNER' if self._autonomy_require_owner_approval else 'AUTO'}`\n"
-            f"TV signals: `{'LIVE' if self._tradingview_execution_enabled else 'WORKBENCH_DRY-RUN'}` | "
-            f"Default qty: `{self._tradingview_default_quantity}`\n"
-            f"Pending approvals: `{pending_count}` | Failure pressure: `{total_failures}`\n"
-            f"Directive: `{directive}`\n"
-            "Quick actions: `/status` `/focus` `/autonomy` `/approve_all`\n"
-            "Use `/help` for full command list."
-        )
-        await self.telegram.send_message(msg, priority="medium")
+        lines = [
+            f"💓 **SAPPHIRE HEARTBEAT** (`{reason}`)",
+            "State:",
+            f"- Active venues: `{', '.join(live) if live else 'none'}`",
+            f"- Paused venues: `{', '.join(paused) if paused else 'none'}`",
+            f"- Kill switch: `{'ACTIVE' if self._kill_switch_active else 'OFF'}`",
+            (
+                f"- Full autonomy: `{'ON' if self._full_autonomy_enabled else 'OFF'}`"
+                f" | Approvals: `{'OWNER' if self._autonomy_require_owner_approval else 'AUTO'}`"
+            ),
+            (
+                f"- DEX mode: stage `{strategy_state.get('dex_execution_stage', 'paper')}`"
+                f" | live dispatch `{'ON' if strategy_state.get('effective_live_dispatch', False) else 'OFF'}`"
+                f" | qty `{strategy_state.get('effective_quantity', 0.0)}`"
+            ),
+            (
+                f"- TradingView mode: `{'LIVE' if self._tradingview_execution_enabled else 'WORKBENCH_DRY-RUN'}`"
+                f" | default qty `{self._tradingview_default_quantity}`"
+            ),
+            f"- Pending approvals: `{pending_count}` | Failure pressure: `{total_failures}`",
+            f"- Owner directive: `{directive}`",
+            "",
+            "Why this matters:",
+            f"- {why_now}",
+            (
+                "- Benefit: concise control state and explicit next actions for rapid operator steering."
+            ),
+            "",
+            "Quick actions:",
+            "`/status` `/focus` `/autonomy` `/approve_all`",
+            "Use `/help` for full command list.",
+        ]
+        await self.telegram.send_message("\n".join(lines), priority="medium")
 
     def _autonomy_context_snapshot(self) -> Dict[str, Any]:
         state = dispatcher.get_control_state()
@@ -1649,13 +1692,18 @@ class AlphaEngine:
                     (
                         f"⚠️ Bulk approval completed with partial failures.\n"
                         f"Approved: `{success_count}` / `{len(pending_keys)}`\n"
-                        f"Failed: `{'; '.join(failed[:5])}`"
+                        f"Failed: `{'; '.join(failed[:5])}`\n"
+                        "Expected outcome: successful sessions continue without owner delay.\n"
+                        "Next step: re-run `/approve_all` after resolving listed failures."
                     ),
                     priority="high",
                 )
             else:
                 await self.telegram.send_message(
-                    f"✅ Bulk approval completed. Approved `{success_count}` pending session(s).",
+                    (
+                        f"✅ Bulk approval completed. Approved `{success_count}` pending session(s).\n"
+                        "Expected outcome: queued autonomy changes move immediately into execution."
+                    ),
                     priority="high",
                 )
             return
@@ -1683,7 +1731,8 @@ class AlphaEngine:
                 await self.telegram.send_message(
                     (
                         f"✅ Session `{session_key}` marked `{decision}`.\n"
-                        f"Dispatch: `{result.get('dispatch_session_key', 'n/a')}`"
+                        f"Dispatch: `{result.get('dispatch_session_key', 'n/a')}`\n"
+                        "Expected outcome: session state is synchronized and downstream action is unblocked."
                     ),
                     priority="high",
                 )
@@ -1691,7 +1740,8 @@ class AlphaEngine:
                 await self.telegram.send_message(
                     (
                         f"⚠️ Session decision captured locally but dispatch failed for `{session_key}`.\n"
-                        f"Reason: `{result.get('reason', 'unknown')}`"
+                        f"Reason: `{result.get('reason', 'unknown')}`\n"
+                        "Benefit: decision is preserved locally for controlled retry."
                     ),
                     priority="high",
                 )
@@ -1757,21 +1807,28 @@ class AlphaEngine:
             self._owner_directive_updated_at = int(time.time())
 
             await self.telegram.send_message(
-                f"🧠 Owner directive recorded: `{directive}`",
+                (
+                    f"🧠 Owner directive recorded: `{directive}`\n"
+                    "Expected outcome: next autonomy cycle and focus snapshots use this directive."
+                ),
                 priority="high",
             )
 
             hook_result = await self.tv_autonomy.dispatch_owner_instruction(directive)
             if hook_result.get("dispatched"):
                 await self.telegram.send_message(
-                    f"✅ OpenClaw steering dispatch queued (`{hook_result.get('session_key', 'n/a')}`).",
+                    (
+                        f"✅ OpenClaw steering dispatch queued (`{hook_result.get('session_key', 'n/a')}`).\n"
+                        "Benefit: direction reaches agents immediately without waiting for the next schedule."
+                    ),
                     priority="medium",
                 )
             else:
                 await self.telegram.send_message(
                     (
                         "⚠️ OpenClaw steering dispatch unavailable "
-                        f"(`{hook_result.get('reason', 'unknown')}`). Directive kept in focus context."
+                        f"(`{hook_result.get('reason', 'unknown')}`). Directive kept in focus context.\n"
+                        "Expected outcome: runtime remains aligned; dispatch retries can run later."
                     ),
                     priority="high",
                 )

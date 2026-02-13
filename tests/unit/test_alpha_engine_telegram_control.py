@@ -60,6 +60,10 @@ def test_approve_command_dispatches_session_payload(telegram_module):
     assert payload["session_key"] == "latest"
     assert payload["note"] == "ship it"
 
+    ack_text = bot.send_message.await_args.args[0]
+    assert "Session decision queued" in ack_text
+    assert "Expected outcome:" in ack_text
+
 
 def test_reject_command_dispatches_session_payload(telegram_module):
     callback = AsyncMock()
@@ -360,6 +364,10 @@ def test_answer_alias_still_routes_to_owner_steer(telegram_module):
     assert quantity == 0.0
     assert "prioritize reliability" in symbol
 
+    ack_text = bot.send_message.await_args.args[0]
+    assert "Heartbeat response captured and queued" in ack_text
+    assert "Expected outcome:" in ack_text
+
 
 def test_security_status_command_dispatches_action(telegram_module):
     callback = AsyncMock()
@@ -407,6 +415,29 @@ def test_security_scan_command_dispatches_payload(telegram_module):
     payload = json.loads(symbol)
     assert payload["skill"] == "ci-cd"
     assert payload["upload_if_missing"] is False
+
+
+def test_digest_builder_summarizes_structured_ack_messages(telegram_module):
+    lines = telegram_module.TelegramPlatformBot._build_digest_lines(
+        [
+            (
+                "🚨 🛡️ VirusTotal scan request queued.\n"
+                "Scope: `all` | upload-on-miss: `NO`\n"
+                "Expected outcome: skill verdict(s) with policy decision and report linkage.\n"
+                "Benefit: blocks risky skill bundles before they impact autonomy."
+            ),
+            (
+                "🚨 🛡️ VirusTotal scan request queued.\n"
+                "Scope: `all` | upload-on-miss: `NO`\n"
+                "Expected outcome: skill verdict(s) with policy decision and report linkage.\n"
+                "Benefit: blocks risky skill bundles before they impact autonomy."
+            ),
+        ]
+    )
+
+    assert any("VirusTotal scan request queued" in line for line in lines)
+    assert any("outcome" in line for line in lines)
+    assert any("x2" in line for line in lines)
 
 
 def test_dispatch_session_decision_payload(autonomy_module, monkeypatch):

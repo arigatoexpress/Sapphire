@@ -169,6 +169,14 @@ class TelegramPlatformBot:
         return value[: max(0, limit - 3)].rstrip() + "..."
 
     @classmethod
+    def _extract_any_section(cls, text: str, markers: List[str], stop_markers: List[str]) -> str:
+        for marker in markers:
+            value = cls._extract_section(text, marker, stop_markers)
+            if value:
+                return value
+        return ""
+
+    @classmethod
     def _summarize_digest_text(cls, text: str) -> str:
         cleaned = cls._clean_digest_text(text)
         lowered = cleaned.lower()
@@ -200,19 +208,37 @@ class TelegramPlatformBot:
             return f"⚡ Market pulse: {insight}" if insight else "⚡ Market pulse update"
 
         if "sapphire heartbeat" in lowered:
-            active = cls._extract_section(
-                cleaned, "Active venues:", ["Paused/deallocated:", "Kill switch:"]
+            active = cls._extract_any_section(
+                cleaned,
+                ["Active venues:", "Active:"],
+                ["Paused/deallocated:", "Paused venues:", "Paused:", "Kill switch:"],
             )
-            paused = cls._extract_section(cleaned, "Paused/deallocated:", ["Kill switch:"])
-            kill = cls._extract_section(cleaned, "Kill switch:", ["Full autonomy:", "Failure pressure:"])
-            autonomy = cls._extract_section(
-                cleaned, "Full autonomy:", ["Failure pressure:", "Owner directive:"]
+            paused = cls._extract_any_section(
+                cleaned,
+                ["Paused/deallocated:", "Paused venues:", "Paused:"],
+                ["Kill switch:", "Autonomy:", "Full autonomy:"],
             )
-            failure = cls._extract_section(cleaned, "Failure pressure:", ["Owner directive:"])
+            kill = cls._extract_section(
+                cleaned,
+                "Kill switch:",
+                ["Full autonomy:", "Autonomy:", "Approvals:", "Failure pressure:"],
+            )
+            autonomy = cls._extract_any_section(
+                cleaned,
+                ["Full autonomy:", "Autonomy:"],
+                ["Failure pressure:", "Owner directive:", "Approvals:"],
+            )
+            approvals = cls._extract_section(
+                cleaned,
+                "Approvals:",
+                ["Failure pressure:", "Owner directive:", "Directive:"],
+            )
+            pending = cls._extract_section(cleaned, "Pending approvals:", ["Failure pressure:", "Directive:"])
             return (
                 "💓 Heartbeat: "
                 f"active `{active or 'none'}` | paused `{paused or 'none'}` | "
-                f"kill `{kill or 'n/a'}` | autonomy `{autonomy or 'n/a'}` | pressure `{failure or 'n/a'}`"
+                f"kill `{kill or 'n/a'}` | autonomy `{autonomy or 'n/a'}` | "
+                f"approvals `{approvals or 'n/a'}` | pending `{pending or '0'}`"
             )
 
         if "tradingview workspace action" in lowered:
@@ -227,6 +253,30 @@ class TelegramPlatformBot:
             return (
                 f"🧩 Workspace `{action}`: `{result or 'processed'}`"
                 + (f" (dispatch `{dispatch}`)" if dispatch else "")
+            )
+
+        if "expected outcome:" in lowered and (
+            "queued" in lowered or "requested" in lowered or "captured" in lowered
+        ):
+            request = cleaned.split("Expected outcome:", 1)[0].strip(" \n\t-")
+            outcome = cls._extract_section(
+                cleaned,
+                "Expected outcome:",
+                ["Benefit:", "Next update:", "Quick actions:", "Use `/help`"],
+            )
+            benefit = cls._extract_section(
+                cleaned,
+                "Benefit:",
+                ["Next update:", "Quick actions:", "Use `/help`"],
+            )
+            return (
+                f"🧭 {cls._trim_summary(request, 70)} | "
+                f"outcome {cls._trim_summary(outcome, 64) or 'n/a'}"
+                + (
+                    f" | benefit {cls._trim_summary(benefit, 56)}"
+                    if benefit
+                    else ""
+                )
             )
 
         return cleaned
@@ -488,7 +538,11 @@ class TelegramPlatformBot:
         )
         if slash_scout_status or mention_scout_status:
             await self.send_message(
-                "🛰️ Scout status request accepted.",
+                (
+                    "🛰️ Scout status request queued.\n"
+                    "Expected outcome: return current scout registration, bridge mode, and fallback readiness.\n"
+                    "Benefit: faster triage if external collaboration is blocked."
+                ),
                 priority=NotificationPriority.HIGH,
             )
             await self._dispatch_callback("CONTROL", "ALL", "SCOUT_STATUS", 0.0)
@@ -521,7 +575,11 @@ class TelegramPlatformBot:
                 separators=(",", ":"),
             )
             await self.send_message(
-                f"🛰️ Scout register request accepted for `@{username}`.",
+                (
+                    f"🛰️ Scout register request queued for `@{username}`.\n"
+                    "Expected outcome: scout identity is created/updated with least-privilege defaults.\n"
+                    "Next update: registration result will include verification or retry guidance."
+                ),
                 priority=NotificationPriority.HIGH,
             )
             await self._dispatch_callback("CONTROL", payload, "SCOUT_REGISTER", 0.0)
@@ -573,7 +631,11 @@ class TelegramPlatformBot:
                 separators=(",", ":"),
             )
             await self.send_message(
-                "🛰️ Scout publish request accepted.",
+                (
+                    "🛰️ Scout publish request queued.\n"
+                    "Expected outcome: sanitized note is posted externally or retained locally with explicit reason.\n"
+                    "Benefit: keeps external collaboration auditable without exposing sensitive data."
+                ),
                 priority=NotificationPriority.HIGH,
             )
             await self._dispatch_callback("CONTROL", payload, "SCOUT_PUBLISH", 0.0)
@@ -602,7 +664,11 @@ class TelegramPlatformBot:
 
             if command == "status":
                 await self.send_message(
-                    "🛡️ VirusTotal security status request accepted.",
+                    (
+                        "🛡️ VirusTotal security status request queued.\n"
+                        "Expected outcome: return scanner availability, policy mode, and latest scan result.\n"
+                        "Benefit: confirms skill-ingestion risk posture before autonomous updates."
+                    ),
                     priority=NotificationPriority.HIGH,
                 )
                 await self._dispatch_callback("CONTROL", "ALL", "SECURITY_STATUS", 0.0)
@@ -618,8 +684,10 @@ class TelegramPlatformBot:
             )
             await self.send_message(
                 (
-                    "🛡️ VirusTotal scan request accepted."
-                    f" Scope: `{skill or 'all'}` | upload-on-miss: `{'YES' if upload_if_missing else 'NO'}`"
+                    "🛡️ VirusTotal scan request queued.\n"
+                    f"Scope: `{skill or 'all'}` | upload-on-miss: `{'YES' if upload_if_missing else 'NO'}`\n"
+                    "Expected outcome: skill verdict(s) with policy decision and report linkage.\n"
+                    "Benefit: blocks risky skill bundles before they impact autonomy."
                 ),
                 priority=NotificationPriority.HIGH,
             )
@@ -647,9 +715,17 @@ class TelegramPlatformBot:
             if len(directive) > 500:
                 directive = directive[:500]
             response_ack = (
-                "💓 Heartbeat response captured and queued for Sapphire execution context."
+                (
+                    "💓 Heartbeat response captured and queued.\n"
+                    "Expected outcome: next autonomy cycle uses your response as steering context.\n"
+                    "Benefit: strategy stays aligned with your latest direction."
+                )
                 if intent in {"answer", "reply", "respond"}
-                else "🧠 Owner directive captured and queued for Sapphire execution context."
+                else (
+                    "🧠 Owner directive captured and queued.\n"
+                    "Expected outcome: directive appears in focus snapshots and autonomy dispatch context.\n"
+                    "Benefit: reduces drift between system behavior and owner intent."
+                )
             )
             await self.send_message(
                 response_ack,
@@ -678,7 +754,11 @@ class TelegramPlatformBot:
                 note = note[:400]
             payload = json.dumps({"note": note}, separators=(",", ":"))
             await self.send_message(
-                "✅ Bulk approval request received. Processing all pending autonomy sessions.",
+                (
+                    "✅ Bulk approval request queued.\n"
+                    "Expected outcome: all pending autonomy sessions move to APPROVE and dispatch.\n"
+                    "Next update: you will receive a summary with approved count and failures (if any)."
+                ),
                 priority=NotificationPriority.HIGH,
             )
             await self._dispatch_callback("CONTROL", payload, "APPROVE_ALL_SESSIONS", 0.0)
@@ -715,7 +795,11 @@ class TelegramPlatformBot:
             decision_label = "APPROVE" if raw_action == "approve" else "REJECT"
 
             await self.send_message(
-                f"🗳️ Session decision captured: `{decision_label}` `{session_key or 'latest'}`",
+                (
+                    f"🗳️ Session decision queued: `{decision_label}` `{session_key or 'latest'}`.\n"
+                    "Expected outcome: session decision is recorded and dispatched to OpenClaw.\n"
+                    "Next update: dispatch confirmation includes session key and status."
+                ),
                 priority=NotificationPriority.HIGH,
             )
             await self._dispatch_callback("CONTROL", decision_payload, decision_action, 0.0)
@@ -754,8 +838,10 @@ class TelegramPlatformBot:
             enabled = mode_text == "ON"
             await self.send_message(
                 (
-                    f"🧭 TradingView signal mode requested: `{'LIVE' if enabled else 'WORKBENCH_DRY-RUN'}`"
+                    f"🧭 TradingView signal mode change queued: `{'LIVE' if enabled else 'WORKBENCH_DRY-RUN'}`"
                     + (f" | qty `{qty_value}`" if qty_value > 0 else "")
+                    + "\nExpected outcome: execution mode is updated with guardrails applied."
+                    + "\nBenefit: clear separation between live dispatch and research-only signal flow."
                 ),
                 priority=NotificationPriority.HIGH,
             )
@@ -780,7 +866,11 @@ class TelegramPlatformBot:
                 else str(mention_stage_match.group(3) or "").strip()
             )
             await self.send_message(
-                f"🚀 DEX stage update requested: `{requested_stage}`",
+                (
+                    f"🚀 DEX stage update queued: `{requested_stage}`.\n"
+                    "Expected outcome: stage gates and effective quantity are recalculated immediately.\n"
+                    "Benefit: controlled progression from paper to staged/live execution."
+                ),
                 priority=NotificationPriority.HIGH,
             )
             await self._dispatch_callback("CONTROL", requested_stage, "SET_EXECUTION_STAGE", 0.0)
@@ -815,7 +905,11 @@ class TelegramPlatformBot:
                 return
 
             await self.send_message(
-                f"🧭 Default TradingView quantity update requested: `{qty_value}`",
+                (
+                    f"🧭 Default TradingView quantity update queued: `{qty_value}`.\n"
+                    "Expected outcome: default signal quantity is updated with venue/rule caps enforced.\n"
+                    "Benefit: lowers risk of under-notional failures or oversizing."
+                ),
                 priority=NotificationPriority.HIGH,
             )
             await self._dispatch_callback("CONTROL", "ALL", "SET_TRADINGVIEW_DEFAULT_QUANTITY", qty_value)
@@ -849,7 +943,11 @@ class TelegramPlatformBot:
                 return
 
             await self.send_message(
-                f"🧭 Control command accepted: `{raw_action.upper()}` target `{target}`",
+                (
+                    f"🧭 Control command queued: `{raw_action.upper()}` target `{target}`.\n"
+                    "Expected outcome: control action executes against the active Sapphire runtime state.\n"
+                    "Next update: command result is posted with status or remediation."
+                ),
                 priority=NotificationPriority.HIGH,
             )
             await self._dispatch_callback("CONTROL", target, mapped_action, 0.0)
@@ -891,7 +989,11 @@ class TelegramPlatformBot:
                 allocation = max(0.0, min(1.0, pct / 100.0))
 
             await self.send_message(
-                f"🧭 Allocation command accepted: `{raw_action.upper()}` `{target}` -> `{allocation*100:.0f}%`",
+                (
+                    f"🧭 Allocation command queued: `{raw_action.upper()}` `{target}` -> `{allocation*100:.0f}%`.\n"
+                    "Expected outcome: venue allocation state updates immediately.\n"
+                    "Benefit: preserves execution continuity while rebalancing venue exposure."
+                ),
                 priority=NotificationPriority.HIGH,
             )
             await self._dispatch_callback("CONTROL", target, "SET_ALLOCATION", allocation)
@@ -947,7 +1049,11 @@ class TelegramPlatformBot:
                 if len(directive) > 500:
                     directive = directive[:500]
                 await self.send_message(
-                    "🧠 Owner note captured from @alpha command and queued.",
+                    (
+                        "🧠 Owner note captured from @alpha and queued.\n"
+                        "Expected outcome: note is injected into autonomy context for the next cycle.\n"
+                        "Benefit: keeps long-form guidance synchronized with agent decisions."
+                    ),
                     priority=NotificationPriority.HIGH,
                 )
                 await self._dispatch_callback("CONTROL", directive, "OWNER_STEER", 0.0)
