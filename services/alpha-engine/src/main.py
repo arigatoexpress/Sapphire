@@ -3867,6 +3867,9 @@ class AlphaEngine:
                         f"PnL: {closed_trade.realized_pnl:+.4f}"
                     )
 
+                # Resolve any pending fill confirmation
+                dispatcher.resolve_fill(message_data)
+
                 # Format notification
                 platform = message_data.get("platform", "Unknown")
                 symbol = message_data.get("symbol", "N/A")
