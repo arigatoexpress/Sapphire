@@ -23,6 +23,18 @@ class AlphaStrategyEngine:
             0.0,
             float(os.getenv("INTERNAL_ARB_EXECUTION_QUANTITY", "0.02")),
         )
+        self.internal_arb_min_notional = max(
+            0.0,
+            float(os.getenv("SAPPHIRE_INTERNAL_ARB_MIN_NOTIONAL", "5.0")),
+        )
+        self.internal_arb_notional_buffer_pct = max(
+            0.0,
+            float(os.getenv("SAPPHIRE_INTERNAL_ARB_NOTIONAL_BUFFER_PCT", "0.05")),
+        )
+        self.internal_arb_max_quantity = max(
+            0.0,
+            float(os.getenv("SAPPHIRE_INTERNAL_ARB_MAX_QUANTITY", "0.25")),
+        )
         self.staged_live_multiplier = self._bounded_multiplier(
             os.getenv("SAPPHIRE_STAGED_LIVE_SIZE_MULTIPLIER", "0.25"),
             fallback=0.25,
@@ -35,6 +47,8 @@ class AlphaStrategyEngine:
             os.getenv("SAPPHIRE_DEX_EXECUTION_STAGE", "paper")
         )
         self._last_mode_log_at = 0.0
+        self._last_quantity_adjust_log_at = 0.0
+        self._last_quantity_block_log_at = 0.0
 
     @classmethod
     def _normalize_stage(cls, raw: Any) -> str:
@@ -98,6 +112,38 @@ class AlphaStrategyEngine:
             "effective_live_dispatch": live_dispatch,
             "effective_quantity": float(round(effective_quantity, 8)),
             "base_quantity": float(self.internal_arb_quantity),
+            "min_notional": float(self.internal_arb_min_notional),
+            "min_notional_buffer_pct": float(self.internal_arb_notional_buffer_pct),
+            "max_quantity": float(self.internal_arb_max_quantity),
+        }
+
+    def _resolve_dispatch_quantity(self, reference_price: float, baseline_quantity: float) -> Dict[str, Any]:
+        quantity = max(0.0, float(baseline_quantity))
+        if quantity <= 0:
+            return {"quantity": 0.0, "adjusted": False, "blocked": False, "reason": "non_positive_quantity"}
+        if reference_price <= 0 or self.internal_arb_min_notional <= 0:
+            return {"quantity": quantity, "adjusted": False, "blocked": False, "reason": "no_notional_check"}
+
+        target_notional = self.internal_arb_min_notional * (1.0 + self.internal_arb_notional_buffer_pct)
+        required_quantity = target_notional / reference_price
+        if required_quantity <= quantity:
+            return {"quantity": quantity, "adjusted": False, "blocked": False, "reason": "baseline_satisfies_notional"}
+
+        if self.internal_arb_max_quantity > 0 and required_quantity > self.internal_arb_max_quantity:
+            return {
+                "quantity": 0.0,
+                "adjusted": False,
+                "blocked": True,
+                "reason": "required_quantity_exceeds_cap",
+                "required_quantity": float(round(required_quantity, 8)),
+                "cap_quantity": float(self.internal_arb_max_quantity),
+            }
+        return {
+            "quantity": float(round(required_quantity, 8)),
+            "adjusted": True,
+            "blocked": False,
+            "reason": "raised_to_min_notional",
+            "required_quantity": float(round(required_quantity, 8)),
         }
 
     async def start(self):
@@ -140,13 +186,42 @@ class AlphaStrategyEngine:
 
                             state = self.execution_state()
                             if state["effective_live_dispatch"] and state["effective_quantity"] > 0:
+                                quantity_resolution = self._resolve_dispatch_quantity(
+                                    aster_price, state["effective_quantity"]
+                                )
+                                dispatch_qty = float(quantity_resolution.get("quantity", 0.0))
+                                if quantity_resolution.get("blocked") or dispatch_qty <= 0:
+                                    now = time.time()
+                                    if now - self._last_quantity_block_log_at > 60:
+                                        logger.warning(
+                                            (
+                                                "Skipping ARB dispatch due notional/cap guard "
+                                                "(price={} baseline_qty={} reason={} required_qty={} cap={})"
+                                            ),
+                                            aster_price,
+                                            state["effective_quantity"],
+                                            quantity_resolution.get("reason"),
+                                            quantity_resolution.get("required_quantity"),
+                                            quantity_resolution.get("cap_quantity"),
+                                        )
+                                        self._last_quantity_block_log_at = now
+                                    continue
+                                if quantity_resolution.get("adjusted"):
+                                    now = time.time()
+                                    if now - self._last_quantity_adjust_log_at > 30:
+                                        logger.info(
+                                            "Adjusted ARB quantity from {} to {} to satisfy min notional guard",
+                                            state["effective_quantity"],
+                                            dispatch_qty,
+                                        )
+                                        self._last_quantity_adjust_log_at = now
                                 from src.execution.dispatcher import dispatcher
 
                                 cmd = {
                                     "type": "ARB_EXECUTE",
                                     "side": "BUY" if aster_price < lighter_price else "SELL",
                                     "symbol": "SOL",
-                                    "quantity": state["effective_quantity"],
+                                    "quantity": dispatch_qty,
                                     "spread": spread_pct,
                                     "source": "alpha_internal_arb",
                                     "execution_stage": state["dex_execution_stage"],
