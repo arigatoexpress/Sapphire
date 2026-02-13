@@ -31,30 +31,30 @@ class _FakeMarketData:
 
 def test_execution_state_exposes_notional_controls(monkeypatch):
     module = _load_engine_module()
-    monkeypatch.setenv("INTERNAL_ARB_EXECUTION_ENABLED", "true")
-    monkeypatch.setenv("INTERNAL_ARB_EXECUTION_QUANTITY", "0.02")
-    monkeypatch.setenv("SAPPHIRE_INTERNAL_ARB_MIN_NOTIONAL", "5.0")
-    monkeypatch.setenv("SAPPHIRE_INTERNAL_ARB_NOTIONAL_BUFFER_PCT", "0.05")
-    monkeypatch.setenv("SAPPHIRE_INTERNAL_ARB_MAX_QUANTITY", "0.25")
+    monkeypatch.setenv("SAPPHIRE_MIN_NOTIONAL", "5.0")
+    monkeypatch.setenv("SAPPHIRE_NOTIONAL_BUFFER_PCT", "0.05")
+    monkeypatch.setenv("SAPPHIRE_MAX_QUANTITY", "0.25")
+    monkeypatch.setenv("SAPPHIRE_DEFAULT_QUANTITY", "0.02")
     monkeypatch.setenv("SAPPHIRE_DEX_EXECUTION_STAGE", "full_live")
 
     engine = module.AlphaStrategyEngine(_FakeMarketData())
     state = engine.execution_state()
 
-    assert state["effective_live_dispatch"] is True
+    assert state["stage_multiplier"] > 0
     assert state["effective_quantity"] == 0.02
     assert state["min_notional"] == 5.0
     assert state["min_notional_buffer_pct"] == 0.05
     assert state["max_quantity"] == 0.25
+    assert "preferred_symbols" in state
+    assert "venue_profiles" in state
 
 
 def test_resolve_dispatch_quantity_raises_to_min_notional(monkeypatch):
     module = _load_engine_module()
-    monkeypatch.setenv("INTERNAL_ARB_EXECUTION_ENABLED", "true")
-    monkeypatch.setenv("INTERNAL_ARB_EXECUTION_QUANTITY", "0.02")
-    monkeypatch.setenv("SAPPHIRE_INTERNAL_ARB_MIN_NOTIONAL", "5.0")
-    monkeypatch.setenv("SAPPHIRE_INTERNAL_ARB_NOTIONAL_BUFFER_PCT", "0.05")
-    monkeypatch.setenv("SAPPHIRE_INTERNAL_ARB_MAX_QUANTITY", "0.25")
+    monkeypatch.setenv("SAPPHIRE_MIN_NOTIONAL", "5.0")
+    monkeypatch.setenv("SAPPHIRE_NOTIONAL_BUFFER_PCT", "0.05")
+    monkeypatch.setenv("SAPPHIRE_MAX_QUANTITY", "0.25")
+    monkeypatch.setenv("SAPPHIRE_DEFAULT_QUANTITY", "0.02")
     monkeypatch.setenv("SAPPHIRE_DEX_EXECUTION_STAGE", "full_live")
 
     engine = module.AlphaStrategyEngine(_FakeMarketData())
@@ -68,11 +68,10 @@ def test_resolve_dispatch_quantity_raises_to_min_notional(monkeypatch):
 
 def test_resolve_dispatch_quantity_blocks_when_required_exceeds_cap(monkeypatch):
     module = _load_engine_module()
-    monkeypatch.setenv("INTERNAL_ARB_EXECUTION_ENABLED", "true")
-    monkeypatch.setenv("INTERNAL_ARB_EXECUTION_QUANTITY", "0.02")
-    monkeypatch.setenv("SAPPHIRE_INTERNAL_ARB_MIN_NOTIONAL", "5.0")
-    monkeypatch.setenv("SAPPHIRE_INTERNAL_ARB_NOTIONAL_BUFFER_PCT", "0.05")
-    monkeypatch.setenv("SAPPHIRE_INTERNAL_ARB_MAX_QUANTITY", "0.05")
+    monkeypatch.setenv("SAPPHIRE_MIN_NOTIONAL", "5.0")
+    monkeypatch.setenv("SAPPHIRE_NOTIONAL_BUFFER_PCT", "0.05")
+    monkeypatch.setenv("SAPPHIRE_MAX_QUANTITY", "0.05")
+    monkeypatch.setenv("SAPPHIRE_DEFAULT_QUANTITY", "0.02")
     monkeypatch.setenv("SAPPHIRE_DEX_EXECUTION_STAGE", "full_live")
 
     engine = module.AlphaStrategyEngine(_FakeMarketData())
@@ -81,3 +80,36 @@ def test_resolve_dispatch_quantity_blocks_when_required_exceeds_cap(monkeypatch)
     assert resolved["blocked"] is True
     assert resolved["reason"] == "required_quantity_exceeds_cap"
     assert resolved["quantity"] == 0.0
+
+
+def test_venue_profiles_and_preferred_symbols(monkeypatch):
+    module = _load_engine_module()
+    monkeypatch.setenv("SAPPHIRE_PREFERRED_SYMBOLS", "BTC,ETH,SOL,ZEC,XMR")
+    monkeypatch.setenv("SAPPHIRE_DEX_EXECUTION_STAGE", "paper")
+
+    engine = module.AlphaStrategyEngine(_FakeMarketData())
+    state = engine.execution_state()
+
+    # Venue profiles expose name & role
+    assert "ASTER" in state["venue_profiles"]
+    assert "LIGHTER" in state["venue_profiles"]
+    assert "role" in state["venue_profiles"]["ASTER"]
+    assert "role" in state["venue_profiles"]["LIGHTER"]
+
+    # Preferred symbols parsed
+    assert state["preferred_symbols"] == ["BTC", "ETH", "SOL", "ZEC", "XMR"]
+
+    # Paper stage = 0 multiplier
+    assert state["stage_multiplier"] == 0.0
+
+
+def test_paper_stage_has_zero_multiplier(monkeypatch):
+    module = _load_engine_module()
+    monkeypatch.setenv("SAPPHIRE_DEX_EXECUTION_STAGE", "paper")
+
+    engine = module.AlphaStrategyEngine(_FakeMarketData())
+    state = engine.execution_state()
+
+    assert state["dex_execution_stage"] == "paper"
+    assert state["stage_multiplier"] == 0.0
+    assert state["effective_quantity"] == 0.0

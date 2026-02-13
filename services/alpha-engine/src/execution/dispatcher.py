@@ -213,10 +213,10 @@ class ExecutionDispatcher:
         allocation = self._venue_allocations.get(normalized_venue, 1.0)
 
         command_payload = dict(command)
-        # Backward-compatible payload for legacy bot gateways that still consume ARB_EXECUTE.
+        # Ensure command type is set for bot gateways.
         action = str(command_payload.get("action", "")).strip().upper()
         if "type" not in command_payload and action in {"BUY", "SELL"}:
-            command_payload["type"] = "ARB_EXECUTE"
+            command_payload["type"] = "TRADE_EXECUTE"
             command_payload["side"] = action
 
         raw_symbol = str(command_payload.get("symbol", "")).strip()
