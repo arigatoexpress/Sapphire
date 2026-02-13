@@ -83,6 +83,32 @@ class ExecutionDispatcher:
             normalized = "LIGHTER"
         return normalized
 
+    def _normalize_symbol_for_venue(self, venue: str, symbol: str) -> str:
+        """Keep execution symbols venue-native to avoid exchange-side rejects."""
+        value = str(symbol or "").strip().upper()
+        if not value:
+            return value
+
+        venue_key = self._normalize_venue(venue)
+        if venue_key == "ASTER":
+            # Aster futures endpoints expect USDT-quoted symbols (e.g., SOLUSDT).
+            cleaned = re.sub(r"[^A-Z0-9]", "", value)
+            if cleaned.endswith("USDT"):
+                return cleaned
+            if cleaned.endswith(("USDC", "USD")):
+                return f"{cleaned[:-4]}USDT" if cleaned.endswith("USDC") else f"{cleaned[:-3]}USDT"
+            return f"{cleaned}USDT"
+
+        if venue_key == "LIGHTER":
+            # Lighter bot maps to base symbols (e.g., SOL, BTC, ETH).
+            cleaned = re.sub(r"[^A-Z0-9]", "", value)
+            for suffix in ("USDT", "USDC", "USD", "PERP"):
+                if cleaned.endswith(suffix):
+                    cleaned = cleaned[: -len(suffix)]
+            return cleaned
+
+        return value
+
     def set_venue_allocation(self, venue: str, allocation: float) -> float:
         normalized = self._normalize_venue(venue)
         if normalized not in self.bot_urls:
@@ -166,6 +192,18 @@ class ExecutionDispatcher:
         allocation = self._venue_allocations.get(normalized_venue, 1.0)
 
         command_payload = dict(command)
+        # Backward-compatible payload for legacy bot gateways that still consume ARB_EXECUTE.
+        action = str(command_payload.get("action", "")).strip().upper()
+        if "type" not in command_payload and action in {"BUY", "SELL"}:
+            command_payload["type"] = "ARB_EXECUTE"
+            command_payload["side"] = action
+
+        raw_symbol = str(command_payload.get("symbol", "")).strip()
+        if raw_symbol:
+            command_payload["symbol"] = self._normalize_symbol_for_venue(
+                normalized_venue, raw_symbol
+            )
+
         quantity = command_payload.get("quantity")
         if allocation < 1.0 and isinstance(quantity, (int, float)) and quantity > 0:
             command_payload["quantity"] = round(float(quantity) * allocation, 8)

@@ -1,6 +1,8 @@
 import asyncio
 import logging
 import os
+import re
+import time
 from datetime import datetime
 
 import google.generativeai as genai
@@ -18,6 +20,11 @@ class GeminiGuard:
         self.telegram = telegram_bot
         self.model = None
         self.running = False
+        self._flash_min_interval_seconds = max(
+            300, int(os.getenv("GEMINI_FLASH_MIN_INTERVAL_SECONDS", "1800"))
+        )
+        self._last_flash_signature = ""
+        self._last_flash_sent_at = 0.0
 
         if self.api_key:
             try:
@@ -64,9 +71,11 @@ class GeminiGuard:
                 # 1. Quick Market Check (Flash)
                 flash_insight = await self._quick_check()
                 if flash_insight and self.telegram:
-                    await self.telegram.send_message(
-                        f"⚡ **Gemini Flash**: {flash_insight}", priority="low"
-                    )
+                    insight_text = str(flash_insight or "").strip()
+                    if self._should_emit_flash(insight_text):
+                        await self.telegram.send_message(
+                            f"⚡ **Gemini Flash**: {insight_text}", priority="low"
+                        )
 
                 # 2. Hourly Recap
                 if (now - self.last_hourly_recap).total_seconds() > 3600:
@@ -156,6 +165,27 @@ class GeminiGuard:
         except Exception as e:
             logger.error(f"Flash generation failed: {e}")
             return None
+
+    def _flash_signature(self, insight: str) -> str:
+        text = str(insight or "").strip().lower()
+        text = re.sub(r"[^a-z0-9\s]", " ", text)
+        text = re.sub(r"\s+", " ", text).strip()
+        tokens = [token for token in text.split(" ") if token]
+        return " ".join(tokens[:24])
+
+    def _should_emit_flash(self, insight: str) -> bool:
+        signature = self._flash_signature(insight)
+        if not signature:
+            return False
+
+        now = time.time()
+        if signature == self._last_flash_signature:
+            if now - self._last_flash_sent_at < self._flash_min_interval_seconds:
+                return False
+
+        self._last_flash_signature = signature
+        self._last_flash_sent_at = now
+        return True
 
     async def _deep_analysis(self):
         """Deep strategic analysis using Pro."""

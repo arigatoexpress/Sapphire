@@ -8,6 +8,7 @@ ALPHA_SERVICE="${ALPHA_SERVICE:-sapphire-alpha}"
 ALPHA_REGION="${ALPHA_REGION:-us-central1}"
 WEB_SERVICE="${WEB_SERVICE:-sapphirebook-web}"
 WEB_REGION="${WEB_REGION:-us-central1}"
+WEB_DOMAIN="${WEB_DOMAIN:-https://sapphirealpha.xyz}"
 
 FAILURES=0
 
@@ -48,6 +49,7 @@ fi
 echo "== Frontend Contract Check =="
 echo "Alpha URL: ${ALPHA_URL}"
 echo "Web URL: ${WEB_URL}"
+echo "Web Domain: ${WEB_DOMAIN}"
 
 if curl -fsS "${ALPHA_URL}/health" >/dev/null; then
   pass "alpha /health"
@@ -66,6 +68,13 @@ if [[ -n "${platform_payload}" ]] && echo "${platform_payload}" | jq -e '.platfo
   pass "platform status contract"
 else
   fail "platform status contract missing aster/lighter"
+fi
+
+control_payload="$(curl -fsS "${ALPHA_URL}/api/v2/control/status" || true)"
+if [[ -n "${control_payload}" ]] && echo "${control_payload}" | jq -e '.tradingview_execution_enabled != null and .pending_autonomy_decisions != null and .venues != null' >/dev/null 2>&1; then
+  pass "control status contract"
+else
+  fail "control status contract missing execution/decision/venues fields"
 fi
 
 routing_payload="$(curl -fsS "${ALPHA_URL}/api/v2/trade/routing" || true)"
@@ -89,6 +98,20 @@ else
   fail "system logs contract expected array"
 fi
 
+forum_topics_payload="$(curl -fsS "${ALPHA_URL}/api/v2/forum/topics?limit=10" || true)"
+if [[ -n "${forum_topics_payload}" ]] && echo "${forum_topics_payload}" | jq -e '.topics | type == "array"' >/dev/null 2>&1; then
+  pass "forum topics contract"
+else
+  fail "forum topics contract expected topics array"
+fi
+
+forum_scout_payload="$(curl -fsS "${ALPHA_URL}/api/v2/forum/scout/status" || true)"
+if [[ -n "${forum_scout_payload}" ]] && echo "${forum_scout_payload}" | jq -e '.profile.agent_id != null and .external_bridge != null' >/dev/null 2>&1; then
+  pass "forum scout status contract"
+else
+  fail "forum scout status contract missing profile/bridge"
+fi
+
 aster_ohlc_payload="$(curl -fsS "${ALPHA_URL}/api/v2/market/ohlc?venue=ASTER&symbol=SOL&interval=1m&limit=20" || true)"
 if [[ -n "${aster_ohlc_payload}" ]] && echo "${aster_ohlc_payload}" | jq -e '.ok == true and (.candles | type == "array") and (.candles | length > 0)' >/dev/null 2>&1; then
   pass "ASTER OHLC contract"
@@ -103,11 +126,25 @@ else
   fail "LIGHTER OHLC contract missing array response"
 fi
 
+workspace_payload="$(curl -fsS "${ALPHA_URL}/api/v2/tradingview/workspace" || true)"
+if [[ -n "${workspace_payload}" ]] && echo "${workspace_payload}" | jq -e '.workspace.state.watchlists != null and .workspace.state.selected_symbol != null' >/dev/null 2>&1; then
+  pass "tradingview workspace contract"
+else
+  fail "tradingview workspace contract missing workspace state"
+fi
+
 cors_header="$(curl -si -H "Origin: ${WEB_URL}" "${ALPHA_URL}/api/v2/market/ohlc?venue=ASTER&symbol=SOL&interval=1m&limit=5" | tr -d '\r' | awk -F': ' 'tolower($1)=="access-control-allow-origin"{print $2; exit}')"
 if [[ "${cors_header}" == "${WEB_URL}" ]]; then
   pass "CORS allow-origin for web URL"
 else
   fail "CORS allow-origin mismatch (expected ${WEB_URL}, got ${cors_header:-<empty>})"
+fi
+
+cors_domain_header="$(curl -si -H "Origin: ${WEB_DOMAIN}" "${ALPHA_URL}/api/v2/market/ohlc?venue=ASTER&symbol=SOL&interval=1m&limit=5" | tr -d '\r' | awk -F': ' 'tolower($1)=="access-control-allow-origin"{print $2; exit}')"
+if [[ "${cors_domain_header}" == "${WEB_DOMAIN}" ]]; then
+  pass "CORS allow-origin for web domain"
+else
+  fail "CORS allow-origin mismatch for web domain (expected ${WEB_DOMAIN}, got ${cors_domain_header:-<empty>})"
 fi
 
 echo

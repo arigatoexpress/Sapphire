@@ -5,7 +5,7 @@ Categorizes errors by type and severity to enable intelligent handling.
 Used by all trading bots and the alpha engine.
 """
 
-from enum import Enum
+from enum import Enum, IntEnum
 from typing import Tuple
 
 
@@ -20,7 +20,7 @@ class ErrorCategory(Enum):
     SYSTEM = "system"  # Circuit break if persistent
 
 
-class ErrorSeverity(Enum):
+class ErrorSeverity(IntEnum):
     """Error severity levels for notification decisions."""
 
     INFO = 1  # Log only, add to digest

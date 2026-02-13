@@ -4,18 +4,20 @@ Separated to keep trading_service.py cleaner.
 """
 
 import logging
-from typing import List
 
 from .autonomous_agent import AutonomousAgent
 from .data_store import DataStore
 from .market_scanner import MarketScanner
-from .aster_config import AGENTS_CONFIG
 
 logger = logging.getLogger(__name__)
 
 
 def init_autonomous_components(
-    feature_pipeline, exchange_client, aster_client, settings, hl_client=None, aster_client=None
+    feature_pipeline,
+    exchange_client,
+    aster_client,
+    settings,
+    lighter_client=None,
 ) -> tuple:
     """
     Initialize all autonomous trading components.

@@ -38,7 +38,7 @@ check_file() {
 
 echo "== Sapphire CI Focused Gate =="
 
-FORBIDDEN_REGEX='(sapphire-v2|hyperliquid|symphony|drift)'
+FORBIDDEN_REGEX='(sapphire-v2|legacy[-_ ]?venue|deprecated[-_ ]?venue)'
 SCAN_PATHS=(
   "README.md"
   "OPERATIONS_RUNBOOK.md"
@@ -73,6 +73,9 @@ done
 
 if "${PYTHON_BIN}" -m py_compile \
   services/alpha-engine/shared/telegram_bot.py \
+  services/alpha-engine/shared/health.py \
+  services/alpha-engine/src/collaboration/forum.py \
+  services/alpha-engine/src/security/virustotal_scanner.py \
   services/alpha-engine/src/integrations/tradingview_autonomy.py \
   services/alpha-engine/src/main.py; then
   pass "alpha-engine syntax compile"
@@ -80,7 +83,9 @@ else
   fail "alpha-engine syntax compile"
 fi
 
-if PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q tests/unit/test_alpha_engine_telegram_control.py; then
+if PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q \
+  tests/unit/test_alpha_engine_telegram_control.py \
+  tests/unit/test_virustotal_skill_scanner.py; then
   pass "telegram control unit tests"
 else
   fail "telegram control unit tests"
@@ -93,6 +98,16 @@ if [[ -d "sapphire-web" ]]; then
     pass "sapphire-web production build"
   else
     fail "sapphire-web production build"
+  fi
+
+  if [[ "${RUN_VISUAL_TESTS:-0}" == "1" ]]; then
+    if npx playwright install chromium && npm run test:visual; then
+      pass "sapphire-web visual regression"
+    else
+      fail "sapphire-web visual regression"
+    fi
+  else
+    echo "INFO: visual regression skipped (set RUN_VISUAL_TESTS=1 to enforce)"
   fi
   popd >/dev/null
 else

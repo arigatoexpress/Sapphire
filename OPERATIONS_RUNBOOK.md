@@ -44,7 +44,14 @@ Supported operator commands in Telegram:
 - `/kill`
 - `/resume`
 - `/approve <session_key> [note]`
+- `/approve_all [note]` (approve all pending autonomy sessions)
 - `/reject <session_key> [reason]`
+- `/trade on [qty]` / `/trade off` (runtime execution mode)
+- `/qty <amount>` (runtime default TradingView quantity)
+- `/stage <paper|staged_live|full_live>` (DEX execution stage)
+- `/scout status` (scout bridge readiness)
+- `/scout register <username> [display_name]` (external scout provisioning)
+- `/scout publish <note>` (sanitized external collaboration note)
 - `/deallocate <venue>`
 - `/allocate <venue> <percent>`
 - `/steer <directive>`
@@ -81,7 +88,7 @@ Supported TradingView actions:
 - `tv_chart_set`, `tv_indicator_add`, `tv_indicator_remove`
 - `tv_strategy_add`, `tv_strategy_remove`
 - `tv_script_add`, `tv_script_remove`
-- `tv_scan_assets`, `tv_ta`, `tv_status`, `tv_custom`
+- `tv_scan_assets`, `tv_backtest`, `tv_ta`, `tv_status`, `tv_custom`
 
 Safety default:
 
@@ -120,11 +127,11 @@ Focused jobs in `us-central1`:
 - `sapphire-alpha-heartbeat-30m` -> sends synthetic `/heartbeat` through alpha webhook every 30 minutes
 - `sapphire-alpha-status-daily` -> sends synthetic `/status` update through alpha webhook daily at `14:15 UTC`
 - `sapphire-alpha-strategy-gate-daily` -> sends `/promotion` through alpha webhook daily at `14:45 UTC`
-- `sapphire-heartbeat-30m` -> Sapphire agent heartbeat hook
-- `obsidian-heartbeat-30m` -> Obsidian agent heartbeat hook
-- `emerald-heartbeat-30m` -> Emerald agent heartbeat hook
-- `sapphire-dep-audit-daily` -> daily dependency audit via gateway hook
-- `sapphire-security-scan-weekly` -> weekly security scan via gateway hook
+- `sapphire-heartbeat-30m` -> Sapphire agent heartbeat via alpha `/tradingview/webhook`
+- `obsidian-heartbeat-30m` -> Obsidian agent heartbeat via alpha `/tradingview/webhook`
+- `emerald-heartbeat-30m` -> Emerald agent heartbeat via alpha `/tradingview/webhook`
+- `sapphire-dep-audit-daily` -> daily dependency audit via alpha `/tradingview/webhook`
+- `sapphire-security-scan-weekly` -> weekly security scan via alpha `/tradingview/webhook`
 
 Idempotent job setup script:
 
@@ -133,7 +140,11 @@ Idempotent job setup script:
 ./scripts/setup_clawdbot_jobs.sh
 ```
 
-Gateway-targeting jobs now use OIDC tokens from `sapphire-main-sa@sapphire-479610.iam.gserviceaccount.com`.
+Scheduler auth model:
+
+- `sapphire-aster-health-6h`, `sapphire-lighter-health-6h`, and `sapphire-gateway-health-6h` use OIDC tokens from `sapphire-main-sa@sapphire-479610.iam.gserviceaccount.com`.
+- OpenClaw employee jobs (`sapphire-heartbeat-30m`, `obsidian-heartbeat-30m`, `emerald-heartbeat-30m`, `sapphire-dep-audit-daily`, `sapphire-security-scan-weekly`) route through `sapphire-alpha` `/tradingview/webhook` with `X-Sapphire-Webhook-Secret`, then dispatch to gateway.
+- `sapphire-aster` and `sapphire-lighter` are authenticated-only Cloud Run services (`roles/run.invoker` limited to `sapphire-main-sa`).
 
 Scope reconciliation (dry-run then apply):
 
@@ -168,6 +179,51 @@ Deploy the SapphireBook/SapphireTrade/Sapphire Alpha frontend to Cloud Run:
 
 This builds `sapphire-web` for `linux/amd64`, pushes to Artifact Registry, and deploys `sapphirebook-web`.
 
+If your primary domain is `sapphirealpha.xyz`, also deploy Firebase Hosting to keep domain delivery in lock-step with Cloud Run:
+
+```bash
+./scripts/deploy_sapphirebook_firebase.sh
+```
+
+Preferred one-command deploy:
+
+```bash
+./scripts/deploy_sapphirebook_all.sh
+```
+
+This runs both deploys with a shared build stamp and verifies:
+- Cloud Run health
+- Domain reachability
+- Freshness markers and build stamp on both bundles
+
+Why both:
+- `sapphirebook-web` serves `*.run.app`.
+- `sapphirealpha.xyz` is currently routed through Firebase Hosting/CDN.
+- Skipping Firebase deploy can make the domain look stale even when Cloud Run is updated.
+
+Release freshness controls now included:
+
+- Build stamp injection (`VITE_BUILD_ID`, `VITE_BUILD_TIME_UTC`) shown in UI.
+- Browser force-refresh control in top bar.
+- Nginx cache policy: `index.html` served with `no-store` headers; hashed assets remain immutable.
+
+## Visual Regression Gate
+
+SapphireBook visual baseline is validated with deterministic mocked API responses:
+
+```bash
+cd sapphire-web
+npx playwright install chromium
+npm run test:visual
+```
+
+To intentionally refresh the baseline after approved design changes:
+
+```bash
+cd sapphire-web
+npm run test:visual:update
+```
+
 ## Alpha Control Plane Deploy
 
 Deploy Telegram/control-plane updates for `sapphire-alpha`:
@@ -182,7 +238,83 @@ Full-autonomy env controls are applied by deploy defaults:
 - `SAPPHIRE_AUTONOMY_ALLOW_CODE_CHANGES=true`
 - `SAPPHIRE_AUTONOMY_ALLOW_GCLOUD_CHANGES=true`
 - `SAPPHIRE_AUTONOMY_DRY_RUN=false`
+- `SAPPHIRE_AUTONOMY_REQUIRE_OWNER_APPROVAL=false` (auto-approve autonomy sessions)
 - `SAPPHIRE_AUTONOMY_LOOP_SECONDS=900`
+- `TRADINGVIEW_EXECUTION_ENABLED=false` (TradingView remains workbench/dry-run by default)
+- `TRADINGVIEW_DEFAULT_QUANTITY=0.02`
+
+Wire true external Moltbook bridge when endpoint/token credentials are ready:
+
+```bash
+MOLTBOOK_API_TOKEN='<external-api-token>' \
+./scripts/wire_moltbook_bridge.sh
+```
+
+This creates/updates and binds:
+- `SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL`
+- `SAPPHIRE_SCOUT_EXTERNAL_POST_URL`
+- `SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN`
+
+Defaults target official Moltbook endpoints:
+- `https://www.moltbook.com/api/v1/agents/register`
+- `https://www.moltbook.com/api/v1/posts`
+- Set `STRICT_STATUS_CHECK=true` only when you want the script to fail hard on status/smoke errors.
+
+Bootstrap a fresh scout agent directly on Moltbook and wire secrets automatically:
+
+```bash
+AGENT_NAME='SAPPHIRE_SCOUT' \
+AGENT_DESCRIPTION='Least-privilege Sapphire scout for external collaboration.' \
+./scripts/bootstrap_moltbook_scout.sh
+```
+
+Bootstrap resilience controls:
+- `REGISTER_RETRIES=4` (default) retries registration on transient errors.
+- `REGISTER_BASE_BACKOFF_SECONDS=2` controls linear retry backoff.
+- `ALLOW_FALLBACK_TO_EXISTING_TOKEN=true` reuses existing token secret when Moltbook register is down.
+
+Wire VirusTotal skill-scanning security (OpenClaw skill defense-in-depth):
+
+```bash
+VT_API_KEY='<virustotal-api-key>' \
+SAPPHIRE_VT_ENFORCEMENT_MODE='block_malicious' \
+./scripts/wire_virustotal_security.sh
+```
+
+This binds:
+- `VIRUSTOTAL_API_KEY`
+
+And enables:
+- `SAPPHIRE_VT_ENABLED=true`
+- `SAPPHIRE_VT_ENFORCEMENT_MODE=block_malicious` (`off|warn|block_malicious|block_suspicious`)
+- `SAPPHIRE_VT_UPLOAD_IF_MISSING=false` (safe default for free-tier quotas)
+- `SAPPHIRE_VT_MAX_SKILLS_PER_SCAN=4`
+- `SAPPHIRE_VT_MAX_REQUESTS_PER_MINUTE=4`
+- `SAPPHIRE_VT_MAX_REQUESTS_PER_DAY=500`
+
+Control endpoints:
+- `GET /api/v2/security/skills/status`
+- `GET|POST /api/v2/security/skills/scan`
+
+Mutable API hardening:
+- Set secret `SAPPHIRE_CONTROL_API_TOKEN` and bind it as `SAPPHIRE_CONTROL_API_TOKEN` env.
+- Supply `X-Sapphire-Control-Token: <token>` (or `Authorization: Bearer <token>`) for:
+  - `POST /api/v2/forum/topics`
+  - `POST /api/v2/forum/topics/{topic_id}/replies`
+  - `POST /api/v2/forum/scout/register`
+  - `POST /api/v2/forum/scout/publish`
+  - `GET|POST /api/v2/security/skills/scan`
+- If token is unconfigured, mutable routes fail closed with `503`.
+
+Telegram controls:
+- `/security status`
+- `/security scan [skill|all] [no-upload|upload]` (default: no-upload)
+
+Execution safety controls:
+
+- `TRADINGVIEW_EXECUTION_ENABLED=false` keeps TradingView in workbench mode (strategy/backtest/signal capture only).
+- Set `TRADINGVIEW_EXECUTION_ENABLED=true` only for controlled live-signal windows after validation.
+- `INTERNAL_ARB_EXECUTION_ENABLED=false` keeps internal spread loop in observe-only mode unless explicitly enabled.
 
 Expected result for current scope:
 
@@ -196,7 +328,8 @@ Immediate safety actions:
 
 1. `/kill` in Telegram to halt and deallocate all enabled venues.
 2. Verify:
-   - `GET /health` for `sapphire-alpha`, `sapphire-aster`, `sapphire-lighter`
+   - `GET /health` for `sapphire-alpha`
+   - run authenticated scheduler probes for `sapphire-aster-health-6h` and `sapphire-lighter-health-6h`
    - latest Cloud Run revision status is `Ready=True`
 3. Resume only after issue triage:
    - `/resume`
@@ -208,7 +341,7 @@ Immediate safety actions:
 gcloud run services list --project sapphire-479610 --platform managed
 gcloud scheduler jobs list --project sapphire-479610 --location us-central1
 curl -sS https://sapphire-alpha-267358751314.us-central1.run.app/health
-curl -sS https://sapphire-aster-267358751314.us-central1.run.app/health
-curl -sS https://sapphire-lighter-267358751314.europe-west1.run.app/health
+gcloud scheduler jobs run sapphire-aster-health-6h --project sapphire-479610 --location us-central1
+gcloud scheduler jobs run sapphire-lighter-health-6h --project sapphire-479610 --location us-central1
 ./scripts/focus_guard.sh
 ```

@@ -65,13 +65,31 @@ contains() {
   return 1
 }
 
+read_array_compat() {
+  # macOS default bash (3.x) lacks mapfile/readarray; keep script portable.
+  local target_array="$1"
+  local input_data="$2"
+  if declare -F mapfile >/dev/null 2>&1; then
+    mapfile -t "$target_array" <<<"$input_data"
+  else
+    eval "$target_array=()"
+    while IFS= read -r line; do
+      [[ -n "$line" ]] || continue
+      eval "$target_array+=(\"\$line\")"
+    done <<<"$input_data"
+  fi
+}
+
 load_inventory() {
-  mapfile -t CURRENT_SERVICES < <(
+  local services_raw jobs_raw
+  services_raw="$(
     gcloud run services list --project "${PROJECT_ID}" --platform managed --format='value(name)' | sort
-  )
-  mapfile -t CURRENT_JOBS < <(
+  )"
+  jobs_raw="$(
     gcloud scheduler jobs list --project "${PROJECT_ID}" --location "${LOCATION}" --format='value(name.basename())' | sort
-  )
+  )"
+  read_array_compat CURRENT_SERVICES "${services_raw}"
+  read_array_compat CURRENT_JOBS "${jobs_raw}"
 }
 
 compute_extras() {

@@ -7,83 +7,64 @@ set -euo pipefail
 
 PROJECT_ID="${PROJECT_ID:-sapphire-479610}"
 LOCATION="${LOCATION:-us-central1}"
-GATEWAY_URL="${GATEWAY_URL:-https://sapphire-gateway-s77j6bxyra-uc.a.run.app}"
-SCHEDULER_SA="${SCHEDULER_SA:-sapphire-main-sa@${PROJECT_ID}.iam.gserviceaccount.com}"
-OIDC_AUDIENCE="${OIDC_AUDIENCE:-${GATEWAY_URL}}"
-
-CHAT_ID="$(gcloud secrets versions access latest --secret=TELEGRAM_CHAT_ID --project "${PROJECT_ID}")"
-OPENCLAW_TOKEN="$(
+ALPHA_URL="${ALPHA_URL:-$(gcloud run services describe sapphire-alpha --project "${PROJECT_ID}" --region "${LOCATION}" --format='value(status.url)')}"
+WEBHOOK_SECRET="$(
   gcloud secrets versions access latest \
-    --secret=OPENCLAW_GATEWAY_TOKEN \
+    --secret=TRADINGVIEW_WEBHOOK_SECRET \
     --project "${PROJECT_ID}"
 )"
 
 SAPPHIRE_HEARTBEAT_BODY="$(cat <<JSON
 {
-  "name": "SAPPHIRE 30m Heartbeat",
-  "agentId": "sapphire",
-  "wakeMode": "now",
-  "sessionKey": "hook:scheduler:heartbeat:sapphire",
-  "deliver": true,
-  "channel": "telegram",
-  "to": "${CHAT_ID}",
-  "message": "SAPPHIRE role heartbeat for arigatoexpress/Sapphire only. Act as Security and Code Quality Lead: summarize top security posture, critical risks, and immediate remediation actions. If owner steering is needed, ask one direct question with concrete options."
+  "action": "tv_custom",
+  "agent_id": "sapphire",
+  "instruction": "SAPPHIRE role heartbeat for arigatoexpress/Sapphire only. Act as Security and Code Quality Lead: summarize top security posture, critical risks, and immediate remediation actions. If owner steering is needed, ask one direct question with concrete options.",
+  "source": "scheduler",
+  "task": "sapphire_heartbeat_30m"
 }
 JSON
 )"
 
 OBSIDIAN_HEARTBEAT_BODY="$(cat <<JSON
 {
-  "name": "OBSIDIAN 30m Heartbeat",
-  "agentId": "obsidian",
-  "wakeMode": "now",
-  "sessionKey": "hook:scheduler:heartbeat:obsidian",
-  "deliver": true,
-  "channel": "telegram",
-  "to": "${CHAT_ID}",
-  "message": "OBSIDIAN role heartbeat for arigatoexpress/Sapphire only. Act as CI/CD and Deployment Ops lead: report pipeline failures, runtime incidents, deploy blockers, and rollback-safe remediation steps. Ask owner for direction only when trade-offs block progress."
+  "action": "tv_custom",
+  "agent_id": "obsidian",
+  "instruction": "OBSIDIAN role heartbeat for arigatoexpress/Sapphire only. Act as CI/CD and Deployment Ops lead: report pipeline failures, runtime incidents, deploy blockers, and rollback-safe remediation steps. Ask owner for direction only when trade-offs block progress.",
+  "source": "scheduler",
+  "task": "obsidian_heartbeat_30m"
 }
 JSON
 )"
 
 EMERALD_HEARTBEAT_BODY="$(cat <<JSON
 {
-  "name": "EMERALD 30m Heartbeat",
-  "agentId": "emerald",
-  "wakeMode": "now",
-  "sessionKey": "hook:scheduler:heartbeat:emerald",
-  "deliver": true,
-  "channel": "telegram",
-  "to": "${CHAT_ID}",
-  "message": "EMERALD role heartbeat for arigatoexpress/Sapphire only. Act as Innovation and Self-Improvement Architect: surface repetitive failure patterns, highest-ROI improvements, and execution priorities aligned to MASTERPLAN.md."
+  "action": "tv_custom",
+  "agent_id": "emerald",
+  "instruction": "EMERALD role heartbeat for arigatoexpress/Sapphire only. Act as Innovation and Self-Improvement Architect: surface repetitive failure patterns, highest-ROI improvements, and execution priorities aligned to MASTERPLAN.md.",
+  "source": "scheduler",
+  "task": "emerald_heartbeat_30m"
 }
 JSON
 )"
 
 DEP_AUDIT_BODY="$(cat <<JSON
 {
-  "name": "Daily Dependency Audit",
-  "agentId": "obsidian",
-  "wakeMode": "now",
-  "sessionKey": "hook:scheduler:dep-audit:daily",
-  "deliver": true,
-  "channel": "telegram",
-  "to": "${CHAT_ID}",
-  "message": "Run dependency audit for arigatoexpress/Sapphire only. Provide severity-ranked findings, safe upgrade sequence, and clearly call out any breaking change risk."
+  "action": "tv_custom",
+  "agent_id": "obsidian",
+  "instruction": "Run dependency audit for arigatoexpress/Sapphire only. Provide severity-ranked findings, safe upgrade sequence, and clearly call out any breaking change risk.",
+  "source": "scheduler",
+  "task": "dep_audit_daily"
 }
 JSON
 )"
 
 SECURITY_SWEEP_BODY="$(cat <<JSON
 {
-  "name": "Weekly Security Sweep",
-  "agentId": "sapphire",
-  "wakeMode": "now",
-  "sessionKey": "hook:scheduler:security-scan:weekly",
-  "deliver": true,
-  "channel": "telegram",
-  "to": "${CHAT_ID}",
-  "message": "Run weekly security sweep for arigatoexpress/Sapphire only. Focus on secret exposure, dependency CVEs, container hardening, and CI/CD supply-chain risks with prioritized remediation actions."
+  "action": "tv_custom",
+  "agent_id": "sapphire",
+  "instruction": "Run weekly security sweep for arigatoexpress/Sapphire only. Focus on secret exposure, dependency CVEs, container hardening, and CI/CD supply-chain risks with prioritized remediation actions.",
+  "source": "scheduler",
+  "task": "security_scan_weekly"
 }
 JSON
 )"
@@ -101,11 +82,9 @@ upsert_hook_job() {
       --description "${description}" \
       --schedule "${schedule}" \
       --time-zone "Etc/UTC" \
-      --uri "${GATEWAY_URL}/hooks/agent" \
+      --uri "${ALPHA_URL}/tradingview/webhook" \
       --http-method POST \
-      --oidc-service-account-email "${SCHEDULER_SA}" \
-      --oidc-token-audience "${OIDC_AUDIENCE}" \
-      --update-headers "Content-Type=application/json,X-OpenClaw-Token=${OPENCLAW_TOKEN}" \
+      --update-headers "Content-Type=application/json,X-Sapphire-Webhook-Secret=${WEBHOOK_SECRET}" \
       --message-body "${body}" >/dev/null
     echo "updated ${name}"
   else
@@ -115,11 +94,9 @@ upsert_hook_job() {
       --description "${description}" \
       --schedule "${schedule}" \
       --time-zone "Etc/UTC" \
-      --uri "${GATEWAY_URL}/hooks/agent" \
+      --uri "${ALPHA_URL}/tradingview/webhook" \
       --http-method POST \
-      --oidc-service-account-email "${SCHEDULER_SA}" \
-      --oidc-token-audience "${OIDC_AUDIENCE}" \
-      --headers "Content-Type=application/json,X-OpenClaw-Token=${OPENCLAW_TOKEN}" \
+      --headers "Content-Type=application/json,X-Sapphire-Webhook-Secret=${WEBHOOK_SECRET}" \
       --message-body "${body}" >/dev/null
     echo "created ${name}"
   fi

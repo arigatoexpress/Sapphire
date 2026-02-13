@@ -60,6 +60,10 @@ def test_approve_command_dispatches_session_payload(telegram_module):
     assert payload["session_key"] == "latest"
     assert payload["note"] == "ship it"
 
+    ack_text = bot.send_message.await_args.args[0]
+    assert "Session decision queued" in ack_text
+    assert "Expected outcome:" in ack_text
+
 
 def test_reject_command_dispatches_session_payload(telegram_module):
     callback = AsyncMock()
@@ -92,6 +96,252 @@ def test_reject_command_dispatches_session_payload(telegram_module):
     assert payload["note"] == "hold until risk is lower"
 
 
+def test_approve_all_command_dispatches_bulk_payload(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {
+                "message": {
+                    "chat": {"id": "12345"},
+                    "text": "/approve_all clear backlog now",
+                }
+            }
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert action == "APPROVE_ALL_SESSIONS"
+    assert quantity == 0.0
+
+    payload = json.loads(symbol)
+    assert payload["note"] == "clear backlog now"
+
+
+def test_digest_builder_summarizes_and_groups_repeated_updates(telegram_module):
+    lines = telegram_module.TelegramPlatformBot._build_digest_lines(
+        [
+            "📝 ⚡ Gemini Flash: Volatility remains within nominal bounds.",
+            "📝 ⚡ Gemini Flash: Volatility remains within nominal bounds.",
+            (
+                "📢 💓 SAPPHIRE HEARTBEAT (scheduled)\n"
+                "Active venues: ASTER, LIGHTER\n"
+                "Paused/deallocated: none\n"
+                "Kill switch: OFF\n"
+                "Full autonomy: ON\n"
+                "Failure pressure: 1\n\n"
+                "Owner directive: none\n\n"
+                "Reply with /status, /heartbeat, /focus."
+            ),
+        ]
+    )
+
+    assert any("Market pulse" in line and "x2" in line for line in lines)
+    assert any("Heartbeat:" in line for line in lines)
+    assert all("Reply with /status" not in line for line in lines)
+
+
+def test_digest_builder_summarizes_autonomy_decision_brief(telegram_module):
+    message = (
+        "🚨 🤖 **AUTONOMY DECISION BRIEF**\n"
+        "Session: `hook:autonomy:12345`\n"
+        "Trigger: `failure_pressure`\n"
+        "Why now: Failure pressure reached `5` (gate max `2`).\n"
+        "Current state: active `ASTER` | paused `LIGHTER` | failure pressure `5` | pending `2` "
+        "| DEX stage `staged_live` | DEX live `ON`\n"
+        "Expected outcome: Triage root-cause failures, tighten guardrails, and stabilize dispatch reliability.\n"
+        "Benefit vs current state: Lower error rate and safer autonomous throughput compared with current elevated "
+        "incident pressure.\n"
+        "Risk if deferred: Unresolved failures can cascade into venue deallocations or kill-switch events.\n"
+        "Decision: `/approve <session_key> <note>` or `/reject <session_key> <reason>`\n"
+        "Bulk option: `/approve_all <note>`"
+    )
+    lines = telegram_module.TelegramPlatformBot._build_digest_lines([message, message])
+
+    assert any("Autonomy brief" in line and "x2" in line for line in lines)
+    assert all("Expected outcome:" not in line for line in lines)
+
+
+def test_trade_mode_command_dispatches_execution_toggle(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {
+                "message": {
+                    "chat": {"id": "12345"},
+                    "text": "/trade on 0.03",
+                }
+            }
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert symbol == "ON"
+    assert action == "SET_TRADING_EXECUTION"
+    assert quantity == 0.03
+
+
+def test_stage_command_dispatches_execution_stage_update(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {
+                "message": {
+                    "chat": {"id": "12345"},
+                    "text": "/stage staged_live",
+                }
+            }
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert symbol == "staged_live"
+    assert action == "SET_EXECUTION_STAGE"
+    assert quantity == 0.0
+
+
+def test_scout_status_command_dispatches_status_action(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {
+                "message": {
+                    "chat": {"id": "12345"},
+                    "text": "/scout status",
+                }
+            }
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert symbol == "ALL"
+    assert action == "SCOUT_STATUS"
+    assert quantity == 0.0
+
+
+def test_scout_register_command_dispatches_payload(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {
+                "message": {
+                    "chat": {"id": "12345"},
+                    "text": "/scout register sapphire_scout Sapphire Scout",
+                }
+            }
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert action == "SCOUT_REGISTER"
+    assert quantity == 0.0
+    payload = json.loads(symbol)
+    assert payload["username"] == "sapphire_scout"
+    assert payload["display_name"] == "Sapphire Scout"
+
+
+def test_scout_publish_command_dispatches_payload(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {
+                "message": {
+                    "chat": {"id": "12345"},
+                    "text": "/scout publish topic:TOPIC-00003 Push sanitized summary to external forum",
+                }
+            }
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert action == "SCOUT_PUBLISH"
+    assert quantity == 0.0
+    payload = json.loads(symbol)
+    assert payload["topic_id"] == "TOPIC-00003"
+    assert "sanitized summary" in payload["body"]
+
+
+def test_qty_command_dispatches_default_quantity_update(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {
+                "message": {
+                    "chat": {"id": "12345"},
+                    "text": "/qty 0.05",
+                }
+            }
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert symbol == "ALL"
+    assert action == "SET_TRADINGVIEW_DEFAULT_QUANTITY"
+    assert quantity == 0.05
+
+
 def test_answer_alias_still_routes_to_owner_steer(telegram_module):
     callback = AsyncMock()
     bot = telegram_module.TelegramPlatformBot(
@@ -113,6 +363,81 @@ def test_answer_alias_still_routes_to_owner_steer(telegram_module):
     assert action == "OWNER_STEER"
     assert quantity == 0.0
     assert "prioritize reliability" in symbol
+
+    ack_text = bot.send_message.await_args.args[0]
+    assert "Heartbeat response captured and queued" in ack_text
+    assert "Expected outcome:" in ack_text
+
+
+def test_security_status_command_dispatches_action(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/security status"}}
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert symbol == "ALL"
+    assert action == "SECURITY_STATUS"
+    assert quantity == 0.0
+
+
+def test_security_scan_command_dispatches_payload(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/security scan ci-cd no-upload"}}
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert action == "SECURITY_SCAN"
+    assert quantity == 0.0
+    payload = json.loads(symbol)
+    assert payload["skill"] == "ci-cd"
+    assert payload["upload_if_missing"] is False
+
+
+def test_digest_builder_summarizes_structured_ack_messages(telegram_module):
+    lines = telegram_module.TelegramPlatformBot._build_digest_lines(
+        [
+            (
+                "🚨 🛡️ VirusTotal scan request queued.\n"
+                "Scope: `all` | upload-on-miss: `NO`\n"
+                "Expected outcome: skill verdict(s) with policy decision and report linkage.\n"
+                "Benefit: blocks risky skill bundles before they impact autonomy."
+            ),
+            (
+                "🚨 🛡️ VirusTotal scan request queued.\n"
+                "Scope: `all` | upload-on-miss: `NO`\n"
+                "Expected outcome: skill verdict(s) with policy decision and report linkage.\n"
+                "Benefit: blocks risky skill bundles before they impact autonomy."
+            ),
+        ]
+    )
+
+    assert any("VirusTotal scan request queued" in line for line in lines)
+    assert any("outcome" in line for line in lines)
+    assert any("x2" in line for line in lines)
 
 
 def test_dispatch_session_decision_payload(autonomy_module, monkeypatch):
@@ -167,3 +492,34 @@ def test_dispatch_session_decision_rejects_invalid_inputs(autonomy_module):
     )
     assert invalid_decision["dispatched"] is False
     assert invalid_decision["reason"] == "invalid_decision"
+
+
+def test_tradingview_backtest_action_dispatches_workbench_request(autonomy_module, monkeypatch):
+    plugin = autonomy_module.TradingViewAutonomyPlugin(_DummyMarketData(), default_chat_id="12345")
+
+    async def fake_dispatch(action, payload, note, agent_id=""):
+        return {
+            "dispatched": True,
+            "action": action,
+            "payload": payload,
+            "note": note,
+            "agent_id": agent_id,
+        }
+
+    monkeypatch.setattr(plugin, "_dispatch_to_openclaw", fake_dispatch)
+
+    result = asyncio.run(
+        plugin.handle_action(
+            "tv_backtest",
+            {
+                "strategy": "tv-aster-breakout",
+                "symbol": "SOL",
+                "timeframe": "15",
+            },
+        )
+    )
+
+    assert result["accepted"] == "backtest_requested"
+    assert result["dispatch"]["dispatched"] is True
+    assert result["dispatch"]["action"] == "tv_backtest"
+    assert "workspace" in result

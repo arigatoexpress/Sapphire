@@ -11,6 +11,21 @@ FAILURES=0
 pass() { echo "PASS: $1"; }
 fail() { echo "FAIL: $1"; FAILURES=$((FAILURES + 1)); }
 
+read_array_compat() {
+  # macOS default bash (3.x) lacks mapfile/readarray; keep script portable.
+  local target_array="$1"
+  local input_data="$2"
+  if declare -F mapfile >/dev/null 2>&1; then
+    mapfile -t "$target_array" <<<"$input_data"
+  else
+    eval "$target_array=()"
+    while IFS= read -r line; do
+      [[ -n "$line" ]] || continue
+      eval "$target_array+=(\"\$line\")"
+    done <<<"$input_data"
+  fi
+}
+
 # These terms represent prohibited legacy scope for current focused operation.
 FORBIDDEN_REGEX='(sapphire-v2)'
 SCAN_PATHS=(
@@ -55,7 +70,8 @@ if command -v gcloud >/dev/null 2>&1; then
     pass "gcloud authenticated: ${ACCOUNT}"
 
     PROJECT_ID="${PROJECT_ID:-sapphire-479610}"
-    mapfile -t CURRENT_SERVICES < <(gcloud run services list --project "${PROJECT_ID}" --platform managed --format='value(name)' 2>/dev/null | sort || true)
+    CURRENT_SERVICES_RAW="$(gcloud run services list --project "${PROJECT_ID}" --platform managed --format='value(name)' 2>/dev/null | sort || true)"
+    read_array_compat CURRENT_SERVICES "${CURRENT_SERVICES_RAW}"
     REQUIRED_SERVICES=(
       "sapphire-alpha"
       "sapphire-aster"

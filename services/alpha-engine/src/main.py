@@ -10,9 +10,11 @@ from typing import Any, Deque, Dict, List, Optional, Set
 
 import uvloop
 from src.ai.gemini_guard import GeminiGuard
+from src.collaboration.forum import SapphireForumService
 from src.execution.dispatcher import dispatcher
 from src.feeds.market_data import MarketDataAggregator
 from src.integrations.tradingview_autonomy import TradingViewAutonomyPlugin
+from src.security.virustotal_scanner import VirusTotalSkillScanner
 from src.strategy.engine import AlphaStrategyEngine
 
 # Add shared library to path
@@ -36,6 +38,12 @@ class AlphaEngine:
         self.running = False
         self.market_data = MarketDataAggregator()
         self.strategy = AlphaStrategyEngine(self.market_data)
+        requested_stage = self._parse_execution_stage_token(
+            os.getenv("SAPPHIRE_DEX_EXECUTION_STAGE", "paper")
+        )
+        self._dex_execution_stage = requested_stage or "paper"
+        self.strategy.set_execution_stage(self._dex_execution_stage)
+        self._dex_stage_updated_at = int(time.time())
 
         # Telegram Bot for Notifications & Commands
         from telegram_bot import TelegramPlatformBot
@@ -64,6 +72,7 @@ class AlphaEngine:
         )
         self._telegram_webhook_url = os.getenv("TELEGRAM_WEBHOOK_URL", "").strip()
         self._telegram_webhook_secret = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
+        self._control_api_token = os.getenv("SAPPHIRE_CONTROL_API_TOKEN", "").strip()
         self._telegram_webhook_mode = bool(self._telegram_webhook_url)
         self._tradingview_webhook_secret = os.getenv("TRADINGVIEW_WEBHOOK_SECRET", "").strip()
         self._tradingview_execution_enabled = (
@@ -119,6 +128,9 @@ class AlphaEngine:
             "SAPPHIRE_AUTONOMY_ALLOW_GCLOUD_CHANGES", default=True
         )
         self._autonomy_dry_run = self._env_flag("SAPPHIRE_AUTONOMY_DRY_RUN", default=False)
+        self._autonomy_require_owner_approval = self._env_flag(
+            "SAPPHIRE_AUTONOMY_REQUIRE_OWNER_APPROVAL", default=False
+        )
         self._autonomy_loop_seconds = max(
             300, int(os.getenv("SAPPHIRE_AUTONOMY_LOOP_SECONDS", "900"))
         )
@@ -137,6 +149,8 @@ class AlphaEngine:
         self._started_at = time.time()
         self._system_log_max_entries = max(100, int(os.getenv("SYSTEM_LOG_MAX_ENTRIES", "500")))
         self._system_logs: Deque[Dict[str, Any]] = deque(maxlen=self._system_log_max_entries)
+        self.forum = SapphireForumService()
+        self.vt_scanner = VirusTotalSkillScanner()
         self._trade_metrics: Dict[str, float] = {
             "total_trades": 0.0,
             "wins": 0.0,
@@ -196,6 +210,43 @@ class AlphaEngine:
             "ALL": "ALL",
         }
         return aliases.get(value, value)
+
+    @staticmethod
+    def _parse_execution_stage_token(raw: Any) -> str:
+        value = str(raw or "").strip().lower().replace("-", "_")
+        aliases = {
+            "paper": "paper",
+            "observe": "paper",
+            "dry": "paper",
+            "dry_run": "paper",
+            "staged": "staged_live",
+            "staged_live": "staged_live",
+            "stage": "staged_live",
+            "live": "full_live",
+            "full": "full_live",
+            "full_live": "full_live",
+            "production": "full_live",
+        }
+        return aliases.get(value, "")
+
+    def _set_execution_stage(self, stage: str, source: str = "manual") -> Dict[str, Any]:
+        previous = self._dex_execution_stage
+        applied = self.strategy.set_execution_stage(stage)
+        self._dex_execution_stage = str(applied.get("dex_execution_stage", previous) or previous)
+        self._dex_stage_updated_at = int(time.time())
+        self._record_system_log(
+            f"DEX execution stage set to {self._dex_execution_stage}",
+            level="warning",
+            tags=["control", "dex_stage"],
+            metadata={
+                "source": source,
+                "previous_stage": previous,
+                "applied_stage": self._dex_execution_stage,
+                "effective_live_dispatch": bool(applied.get("effective_live_dispatch", False)),
+                "effective_quantity": float(applied.get("effective_quantity", 0.0)),
+            },
+        )
+        return applied
 
     @staticmethod
     def _parse_tradingview_message(message: str) -> Dict[str, Any]:
@@ -272,6 +323,53 @@ class AlphaEngine:
             return self._tradingview_max_quantity_default
         return None
 
+    def _effective_trade_quantity_cap(self) -> float | None:
+        caps: List[float] = []
+        for venue in dispatcher.bot_urls.keys():
+            venue_cap = self._max_quantity_for_venue(venue)
+            if venue_cap is not None and venue_cap > 0:
+                caps.append(float(venue_cap))
+
+        for rule in self._tradingview_strategy_rules.values():
+            strategy_cap = rule.get("max_quantity")
+            if isinstance(strategy_cap, (int, float)) and float(strategy_cap) > 0:
+                caps.append(float(strategy_cap))
+
+        return min(caps) if caps else None
+
+    def _recommended_default_trade_quantity(self) -> float:
+        base = 0.02
+        cap = self._effective_trade_quantity_cap()
+        if cap is None:
+            return base
+        return round(max(0.001, min(base, float(cap))), 8)
+
+    def _set_tradingview_default_quantity(self, requested_quantity: float) -> Dict[str, Any]:
+        requested = max(0.0, float(requested_quantity))
+        if requested <= 0:
+            return {
+                "ok": False,
+                "reason": "quantity_must_be_positive",
+                "requested": requested,
+            }
+
+        cap = self._effective_trade_quantity_cap()
+        applied = requested
+        capped = False
+        if cap is not None and applied > cap:
+            applied = float(cap)
+            capped = True
+
+        applied = round(applied, 8)
+        self._tradingview_default_quantity = applied
+        return {
+            "ok": True,
+            "requested": requested,
+            "applied": applied,
+            "capped": capped,
+            "cap": cap,
+        }
+
     def _parse_strategy_rules(self, raw_value: str) -> Dict[str, Dict[str, Any]]:
         if not raw_value:
             return {}
@@ -326,6 +424,7 @@ class AlphaEngine:
 
     async def _send_promotion_gate_report(self, reason: str = "manual") -> None:
         state = dispatcher.get_control_state()
+        strategy_state = self.strategy.execution_state()
         active_venues = [
             venue for venue, item in state.items() if not item["paused"] and item["allocation"] > 0
         ]
@@ -348,14 +447,15 @@ class AlphaEngine:
                 f"Failure pressure is {total_failures}",
             ),
             (
-                "TradingView rules enforced",
-                self._tradingview_enforce_strategy_rules and bool(self._tradingview_strategy_rules),
-                "Strategy rules not enforced or missing",
+                "TradingView strategy rules optional in workbench mode",
+                (not self._tradingview_execution_enabled)
+                or (self._tradingview_enforce_strategy_rules and bool(self._tradingview_strategy_rules)),
+                "Enable strategy rules if turning TradingView live mode on",
             ),
             (
-                "TradingView execution still dry-run",
-                not self._tradingview_execution_enabled,
-                "TRADINGVIEW_EXECUTION_ENABLED=true",
+                "DEX execution stage configured",
+                strategy_state.get("dex_execution_stage") in {"paper", "staged_live", "full_live"},
+                "SAPPHIRE_DEX_EXECUTION_STAGE is invalid",
             ),
             (
                 "TradingView autonomy plugin enabled",
@@ -408,8 +508,16 @@ class AlphaEngine:
                 "",
                 f"Active venues: `{', '.join(active_venues) if active_venues else 'none'}`",
                 f"Failure pressure: `{total_failures}`",
+                f"DEX stage: `{strategy_state.get('dex_execution_stage', 'paper')}`",
+                f"DEX live dispatch: `{bool(strategy_state.get('effective_live_dispatch', False))}`",
+                f"DEX effective qty: `{strategy_state.get('effective_quantity', 0.0)}`",
                 f"Rules configured: `{len(self._tradingview_strategy_rules)}`",
                 f"TV autonomy enabled: `{self.tv_autonomy.enabled}`",
+                (
+                    "TV signal mode: `LIVE`"
+                    if self._tradingview_execution_enabled
+                    else "TV signal mode: `WORKBENCH_DRY_RUN`"
+                ),
                 f"TV hook configured: `{bool(self.tv_autonomy.hook_url and self.tv_autonomy.hook_token)}`",
             ]
         )
@@ -567,32 +675,117 @@ class AlphaEngine:
         )
 
     async def _send_control_status(self) -> None:
-        state = dispatcher.get_control_state()
-        pending_sessions = [
-            session
-            for session in self._autonomy_sessions.values()
-            if session.get("decision", "pending") == "pending"
-        ]
+        snapshot = self._control_snapshot()
+        primary_venues = ", ".join(sorted(snapshot["primary_execution_venues"])) or "none"
+        tv_signal_mode = (
+            "LIVE_SIGNAL_EXECUTION"
+            if snapshot["tradingview_signal_mode"] == "live"
+            else "WORKBENCH_DRY_RUN"
+        )
+        active_count = len([item for item in snapshot["venues"].values() if not item["paused"]])
+        pressure = int(snapshot.get("failure_pressure", 0))
+        if snapshot["kill_switch_active"]:
+            status_read = "Trading is intentionally halted by kill switch."
+        elif active_count < self._trading_gate_min_active_venues:
+            status_read = (
+                f"Active venue count is below target ({active_count}/{self._trading_gate_min_active_venues})."
+            )
+        elif pressure > self._trading_gate_max_failure_pressure:
+            status_read = (
+                f"Failure pressure is elevated ({pressure}/{self._trading_gate_max_failure_pressure})."
+            )
+        else:
+            status_read = "Runtime is inside autonomy guardrails."
         lines = [
             "📊 **CONTROL STATUS**",
-            f"Kill switch: `{'ACTIVE' if self._kill_switch_active else 'INACTIVE'}`",
-            f"Full autonomy: `{'ON' if self._full_autonomy_enabled else 'OFF'}`",
-            f"Autonomy dispatches: `{self._autonomy_dispatch_count}`",
-            f"Pending autonomy decisions: `{len(pending_sessions)}`",
+            f"Kill switch: `{'ACTIVE' if snapshot['kill_switch_active'] else 'INACTIVE'}`",
+            f"Full autonomy: `{'ON' if snapshot['full_autonomy_enabled'] else 'OFF'}`",
+            f"Primary execution: `DEX_NATIVE ({primary_venues})`",
+            f"DEX stage: `{snapshot['dex_execution_stage']}`",
+            f"DEX live dispatch: `{'ON' if snapshot['dex_live_dispatch_enabled'] else 'OFF'}`",
+            f"DEX effective qty: `{snapshot['dex_effective_quantity']}`",
+            f"TradingView signal mode: `{tv_signal_mode}`",
+            f"Signal default quantity: `{snapshot['tradingview_default_quantity']}`",
+            (
+                "VT skill security: `ON`"
+                if snapshot.get("vt_security_enabled")
+                else "VT skill security: `OFF`"
+            ),
+            f"VT policy mode: `{snapshot.get('vt_enforcement_mode', 'warn')}`",
+            f"Autonomy dispatches: `{snapshot['autonomy_dispatch_count']}`",
+            f"Pending autonomy decisions: `{snapshot['pending_autonomy_decisions']}`",
+            f"Operational read: {status_read}",
             "",
         ]
-        for venue in sorted(state.keys()):
-            item = state[venue]
+        for venue in sorted(snapshot["venues"].keys()):
+            item = snapshot["venues"][venue]
             status = "PAUSED" if item["paused"] else "LIVE"
-            fail_count = self._failure_counts.get(venue, 0)
+            fail_count = item.get("failure_count", 0)
             lines.append(
                 f"- `{venue}` | {status} | alloc `{item['allocation']*100:.0f}%` | failures `{fail_count}`"
             )
 
         await self.telegram.send_message("\n".join(lines), priority="medium")
 
+    def _control_snapshot(self) -> Dict[str, Any]:
+        state = dispatcher.get_control_state()
+        strategy_state = self.strategy.execution_state()
+        pending_sessions = [
+            session
+            for session in self._autonomy_sessions.values()
+            if session.get("decision", "pending") == "pending"
+        ]
+        pending_sessions.sort(key=lambda item: int(item.get("created_at", 0)), reverse=True)
+        pending_summary = [
+            {
+                "session_key": str(item.get("session_key", "")).strip(),
+                "trigger": str(item.get("trigger", "")).strip(),
+                "created_at": int(item.get("created_at", 0)),
+                "instruction": str(item.get("instruction", "")).strip(),
+            }
+            for item in pending_sessions[:20]
+            if str(item.get("session_key", "")).strip()
+        ]
+
+        venues: Dict[str, Dict[str, Any]] = {}
+        for venue, venue_state in state.items():
+            venues[venue] = {
+                "allocation": float(venue_state.get("allocation", 0.0)),
+                "paused": bool(venue_state.get("paused", False)),
+                "paused_until": venue_state.get("paused_until"),
+                "pause_reason": venue_state.get("pause_reason", ""),
+                "failure_count": int(self._failure_counts.get(venue, 0)),
+            }
+
+        return {
+            "kill_switch_active": self._kill_switch_active,
+            "full_autonomy_enabled": self._full_autonomy_enabled,
+            "owner_approval_required": self._autonomy_require_owner_approval,
+            "primary_execution_plane": "dex_venues",
+            "primary_execution_venues": sorted(venues.keys()),
+            "dex_execution_stage": strategy_state.get("dex_execution_stage", "paper"),
+            "dex_live_dispatch_enabled": bool(strategy_state.get("effective_live_dispatch", False)),
+            "dex_stage_multiplier": float(strategy_state.get("stage_multiplier", 0.0)),
+            "dex_effective_quantity": float(strategy_state.get("effective_quantity", 0.0)),
+            "dex_base_quantity": float(strategy_state.get("base_quantity", 0.0)),
+            "tradingview_execution_enabled": self._tradingview_execution_enabled,
+            "tradingview_signal_mode": "live" if self._tradingview_execution_enabled else "workbench_dry_run",
+            "tradingview_default_quantity": float(self._tradingview_default_quantity),
+            "autonomy_dispatch_count": int(self._autonomy_dispatch_count),
+            "pending_autonomy_decisions": len(pending_summary),
+            "pending_sessions": pending_summary,
+            "owner_directive": self._owner_directive or "",
+            "failure_pressure": int(sum(self._failure_counts.values())),
+            "vt_security_enabled": bool(self.vt_scanner.enabled),
+            "vt_api_key_configured": bool(self.vt_scanner.api_key),
+            "vt_enforcement_mode": self.vt_scanner.enforcement_mode,
+            "venues": venues,
+            "timestamp": int(time.time()),
+        }
+
     async def _send_focus_snapshot(self) -> None:
         state = dispatcher.get_control_state()
+        strategy_state = self.strategy.execution_state()
         venue_summary = ", ".join(sorted(state.keys())) if state else "none"
 
         directive = self._owner_directive.strip() or "none"
@@ -610,8 +803,23 @@ class AlphaEngine:
             f"Enabled venues: `{venue_summary}`",
             f"Kill switch: `{'ACTIVE' if self._kill_switch_active else 'OFF'}`",
             f"Full autonomy mode: `{'ON' if self._full_autonomy_enabled else 'OFF'}`",
+            (
+                f"Owner approval gate: `{'ON' if self._autonomy_require_owner_approval else 'AUTO-APPROVE'}`"
+            ),
+            "Primary execution plane: `DEX_NATIVE (ASTER/LIGHTER)`",
+            f"DEX stage: `{strategy_state.get('dex_execution_stage', 'paper')}`",
+            (
+                f"DEX live dispatch: `{'ON' if strategy_state.get('effective_live_dispatch', False) else 'OFF'}`"
+            ),
+            f"DEX effective qty: `{strategy_state.get('effective_quantity', 0.0)}`",
+            (
+                "TradingView signal mode: `LIVE`"
+                if self._tradingview_execution_enabled
+                else "TradingView signal mode: `WORKBENCH_DRY_RUN`"
+            ),
             f"TradingView autonomy: `{'ON' if self.tv_autonomy.enabled else 'OFF'}`",
             f"Community scripts: `{'ON' if self.tv_autonomy.community_access_enabled else 'OFF'}`",
+            f"VT skill security: `{'ON' if self.vt_scanner.enabled else 'OFF'}` (`{self.vt_scanner.enforcement_mode}`)",
             f"Owner directive: `{directive}`",
             f"Directive updated: `{directive_updated}`",
             "",
@@ -621,29 +829,66 @@ class AlphaEngine:
 
     async def _send_heartbeat(self, reason: str) -> None:
         state = dispatcher.get_control_state()
+        strategy_state = self.strategy.execution_state()
         live = [venue for venue, item in state.items() if not item["paused"] and item["allocation"] > 0]
         paused = [venue for venue, item in state.items() if item["paused"] or item["allocation"] <= 0]
         total_failures = sum(self._failure_counts.values())
+        pending_count = len(self._pending_autonomy_session_keys())
         directive = self._owner_directive.strip() or "none"
         if len(directive) > 120:
             directive = directive[:117] + "..."
+        if self._kill_switch_active:
+            why_now = "Kill switch is active; runtime remains in safety-first containment mode."
+        elif total_failures > self._trading_gate_max_failure_pressure:
+            why_now = (
+                f"Failure pressure is elevated ({total_failures}/{self._trading_gate_max_failure_pressure}); "
+                "expect autonomous triage."
+            )
+        elif len(live) < self._trading_gate_min_active_venues:
+            why_now = (
+                f"Active venue count is below target ({len(live)}/{self._trading_gate_min_active_venues}); "
+                "autonomy will prioritize venue recovery."
+            )
+        else:
+            why_now = "Execution and control state are inside configured guardrails."
 
-        msg = (
-            f"💓 **SAPPHIRE HEARTBEAT** (`{reason}`)\n"
-            f"Active venues: `{', '.join(live) if live else 'none'}`\n"
-            f"Paused/deallocated: `{', '.join(paused) if paused else 'none'}`\n"
-            f"Kill switch: `{'ACTIVE' if self._kill_switch_active else 'OFF'}`\n"
-            f"Full autonomy: `{'ON' if self._full_autonomy_enabled else 'OFF'}`\n"
-            f"Failure pressure: `{total_failures}`\n\n"
-            f"Owner directive: `{directive}`\n\n"
-            "Reply with `/status`, `/heartbeat`, `/focus`, `/promotion`, `/autonomy`, `/kill`, `/resume`, `/steer <directive>`, `/answer <response>`, "
-            "`/approve <session_key>`, `/reject <session_key> <reason>`, "
-            "or `@alpha deallocate <venue>`."
-        )
-        await self.telegram.send_message(msg, priority="medium")
+        lines = [
+            f"💓 **SAPPHIRE HEARTBEAT** (`{reason}`)",
+            "State:",
+            f"- Active venues: `{', '.join(live) if live else 'none'}`",
+            f"- Paused venues: `{', '.join(paused) if paused else 'none'}`",
+            f"- Kill switch: `{'ACTIVE' if self._kill_switch_active else 'OFF'}`",
+            (
+                f"- Full autonomy: `{'ON' if self._full_autonomy_enabled else 'OFF'}`"
+                f" | Approvals: `{'OWNER' if self._autonomy_require_owner_approval else 'AUTO'}`"
+            ),
+            (
+                f"- DEX mode: stage `{strategy_state.get('dex_execution_stage', 'paper')}`"
+                f" | live dispatch `{'ON' if strategy_state.get('effective_live_dispatch', False) else 'OFF'}`"
+                f" | qty `{strategy_state.get('effective_quantity', 0.0)}`"
+            ),
+            (
+                f"- TradingView mode: `{'LIVE' if self._tradingview_execution_enabled else 'WORKBENCH_DRY-RUN'}`"
+                f" | default qty `{self._tradingview_default_quantity}`"
+            ),
+            f"- Pending approvals: `{pending_count}` | Failure pressure: `{total_failures}`",
+            f"- Owner directive: `{directive}`",
+            "",
+            "Why this matters:",
+            f"- {why_now}",
+            (
+                "- Benefit: concise control state and explicit next actions for rapid operator steering."
+            ),
+            "",
+            "Quick actions:",
+            "`/status` `/focus` `/autonomy` `/approve_all`",
+            "Use `/help` for full command list.",
+        ]
+        await self.telegram.send_message("\n".join(lines), priority="medium")
 
     def _autonomy_context_snapshot(self) -> Dict[str, Any]:
         state = dispatcher.get_control_state()
+        strategy_state = self.strategy.execution_state()
         active_venues = [
             venue for venue, item in state.items() if not item.get("paused") and item.get("allocation", 0) > 0
         ]
@@ -662,6 +907,9 @@ class AlphaEngine:
             "autonomy_dispatch_count": self._autonomy_dispatch_count,
             "allowed_repo_scope": sorted(list(getattr(self.tv_autonomy, "allowed_repo_scope", set()))),
             "allowed_project_scope": sorted(list(getattr(self.tv_autonomy, "allowed_project_scope", set()))),
+            "dex_execution_stage": strategy_state.get("dex_execution_stage", "paper"),
+            "dex_live_dispatch": bool(strategy_state.get("effective_live_dispatch", False)),
+            "dex_effective_quantity": float(strategy_state.get("effective_quantity", 0.0)),
             "pending_autonomy_sessions": len(
                 [
                     session
@@ -683,6 +931,122 @@ class AlphaEngine:
         if total_failures > self._trading_gate_max_failure_pressure:
             return "failure_pressure"
         return "scheduled_cycle"
+
+    def _autonomy_request_brief(self, trigger: str, context: Dict[str, Any]) -> Dict[str, str]:
+        trigger_key = str(trigger or "").strip().lower()
+        active_count = len(context.get("active_venues", []))
+        failure_pressure = int(context.get("total_failure_pressure", 0))
+
+        if trigger_key == "venue_shortfall":
+            return {
+                "reasoning": (
+                    f"Active venues dropped to `{active_count}` (minimum required `{self._trading_gate_min_active_venues}`)."
+                ),
+                "expected_outcome": (
+                    "Run venue diagnostics, repair route/config drift, and restore balanced multi-venue execution."
+                ),
+                "expected_benefit": (
+                    "Higher execution resilience and lower concentration risk versus current reduced venue coverage."
+                ),
+                "deferral_risk": (
+                    "Prolonged single-venue dependency increases outage impact and missed execution windows."
+                ),
+            }
+
+        if trigger_key == "failure_pressure":
+            return {
+                "reasoning": (
+                    f"Failure pressure reached `{failure_pressure}` (gate max `{self._trading_gate_max_failure_pressure}`)."
+                ),
+                "expected_outcome": (
+                    "Triage root-cause failures, tighten guardrails, and stabilize dispatch reliability."
+                ),
+                "expected_benefit": (
+                    "Lower error rate and safer autonomous throughput compared with current elevated incident pressure."
+                ),
+                "deferral_risk": (
+                    "Unresolved failures can cascade into venue deallocations or kill-switch events."
+                ),
+            }
+
+        if trigger_key == "kill_switch_active":
+            return {
+                "reasoning": "Kill switch is active and needs targeted remediation work before safe scale-up.",
+                "expected_outcome": (
+                    "Produce a recovery plan with diagnostics and staged remediations while preserving trade safety."
+                ),
+                "expected_benefit": (
+                    "Faster, evidence-based recovery versus ad-hoc manual troubleshooting from the current halted state."
+                ),
+                "deferral_risk": "Extended downtime and stale risk posture until root causes are resolved.",
+            }
+
+        if trigger_key == "startup_bootstrap":
+            return {
+                "reasoning": "Service bootstrapped and requires baseline environment verification.",
+                "expected_outcome": "Validate runtime config/state and queue fixes for any drift discovered at startup.",
+                "expected_benefit": (
+                    "Catches misconfiguration early and improves first-hour reliability versus passive warm-up."
+                ),
+                "deferral_risk": "Silent drift can persist until it surfaces as a production incident.",
+            }
+
+        if trigger_key == "manual_telegram":
+            return {
+                "reasoning": "Owner explicitly requested an autonomy cycle from Telegram.",
+                "expected_outcome": "Run a focused improvement pass across Sapphire code/runtime/cloud controls.",
+                "expected_benefit": "Shorter turnaround on reliability and performance enhancements versus manual steps.",
+                "deferral_risk": "Improvement backlog grows and operational gains are delayed.",
+            }
+
+        return {
+            "reasoning": "Scheduled autonomy cycle reached its execution window.",
+            "expected_outcome": "Perform maintenance and improvement actions inside Sapphire guardrails.",
+            "expected_benefit": "Steady reliability/performance uplift versus remaining in static baseline mode.",
+            "deferral_risk": "Known optimizations and preventive fixes remain unapplied until a later cycle.",
+        }
+
+    def _format_autonomy_decision_brief(
+        self,
+        session_key: str,
+        trigger: str,
+        context: Dict[str, Any],
+        approval_required: bool,
+    ) -> str:
+        brief = self._autonomy_request_brief(trigger, context)
+        active = context.get("active_venues", [])
+        paused = context.get("paused_venues", [])
+        active_text = ", ".join(active) if active else "none"
+        paused_text = ", ".join(paused) if paused else "none"
+        failure_pressure = int(context.get("total_failure_pressure", 0))
+        pending = int(context.get("pending_autonomy_sessions", 0))
+        dex_stage = str(context.get("dex_execution_stage", "paper"))
+        dex_live = "ON" if bool(context.get("dex_live_dispatch", False)) else "OFF"
+        key = str(session_key or "").strip() or "n/a"
+
+        lines = [
+            "🤖 **AUTONOMY DECISION BRIEF**",
+            f"Session: `{key}`",
+            f"Trigger: `{trigger}`",
+            f"Why now: {brief['reasoning']}",
+            (
+                "Current state: "
+                f"active `{active_text}` | paused `{paused_text}` | "
+                f"failure pressure `{failure_pressure}` | pending `{pending}` | "
+                f"DEX stage `{dex_stage}` | DEX live `{dex_live}`"
+            ),
+            f"Expected outcome: {brief['expected_outcome']}",
+            f"Benefit vs current state: {brief['expected_benefit']}",
+            f"Risk if deferred: {brief['deferral_risk']}",
+        ]
+        if approval_required and key != "n/a":
+            lines.append("Decision: `/approve <session_key> <note>` or `/reject <session_key> <reason>`")
+            lines.append("Bulk option: `/approve_all <note>`")
+        elif approval_required:
+            lines.append("Decision gate is ON, but no session key was returned from dispatch.")
+        else:
+            lines.append("Decision mode: `AUTO-APPROVE`")
+        return "\n".join(lines)
 
     def _record_autonomy_session(self, session_key: str, trigger: str, instruction: str) -> None:
         key = str(session_key or "").strip()
@@ -734,6 +1098,74 @@ class AlphaEngine:
         pending.sort(key=lambda item: int(item.get("created_at", 0)), reverse=True)
         return str(pending[0].get("session_key", "")).strip()
 
+    def _pending_autonomy_session_keys(self) -> List[str]:
+        pending = [
+            item
+            for item in self._autonomy_sessions.values()
+            if item.get("decision", "pending") == "pending"
+        ]
+        pending.sort(key=lambda item: int(item.get("created_at", 0)))
+        keys = [str(item.get("session_key", "")).strip() for item in pending]
+        return [key for key in keys if key]
+
+    async def _apply_autonomy_session_decision(
+        self,
+        session_key: str,
+        decision: str,
+        note: str = "",
+        source: str = "owner",
+    ) -> Dict[str, Any]:
+        normalized_decision = str(decision or "").strip().upper()
+        if normalized_decision not in {"APPROVE", "REJECT"}:
+            return {"dispatched": False, "reason": "invalid_decision", "session_key": ""}
+
+        resolved_key = self._resolve_autonomy_session_key(session_key)
+        if not resolved_key:
+            return {"dispatched": False, "reason": "session_not_found", "session_key": ""}
+
+        trimmed_note = str(note or "").strip()
+        if len(trimmed_note) > 400:
+            trimmed_note = trimmed_note[:400]
+
+        entry = self._autonomy_sessions.get(resolved_key, {"session_key": resolved_key})
+        entry["decision"] = "approved" if normalized_decision == "APPROVE" else "rejected"
+        entry["decision_note"] = trimmed_note
+        entry["decision_at"] = int(time.time())
+        entry["decision_source"] = source
+        self._autonomy_sessions[resolved_key] = entry
+
+        hook_result = await self.tv_autonomy.dispatch_session_decision(
+            session_key=resolved_key,
+            decision=normalized_decision,
+            note=trimmed_note,
+        )
+        dispatched = bool(hook_result.get("dispatched"))
+        reason = str(hook_result.get("reason", "")).strip()
+        log_level = "info" if dispatched else "warning"
+        self._record_system_log(
+            (
+                f"Autonomy session {resolved_key} -> {normalized_decision}"
+                + (f" ({source})" if source else "")
+                + (f" failed: {reason}" if reason and not dispatched else "")
+            ),
+            level=log_level,
+            tags=["autonomy", "decision"],
+            metadata={
+                "session_key": resolved_key,
+                "decision": normalized_decision,
+                "source": source,
+                "reason": reason,
+                "dispatched": dispatched,
+            },
+        )
+        return {
+            "dispatched": dispatched,
+            "reason": reason,
+            "session_key": resolved_key,
+            "decision": normalized_decision,
+            "dispatch_session_key": str(hook_result.get("session_key", "")).strip(),
+        }
+
     @staticmethod
     def _parse_session_decision_payload(payload_text: str) -> Dict[str, str]:
         text = str(payload_text or "").strip()
@@ -756,6 +1188,19 @@ class AlphaEngine:
 
         return {"session_key": text, "note": ""}
 
+    @staticmethod
+    def _parse_json_payload(payload_text: str) -> Dict[str, Any]:
+        text = str(payload_text or "").strip()
+        if not text:
+            return {}
+        try:
+            parsed = json.loads(text)
+        except Exception:
+            return {}
+        if isinstance(parsed, dict):
+            return parsed
+        return {}
+
     async def _dispatch_full_autonomy_cycle(self, trigger: str, force: bool = False) -> Dict[str, Any]:
         if not self._full_autonomy_enabled:
             return {"dispatched": False, "reason": "full_autonomy_disabled"}
@@ -775,6 +1220,7 @@ class AlphaEngine:
             f"{directive} Execute an autonomous maintenance and improvement cycle for code + cloud. "
             "Prioritize production safety first, then reliability, then performance."
         )
+        brief = self._autonomy_request_brief(trigger, context)
 
         if self._autonomy_dry_run:
             await self.telegram.send_message(
@@ -782,7 +1228,10 @@ class AlphaEngine:
                     "🧪 Full autonomy dry-run cycle prepared.\n"
                     f"Trigger: `{trigger}`\n"
                     f"Active venues: `{', '.join(context['active_venues']) if context['active_venues'] else 'none'}`\n"
-                    f"Failure pressure: `{context['total_failure_pressure']}`"
+                    f"Failure pressure: `{context['total_failure_pressure']}`\n"
+                    f"Why now: {brief['reasoning']}\n"
+                    f"Expected outcome: {brief['expected_outcome']}\n"
+                    f"Benefit vs current state: {brief['expected_benefit']}"
                 ),
                 priority="medium",
             )
@@ -808,15 +1257,51 @@ class AlphaEngine:
                 tags=["autonomy", "dispatch"],
                 metadata={"session_key": hook_result.get("session_key", "")},
             )
-            await self.telegram.send_message(
-                (
-                    "🤖 Full autonomy cycle dispatched.\n"
-                    f"Trigger: `{trigger}`\n"
-                    f"Session: `{hook_result.get('session_key', 'n/a')}`\n"
-                    "Decision loop: `/approve <session_key>` or `/reject <session_key> <reason>`."
-                ),
-                priority="high",
-            )
+            if session_key and not self._autonomy_require_owner_approval:
+                auto_result = await self._apply_autonomy_session_decision(
+                    session_key=session_key,
+                    decision="APPROVE",
+                    note="Auto-approved by Sapphire autonomy policy.",
+                    source="policy_auto",
+                )
+                decision_brief = self._format_autonomy_decision_brief(
+                    session_key=session_key,
+                    trigger=trigger,
+                    context=context,
+                    approval_required=False,
+                )
+                if auto_result.get("dispatched"):
+                    await self.telegram.send_message(
+                        (
+                            "🤖 Full autonomy cycle dispatched + auto-approved.\n"
+                            f"{decision_brief}"
+                        ),
+                        priority="high",
+                    )
+                else:
+                    await self.telegram.send_message(
+                        (
+                            "⚠️ Full autonomy cycle dispatched and marked auto-approved locally,\n"
+                            f"but decision dispatch failed for `{session_key}`.\n"
+                            f"Reason: `{auto_result.get('reason', 'unknown')}`\n\n"
+                            f"{decision_brief}"
+                        ),
+                        priority="high",
+                    )
+            else:
+                decision_brief = self._format_autonomy_decision_brief(
+                    session_key=session_key,
+                    trigger=trigger,
+                    context=context,
+                    approval_required=self._autonomy_require_owner_approval,
+                )
+                await self.telegram.send_message(
+                    (
+                        "🤖 Full autonomy cycle dispatched.\n"
+                        f"{decision_brief}"
+                    ),
+                    priority="high",
+                )
         else:
             self._record_system_log(
                 f"Full autonomy dispatch unavailable ({trigger}): {hook_result.get('reason', 'unknown')}",
@@ -848,6 +1333,381 @@ class AlphaEngine:
     async def _handle_control_command(self, target: str, action: str, value: float) -> None:
         normalized_action = action.upper()
 
+        if normalized_action in {"SECURITY_STATUS", "VT_STATUS", "SKILL_SECURITY_STATUS"}:
+            status = await self._handle_security_skills_status_request({})
+            last_scan = status.get("last_scan", {}) if isinstance(status, dict) else {}
+            last_scan_type = str(last_scan.get("type", "none")).strip() or "none"
+            last_scan_time = int(last_scan.get("timestamp", 0) or 0)
+            last_scan_verdict = str(last_scan.get("verdict", "n/a")).strip() or "n/a"
+            await self.telegram.send_message(
+                (
+                    "🛡️ **VIRUSTOTAL SKILL SECURITY**\n"
+                    f"Enabled: `{'YES' if status.get('enabled') else 'NO'}`\n"
+                    f"API key configured: `{'YES' if status.get('api_key_configured') else 'NO'}`\n"
+                    f"Policy mode: `{status.get('enforcement_mode', 'warn')}`\n"
+                    f"Skills dir: `{status.get('skills_dir', '')}`\n"
+                    f"Upload-on-miss: `{'YES' if status.get('upload_if_missing_default') else 'NO'}`\n"
+                    f"Last scan: `{last_scan_type}` at `{last_scan_time}` verdict `{last_scan_verdict}`"
+                ),
+                priority="medium",
+            )
+            return
+
+        if normalized_action in {"SECURITY_SCAN", "VT_SCAN", "SKILL_SECURITY_SCAN"}:
+            payload = self._parse_json_payload(target)
+            requested_skill = str(payload.get("skill", "")).strip()
+            if not requested_skill:
+                requested_skill = str(target or "").strip()
+            if requested_skill.startswith("{"):
+                requested_skill = ""
+            upload_if_missing = payload.get("upload_if_missing", self.vt_scanner.upload_if_missing_default)
+            upload_bool = str(upload_if_missing).strip().lower() in {"1", "true", "yes", "on"}
+
+            scan_scope = requested_skill if requested_skill and requested_skill.lower() != "all" else "all"
+            await self.telegram.send_message(
+                f"🛡️ VirusTotal scan requested for `{scan_scope}` (upload-on-miss: `{'YES' if upload_bool else 'NO'}`).",
+                priority="high",
+            )
+            result = await self._handle_security_skill_scan_request(
+                {
+                    "skill": requested_skill,
+                    "upload_if_missing": upload_bool,
+                }
+            )
+
+            if not result.get("ok"):
+                await self.telegram.send_message(
+                    (
+                        "❌ VirusTotal scan failed.\n"
+                        f"Reason: `{result.get('error', 'unknown')}`"
+                    ),
+                    priority="high",
+                )
+                return
+
+            if isinstance(result.get("results"), list):
+                counts = result.get("counts", {})
+                await self.telegram.send_message(
+                    (
+                        "✅ VirusTotal batch scan completed.\n"
+                        f"Skills scanned: `{result.get('skills_scanned', 0)}`\n"
+                        f"Benign: `{counts.get('benign', 0)}` | "
+                        f"Suspicious: `{counts.get('suspicious', 0)}` | "
+                        f"Malicious: `{counts.get('malicious', 0)}` | "
+                        f"Unknown: `{counts.get('unknown', 0)}`\n"
+                        f"Policy blocked: `{result.get('blocked_count', 0)}`"
+                    ),
+                    priority="high",
+                )
+            else:
+                security = result.get("security", {})
+                policy = security.get("policy", {}) if isinstance(security, dict) else {}
+                await self.telegram.send_message(
+                    (
+                        f"✅ VirusTotal scan completed for `{result.get('skill', 'unknown')}`.\n"
+                        f"Verdict: `{security.get('verdict', 'unknown')}` | "
+                        f"Code Insight: `{security.get('code_insight_verdict', 'unknown')}`\n"
+                        f"Policy: `{policy.get('mode', 'warn')}` | "
+                        f"Allowed: `{'YES' if policy.get('allowed') else 'NO'}`\n"
+                        f"Report: {result.get('vt', {}).get('report_url', 'n/a')}"
+                    ),
+                    priority="high",
+                )
+            return
+
+        if normalized_action in {"SCOUT_STATUS", "FORUM_SCOUT_STATUS"}:
+            status = self.forum.scout_status()
+            profile = status.get("profile", {}) if isinstance(status, dict) else {}
+            registration = status.get("registration", {}) if isinstance(status, dict) else {}
+            bridge = status.get("external_bridge", {}) if isinstance(status, dict) else {}
+            await self.telegram.send_message(
+                (
+                    "🛰️ **SCOUT STATUS**\n"
+                    f"Agent: `{profile.get('agent_id', 'SAPPHIRE_SCOUT')}`\n"
+                    f"Sensitive access: `{profile.get('sensitive_data_access', 'none')}`\n"
+                    f"Registered: `{'YES' if registration.get('registered') else 'NO'}`"
+                    + (
+                        f" (@{registration.get('username')})"
+                        if registration.get("username")
+                        else ""
+                    )
+                    + "\n"
+                    f"Dispatch mode: `{bridge.get('dispatch_mode', 'none')}`\n"
+                    f"External register URL: `{'YES' if bridge.get('register_url_configured') else 'NO'}`\n"
+                    f"External post URL: `{'YES' if bridge.get('post_url_configured') else 'NO'}`\n"
+                    f"Fallback hook ready: `{'YES' if bridge.get('fallback_hook_token_configured') and bridge.get('fallback_hook_url_configured') and bridge.get('fallback_chat_id_configured') else 'NO'}`"
+                ),
+                priority="medium",
+            )
+            return
+
+        if normalized_action in {"SCOUT_REGISTER", "FORUM_SCOUT_REGISTER"}:
+            payload = self._parse_json_payload(target)
+            username = str(payload.get("username", "")).strip()
+            if not username:
+                fallback_username = str(target or "").strip().split(" ", 1)[0]
+                username = fallback_username.strip()
+            if not username:
+                await self.telegram.send_message(
+                    "❌ Scout register requires a username. Use `/scout register <username> [display_name]`.",
+                    priority="high",
+                )
+                return
+
+            display_name = str(payload.get("display_name", "")).strip()
+            if not display_name:
+                chunks = str(target or "").strip().split(" ", 1)
+                display_name = chunks[1].strip() if len(chunks) > 1 else "Sapphire Scout"
+            bio = str(payload.get("bio", "")).strip() or (
+                "Least-privilege scout for public collaboration. No secrets, no trading actions."
+            )
+            result = await self._handle_forum_scout_register_request(
+                {
+                    "username": username,
+                    "display_name": display_name,
+                    "bio": bio,
+                }
+            )
+            if not result.get("ok"):
+                await self.telegram.send_message(
+                    (
+                        "❌ Scout registration failed.\n"
+                        f"Reason: `{result.get('error', 'unknown')}`"
+                    ),
+                    priority="high",
+                )
+            return
+
+        if normalized_action in {"SCOUT_PUBLISH", "FORUM_SCOUT_PUBLISH"}:
+            payload = self._parse_json_payload(target)
+            body = str(payload.get("body", "")).strip()
+            if not body:
+                body = str(target or "").strip()
+            if not body:
+                await self.telegram.send_message(
+                    "❌ Scout publish requires message body text. Use `/scout publish <note>`.",
+                    priority="high",
+                )
+                return
+
+            result = await self._handle_forum_scout_publish_request(
+                {
+                    "topic_id": str(payload.get("topic_id", "")).strip(),
+                    "title": str(payload.get("title", "")).strip(),
+                    "body": body,
+                    "author": str(payload.get("author", "")).strip() or "SAPPHIRE_SCOUT",
+                    "kind": str(payload.get("kind", "")).strip() or "note",
+                    "lane": str(payload.get("lane", "")).strip() or "external",
+                    "state": str(payload.get("state", "")).strip() or "open",
+                    "priority": str(payload.get("priority", "")).strip() or "medium",
+                    "tags": payload.get("tags", ["scout", "external"]),
+                }
+            )
+            if not result.get("ok"):
+                await self.telegram.send_message(
+                    (
+                        "❌ Scout publish failed.\n"
+                        f"Reason: `{result.get('error', 'unknown')}`"
+                    ),
+                    priority="high",
+                )
+                return
+
+            dispatch = result.get("dispatch", {}) if isinstance(result, dict) else {}
+            metadata = dispatch.get("metadata", {}) if isinstance(dispatch, dict) else {}
+            metadata = metadata if isinstance(metadata, dict) else {}
+            reason = str(dispatch.get("reason", "unknown")).strip() or "unknown"
+            outcome = "external post accepted."
+            if reason == "ok_pending_verification" or metadata.get("verification_required"):
+                outcome = "accepted by Moltbook, pending verification before full feed visibility."
+            elif reason == "moltbook_rate_limited":
+                retry_after_minutes = int(metadata.get("retry_after_minutes", 0) or 0)
+                if retry_after_minutes > 0:
+                    outcome = f"provider cooldown active; retry in about {retry_after_minutes} minutes."
+                else:
+                    outcome = "provider cooldown active; retry after the next rate-limit window."
+            elif reason == "moltbook_pending_claim":
+                outcome = "account is pending claim; owner claim completion is required before publishing."
+            elif reason == "moltbook_already_registered":
+                outcome = "provider already has this scout account registered."
+            elif not dispatch.get("dispatched"):
+                outcome = "external publish blocked; note remains stored locally for retry."
+            await self.telegram.send_message(
+                (
+                    f"🛰️ Scout note processed for topic `{result.get('topic_id', 'n/a')}`.\n"
+                    f"Dispatch mode: `{dispatch.get('mode', 'none')}` | "
+                    f"Dispatch: `{'YES' if dispatch.get('dispatched') else 'NO'}`\n"
+                    f"Reason: `{reason}`\n"
+                    f"Outcome: {outcome}\n"
+                    "Benefit: external collaboration remains sanitized and auditable."
+                ),
+                priority="high",
+            )
+            return
+
+        if normalized_action in {"SET_EXECUTION_STAGE", "SET_DEX_EXECUTION_STAGE", "PROMOTION_STAGE"}:
+            requested = self._parse_execution_stage_token(target)
+            if not requested:
+                await self.telegram.send_message(
+                    "❌ Invalid stage. Use one of: `paper`, `staged_live`, `full_live`.",
+                    priority="high",
+                )
+                return
+
+            applied = self._set_execution_stage(requested, source="telegram")
+            await self.telegram.send_message(
+                (
+                    f"✅ DEX execution stage set to `{applied.get('dex_execution_stage', requested)}`.\n"
+                    f"Live dispatch: `{'ON' if applied.get('effective_live_dispatch', False) else 'OFF'}` | "
+                    f"Effective qty: `{applied.get('effective_quantity', 0.0)}`"
+                ),
+                priority="high",
+            )
+            return
+
+        if normalized_action in {"SET_TRADING_EXECUTION", "SET_EXECUTION"}:
+            mode = str(target or "").strip().upper()
+            if mode not in {"ON", "OFF", "TRUE", "FALSE", "1", "0"}:
+                await self.telegram.send_message(
+                    "❌ Invalid TradingView signal mode. Use `/trade on [qty]` or `/trade off`.",
+                    priority="high",
+                )
+                return
+
+            enable_execution = mode in {"ON", "TRUE", "1"}
+            quantity_value = max(0.0, float(value or 0.0))
+            quantity_result: Dict[str, Any] | None = None
+
+            self._tradingview_execution_enabled = enable_execution
+            if enable_execution:
+                if quantity_value > 0:
+                    quantity_result = self._set_tradingview_default_quantity(quantity_value)
+                elif self._tradingview_default_quantity <= 0:
+                    quantity_result = self._set_tradingview_default_quantity(
+                        self._recommended_default_trade_quantity()
+                    )
+            self._record_system_log(
+                (
+                    f"TradingView signal mode set to {'LIVE' if enable_execution else 'WORKBENCH_DRY-RUN'}"
+                    + (
+                        f" (qty={self._tradingview_default_quantity})"
+                        if enable_execution
+                        else ""
+                    )
+                ),
+                level="warning",
+                tags=["control", "execution_mode"],
+                metadata={
+                    "execution_enabled": enable_execution,
+                    "default_quantity": self._tradingview_default_quantity,
+                },
+            )
+
+            if enable_execution:
+                qty_note = f"Default qty `{self._tradingview_default_quantity}`."
+                if quantity_result and quantity_result.get("capped"):
+                    qty_note = (
+                        f"Default qty capped to `{quantity_result.get('applied')}` "
+                        f"(cap `{quantity_result.get('cap')}`)."
+                    )
+                await self.telegram.send_message(
+                    f"✅ TradingView signal mode: `LIVE`. {qty_note}",
+                    priority="high",
+                )
+            else:
+                await self.telegram.send_message(
+                    "🧪 TradingView signal mode: `WORKBENCH_DRY-RUN` (signals captured for research/backtests only).",
+                    priority="high",
+                )
+            return
+
+        if normalized_action in {"SET_TRADINGVIEW_DEFAULT_QUANTITY", "SET_DEFAULT_QUANTITY"}:
+            result = self._set_tradingview_default_quantity(float(value or 0.0))
+            if not result.get("ok"):
+                await self.telegram.send_message(
+                    "❌ Default quantity must be greater than zero.",
+                    priority="high",
+                )
+                return
+
+            self._record_system_log(
+                "TradingView default quantity updated",
+                level="warning",
+                tags=["control", "execution_mode"],
+                metadata={
+                    "requested_quantity": result.get("requested"),
+                    "applied_quantity": result.get("applied"),
+                    "capped": bool(result.get("capped")),
+                    "cap": result.get("cap"),
+                },
+            )
+            if result.get("capped"):
+                await self.telegram.send_message(
+                    (
+                        f"⚠️ Default quantity capped to `{result.get('applied')}` "
+                        f"(requested `{result.get('requested')}`, cap `{result.get('cap')}`)."
+                    ),
+                    priority="high",
+                )
+            else:
+                live_note = "LIVE" if self._tradingview_execution_enabled else "DRY-RUN"
+                await self.telegram.send_message(
+                    f"✅ Default TradingView quantity set to `{result.get('applied')}` (mode `{live_note}`).",
+                    priority="high",
+                )
+            return
+
+        if normalized_action == "APPROVE_ALL_SESSIONS":
+            decision_payload = self._parse_session_decision_payload(target)
+            note = str(decision_payload.get("note", "")).strip()
+            if len(note) > 400:
+                note = note[:400]
+
+            pending_keys = self._pending_autonomy_session_keys()
+            if not pending_keys:
+                await self.telegram.send_message(
+                    "ℹ️ No pending autonomy sessions to approve.",
+                    priority="high",
+                )
+                return
+
+            success_count = 0
+            failed: List[str] = []
+            for session_key in pending_keys:
+                result = await self._apply_autonomy_session_decision(
+                    session_key=session_key,
+                    decision="APPROVE",
+                    note=note,
+                    source="owner_bulk",
+                )
+                if result.get("dispatched"):
+                    success_count += 1
+                else:
+                    failed.append(
+                        f"{result.get('session_key', session_key)}:{result.get('reason', 'unknown')}"
+                    )
+
+            if failed:
+                await self.telegram.send_message(
+                    (
+                        f"⚠️ Bulk approval completed with partial failures.\n"
+                        f"Approved: `{success_count}` / `{len(pending_keys)}`\n"
+                        f"Failed: `{'; '.join(failed[:5])}`\n"
+                        "Expected outcome: successful sessions continue without owner delay.\n"
+                        "Next step: re-run `/approve_all` after resolving listed failures."
+                    ),
+                    priority="high",
+                )
+            else:
+                await self.telegram.send_message(
+                    (
+                        f"✅ Bulk approval completed. Approved `{success_count}` pending session(s).\n"
+                        "Expected outcome: queued autonomy changes move immediately into execution."
+                    ),
+                    priority="high",
+                )
+            return
+
         if normalized_action in {"APPROVE_SESSION", "REJECT_SESSION"}:
             decision_payload = self._parse_session_decision_payload(target)
             session_key = self._resolve_autonomy_session_key(decision_payload.get("session_key", ""))
@@ -861,46 +1721,29 @@ class AlphaEngine:
                 )
                 return
 
-            entry = self._autonomy_sessions.get(session_key, {"session_key": session_key})
-            if len(note) > 400:
-                note = note[:400]
-            entry["decision"] = "approved" if decision == "APPROVE" else "rejected"
-            entry["decision_note"] = note
-            entry["decision_at"] = int(time.time())
-            self._autonomy_sessions[session_key] = entry
-
-            hook_result = await self.tv_autonomy.dispatch_session_decision(
+            result = await self._apply_autonomy_session_decision(
                 session_key=session_key,
                 decision=decision,
                 note=note,
+                source="owner_manual",
             )
-            if hook_result.get("dispatched"):
+            if result.get("dispatched"):
                 await self.telegram.send_message(
                     (
                         f"✅ Session `{session_key}` marked `{decision}`.\n"
-                        f"Dispatch: `{hook_result.get('session_key', 'n/a')}`"
+                        f"Dispatch: `{result.get('dispatch_session_key', 'n/a')}`\n"
+                        "Expected outcome: session state is synchronized and downstream action is unblocked."
                     ),
                     priority="high",
-                )
-                self._record_system_log(
-                    f"Owner session decision {decision} for {session_key}",
-                    level="info",
-                    tags=["autonomy", "decision"],
-                    metadata={"session_key": session_key, "decision": decision, "note": note},
                 )
             else:
                 await self.telegram.send_message(
                     (
                         f"⚠️ Session decision captured locally but dispatch failed for `{session_key}`.\n"
-                        f"Reason: `{hook_result.get('reason', 'unknown')}`"
+                        f"Reason: `{result.get('reason', 'unknown')}`\n"
+                        "Benefit: decision is preserved locally for controlled retry."
                     ),
                     priority="high",
-                )
-                self._record_system_log(
-                    f"Session decision dispatch failed for {session_key}",
-                    level="warning",
-                    tags=["autonomy", "decision"],
-                    metadata={"session_key": session_key, "decision": decision, "reason": hook_result.get("reason", "")},
                 )
             return
 
@@ -927,7 +1770,22 @@ class AlphaEngine:
             return
 
         if normalized_action in {"PROMOTION_GATE", "STRATEGY_GATE", "PROMOTION", "GATE"}:
-            await self._send_promotion_gate_report("manual")
+            requested_stage = self._parse_execution_stage_token(target)
+            if requested_stage:
+                applied = self._set_execution_stage(requested_stage, source="promotion_gate")
+                await self.telegram.send_message(
+                    (
+                        f"🚀 Promotion stage updated to `{applied.get('dex_execution_stage', requested_stage)}`.\n"
+                        f"Live dispatch: `{'ON' if applied.get('effective_live_dispatch', False) else 'OFF'}` | "
+                        f"Effective qty: `{applied.get('effective_quantity', 0.0)}`"
+                    ),
+                    priority="high",
+                )
+                await self._send_promotion_gate_report(
+                    f"promotion:{applied.get('dex_execution_stage', requested_stage)}"
+                )
+            else:
+                await self._send_promotion_gate_report("manual")
             return
 
         if normalized_action in {"AUTONOMY", "AUTONOMY_CYCLE"}:
@@ -949,21 +1807,28 @@ class AlphaEngine:
             self._owner_directive_updated_at = int(time.time())
 
             await self.telegram.send_message(
-                f"🧠 Owner directive recorded: `{directive}`",
+                (
+                    f"🧠 Owner directive recorded: `{directive}`\n"
+                    "Expected outcome: next autonomy cycle and focus snapshots use this directive."
+                ),
                 priority="high",
             )
 
             hook_result = await self.tv_autonomy.dispatch_owner_instruction(directive)
             if hook_result.get("dispatched"):
                 await self.telegram.send_message(
-                    f"✅ OpenClaw steering dispatch queued (`{hook_result.get('session_key', 'n/a')}`).",
+                    (
+                        f"✅ OpenClaw steering dispatch queued (`{hook_result.get('session_key', 'n/a')}`).\n"
+                        "Benefit: direction reaches agents immediately without waiting for the next schedule."
+                    ),
                     priority="medium",
                 )
             else:
                 await self.telegram.send_message(
                     (
                         "⚠️ OpenClaw steering dispatch unavailable "
-                        f"(`{hook_result.get('reason', 'unknown')}`). Directive kept in focus context."
+                        f"(`{hook_result.get('reason', 'unknown')}`). Directive kept in focus context.\n"
+                        "Expected outcome: runtime remains aligned; dispatch retries can run later."
                     ),
                     priority="high",
                 )
@@ -1086,14 +1951,19 @@ class AlphaEngine:
         if self.tv_autonomy.is_workspace_action(normalized_action):
             workspace_result = await self.tv_autonomy.handle_action(normalized_action, merged_payload)
             result_type = workspace_result.get("accepted", "unknown")
-            if result_type in {"workspace_updated", "workspace_noop", "scan_requested", "custom_requested"}:
+            if result_type in {
+                "workspace_updated",
+                "workspace_noop",
+                "scan_requested",
+                "backtest_requested",
+                "custom_requested",
+            }:
                 dispatch = workspace_result.get("dispatch", {})
                 dispatch_status = "yes" if dispatch.get("dispatched") else f"no ({dispatch.get('reason', 'n/a')})"
                 await self.telegram.send_message(
                     (
-                        f"🧩 TradingView workspace action `{normalized_action}` processed.\n"
-                        f"Result: `{result_type}`\n"
-                        f"OpenClaw dispatch: `{dispatch_status}`"
+                        f"🧩 Workspace `{normalized_action}` -> `{result_type}`"
+                        f" (dispatch `{dispatch_status}`)"
                     ),
                     priority="medium",
                 )
@@ -1254,7 +2124,7 @@ class AlphaEngine:
             )
             await self.telegram.send_message(
                 (
-                    f"📥 TradingView signal captured (dry-run): `{normalized_action.upper()} {symbol}` "
+                    f"📥 TradingView signal captured (workbench dry-run): `{normalized_action.upper()} {symbol}` "
                     f"with quantities `{', '.join(qty_parts)}`. Set `TRADINGVIEW_EXECUTION_ENABLED=true` to execute."
                     f"{cap_note}"
                 ),
@@ -1448,23 +2318,47 @@ class AlphaEngine:
             await start_health_server(
                 telegram_update_handler=self.telegram._process_update,
                 telegram_webhook_secret=self._telegram_webhook_secret,
+                control_api_token=self._control_api_token,
                 tradingview_update_handler=self._handle_tradingview_signal,
                 tradingview_webhook_secret=self._tradingview_webhook_secret,
                 market_ohlc_handler=self._handle_market_ohlc_request,
                 platform_status_handler=self._handle_platform_status_request,
+                control_status_handler=self._handle_control_status_request,
                 routing_info_handler=self._handle_routing_info_request,
                 performance_stats_handler=self._handle_performance_stats_request,
                 system_logs_handler=self._handle_system_logs_request,
+                tradingview_workspace_handler=self._handle_tradingview_workspace_request,
+                forum_topics_handler=self._handle_forum_topics_request,
+                forum_create_topic_handler=self._handle_forum_create_topic_request,
+                forum_topic_detail_handler=self._handle_forum_topic_detail_request,
+                forum_replies_handler=self._handle_forum_replies_request,
+                forum_scout_status_handler=self._handle_forum_scout_status_request,
+                forum_scout_register_handler=self._handle_forum_scout_register_request,
+                forum_scout_publish_handler=self._handle_forum_scout_publish_request,
+                security_skills_status_handler=self._handle_security_skills_status_request,
+                security_skills_scan_handler=self._handle_security_skill_scan_request,
             )
         else:
             await start_health_server(
+                control_api_token=self._control_api_token,
                 tradingview_update_handler=self._handle_tradingview_signal,
                 tradingview_webhook_secret=self._tradingview_webhook_secret,
                 market_ohlc_handler=self._handle_market_ohlc_request,
                 platform_status_handler=self._handle_platform_status_request,
+                control_status_handler=self._handle_control_status_request,
                 routing_info_handler=self._handle_routing_info_request,
                 performance_stats_handler=self._handle_performance_stats_request,
                 system_logs_handler=self._handle_system_logs_request,
+                tradingview_workspace_handler=self._handle_tradingview_workspace_request,
+                forum_topics_handler=self._handle_forum_topics_request,
+                forum_create_topic_handler=self._handle_forum_create_topic_request,
+                forum_topic_detail_handler=self._handle_forum_topic_detail_request,
+                forum_replies_handler=self._handle_forum_replies_request,
+                forum_scout_status_handler=self._handle_forum_scout_status_request,
+                forum_scout_register_handler=self._handle_forum_scout_register_request,
+                forum_scout_publish_handler=self._handle_forum_scout_publish_request,
+                security_skills_status_handler=self._handle_security_skills_status_request,
+                security_skills_scan_handler=self._handle_security_skill_scan_request,
             )
 
         # 1. Start Telegram FIRST for immediate status
@@ -1609,6 +2503,7 @@ class AlphaEngine:
     async def _handle_platform_status_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
         snapshot = self.market_data.get_market_snapshot(symbol="SOL")
         control_state = dispatcher.get_control_state()
+        strategy_state = self.strategy.execution_state()
         platforms: Dict[str, Dict[str, Any]] = {}
 
         for venue in ("ASTER", "LIGHTER"):
@@ -1650,11 +2545,18 @@ class AlphaEngine:
         return {
             "platforms": platforms,
             "kill_switch_active": self._kill_switch_active,
+            "dex_execution_stage": strategy_state.get("dex_execution_stage", "paper"),
+            "dex_live_dispatch": bool(strategy_state.get("effective_live_dispatch", False)),
+            "dex_effective_quantity": float(strategy_state.get("effective_quantity", 0.0)),
             "timestamp": int(time.time()),
         }
 
+    async def _handle_control_status_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
+        return self._control_snapshot()
+
     async def _handle_routing_info_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
         state = dispatcher.get_control_state()
+        strategy_state = self.strategy.execution_state()
         active = [venue for venue, item in state.items() if not item.get("paused") and item.get("allocation", 0) > 0]
         paused = [venue for venue, item in state.items() if item.get("paused") or item.get("allocation", 0) <= 0]
         failure_pressure = int(sum(self._failure_counts.values()))
@@ -1691,6 +2593,8 @@ class AlphaEngine:
                 "paused_venues": paused,
                 "failure_pressure": failure_pressure,
                 "kill_switch_active": self._kill_switch_active,
+                "dex_execution_stage": strategy_state.get("dex_execution_stage", "paper"),
+                "dex_live_dispatch": bool(strategy_state.get("effective_live_dispatch", False)),
             },
             "timestamp": int(time.time()),
         }
@@ -1727,6 +2631,194 @@ class AlphaEngine:
             limit = 80
         limit = max(1, min(limit, self._system_log_max_entries))
         return list(self._system_logs)[-limit:]
+
+    async def _handle_tradingview_workspace_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
+        snapshot = self.tv_autonomy.status_snapshot()
+        return {
+            "workspace": snapshot,
+            "timestamp": int(time.time()),
+        }
+
+    async def _handle_security_skills_status_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
+        status = self.vt_scanner.status()
+        status["timestamp"] = int(time.time())
+        return status
+
+    async def _handle_security_skill_scan_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        requested_skill = str(payload.get("skill", "")).strip()
+        upload_if_missing_raw = payload.get("upload_if_missing", self.vt_scanner.upload_if_missing_default)
+        upload_if_missing = str(upload_if_missing_raw).strip().lower() in {"1", "true", "yes", "on"}
+
+        if requested_skill and requested_skill.lower() != "all":
+            result = await self.vt_scanner.scan_skill(
+                requested_skill,
+                upload_if_missing=upload_if_missing,
+            )
+            if result.get("ok"):
+                security = result.get("security", {})
+                self._record_system_log(
+                    f"VirusTotal scan completed for {requested_skill}",
+                    level="info",
+                    tags=["security", "virustotal", "skills"],
+                    metadata={
+                        "skill": requested_skill,
+                        "verdict": security.get("verdict", "unknown"),
+                        "policy_blocked": bool(
+                            (security.get("policy", {}) or {}).get("blocked", False)
+                        ),
+                    },
+                )
+            return result
+
+        batch_result = await self.vt_scanner.scan_all_skills(upload_if_missing=upload_if_missing)
+        if batch_result.get("ok"):
+            self._record_system_log(
+                "VirusTotal batch scan completed",
+                level="info",
+                tags=["security", "virustotal", "skills"],
+                metadata={
+                    "skills_scanned": int(batch_result.get("skills_scanned", 0)),
+                    "counts": batch_result.get("counts", {}),
+                    "blocked_count": int(batch_result.get("blocked_count", 0)),
+                },
+            )
+        return batch_result
+
+    async def _handle_forum_topics_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        board = self.forum.list_topics(payload)
+        control = self._control_snapshot()
+        return {
+            **board,
+            "control": {
+                "pending_autonomy_decisions": int(control.get("pending_autonomy_decisions", 0)),
+                "owner_directive": str(control.get("owner_directive", "") or ""),
+                "failure_pressure": int(control.get("failure_pressure", 0)),
+            },
+            "timestamp": int(time.time()),
+        }
+
+    async def _handle_forum_topic_detail_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        topic_id = str(payload.get("topic_id", "")).strip()
+        if not topic_id:
+            return {"error": "topic_id_required"}
+        topic = self.forum.get_topic_detail(topic_id)
+        if not topic:
+            return {"error": "topic_not_found", "topic_id": topic_id}
+        return {"topic": topic, "timestamp": int(time.time())}
+
+    async def _handle_forum_create_topic_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            topic = self.forum.create_topic(
+                {
+                    "title": payload.get("title", ""),
+                    "body": payload.get("body", ""),
+                    "lane": payload.get("lane", "research"),
+                    "state": payload.get("state", "open"),
+                    "priority": payload.get("priority", "medium"),
+                    "author": payload.get("author", "SAPPHIRE"),
+                    "tags": payload.get("tags", []),
+                    "source": payload.get("source", "internal"),
+                }
+            )
+        except ValueError as exc:
+            return {"error": str(exc)}
+
+        self._record_system_log(
+            f"Forum topic created: {topic.get('topic_id', 'unknown')}",
+            level="info",
+            tags=["forum", "topic"],
+            metadata={
+                "topic_id": topic.get("topic_id", ""),
+                "lane": topic.get("lane", ""),
+                "priority": topic.get("priority", ""),
+            },
+        )
+        return {"topic": topic, "timestamp": int(time.time())}
+
+    async def _handle_forum_replies_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        topic_id = str(payload.get("topic_id", "")).strip()
+        if not topic_id:
+            return {"error": "topic_id_required"}
+
+        body = str(payload.get("body", "")).strip()
+        if not body:
+            return {"error": "body_required"}
+
+        try:
+            reply = self.forum.add_reply(
+                topic_id,
+                {
+                    "body": body,
+                    "author": payload.get("author", "SAPPHIRE"),
+                    "kind": payload.get("kind", "comment"),
+                    "state": payload.get("state", ""),
+                    "source": payload.get("source", "internal"),
+                },
+            )
+        except ValueError as exc:
+            return {"error": str(exc)}
+
+        self._record_system_log(
+            f"Forum reply added to {topic_id}",
+            level="info",
+            tags=["forum", "reply"],
+            metadata={"topic_id": topic_id, "reply_id": reply.get("reply_id", "")},
+        )
+        return {"reply": reply, "timestamp": int(time.time())}
+
+    async def _handle_forum_scout_status_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
+        return self.forum.scout_status()
+
+    async def _handle_forum_scout_register_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        result = await self.forum.register_scout_account(payload)
+        if result.get("ok"):
+            dispatch = result.get("dispatch", {}) or {}
+            mode = str(dispatch.get("mode", "none")).strip() or "none"
+            metadata = dispatch.get("metadata", {}) if isinstance(dispatch, dict) else {}
+            metadata = metadata if isinstance(metadata, dict) else {}
+            username = result.get("registration", {}).get("username", "unknown")
+            if dispatch.get("dispatched"):
+                lines = [
+                    "🛰️ Scout registration processed.",
+                    f"Mode: `{mode}`",
+                    f"User: `@{username}`",
+                    "Outcome: least-privilege external collaboration scout is active.",
+                ]
+                if metadata.get("claim_url"):
+                    lines.append(f"Action: complete claim in Moltbook once using `{metadata.get('claim_url')}`.")
+                elif metadata.get("already_registered"):
+                    lines.append("Action: existing claimed scout account detected; no re-registration needed.")
+                await self.telegram.send_message(
+                    "\n".join(lines),
+                    priority="medium",
+                )
+            else:
+                lines = [
+                    "🛰️ Scout registration prepared locally; external provider blocked dispatch.",
+                    f"Mode: `{mode}`",
+                    f"Reason: `{dispatch.get('reason', 'not_configured')}`",
+                    "Benefit preserved: local SapphireBook record exists for retry/audit without exposing sensitive data.",
+                ]
+                if metadata.get("hint"):
+                    lines.append(f"Hint: {metadata.get('hint')}")
+                await self.telegram.send_message(
+                    "\n".join(lines),
+                    priority="medium",
+                )
+        return result
+
+    async def _handle_forum_scout_publish_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        result = await self.forum.publish_scout_note(payload)
+        if result.get("ok"):
+            dispatch = result.get("dispatch", {}) or {}
+            if not dispatch.get("dispatched"):
+                self._record_system_log(
+                    "Scout outbound note stored locally; external publish pending",
+                    level="warning",
+                    tags=["forum", "scout"],
+                    metadata={"reason": dispatch.get("reason", "not_configured")},
+                )
+        return result
 
     async def stop(self):
         logger.info("🛑 Stopping Alpha Engine...")

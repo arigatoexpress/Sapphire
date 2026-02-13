@@ -121,8 +121,8 @@ upsert_oidc_get_job() {
 }
 
 upsert_http_job "sapphire-alpha-health-6h" "0 */6 * * *" "${ALPHA_URL}/health" "GET" "" ""
-upsert_http_job "sapphire-aster-health-6h" "5 */6 * * *" "${ASTER_URL}/health" "GET" "" ""
-upsert_http_job "sapphire-lighter-health-6h" "10 */6 * * *" "${LIGHTER_URL}/health" "GET" "" ""
+upsert_oidc_get_job "sapphire-aster-health-6h" "5 */6 * * *" "${ASTER_URL}/health" "${ASTER_URL}"
+upsert_oidc_get_job "sapphire-lighter-health-6h" "10 */6 * * *" "${LIGHTER_URL}/health" "${LIGHTER_URL}"
 upsert_oidc_get_job "sapphire-gateway-health-6h" "15 */6 * * *" "${GATEWAY_URL}/" "${GATEWAY_URL}"
 upsert_http_job \
   "sapphire-alpha-heartbeat-30m" \

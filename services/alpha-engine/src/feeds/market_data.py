@@ -88,6 +88,12 @@ class MarketDataAggregator:
         self._lighter_seen_hashes: Deque[str] = deque()
         self._lighter_seen_hash_set: set[str] = set()
         self._lighter_seen_hash_max = max(1000, int(os.getenv("LIGHTER_SEEN_HASH_MAX", "4000")))
+        self._lighter_max_tick_jump_ratio = self._env_float(
+            "LIGHTER_MAX_TICK_JUMP_RATIO", 3.0, minimum=1.2
+        )
+        self._lighter_tick_jump_window_seconds = self._env_float(
+            "LIGHTER_TICK_JUMP_WINDOW_SECONDS", 600.0, minimum=30.0
+        )
 
         self._lighter_last_issue = ""
         self._lighter_last_issue_ts = 0.0
@@ -177,6 +183,25 @@ class MarketDataAggregator:
         symbol_key = str(symbol or "").strip().upper() or self._chart_symbol
         ts = float(timestamp if timestamp is not None else time.time())
         volume_value = max(0.0, float(volume or 0.0))
+
+        if venue_key == "LIGHTER":
+            history = self._tick_history.get(venue_key, {}).get(symbol_key, deque())
+            if history:
+                last_ts, last_price, _ = history[-1]
+                if (
+                    last_price > 0
+                    and abs(ts - float(last_ts)) <= self._lighter_tick_jump_window_seconds
+                ):
+                    ratio = max(
+                        price_value / float(last_price),
+                        float(last_price) / price_value,
+                    )
+                    if ratio > self._lighter_max_tick_jump_ratio:
+                        self._log_lighter_issue(
+                            "Filtered LIGHTER outlier tick "
+                            f"(price={price_value}, previous={last_price}, ratio={ratio:.2f})."
+                        )
+                        return
 
         self.prices.setdefault(venue_key, {})[symbol_key] = price_value
         ticks = self._tick_history[venue_key][symbol_key]
@@ -352,6 +377,12 @@ class MarketDataAggregator:
         else:
             return []
 
+        expected_market_index: Optional[int] = None
+        try:
+            expected_market_index = int(str(self._lighter_market_id).strip())
+        except (TypeError, ValueError):
+            expected_market_index = None
+
         ticks: List[Tuple[float, float, float]] = []
         for item in entries:
             if not isinstance(item, dict):
@@ -361,7 +392,18 @@ class MarketDataAggregator:
 
             pubdata = item.get("pubdata", {})
             trade_pubdata = pubdata.get("trade_pubdata", {}) if isinstance(pubdata, dict) else {}
-            price = self._coerce_price(trade_pubdata.get("price")) or self._extract_price_from_object(item)
+            if not isinstance(trade_pubdata, dict):
+                continue
+
+            market_index = trade_pubdata.get("market_index")
+            if expected_market_index is not None:
+                try:
+                    if int(market_index) != expected_market_index:
+                        continue
+                except (TypeError, ValueError):
+                    continue
+
+            price = self._coerce_price(trade_pubdata.get("price"))
             if price is None or price <= 0:
                 continue
 
@@ -477,13 +519,17 @@ class MarketDataAggregator:
         symbol_key = str(symbol or "").strip().upper() or self._chart_symbol
         interval_key, interval_seconds = self._parse_interval(interval)
         bar_limit = max(10, min(int(limit or 120), 500))
+        tracking_symbol = symbol_key
 
         candles: List[Dict[str, float]] = []
         source = "tick_buffer"
 
         if venue_key == "ASTER":
+            tracking_symbol = self._normalize_aster_symbol(
+                self._aster_symbol if symbol_key == self._chart_symbol else symbol_key
+            )
             aster_candles = await self._fetch_aster_ohlc(
-                symbol=self._aster_symbol if symbol_key == self._chart_symbol else symbol_key,
+                symbol=tracking_symbol,
                 interval_seconds=interval_seconds,
                 limit=bar_limit,
             )
@@ -491,6 +537,7 @@ class MarketDataAggregator:
                 candles = aster_candles
                 source = "aster_klines"
         elif venue_key == "LIGHTER":
+            tracking_symbol = self._lighter_market_symbol
             lighter_candles = await self._fetch_lighter_logs_ohlc(
                 interval_seconds=interval_seconds,
                 limit=bar_limit,
@@ -513,6 +560,7 @@ class MarketDataAggregator:
         return {
             "venue": venue_key,
             "symbol": symbol_key,
+            "tracking_symbol": tracking_symbol,
             "interval": interval_key,
             "interval_seconds": interval_seconds,
             "limit": bar_limit,
@@ -676,14 +724,10 @@ class MarketDataAggregator:
                 await asyncio.sleep(self._lighter_poll_interval_seconds)
 
     def _extract_lighter_price_from_logs(self, payload: Any) -> Optional[float]:
-        if isinstance(payload, list):
-            for item in payload:
-                price = self._extract_price_from_object(item)
-                if price is not None and price > 0:
-                    return price
-            return None
-
-        return self._extract_price_from_object(payload)
+        ticks = self._extract_lighter_ticks_from_logs(payload)
+        if ticks:
+            return float(ticks[-1][1])
+        return None
 
     def _extract_lighter_price_from_ws_message(self, message: Any) -> Optional[float]:
         if isinstance(message, bytes):

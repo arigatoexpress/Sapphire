@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import TradingChart from '../components/TradingChart.vue'
-import { fetchMarketOHLC, fetchPlatformStatus, fetchSystemLogs, type OhlcCandle } from '../api/client'
+import {
+    fetchControlStatus,
+    fetchMarketOHLC,
+    fetchPlatformStatus,
+    fetchSystemLogs,
+    type OhlcCandle,
+} from '../api/client'
 
 interface VenueCard {
     id: 'aster' | 'lighter'
@@ -10,6 +16,14 @@ interface VenueCard {
     mode: string
     notes: string
     price: number | null
+}
+
+interface VenueChartMeta {
+    symbol: string
+    trackingSymbol: string
+    source: string
+    interval: string
+    generatedAt: number
 }
 
 const venues = ref<VenueCard[]>([
@@ -32,11 +46,30 @@ const venues = ref<VenueCard[]>([
 ])
 
 const recentOps = ref<string[]>([])
-const chartCandles = ref<OhlcCandle[]>([])
-const chartSourceLabel = ref('Waiting for live OHLC feed')
+const asterCandles = ref<OhlcCandle[]>([])
+const lighterCandles = ref<OhlcCandle[]>([])
+const asterMeta = ref<VenueChartMeta>({
+    symbol: 'SOL',
+    trackingSymbol: 'SOLUSDT',
+    source: 'unavailable',
+    interval: '1m',
+    generatedAt: 0,
+})
+const lighterMeta = ref<VenueChartMeta>({
+    symbol: 'SOL',
+    trackingSymbol: 'SOL',
+    source: 'unavailable',
+    interval: '1m',
+    generatedAt: 0,
+})
 const loading = ref(true)
 const lastRefreshEpoch = ref(0)
 const nowEpoch = ref(Date.now())
+const controlState = ref<{
+    tradingview_execution_enabled: boolean
+    tradingview_default_quantity: number
+    pending_autonomy_decisions: number
+} | null>(null)
 let refreshTimer: ReturnType<typeof setInterval> | null = null
 let clockTimer: ReturnType<typeof setInterval> | null = null
 
@@ -55,38 +88,70 @@ const refreshAge = computed(() => {
     return `${Math.max(0, Math.round((nowEpoch.value - lastRefreshEpoch.value) / 1000))}s ago`
 })
 
-const latestMergedClose = computed(() => {
-    const tail = chartCandles.value[chartCandles.value.length - 1]
+const executionModeLabel = computed(() =>
+    controlState.value?.tradingview_execution_enabled ? 'signals live' : 'workbench dry-run',
+)
+
+const defaultQtyLabel = computed(() => {
+    const qty = Number(controlState.value?.tradingview_default_quantity || 0)
+    return qty > 0 ? qty.toString() : 'n/a'
+})
+
+const pendingDecisionCount = computed(() => Number(controlState.value?.pending_autonomy_decisions || 0))
+
+const formatPrice = (value: number | null) => {
+    if (value === null || !Number.isFinite(value) || value <= 0) return 'n/a'
+    if (value >= 1000) return `$${value.toFixed(2)}`
+    if (value >= 100) return `$${value.toFixed(3)}`
+    return `$${value.toFixed(4)}`
+}
+
+const asterVenuePrice = computed(() => venues.value.find((item) => item.id === 'aster')?.price ?? null)
+const lighterVenuePrice = computed(() => venues.value.find((item) => item.id === 'lighter')?.price ?? null)
+
+const asterLastClose = computed(() => {
+    const tail = asterCandles.value[asterCandles.value.length - 1]
     return tail ? Number(tail.close) : null
 })
 
-const mergedRangePct = computed(() => {
-    if (chartCandles.value.length < 2) return null
-    const highs = chartCandles.value.map((item) => Number(item.high))
-    const lows = chartCandles.value.map((item) => Number(item.low))
-    const tail = chartCandles.value[chartCandles.value.length - 1]
-    const close = Number(tail?.close || 0)
-    if (!Number.isFinite(close) || close <= 0) return null
-    const spread = Math.max(...highs) - Math.min(...lows)
-    return (spread / close) * 100
+const lighterLastClose = computed(() => {
+    const tail = lighterCandles.value[lighterCandles.value.length - 1]
+    return tail ? Number(tail.close) : null
 })
 
-const momentumPct = computed(() => {
-    if (chartCandles.value.length < 8) return null
-    const head = chartCandles.value[0]
-    const tail = chartCandles.value[chartCandles.value.length - 1]
-    const first = Number(head?.close || 0)
-    const last = Number(tail?.close || 0)
-    if (!Number.isFinite(first) || first <= 0 || !Number.isFinite(last)) return null
-    return ((last - first) / first) * 100
+const effectiveAsterPrice = computed(() => asterVenuePrice.value ?? asterLastClose.value)
+const effectiveLighterPrice = computed(() => lighterVenuePrice.value ?? lighterLastClose.value)
+
+const spreadAbs = computed(() => {
+    if (effectiveAsterPrice.value === null || effectiveLighterPrice.value === null) return null
+    return Math.abs(effectiveAsterPrice.value - effectiveLighterPrice.value)
 })
 
-const volatilityTone = computed(() => {
-    const range = mergedRangePct.value ?? 0
-    if (range >= 4) return 'tone-hot'
-    if (range >= 2) return 'tone-warm'
+const spreadPct = computed(() => {
+    if (effectiveAsterPrice.value === null || effectiveLighterPrice.value === null) return null
+    const midpoint = (effectiveAsterPrice.value + effectiveLighterPrice.value) / 2
+    if (!Number.isFinite(midpoint) || midpoint <= 0) return null
+    return (Math.abs(effectiveAsterPrice.value - effectiveLighterPrice.value) / midpoint) * 100
+})
+
+const spreadTone = computed(() => {
+    const value = spreadPct.value ?? 0
+    if (value >= 1.0) return 'tone-hot'
+    if (value >= 0.4) return 'tone-warm'
     return 'tone-calm'
 })
+
+const formatBarAge = (candles: OhlcCandle[]) => {
+    const last = candles[candles.length - 1] as OhlcCandle | undefined
+    if (!last) return 'n/a'
+    const ts = Math.floor(Number(last.time) || 0)
+    if (ts <= 0) return 'n/a'
+    const delta = Math.max(0, Math.round(Date.now() / 1000 - ts))
+    return `${delta}s`
+}
+
+const asterBarAge = computed(() => formatBarAge(asterCandles.value))
+const lighterBarAge = computed(() => formatBarAge(lighterCandles.value))
 
 const normalizeCandles = (candles: OhlcCandle[] | null | undefined): OhlcCandle[] =>
     (candles || [])
@@ -107,39 +172,6 @@ const normalizeCandles = (candles: OhlcCandle[] | null | undefined): OhlcCandle[
                 Number.isFinite(item.close),
         )
         .sort((a, b) => a.time - b.time)
-
-const mergeVenueCandles = (series: OhlcCandle[][]): OhlcCandle[] => {
-    const byTime = new Map<number, OhlcCandle[]>()
-    for (const candles of series) {
-        for (const candle of candles) {
-            const key = Math.floor(Number(candle.time))
-            const existing = byTime.get(key) || []
-            existing.push(candle)
-            byTime.set(key, existing)
-        }
-    }
-
-    return Array.from(byTime.entries())
-        .sort((a, b) => a[0] - b[0])
-        .slice(-180)
-        .map(([time, candles]) => {
-            const opens = candles.map((item) => Number(item.open))
-            const closes = candles.map((item) => Number(item.close))
-            const highs = candles.map((item) => Number(item.high))
-            const lows = candles.map((item) => Number(item.low))
-            const volume = candles.reduce((sum, item) => sum + Number(item.volume || 0), 0)
-            const avgOpen = opens.reduce((sum, value) => sum + value, 0) / opens.length
-            const avgClose = closes.reduce((sum, value) => sum + value, 0) / closes.length
-            return {
-                time,
-                open: avgOpen,
-                high: Math.max(...highs),
-                low: Math.min(...lows),
-                close: avgClose,
-                volume,
-            }
-        })
-}
 
 const normalizeVenueStatus = (value: unknown): VenueCard['status'] => {
     if (typeof value !== 'string') return 'offline'
@@ -173,11 +205,12 @@ const applyPlatformPayload = (payload: any) => {
 
 const loadOpsView = async () => {
     try {
-        const [platforms, logs, asterOhlc, lighterOhlc] = await Promise.all([
+        const [platforms, logs, asterOhlc, lighterOhlc, controlPayload] = await Promise.all([
             fetchPlatformStatus(),
             fetchSystemLogs(),
-            fetchMarketOHLC({ venue: 'ASTER', symbol: 'SOL', interval: '1m', limit: 180 }),
-            fetchMarketOHLC({ venue: 'LIGHTER', symbol: 'SOL', interval: '1m', limit: 180 }),
+            fetchMarketOHLC({ venue: 'ASTER', symbol: 'SOL', interval: '1m', limit: 220 }),
+            fetchMarketOHLC({ venue: 'LIGHTER', symbol: 'SOL', interval: '1m', limit: 220 }),
+            fetchControlStatus(),
         ])
 
         if (platforms) applyPlatformPayload(platforms)
@@ -185,22 +218,39 @@ const loadOpsView = async () => {
             recentOps.value = logs
                 .map((entry: any) => entry?.message || entry?.msg || String(entry))
                 .filter((message: string) =>
-                    /aster|lighter|deploy|risk|position|execution|promotion|allocation|heartbeat/i.test(message),
+                    /aster|lighter|deploy|risk|position|execution|promotion|allocation|heartbeat|ohlc|arb/i.test(message),
                 )
-                .slice(-8)
+                .slice(-10)
                 .reverse()
         }
 
-        const asterCandles = normalizeCandles(asterOhlc?.candles)
-        const lighterCandles = normalizeCandles(lighterOhlc?.candles)
-        const merged = mergeVenueCandles([asterCandles, lighterCandles])
-        chartCandles.value = merged
+        asterCandles.value = normalizeCandles(asterOhlc?.candles)
+        lighterCandles.value = normalizeCandles(lighterOhlc?.candles)
 
-        if (merged.length > 0) {
-            chartSourceLabel.value = `Live OHLC merge · ASTER ${asterCandles.length} + LIGHTER ${lighterCandles.length}`
-        } else {
-            chartSourceLabel.value = 'Waiting for live OHLC feed'
+        asterMeta.value = {
+            symbol: String(asterOhlc?.symbol || 'SOL').toUpperCase(),
+            trackingSymbol: String(asterOhlc?.tracking_symbol || asterOhlc?.symbol || 'SOL').toUpperCase(),
+            source: String(asterOhlc?.source || 'unavailable'),
+            interval: String(asterOhlc?.interval || '1m'),
+            generatedAt: Number(asterOhlc?.generated_at || 0),
         }
+
+        lighterMeta.value = {
+            symbol: String(lighterOhlc?.symbol || 'SOL').toUpperCase(),
+            trackingSymbol: String(lighterOhlc?.tracking_symbol || lighterOhlc?.symbol || 'SOL').toUpperCase(),
+            source: String(lighterOhlc?.source || 'unavailable'),
+            interval: String(lighterOhlc?.interval || '1m'),
+            generatedAt: Number(lighterOhlc?.generated_at || 0),
+        }
+
+        if (controlPayload?.ok) {
+            controlState.value = {
+                tradingview_execution_enabled: Boolean(controlPayload.tradingview_execution_enabled),
+                tradingview_default_quantity: Number(controlPayload.tradingview_default_quantity || 0),
+                pending_autonomy_decisions: Number(controlPayload.pending_autonomy_decisions || 0),
+            }
+        }
+
         lastRefreshEpoch.value = Date.now()
     } catch (error) {
         console.error('Failed to load trade view data:', error)
@@ -228,72 +278,88 @@ onUnmounted(() => {
         <section class="hero card glass-lift">
             <div class="hero-copy">
                 <span class="font-mono kicker">SAPPHIRETRADE</span>
-                <h2>Autonomous execution board for ASTER + LIGHTER.</h2>
-                <p>Web controls remain read-only. Execution commands and overrides are routed through Telegram heartbeat.</p>
+                <h2>Venue-native execution telemetry for ASTER + LIGHTER.</h2>
+                <p>
+                    Charts are now split by venue so each panel tracks one feed directly. No cross-venue candle averaging is used in
+                    the chart path.
+                </p>
             </div>
             <div class="health-line">
-                <span class="chip">
-                    Healthy venues: {{ healthyCount }}/{{ venues.length }}
-                </span>
-                <span class="chip muted">
-                    Posture: {{ portfolioPosture }}
-                </span>
-                <span class="chip muted">
-                    Sync: {{ refreshAge }}
-                </span>
+                <span class="chip">Healthy venues: {{ healthyCount }}/{{ venues.length }}</span>
+                <span class="chip muted">Posture: {{ portfolioPosture }}</span>
+                <span class="chip muted">Sync: {{ refreshAge }}</span>
+                <span class="chip muted">DEX execution: ASTER + LIGHTER</span>
+                <span class="chip muted">TV: {{ executionModeLabel }} · qty {{ defaultQtyLabel }}</span>
+                <span class="chip muted">Pending decisions: {{ pendingDecisionCount }}</span>
             </div>
         </section>
 
         <section class="metric-strip">
             <article class="metric card glass-lift">
-                <p class="font-mono">Merged Mark</p>
-                <strong>{{ latestMergedClose === null ? 'n/a' : `$${latestMergedClose.toFixed(3)}` }}</strong>
-                <small>Cross-venue weighted close from live OHLC merge.</small>
+                <p class="font-mono">ASTER Mark</p>
+                <strong>{{ formatPrice(effectiveAsterPrice) }}</strong>
+                <small>
+                    feed close {{ formatPrice(asterLastClose) }} · venue mark {{ formatPrice(asterVenuePrice) }}
+                </small>
             </article>
             <article class="metric card glass-lift">
-                <p class="font-mono">Range (Window)</p>
-                <strong :class="volatilityTone">{{ mergedRangePct === null ? 'n/a' : `${mergedRangePct.toFixed(2)}%` }}</strong>
-                <small>High/low spread over the active telemetry window.</small>
+                <p class="font-mono">LIGHTER Mark</p>
+                <strong>{{ formatPrice(effectiveLighterPrice) }}</strong>
+                <small>
+                    feed close {{ formatPrice(lighterLastClose) }} · venue mark {{ formatPrice(lighterVenuePrice) }}
+                </small>
             </article>
             <article class="metric card glass-lift">
-                <p class="font-mono">Momentum Delta</p>
-                <strong :class="{ bullish: (momentumPct || 0) > 0, bearish: (momentumPct || 0) < 0 }">
-                    {{ momentumPct === null ? 'n/a' : `${momentumPct.toFixed(2)}%` }}
+                <p class="font-mono">Cross-Venue Spread</p>
+                <strong :class="spreadTone">
+                    {{ spreadPct === null ? 'n/a' : `${spreadPct.toFixed(3)}%` }}
                 </strong>
-                <small>Directional delta across the current merged series.</small>
+                <small>
+                    absolute delta {{ spreadAbs === null ? 'n/a' : formatPrice(spreadAbs) }}
+                </small>
             </article>
         </section>
 
-        <section class="grid">
+        <section class="chart-grid">
             <article class="chart-panel card glass-lift">
                 <header>
-                    <h3 class="font-mono">Cross-Venue Price Pulse</h3>
-                    <small>{{ chartSourceLabel }}</small>
+                    <h3 class="font-mono">ASTER ({{ asterMeta.trackingSymbol }})</h3>
+                    <small>
+                        source {{ asterMeta.source }} · req {{ asterMeta.symbol }} · {{ asterMeta.interval }} · bar age {{ asterBarAge }}
+                    </small>
                 </header>
-                <TradingChart :candles="chartCandles" :height="300" />
+                <TradingChart :candles="asterCandles" :height="290" />
             </article>
 
-            <article class="venue-board card">
+            <article class="chart-panel card glass-lift">
                 <header>
-                    <h3 class="font-mono">Venue State</h3>
-                    <small>read-only telemetry</small>
+                    <h3 class="font-mono">LIGHTER ({{ lighterMeta.trackingSymbol }})</h3>
+                    <small>
+                        source {{ lighterMeta.source }} · req {{ lighterMeta.symbol }} · {{ lighterMeta.interval }} · bar age {{ lighterBarAge }}
+                    </small>
                 </header>
-                <div class="venues-grid">
-                    <article v-for="venue in venues" :key="venue.id" class="venue-card glass-lift">
-                        <header>
-                            <h4 class="font-mono">{{ venue.label }}</h4>
-                            <span class="status-pill font-mono" :class="statusClass(venue.status)">
-                                {{ venue.status.toUpperCase() }}
-                            </span>
-                        </header>
-                        <strong class="price">
-                            {{ venue.price === null ? 'n/a' : `$${venue.price.toFixed(3)}` }}
-                        </strong>
-                        <p class="mode">{{ venue.mode }}</p>
-                        <p class="notes">{{ venue.notes }}</p>
-                    </article>
-                </div>
+                <TradingChart :candles="lighterCandles" :height="290" />
             </article>
+        </section>
+
+        <section class="venue-board card">
+            <header>
+                <h3 class="font-mono">Venue State</h3>
+                <small>read-only telemetry</small>
+            </header>
+            <div class="venues-grid">
+                <article v-for="venue in venues" :key="venue.id" class="venue-card glass-lift">
+                    <header>
+                        <h4 class="font-mono">{{ venue.label }}</h4>
+                        <span class="status-pill font-mono" :class="statusClass(venue.status)">
+                            {{ venue.status.toUpperCase() }}
+                        </span>
+                    </header>
+                    <strong class="price">{{ formatPrice(venue.price) }}</strong>
+                    <p class="mode">{{ venue.mode }}</p>
+                    <p class="notes">{{ venue.notes }}</p>
+                </article>
+            </div>
         </section>
 
         <section class="ops-log card">
@@ -359,12 +425,6 @@ onUnmounted(() => {
     color: #9cdcff;
 }
 
-.grid {
-    display: grid;
-    grid-template-columns: 1.15fr 1fr;
-    gap: 0.8rem;
-}
-
 .metric-strip {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -407,12 +467,10 @@ onUnmounted(() => {
     color: #84f0cf;
 }
 
-.bullish {
-    color: #7deec2;
-}
-
-.bearish {
-    color: #ffb2b2;
+.chart-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.8rem;
 }
 
 .chart-panel,
@@ -442,6 +500,7 @@ onUnmounted(() => {
 
 .venues-grid {
     display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.6rem;
 }
 
@@ -547,7 +606,11 @@ onUnmounted(() => {
         grid-template-columns: 1fr;
     }
 
-    .grid {
+    .chart-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .venues-grid {
         grid-template-columns: 1fr;
     }
 }
