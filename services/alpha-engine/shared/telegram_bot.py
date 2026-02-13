@@ -107,6 +107,61 @@ class TelegramPlatformBot:
                 return candidate
         return NotificationPriority.MEDIUM
 
+    @staticmethod
+    def _parse_media_publish_arg(media_arg: str) -> Dict[str, Any]:
+        text = str(media_arg or "").strip()
+        payload: Dict[str, Any] = {
+            "topic": "",
+            "targets": ["twitter", "substack"],
+            "note": "",
+        }
+        if not text:
+            return payload
+
+        def _extract_segment(key: str, source: str) -> tuple[str, str]:
+            pattern = rf"(?:^|\s){key}(?:=|:)\s*(.+?)(?=\s+(?:targets?|topic|note)(?:=|:)|$)"
+            match = re.search(pattern, source, flags=re.IGNORECASE)
+            if not match:
+                return "", source
+            value = str(match.group(1) or "").strip()
+            updated = (source[: match.start()] + " " + source[match.end() :]).strip()
+            return value, re.sub(r"\s+", " ", updated).strip()
+
+        target_text, text = _extract_segment("targets?", text)
+        topic_text, text = _extract_segment("topic", text)
+        note_text, text = _extract_segment("note", text)
+
+        if target_text:
+            tokens = [chunk.strip().lower() for chunk in re.split(r"[,+/|]", target_text) if chunk.strip()]
+            if len(tokens) == 1 and " " in tokens[0]:
+                tokens = [chunk.strip().lower() for chunk in tokens[0].split(" ") if chunk.strip()]
+            if tokens:
+                payload["targets"] = tokens
+
+        payload["topic"] = topic_text or text
+        payload["note"] = note_text
+        return payload
+
+    @staticmethod
+    def _parse_media_request_arg(media_arg: str) -> Dict[str, str]:
+        text = str(media_arg or "").strip()
+        if not text:
+            return {"request_id": "latest", "note": ""}
+
+        head, tail = text, ""
+        if " " in text:
+            head, tail = text.split(" ", 1)
+            head = head.strip()
+            tail = tail.strip()
+
+        if re.fullmatch(r"(latest|[A-Za-z0-9:._-]+)", head, flags=re.IGNORECASE):
+            request_id = head
+            note = tail
+        else:
+            request_id = "latest"
+            note = text
+        return {"request_id": request_id or "latest", "note": note}
+
     async def _get_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
             timeout = aiohttp.ClientTimeout(total=20, connect=10, sock_connect=10, sock_read=15)
@@ -486,8 +541,12 @@ class TelegramPlatformBot:
             "- `/security status`\n"
             "- `/security scan [skill|all] [no-upload|upload]` (default: no-upload)\n"
             "- `/media status`\n"
+            "- `/media queue`\n"
             "- `/media mode <draft_only|owner_approval|auto_post>`\n"
             "- `/media draft <topic>`\n"
+            "- `/media publish [topic:<name>] [targets:<x|substack|both>]`\n"
+            "- `/media approve [request_id|latest] [note]`\n"
+            "- `/media reject [request_id|latest] [reason]`\n"
             "- `/deallocate <venue>`\n"
             "- `/allocate <venue> <percent>`\n\n"
             "Owner steering:\n"
@@ -700,12 +759,12 @@ class TelegramPlatformBot:
 
         # Media workflow commands (Twitter + Substack automation plane)
         slash_media_cmd = re.search(
-            r"^/media\s+(status|mode|draft)(?:\s+(.+))?$",
+            r"^/media\s+(status|mode|draft|publish|queue|approve|reject)(?:\s+(.+))?$",
             text,
             flags=re.IGNORECASE,
         )
         mention_media_cmd = re.search(
-            r"@(alpha|control)\s+media\s+(status|mode|draft)(?:\s+(.+))?$",
+            r"@(alpha|control)\s+media\s+(status|mode|draft|publish|queue|approve|reject)(?:\s+(.+))?$",
             text,
             flags=re.IGNORECASE,
         )
@@ -729,6 +788,18 @@ class TelegramPlatformBot:
                 await self._dispatch_callback("CONTROL", "ALL", "MEDIA_STATUS", 0.0)
                 return
 
+            if media_command == "queue":
+                await self.send_message(
+                    (
+                        "📰 Sapphire media queue status request queued.\n"
+                        "Expected outcome: return pending approvals, queued publishes, and recent publish outcomes.\n"
+                        "Benefit: makes outbound communications workflow auditable in real time."
+                    ),
+                    priority=NotificationPriority.HIGH,
+                )
+                await self._dispatch_callback("CONTROL", "ALL", "MEDIA_QUEUE_STATUS", 0.0)
+                return
+
             if media_command == "mode":
                 if not media_arg:
                     await self.send_message(
@@ -747,6 +818,40 @@ class TelegramPlatformBot:
                     priority=NotificationPriority.HIGH,
                 )
                 await self._dispatch_callback("CONTROL", payload, "MEDIA_SET_MODE", 0.0)
+                return
+
+            if media_command == "publish":
+                payload_data = self._parse_media_publish_arg(media_arg)
+                payload = json.dumps(payload_data, separators=(",", ":"))
+                targets = ", ".join(payload_data.get("targets", [])) or "twitter, substack"
+                topic = str(payload_data.get("topic", "")).strip() or "latest draft"
+                await self.send_message(
+                    (
+                        "📰 Sapphire media publish request queued.\n"
+                        f"Topic source: `{topic}` | targets: `{targets}`\n"
+                        "Expected outcome: draft is queued for owner approval or auto-post based on media mode.\n"
+                        "Benefit: creates consistent outward narrative with explicit governance."
+                    ),
+                    priority=NotificationPriority.HIGH,
+                )
+                await self._dispatch_callback("CONTROL", payload, "MEDIA_PUBLISH", 0.0)
+                return
+
+            if media_command in {"approve", "reject"}:
+                parsed = self._parse_media_request_arg(media_arg)
+                payload = json.dumps(parsed, separators=(",", ":"))
+                request_id = parsed.get("request_id", "latest") or "latest"
+                decision = "approve" if media_command == "approve" else "reject"
+                await self.send_message(
+                    (
+                        f"📰 Sapphire media {decision} request queued for `{request_id}`.\n"
+                        "Expected outcome: selected publish request is promoted to queue or removed.\n"
+                        "Benefit: keeps communication control tight without manual dashboard ops."
+                    ),
+                    priority=NotificationPriority.HIGH,
+                )
+                action = "MEDIA_APPROVE" if media_command == "approve" else "MEDIA_REJECT"
+                await self._dispatch_callback("CONTROL", payload, action, 0.0)
                 return
 
             topic = media_arg or "weekly research update"

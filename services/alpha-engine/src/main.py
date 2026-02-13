@@ -8,6 +8,7 @@ import time
 from collections import defaultdict, deque
 from typing import Any, Deque, Dict, List, Optional, Set
 
+import aiohttp
 import uvloop
 from src.ai.gemini_guard import GeminiGuard
 from src.collaboration.forum import SapphireForumService
@@ -161,8 +162,23 @@ class AlphaEngine:
         self._media_substack_publication = str(
             os.getenv("SAPPHIRE_SUBSTACK_PUBLICATION_URL", "")
         ).strip()
+        self._media_twitter_post_url = str(os.getenv("SAPPHIRE_MEDIA_TWITTER_POST_URL", "")).strip()
+        self._media_substack_post_url = str(os.getenv("SAPPHIRE_MEDIA_SUBSTACK_POST_URL", "")).strip()
         self._media_twitter_api_token = str(os.getenv("SAPPHIRE_TWITTER_API_TOKEN", "")).strip()
         self._media_substack_api_token = str(os.getenv("SAPPHIRE_SUBSTACK_API_TOKEN", "")).strip()
+        self._media_publish_max_attempts = max(1, int(os.getenv("SAPPHIRE_MEDIA_MAX_ATTEMPTS", "4")))
+        self._media_retry_base_seconds = max(
+            10, int(os.getenv("SAPPHIRE_MEDIA_RETRY_BASE_SECONDS", "120"))
+        )
+        self._media_publish_timeout_seconds = max(
+            5, int(os.getenv("SAPPHIRE_MEDIA_POST_TIMEOUT_SECONDS", "20"))
+        )
+        self._media_publish_poll_seconds = max(5, int(os.getenv("SAPPHIRE_MEDIA_POLL_SECONDS", "20")))
+        self._media_queue_max_items = max(20, int(os.getenv("SAPPHIRE_MEDIA_QUEUE_MAX_ITEMS", "200")))
+        self._media_queue: Deque[Dict[str, Any]] = deque(maxlen=self._media_queue_max_items)
+        self._media_pending_approvals: Dict[str, Dict[str, Any]] = {}
+        self._media_recent_results: Deque[Dict[str, Any]] = deque(maxlen=50)
+        self._media_last_draft_payload: Dict[str, Any] = {}
         self._media_last_draft: Dict[str, Any] = {"topic": "", "title": "", "timestamp": 0}
         self._media_last_publish: Dict[str, Any] = {
             "target": "",
@@ -170,6 +186,8 @@ class AlphaEngine:
             "detail": "",
             "timestamp": 0,
         }
+        self._media_publish_sequence = 0
+        self._media_publish_task: Optional[asyncio.Task[Any]] = None
         self._trade_metrics: Dict[str, float] = {
             "total_trades": 0.0,
             "wins": 0.0,
@@ -263,6 +281,425 @@ class AlphaEngine:
             "autopost": "auto_post",
         }
         return aliases.get(value, "")
+
+    @staticmethod
+    def _normalize_media_targets(raw_targets: Any) -> List[str]:
+        if isinstance(raw_targets, list):
+            tokens = [str(item or "").strip().lower() for item in raw_targets]
+        else:
+            text = str(raw_targets or "").strip().lower()
+            if not text:
+                text = "both"
+            for separator in (";", "|"):
+                text = text.replace(separator, ",")
+            tokens = [chunk.strip() for chunk in text.split(",") if chunk.strip()]
+            if len(tokens) == 1 and " " in tokens[0]:
+                tokens = [chunk.strip() for chunk in tokens[0].split(" ") if chunk.strip()]
+
+        normalized: List[str] = []
+        for token in tokens:
+            if token in {"both", "all", "x+substack", "twitter+substack"}:
+                normalized.extend(["twitter", "substack"])
+                continue
+            if token in {"x", "twitter", "tweet"}:
+                normalized.append("twitter")
+                continue
+            if token in {"substack", "newsletter"}:
+                normalized.append("substack")
+                continue
+
+        if not normalized:
+            normalized = ["twitter", "substack"]
+
+        deduped: List[str] = []
+        for target in normalized:
+            if target not in deduped:
+                deduped.append(target)
+        return deduped
+
+    def _next_media_request_id(self) -> str:
+        self._media_publish_sequence += 1
+        return f"media:{int(time.time())}:{self._media_publish_sequence:04d}"
+
+    def _media_channel_config(self, channel: str) -> Dict[str, Any]:
+        target = str(channel or "").strip().lower()
+        if target == "twitter":
+            enabled = bool(self._media_twitter_enabled)
+            token = str(self._media_twitter_api_token or "").strip()
+            endpoint = str(self._media_twitter_post_url or "").strip()
+            ready = bool(enabled and endpoint and token)
+            return {
+                "channel": "twitter",
+                "enabled": enabled,
+                "ready": ready,
+                "endpoint": endpoint,
+                "token": token,
+                "handle": self._media_twitter_handle or "",
+                "publication": "",
+            }
+        if target == "substack":
+            enabled = bool(self._media_substack_enabled)
+            token = str(self._media_substack_api_token or "").strip()
+            endpoint = str(self._media_substack_post_url or "").strip()
+            ready = bool(enabled and endpoint and token)
+            return {
+                "channel": "substack",
+                "enabled": enabled,
+                "ready": ready,
+                "endpoint": endpoint,
+                "token": token,
+                "handle": "",
+                "publication": self._media_substack_publication or "",
+            }
+        return {
+            "channel": target or "unknown",
+            "enabled": False,
+            "ready": False,
+            "endpoint": "",
+            "token": "",
+            "handle": "",
+            "publication": "",
+        }
+
+    def _resolve_media_request_id(self, raw_request_id: str) -> str:
+        candidate = str(raw_request_id or "").strip()
+        if candidate and candidate.lower() != "latest":
+            return candidate
+
+        if self._media_pending_approvals:
+            latest_pending = sorted(
+                self._media_pending_approvals.values(),
+                key=lambda item: int(item.get("created_at", 0)),
+                reverse=True,
+            )
+            if latest_pending:
+                return str(latest_pending[0].get("request_id", "")).strip()
+
+        if self._media_queue:
+            latest_queued = sorted(
+                list(self._media_queue),
+                key=lambda item: int(item.get("created_at", 0)),
+                reverse=True,
+            )
+            if latest_queued:
+                return str(latest_queued[0].get("request_id", "")).strip()
+
+        return ""
+
+    def _enqueue_media_publish_request(
+        self,
+        draft: Dict[str, Any],
+        targets: List[str],
+        source: str,
+        require_approval: bool,
+        note: str = "",
+    ) -> Dict[str, Any]:
+        now = int(time.time())
+        request_id = self._next_media_request_id()
+        item = {
+            "request_id": request_id,
+            "created_at": now,
+            "updated_at": now,
+            "source": str(source or "manual").strip() or "manual",
+            "topic": str(draft.get("topic", "")).strip(),
+            "title": str(draft.get("title", "")).strip(),
+            "body": str(draft.get("body", "")).strip(),
+            "targets": self._normalize_media_targets(targets),
+            "status": "pending_approval" if require_approval else "queued",
+            "attempts": 0,
+            "max_attempts": int(self._media_publish_max_attempts),
+            "next_attempt_at": now,
+            "note": str(note or "").strip(),
+        }
+
+        if require_approval:
+            self._media_pending_approvals[request_id] = item
+        else:
+            self._media_queue.append(item)
+
+        self._record_system_log(
+            f"Media publish request {request_id} created ({item['status']})",
+            level="info",
+            tags=["media", "queue"],
+            metadata={
+                "targets": item["targets"],
+                "source": item["source"],
+                "mode": self._media_mode,
+            },
+        )
+        return item
+
+    def _approve_media_publish_request(self, raw_request_id: str, note: str = "") -> Dict[str, Any]:
+        request_id = self._resolve_media_request_id(raw_request_id)
+        if not request_id:
+            return {"ok": False, "error": "request_not_found", "request_id": ""}
+
+        item = self._media_pending_approvals.pop(request_id, None)
+        if not item:
+            return {"ok": False, "error": "request_not_pending", "request_id": request_id}
+
+        item["status"] = "queued"
+        item["updated_at"] = int(time.time())
+        if note:
+            item["approval_note"] = str(note).strip()[:400]
+        self._media_queue.append(item)
+        self._record_system_log(
+            f"Media publish request {request_id} approved",
+            level="info",
+            tags=["media", "approval"],
+            metadata={"targets": item.get("targets", [])},
+        )
+        return {
+            "ok": True,
+            "request_id": request_id,
+            "targets": list(item.get("targets", [])),
+            "queue_depth": len(self._media_queue),
+        }
+
+    def _reject_media_publish_request(self, raw_request_id: str, reason: str = "") -> Dict[str, Any]:
+        request_id = self._resolve_media_request_id(raw_request_id)
+        if not request_id:
+            return {"ok": False, "error": "request_not_found", "request_id": ""}
+
+        item = self._media_pending_approvals.pop(request_id, None)
+        if not item:
+            return {"ok": False, "error": "request_not_pending", "request_id": request_id}
+
+        reason_text = str(reason or "").strip()[:400]
+        self._record_system_log(
+            f"Media publish request {request_id} rejected",
+            level="warning",
+            tags=["media", "approval"],
+            metadata={"reason": reason_text},
+        )
+        return {
+            "ok": True,
+            "request_id": request_id,
+            "reason": reason_text,
+            "targets": list(item.get("targets", [])),
+        }
+
+    @staticmethod
+    def _compose_twitter_text(title: str, body: str, limit: int = 280) -> str:
+        headline = str(title or "").strip() or "Sapphire update"
+        summary = " ".join(str(body or "").split())
+        if summary:
+            text = f"{headline} | {summary}"
+        else:
+            text = headline
+        if len(text) <= limit:
+            return text
+        return text[: max(0, limit - 3)].rstrip() + "..."
+
+    def _build_media_channel_payload(self, channel: str, item: Dict[str, Any]) -> Dict[str, Any]:
+        base = {
+            "request_id": str(item.get("request_id", "")).strip(),
+            "topic": str(item.get("topic", "")).strip(),
+            "title": str(item.get("title", "")).strip(),
+            "body": str(item.get("body", "")).strip(),
+            "source": str(item.get("source", "manual")).strip(),
+            "attempt": int(item.get("attempts", 0)) + 1,
+            "timestamp": int(time.time()),
+        }
+        if channel == "twitter":
+            base.update(
+                {
+                    "text": self._compose_twitter_text(
+                        str(item.get("title", "")).strip(),
+                        str(item.get("body", "")).strip(),
+                    ),
+                    "handle": self._media_twitter_handle or "",
+                }
+            )
+            return base
+        if channel == "substack":
+            base.update(
+                {
+                    "markdown": str(item.get("body", "")).strip(),
+                    "publication": self._media_substack_publication or "",
+                }
+            )
+            return base
+        return base
+
+    async def _publish_media_channel(self, channel: str, item: Dict[str, Any]) -> Dict[str, Any]:
+        config = self._media_channel_config(channel)
+        target = str(config.get("channel", channel)).strip() or str(channel or "unknown")
+        if not config.get("enabled"):
+            return {
+                "channel": target,
+                "ok": False,
+                "retryable": False,
+                "reason": "channel_disabled",
+                "detail": "channel is disabled",
+            }
+        if not config.get("ready"):
+            return {
+                "channel": target,
+                "ok": False,
+                "retryable": False,
+                "reason": "channel_not_ready",
+                "detail": "endpoint/token not configured",
+            }
+
+        payload = self._build_media_channel_payload(target, item)
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {config.get('token', '')}",
+        }
+        timeout = aiohttp.ClientTimeout(total=self._media_publish_timeout_seconds)
+        try:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(str(config.get("endpoint", "")), json=payload, headers=headers) as resp:
+                    body = (await resp.text())[:300]
+                    if 200 <= resp.status < 300:
+                        return {
+                            "channel": target,
+                            "ok": True,
+                            "retryable": False,
+                            "reason": "ok",
+                            "detail": body,
+                            "status_code": resp.status,
+                        }
+                    retryable = resp.status == 429 or resp.status >= 500
+                    return {
+                        "channel": target,
+                        "ok": False,
+                        "retryable": retryable,
+                        "reason": "http_error",
+                        "detail": f"status={resp.status} body={body}",
+                        "status_code": resp.status,
+                    }
+        except (asyncio.TimeoutError, aiohttp.ClientError) as exc:
+            return {
+                "channel": target,
+                "ok": False,
+                "retryable": True,
+                "reason": "network_error",
+                "detail": str(exc)[:300],
+            }
+
+    async def _process_media_queue_item(self, item: Dict[str, Any]) -> None:
+        now = int(time.time())
+        item["attempts"] = int(item.get("attempts", 0)) + 1
+        item["updated_at"] = now
+        targets = self._normalize_media_targets(item.get("targets", []))
+        results: List[Dict[str, Any]] = []
+        retryable_failure = False
+        non_retryable_failure = False
+
+        for target in targets:
+            result = await self._publish_media_channel(target, item)
+            results.append(result)
+            if not result.get("ok") and result.get("retryable"):
+                retryable_failure = True
+            if not result.get("ok") and not result.get("retryable"):
+                non_retryable_failure = True
+
+        success_targets = [r["channel"] for r in results if r.get("ok")]
+        failed_results = [r for r in results if not r.get("ok")]
+        failed_targets = [r.get("channel", "unknown") for r in failed_results]
+        max_attempts = int(item.get("max_attempts", self._media_publish_max_attempts))
+
+        if not failed_results:
+            self._media_last_publish = {
+                "target": ",".join(success_targets) or "none",
+                "status": "success",
+                "detail": f"request {item.get('request_id', 'n/a')} published",
+                "timestamp": now,
+            }
+            self._media_recent_results.append(
+                {
+                    "request_id": item.get("request_id", ""),
+                    "status": "success",
+                    "targets": success_targets,
+                    "timestamp": now,
+                }
+            )
+            await self.telegram.send_message(
+                (
+                    "✅ Media publish completed.\n"
+                    f"Request: `{item.get('request_id', 'n/a')}`\n"
+                    f"Targets: `{', '.join(success_targets) if success_targets else 'none'}`\n"
+                    "Benefit: Sapphire external narrative is synchronized with internal operations."
+                ),
+                priority="high",
+            )
+            return
+
+        if retryable_failure and int(item.get("attempts", 0)) < max_attempts:
+            delay_seconds = int(self._media_retry_base_seconds * int(item.get("attempts", 0)))
+            item["status"] = "queued"
+            item["next_attempt_at"] = now + delay_seconds
+            self._media_queue.append(item)
+            await self.telegram.send_message(
+                (
+                    "⚠️ Media publish encountered retryable failure.\n"
+                    f"Request: `{item.get('request_id', 'n/a')}`\n"
+                    f"Failed targets: `{', '.join(failed_targets)}`\n"
+                    f"Retry: `{item.get('attempts', 0)}/{max_attempts}` in `{delay_seconds}s`"
+                ),
+                priority="high",
+            )
+            return
+
+        failure_reason = "; ".join(
+            [f"{r.get('channel', 'unknown')}:{r.get('reason', 'error')}" for r in failed_results]
+        )[:300]
+        status = "partial_failed" if success_targets else "failed"
+        self._media_last_publish = {
+            "target": ",".join(targets) or "none",
+            "status": status,
+            "detail": failure_reason,
+            "timestamp": now,
+        }
+        self._media_recent_results.append(
+            {
+                "request_id": item.get("request_id", ""),
+                "status": status,
+                "targets": targets,
+                "failed_targets": failed_targets,
+                "timestamp": now,
+            }
+        )
+        await self.telegram.send_message(
+            (
+                "❌ Media publish failed.\n"
+                f"Request: `{item.get('request_id', 'n/a')}`\n"
+                f"Successful targets: `{', '.join(success_targets) if success_targets else 'none'}`\n"
+                f"Failed targets: `{', '.join(failed_targets) if failed_targets else 'none'}`\n"
+                f"Reason: `{failure_reason}`\n"
+                + (
+                    "Benefit retained: published channels remain delivered."
+                    if non_retryable_failure and success_targets
+                    else "Action: adjust channel credentials/endpoints and re-run `/media publish`."
+                )
+            ),
+            priority="high",
+        )
+
+    async def _process_media_queue_once(self) -> None:
+        if not self._media_queue:
+            return
+
+        now = int(time.time())
+        queue_len = len(self._media_queue)
+        for _ in range(queue_len):
+            item = self._media_queue.popleft()
+            if int(item.get("next_attempt_at", 0)) > now:
+                self._media_queue.append(item)
+                continue
+            await self._process_media_queue_item(item)
+
+    async def _media_publish_loop(self) -> None:
+        while self.running:
+            try:
+                await asyncio.sleep(self._media_publish_poll_seconds)
+                await self._process_media_queue_once()
+            except asyncio.CancelledError:
+                break
+            except Exception as exc:
+                logger.error(f"Media publish loop error: {exc}")
 
     def _set_execution_stage(self, stage: str, source: str = "manual") -> Dict[str, Any]:
         previous = self._dex_execution_stage
@@ -753,6 +1190,11 @@ class AlphaEngine:
                 f"Media channels: X `{'READY' if media_snapshot.get('twitter_ready') else 'NOT_READY'}` | "
                 f"Substack `{'READY' if media_snapshot.get('substack_ready') else 'NOT_READY'}`"
             ),
+            (
+                "Media queue: pending "
+                f"`{media_snapshot.get('queue', {}).get('pending_count', 0)}` | "
+                f"queued `{media_snapshot.get('queue', {}).get('queued_count', 0)}`"
+            ),
             f"Autonomy dispatches: `{snapshot['autonomy_dispatch_count']}`",
             f"Pending autonomy decisions: `{snapshot['pending_autonomy_decisions']}`",
             f"Operational read: {status_read}",
@@ -827,25 +1269,61 @@ class AlphaEngine:
             "timestamp": int(time.time()),
         }
 
+    def _media_queue_snapshot(self) -> Dict[str, Any]:
+        pending_items = sorted(
+            self._media_pending_approvals.values(),
+            key=lambda item: int(item.get("created_at", 0)),
+            reverse=True,
+        )
+        queued_items = sorted(
+            list(self._media_queue),
+            key=lambda item: int(item.get("created_at", 0)),
+            reverse=True,
+        )
+        recent_items = sorted(
+            list(self._media_recent_results),
+            key=lambda item: int(item.get("timestamp", 0)),
+            reverse=True,
+        )
+
+        def _summarize_request(item: Dict[str, Any]) -> Dict[str, Any]:
+            return {
+                "request_id": str(item.get("request_id", "")).strip(),
+                "status": str(item.get("status", "")).strip(),
+                "targets": list(item.get("targets", [])),
+                "topic": str(item.get("topic", "")).strip(),
+                "created_at": int(item.get("created_at", 0)),
+                "updated_at": int(item.get("updated_at", 0)),
+                "attempts": int(item.get("attempts", 0)),
+                "max_attempts": int(item.get("max_attempts", self._media_publish_max_attempts)),
+                "next_attempt_at": int(item.get("next_attempt_at", 0)),
+            }
+
+        return {
+            "pending_count": len(pending_items),
+            "queued_count": len(queued_items),
+            "pending_items": [_summarize_request(item) for item in pending_items[:10]],
+            "queued_items": [_summarize_request(item) for item in queued_items[:10]],
+            "recent_results": list(recent_items[:10]),
+        }
+
     def _media_status_snapshot(self) -> Dict[str, Any]:
-        twitter_ready = bool(
-            self._media_twitter_enabled and self._media_twitter_api_token and self._media_twitter_handle
-        )
-        substack_ready = bool(
-            self._media_substack_enabled
-            and self._media_substack_api_token
-            and self._media_substack_publication
-        )
+        twitter_config = self._media_channel_config("twitter")
+        substack_config = self._media_channel_config("substack")
+        queue_snapshot = self._media_queue_snapshot()
         return {
             "mode": self._media_mode,
             "twitter_enabled": bool(self._media_twitter_enabled),
-            "twitter_ready": twitter_ready,
+            "twitter_ready": bool(twitter_config.get("ready")),
             "twitter_handle": self._media_twitter_handle or "",
+            "twitter_endpoint_configured": bool(twitter_config.get("endpoint")),
             "substack_enabled": bool(self._media_substack_enabled),
-            "substack_ready": substack_ready,
+            "substack_ready": bool(substack_config.get("ready")),
             "substack_publication": self._media_substack_publication or "",
+            "substack_endpoint_configured": bool(substack_config.get("endpoint")),
             "last_draft": dict(self._media_last_draft),
             "last_publish": dict(self._media_last_publish),
+            "queue": queue_snapshot,
             "timestamp": int(time.time()),
         }
 
@@ -863,6 +1341,10 @@ class AlphaEngine:
         snapshot = self._media_status_snapshot()
         last_draft = snapshot.get("last_draft", {}) if isinstance(snapshot, dict) else {}
         last_publish = snapshot.get("last_publish", {}) if isinstance(snapshot, dict) else {}
+        queue = snapshot.get("queue", {}) if isinstance(snapshot, dict) else {}
+        pending_items = queue.get("pending_items", []) if isinstance(queue, dict) else []
+        queued_items = queue.get("queued_items", []) if isinstance(queue, dict) else []
+        recent_results = queue.get("recent_results", []) if isinstance(queue, dict) else []
         mode = str(snapshot.get("mode", "owner_approval"))
         policy_explainer = {
             "draft_only": "generates drafts only; no outbound publishing.",
@@ -893,9 +1375,36 @@ class AlphaEngine:
                 f" target `{last_publish.get('target') or 'n/a'}`"
                 f" at `{self._fmt_unix_ts(last_publish.get('timestamp'))}`"
             ),
+            (
+                f"Queue: pending approvals `{queue.get('pending_count', 0)}`"
+                f" | queued publishes `{queue.get('queued_count', 0)}`"
+            ),
             "",
-            "Commands: `/media mode <draft_only|owner_approval|auto_post>` and `/media draft <topic>`",
+            (
+                "Commands: `/media mode <draft_only|owner_approval|auto_post>`, `/media draft <topic>`, "
+                "`/media publish [topic:<name>] [targets:<x|substack|both>]`, `/media queue`, "
+                "`/media approve <request_id|latest>`, `/media reject <request_id|latest>`"
+            ),
         ]
+        if pending_items:
+            latest = pending_items[0]
+            lines.append(
+                "Latest pending: "
+                f"`{latest.get('request_id', 'n/a')}` -> `{', '.join(latest.get('targets', [])) or 'none'}`"
+            )
+        if queued_items:
+            latest = queued_items[0]
+            lines.append(
+                "Latest queued: "
+                f"`{latest.get('request_id', 'n/a')}` retry `{latest.get('attempts', 0)}/{latest.get('max_attempts', 0)}` "
+                f"next `{self._fmt_unix_ts(latest.get('next_attempt_at'))}`"
+            )
+        if recent_results:
+            latest = recent_results[0]
+            lines.append(
+                "Latest outcome: "
+                f"`{latest.get('request_id', 'n/a')}` status `{latest.get('status', 'unknown')}`"
+            )
         await self.telegram.send_message("\n".join(lines), priority="medium")
 
     def _set_media_mode(self, requested_mode: str, source: str = "manual") -> Dict[str, Any]:
@@ -952,6 +1461,13 @@ class AlphaEngine:
         ]
         body = "\n".join(body_lines)
         self._media_last_draft = {"topic": normalized_topic, "title": title, "timestamp": timestamp}
+        self._media_last_draft_payload = {
+            "topic": normalized_topic,
+            "title": title,
+            "body": body,
+            "timestamp": timestamp,
+            "mode": self._media_mode,
+        }
         self._record_system_log(
             f"Media draft generated for topic '{normalized_topic}'",
             level="info",
@@ -965,6 +1481,17 @@ class AlphaEngine:
             "timestamp": timestamp,
             "mode": self._media_mode,
         }
+
+    def _resolve_media_draft_for_publish(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        requested_topic = str(payload.get("topic", "")).strip()
+        if requested_topic:
+            return self._build_media_draft(requested_topic)
+
+        if self._media_last_draft_payload and self._media_last_draft_payload.get("body"):
+            return dict(self._media_last_draft_payload)
+
+        fallback_topic = str(self._media_last_draft.get("topic", "")).strip() or "weekly operations update"
+        return self._build_media_draft(fallback_topic)
 
     async def _send_focus_snapshot(self) -> None:
         state = dispatcher.get_control_state()
@@ -1528,7 +2055,7 @@ class AlphaEngine:
     async def _handle_control_command(self, target: str, action: str, value: float) -> None:
         normalized_action = action.upper()
 
-        if normalized_action in {"MEDIA_STATUS", "COMMUNICATION_STATUS"}:
+        if normalized_action in {"MEDIA_STATUS", "MEDIA_QUEUE_STATUS", "MEDIA_QUEUE", "COMMUNICATION_STATUS"}:
             await self._send_media_status()
             return
 
@@ -1580,6 +2107,115 @@ class AlphaEngine:
                     f"Substack ready: `{'YES' if snapshot.get('substack_ready') else 'NO'}`\n"
                     f"Policy: {publish_note}\n"
                     "Use `/media status` to review channel readiness."
+                ),
+                priority="high",
+            )
+            return
+
+        if normalized_action in {"MEDIA_PUBLISH", "MEDIA_DISPATCH"}:
+            payload = self._parse_json_payload(target)
+            draft = self._resolve_media_draft_for_publish(payload)
+            targets = self._normalize_media_targets(payload.get("targets", []))
+            note = str(payload.get("note", "")).strip()
+            mode = self._media_mode
+
+            if mode == "draft_only":
+                await self.telegram.send_message(
+                    (
+                        "📰 Media publish request captured, but mode is `draft_only`.\n"
+                        f"Draft retained: `{draft.get('title', 'n/a')}`\n"
+                        "Expected outcome: no outbound post until mode changes to owner approval or auto-post."
+                    ),
+                    priority="high",
+                )
+                return
+
+            require_approval = mode == "owner_approval"
+            request = self._enqueue_media_publish_request(
+                draft=draft,
+                targets=targets,
+                source="telegram",
+                require_approval=require_approval,
+                note=note,
+            )
+            request_id = str(request.get("request_id", "n/a")).strip() or "n/a"
+            targets_text = ", ".join(request.get("targets", [])) or "none"
+
+            if require_approval:
+                await self.telegram.send_message(
+                    (
+                        "📰 Media publish request is pending owner approval.\n"
+                        f"Request: `{request_id}`\n"
+                        f"Targets: `{targets_text}`\n"
+                        "Expected outcome: publish starts after `/media approve <request_id|latest>`.\n"
+                        "Benefit: keeps outbound messaging aligned with operator intent."
+                    ),
+                    priority="high",
+                )
+                return
+
+            await self.telegram.send_message(
+                (
+                    "📰 Media publish request queued for immediate delivery.\n"
+                    f"Request: `{request_id}`\n"
+                    f"Targets: `{targets_text}`\n"
+                    "Expected outcome: queue worker will post to ready channels now."
+                ),
+                priority="high",
+            )
+            await self._process_media_queue_once()
+            return
+
+        if normalized_action in {"MEDIA_APPROVE", "MEDIA_REQUEST_APPROVE"}:
+            payload = self._parse_json_payload(target)
+            request_id = str(payload.get("request_id", "")).strip() or str(target or "").strip()
+            note = str(payload.get("note", "")).strip()
+            result = self._approve_media_publish_request(request_id, note=note)
+            if not result.get("ok"):
+                await self.telegram.send_message(
+                    (
+                        "❌ Media approval failed.\n"
+                        f"Request: `{result.get('request_id', request_id or 'n/a')}`\n"
+                        f"Reason: `{result.get('error', 'unknown')}`"
+                    ),
+                    priority="high",
+                )
+                return
+
+            await self.telegram.send_message(
+                (
+                    "✅ Media request approved and queued.\n"
+                    f"Request: `{result.get('request_id', 'n/a')}`\n"
+                    f"Targets: `{', '.join(result.get('targets', [])) or 'none'}`\n"
+                    f"Queue depth: `{result.get('queue_depth', 0)}`"
+                ),
+                priority="high",
+            )
+            await self._process_media_queue_once()
+            return
+
+        if normalized_action in {"MEDIA_REJECT", "MEDIA_REQUEST_REJECT"}:
+            payload = self._parse_json_payload(target)
+            request_id = str(payload.get("request_id", "")).strip() or str(target or "").strip()
+            reason = str(payload.get("reason", "")).strip() or str(payload.get("note", "")).strip()
+            result = self._reject_media_publish_request(request_id, reason=reason)
+            if not result.get("ok"):
+                await self.telegram.send_message(
+                    (
+                        "❌ Media rejection failed.\n"
+                        f"Request: `{result.get('request_id', request_id or 'n/a')}`\n"
+                        f"Reason: `{result.get('error', 'unknown')}`"
+                    ),
+                    priority="high",
+                )
+                return
+
+            await self.telegram.send_message(
+                (
+                    "🛑 Media request rejected.\n"
+                    f"Request: `{result.get('request_id', 'n/a')}`\n"
+                    f"Targets: `{', '.join(result.get('targets', [])) or 'none'}`\n"
+                    f"Reason: `{result.get('reason', 'none') or 'none'}`"
                 ),
                 priority="high",
             )
@@ -2628,6 +3264,7 @@ class AlphaEngine:
         else:
             asyncio.create_task(self.telegram.start_listener())
         self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
+        self._media_publish_task = asyncio.create_task(self._media_publish_loop())
 
         # 2. Start Pub/Sub Listener for Trade Results
         asyncio.create_task(self._listen_for_trades())
@@ -3079,6 +3716,8 @@ class AlphaEngine:
             self._heartbeat_task.cancel()
         if self._autonomy_task:
             self._autonomy_task.cancel()
+        if self._media_publish_task:
+            self._media_publish_task.cancel()
         await self.market_data.stop()
         await self.strategy.stop()
         await dispatcher.stop()
