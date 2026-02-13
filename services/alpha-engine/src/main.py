@@ -22,6 +22,8 @@ from src.strategy.engine import AlphaStrategyEngine
 # Add shared library to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from shared.error_classifier import ErrorCategory, ErrorSeverity, classify_error
+from shared.enhanced_episodic_memory import EnhancedMemoryBank, MarketSnapshot
+from shared.dual_speed_cognition import DualSpeedCognition, CognitionRequest, CognitionSpeed
 from health import start_health_server
 from smart_notifications import notification_manager
 from telegram_bot import SAPPHIRE, OBSIDIAN, EMERALD
@@ -42,6 +44,19 @@ class AlphaEngine:
         self.market_data = MarketDataAggregator()
         self.strategy = AlphaStrategyEngine(self.market_data)
         self.portfolio = PortfolioTracker()
+
+        # Cognitive systems — episodic memory and dual-speed cognition
+        self.memory = EnhancedMemoryBank()
+        self.cognition = DualSpeedCognition()
+        self._cognition_enabled = bool(
+            os.getenv("SAPPHIRE_COGNITION_ENABLED", "true").strip().lower()
+            in ("true", "1", "yes")
+        )
+        self._memory_enabled = bool(
+            os.getenv("SAPPHIRE_EPISODIC_MEMORY_ENABLED", "true").strip().lower()
+            in ("true", "1", "yes")
+        )
+
         requested_stage = self._parse_execution_stage_token(
             os.getenv("SAPPHIRE_DEX_EXECUTION_STAGE", "paper")
         )
@@ -1444,6 +1459,63 @@ class AlphaEngine:
 
         await self.telegram.send_as(SAPPHIRE, "\n".join(lines))
 
+    async def _send_cognitive_status(self) -> None:
+        """Send episodic memory and cognition status via Telegram."""
+        lines = ["*Cognitive Systems*"]
+
+        # Episodic Memory
+        lines.append(f"\n*Episodic Memory*: {'enabled' if self._memory_enabled else 'disabled'}")
+        if self._memory_enabled:
+            try:
+                stats = self.memory.get_stats()
+                lines.append(f"  Episodes: {stats.get('total_episodes', 0)}")
+                lines.append(f"  Trades recorded: {stats.get('total_trades', 0)}")
+                lines.append(f"  Total PnL: {stats.get('total_pnl', 0):+.4f}")
+                with_lessons = stats.get("episodes_with_full_lessons", 0)
+                if with_lessons:
+                    lines.append(f"  Episodes with lessons: {with_lessons}")
+                regime_dist = stats.get("regime_distribution", {})
+                if regime_dist:
+                    top = sorted(regime_dist.items(), key=lambda x: x[1], reverse=True)[:3]
+                    lines.append(f"  Top regimes: {', '.join(f'{k}({v})' for k, v in top)}")
+            except Exception as e:
+                lines.append(f"  Error: {e}")
+
+            # Temporal insights
+            try:
+                temporal = self.memory.get_temporal_insights()
+                best = temporal.get("best_hours", [])
+                worst = temporal.get("worst_hours", [])
+                if best:
+                    lines.append(f"  Best hours (UTC): {best[:3]}")
+                if worst:
+                    lines.append(f"  Worst hours (UTC): {worst[:3]}")
+            except Exception:
+                pass
+
+        # Dual-Speed Cognition
+        lines.append(f"\n*Dual-Speed Cognition*: {'enabled' if self._cognition_enabled else 'disabled'}")
+        if self._cognition_enabled:
+            try:
+                metrics = self.cognition.get_metrics()
+                s1_calls = metrics.get("system1_calls", 0)
+                s2_calls = metrics.get("system2_calls", 0)
+                overrides = metrics.get("overrides", 0)
+                lines.append(f"  System 1 (Flash) calls: {s1_calls}")
+                lines.append(f"  System 2 (Pro) calls: {s2_calls}")
+                if s1_calls > 0:
+                    lines.append(
+                        f"  Overrides: {overrides} ({metrics.get('override_rate', 0):.0f}%)"
+                    )
+                    s1_lat = metrics.get("avg_system1_latency_ms", 0)
+                    s2_lat = metrics.get("avg_system2_latency_ms", 0)
+                    if s1_lat:
+                        lines.append(f"  Avg latency: S1={s1_lat:.0f}ms, S2={s2_lat:.0f}ms")
+            except Exception as e:
+                lines.append(f"  Error: {e}")
+
+        await self.telegram.send_as(EMERALD, "\n".join(lines))
+
     def _control_snapshot(self) -> Dict[str, Any]:
         state = dispatcher.get_control_state()
         strategy_state = self.strategy.execution_state()
@@ -1510,6 +1582,10 @@ class AlphaEngine:
             "media": media_snapshot,
             "venues": venues,
             "portfolio": self.portfolio.snapshot(),
+            "cognition_enabled": self._cognition_enabled,
+            "memory_enabled": self._memory_enabled,
+            "cognition_metrics": self.cognition.get_metrics() if self._cognition_enabled else {},
+            "memory_stats": self.memory.get_stats() if self._memory_enabled else {},
             "timestamp": int(time.time()),
         }
 
@@ -2956,6 +3032,10 @@ class AlphaEngine:
             await self._send_portfolio_status()
             return
 
+        if normalized_action in {"MEMORY_STATUS", "COGNITION_STATUS"}:
+            await self._send_cognitive_status()
+            return
+
         if normalized_action in {"FOCUS", "CONTROL_FOCUS"}:
             await self._send_focus_snapshot()
             return
@@ -3019,6 +3099,36 @@ class AlphaEngine:
                         f"Win rate: {port_snap['win_rate']}% "
                         f"({port_snap['wins']}W / {port_snap['losses']}L)"
                     )
+
+            # Add episodic memory context
+            if self._memory_enabled:
+                try:
+                    mem_stats = self.memory.get_stats()
+                    if mem_stats.get("total_episodes", 0) > 0:
+                        context_lines.append(
+                            f"Memory: {mem_stats['total_episodes']} episodes, "
+                            f"{mem_stats['total_trades']} trades recorded"
+                        )
+                    temporal = self.memory.get_temporal_insights()
+                    if temporal.get("best_hours"):
+                        context_lines.append(
+                            f"Best trading hours: {temporal['best_hours'][:3]}"
+                        )
+                except Exception:
+                    pass
+
+            # Add cognition metrics
+            if self._cognition_enabled:
+                try:
+                    cog_metrics = self.cognition.get_metrics()
+                    if cog_metrics.get("system1_calls", 0) > 0:
+                        context_lines.append(
+                            f"Cognition: {cog_metrics['system1_calls']} decisions, "
+                            f"{cog_metrics.get('overrides', 0)} overrides "
+                            f"({cog_metrics.get('override_rate', 0):.0f}%)"
+                        )
+                except Exception:
+                    pass
 
             system_context = "\n".join(context_lines)
 
@@ -3434,6 +3544,80 @@ class AlphaEngine:
                 "blocked_targets": sorted(list(notional_blocked_targets.keys())),
                 "strategy": strategy_label or None,
             }
+
+        # ── Dual-Speed Cognition Pre-Trade Check ──────────────────
+        cognition_override = False
+        if self._cognition_enabled and normalized_action in ("buy", "sell"):
+            try:
+                snapshot = self.market_data.get_multi_symbol_snapshot()
+                # Build memory recall context
+                memory_advice = ""
+                if self._memory_enabled:
+                    market_snap = MarketSnapshot(prices={symbol: snapshot.get("ASTER", {}).get(symbol, {}).get("price", 0)})
+                    memory_advice = await self.memory.recall_for_decision(
+                        symbol=symbol,
+                        snapshot=market_snap,
+                        context=f"TradingView signal: {normalized_action.upper()} {symbol}",
+                    ) or ""
+
+                cognition_prompt = (
+                    f"TradingView signal: {normalized_action.upper()} {symbol}\n"
+                    f"Strategy: {strategy_label or 'default'}\n"
+                    f"Targets: {', '.join(executable_targets)}\n"
+                )
+                if memory_advice:
+                    cognition_prompt += f"Past experience: {memory_advice[:400]}\n"
+                cognition_prompt += (
+                    "Should we execute this trade? Consider risk and market conditions.\n"
+                    "Respond with DECISION: BUY/SELL/HOLD, CONFIDENCE: 0-1, REASONING: <why>"
+                )
+
+                cog_result = await self.cognition.process(
+                    CognitionRequest(
+                        prompt=cognition_prompt,
+                        speed=CognitionSpeed.DUAL,
+                        max_latency_ms=5000,
+                    )
+                )
+                logger.info(
+                    f"🧠 Cognition: {cog_result.decision} (conf={cog_result.confidence:.2f}, "
+                    f"override={cog_result.was_overridden}, latency={cog_result.latency_ms:.0f}ms)"
+                )
+
+                # If cognition says HOLD with high confidence, block the trade
+                if cog_result.decision == "HOLD" and cog_result.confidence >= 0.7:
+                    cognition_override = True
+                    await self.telegram.send_as(
+                        SAPPHIRE,
+                        f"🧠 Cognition blocked {normalized_action.upper()} {symbol}: "
+                        f"{cog_result.reasoning[:200]}",
+                    )
+                    self._record_system_log(
+                        f"Cognition override: blocked {normalized_action.upper()} {symbol}",
+                        level="warning",
+                        tags=["cognition", "override"],
+                        metadata={"confidence": cog_result.confidence, "reasoning": cog_result.reasoning[:300]},
+                    )
+            except Exception as e:
+                logger.warning(f"Cognition pre-check failed (non-blocking): {e}")
+
+        if cognition_override:
+            return {
+                "accepted": "cognition_blocked",
+                "signal_key": signal_key,
+                "targets": executable_targets,
+                "reason": "Dual-speed cognition overrode the signal",
+            }
+
+        # ── Record episodic memory event ──────────────────────────
+        if self._memory_enabled:
+            try:
+                self.memory.record_action(
+                    f"Executing {normalized_action.upper()} {symbol} across {', '.join(executable_targets)}",
+                    {"action": normalized_action.upper(), "symbol": symbol, "signal_key": signal_key},
+                )
+            except Exception:
+                pass  # Memory is non-critical
 
         dispatch_results: Dict[str, bool] = {}
         for venue in executable_targets:
@@ -3869,6 +4053,13 @@ class AlphaEngine:
 
                 # Resolve any pending fill confirmation
                 dispatcher.resolve_fill(message_data)
+
+                # Record trade in episodic memory
+                if self._memory_enabled:
+                    try:
+                        self.memory.record_trade(message_data)
+                    except Exception:
+                        pass  # Memory is non-critical
 
                 # Format notification
                 platform = message_data.get("platform", "Unknown")
