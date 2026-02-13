@@ -430,3 +430,25 @@ def test_register_scout_uses_existing_moltbook_token_without_dispatch(monkeypatc
     assert result["dispatch"]["dispatched"] is True
     assert result["dispatch"]["reason"] == "moltbook_token_present"
     assert result["dispatch"]["metadata"]["already_registered"] is True
+
+
+def test_scout_status_assumes_registered_when_moltbook_token_present(monkeypatch, tmp_path):
+    module = _load_forum_module()
+    monkeypatch.setenv("SAPPHIRE_FORUM_STORE_PATH", str(tmp_path / "forum.json"))
+    monkeypatch.setenv("SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL", "https://www.moltbook.com/api/v1/agents/register")
+    monkeypatch.setenv("SAPPHIRE_SCOUT_EXTERNAL_POST_URL", "https://www.moltbook.com/api/v1/posts")
+    monkeypatch.setenv("SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN", "moltbook_existing_token")
+    monkeypatch.setenv("SAPPHIRE_SCOUT_USERNAME", "sapphire_scout")
+    monkeypatch.setenv("SAPPHIRE_SCOUT_DISPLAY_NAME", "Sapphire Scout")
+
+    service = module.SapphireForumService()
+    status = service.scout_status()
+
+    assert status["registration"]["registered"] is True
+    assert status["registration"]["registered_runtime"] is False
+    assert status["registration"]["assumed_registered"] is True
+    assert status["registration"]["registered_source"] == "api_token"
+    assert status["registration"]["username"] == "sapphire_scout"
+    assert status["external_bridge"]["provider"] == "moltbook"
+    assert status["external_bridge"]["external_ready"] is True
+    assert status["external_bridge"]["provider_state"] == "registered_active"

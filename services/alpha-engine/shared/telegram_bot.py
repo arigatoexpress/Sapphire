@@ -521,6 +521,8 @@ class TelegramPlatformBot:
         return (
             "💎 **SAPPHIRE TELEGRAM CONTROL**\n"
             f"Focused venues: `{targets}`\n\n"
+            "Natural language chat is enabled: plain-text messages are parsed into control actions or steering notes.\n"
+            "Examples: `status`, `autonomy`, `trade on 0.03`, `allocate lighter 40`, `approve all ship it`.\n\n"
             "Control commands:\n"
             "- `/status`\n"
             "- `/heartbeat`\n"
@@ -569,6 +571,254 @@ class TelegramPlatformBot:
             logger.error(f"Telegram command callback error: {exc}")
             await self.send_message(f"❌ Command dispatch failed: {exc}", priority=NotificationPriority.HIGH)
             return False
+
+    @staticmethod
+    def _strip_control_mention(text: str) -> str:
+        value = str(text or "").strip()
+        return re.sub(r"^@(alpha|control)\s+", "", value, flags=re.IGNORECASE).strip()
+
+    def _parse_plain_text_command(self, text: str) -> Optional[Dict[str, Any]]:
+        raw = self._strip_control_mention(text)
+        normalized = raw.lower().strip()
+        if not normalized:
+            return None
+        if normalized.startswith("/"):
+            return None
+
+        if re.search(r"\b(scout\s+status)\b", normalized):
+            return {
+                "platform": "CONTROL",
+                "symbol": "ALL",
+                "action": "SCOUT_STATUS",
+                "quantity": 0.0,
+                "ack": "🛰️ Scout status request queued from plain-text chat.",
+            }
+
+        scout_register = re.search(
+            r"\bscout\s+register\s+([A-Za-z0-9_-]{3,32})(?:\s+(.+))?$",
+            raw,
+            flags=re.IGNORECASE,
+        )
+        if scout_register:
+            payload = json.dumps(
+                {
+                    "username": str(scout_register.group(1) or "").strip(),
+                    "display_name": str(scout_register.group(2) or "").strip() or "Sapphire Scout",
+                    "bio": "Least-privilege scout for public collaboration. No secrets, no trading actions.",
+                },
+                separators=(",", ":"),
+            )
+            return {
+                "platform": "CONTROL",
+                "symbol": payload,
+                "action": "SCOUT_REGISTER",
+                "quantity": 0.0,
+                "ack": "🛰️ Scout registration request queued from plain-text chat.",
+            }
+
+        scout_publish = re.search(
+            r"\bscout\s+publish\s+(.+)$",
+            raw,
+            flags=re.IGNORECASE,
+        )
+        if scout_publish:
+            payload = json.dumps(
+                {
+                    "body": str(scout_publish.group(1) or "").strip(),
+                    "author": "SAPPHIRE_SCOUT",
+                    "kind": "note",
+                    "lane": "external",
+                    "tags": ["scout", "external"],
+                },
+                separators=(",", ":"),
+            )
+            return {
+                "platform": "CONTROL",
+                "symbol": payload,
+                "action": "SCOUT_PUBLISH",
+                "quantity": 0.0,
+                "ack": "🛰️ Scout publish request queued from plain-text chat.",
+            }
+
+        if re.search(r"\b(what'?s\s+status|status)\b", normalized):
+            return {
+                "platform": "CONTROL",
+                "symbol": "ALL",
+                "action": "CONTROL_STATUS",
+                "quantity": 0.0,
+                "ack": "📊 Status request queued from plain-text chat.",
+            }
+        if "heartbeat" in normalized or normalized == "ping":
+            return {
+                "platform": "CONTROL",
+                "symbol": "ALL",
+                "action": "HEARTBEAT",
+                "quantity": 0.0,
+                "ack": "💓 Heartbeat request queued from plain-text chat.",
+            }
+        if "focus" in normalized:
+            return {
+                "platform": "CONTROL",
+                "symbol": "ALL",
+                "action": "CONTROL_FOCUS",
+                "quantity": 0.0,
+                "ack": "🎯 Focus snapshot request queued from plain-text chat.",
+            }
+        if "autonomy" in normalized:
+            return {
+                "platform": "CONTROL",
+                "symbol": "ALL",
+                "action": "AUTONOMY_CYCLE",
+                "quantity": 0.0,
+                "ack": "🤖 Autonomy cycle request queued from plain-text chat.",
+            }
+        if re.search(r"\b(kill|halt)\b", normalized):
+            return {
+                "platform": "CONTROL",
+                "symbol": "ALL",
+                "action": "HALT_TRADING",
+                "quantity": 0.0,
+                "ack": "🛑 Kill-switch command queued from plain-text chat.",
+            }
+        if "resume" in normalized:
+            return {
+                "platform": "CONTROL",
+                "symbol": "ALL",
+                "action": "RESUME_TRADING",
+                "quantity": 0.0,
+                "ack": "✅ Resume command queued from plain-text chat.",
+            }
+        if "approve all" in normalized or "approve backlog" in normalized:
+            note = re.sub(r"^.*approve(?:\s+all|\s+backlog)\s*", "", raw, flags=re.IGNORECASE).strip()
+            payload = json.dumps({"note": note}, separators=(",", ":"))
+            return {
+                "platform": "CONTROL",
+                "symbol": payload,
+                "action": "APPROVE_ALL_SESSIONS",
+                "quantity": 0.0,
+                "ack": "✅ Bulk approval queued from plain-text chat.",
+            }
+
+        approve_match = re.search(
+            r"\bapprove\s+([A-Za-z0-9:._-]+|latest)(?:\s+(.+))?$",
+            raw,
+            flags=re.IGNORECASE,
+        )
+        if approve_match:
+            payload = json.dumps(
+                {
+                    "session_key": str(approve_match.group(1) or "").strip(),
+                    "note": str(approve_match.group(2) or "").strip(),
+                },
+                separators=(",", ":"),
+            )
+            return {
+                "platform": "CONTROL",
+                "symbol": payload,
+                "action": "APPROVE_SESSION",
+                "quantity": 0.0,
+                "ack": "✅ Session approval queued from plain-text chat.",
+            }
+
+        reject_match = re.search(
+            r"\breject\s+([A-Za-z0-9:._-]+|latest)(?:\s+(.+))?$",
+            raw,
+            flags=re.IGNORECASE,
+        )
+        if reject_match:
+            payload = json.dumps(
+                {
+                    "session_key": str(reject_match.group(1) or "").strip(),
+                    "note": str(reject_match.group(2) or "").strip(),
+                },
+                separators=(",", ":"),
+            )
+            return {
+                "platform": "CONTROL",
+                "symbol": payload,
+                "action": "REJECT_SESSION",
+                "quantity": 0.0,
+                "ack": "🛑 Session rejection queued from plain-text chat.",
+            }
+
+        trade_mode_match = re.search(
+            r"\b(?:trade|tradingview|tv)\s+(on|off)(?:\s+([0-9]*\.?[0-9]+))?",
+            normalized,
+        )
+        if trade_mode_match:
+            mode = str(trade_mode_match.group(1) or "").strip().upper()
+            qty_text = str(trade_mode_match.group(2) or "").strip()
+            qty = float(qty_text) if qty_text else 0.0
+            return {
+                "platform": "CONTROL",
+                "symbol": mode,
+                "action": "SET_TRADING_EXECUTION",
+                "quantity": qty,
+                "ack": (
+                    "🧭 TradingView execution mode update queued from plain-text chat "
+                    f"(`{'LIVE' if mode == 'ON' else 'WORKBENCH_DRY-RUN'}`)."
+                ),
+            }
+
+        stage_match = re.search(
+            r"\b(?:stage|promotion)\s+(paper|staged_live|staged|full_live|full|live)\b",
+            normalized,
+        )
+        if stage_match:
+            return {
+                "platform": "CONTROL",
+                "symbol": str(stage_match.group(1) or "").strip(),
+                "action": "SET_EXECUTION_STAGE",
+                "quantity": 0.0,
+                "ack": "🚀 DEX stage update queued from plain-text chat.",
+            }
+
+        allocate_match = re.search(
+            r"\ballocate\s+(all|aster|lighter|light)\s+([0-9]{1,3}(?:\.[0-9]+)?)\b",
+            normalized,
+        )
+        if allocate_match:
+            target = self._normalize_target(str(allocate_match.group(1) or "").strip())
+            percent = float(str(allocate_match.group(2) or "100").strip())
+            return {
+                "platform": "CONTROL",
+                "symbol": target,
+                "action": "SET_ALLOCATION",
+                "quantity": max(0.0, min(1.0, percent / 100.0)),
+                "ack": f"🧭 Allocation update queued from plain-text chat (`{target}` -> `{percent:.0f}%`).",
+            }
+
+        deallocate_match = re.search(r"\b(deallocate|pause)\s+(all|aster|lighter|light)\b", normalized)
+        if deallocate_match:
+            target = self._normalize_target(str(deallocate_match.group(2) or "").strip())
+            return {
+                "platform": "CONTROL",
+                "symbol": target,
+                "action": "SET_ALLOCATION",
+                "quantity": 0.0,
+                "ack": f"🧯 Deallocation update queued from plain-text chat (`{target}` -> `0%`).",
+            }
+
+        manual_trade = re.search(
+            r"\b(aster|lighter|all)\s+(buy|sell|close)\s+([0-9]*\.?[0-9]+)\s+([A-Za-z0-9:_-]+)\b",
+            normalized,
+        )
+        if manual_trade:
+            platform = self._normalize_target(str(manual_trade.group(1) or "").strip())
+            action = str(manual_trade.group(2) or "").strip().upper()
+            qty = float(str(manual_trade.group(3) or "0").strip())
+            symbol = str(manual_trade.group(4) or "").strip().upper()
+            return {
+                "platform": platform,
+                "symbol": symbol,
+                "action": action,
+                "quantity": qty,
+                "ack": (
+                    f"⚡ Manual trade queued from plain-text chat (`{platform}` `{action}` `{qty}` `{symbol}`)."
+                ),
+            }
+
+        return None
 
     async def _process_update(self, update: Dict[str, Any]):
         message = update.get("message", {}) or update.get("edited_message", {})
@@ -1214,19 +1464,30 @@ class TelegramPlatformBot:
             await self._dispatch_callback("alpha", "AI", action, 0.0)
             return
 
-        # Fallback: @alpha <free-text> is treated as steering context.
-        fallback_steer = re.search(r"@(alpha|control)\s+(.+)$", text, flags=re.IGNORECASE)
-        if fallback_steer:
-            directive = fallback_steer.group(2).strip()
-            if directive:
-                if len(directive) > 500:
-                    directive = directive[:500]
-                await self.send_message(
-                    (
-                        "🧠 Owner note captured from @alpha and queued.\n"
-                        "Expected outcome: note is injected into autonomy context for the next cycle.\n"
-                        "Benefit: keeps long-form guidance synchronized with agent decisions."
-                    ),
-                    priority=NotificationPriority.HIGH,
-                )
-                await self._dispatch_callback("CONTROL", directive, "OWNER_STEER", 0.0)
+        parsed_plain = self._parse_plain_text_command(text)
+        if parsed_plain:
+            await self.send_message(
+                str(parsed_plain.get("ack") or "🧭 Plain-text request captured and queued."),
+                priority=NotificationPriority.HIGH,
+            )
+            await self._dispatch_callback(
+                str(parsed_plain.get("platform") or "CONTROL"),
+                str(parsed_plain.get("symbol") or "ALL"),
+                str(parsed_plain.get("action") or "OWNER_STEER"),
+                float(parsed_plain.get("quantity") or 0.0),
+            )
+            return
+
+        directive = self._strip_control_mention(text)
+        if directive:
+            if len(directive) > 500:
+                directive = directive[:500]
+            await self.send_message(
+                (
+                    "🧠 Plain-text directive captured and queued.\n"
+                    "Expected outcome: message is injected into autonomy context for immediate agent steering.\n"
+                    "Benefit: you can use natural chat without strict command syntax."
+                ),
+                priority=NotificationPriority.HIGH,
+            )
+            await self._dispatch_callback("CONTROL", directive, "OWNER_STEER", 0.0)

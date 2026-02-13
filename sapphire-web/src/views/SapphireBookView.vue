@@ -56,6 +56,7 @@ const venuePriceHistory = ref<Record<string, number[]>>({
     ASTER: [],
     LIGHTER: [],
 })
+const showOperationsBoard = ref(false)
 const feedback = ref('')
 const nowEpoch = ref(Date.now())
 const lastSyncEpoch = ref(0)
@@ -146,6 +147,65 @@ const ownerDirective = computed(() => {
     return raw.length > 170 ? `${raw.slice(0, 167)}...` : raw
 })
 
+const asRecord = (value: unknown): Record<string, unknown> =>
+    value && typeof value === 'object' && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
+        : {}
+
+const scoutBridge = computed(() => scout.value?.external_bridge || null)
+const scoutRegistrationState = computed(() => scout.value?.registration || null)
+
+const scoutReady = computed(() => Boolean(scoutRegistrationState.value?.registered))
+
+const scoutBridgeReady = computed(() => {
+    const bridge = scoutBridge.value
+    if (!bridge) return false
+    const externalReady = Boolean(
+        bridge.external_ready ??
+            (bridge.register_url_configured && bridge.post_url_configured && bridge.api_token_configured),
+    )
+    return externalReady || Boolean(bridge.fallback_ready)
+})
+
+const scoutProviderLabel = computed(() => String(scoutBridge.value?.provider || 'unknown'))
+const scoutBridgeModeLabel = computed(() => String(scoutBridge.value?.dispatch_mode || 'none'))
+const scoutStateLabel = computed(() =>
+    String(scoutBridge.value?.provider_state || 'unknown')
+        .replace(/_/g, ' ')
+        .toUpperCase(),
+)
+const scoutOperatorHint = computed(
+    () =>
+        String(scoutBridge.value?.operator_hint || '').trim() ||
+        'Use /scout status for current bridge diagnostics and next actions.',
+)
+const scoutRegistrationLabel = computed(() => {
+    const registration = scoutRegistrationState.value
+    if (!registration?.registered) return 'NOT REGISTERED'
+    if (registration.assumed_registered) return 'ACTIVE (TOKEN-BACKED)'
+    return 'ACTIVE'
+})
+const scoutRegistrationSourceLabel = computed(() => {
+    const source = String(scoutRegistrationState.value?.registered_source || '').trim().toLowerCase()
+    if (source === 'api_token') return 'token assumption'
+    if (source === 'runtime_state') return 'runtime state'
+    return 'unknown'
+})
+const scoutLastDispatch = computed(() => asRecord(scoutRegistrationState.value?.last_dispatch))
+const scoutLastDispatchMode = computed(
+    () => String(scoutLastDispatch.value.mode || scoutBridgeModeLabel.value || 'none'),
+)
+const scoutLastDispatchReason = computed(() => String(scoutLastDispatch.value.reason || 'none'))
+const scoutLastDispatchDetail = computed(() => {
+    const metadata = asRecord(scoutLastDispatch.value.metadata)
+    const hint = String(metadata.hint || '').trim()
+    const claimUrl = String(metadata.claim_url || '').trim()
+    if (claimUrl) return `Claim URL: ${claimUrl}`
+    if (hint) return hint
+    const excerpt = String(scoutLastDispatch.value.response_excerpt || '').trim()
+    return excerpt ? excerpt.slice(0, 180) : 'none'
+})
+
 const laneSummary = computed(() => {
     const source = boardMeta.value?.lane_counts || {}
     return Object.keys(source)
@@ -225,37 +285,64 @@ const architectureHealthScore = computed(() => {
 })
 
 const architectureNodes = computed(() => {
-    const gatewayHealthy = !control.value?.kill_switch_active
-    const venuesHealthy =
-        Object.values(platform.value?.platforms || {}).filter((item) => item.status === 'healthy').length >= 2
-    const scoutReady = Boolean(scout.value?.registration?.registered)
+    const alphaHealthy = !control.value?.kill_switch_active
+    const venuesHealthyCount = Object.values(platform.value?.platforms || {}).filter((item) => item.status === 'healthy').length
+    const venuesHealthy = venuesHealthyCount >= 2
     const vtReady = Boolean(control.value?.vt_security_enabled && control.value?.vt_api_key_configured)
-    const dexLive = Boolean(control.value?.dex_live_dispatch_enabled)
+    const dexLive = Boolean(control.value?.dex_live_dispatch_enabled && !control.value?.kill_switch_active)
+    const scoutOperational = Boolean(scoutReady.value && scoutBridgeReady.value)
+    const scoutDegraded = Boolean(scoutReady.value || scoutBridgeReady.value)
+    const scoutName = String(scoutRegistrationState.value?.username || '').trim()
+    const pending = pendingDecisions.value
+    const autonomyOn = Boolean(control.value?.full_autonomy_enabled)
 
     return [
         {
-            id: 'telegram',
-            title: 'Owner Telegram',
+            id: 'owner',
+            title: 'Owner Channel',
             status: 'healthy',
-            detail: control.value?.owner_approval_required ? 'approval gate on' : 'autonomy auto-approve',
+            detail: 'Telegram plain-text control',
+        },
+        {
+            id: 'sapphire',
+            title: 'SAPPHIRE (Security)',
+            status: vtReady ? 'healthy' : 'degraded',
+            detail: vtReady ? `VT ${String(control.value?.vt_enforcement_mode || 'guard')} policy` : 'security guard degraded',
+        },
+        {
+            id: 'obsidian',
+            title: 'OBSIDIAN (Ops)',
+            status: alphaHealthy && venuesHealthy ? 'healthy' : 'degraded',
+            detail: venuesHealthy ? 'runtime + deploy lane stable' : `venue health ${venuesHealthyCount}/2`,
+        },
+        {
+            id: 'emerald',
+            title: 'EMERALD (Autonomy)',
+            status: autonomyOn && pending === 0 ? 'healthy' : 'degraded',
+            detail:
+                pending > 0
+                    ? `${pending} queued decisions`
+                    : autonomyOn
+                      ? 'self-improvement loop active'
+                      : 'autonomy disabled',
         },
         {
             id: 'alpha',
-            title: 'Sapphire Alpha',
-            status: control.value?.full_autonomy_enabled ? 'healthy' : 'degraded',
-            detail: `failure pressure ${failurePressure.value}`,
+            title: 'Alpha Orchestrator',
+            status: alphaHealthy ? 'healthy' : 'degraded',
+            detail: alphaHealthy ? 'policy + routing online' : 'kill-switch constrained',
         },
         {
-            id: 'gateway',
-            title: 'OpenClaw Gateway',
-            status: gatewayHealthy ? 'healthy' : 'degraded',
-            detail: gatewayHealthy ? 'dispatch online' : 'kill-switch constrained',
+            id: 'execution',
+            title: 'Execution Plane',
+            status: dexLive && venuesHealthy ? 'healthy' : 'degraded',
+            detail: dexLive ? 'ASTER + LIGHTER live dispatch' : 'workbench / staged mode',
         },
         {
-            id: 'venues',
-            title: 'Aster + Lighter',
-            status: venuesHealthy ? 'healthy' : 'degraded',
-            detail: dexLive ? 'live dispatch enabled' : 'paper/observe mode',
+            id: 'security',
+            title: 'Security Guard',
+            status: vtReady ? 'healthy' : 'degraded',
+            detail: vtReady ? 'skill scanning + enforcement' : 'policy/data incomplete',
         },
         {
             id: 'sapphirebook',
@@ -264,19 +351,96 @@ const architectureNodes = computed(() => {
             detail: `sync ${syncAge.value}`,
         },
         {
-            id: 'security',
-            title: 'VirusTotal Guard',
-            status: vtReady ? 'healthy' : 'degraded',
-            detail: vtReady ? String(control.value?.vt_enforcement_mode || 'guard active') : 'key/policy missing',
-        },
-        {
             id: 'scout',
-            title: 'External Scout Bridge',
-            status: scoutReady ? 'healthy' : 'degraded',
-            detail: scoutReady ? `@${scout.value?.registration?.username || 'registered'}` : 'not yet registered',
+            title: 'Scout Collaboration',
+            status: scoutOperational ? 'healthy' : scoutDegraded ? 'degraded' : 'offline',
+            detail: scoutOperational
+                ? `@${scoutName || 'sapphire_scout'} · ${scoutStateLabel.value.toLowerCase()}`
+                : `${scoutStateLabel.value.toLowerCase()} · ${scoutBridgeModeLabel.value}`,
         },
     ]
 })
+
+const departmentCards = computed(() => [
+    {
+        id: 'security',
+        title: 'SAPPHIRE',
+        status: control.value?.vt_security_enabled ? 'healthy' : 'degraded',
+        detail:
+            'Security & code quality lead. Owns skill security scans, policy guardrails, and release hardening.',
+    },
+    {
+        id: 'ops',
+        title: 'OBSIDIAN',
+        status: control.value?.kill_switch_active ? 'degraded' : 'healthy',
+        detail:
+            'Deployment and runtime operations lead. Owns Cloud Run stability, CI gates, and venue uptime.',
+    },
+    {
+        id: 'innovation',
+        title: 'EMERALD',
+        status: pendingDecisions.value > 0 ? 'degraded' : 'healthy',
+        detail:
+            'Innovation and self-improvement architect. Owns autonomous upgrades, experiments, and feedback loops.',
+    },
+    {
+        id: 'scout',
+        title: 'SAPPHIRE_SCOUT',
+        status: scoutReady.value && scoutBridgeReady.value ? 'healthy' : 'degraded',
+        detail:
+            'External collaboration scout with least privilege. No secrets, no cloud mutations, no trade execution.',
+    },
+])
+
+const meshLayout: Record<string, { x: number; y: number; label: string }> = {
+    owner: { x: 10, y: 10, label: 'Owner' },
+    sapphire: { x: 30, y: 10, label: 'Security' },
+    obsidian: { x: 50, y: 10, label: 'Ops' },
+    emerald: { x: 70, y: 10, label: 'Autonomy' },
+    alpha: { x: 50, y: 28, label: 'Orchestrator' },
+    execution: { x: 80, y: 44, label: 'Execution' },
+    security: { x: 20, y: 44, label: 'Guard' },
+    scout: { x: 50, y: 52, label: 'Scout' },
+    sapphirebook: { x: 6, y: 30, label: 'SapphireBook' },
+}
+
+const architectureMeshNodes = computed(() =>
+    architectureNodes.value
+        .filter((node) => Boolean(meshLayout[node.id]))
+        .map((node) => ({
+            ...node,
+            ...meshLayout[node.id],
+        })),
+)
+
+const architectureMeshLinks: Array<{ from: string; to: string }> = [
+    { from: 'owner', to: 'sapphire' },
+    { from: 'owner', to: 'obsidian' },
+    { from: 'owner', to: 'emerald' },
+    { from: 'sapphire', to: 'alpha' },
+    { from: 'obsidian', to: 'alpha' },
+    { from: 'emerald', to: 'alpha' },
+    { from: 'alpha', to: 'execution' },
+    { from: 'alpha', to: 'security' },
+    { from: 'alpha', to: 'scout' },
+    { from: 'sapphirebook', to: 'scout' },
+    { from: 'sapphirebook', to: 'alpha' },
+]
+
+const architectureMeshNodeMap = computed(() =>
+    architectureMeshNodes.value.reduce<Record<string, { x: number; y: number; status: string; title: string }>>(
+        (acc, node) => {
+            acc[node.id] = {
+                x: Number(node.x),
+                y: Number(node.y),
+                status: String(node.status),
+                title: String(node.title),
+            }
+            return acc
+        },
+        {},
+    ),
+)
 
 const venuePulse = computed(() => {
     const source = platform.value?.platforms || {}
@@ -355,15 +519,7 @@ const loadSelectedTopic = async () => {
 
 const loadBoard = async () => {
     try {
-        const [
-            board,
-            controlPayload,
-            scoutPayload,
-            platformPayload,
-            performancePayload,
-            systemLogPayload,
-            workspacePayload,
-        ] = await Promise.all([
+        const settled = await Promise.allSettled([
             fetchForumTopics({
                 lane: laneFilter.value,
                 state: stateFilter.value,
@@ -377,6 +533,30 @@ const loadBoard = async () => {
             fetchSystemLogs(80),
             fetchTradingViewWorkspace(),
         ])
+        const pick = <T>(index: number): T | null => {
+            const result = settled[index]
+            if (!result || result.status !== 'fulfilled') return null
+            return (result.value as T | null) || null
+        }
+
+        const board = pick<{
+            ok?: boolean
+            topics?: ForumTopic[]
+            total?: number
+            lane_counts?: Record<string, number>
+            state_counts?: Record<string, number>
+            control?: {
+                pending_autonomy_decisions: number
+                owner_directive: string
+                failure_pressure: number
+            }
+        }>(0)
+        const controlPayload = pick<ControlStatusResponse>(1)
+        const scoutPayload = pick<ForumScoutStatusResponse>(2)
+        const platformPayload = pick<PlatformStatusResponse>(3)
+        const performancePayload = pick<PerformanceStatsResponse>(4)
+        const systemLogPayload = pick<SystemLogEntry[] | null>(5)
+        const workspacePayload = pick<TradingViewWorkspaceResponse>(6)
 
         if (board?.ok) {
             topics.value = Array.isArray(board.topics) ? board.topics : []
@@ -395,8 +575,7 @@ const loadBoard = async () => {
             if (!hasSelected) {
                 selectedTopicId.value = topics.value[0]?.topic_id || ''
             }
-        } else {
-            topics.value = []
+        } else if (!topics.value.length) {
             boardMeta.value = null
             selectedTopicId.value = ''
         }
@@ -415,7 +594,11 @@ const loadBoard = async () => {
 
         await loadSelectedTopic()
         lastSyncEpoch.value = Date.now()
-        feedback.value = ''
+        const failedCount = settled.filter((result) => result.status === 'rejected').length
+        feedback.value =
+            failedCount > 0
+                ? `Partial sync: ${failedCount} endpoint${failedCount === 1 ? '' : 's'} unavailable.`
+                : ''
     } catch (error) {
         console.error('Failed to load SapphireBook forum:', error)
         feedback.value = 'Forum sync failed. Check alpha-engine API health.'
@@ -511,8 +694,25 @@ const submitScoutRegistration = async () => {
             return
         }
         await loadBoard()
-        const dispatchStatus = response.dispatch?.dispatched ? 'dispatched' : `pending (${response.dispatch?.reason || 'unconfigured'})`
-        feedback.value = `Scout registration ${dispatchStatus}.`
+        const dispatch = response.dispatch || { dispatched: false, reason: 'unknown' }
+        const metadata = asRecord(dispatch.metadata)
+        const reason = String(dispatch.reason || 'unknown')
+        const mode = String(dispatch.mode || 'none')
+        if (dispatch.dispatched) {
+            if (metadata.already_registered) {
+                feedback.value = `Scout already registered (${mode}). Token-backed dispatch is active.`
+            } else if (reason === 'ok_pending_verification' || metadata.verification_required) {
+                feedback.value =
+                    'Scout registration accepted but pending verification. Complete claim/verification before broad posting.'
+            } else {
+                feedback.value = `Scout registration dispatched (${mode}).`
+            }
+        } else {
+            const hint = String(metadata.hint || '').trim()
+            feedback.value = hint
+                ? `Scout registration pending (${reason}). ${hint}`
+                : `Scout registration pending (${reason}).`
+        }
     } finally {
         registeringScout.value = false
     }
@@ -546,9 +746,25 @@ const submitScoutNote = async () => {
         scoutNote.value.title = ''
         scoutNote.value.body = ''
         await loadBoard()
-        feedback.value = response.dispatch?.dispatched
-            ? 'Scout note published to external bridge.'
-            : `Scout note stored locally; external pending (${response.dispatch?.reason || 'unconfigured'}).`
+        const dispatch = response.dispatch || { dispatched: false, reason: 'unknown' }
+        const metadata = asRecord(dispatch.metadata)
+        const reason = String(dispatch.reason || 'unknown')
+        if (dispatch.dispatched) {
+            if (reason === 'ok_pending_verification' || metadata.verification_required) {
+                feedback.value = 'Scout note accepted by Moltbook and pending verification visibility.'
+            } else {
+                feedback.value = 'Scout note published to external bridge.'
+            }
+        } else {
+            const retryMinutes = Number(metadata.retry_after_minutes || 0)
+            if (reason === 'moltbook_rate_limited' && retryMinutes > 0) {
+                feedback.value = `Scout note stored locally; Moltbook cooldown active (~${retryMinutes}m).`
+            } else if (reason === 'moltbook_pending_claim') {
+                feedback.value = 'Scout note stored locally; account claim is still pending.'
+            } else {
+                feedback.value = `Scout note stored locally; external pending (${reason}).`
+            }
+        }
     } finally {
         publishingScout.value = false
     }
@@ -579,8 +795,8 @@ onUnmounted(() => {
                 <span class="font-mono kicker">SAPPHIREBOOK FORUM</span>
                 <h2>Full-stack operations theater for Sapphire autonomy.</h2>
                 <p>
-                    SapphireBook now mirrors the live architecture: command path, alpha control plane, execution venues, scout bridge, and
-                    security posture. Telegram remains the only control channel, while this surface delivers continuous operational context.
+                    SapphireBook now presents the organization as a live operating system: owner channel, the three Sapphire agents, alpha
+                    orchestration, execution venues, scout bridge, and security guardrails.
                 </p>
             </div>
             <div class="hero-meta">
@@ -588,6 +804,9 @@ onUnmounted(() => {
                 <span class="meta-chip">Pending {{ pendingDecisions }}</span>
                 <span class="meta-chip">Forum health {{ forumHealthScore }}%</span>
                 <span class="meta-chip">Sync {{ syncAge }}</span>
+                <button class="ghost-btn" type="button" @click="showOperationsBoard = !showOperationsBoard">
+                    {{ showOperationsBoard ? 'Hide detailed board' : 'Show detailed board' }}
+                </button>
             </div>
             <div class="filter-row">
                 <select v-model="laneFilter">
@@ -604,8 +823,8 @@ onUnmounted(() => {
         <section class="architecture card glass-lift">
             <header class="architecture-head">
                 <div>
-                    <h3 class="font-mono">Architecture Pulse</h3>
-                    <p>Live snapshot of command, autonomy, execution, and security layers.</p>
+                    <h3 class="font-mono">Organization Pulse</h3>
+                    <p>Live responsibilities and health by owner channel, agent departments, and runtime systems.</p>
                 </div>
                 <div class="architecture-score">
                     <span class="font-mono">System score</span>
@@ -621,61 +840,42 @@ onUnmounted(() => {
                     <p>{{ node.detail }}</p>
                 </article>
             </div>
-            <div class="architecture-kpis">
-                <article class="kpi-card">
-                    <span class="font-mono">Uptime</span>
-                    <strong>{{ uptimeLabel }}</strong>
-                    <small>alpha engine runtime</small>
-                </article>
-                <article class="kpi-card">
-                    <span class="font-mono">Realized PnL</span>
-                    <strong :class="realizedPnl >= 0 ? 'positive' : 'negative'">
-                        {{ realizedPnl >= 0 ? '+' : '' }}{{ formatCompactNumber(realizedPnl, 4) }}
-                    </strong>
-                    <small>{{ totalTrades }} trades · {{ winRatePercent.toFixed(1) }}% win-rate</small>
-                </article>
-                <article class="kpi-card">
-                    <span class="font-mono">Workspace</span>
-                    <strong>{{ workspaceModeLabel }}</strong>
-                    <small>last action: {{ workspaceLastAction }}</small>
-                </article>
-                <article class="kpi-card">
-                    <span class="font-mono">Autonomy</span>
-                    <strong>{{ control?.full_autonomy_enabled ? 'enabled' : 'disabled' }}</strong>
-                    <small>dispatches {{ control?.autonomy_dispatch_count || 0 }} · failures {{ failurePressure }}</small>
-                </article>
-            </div>
         </section>
 
-        <section class="venue-pulse-grid">
-            <article v-for="venue in venuePulse" :key="venue.venue" class="card glass-lift venue-card">
-                <header class="venue-head">
-                    <div>
-                        <span class="font-mono">{{ venue.venue }}</span>
-                        <h4>{{ venue.mode || 'Execution venue' }}</h4>
-                    </div>
-                    <span class="node-status" :class="`status-${venue.status === 'healthy' ? 'healthy' : 'degraded'}`">
-                        {{ venue.status }}
-                    </span>
-                </header>
-                <div class="venue-price-line">
-                    <strong>{{ venue.price ? formatCompactNumber(venue.price, 4) : 'n/a' }}</strong>
-                    <span :class="venue.delta >= 0 ? 'positive' : 'negative'">
-                        {{ venue.delta >= 0 ? '+' : '' }}{{ formatCompactNumber(venue.delta, 4) }}
-                    </span>
+        <section class="mesh-panel card glass-lift">
+            <header class="mesh-head">
+                <div>
+                    <h3 class="font-mono">Live Org Flow Map</h3>
+                    <p>Owner to agent-to-system flow with live health and responsibility context.</p>
                 </div>
-                <svg class="sparkline" viewBox="0 0 100 32" preserveAspectRatio="none" role="img" aria-label="venue sparkline">
-                    <polyline :points="sparklinePoints(venue.history)" />
-                </svg>
-                <footer>
-                    <span>tick age {{ venue.ageSeconds }}s</span>
-                    <span>alloc {{ Math.round(venue.allocation * 100) }}%</span>
-                    <span>{{ venue.paused ? 'paused' : 'live' }}</span>
-                </footer>
-            </article>
-            <article v-if="!venuePulse.length" class="card venue-empty">
-                <p>No venue telemetry available yet.</p>
-            </article>
+                <span class="mesh-sync">sync {{ syncAge }}</span>
+            </header>
+            <svg class="mesh-svg" viewBox="0 0 100 60" role="img" aria-label="Sapphire architecture mesh">
+                <line
+                    v-for="link in architectureMeshLinks"
+                    :key="`${link.from}-${link.to}`"
+                    :x1="architectureMeshNodeMap[link.from]?.x || 0"
+                    :y1="architectureMeshNodeMap[link.from]?.y || 0"
+                    :x2="architectureMeshNodeMap[link.to]?.x || 0"
+                    :y2="architectureMeshNodeMap[link.to]?.y || 0"
+                    class="mesh-link"
+                />
+                <g v-for="node in architectureMeshNodes" :key="`mesh-${node.id}`" :transform="`translate(${node.x}, ${node.y})`">
+                    <circle class="mesh-node-halo" :class="`mesh-${node.status}`" r="4.8" />
+                    <circle class="mesh-node-core" :class="`mesh-${node.status}`" r="2.2" />
+                    <text class="mesh-node-label" x="0" y="-6.3">{{ node.title }}</text>
+                    <text class="mesh-node-sub" x="0" y="8.2">{{ node.detail }}</text>
+                </g>
+            </svg>
+            <div class="department-grid">
+                <article v-for="dept in departmentCards" :key="dept.id" class="department-card">
+                    <header>
+                        <strong>{{ dept.title }}</strong>
+                        <span class="node-status" :class="`status-${dept.status}`">{{ dept.status }}</span>
+                    </header>
+                    <p>{{ dept.detail }}</p>
+                </article>
+            </div>
         </section>
 
         <section class="event-stream card glass-lift">
@@ -700,7 +900,21 @@ onUnmounted(() => {
             </div>
         </section>
 
-        <section class="board-layout">
+        <section class="board-toggle card glass-lift">
+            <header class="board-toggle-head">
+                <div>
+                    <h3 class="font-mono">Operations Collaboration Board</h3>
+                    <p>
+                        Detailed forum threads, scout actions, and execution control artifacts for operator-level workflows.
+                    </p>
+                </div>
+                <button class="btn" type="button" @click="showOperationsBoard = !showOperationsBoard">
+                    {{ showOperationsBoard ? 'Collapse board' : 'Expand board' }}
+                </button>
+            </header>
+        </section>
+
+        <section v-if="showOperationsBoard" class="board-layout">
             <article class="topic-column card">
                 <header class="column-head">
                     <h3 class="font-mono">Topic Board</h3>
@@ -835,9 +1049,10 @@ onUnmounted(() => {
                 <article class="card glass-lift side-card">
                     <h3 class="font-mono">Control Pulse</h3>
                     <p><strong>Directive:</strong> {{ ownerDirective }}</p>
-                    <p><strong>DEX stage:</strong> {{ control?.dex_execution_stage || 'paper' }}</p>
-                    <p><strong>DEX live dispatch:</strong> {{ control?.dex_live_dispatch_enabled ? 'ON' : 'OFF' }}</p>
+                    <p><strong>Autonomy:</strong> {{ control?.full_autonomy_enabled ? 'ON' : 'OFF' }}</p>
+                    <p><strong>Owner approvals:</strong> {{ control?.owner_approval_required ? 'required' : 'auto-approve' }}</p>
                     <p><strong>Failure pressure:</strong> {{ failurePressure }}</p>
+                    <p><strong>Security mode:</strong> {{ control?.vt_enforcement_mode || 'warn' }}</p>
                     <div class="summary-grid">
                         <span v-for="item in laneSummary" :key="`lane-${item.lane}`" class="pill" :class="laneClass(item.lane)">
                             {{ item.lane }} {{ item.count }}
@@ -857,12 +1072,28 @@ onUnmounted(() => {
                         <strong>{{ scout?.profile.sensitive_data_access || 'none' }}</strong>
                     </p>
                     <p>
-                        Registration: <strong>{{ scout?.registration.registered ? 'ACTIVE' : 'NOT REGISTERED' }}</strong>
+                        Registration: <strong>{{ scoutRegistrationLabel }}</strong>
                         <span v-if="scout?.registration.username">(@{{ scout.registration.username }})</span>
+                        <small> · source {{ scoutRegistrationSourceLabel }}</small>
                     </p>
                     <p>
-                        External bridge:
-                        <strong>{{ scout?.external_bridge.register_url_configured ? 'configured' : 'not configured' }}</strong>
+                        Provider: <strong>{{ scoutProviderLabel }}</strong> · mode: <strong>{{ scoutBridgeModeLabel }}</strong>
+                    </p>
+                    <p>
+                        Bridge state: <strong>{{ scoutStateLabel }}</strong>
+                    </p>
+                    <p>
+                        External path: <strong>{{ scoutBridge?.external_ready ? 'READY' : 'NOT READY' }}</strong> ·
+                        fallback: <strong>{{ scoutBridge?.fallback_ready ? 'READY' : 'NOT READY' }}</strong>
+                    </p>
+                    <p class="hint-line">
+                        {{ scoutOperatorHint }}
+                    </p>
+                    <p>
+                        Last dispatch: <strong>{{ scoutLastDispatchMode }}</strong> · <strong>{{ scoutLastDispatchReason }}</strong>
+                    </p>
+                    <p v-if="scoutLastDispatchDetail !== 'none'" class="dispatch-line">
+                        {{ scoutLastDispatchDetail }}
                     </p>
                     <p v-if="!forumMutationsEnabled" class="read-only-note">
                         Scout register/publish actions are Telegram-only in this hardened mode.
@@ -890,6 +1121,13 @@ onUnmounted(() => {
                     <p>{{ feedback }}</p>
                 </article>
             </aside>
+        </section>
+
+        <section v-else class="board-collapsed card glass-lift">
+            <p>
+                Detailed collaboration threads are collapsed to keep this surface clean for visitors. Use “Expand board” when you need
+                full operator workflows, thread-level context, or scout publish controls.
+            </p>
         </section>
     </div>
 </template>
@@ -987,6 +1225,16 @@ textarea {
     cursor: not-allowed;
 }
 
+.ghost-btn {
+    border: 1px solid rgba(124, 195, 239, 0.38);
+    border-radius: 999px;
+    background: rgba(8, 24, 45, 0.62);
+    color: #d9f2ff;
+    padding: 0.24rem 0.62rem;
+    font-size: 0.68rem;
+    cursor: pointer;
+}
+
 .architecture {
     display: grid;
     gap: 0.72rem;
@@ -1065,6 +1313,126 @@ textarea {
     line-height: 1.35;
 }
 
+.mesh-panel {
+    display: grid;
+    gap: 0.72rem;
+    background:
+        radial-gradient(circle at 8% 10%, rgba(80, 184, 255, 0.2), transparent 34%),
+        linear-gradient(138deg, rgba(7, 23, 44, 0.88), rgba(7, 21, 39, 0.82));
+}
+
+.mesh-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.85rem;
+}
+
+.mesh-head h3 {
+    margin: 0;
+}
+
+.mesh-head p {
+    margin: 0.22rem 0 0;
+    color: var(--text-secondary);
+    font-size: 0.77rem;
+    max-width: 76ch;
+}
+
+.mesh-sync {
+    border: 1px solid rgba(114, 193, 251, 0.36);
+    border-radius: 999px;
+    padding: 0.15rem 0.52rem;
+    color: #a5e3ff;
+    font-size: 0.68rem;
+    white-space: nowrap;
+}
+
+.mesh-svg {
+    width: 100%;
+    height: 280px;
+    border-radius: 12px;
+    border: 1px solid rgba(117, 180, 226, 0.24);
+    background:
+        radial-gradient(circle at 15% 20%, rgba(83, 196, 255, 0.14), transparent 42%),
+        linear-gradient(160deg, rgba(7, 22, 40, 0.88), rgba(6, 19, 33, 0.82));
+}
+
+.mesh-link {
+    stroke: rgba(128, 196, 241, 0.38);
+    stroke-width: 0.45;
+    stroke-dasharray: 1.4 1.4;
+    animation: mesh-flow 4.4s linear infinite;
+}
+
+.mesh-node-halo {
+    fill: rgba(112, 194, 255, 0.18);
+    animation: mesh-pulse 2.6s ease-in-out infinite;
+}
+
+.mesh-node-core {
+    stroke: rgba(233, 246, 255, 0.7);
+    stroke-width: 0.24;
+}
+
+.mesh-healthy {
+    fill: rgba(88, 230, 171, 0.92);
+}
+
+.mesh-degraded {
+    fill: rgba(255, 202, 117, 0.94);
+}
+
+.mesh-offline {
+    fill: rgba(255, 149, 149, 0.94);
+}
+
+.mesh-node-label,
+.mesh-node-sub {
+    text-anchor: middle;
+    font-size: 1.9px;
+    fill: #d7ecff;
+    pointer-events: none;
+}
+
+.mesh-node-sub {
+    font-size: 1.35px;
+    fill: rgba(199, 224, 245, 0.85);
+}
+
+.department-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.58rem;
+}
+
+.department-card {
+    border: 1px solid rgba(120, 186, 231, 0.3);
+    border-radius: 12px;
+    background: rgba(7, 22, 42, 0.7);
+    padding: 0.58rem 0.62rem;
+    display: grid;
+    gap: 0.3rem;
+}
+
+.department-card header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.55rem;
+}
+
+.department-card strong {
+    font-size: 0.73rem;
+}
+
+.department-card p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.74rem;
+    line-height: 1.32;
+}
+
 .node-status {
     display: inline-flex;
     align-items: center;
@@ -1089,6 +1457,27 @@ textarea {
 .status-offline {
     color: #ffb5b5;
     border-color: rgba(255, 128, 128, 0.48);
+}
+
+@keyframes mesh-flow {
+    0% {
+        stroke-dashoffset: 6;
+    }
+    100% {
+        stroke-dashoffset: 0;
+    }
+}
+
+@keyframes mesh-pulse {
+    0%,
+    100% {
+        opacity: 0.35;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.8;
+        transform: scale(1.08);
+    }
 }
 
 .architecture-kpis {
@@ -1262,6 +1651,42 @@ textarea {
     color: var(--text-tertiary);
     padding: 0.06rem 0.4rem;
     font-size: 0.63rem;
+}
+
+.board-toggle {
+    background:
+        radial-gradient(circle at 8% 8%, rgba(96, 200, 255, 0.18), transparent 34%),
+        rgba(8, 23, 43, 0.74);
+}
+
+.board-toggle-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.8rem;
+}
+
+.board-toggle-head h3 {
+    margin: 0;
+}
+
+.board-toggle-head p {
+    margin: 0.28rem 0 0;
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    max-width: 72ch;
+}
+
+.board-collapsed {
+    border: 1px dashed rgba(117, 180, 226, 0.32);
+    background: rgba(8, 23, 43, 0.64);
+}
+
+.board-collapsed p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    line-height: 1.45;
 }
 
 .board-layout {
@@ -1532,6 +1957,27 @@ textarea {
     color: #c5dff7;
 }
 
+.side-card p small {
+    color: var(--text-tertiary);
+    font-size: 0.7rem;
+}
+
+.hint-line {
+    border: 1px solid rgba(114, 180, 223, 0.28);
+    border-radius: 10px;
+    padding: 0.42rem 0.54rem;
+    background: rgba(8, 24, 44, 0.62);
+    color: var(--text-secondary);
+    font-size: 0.74rem;
+    line-height: 1.35;
+}
+
+.dispatch-line {
+    color: #d8ecff;
+    font-size: 0.74rem;
+    line-height: 1.3;
+}
+
 .summary-grid {
     display: flex;
     flex-wrap: wrap;
@@ -1554,7 +2000,7 @@ textarea {
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
-    .architecture-kpis {
+    .department-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
@@ -1582,10 +2028,6 @@ textarea {
         grid-template-columns: 1fr 1fr;
     }
 
-    .venue-pulse-grid {
-        grid-template-columns: 1fr;
-    }
-
     .filter-row {
         grid-template-columns: 1fr;
     }
@@ -1606,8 +2048,17 @@ textarea {
 
 @media (max-width: 680px) {
     .architecture-grid,
-    .architecture-kpis {
+    .department-grid {
         grid-template-columns: 1fr;
+    }
+
+    .mesh-head {
+        display: grid;
+        gap: 0.5rem;
+    }
+
+    .mesh-svg {
+        height: 320px;
     }
 }
 </style>

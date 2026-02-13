@@ -37,6 +37,7 @@ class ExecutionDispatcher:
         self._venue_allocations: Dict[str, float] = {venue: 1.0 for venue in self.bot_urls}
         self._venue_paused_until: Dict[str, float] = {}
         self._venue_pause_reason: Dict[str, str] = {}
+        self._last_dispatch_errors: Dict[str, Dict[str, Any]] = {}
 
     async def start(self):
         self.session = aiohttp.ClientSession()
@@ -168,16 +169,35 @@ class ExecutionDispatcher:
 
         return self._venue_allocations.get(venue, 1.0) > 0.0
 
+    def _record_dispatch_error(
+        self,
+        venue: str,
+        reason: str,
+        status: int | None = None,
+        body: str = "",
+    ) -> None:
+        self._last_dispatch_errors[self._normalize_venue(venue)] = {
+            "reason": str(reason or "").strip() or "unknown",
+            "status": int(status) if isinstance(status, int) else None,
+            "body": str(body or "").strip()[:320],
+            "timestamp": int(time.time()),
+        }
+
+    def get_last_dispatch_error(self, venue: str) -> Dict[str, Any]:
+        return dict(self._last_dispatch_errors.get(self._normalize_venue(venue), {}))
+
     async def send_command(self, venue: str, command: Dict[str, Any]) -> bool:
         """Send a command to a specific bot."""
         if not self.session:
             logger.error("Dispatcher not started!")
+            self._record_dispatch_error(venue, "dispatcher_not_started")
             return False
 
         normalized_venue = self._normalize_venue(venue)
         url = self.bot_urls.get(normalized_venue)
         if not url:
             logger.error(f"No URL configured for venue: {venue}")
+            self._record_dispatch_error(normalized_venue, "venue_url_missing")
             return False
 
         if not self._is_venue_dispatchable(normalized_venue):
@@ -185,6 +205,7 @@ class ExecutionDispatcher:
                 f"🚫 Command blocked for {normalized_venue}: allocation={self._venue_allocations.get(normalized_venue, 1.0):.2f}, "
                 f"paused={normalized_venue in self._venue_paused_until}"
             )
+            self._record_dispatch_error(normalized_venue, "venue_not_dispatchable")
             return False
 
         full_url = f"{url}/execute"
@@ -212,18 +233,31 @@ class ExecutionDispatcher:
         try:
             async with self.session.post(full_url, json=command_payload, headers=auth_headers) as val:
                 if val.status == 200:
+                    self._last_dispatch_errors.pop(normalized_venue, None)
                     logger.info(f"✅ Command Sent to {normalized_venue}: {command_payload}")
                     return True
                 elif val.status == 403:
+                    body = await val.text()
                     logger.error(
-                        f"🚫 Permission Denied (403): Ensure Hub service account has 'run.invoker' on {normalized_venue}"
+                        f"🚫 Permission Denied (403): Ensure Hub service account has 'run.invoker' on {normalized_venue} | {body[:240]}"
                     )
+                    self._record_dispatch_error(normalized_venue, "permission_denied", status=403, body=body)
                     return False
                 else:
-                    logger.error(f"❌ Command Failed {normalized_venue}: {val.status}")
+                    body = await val.text()
+                    logger.error(
+                        f"❌ Command Failed {normalized_venue}: status={val.status} body={body[:240]}"
+                    )
+                    self._record_dispatch_error(
+                        normalized_venue,
+                        "http_error",
+                        status=int(val.status),
+                        body=body,
+                    )
                     return False
         except Exception as e:
             logger.error(f"Dispatch Error ({normalized_venue}): {e}")
+            self._record_dispatch_error(normalized_venue, "dispatch_exception", body=str(e))
             return False
 
 

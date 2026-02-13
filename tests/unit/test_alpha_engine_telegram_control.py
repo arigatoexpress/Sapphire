@@ -369,6 +369,83 @@ def test_answer_alias_still_routes_to_owner_steer(telegram_module):
     assert "Expected outcome:" in ack_text
 
 
+def test_plain_text_status_routes_to_control_status(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "status please"}}
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert symbol == "ALL"
+    assert action == "CONTROL_STATUS"
+    assert quantity == 0.0
+
+    ack_text = bot.send_message.await_args.args[0]
+    assert "plain-text chat" in ack_text.lower()
+
+
+def test_plain_text_manual_trade_routes_to_venue(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "aster buy 0.6 btc"}}
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "ASTER"
+    assert symbol == "BTC"
+    assert action == "BUY"
+    assert quantity == 0.6
+
+
+def test_plain_text_fallback_routes_to_owner_steer(telegram_module):
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token",
+        chat_id="12345",
+        command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+
+    asyncio.run(
+        bot._process_update(
+            {
+                "message": {
+                    "chat": {"id": "12345"},
+                    "text": "let the agents prioritize reliability over speed this week",
+                }
+            }
+        )
+    )
+
+    callback.assert_awaited_once()
+    platform, symbol, action, quantity = callback.await_args.args
+    assert platform == "CONTROL"
+    assert action == "OWNER_STEER"
+    assert quantity == 0.0
+    assert "prioritize reliability" in symbol
+
+
 def test_security_status_command_dispatches_action(telegram_module):
     callback = AsyncMock()
     bot = telegram_module.TelegramPlatformBot(

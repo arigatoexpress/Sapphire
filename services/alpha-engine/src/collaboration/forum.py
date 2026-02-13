@@ -897,6 +897,7 @@ class SapphireForumService:
         fallback_ready = bool(
             fallback.get("hook_url") and fallback.get("hook_token") and fallback.get("chat_id")
         )
+        external_ready = bool(external_register_url and external_post_url and external_token_set)
         dispatch_mode = "external_http" if external_register_url or external_post_url else "openclaw_hook"
         if dispatch_mode == "openclaw_hook" and not fallback_ready:
             dispatch_mode = "none"
@@ -908,9 +909,53 @@ class SapphireForumService:
         )
 
         with self._lock:
+            registration = dict(self._scout_registration)
+            runtime_registered = bool(registration.get("registered"))
+            assumed_registered = bool(
+                not runtime_registered and provider == "moltbook" and external_token_set
+            )
+            effective_registered = bool(runtime_registered or assumed_registered)
+            if assumed_registered:
+                registration["registered"] = True
+                registration["registered_source"] = "api_token"
+                if not str(registration.get("username", "")).strip():
+                    registration["username"] = (
+                        str(os.getenv("SAPPHIRE_SCOUT_USERNAME", "")).strip() or "sapphire_scout"
+                    )
+                if not str(registration.get("display_name", "")).strip():
+                    registration["display_name"] = (
+                        str(os.getenv("SAPPHIRE_SCOUT_DISPLAY_NAME", "")).strip() or "Sapphire Scout"
+                    )
+            else:
+                registration["registered_source"] = "runtime_state"
+            registration["registered_runtime"] = runtime_registered
+            registration["assumed_registered"] = assumed_registered
+
+            if dispatch_mode == "none":
+                provider_state = "bridge_unconfigured"
+                operator_hint = "Configure external bridge URLs or OpenClaw fallback hook settings."
+            elif dispatch_mode == "openclaw_hook":
+                provider_state = "fallback_only_ready" if fallback_ready else "fallback_not_ready"
+                operator_hint = (
+                    "OpenClaw fallback can deliver scout work; wire external Moltbook URLs to publish directly."
+                    if fallback_ready
+                    else "Configure fallback hook URL/token/chat to keep scout collaboration available."
+                )
+            elif provider == "moltbook" and not external_token_set:
+                provider_state = "missing_api_token"
+                operator_hint = "Add SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN so external publish can execute."
+            elif effective_registered:
+                provider_state = "registered_active"
+                operator_hint = (
+                    "Scout bridge is active. Use /scout publish to send sanitized external summaries."
+                )
+            else:
+                provider_state = "registration_required"
+                operator_hint = "Run /scout register <username> to activate least-privilege scout identity."
+
             return {
                 "profile": self._scout_profile(),
-                "registration": dict(self._scout_registration),
+                "registration": registration,
                 "external_bridge": {
                     "register_url_configured": bool(external_register_url),
                     "post_url_configured": bool(external_post_url),
@@ -918,8 +963,12 @@ class SapphireForumService:
                     "fallback_hook_url_configured": bool(fallback.get("hook_url")),
                     "fallback_hook_token_configured": bool(fallback.get("hook_token")),
                     "fallback_chat_id_configured": bool(fallback.get("chat_id")),
+                    "external_ready": external_ready,
+                    "fallback_ready": fallback_ready,
                     "dispatch_mode": dispatch_mode,
                     "provider": provider,
+                    "provider_state": provider_state,
+                    "operator_hint": operator_hint,
                 },
                 "timestamp": self._now(),
             }

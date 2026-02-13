@@ -121,7 +121,7 @@ class AlphaEngine:
         self._auto_deallocated: Set[str] = set()
         self._owner_directive = str(os.getenv("SAPPHIRE_OWNER_DIRECTIVE", "")).strip()
         self._owner_directive_updated_at = int(time.time()) if self._owner_directive else 0
-        self._full_autonomy_enabled = self._env_flag("SAPPHIRE_FULL_AUTONOMY_ENABLED", default=False)
+        self._full_autonomy_enabled = self._env_flag("SAPPHIRE_FULL_AUTONOMY_ENABLED", default=True)
         self._autonomy_allow_code_changes = self._env_flag(
             "SAPPHIRE_AUTONOMY_ALLOW_CODE_CHANGES", default=True
         )
@@ -194,6 +194,16 @@ class AlphaEngine:
             "losses": 0.0,
             "realized_pnl": 0.0,
         }
+        self._min_notional_by_venue: Dict[str, float] = {
+            "ASTER": max(0.0, float(os.getenv("SAPPHIRE_MIN_NOTIONAL_ASTER", "5.0"))),
+            "LIGHTER": max(0.0, float(os.getenv("SAPPHIRE_MIN_NOTIONAL_LIGHTER", "10.0"))),
+        }
+        self._min_notional_buffer_pct = max(
+            0.0, float(os.getenv("SAPPHIRE_MIN_NOTIONAL_BUFFER_PCT", "0.05"))
+        )
+        self._min_trade_quantity_floor = max(
+            0.0, float(os.getenv("SAPPHIRE_MIN_TRADE_QUANTITY_FLOOR", "0.0001"))
+        )
 
     @staticmethod
     def _env_flag(name: str, default: bool = False) -> bool:
@@ -794,6 +804,98 @@ class AlphaEngine:
         if self._tradingview_max_quantity_default > 0:
             return self._tradingview_max_quantity_default
         return None
+
+    @staticmethod
+    def _normalize_symbol_base(symbol: str) -> str:
+        value = str(symbol or "").strip().upper()
+        if not value:
+            return value
+        cleaned = value.replace("-", "").replace("_", "")
+        for suffix in ("USDT", "USDC", "USD", "PERP"):
+            if cleaned.endswith(suffix):
+                cleaned = cleaned[: -len(suffix)]
+                break
+        return cleaned or value
+
+    def _resolve_reference_price(self, venue: str, symbol: str) -> float:
+        venue_key = self._normalize_platform(venue)
+        symbol_key = self._normalize_symbol_base(symbol)
+        price = self._as_float(self.market_data.get_price(venue_key, symbol_key))
+        if isinstance(price, float) and price > 0:
+            return price
+        # Fallback to SOL when a symbol tick is unavailable, to keep notional guard operational.
+        fallback = self._as_float(self.market_data.get_price(venue_key, "SOL"))
+        if isinstance(fallback, float) and fallback > 0:
+            return fallback
+        return 0.0
+
+    def _apply_min_notional_guard(self, venue: str, symbol: str, quantity: float) -> Dict[str, Any]:
+        venue_key = self._normalize_platform(venue)
+        base_qty = max(0.0, float(quantity or 0.0))
+        min_notional = float(self._min_notional_by_venue.get(venue_key, 0.0))
+        if base_qty <= 0:
+            return {
+                "blocked": True,
+                "adjusted": False,
+                "quantity": 0.0,
+                "reason": "non_positive_quantity",
+                "venue": venue_key,
+            }
+
+        if min_notional <= 0:
+            return {
+                "blocked": False,
+                "adjusted": False,
+                "quantity": base_qty,
+                "reason": "guard_disabled",
+                "venue": venue_key,
+                "min_notional": min_notional,
+            }
+
+        reference_price = self._resolve_reference_price(venue_key, symbol)
+        if reference_price <= 0:
+            return {
+                "blocked": False,
+                "adjusted": False,
+                "quantity": base_qty,
+                "reason": "reference_price_unavailable",
+                "venue": venue_key,
+                "min_notional": min_notional,
+            }
+
+        target_notional = min_notional * (1.0 + self._min_notional_buffer_pct)
+        required_qty = target_notional / reference_price
+        floor_qty = self._min_trade_quantity_floor if self._min_trade_quantity_floor > 0 else 0.0
+        adjusted_qty = max(base_qty, required_qty, floor_qty)
+
+        cap = self._max_quantity_for_venue(venue_key)
+        if cap is not None and cap > 0 and adjusted_qty > cap:
+            return {
+                "blocked": True,
+                "adjusted": False,
+                "quantity": 0.0,
+                "reason": "required_quantity_exceeds_cap",
+                "venue": venue_key,
+                "min_notional": min_notional,
+                "target_notional": float(round(target_notional, 6)),
+                "required_quantity": float(round(required_qty, 8)),
+                "cap_quantity": float(round(cap, 8)),
+                "reference_price": float(round(reference_price, 8)),
+            }
+
+        rounded_qty = float(round(adjusted_qty, 8))
+        adjusted = rounded_qty > (base_qty + 1e-10)
+        return {
+            "blocked": False,
+            "adjusted": adjusted,
+            "quantity": rounded_qty,
+            "reason": "raised_to_min_notional" if adjusted else "baseline_satisfies_notional",
+            "venue": venue_key,
+            "min_notional": min_notional,
+            "target_notional": float(round(target_notional, 6)),
+            "required_quantity": float(round(required_qty, 8)),
+            "reference_price": float(round(reference_price, 8)),
+        }
 
     def _effective_trade_quantity_cap(self) -> float | None:
         caps: List[float] = []
@@ -1539,7 +1641,7 @@ class AlphaEngine:
             f"Owner directive: `{directive}`",
             f"Directive updated: `{directive_updated}`",
             "",
-            "Use `/steer <directive>` or `/answer <response>` to update direction.",
+            "Use plain text (or `/steer`/`/answer`) to update direction.",
         ]
         await self.telegram.send_message("\n".join(lines), priority="medium")
 
@@ -1603,8 +1705,8 @@ class AlphaEngine:
             ),
             "",
             "Quick actions:",
-            "`/status` `/focus` `/autonomy` `/approve_all`",
-            "Use `/help` for full command list.",
+            "`status` `focus` `autonomy` `approve all`",
+            "Plain-text chat is enabled; slash commands remain supported via `/help`.",
         ]
         await self.telegram.send_message("\n".join(lines), priority="medium")
 
@@ -2992,6 +3094,8 @@ class AlphaEngine:
 
         per_target_quantity: Dict[str, float] = {}
         capped_targets: List[str] = []
+        notional_adjusted_targets: List[str] = []
+        notional_blocked_targets: Dict[str, Dict[str, Any]] = {}
         for venue in targets:
             venue_cap = self._max_quantity_for_venue(venue)
             strategy_cap = strategy_rule.get("max_quantity") if strategy_rule else None
@@ -3001,13 +3105,51 @@ class AlphaEngine:
             if venue_cap is not None and venue_qty > venue_cap:
                 venue_qty = venue_cap
                 capped_targets.append(venue)
-            per_target_quantity[venue] = venue_qty
+            quantity_guard = self._apply_min_notional_guard(venue, symbol, venue_qty)
+            if quantity_guard.get("blocked"):
+                notional_blocked_targets[venue] = quantity_guard
+                continue
+            if quantity_guard.get("adjusted"):
+                notional_adjusted_targets.append(venue)
+            per_target_quantity[venue] = float(quantity_guard.get("quantity", venue_qty))
+
+        executable_targets = [venue for venue in targets if venue not in notional_blocked_targets]
+        if not executable_targets:
+            blocked_fragments = [
+                f"{venue}:{details.get('reason', 'guard_blocked')}"
+                for venue, details in sorted(notional_blocked_targets.items())
+            ]
+            await self.telegram.send_message(
+                (
+                    "⚠️ TradingView alert blocked by min-notional guard on all targets.\n"
+                    f"Targets: `{'; '.join(blocked_fragments)}`"
+                ),
+                priority="high",
+            )
+            return {
+                "accepted": "blocked",
+                "reason": "min_notional_guard",
+                "targets": targets,
+                "blocked_targets": sorted(list(notional_blocked_targets.keys())),
+                "signal_key": signal_key,
+                "strategy": strategy_label or None,
+            }
 
         if not self._tradingview_execution_enabled:
-            qty_parts = [f"{venue}:{per_target_quantity[venue]}" for venue in sorted(targets)]
+            qty_parts = [f"{venue}:{per_target_quantity[venue]}" for venue in sorted(executable_targets)]
             cap_note = (
                 f" Caps applied on `{', '.join(sorted(set(capped_targets)))}`."
                 if capped_targets
+                else ""
+            )
+            adjust_note = (
+                f" Min-notional adjustment applied on `{', '.join(sorted(set(notional_adjusted_targets)))}`."
+                if notional_adjusted_targets
+                else ""
+            )
+            blocked_note = (
+                f" Guard-blocked targets `{', '.join(sorted(notional_blocked_targets.keys()))}`."
+                if notional_blocked_targets
                 else ""
             )
             await self.telegram.send_message(
@@ -3015,20 +3157,24 @@ class AlphaEngine:
                     f"📥 TradingView signal captured (workbench dry-run): `{normalized_action.upper()} {symbol}` "
                     f"with quantities `{', '.join(qty_parts)}`. Set `TRADINGVIEW_EXECUTION_ENABLED=true` to execute."
                     f"{cap_note}"
+                    f"{adjust_note}"
+                    f"{blocked_note}"
                 ),
                 priority="medium",
             )
             return {
                 "accepted": "dry_run",
-                "targets": targets,
+                "targets": executable_targets,
                 "signal_key": signal_key,
                 "quantities": per_target_quantity,
                 "capped_targets": sorted(set(capped_targets)),
+                "adjusted_targets": sorted(set(notional_adjusted_targets)),
+                "blocked_targets": sorted(list(notional_blocked_targets.keys())),
                 "strategy": strategy_label or None,
             }
 
         dispatch_results: Dict[str, bool] = {}
-        for venue in targets:
+        for venue in executable_targets:
             dispatch_results[venue] = await dispatcher.send_command(
                 venue,
                 {
@@ -3042,31 +3188,59 @@ class AlphaEngine:
 
         failed_targets = [venue for venue, ok in dispatch_results.items() if not ok]
         if failed_targets:
+            failed_details: List[str] = []
+            for venue in failed_targets:
+                dispatch_error = dispatcher.get_last_dispatch_error(venue)
+                failed_details.append(
+                    f"{venue}:{dispatch_error.get('reason', 'unknown')}:{dispatch_error.get('status', 'n/a')}"
+                )
+            if notional_blocked_targets:
+                failed_details.extend(
+                    [
+                        f"{venue}:{details.get('reason', 'guard_blocked')}:guard"
+                        for venue, details in sorted(notional_blocked_targets.items())
+                    ]
+                )
             await self.telegram.send_message(
-                f"❌ TradingView dispatch failed for `{', '.join(failed_targets)}` (`{signal_key}`).",
+                (
+                    f"❌ TradingView dispatch failed (`{signal_key}`).\n"
+                    f"Details: `{'; '.join(failed_details[:6])}`"
+                ),
                 priority="high",
             )
             return {
                 "accepted": "partial_failure",
-                "targets": targets,
+                "targets": executable_targets,
                 "failed_targets": failed_targets,
                 "signal_key": signal_key,
                 "quantities": per_target_quantity,
                 "capped_targets": sorted(set(capped_targets)),
+                "adjusted_targets": sorted(set(notional_adjusted_targets)),
+                "blocked_targets": sorted(list(notional_blocked_targets.keys())),
                 "strategy": strategy_label or None,
             }
 
-        qty_parts = [f"{venue}:{per_target_quantity[venue]}" for venue in sorted(targets)]
+        qty_parts = [f"{venue}:{per_target_quantity[venue]}" for venue in sorted(executable_targets)]
+        blocked_note = (
+            f" Blocked targets: `{', '.join(sorted(notional_blocked_targets.keys()))}`."
+            if notional_blocked_targets
+            else ""
+        )
         await self.telegram.send_message(
-            f"✅ TradingView executed: `{normalized_action.upper()} {symbol}` with `{', '.join(qty_parts)}` (`{signal_key}`).",
+            (
+                f"✅ TradingView executed: `{normalized_action.upper()} {symbol}` with "
+                f"`{', '.join(qty_parts)}` (`{signal_key}`).{blocked_note}"
+            ),
             priority="high",
         )
         return {
             "accepted": "executed",
-            "targets": targets,
+            "targets": executable_targets,
             "signal_key": signal_key,
             "quantities": per_target_quantity,
             "capped_targets": sorted(set(capped_targets)),
+            "adjusted_targets": sorted(set(notional_adjusted_targets)),
+            "blocked_targets": sorted(list(notional_blocked_targets.keys())),
             "strategy": strategy_label or None,
         }
 
@@ -3181,15 +3355,64 @@ class AlphaEngine:
             )
             return
 
-        # Dispatch command via ExecutionDispatcher
-        await dispatcher.send_command(
-            platform,
+        if not self._symbol_allowed_for_venue(normalized_platform, symbol):
+            await self.telegram.send_message(
+                f"⚠️ Manual trade blocked: `{symbol}` is outside allowed symbol scope for `{normalized_platform}`.",
+                priority="high",
+            )
+            return
+
+        quantity_guard = self._apply_min_notional_guard(normalized_platform, symbol, quantity)
+        if quantity_guard.get("blocked"):
+            await self.telegram.send_message(
+                (
+                    f"⚠️ Manual trade blocked on `{normalized_platform}` by min-notional guard.\n"
+                    f"Reason: `{quantity_guard.get('reason', 'guard_blocked')}`\n"
+                    f"Required qty: `{quantity_guard.get('required_quantity', 'n/a')}` | "
+                    f"Cap: `{quantity_guard.get('cap_quantity', 'n/a')}`"
+                ),
+                priority="high",
+            )
+            return
+
+        dispatch_quantity = float(quantity_guard.get("quantity", quantity))
+        if quantity_guard.get("adjusted"):
+            await self.telegram.send_message(
+                (
+                    f"🧮 Manual trade quantity auto-adjusted on `{normalized_platform}` to `{dispatch_quantity}` "
+                    f"to satisfy minimum notional guardrails."
+                ),
+                priority="medium",
+            )
+
+        dispatched = await dispatcher.send_command(
+            normalized_platform,
             {
                 "action": action,
                 "symbol": symbol,
-                "quantity": quantity,
+                "quantity": dispatch_quantity,
                 "source": "telegram_override",
             },
+        )
+        if dispatched:
+            await self.telegram.send_message(
+                (
+                    f"✅ Manual trade dispatched: `{normalized_platform}` "
+                    f"`{action}` `{dispatch_quantity}` `{symbol}`."
+                ),
+                priority="high",
+            )
+            return
+
+        dispatch_error = dispatcher.get_last_dispatch_error(normalized_platform)
+        await self.telegram.send_message(
+            (
+                f"❌ Manual trade dispatch failed on `{normalized_platform}`.\n"
+                f"Reason: `{dispatch_error.get('reason', 'unknown')}`\n"
+                f"Status: `{dispatch_error.get('status', 'n/a')}`\n"
+                f"Detail: `{str(dispatch_error.get('body', 'n/a'))[:160]}`"
+            ),
+            priority="high",
         )
 
     async def start(self):
