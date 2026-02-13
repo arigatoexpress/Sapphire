@@ -23,6 +23,8 @@ IMAGE_LATEST="${AR_REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${IMAGE_NAME}
 GIT_SHA="$(git -C "${ROOT_DIR}" rev-parse --short HEAD 2>/dev/null || echo unknown)"
 BUILD_ID="${BUILD_ID:-web-${IMAGE_TAG}-${GIT_SHA}}"
 BUILD_TIME_UTC="${BUILD_TIME_UTC:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+SKIP_NPM_INSTALL="${SKIP_NPM_INSTALL:-0}"
+SKIP_LOCAL_BUILD="${SKIP_LOCAL_BUILD:-0}"
 
 echo "== Sapphirebook Web Deploy =="
 echo "Project: ${PROJECT_ID}"
@@ -33,8 +35,13 @@ echo "Build time (UTC): ${BUILD_TIME_UTC}"
 echo
 
 cd "${WEB_DIR}"
-npm ci --no-audit --no-fund
-VITE_BUILD_ID="${BUILD_ID}" VITE_BUILD_TIME_UTC="${BUILD_TIME_UTC}" npm run build
+if [[ "${SKIP_NPM_INSTALL}" != "1" ]]; then
+  npm ci --no-audit --no-fund
+fi
+
+if [[ "${SKIP_LOCAL_BUILD}" != "1" ]]; then
+  VITE_BUILD_ID="${BUILD_ID}" VITE_BUILD_TIME_UTC="${BUILD_TIME_UTC}" npm run build
+fi
 
 docker buildx build \
   --platform "${PLATFORM}" \

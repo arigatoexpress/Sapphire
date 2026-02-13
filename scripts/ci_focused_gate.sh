@@ -99,6 +99,16 @@ if [[ -d "sapphire-web" ]]; then
   else
     fail "sapphire-web production build"
   fi
+
+  if [[ "${RUN_VISUAL_TESTS:-0}" == "1" ]]; then
+    if npx playwright install chromium && npm run test:visual; then
+      pass "sapphire-web visual regression"
+    else
+      fail "sapphire-web visual regression"
+    fi
+  else
+    echo "INFO: visual regression skipped (set RUN_VISUAL_TESTS=1 to enforce)"
+  fi
   popd >/dev/null
 else
   fail "missing sapphire-web directory"

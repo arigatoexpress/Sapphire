@@ -185,6 +185,17 @@ If your primary domain is `sapphirealpha.xyz`, also deploy Firebase Hosting to k
 ./scripts/deploy_sapphirebook_firebase.sh
 ```
 
+Preferred one-command deploy:
+
+```bash
+./scripts/deploy_sapphirebook_all.sh
+```
+
+This runs both deploys with a shared build stamp and verifies:
+- Cloud Run health
+- Domain reachability
+- Freshness markers and build stamp on both bundles
+
 Why both:
 - `sapphirebook-web` serves `*.run.app`.
 - `sapphirealpha.xyz` is currently routed through Firebase Hosting/CDN.
@@ -195,6 +206,23 @@ Release freshness controls now included:
 - Build stamp injection (`VITE_BUILD_ID`, `VITE_BUILD_TIME_UTC`) shown in UI.
 - Browser force-refresh control in top bar.
 - Nginx cache policy: `index.html` served with `no-store` headers; hashed assets remain immutable.
+
+## Visual Regression Gate
+
+SapphireBook visual baseline is validated with deterministic mocked API responses:
+
+```bash
+cd sapphire-web
+npx playwright install chromium
+npm run test:visual
+```
+
+To intentionally refresh the baseline after approved design changes:
+
+```bash
+cd sapphire-web
+npm run test:visual:update
+```
 
 ## Alpha Control Plane Deploy
 

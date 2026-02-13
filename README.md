@@ -66,6 +66,7 @@ Web UI is read-only for control actions. Agent prompting, approvals, and steerin
 ./scripts/bootstrap_moltbook_scout.sh # retries registration + can fallback to existing token secret
 ./scripts/wire_virustotal_security.sh # binds VIRUSTOTAL_API_KEY and VT policy env vars
 ./scripts/verify_focused_stack.sh
+./scripts/deploy_sapphirebook_all.sh # one-command Cloud Run + Firebase deploy with freshness verification
 ./scripts/deploy_sapphirebook_web.sh
 ./scripts/deploy_sapphirebook_firebase.sh # updates sapphirealpha.xyz Firebase Hosting delivery
 ./scripts/deploy_sapphire_alpha.sh
