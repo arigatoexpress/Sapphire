@@ -84,8 +84,11 @@ def test_resolve_dispatch_quantity_blocks_when_required_exceeds_cap(monkeypatch)
 
 def test_venue_profiles_and_preferred_symbols(monkeypatch):
     module = _load_engine_module()
-    monkeypatch.setenv("SAPPHIRE_PREFERRED_SYMBOLS", "BTC,ETH,SOL,ZEC,XMR")
     monkeypatch.setenv("SAPPHIRE_DEX_EXECUTION_STAGE", "paper")
+
+    # Override module-level PREFERRED_SYMBOLS which was parsed at import time.
+    custom_symbols = ["BTC", "ETH", "SOL", "ZEC", "XMR"]
+    monkeypatch.setattr(module, "PREFERRED_SYMBOLS", custom_symbols)
 
     engine = module.AlphaStrategyEngine(_FakeMarketData())
     state = engine.execution_state()
