@@ -85,6 +85,12 @@ ADVERSARIAL_STRINGS = [
     "learn bias '; DROP TABLE-- LONG 1h",
     "/learn report",
     "/learn bias __proto__ SHORT",
+    "outreach post",
+    "outreach stats",
+    "outreach templates",
+    "outreach post '; DROP TABLE-- BTC",
+    "/outreach post general_invite",
+    "/outreach post __proto__",
 ]
 
 
