@@ -1,6 +1,6 @@
 # Sapphire Master Roadmap
 
-> Last Updated: Feb 13, 2026 | Status: Phase 4 Active
+> Last Updated: Feb 13, 2026 | Status: Phase 4 Complete ✅
 
 ## Vision
 Build a top-tier autonomous crypto trading platform with secure multi-agent collaboration, crowdsourced swarm intelligence, and automated public presence.
@@ -63,9 +63,9 @@ _Rich collaborative forum as sole Scout ↔ Agent interface_
 _Secure external bot collaboration via crowdsourced trade ideas_
 
 ### Molthub Scout Outreach
-- [ ] Scout posts on Molthub inviting bots (TRADE IDEAS ONLY)
-- [ ] All external content passes through skill auditor
-- [ ] No sensitive data exposed in outbound communications
+- [x] Scout posts on Molthub inviting bots (TRADE IDEAS ONLY) (PR #30)
+- [x] All external content passes through skill auditor (PR #30)
+- [x] No sensitive data exposed in outbound communications (PR #30)
 
 ### Bot Reputation & Points System
 - [x] Point/reputation schema for contributing agents (PR #26)
@@ -77,7 +77,7 @@ _Secure external bot collaboration via crowdsourced trade ideas_
 ### Swarm Intelligence Framework
 - [x] Aggregate trade ideas with reputation weighting (PR #28)
 - [x] Consensus mechanisms for high-conviction trades (PR #28)
-- [ ] Collaborative learning across bot network
+- [x] Collaborative learning across bot network (PR #29)
 
 ## Phase 5: Task Management System 📋
 _Organized tracking of goals and progress_
@@ -114,8 +114,8 @@ _On-chain agent presence via Virtuals protocol_
 
 ## Execution Priority
 ```
-Phase 1 (NOW)  →  Phase 2  →  Phase 3  →  Phase 5  →  Phase 4  →  Phase 6  →  Phase 7
-Harden          Security    Forum       Tracking     Swarm       Social       On-chain
+Phase 1 ✅  →  Phase 2 ✅  →  Phase 3 ✅  →  Phase 4 ✅  →  Phase 5 (NEXT)  →  Phase 6  →  Phase 7
+Harden        Security       Forum          Swarm          Tracking            Social     On-chain
 ```
 
 ## Completed Milestones
@@ -133,4 +133,6 @@ Harden          Security    Forum       Tracking     Swarm       Social       On
 - ✅ PR #26: Bot Reputation & Points System (weighted composite scoring, auto-ban, penalties, 30 tests)
 - ✅ PR #27: Reputation Engine Wiring (5 Telegram commands, REPUTATION_READ/ADMIN capabilities)
 - ✅ PR #28: Swarm Intelligence Aggregation (reputation-weighted consensus, conviction scoring, idea lifecycle)
-- ✅ 400 tests passing
+- ✅ PR #29: Collaborative Learning (swarm knowledge extraction, adaptive confidence ±25%, conviction calibration)
+- ✅ PR #30: Molthub Outreach (template library, regex credential leak detection, inbound idea validation)
+- ✅ 477 tests passing

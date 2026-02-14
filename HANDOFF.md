@@ -1,6 +1,6 @@
 # Sapphire Codex Handoff Package
 
-> Generated: Feb 13, 2026 | Deploy: sapphire-alpha-00155-rnn | Tests: 400 passing
+> Generated: Feb 13, 2026 | Deploy: sapphire-alpha-00156-94j | Tests: 477 passing
 
 ---
 
@@ -12,8 +12,8 @@ Build a top-tier autonomous crypto trading platform with secure multi-agent coll
 
 **Execution priority:**
 ```
-Phase 1 (NOW) → Phase 2 → Phase 3 → Phase 5 → Phase 4 → Phase 6 → Phase 7
-Harden         Security   Forum      Tracking    Swarm      Social    On-chain
+Phase 1 ✅ → Phase 2 ✅ → Phase 3 ✅ → Phase 4 ✅ → Phase 5 (NEXT) → Phase 6 → Phase 7
+Harden       Security      Forum        Swarm        Tracking         Social    On-chain
 ```
 
 ---
@@ -36,8 +36,12 @@ Harden         Security   Forum      Tracking    Swarm      Social    On-chain
 - **Forum approval workflows**: Governance-lane topics, consensus voting, auto-resolution
 - **Bot reputation system**: Weighted composite scoring (accuracy/profitability/quality/consistency), auto-ban, penalties
 - **Swarm intelligence**: Reputation-weighted trade idea aggregation, conviction scoring, consensus mechanisms
+- **Collaborative learning**: Swarm knowledge extraction, adaptive confidence ±25%, conviction calibration, bot synergy
+- **Molthub outreach**: Template-based recruitment posts, regex credential leak detection, inbound idea validation
 - **Reputation commands**: `/rep leaderboard`, `/rep info`, `/rep count`, `/rep ban`, `/rep penalize`
 - **Swarm commands**: `/swarm aggregate`, `/swarm ideas`, `/swarm stats`
+- **Learning commands**: `/learn report`, `/learn summary`, `/learn bias`
+- **Outreach commands**: `/outreach post`, `/outreach stats`, `/outreach templates`
 
 ### Repo & Infra
 - **Repo**: `arigatoexpress/Sapphire` (PRIVATE) — `/Users/aribs/Documents/Projects/AI Repo Manager/repos/Sapphire/`
@@ -69,6 +73,8 @@ Harden         Security   Forum      Tracking    Swarm      Social    On-chain
 | **Dispatcher** | `src/execution/dispatcher.py` | — | Multi-venue order routing |
 | **Market Data** | `src/feeds/market_data.py` | — | WebSocket feeds from multiple exchanges |
 | **Strategy Engine** | `src/strategy/engine.py` | — | Alpha strategy with fallback strategies |
+| **Learning** | `src/collaboration/learning.py` | 428 | Swarm learning: pattern extraction, adaptive confidence, calibration |
+| **Outreach** | `src/collaboration/molthub_outreach.py` | 312 | Molthub outreach: templates, credential blocking, idea validation |
 | **TV Autonomy** | `src/integrations/tradingview_autonomy.py` | — | TradingView autonomous dispatch plugin |
 
 ### Agent Roles
@@ -89,18 +95,20 @@ Harden         Security   Forum      Tracking    Swarm      Social    On-chain
 
 ---
 
-## 📊 Test Coverage (400 passing)
+## 📊 Test Coverage (477 passing)
 
 | Test File | Tests | Covers |
 |-----------|-------|--------|
-| `test_alpha_engine_telegram_control.py` | 58 | Telegram commands, routing, kill switch, venue control, forum/rep/swarm commands |
+| `test_alpha_engine_telegram_control.py` | 74 | Telegram commands, routing, kill switch, venue control, forum/rep/swarm/learn/outreach commands |
 | `test_forum_phase3.py` | 51 | Categories, voting, threading, quality, profiles, approvals |
 | `test_gate_enforcement.py` | 38 | AgentGate capability boundaries, all 4 agents + rogue, 13 capabilities |
 | `test_agent_permissions.py` | 37 | Per-agent caps, PermissionDenied, unknown agents, stats, registration |
 | `test_prompt_sanitizer.py` | 35 | Role override, exfil, code exec, boundary, clean, scoring, trade data |
+| `test_molthub_outreach.py` | 34 | Template composition, outbound sanitization, inbound validation, dispatch, cooldown, stats |
 | `test_swarm_aggregation.py` | 33 | Reputation-weighted consensus, conviction, lifecycle, expiry, stats |
 | `test_bot_reputation.py` | 30 | Registration, outcomes, quality, penalties, bans, leaderboard, weights |
-| `test_security_fuzz.py` | 22 | Adversarial strings, injection payloads, forum/rep/swarm fuzz |
+| `test_collaborative_learning.py` | 29 | Recording, insights, calibration, synergy, biases, adaptive confidence, reports |
+| `test_security_fuzz.py` | 28 | Adversarial strings, injection payloads, forum/rep/swarm/learn/outreach fuzz |
 | `test_sapphire_forum_service.py` | 18 | Forum topics, replies, redaction, content filtering |
 | `test_skill_auditor.py` | 17 | Credential theft, exfil, injection, obfuscation, isnad, reporting |
 | `test_portfolio_tracker.py` | 13 | Position lifecycle, P&L, ring buffer, edge cases |
@@ -134,17 +142,23 @@ Harden         Security   Forum      Tracking    Swarm      Social    On-chain
 | #26 | Bot Reputation System | Weighted composite scoring, auto-ban, penalties, leaderboard |
 | #27 | Reputation Engine Wiring | 5 Telegram commands, REPUTATION_READ/ADMIN capabilities |
 | #28 | Swarm Intelligence Aggregation | Reputation-weighted consensus, conviction scoring, idea lifecycle |
+| #29 | Collaborative Learning | Swarm knowledge extraction, adaptive confidence ±25%, conviction calibration |
+| #30 | Molthub Outreach | Template library, regex credential leak detection, inbound idea validation |
 
 ---
 
 ## 🔜 What To Do Next
 
-### Phase 4 Remaining: Molthub Integration
-- Scout posts on Molthub inviting external bots (TRADE IDEAS ONLY)
-- All external content passes through skill auditor
-- Collaborative learning across bot network
+### Phase 4: Complete ✅
+All Phase 4 items delivered: bot reputation, swarm aggregation, collaborative learning, Molthub outreach.
 
-### Phase 5–7: See ROADMAP.md
+### Phase 5: Task Management System
+- Build or integrate Asana-like task management
+- Asana MCP connector ready (credentials stored)
+- Agent tasks, milestones, deliverables tracking
+- Automated progress reports from agents
+
+### Phase 6–7: See ROADMAP.md
 
 ---
 
