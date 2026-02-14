@@ -1201,6 +1201,7 @@ class AlphaEngine:
             "cognition_metrics": self.cognition.get_metrics() if self._cognition_enabled else {},
             "memory_stats": self.memory.get_stats() if self._memory_enabled else {},
             "alpha_scanner": self.alpha_scanner.get_metrics(),
+            "dispatcher_hardening": dispatcher.get_hardening_status(),
             "timestamp": int(time.time()),
         }
 
