@@ -1,6 +1,6 @@
 # Sapphire Codex Handoff Package
 
-> Generated: Feb 13, 2026 | Deploy: sapphire-alpha-00153-xvp | Tests: 308 passing
+> Generated: Feb 13, 2026 | Deploy: sapphire-alpha-00155-rnn | Tests: 400 passing
 
 ---
 
@@ -20,7 +20,7 @@ Harden         Security   Forum      Tracking    Swarm      Social    On-chain
 
 ## 📍 Current State
 
-### What's Live (sapphire-alpha-00153-xvp)
+### What's Live (sapphire-alpha-00155-rnn)
 - **Multi-venue trading**: Drift, Hyperliquid, Aster, Symphony, Lighter
 - **TradingView webhook integration**: Signal → cognition → execution pipeline
 - **Dual-speed cognition**: Fast (Flash) + deep (Pro) AI pre-trade validation
@@ -30,9 +30,14 @@ Harden         Security   Forum      Tracking    Swarm      Social    On-chain
 - **Skill security auditor**: 8 threat categories, isnad provenance chains, 24 injection patterns
 - **Agent activity feed**: Periodic Telegram digests every 5 min, grouped by agent/category
 - **Prompt injection defense**: Sanitizer on all LLM prompt paths (Telegram → Gemini, memory → cognition, trade data → recap)
-- **Agent permission system**: 24 atomic capabilities, 4 role definitions, 12 runtime gates enforced
+- **Agent permission system**: 26 atomic capabilities, 4 role definitions, 12 runtime gates enforced
 - **Forum service**: Rich collaborative forum with categories, voting, threading, quality metrics, agent profiles
 - **Forum Telegram commands**: `/forum top`, `/forum vote`, `/forum agents`, `/forum thread`, `/forum post`
+- **Forum approval workflows**: Governance-lane topics, consensus voting, auto-resolution
+- **Bot reputation system**: Weighted composite scoring (accuracy/profitability/quality/consistency), auto-ban, penalties
+- **Swarm intelligence**: Reputation-weighted trade idea aggregation, conviction scoring, consensus mechanisms
+- **Reputation commands**: `/rep leaderboard`, `/rep info`, `/rep count`, `/rep ban`, `/rep penalize`
+- **Swarm commands**: `/swarm aggregate`, `/swarm ideas`, `/swarm stats`
 
 ### Repo & Infra
 - **Repo**: `arigatoexpress/Sapphire` (PRIVATE) — `/Users/aribs/Documents/Projects/AI Repo Manager/repos/Sapphire/`
@@ -84,16 +89,18 @@ Harden         Security   Forum      Tracking    Swarm      Social    On-chain
 
 ---
 
-## 📊 Test Coverage (308 passing)
+## 📊 Test Coverage (400 passing)
 
 | Test File | Tests | Covers |
 |-----------|-------|--------|
-| `test_forum_phase3.py` | 39 | Categories, voting, threading, quality metrics, agent profiles, top topics |
+| `test_alpha_engine_telegram_control.py` | 58 | Telegram commands, routing, kill switch, venue control, forum/rep/swarm commands |
+| `test_forum_phase3.py` | 51 | Categories, voting, threading, quality, profiles, approvals |
 | `test_gate_enforcement.py` | 38 | AgentGate capability boundaries, all 4 agents + rogue, 13 capabilities |
 | `test_agent_permissions.py` | 37 | Per-agent caps, PermissionDenied, unknown agents, stats, registration |
 | `test_prompt_sanitizer.py` | 35 | Role override, exfil, code exec, boundary, clean, scoring, trade data |
-| `test_alpha_engine_telegram_control.py` | 40 | Telegram commands, routing, kill switch, venue control, forum commands |
-| `test_security_fuzz.py` | 18 | Adversarial strings, injection payloads, forum sanitizer, prompt detection |
+| `test_swarm_aggregation.py` | 33 | Reputation-weighted consensus, conviction, lifecycle, expiry, stats |
+| `test_bot_reputation.py` | 30 | Registration, outcomes, quality, penalties, bans, leaderboard, weights |
+| `test_security_fuzz.py` | 22 | Adversarial strings, injection payloads, forum/rep/swarm fuzz |
 | `test_sapphire_forum_service.py` | 18 | Forum topics, replies, redaction, content filtering |
 | `test_skill_auditor.py` | 17 | Credential theft, exfil, injection, obfuscation, isnad, reporting |
 | `test_portfolio_tracker.py` | 13 | Position lifecycle, P&L, ring buffer, edge cases |
@@ -123,19 +130,19 @@ Harden         Security   Forum      Tracking    Swarm      Social    On-chain
 | #22 | Forum Injection Hardening | 18 adversarial tests, forum content blocking |
 | #23 | Phase 3 Forum Expansion | Categories, voting, threading, quality metrics, agent profiles |
 | #24 | Forum Telegram Wiring | 5 new commands, 5 engine handlers, category/threading passthrough |
+| #25 | Forum Approval Workflows | Consensus voting, governance-lane topics, auto-resolution |
+| #26 | Bot Reputation System | Weighted composite scoring, auto-ban, penalties, leaderboard |
+| #27 | Reputation Engine Wiring | 5 Telegram commands, REPUTATION_READ/ADMIN capabilities |
+| #28 | Swarm Intelligence Aggregation | Reputation-weighted consensus, conviction scoring, idea lifecycle |
 
 ---
 
 ## 🔜 What To Do Next
 
-### Immediate (Phase 3 Remaining)
-1. **Forum-based approval workflows** — Route pending decisions (autonomy cycles, trade approvals) through forum topics with agent voting
-
-### Phase 4: Molthub Swarm Intelligence
+### Phase 4 Remaining: Molthub Integration
 - Scout posts on Molthub inviting external bots (TRADE IDEAS ONLY)
-- Bot reputation/points system: accuracy, profitability, info quality tracking
-- Public leaderboard, reputation-weighted trade idea aggregation
-- Consensus mechanisms for high-conviction trades
+- All external content passes through skill auditor
+- Collaborative learning across bot network
 
 ### Phase 5–7: See ROADMAP.md
 

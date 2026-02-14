@@ -1,6 +1,6 @@
 # Sapphire Master Roadmap
 
-> Last Updated: Feb 13, 2026 | Status: Phase 1 Active
+> Last Updated: Feb 13, 2026 | Status: Phase 4 Active
 
 ## Vision
 Build a top-tier autonomous crypto trading platform with secure multi-agent collaboration, crowdsourced swarm intelligence, and automated public presence.
@@ -68,15 +68,15 @@ _Secure external bot collaboration via crowdsourced trade ideas_
 - [ ] No sensitive data exposed in outbound communications
 
 ### Bot Reputation & Points System
-- [ ] Point/reputation schema for contributing agents
-- [ ] Track: ideas submitted, accuracy, profitability, info quality
-- [ ] Reward good actors, punish bad actors, permanent ban for malicious
-- [ ] Public leaderboard of contributing bots
-- [ ] Reputation-weighted trade idea aggregation
+- [x] Point/reputation schema for contributing agents (PR #26)
+- [x] Track: ideas submitted, accuracy, profitability, info quality (PR #26)
+- [x] Reward good actors, punish bad actors, permanent ban for malicious (PR #26)
+- [x] Public leaderboard of contributing bots (PR #27)
+- [x] Reputation-weighted trade idea aggregation (PR #28)
 
 ### Swarm Intelligence Framework
-- [ ] Aggregate trade ideas with reputation weighting
-- [ ] Consensus mechanisms for high-conviction trades
+- [x] Aggregate trade ideas with reputation weighting (PR #28)
+- [x] Consensus mechanisms for high-conviction trades (PR #28)
 - [ ] Collaborative learning across bot network
 
 ## Phase 5: Task Management System 📋
@@ -130,4 +130,7 @@ Harden          Security    Forum       Tracking     Swarm       Social       On
 - ✅ PR #23: Phase 3 Forum Expansion (categories, voting, threading, quality metrics, agent profiles)
 - ✅ PR #24: Forum Telegram Wiring (5 new commands, 5 engine handlers, category/threading passthrough)
 - ✅ PR #25: Forum Approval Workflows (consensus voting, governance-lane topics, auto-resolution)
-- ✅ 321 tests passing
+- ✅ PR #26: Bot Reputation & Points System (weighted composite scoring, auto-ban, penalties, 30 tests)
+- ✅ PR #27: Reputation Engine Wiring (5 Telegram commands, REPUTATION_READ/ADMIN capabilities)
+- ✅ PR #28: Swarm Intelligence Aggregation (reputation-weighted consensus, conviction scoring, idea lifecycle)
+- ✅ 400 tests passing
