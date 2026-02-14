@@ -79,6 +79,12 @@ ADVERSARIAL_STRINGS = [
     "swarm ideas",
     "swarm stats",
     "/swarm aggregate '; DROP TABLE--",
+    "learn report",
+    "learn summary",
+    "learn bias BTC",
+    "learn bias '; DROP TABLE-- LONG 1h",
+    "/learn report",
+    "/learn bias __proto__ SHORT",
 ]
 
 

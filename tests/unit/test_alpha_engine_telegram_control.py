@@ -1282,3 +1282,116 @@ def test_swarm_stats_plain_text(telegram_module):
     result = bot._parse_plain_text_command("swarm stats")
     assert result is not None
     assert result["action"] == "SWARM_STATS"
+
+
+# ── Phase 4: Learning Telegram Commands ─────────────────────────
+
+
+def test_learn_report_slash_command(telegram_module):
+    """'/learn report' dispatches LEARN_REPORT."""
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/learn report"}}
+        )
+    )
+    callback.assert_awaited_once()
+    _, _, action, _ = callback.await_args.args
+    assert action == "LEARN_REPORT"
+
+
+def test_learn_summary_slash_command(telegram_module):
+    """'/learn summary' dispatches LEARN_SUMMARY."""
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/learn summary"}}
+        )
+    )
+    callback.assert_awaited_once()
+    _, _, action, _ = callback.await_args.args
+    assert action == "LEARN_SUMMARY"
+
+
+def test_learn_bias_slash_command(telegram_module):
+    """'/learn bias BTC LONG 1h' dispatches LEARN_BIAS with payload."""
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/learn bias BTC LONG 1h"}}
+        )
+    )
+    callback.assert_awaited_once()
+    _, symbol, action, _ = callback.await_args.args
+    assert action == "LEARN_BIAS"
+    payload = json.loads(symbol)
+    assert payload["symbol"] == "BTC"
+    assert payload["direction"] == "LONG"
+    assert payload["timeframe"] == "1h"
+
+
+def test_learn_bias_slash_command_defaults(telegram_module):
+    """'/learn bias ETH' defaults direction=LONG, timeframe=1h."""
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/learn bias ETH"}}
+        )
+    )
+    callback.assert_awaited_once()
+    _, symbol, action, _ = callback.await_args.args
+    assert action == "LEARN_BIAS"
+    payload = json.loads(symbol)
+    assert payload["symbol"] == "ETH"
+    assert payload["direction"] == "LONG"
+    assert payload["timeframe"] == "1h"
+
+
+def test_learn_report_plain_text(telegram_module):
+    """Plain text 'learn report' dispatches LEARN_REPORT."""
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=AsyncMock(),
+    )
+    result = bot._parse_plain_text_command("learn report")
+    assert result is not None
+    assert result["action"] == "LEARN_REPORT"
+
+
+def test_learn_summary_plain_text(telegram_module):
+    """Plain text 'learn summary' dispatches LEARN_SUMMARY."""
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=AsyncMock(),
+    )
+    result = bot._parse_plain_text_command("learn summary")
+    assert result is not None
+    assert result["action"] == "LEARN_SUMMARY"
+
+
+def test_learn_bias_plain_text(telegram_module):
+    """Plain text 'learn bias SOL SHORT 4h' dispatches LEARN_BIAS."""
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=AsyncMock(),
+    )
+    result = bot._parse_plain_text_command("learn bias SOL SHORT 4h")
+    assert result is not None
+    assert result["action"] == "LEARN_BIAS"
+    payload = json.loads(result["symbol"])
+    assert payload["symbol"] == "SOL"
+    assert payload["direction"] == "SHORT"
+    assert payload["timeframe"] == "4h"
