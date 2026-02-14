@@ -1,115 +1,701 @@
 """
-Cognition & Memory Test Suite — 2.3
+Comprehensive tests for Sapphire AI cognition and memory subsystems.
 
 Covers:
-  - EnhancedMemoryBank  (shared/enhanced_episodic_memory.py)
-  - DualSpeedCognition   (shared/dual_speed_cognition.py)
-  - EpisodicMemory       (cloud_trader/memory/episodic_memory.py)
-  - ReflectionAgent      (cloud_trader/memory/reflection_agent.py)
-  - Episode / TradeOutcome helpers (cloud_trader/memory/episode.py)
+- DualSpeedCognition (dual_speed_cognition.py)
+- EpisodicMemoryBank (episodic_memory.py)
+- EnhancedMemoryBank (enhanced_episodic_memory.py)
+
+All Gemini/genai calls are mocked — no API keys needed.
 """
 
 import asyncio
 import json
 import os
+import statistics
 import sys
 import tempfile
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-# Add alpha-engine to path for shared/ imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/alpha-engine"))
+# Add alpha-engine root to sys.path so `shared.*` imports resolve
+sys.path.insert(
+    0, os.path.join(os.path.dirname(__file__), "../../services/alpha-engine")
+)
 
-# ── Episode & TradeOutcome ──────────────────────────────────────
+# ─── Dual Speed Cognition ───────────────────────────────────────────
 
-from cloud_trader.memory.episode import Episode, TradeOutcome, create_episode
-
-
-class TestTradeOutcome:
-    def test_defaults(self):
-        o = TradeOutcome()
-        assert o.success is False
-        assert o.pnl == 0.0
-        assert o.exit_reason == ""
-
-    def test_to_dict(self):
-        o = TradeOutcome(success=True, pnl=50.0, exit_reason="take_profit")
-        d = o.to_dict()
-        assert d["success"] is True
-        assert d["pnl"] == 50.0
-        assert d["exit_reason"] == "take_profit"
+from shared.dual_speed_cognition import (
+    CognitionRequest,
+    CognitionResult,
+    CognitionSpeed,
+    DualSpeedCognition,
+    get_dual_cognition,
+)
 
 
-class TestEpisode:
-    def _make_episode(self, **kw):
-        defaults = dict(
-            symbol="SOL",
-            signal_type="LONG",
-            entry_price=145.0,
-            market_state_text="SOL trending up with high volume",
-            confidence=0.8,
+class TestCognitionSpeedEnum:
+    """Tests for the CognitionSpeed enum."""
+
+    def test_enum_values(self):
+        assert CognitionSpeed.SYSTEM_1 == "system_1"
+        assert CognitionSpeed.SYSTEM_2 == "system_2"
+        assert CognitionSpeed.DUAL == "dual"
+
+    def test_enum_is_str(self):
+        assert isinstance(CognitionSpeed.SYSTEM_1, str)
+
+    def test_enum_from_value(self):
+        assert CognitionSpeed("system_1") == CognitionSpeed.SYSTEM_1
+        assert CognitionSpeed("dual") == CognitionSpeed.DUAL
+
+
+class TestCognitionDataClasses:
+    """Tests for CognitionRequest and CognitionResult dataclasses."""
+
+    def test_request_defaults(self):
+        req = CognitionRequest(prompt="test")
+        assert req.prompt == "test"
+        assert req.context == {}
+        assert req.speed == CognitionSpeed.DUAL
+        assert req.max_latency_ms == 5000.0
+        assert req.requires_validation is True
+
+    def test_request_custom_values(self):
+        req = CognitionRequest(
+            prompt="Should I buy SOL?",
+            context={"price": 150.0},
+            speed=CognitionSpeed.SYSTEM_1,
+            max_latency_ms=1000.0,
+            requires_validation=False,
         )
-        defaults.update(kw)
-        return create_episode(**defaults)
+        assert req.speed == CognitionSpeed.SYSTEM_1
+        assert req.max_latency_ms == 1000.0
+        assert req.context["price"] == 150.0
 
-    def test_auto_id_generation(self):
-        ep = self._make_episode()
-        assert ep.episode_id  # non-empty
-        assert len(ep.episode_id) == 16
+    def test_result_basic(self):
+        result = CognitionResult(
+            decision="BUY",
+            confidence=0.85,
+            reasoning="Strong trend",
+            system_used=CognitionSpeed.SYSTEM_1,
+            latency_ms=42.0,
+        )
+        assert result.decision == "BUY"
+        assert result.confidence == 0.85
+        assert result.system1_decision is None
+        assert result.system2_validation is None
+        assert result.was_overridden is False
 
-    def test_is_complete_requires_outcome_and_lesson(self):
-        ep = self._make_episode()
-        assert ep.is_complete() is False
-        ep.outcome = TradeOutcome(success=True, pnl=10)
-        assert ep.is_complete() is False
-        ep.lesson = "Ride the momentum"
-        assert ep.is_complete() is True
-
-    def test_was_profitable(self):
-        ep = self._make_episode()
-        assert ep.was_profitable() is False
-        ep.outcome = TradeOutcome(pnl=-5)
-        assert ep.was_profitable() is False
-        ep.outcome = TradeOutcome(pnl=10)
-        assert ep.was_profitable() is True
-
-    def test_round_trip_dict(self):
-        ep = self._make_episode()
-        ep.outcome = TradeOutcome(success=True, pnl=42.5, exit_reason="take_profit")
-        ep.lesson = "Don't chase"
-        d = ep.to_dict()
-        restored = Episode.from_dict(d)
-        assert restored.episode_id == ep.episode_id
-        assert restored.outcome.pnl == 42.5
-        assert restored.lesson == "Don't chase"
-
-    def test_round_trip_json(self):
-        ep = self._make_episode()
-        j = ep.to_json()
-        restored = Episode.from_json(j)
-        assert restored.symbol == "SOL"
-
-    def test_to_context_text_contains_key_fields(self):
-        ep = self._make_episode()
-        ep.outcome = TradeOutcome(success=True, pnl=50, pnl_percent=3.4)
-        ep.lesson = "Trail stops"
-        text = ep.to_context_text()
-        assert "SOL" in text
-        assert "LONG" in text
-        assert "Trail stops" in text
-
-    def test_to_reflection_prompt_context(self):
-        ep = self._make_episode()
-        ep.outcome = TradeOutcome(pnl=20, pnl_percent=1.5, exit_reason="stop_loss", max_drawdown=5)
-        text = ep.to_reflection_prompt_context()
-        assert "stop_loss" in text
-        assert "SOL" in text
+    def test_result_dual_mode(self):
+        result = CognitionResult(
+            decision="SELL",
+            confidence=0.7,
+            reasoning="Override",
+            system_used=CognitionSpeed.DUAL,
+            latency_ms=1500.0,
+            system1_decision="BUY",
+            system2_validation="SELL",
+            was_overridden=True,
+        )
+        assert result.was_overridden is True
+        assert result.system1_decision == "BUY"
+        assert result.system2_validation == "SELL"
 
 
-# ── Enhanced Episodic Memory ────────────────────────────────────
+class TestDualSpeedCognition:
+    """Tests for the DualSpeedCognition engine."""
+
+    def test_mock_mode_no_api_key(self):
+        """Without API key, should initialize in mock mode."""
+        with patch.dict(os.environ, {}, clear=True):
+            os.environ.pop("GEMINI_API_KEY", None)
+            os.environ.pop("GOOGLE_API_KEY", None)
+            cog = DualSpeedCognition()
+            assert cog.system1 is None
+            assert cog.system2 is None
+
+    def test_default_model_names(self):
+        assert DualSpeedCognition.SYSTEM_1_MODEL_DEFAULT == "gemini-2.5-flash"
+        assert DualSpeedCognition.SYSTEM_2_MODEL_DEFAULT == "gemini-2.5-pro"
+
+    def test_env_model_override(self):
+        """Model names can be overridden via env vars."""
+        with patch.dict(
+            os.environ,
+            {
+                "SAPPHIRE_SYSTEM1_MODEL": "test-flash",
+                "SAPPHIRE_SYSTEM2_MODEL": "test-pro",
+            },
+            clear=False,
+        ):
+            os.environ.pop("GEMINI_API_KEY", None)
+            os.environ.pop("GOOGLE_API_KEY", None)
+            cog = DualSpeedCognition()
+            assert cog.SYSTEM_1_MODEL == "test-flash"
+            assert cog.SYSTEM_2_MODEL == "test-pro"
+
+    def test_threshold_values(self):
+        assert DualSpeedCognition.INSTANT_ACTION_THRESHOLD == 0.85
+        assert DualSpeedCognition.VALIDATION_REQUIRED_THRESHOLD == 0.70
+        assert DualSpeedCognition.COGNITIVE_WINDOW_MS == 2000
+
+    def test_initial_metrics(self):
+        with patch.dict(os.environ, {}, clear=True):
+            os.environ.pop("GEMINI_API_KEY", None)
+            os.environ.pop("GOOGLE_API_KEY", None)
+            cog = DualSpeedCognition()
+            assert cog.system1_calls == 0
+            assert cog.system2_calls == 0
+            assert cog.overrides == 0
+            assert cog.avg_system1_latency_ms == 0.0
+            assert cog.avg_system2_latency_ms == 0.0
+
+
+class TestResponseParsing:
+    """Tests for _parse_response logic."""
+
+    def setup_method(self):
+        with patch.dict(os.environ, {}, clear=True):
+            os.environ.pop("GEMINI_API_KEY", None)
+            os.environ.pop("GOOGLE_API_KEY", None)
+            self.cog = DualSpeedCognition()
+
+    def test_parse_buy_decision(self):
+        text = "DECISION: BUY\nCONFIDENCE: 0.9\nREASON: Strong breakout"
+        decision, conf, reasoning = self.cog._parse_response(text)
+        assert decision == "BUY"
+        assert conf == 0.9
+        assert reasoning == text
+
+    def test_parse_sell_decision(self):
+        text = "DECISION: SELL\nCONFIDENCE: 0.75\nANALYSIS: Bearish"
+        decision, conf, reasoning = self.cog._parse_response(text)
+        assert decision == "SELL"
+        assert conf == 0.75
+
+    def test_parse_hold_default(self):
+        text = "I'm not sure what to do here."
+        decision, conf, reasoning = self.cog._parse_response(text)
+        assert decision == "HOLD"
+        assert conf == 0.5
+
+    def test_parse_malformed_confidence(self):
+        text = "DECISION: BUY\nCONFIDENCE: not_a_number"
+        decision, conf, reasoning = self.cog._parse_response(text)
+        assert decision == "BUY"
+        assert conf == 0.5  # Falls back to default
+
+    def test_parse_decision_case_insensitive(self):
+        text = "DECISION: buy something\nCONFIDENCE: 0.8"
+        decision, conf, reasoning = self.cog._parse_response(text)
+        assert decision == "BUY"
+
+    def test_parse_sell_in_mixed_text(self):
+        text = "DECISION: STRONG SELL\nCONFIDENCE: 0.88"
+        decision, conf, _ = self.cog._parse_response(text)
+        assert decision == "SELL"
+        assert conf == 0.88
+
+    def test_parse_empty_string(self):
+        decision, conf, reasoning = self.cog._parse_response("")
+        assert decision == "HOLD"
+        assert conf == 0.5
+        assert reasoning == ""
+
+
+class TestOverrideLogic:
+    """Tests for _should_override decision logic."""
+
+    def setup_method(self):
+        with patch.dict(os.environ, {}, clear=True):
+            os.environ.pop("GEMINI_API_KEY", None)
+            os.environ.pop("GOOGLE_API_KEY", None)
+            self.cog = DualSpeedCognition()
+
+    def test_override_different_decisions_high_confidence(self):
+        """S2 disagrees with high confidence -> override."""
+        assert self.cog._should_override("BUY", "SELL", 0.8) is True
+
+    def test_no_override_different_decisions_low_confidence(self):
+        """S2 disagrees but low confidence -> no override."""
+        assert self.cog._should_override("BUY", "SELL", 0.5) is False
+
+    def test_no_override_same_decisions(self):
+        """Both agree -> no override regardless of confidence."""
+        assert self.cog._should_override("BUY", "BUY", 0.99) is False
+        assert self.cog._should_override("SELL", "SELL", 0.8) is False
+        assert self.cog._should_override("HOLD", "HOLD", 0.9) is False
+
+    def test_safety_override_hold_vs_buy(self):
+        """S2 says HOLD, S1 wants to BUY with S2 conf >= 0.6 -> override (safety)."""
+        assert self.cog._should_override("BUY", "HOLD", 0.6) is True
+        assert self.cog._should_override("BUY", "HOLD", 0.65) is True
+
+    def test_safety_override_hold_vs_sell(self):
+        """S2 says HOLD, S1 wants to SELL with S2 conf >= 0.6 -> override (safety)."""
+        assert self.cog._should_override("SELL", "HOLD", 0.6) is True
+
+    def test_no_safety_override_low_confidence(self):
+        """S2 says HOLD but confidence too low -> no override."""
+        assert self.cog._should_override("BUY", "HOLD", 0.55) is False
+
+    def test_override_at_exact_threshold(self):
+        """At exactly 0.7 confidence with different decisions -> override."""
+        assert self.cog._should_override("BUY", "SELL", 0.7) is True
+
+    def test_no_override_just_below_threshold(self):
+        """At 0.69 confidence with different decisions -> no override."""
+        assert self.cog._should_override("BUY", "SELL", 0.69) is False
+
+
+class TestMetricsUpdate:
+    """Tests for metrics tracking."""
+
+    def setup_method(self):
+        with patch.dict(os.environ, {}, clear=True):
+            os.environ.pop("GEMINI_API_KEY", None)
+            os.environ.pop("GOOGLE_API_KEY", None)
+            self.cog = DualSpeedCognition()
+
+    def test_system1_first_call(self):
+        self.cog.system1_calls = 1
+        self.cog._update_system1_metrics(100.0)
+        assert self.cog.avg_system1_latency_ms == 100.0
+
+    def test_system1_running_average(self):
+        self.cog.system1_calls = 1
+        self.cog._update_system1_metrics(100.0)
+        self.cog.system1_calls = 2
+        self.cog._update_system1_metrics(200.0)
+        assert self.cog.avg_system1_latency_ms == 150.0
+
+    def test_system2_first_call(self):
+        self.cog.system2_calls = 1
+        self.cog._update_system2_metrics(500.0)
+        assert self.cog.avg_system2_latency_ms == 500.0
+
+    def test_get_metrics_format(self):
+        metrics = self.cog.get_metrics()
+        assert "system1_calls" in metrics
+        assert "system2_calls" in metrics
+        assert "overrides" in metrics
+        assert "override_rate" in metrics
+        assert "avg_system1_latency_ms" in metrics
+        assert "avg_system2_latency_ms" in metrics
+
+    def test_override_rate_no_calls(self):
+        metrics = self.cog.get_metrics()
+        assert metrics["override_rate"] == 0.0
+
+    def test_override_rate_with_calls(self):
+        self.cog.system2_calls = 10
+        self.cog.overrides = 3
+        metrics = self.cog.get_metrics()
+        assert metrics["override_rate"] == 0.3
+
+
+class TestAsyncCognitionMock:
+    """Async tests with mocked Gemini -- mock mode only."""
+
+    def setup_method(self):
+        with patch.dict(os.environ, {}, clear=True):
+            os.environ.pop("GEMINI_API_KEY", None)
+            os.environ.pop("GOOGLE_API_KEY", None)
+            self.cog = DualSpeedCognition()
+
+    @pytest.mark.asyncio
+    async def test_system1_mock_response(self):
+        result = await self.cog._invoke_system1("test prompt")
+        assert result == ("HOLD", 0.5, "[MOCK] System 1 response")
+
+    @pytest.mark.asyncio
+    async def test_system2_mock_response(self):
+        result = await self.cog._invoke_system2("test prompt")
+        assert result == ("HOLD", 0.5, "[MOCK] System 2 response")
+
+    @pytest.mark.asyncio
+    async def test_process_system1_only(self):
+        req = CognitionRequest(prompt="test", speed=CognitionSpeed.SYSTEM_1)
+        result = await self.cog.process(req)
+        assert result.decision == "HOLD"
+        assert result.system_used == CognitionSpeed.SYSTEM_1
+        assert result.system1_decision == "HOLD"
+        assert result.latency_ms >= 0
+
+    @pytest.mark.asyncio
+    async def test_process_system2_only(self):
+        req = CognitionRequest(prompt="test", speed=CognitionSpeed.SYSTEM_2)
+        result = await self.cog.process(req)
+        assert result.decision == "HOLD"
+        assert result.system_used == CognitionSpeed.SYSTEM_2
+        assert result.system2_validation == "HOLD"
+
+    @pytest.mark.asyncio
+    async def test_process_dual_mode(self):
+        req = CognitionRequest(prompt="test", speed=CognitionSpeed.DUAL)
+        result = await self.cog.process(req)
+        assert result.decision == "HOLD"
+        assert result.system_used == CognitionSpeed.DUAL
+        assert result.system1_decision == "HOLD"
+        assert result.system2_validation == "HOLD"
+        assert result.was_overridden is False
+
+    @pytest.mark.asyncio
+    async def test_dual_no_provisional_below_threshold(self):
+        """Mock confidence is 0.5, below 0.85 threshold -> no provisional action."""
+        callback_called = False
+
+        async def provisional_cb(decision, confidence, reasoning):
+            nonlocal callback_called
+            callback_called = True
+
+        req = CognitionRequest(prompt="test", speed=CognitionSpeed.DUAL)
+        await self.cog.process(req, on_provisional_decision=provisional_cb)
+        assert callback_called is False
+
+    @pytest.mark.asyncio
+    async def test_dual_confidence_average(self):
+        """When both agree (HOLD/HOLD), confidence should be averaged."""
+        req = CognitionRequest(prompt="test", speed=CognitionSpeed.DUAL)
+        result = await self.cog.process(req)
+        # Both return 0.5, average = 0.5
+        assert result.confidence == 0.5
+
+
+class TestGlobalInstance:
+    """Tests for the singleton get_dual_cognition."""
+
+    def test_get_dual_cognition_creates_instance(self):
+        import shared.dual_speed_cognition as module
+
+        module._cognition_instance = None
+        with patch.dict(os.environ, {}, clear=True):
+            os.environ.pop("GEMINI_API_KEY", None)
+            os.environ.pop("GOOGLE_API_KEY", None)
+            inst = get_dual_cognition()
+            assert inst is not None
+            # Second call returns same instance
+            inst2 = get_dual_cognition()
+            assert inst is inst2
+        module._cognition_instance = None
+
+
+# ─── Episodic Memory ────────────────────────────────────────────────
+
+from shared.episodic_memory import (
+    EpisodicMemoryBank,
+    MarketEpisode,
+    get_episodic_memory,
+)
+
+
+class TestMarketEpisode:
+    """Tests for the MarketEpisode dataclass."""
+
+    def test_defaults(self):
+        ep = MarketEpisode(
+            episode_id="ep-001",
+            name="Test Episode",
+            start_time=datetime(2026, 1, 15, 10, 0, 0),
+        )
+        assert ep.regime == "unknown"
+        assert ep.total_pnl == 0.0
+        assert ep.win_rate == 0.0
+        assert ep.trades == []
+        assert ep.lesson is None
+
+    def test_serialization_roundtrip(self):
+        now = datetime(2026, 1, 15, 10, 0, 0)
+        ep = MarketEpisode(
+            episode_id="ep-001",
+            name="SOL Breakout",
+            start_time=now,
+            end_time=now + timedelta(hours=4),
+            regime="trending_up",
+            key_events=["Volume spike"],
+            symbols_involved=["SOL"],
+            price_change_pct=5.0,
+            total_pnl=250.0,
+            win_rate=0.75,
+            tags=["breakout", "high_vol"],
+        )
+        data = ep.to_dict()
+        ep2 = MarketEpisode.from_dict(data)
+        assert ep2.episode_id == ep.episode_id
+        assert ep2.name == ep.name
+        assert ep2.regime == ep.regime
+        assert ep2.total_pnl == ep.total_pnl
+        assert ep2.win_rate == ep.win_rate
+        assert ep2.tags == ["breakout", "high_vol"]
+        assert ep2.end_time == ep.end_time
+
+    def test_to_dict_none_end_time(self):
+        ep = MarketEpisode(
+            episode_id="ep-001",
+            name="In Progress",
+            start_time=datetime(2026, 1, 15, 10, 0, 0),
+        )
+        data = ep.to_dict()
+        assert data["end_time"] is None
+
+    def test_from_dict_missing_optional_fields(self):
+        data = {
+            "episode_id": "ep-001",
+            "name": "Minimal",
+            "start_time": "2026-01-15T10:00:00",
+        }
+        ep = MarketEpisode.from_dict(data)
+        assert ep.regime == "unknown"
+        assert ep.trades == []
+        assert ep.lesson is None
+
+    def test_get_summary_with_end_time(self):
+        ep = MarketEpisode(
+            episode_id="ep-001",
+            name="Test",
+            start_time=datetime(2026, 1, 15, 10, 0, 0),
+            end_time=datetime(2026, 1, 15, 14, 0, 0),
+            regime="trending_up",
+            total_pnl=100.0,
+            win_rate=0.8,
+            lesson="Buy on breakouts",
+        )
+        summary = ep.get_summary()
+        assert "Test" in summary
+        assert "trending_up" in summary
+        assert "4.0h" in summary
+        assert "Buy on breakouts" in summary
+
+
+class TestEpisodicMemoryBank:
+    """Tests for the EpisodicMemoryBank lifecycle."""
+
+    def setup_method(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.storage_path = os.path.join(self.tmpdir, "test_memory.json")
+        with patch.dict(os.environ, {}, clear=True):
+            os.environ.pop("GEMINI_API_KEY", None)
+            os.environ.pop("GOOGLE_API_KEY", None)
+            self.bank = EpisodicMemoryBank(storage_path=self.storage_path)
+
+    def test_initial_state(self):
+        assert len(self.bank.episodes) == 0
+        assert self.bank.current_episode is None
+        assert self.bank.model is None
+
+    def test_start_episode(self):
+        ep = self.bank.start_episode("Test Episode", "trending_up", ["SOL"])
+        assert ep is not None
+        assert self.bank.current_episode is ep
+        assert ep.regime == "trending_up"
+        assert "SOL" in ep.symbols_involved
+        assert ep.episode_id.startswith("ep-")
+
+    def test_record_trade(self):
+        self.bank.start_episode("Test", "ranging", ["BTC"])
+        self.bank.record_trade({"symbol": "BTC", "side": "BUY", "pnl": 50.0})
+        assert len(self.bank.current_episode.trades) == 1
+        assert self.bank.current_episode.trades[0]["pnl"] == 50.0
+
+    def test_record_trade_no_episode(self):
+        """Recording with no active episode should be a no-op."""
+        self.bank.record_trade({"symbol": "SOL", "side": "BUY", "pnl": 100.0})
+        # No error raised
+
+    def test_record_event(self):
+        self.bank.start_episode("Test", "ranging")
+        self.bank.record_event("Big volume spike")
+        assert "Big volume spike" in self.bank.current_episode.key_events
+
+    def test_record_event_no_episode(self):
+        self.bank.record_event("Something happened")
+        # No error raised
+
+    def test_end_episode(self):
+        self.bank.start_episode("Test", "high_volatility", ["SOL"])
+        self.bank.record_trade({"pnl": 100.0})
+        self.bank.record_trade({"pnl": -30.0})
+        self.bank.record_trade({"pnl": 50.0})
+
+        ep = self.bank.end_episode(price_change_pct=5.0, volume_change_pct=200.0)
+        assert ep is not None
+        assert ep.end_time is not None
+        assert ep.total_pnl == 120.0
+        assert ep.win_rate == pytest.approx(2 / 3, abs=0.01)
+        assert ep.price_change_pct == 5.0
+        assert self.bank.current_episode is None
+        assert ep.episode_id in self.bank.episodes
+
+    def test_end_episode_no_trades(self):
+        self.bank.start_episode("Empty", "ranging")
+        ep = self.bank.end_episode()
+        assert ep.total_pnl == 0.0
+        assert ep.win_rate == 0.0
+
+    def test_end_episode_no_current(self):
+        result = self.bank.end_episode()
+        assert result is None
+
+    def test_persistence_roundtrip(self):
+        self.bank.start_episode("Persist Test", "trending_up", ["ETH"])
+        self.bank.record_trade({"pnl": 75.0})
+        self.bank.end_episode(price_change_pct=3.0)
+
+        # Create new bank from same storage
+        with patch.dict(os.environ, {}, clear=True):
+            os.environ.pop("GEMINI_API_KEY", None)
+            os.environ.pop("GOOGLE_API_KEY", None)
+            bank2 = EpisodicMemoryBank(storage_path=self.storage_path)
+        assert len(bank2.episodes) == 1
+        ep = list(bank2.episodes.values())[0]
+        assert ep.name == "Persist Test"
+        assert ep.total_pnl == 75.0
+
+    def test_find_similar_by_regime(self):
+        # Manually create episodes with unique IDs to avoid timestamp collision
+        for i, (name, regime, syms) in enumerate([
+            ("Trending A", "trending_up", ["SOL"]),
+            ("Trending B", "trending_up", ["BTC"]),
+            ("Volatile C", "high_volatility", ["SOL"]),
+        ]):
+            ep = MarketEpisode(
+                episode_id=f"ep-find-regime-{i}",
+                name=name,
+                start_time=datetime(2026, 1, 15, 10 + i, 0),
+                end_time=datetime(2026, 1, 15, 11 + i, 0),
+                regime=regime,
+                symbols_involved=syms,
+            )
+            self.bank.episodes[ep.episode_id] = ep
+
+        matches = self.bank.find_similar_episodes("trending_up")
+        assert len(matches) == 2
+        for m in matches:
+            assert m.regime == "trending_up"
+
+    def test_find_similar_by_symbol(self):
+        for i, (name, syms) in enumerate([
+            ("SOL A", ["SOL"]),
+            ("BTC A", ["BTC"]),
+        ]):
+            ep = MarketEpisode(
+                episode_id=f"ep-find-sym-{i}",
+                name=name,
+                start_time=datetime(2026, 1, 15, 10 + i, 0),
+                end_time=datetime(2026, 1, 15, 11 + i, 0),
+                regime="trending_up",
+                symbols_involved=syms,
+            )
+            self.bank.episodes[ep.episode_id] = ep
+
+        matches = self.bank.find_similar_episodes("trending_up", ["SOL"])
+        assert len(matches) == 2
+        assert matches[0].symbols_involved == ["SOL"]
+
+    def test_find_similar_no_matches(self):
+        ep = MarketEpisode(
+            episode_id="ep-no-match",
+            name="Only Trending",
+            start_time=datetime(2026, 1, 15, 10, 0),
+            regime="trending_up",
+        )
+        self.bank.episodes[ep.episode_id] = ep
+        matches = self.bank.find_similar_episodes("mean_reversion")
+        assert len(matches) == 0
+
+    def test_find_similar_limit(self):
+        for i in range(10):
+            ep = MarketEpisode(
+                episode_id=f"ep-limit-{i}",
+                name=f"Episode {i}",
+                start_time=datetime(2026, 1, 15, i, 0),
+                regime="ranging",
+                symbols_involved=["SOL"],
+            )
+            self.bank.episodes[ep.episode_id] = ep
+        matches = self.bank.find_similar_episodes("ranging", limit=3)
+        assert len(matches) == 3
+
+    def test_get_stats(self):
+        ep_a = MarketEpisode(
+            episode_id="ep-stats-a",
+            name="EP A",
+            start_time=datetime(2026, 1, 15, 10, 0),
+            regime="trending_up",
+            symbols_involved=["SOL"],
+            trades=[{"pnl": 100.0}],
+            total_pnl=100.0,
+        )
+        ep_b = MarketEpisode(
+            episode_id="ep-stats-b",
+            name="EP B",
+            start_time=datetime(2026, 1, 15, 11, 0),
+            regime="ranging",
+            symbols_involved=["BTC"],
+            trades=[{"pnl": -20.0}, {"pnl": 30.0}],
+            total_pnl=10.0,
+        )
+        self.bank.episodes[ep_a.episode_id] = ep_a
+        self.bank.episodes[ep_b.episode_id] = ep_b
+
+        stats = self.bank.get_stats()
+        assert stats["total_episodes"] == 2
+        assert stats["total_trades"] == 3
+        assert stats["total_pnl"] == 110.0
+        assert "trending_up" in stats["regimes"]
+        assert "ranging" in stats["regimes"]
+        assert stats["lessons_extracted"] == 0
+
+    @pytest.mark.asyncio
+    async def test_extract_lesson_no_model(self):
+        ep = MarketEpisode(
+            episode_id="ep-test",
+            name="Test",
+            start_time=datetime(2026, 1, 15),
+        )
+        lesson = await self.bank.extract_lesson(ep)
+        assert "unavailable" in lesson.lower()
+
+    @pytest.mark.asyncio
+    async def test_recall_for_decision_no_episodes(self):
+        result = await self.bank.recall_for_decision("SOL", "trending_up")
+        assert "No relevant past episodes" in result
+
+    @pytest.mark.asyncio
+    async def test_recall_with_episodes_no_lessons(self):
+        self.bank.start_episode("Test", "trending_up", ["SOL"])
+        self.bank.end_episode()
+        result = await self.bank.recall_for_decision("SOL", "trending_up")
+        assert "no lessons extracted" in result.lower()
+
+    @pytest.mark.asyncio
+    async def test_recall_with_episodes_and_lessons(self):
+        self.bank.start_episode("Test", "trending_up", ["SOL"])
+        ep = self.bank.end_episode()
+        ep.lesson = "Buy on volume spikes during uptrends"
+        result = await self.bank.recall_for_decision("SOL", "trending_up")
+        assert "Buy on volume spikes" in result
+
+
+class TestEpisodicGlobalInstance:
+    def test_get_episodic_memory(self):
+        import shared.episodic_memory as module
+
+        module._memory_instance = None
+        with patch.dict(os.environ, {}, clear=True):
+            os.environ.pop("GEMINI_API_KEY", None)
+            os.environ.pop("GOOGLE_API_KEY", None)
+            inst = get_episodic_memory()
+            assert inst is not None
+            inst2 = get_episodic_memory()
+            assert inst is inst2
+        module._memory_instance = None
+
+
+# ─── Enhanced Episodic Memory ────────────────────────────────────────
 
 from shared.enhanced_episodic_memory import (
     CausalChain,
@@ -121,750 +707,542 @@ from shared.enhanced_episodic_memory import (
     MultiFacetedLesson,
     TemporalPattern,
     auto_detect_regime,
+    get_enhanced_memory,
 )
 
 
+class TestMarketRegimeEnum:
+    def test_all_values(self):
+        assert MarketRegime.TRENDING_UP == "trending_up"
+        assert MarketRegime.TRENDING_DOWN == "trending_down"
+        assert MarketRegime.HIGH_VOLATILITY == "high_volatility"
+        assert MarketRegime.LOW_VOLATILITY == "low_volatility"
+        assert MarketRegime.RANGING == "ranging"
+        assert MarketRegime.BREAKOUT == "breakout"
+        assert MarketRegime.MEAN_REVERSION == "mean_reversion"
+        assert MarketRegime.UNKNOWN == "unknown"
+
+    def test_is_str(self):
+        assert isinstance(MarketRegime.TRENDING_UP, str)
+
+
 class TestMarketSnapshot:
-    def _make_snapshot(self, **overrides):
-        defaults = dict(
-            timestamp=datetime.now(timezone.utc),
-            prices={"SOL": 145},
-            volumes={"SOL": 800_000_000},
-            volatility={"SOL": 0.025},
-            order_book_imbalance={"SOL": 0.05},
+    def test_defaults(self):
+        snap = MarketSnapshot(timestamp=datetime.now(timezone.utc))
+        assert snap.prices == {}
+        assert snap.volumes == {}
+        assert snap.volatility == {}
+
+    def test_serialization_roundtrip(self):
+        now = datetime.now(timezone.utc)
+        snap = MarketSnapshot(
+            timestamp=now,
+            prices={"SOL": 150.0, "BTC": 48000.0},
+            volumes={"SOL": 1e9},
+            volatility={"SOL": 0.04},
+            order_book_imbalance={"SOL": 0.2},
             funding_rates={"SOL": 0.001},
+            open_interest={"SOL": 5e8},
+            correlations={"SOL:BTC": 0.85},
         )
-        defaults.update(overrides)
-        return MarketSnapshot(**defaults)
+        data = snap.to_dict()
+        snap2 = MarketSnapshot.from_dict(data)
+        assert snap2.prices["SOL"] == 150.0
+        assert snap2.correlations["SOL:BTC"] == 0.85
+        assert snap2.timestamp.year == now.year
 
-    def test_round_trip_dict(self):
-        s = self._make_snapshot()
-        d = s.to_dict()
-        restored = MarketSnapshot.from_dict(d)
-        assert restored.prices == s.prices
-        assert restored.volumes == s.volumes
-
-    def test_get_regime_indicators(self):
-        s = self._make_snapshot(volatility={"SOL": 0.04})
-        indicators = s.get_regime_indicators()
-        assert indicators["avg_volatility"] == 0.04
-        assert indicators["high_volatility"] is True  # > 0.03
-
-    def test_empty_fields(self):
-        s = MarketSnapshot(timestamp=datetime.now(timezone.utc))
-        indicators = s.get_regime_indicators()
+    def test_regime_indicators_empty(self):
+        snap = MarketSnapshot(timestamp=datetime.now(timezone.utc))
+        indicators = snap.get_regime_indicators()
         assert indicators["avg_volatility"] == 0
+        assert indicators["avg_imbalance"] == 0
         assert indicators["high_volatility"] is False
+
+    def test_regime_indicators_with_data(self):
+        snap = MarketSnapshot(
+            timestamp=datetime.now(timezone.utc),
+            volatility={"SOL": 0.05, "BTC": 0.04},
+            order_book_imbalance={"SOL": 0.2, "BTC": 0.1},
+            funding_rates={"SOL": 0.002},
+        )
+        indicators = snap.get_regime_indicators()
+        assert indicators["avg_volatility"] == pytest.approx(0.045)
+        assert indicators["high_volatility"] is True
+        assert indicators["bullish_pressure"] is True
 
 
 class TestAutoDetectRegime:
-    def _snapshot(self, vol=0.02, imbalance=0.0):
-        return MarketSnapshot(
+    def test_high_volatility_breakout(self):
+        snap = MarketSnapshot(
             timestamp=datetime.now(timezone.utc),
-            volatility={"X": vol},
-            order_book_imbalance={"X": imbalance},
-            funding_rates={"X": 0.001},
+            volatility={"SOL": 0.05},
+            order_book_imbalance={"SOL": 0.2},
         )
-
-    def test_high_volatility_bullish_breakout(self):
-        snap = self._snapshot(vol=0.05, imbalance=0.2)
         regime, conf = auto_detect_regime(snap)
         assert regime == MarketRegime.BREAKOUT
-        assert conf >= 0.7
+        assert conf == 0.8
 
     def test_high_volatility_bearish(self):
-        snap = self._snapshot(vol=0.05, imbalance=-0.2)
-        regime, _ = auto_detect_regime(snap)
+        snap = MarketSnapshot(
+            timestamp=datetime.now(timezone.utc),
+            volatility={"SOL": 0.05},
+            order_book_imbalance={"SOL": -0.2},
+        )
+        regime, conf = auto_detect_regime(snap)
         assert regime == MarketRegime.HIGH_VOLATILITY
+        assert conf == 0.7
 
-    def test_trending_up_via_price_change(self):
-        snap = self._snapshot(vol=0.02, imbalance=0.0)
-        regime, _ = auto_detect_regime(snap, price_change_1h={"X": 3.0})
+    def test_high_volatility_neutral(self):
+        snap = MarketSnapshot(
+            timestamp=datetime.now(timezone.utc),
+            volatility={"SOL": 0.05},
+            order_book_imbalance={"SOL": 0.05},
+        )
+        regime, conf = auto_detect_regime(snap)
+        assert regime == MarketRegime.HIGH_VOLATILITY
+        assert conf == 0.6
+
+    def test_trending_up_by_price_change(self):
+        snap = MarketSnapshot(
+            timestamp=datetime.now(timezone.utc),
+            volatility={"SOL": 0.02},
+            order_book_imbalance={"SOL": 0.0},
+        )
+        regime, conf = auto_detect_regime(snap, price_change_1h={"SOL": 3.0})
         assert regime == MarketRegime.TRENDING_UP
+        assert conf == 0.75
 
-    def test_trending_down_via_price_change(self):
-        snap = self._snapshot(vol=0.02, imbalance=0.0)
-        regime, _ = auto_detect_regime(snap, price_change_1h={"X": -3.0})
+    def test_trending_down_by_price_change(self):
+        snap = MarketSnapshot(
+            timestamp=datetime.now(timezone.utc),
+            volatility={"SOL": 0.02},
+            order_book_imbalance={"SOL": 0.0},
+        )
+        regime, conf = auto_detect_regime(snap, price_change_1h={"SOL": -3.5})
         assert regime == MarketRegime.TRENDING_DOWN
+        assert conf == 0.75
 
-    def test_bullish_pressure(self):
-        snap = self._snapshot(vol=0.02, imbalance=0.15)
-        regime, _ = auto_detect_regime(snap)
-        assert regime == MarketRegime.TRENDING_UP
-
-    def test_bearish_pressure(self):
-        snap = self._snapshot(vol=0.02, imbalance=-0.15)
-        regime, _ = auto_detect_regime(snap)
-        assert regime == MarketRegime.TRENDING_DOWN
-
-    def test_ranging_market(self):
-        snap = self._snapshot(vol=0.01, imbalance=0.02)
-        regime, _ = auto_detect_regime(snap)
+    def test_ranging_low_vol_neutral_imbalance(self):
+        snap = MarketSnapshot(
+            timestamp=datetime.now(timezone.utc),
+            volatility={"SOL": 0.01},
+            order_book_imbalance={"SOL": 0.02},
+        )
+        regime, conf = auto_detect_regime(snap)
         assert regime == MarketRegime.RANGING
+        assert conf == 0.65
 
     def test_low_volatility(self):
-        snap = self._snapshot(vol=0.01, imbalance=0.08)
-        regime, _ = auto_detect_regime(snap)
+        snap = MarketSnapshot(
+            timestamp=datetime.now(timezone.utc),
+            volatility={"SOL": 0.01},
+            order_book_imbalance={"SOL": 0.08},
+        )
+        regime, conf = auto_detect_regime(snap)
         assert regime == MarketRegime.LOW_VOLATILITY
+        assert conf == 0.55
+
+    def test_bullish_pressure(self):
+        snap = MarketSnapshot(
+            timestamp=datetime.now(timezone.utc),
+            volatility={"SOL": 0.02},
+            order_book_imbalance={"SOL": 0.15},
+        )
+        regime, conf = auto_detect_regime(snap)
+        assert regime == MarketRegime.TRENDING_UP
+        assert conf == 0.6
+
+    def test_bearish_pressure(self):
+        snap = MarketSnapshot(
+            timestamp=datetime.now(timezone.utc),
+            volatility={"SOL": 0.02},
+            order_book_imbalance={"SOL": -0.15},
+        )
+        regime, conf = auto_detect_regime(snap)
+        assert regime == MarketRegime.TRENDING_DOWN
+        assert conf == 0.6
 
 
 class TestCausalChain:
-    def test_add_event_links_to_previous(self):
+    def test_empty_chain(self):
         chain = CausalChain(chain_id="test-chain")
-        e1 = chain.add_event("market", "Price spike")
-        e2 = chain.add_event("action", "Entered long")
-        assert e2.caused_by == "test-chain-0"
-        assert e1.led_to == "test-chain-1"
-
-    def test_get_narrative_empty(self):
-        chain = CausalChain(chain_id="empty")
+        assert len(chain.events) == 0
         assert chain.get_narrative() == "No events recorded."
 
-    def test_get_narrative_multiple(self):
-        chain = CausalChain(chain_id="c")
+    def test_add_single_event(self):
+        chain = CausalChain(chain_id="c1")
+        event = chain.add_event("market", "Price spike detected", {"pct": 5.0})
+        assert len(chain.events) == 1
+        assert event.event_type == "market"
+        assert event.caused_by is None
+        assert event.led_to is None
+
+    def test_chain_linking(self):
+        chain = CausalChain(chain_id="c1")
         chain.add_event("market", "Volume spike")
-        chain.add_event("action", "Bought SOL")
+        chain.add_event("action", "Entered long")
+        chain.add_event("outcome", "Profit taken")
+
+        assert len(chain.events) == 3
+        assert chain.events[0].led_to == "c1-1"
+        assert chain.events[1].caused_by == "c1-0"
+        assert chain.events[1].led_to == "c1-2"
+        assert chain.events[2].caused_by == "c1-1"
+
+    def test_narrative(self):
+        chain = CausalChain(chain_id="c1")
+        chain.add_event("market", "Volume spike")
+        chain.add_event("action", "Entered long")
         narrative = chain.get_narrative()
-        assert "Volume spike" in narrative
-        assert "→" in narrative  # second event prefixed
+        assert "[market] Volume spike" in narrative
+        assert "[action] Entered long" in narrative
 
     def test_to_dict(self):
-        chain = CausalChain(chain_id="c")
-        chain.add_event("market", "Event 1")
-        d = chain.to_dict()
-        assert d["chain_id"] == "c"
-        assert len(d["events"]) == 1
+        chain = CausalChain(chain_id="c1")
+        chain.add_event("market", "Test event", {"key": "val"})
+        data = chain.to_dict()
+        assert data["chain_id"] == "c1"
+        assert len(data["events"]) == 1
+        assert data["events"][0]["data"]["key"] == "val"
 
 
 class TestMultiFacetedLesson:
-    def test_round_trip(self):
+    def test_defaults(self):
+        lesson = MultiFacetedLesson()
+        assert lesson.tactical is None
+        assert lesson.strategic is None
+        assert lesson.psychological is None
+        assert lesson.counter_factual is None
+        assert lesson.confidence == 0.5
+
+    def test_full_lesson(self):
         lesson = MultiFacetedLesson(
-            tactical="Trail stops",
-            strategic="Follow momentum",
-            psychological="Stay calm",
-            counter_factual="Could have waited",
-            confidence=0.8,
+            tactical="Use tighter stops",
+            strategic="Trail in uptrends",
+            psychological="Avoid revenge trading",
+            counter_factual="Waiting 5 min = 2% better entry",
+            confidence=0.85,
         )
-        d = lesson.to_dict()
-        restored = MultiFacetedLesson.from_dict(d)
-        assert restored.tactical == "Trail stops"
-        assert restored.confidence == 0.8
+        assert lesson.confidence == 0.85
+
+    def test_serialization_roundtrip(self):
+        lesson = MultiFacetedLesson(
+            tactical="Close half at R1",
+            strategic="Trend follow",
+            confidence=0.7,
+        )
+        data = lesson.to_dict()
+        lesson2 = MultiFacetedLesson.from_dict(data)
+        assert lesson2.tactical == "Close half at R1"
+        assert lesson2.confidence == 0.7
+        assert lesson2.psychological is None
+
+    def test_get_summary_partial(self):
+        lesson = MultiFacetedLesson(tactical="Use stops", strategic="Follow trends")
+        summary = lesson.get_summary()
+        assert "Tactical" in summary
+        assert "Strategic" in summary
+        assert "Psychological" not in summary
 
     def test_get_summary_empty(self):
         lesson = MultiFacetedLesson()
-        assert lesson.get_summary() == "No lessons extracted."
-
-    def test_get_summary_partial(self):
-        lesson = MultiFacetedLesson(tactical="Use trailing stops")
-        summary = lesson.get_summary()
-        assert "Tactical" in summary
-        assert "trailing stops" in summary
+        assert "No lessons" in lesson.get_summary()
 
 
 class TestTemporalPattern:
-    def test_win_rate_zero_trades(self):
-        p = TemporalPattern(hour_of_day=14, day_of_week=2)
-        assert p.win_rate == 0.0
+    def test_defaults(self):
+        tp = TemporalPattern(hour_of_day=14, day_of_week=2)
+        assert tp.trades_taken == 0
+        assert tp.wins == 0
+        assert tp.losses == 0
+        assert tp.total_pnl == 0.0
 
-    def test_win_rate_calculation(self):
-        p = TemporalPattern(hour_of_day=14, day_of_week=2, trades_taken=10, wins=7)
-        assert p.win_rate == 0.7
+    def test_win_rate_no_trades(self):
+        tp = TemporalPattern(hour_of_day=10, day_of_week=0)
+        assert tp.win_rate == 0.0
+
+    def test_win_rate_with_trades(self):
+        tp = TemporalPattern(hour_of_day=10, day_of_week=0, trades_taken=10, wins=7)
+        assert tp.win_rate == 0.7
+
+    def test_to_dict(self):
+        tp = TemporalPattern(hour_of_day=14, day_of_week=3, trades_taken=5, wins=3, total_pnl=250.0)
+        data = tp.to_dict()
+        assert data["hour_of_day"] == 14
+        assert data["day_of_week"] == 3
+        assert data["total_pnl"] == 250.0
 
 
 class TestEnhancedEpisode:
-    def test_round_trip_dict(self):
+    def test_defaults(self):
         ep = EnhancedEpisode(
-            episode_id="test-001",
-            name="SOL Breakout",
+            episode_id="ep-test",
+            name="Test",
             start_time=datetime.now(timezone.utc),
-            regime=MarketRegime.BREAKOUT,
-            regime_confidence=0.85,
-            symbols_involved=["SOL"],
-            total_pnl=150.0,
-            win_rate=0.75,
-            tags=["momentum"],
         )
-        ep.lessons = MultiFacetedLesson(tactical="Trail stops", confidence=0.9)
-        d = ep.to_dict()
-        restored = EnhancedEpisode.from_dict(d)
-        assert restored.episode_id == "test-001"
-        assert restored.regime == MarketRegime.BREAKOUT
-        assert restored.lessons.tactical == "Trail stops"
+        assert ep.regime == MarketRegime.UNKNOWN
+        assert ep.regime_confidence == 0.5
+        assert ep.total_pnl == 0.0
+        assert ep.lessons is None
+
+    def test_serialization_roundtrip(self):
+        now = datetime.now(timezone.utc)
+        snap = MarketSnapshot(
+            timestamp=now,
+            prices={"SOL": 150.0},
+            volatility={"SOL": 0.03},
+        )
+        lesson = MultiFacetedLesson(tactical="Use stops", confidence=0.8)
+        ep = EnhancedEpisode(
+            episode_id="ep-test",
+            name="Roundtrip Test",
+            start_time=now,
+            end_time=now + timedelta(hours=2),
+            start_snapshot=snap,
+            regime=MarketRegime.TRENDING_UP,
+            regime_confidence=0.75,
+            symbols_involved=["SOL"],
+            total_pnl=500.0,
+            win_rate=0.8,
+            lessons=lesson,
+            tags=["breakout"],
+            hour_of_day=14,
+            day_of_week=2,
+        )
+        data = ep.to_dict()
+        ep2 = EnhancedEpisode.from_dict(data)
+        assert ep2.episode_id == "ep-test"
+        assert ep2.regime == MarketRegime.TRENDING_UP
+        assert ep2.regime_confidence == 0.75
+        assert ep2.total_pnl == 500.0
+        assert ep2.start_snapshot is not None
+        assert ep2.start_snapshot.prices["SOL"] == 150.0
+        assert ep2.lessons.tactical == "Use stops"
+        assert ep2.lessons.confidence == 0.8
 
     def test_get_summary(self):
+        now = datetime.now(timezone.utc)
+        lesson = MultiFacetedLesson(tactical="Use stops")
         ep = EnhancedEpisode(
-            episode_id="t",
-            name="Test Episode",
-            start_time=datetime.now(timezone.utc),
-            end_time=datetime.now(timezone.utc) + timedelta(hours=2),
-            regime=MarketRegime.TRENDING_UP,
-            total_pnl=100.0,
-            win_rate=0.8,
+            episode_id="ep-test",
+            name="Summary Test",
+            start_time=now,
+            end_time=now + timedelta(hours=3),
+            regime=MarketRegime.BREAKOUT,
+            regime_confidence=0.8,
+            total_pnl=250.0,
+            win_rate=0.75,
+            sharpe_ratio=1.5,
+            lessons=lesson,
+            tags=["momentum"],
         )
         summary = ep.get_summary()
-        assert "Test Episode" in summary
-        assert "trending_up" in summary
+        assert "Summary Test" in summary
+        assert "breakout" in summary
+        assert "Tactical" in summary
+        assert "momentum" in summary
 
 
 class TestEnhancedMemoryBank:
-    def _make_bank(self, tmp_path):
-        path = os.path.join(str(tmp_path), "test_memory.json")
-        with patch.dict(os.environ, {"GEMINI_API_KEY": ""}, clear=False):
-            return EnhancedMemoryBank(storage_path=path)
+    def setup_method(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.storage_path = os.path.join(self.tmpdir, "test_enhanced_memory.json")
+        with patch.dict(os.environ, {}, clear=True):
+            os.environ.pop("GEMINI_API_KEY", None)
+            os.environ.pop("GOOGLE_API_KEY", None)
+            self.bank = EnhancedMemoryBank(storage_path=self.storage_path)
 
-    def _make_snapshot(self, vol=0.025, imbalance=0.05):
+    def _make_snapshot(self, vol=0.03, imbalance=0.1, prices=None):
         return MarketSnapshot(
             timestamp=datetime.now(timezone.utc),
-            prices={"SOL": 145},
-            volumes={"SOL": 800_000_000},
+            prices=prices or {"SOL": 150.0},
+            volumes={"SOL": 1e9},
             volatility={"SOL": vol},
             order_book_imbalance={"SOL": imbalance},
             funding_rates={"SOL": 0.001},
         )
 
-    def test_start_and_end_episode(self, tmp_path):
-        bank = self._make_bank(tmp_path)
+    def test_initial_state(self):
+        assert len(self.bank.episodes) == 0
+        assert self.bank.current_episode is None
+        assert self.bank.model is None
+
+    def test_start_episode_auto_regime(self):
+        snap = self._make_snapshot(vol=0.05, imbalance=0.2)
+        ep = self.bank.start_episode("Breakout Test", snap, ["SOL"])
+        assert ep.regime == MarketRegime.BREAKOUT
+        assert ep.regime_confidence == 0.8
+        assert self.bank.current_episode is ep
+        assert len(ep.causal_chain.events) == 1  # Start event recorded
+
+    def test_record_market_event(self):
         snap = self._make_snapshot()
-        ep = bank.start_episode("Test EP", snap, symbols=["SOL"])
-        assert bank.current_episode is not None
-        assert ep.regime != MarketRegime.UNKNOWN
+        self.bank.start_episode("Test", snap)
+        self.bank.record_market_event("Big volume spike", {"volume": 3e9})
+        assert len(self.bank.current_episode.causal_chain.events) == 2
 
-        ended = bank.end_episode(snap)
-        assert ended is not None
-        assert bank.current_episode is None
-        assert ended.episode_id in bank.episodes
-
-    def test_record_trade_adds_to_causal_chain(self, tmp_path):
-        bank = self._make_bank(tmp_path)
+    def test_record_action(self):
         snap = self._make_snapshot()
-        bank.start_episode("Trade Test", snap)
-        bank.record_trade({"symbol": "SOL", "side": "BUY", "price": 145.5, "pnl": 25})
-        assert len(bank.current_episode.trades) == 1
-        # Start event + trade event = at least 2 events
-        assert len(bank.current_episode.causal_chain.events) >= 2
+        self.bank.start_episode("Test", snap)
+        self.bank.record_action("Entered long SOL")
+        assert len(self.bank.current_episode.causal_chain.events) == 2
 
-    def test_record_events(self, tmp_path):
-        bank = self._make_bank(tmp_path)
-        bank.start_episode("Event Test", self._make_snapshot())
-        bank.record_market_event("Volume spike")
-        bank.record_action("Entered long")
-        bank.record_outcome("Hit TP")
-        assert len(bank.current_episode.causal_chain.events) >= 4
+    def test_record_outcome(self):
+        snap = self._make_snapshot()
+        self.bank.start_episode("Test", snap)
+        self.bank.record_outcome("TP1 hit")
+        assert len(self.bank.current_episode.causal_chain.events) == 2
 
-    def test_no_op_when_no_current_episode(self, tmp_path):
-        bank = self._make_bank(tmp_path)
+    def test_record_trade(self):
+        snap = self._make_snapshot()
+        self.bank.start_episode("Test", snap)
+        self.bank.record_trade({"symbol": "SOL", "side": "BUY", "price": 150.0, "pnl": 50.0})
+        assert len(self.bank.current_episode.trades) == 1
+        assert len(self.bank.current_episode.causal_chain.events) == 2
+
+    def test_record_trade_no_episode(self):
+        self.bank.record_trade({"symbol": "SOL", "side": "BUY"})
         # Should not raise
-        bank.record_market_event("Test")
-        bank.record_action("Test")
-        bank.record_outcome("Test")
-        bank.record_trade({"symbol": "X"})
 
-    def test_end_episode_calculates_outcomes(self, tmp_path):
-        bank = self._make_bank(tmp_path)
+    def test_end_episode_calculations(self):
         snap = self._make_snapshot()
-        bank.start_episode("PnL Test", snap, symbols=["SOL"])
-        bank.record_trade({"symbol": "SOL", "side": "BUY", "price": 145, "pnl": 50})
-        bank.record_trade({"symbol": "SOL", "side": "BUY", "price": 146, "pnl": -10})
-        bank.record_trade({"symbol": "SOL", "side": "BUY", "price": 147, "pnl": 30})
+        self.bank.start_episode("Calc Test", snap, ["SOL"])
+        self.bank.record_trade({"pnl": 100.0})
+        self.bank.record_trade({"pnl": -30.0})
+        self.bank.record_trade({"pnl": 80.0})
 
-        ep = bank.end_episode(snap)
-        assert ep.total_pnl == 70.0
-        assert 0 < ep.win_rate <= 1.0
-        assert ep.sharpe_ratio != 0  # 3 trades with variance
+        end_snap = self._make_snapshot()
+        ep = self.bank.end_episode(end_snap)
+        assert ep.total_pnl == 150.0
+        assert ep.win_rate == pytest.approx(2 / 3, abs=0.01)
+        assert ep.end_time is not None
+        assert ep.end_snapshot is not None
+        assert ep.episode_id in self.bank.episodes
+        assert self.bank.current_episode is None
 
-    def test_persistence_round_trip(self, tmp_path):
-        path = os.path.join(str(tmp_path), "persist_test.json")
-        with patch.dict(os.environ, {"GEMINI_API_KEY": ""}, clear=False):
-            bank1 = EnhancedMemoryBank(storage_path=path)
-            snap = self._make_snapshot()
-            bank1.start_episode("Persist Test", snap)
-            bank1.end_episode(snap)
-            assert os.path.exists(path)
-
-            # Load in a new bank
-            bank2 = EnhancedMemoryBank(storage_path=path)
-            assert len(bank2.episodes) == 1
-
-    def test_find_similar_episodes(self, tmp_path):
-        bank = self._make_bank(tmp_path)
+    def test_end_episode_sharpe(self):
         snap = self._make_snapshot()
+        self.bank.start_episode("Sharpe Test", snap)
+        self.bank.record_trade({"pnl": 100.0})
+        self.bank.record_trade({"pnl": 50.0})
+        self.bank.record_trade({"pnl": -20.0})
+        ep = self.bank.end_episode()
+        assert ep.sharpe_ratio > 0
 
-        # Store two episodes (manually set IDs to avoid same-second collision)
-        bank.start_episode("EP1", snap, symbols=["SOL"])
-        bank.current_episode.episode_id = "ep-find-001"
-        bank.current_episode.regime = MarketRegime.BREAKOUT
-        bank.current_episode.regime_confidence = 0.9
-        bank.current_episode.causal_chain.chain_id = "ep-find-001"
-        bank.end_episode(snap)
+    def test_end_episode_no_current(self):
+        assert self.bank.end_episode() is None
 
-        bank.start_episode("EP2", snap, symbols=["BTC"])
-        bank.current_episode.episode_id = "ep-find-002"
-        bank.current_episode.regime = MarketRegime.RANGING
-        bank.current_episode.causal_chain.chain_id = "ep-find-002"
-        bank.end_episode(snap)
+    def test_persistence_roundtrip(self):
+        snap = self._make_snapshot()
+        self.bank.start_episode("Persist", snap, ["SOL"])
+        self.bank.record_trade({"pnl": 100.0})
+        self.bank.end_episode()
 
-        results = bank.find_similar_episodes(regime=MarketRegime.BREAKOUT, symbols=["SOL"])
-        assert len(results) >= 1
-        assert results[0].name == "EP1"
+        with patch.dict(os.environ, {}, clear=True):
+            os.environ.pop("GEMINI_API_KEY", None)
+            os.environ.pop("GOOGLE_API_KEY", None)
+            bank2 = EnhancedMemoryBank(storage_path=self.storage_path)
+        assert len(bank2.episodes) == 1
 
-    def test_get_temporal_insights_no_data(self, tmp_path):
-        bank = self._make_bank(tmp_path)
-        insights = bank.get_temporal_insights()
+    def test_find_similar_by_regime(self):
+        # Manually create episodes with unique IDs to avoid timestamp collision
+        for i, (regime, conf) in enumerate([
+            (MarketRegime.BREAKOUT, 0.8),
+            (MarketRegime.BREAKOUT, 0.75),
+            (MarketRegime.RANGING, 0.65),
+        ]):
+            ep = EnhancedEpisode(
+                episode_id=f"ep-regime-{i}",
+                name=f"Test {i}",
+                start_time=datetime(2026, 1, 15, 10 + i, 0, tzinfo=timezone.utc),
+                regime=regime,
+                regime_confidence=conf,
+                symbols_involved=["SOL"],
+            )
+            self.bank.episodes[ep.episode_id] = ep
+
+        matches = self.bank.find_similar_episodes(regime=MarketRegime.BREAKOUT, limit=5)
+        assert len(matches) >= 2
+
+    def test_find_similar_limit(self):
+        for i in range(10):
+            ep = EnhancedEpisode(
+                episode_id=f"ep-limit-{i}",
+                name=f"EP {i}",
+                start_time=datetime(2026, 1, 15, i, 0, tzinfo=timezone.utc),
+                symbols_involved=["SOL"],
+            )
+            self.bank.episodes[ep.episode_id] = ep
+        matches = self.bank.find_similar_episodes(symbols=["SOL"], limit=3)
+        assert len(matches) == 3
+
+    def test_temporal_pattern_update(self):
+        snap = self._make_snapshot()
+        self.bank.start_episode("TP Test", snap, ["SOL"])
+        self.bank.record_trade({"pnl": 50.0})
+        self.bank.end_episode()
+
+        assert len(self.bank.temporal_patterns) > 0
+        pattern = list(self.bank.temporal_patterns.values())[0]
+        assert pattern.trades_taken >= 1
+
+    def test_get_temporal_insights_empty(self):
+        insights = self.bank.get_temporal_insights()
         assert "message" in insights
 
-    def test_get_stats(self, tmp_path):
-        bank = self._make_bank(tmp_path)
+    def test_get_temporal_insights_with_data(self):
+        for i in range(3):
+            snap = self._make_snapshot()
+            self.bank.start_episode(f"EP {i}", snap, ["SOL"])
+            self.bank.record_trade({"pnl": (i + 1) * 10.0})
+            self.bank.end_episode()
+
+        insights = self.bank.get_temporal_insights()
+        assert "best_hour" in insights
+        assert "worst_hour" in insights
+
+    @pytest.mark.asyncio
+    async def test_extract_lessons_mock(self):
+        ep = EnhancedEpisode(
+            episode_id="ep-test",
+            name="Mock Test",
+            start_time=datetime.now(timezone.utc),
+            causal_chain=CausalChain("ep-test"),
+        )
+        lessons = await self.bank.extract_multi_faceted_lessons(ep)
+        assert lessons.tactical is not None
+        assert lessons.confidence == 0.3
+
+    @pytest.mark.asyncio
+    async def test_recall_no_episodes(self):
         snap = self._make_snapshot()
-        bank.start_episode("Stats Test", snap)
-        bank.record_trade({"pnl": 100})
-        bank.end_episode(snap)
-        stats = bank.get_stats()
+        result = await self.bank.recall_for_decision("SOL", snap)
+        assert "No relevant past" in result
+
+    def test_get_stats(self):
+        snap = self._make_snapshot()
+        self.bank.start_episode("Stats Test", snap, ["SOL"])
+        self.bank.record_trade({"pnl": 100.0})
+        self.bank.end_episode()
+
+        stats = self.bank.get_stats()
         assert stats["total_episodes"] == 1
-
-    @pytest.mark.asyncio
-    async def test_extract_lessons_mock_mode(self, tmp_path):
-        """Without API key, returns mock lesson."""
-        bank = self._make_bank(tmp_path)
-        snap = self._make_snapshot()
-        bank.start_episode("Lesson Test", snap)
-        bank.record_trade({"pnl": 50})
-        ep = bank.end_episode(snap)
-        lesson = await bank.extract_multi_faceted_lessons(ep)
-        assert lesson.confidence == 0.3  # mock confidence
-        assert lesson.tactical is not None
-
-    @pytest.mark.asyncio
-    async def test_recall_for_decision_no_episodes(self, tmp_path):
-        bank = self._make_bank(tmp_path)
-        snap = self._make_snapshot()
-        result = await bank.recall_for_decision("SOL", snap)
-        assert "No relevant" in result
-
-
-# ── Dual-Speed Cognition ────────────────────────────────────────
-
-from shared.dual_speed_cognition import (
-    CognitionRequest,
-    CognitionResult,
-    CognitionSpeed,
-    DualSpeedCognition,
-)
-
-
-class TestCognitionDataclasses:
-    def test_cognition_request_defaults(self):
-        req = CognitionRequest(prompt="Should I buy SOL?")
-        assert req.speed == CognitionSpeed.DUAL
-        assert req.max_latency_ms == 5000.0
-
-    def test_cognition_result(self):
-        res = CognitionResult(
-            decision="BUY",
-            confidence=0.9,
-            reasoning="Strong momentum",
-            system_used=CognitionSpeed.SYSTEM_1,
-            latency_ms=45.0,
-        )
-        assert res.was_overridden is False
-
-
-class TestDualSpeedCognitionMockMode:
-    """Tests DualSpeedCognition when no API key is set (mock mode)."""
-
-    def _make_cognition(self):
-        with patch.dict(os.environ, {"GEMINI_API_KEY": "", "GOOGLE_API_KEY": ""}, clear=False):
-            return DualSpeedCognition()
-
-    @pytest.mark.asyncio
-    async def test_system1_only_mock(self):
-        cog = self._make_cognition()
-        req = CognitionRequest(prompt="Test", speed=CognitionSpeed.SYSTEM_1)
-        result = await cog.process(req)
-        assert result.decision == "HOLD"
-        assert result.system_used == CognitionSpeed.SYSTEM_1
-        assert result.latency_ms >= 0
-
-    @pytest.mark.asyncio
-    async def test_system2_only_mock(self):
-        cog = self._make_cognition()
-        req = CognitionRequest(prompt="Test", speed=CognitionSpeed.SYSTEM_2)
-        result = await cog.process(req)
-        assert result.decision == "HOLD"
-        assert result.system_used == CognitionSpeed.SYSTEM_2
-
-    @pytest.mark.asyncio
-    async def test_dual_mode_mock(self):
-        cog = self._make_cognition()
-        req = CognitionRequest(prompt="Test", speed=CognitionSpeed.DUAL)
-        result = await cog.process(req)
-        assert result.decision == "HOLD"
-        assert result.system_used == CognitionSpeed.DUAL
-        assert result.system1_decision == "HOLD"
-        assert result.system2_validation == "HOLD"
-        assert result.was_overridden is False
-
-    @pytest.mark.asyncio
-    async def test_metrics_tracked_mock_mode(self):
-        """In mock mode, system1/2 are None so call counters stay at 0;
-        but latency metrics are still updated."""
-        cog = self._make_cognition()
-        req = CognitionRequest(prompt="Test", speed=CognitionSpeed.DUAL)
-        await cog.process(req)
-        m = cog.get_metrics()
-        # Mock mode doesn't increment call counters (system1/2 are None)
-        assert m["system1_calls"] == 0
-        assert m["system2_calls"] == 0
-        # But latency updates still fire
-        assert m["avg_system1_latency_ms"] >= 0
-        assert m["avg_system2_latency_ms"] >= 0
-
-    @pytest.mark.asyncio
-    async def test_provisional_callback_not_called_at_low_confidence(self):
-        cog = self._make_cognition()
-        callback = AsyncMock()
-        req = CognitionRequest(prompt="Test", speed=CognitionSpeed.DUAL)
-        await cog.process(req, on_provisional_decision=callback)
-        callback.assert_not_called()  # mock mode returns 0.5 confidence < 0.85 threshold
-
-
-class TestParseResponse:
-    def _make_cognition(self):
-        with patch.dict(os.environ, {"GEMINI_API_KEY": "", "GOOGLE_API_KEY": ""}, clear=False):
-            return DualSpeedCognition()
-
-    def test_parse_buy(self):
-        cog = self._make_cognition()
-        decision, conf, _ = cog._parse_response("DECISION: BUY\nCONFIDENCE: 0.85\nREASON: Strong")
-        assert decision == "BUY"
-        assert conf == 0.85
-
-    def test_parse_sell(self):
-        cog = self._make_cognition()
-        decision, _, _ = cog._parse_response("DECISION: SELL\nCONFIDENCE: 0.7")
-        assert decision == "SELL"
-
-    def test_parse_hold_default(self):
-        cog = self._make_cognition()
-        decision, conf, _ = cog._parse_response("I think we should wait and see.")
-        assert decision == "HOLD"
-        assert conf == 0.5
-
-    def test_parse_invalid_confidence(self):
-        cog = self._make_cognition()
-        _, conf, _ = cog._parse_response("DECISION: BUY\nCONFIDENCE: not-a-number")
-        assert conf == 0.5  # fallback
-
-
-class TestShouldOverride:
-    def _make_cognition(self):
-        with patch.dict(os.environ, {"GEMINI_API_KEY": "", "GOOGLE_API_KEY": ""}, clear=False):
-            return DualSpeedCognition()
-
-    def test_different_decision_high_confidence_overrides(self):
-        cog = self._make_cognition()
-        assert cog._should_override("BUY", "SELL", 0.8) is True
-
-    def test_same_decision_no_override(self):
-        cog = self._make_cognition()
-        assert cog._should_override("BUY", "BUY", 0.9) is False
-
-    def test_hold_overrides_buy_at_moderate_confidence(self):
-        cog = self._make_cognition()
-        assert cog._should_override("BUY", "HOLD", 0.65) is True
-
-    def test_hold_does_not_override_buy_at_low_confidence(self):
-        cog = self._make_cognition()
-        assert cog._should_override("BUY", "HOLD", 0.5) is False
-
-    def test_different_decision_low_confidence_no_override(self):
-        cog = self._make_cognition()
-        assert cog._should_override("BUY", "SELL", 0.5) is False
-
-
-# ── Episodic Memory (cloud_trader) ─────────────────────────────
-
-from cloud_trader.memory.episodic_memory import EpisodicMemory
-
-
-class TestEpisodicMemory:
-    def _make_memory(self, tmp_path=None):
-        path = str(tmp_path) if tmp_path else None
-        return EpisodicMemory(storage_path=path, max_memory_episodes=50, max_recent_episodes=20)
-
-    def _make_episode(self, symbol="SOL", pnl=None, lesson=None, text="trending up"):
-        ep = create_episode(
-            symbol=symbol,
-            signal_type="LONG",
-            entry_price=145.0,
-            market_state_text=text,
-            confidence=0.8,
-        )
-        if pnl is not None:
-            ep.outcome = TradeOutcome(success=pnl > 0, pnl=pnl)
-        if lesson:
-            ep.lesson = lesson
-        return ep
-
-    @pytest.mark.asyncio
-    async def test_store_and_retrieve(self):
-        mem = self._make_memory()
-        ep = self._make_episode()
-        eid = await mem.store(ep)
-        assert mem.get_by_id(eid) is ep
-
-    @pytest.mark.asyncio
-    async def test_symbol_index(self):
-        mem = self._make_memory()
-        await mem.store(self._make_episode(symbol="SOL"))
-        await mem.store(self._make_episode(symbol="BTC"))
-        assert "SOL" in mem._by_symbol
-        assert "BTC" in mem._by_symbol
-
-    @pytest.mark.asyncio
-    async def test_profitable_index(self):
-        mem = self._make_memory()
-        await mem.store(self._make_episode(pnl=50))
-        await mem.store(self._make_episode(pnl=-10))
-        assert len(mem._profitable_ids) == 1
-        assert len(mem._unprofitable_ids) == 1
-
-    @pytest.mark.asyncio
-    async def test_update_outcome(self):
-        mem = self._make_memory()
-        ep = self._make_episode()
-        eid = await mem.store(ep)
-        result = await mem.update_outcome(eid, TradeOutcome(success=True, pnl=100))
-        assert result is True
-        assert mem.get_by_id(eid).outcome.pnl == 100
-
-    @pytest.mark.asyncio
-    async def test_update_outcome_missing_id(self):
-        mem = self._make_memory()
-        result = await mem.update_outcome("nonexistent", TradeOutcome())
-        assert result is False
-
-    @pytest.mark.asyncio
-    async def test_add_reflection(self):
-        mem = self._make_memory()
-        ep = self._make_episode()
-        eid = await mem.store(ep)
-        result = await mem.add_reflection(eid, "Good entry", "Bad exit", "Use trailing stops")
-        assert result is True
-        assert mem.get_by_id(eid).lesson == "Use trailing stops"
-
-    @pytest.mark.asyncio
-    async def test_add_reflection_missing_id(self):
-        mem = self._make_memory()
-        result = await mem.add_reflection("nope", "", "", "")
-        assert result is False
-
-    @pytest.mark.asyncio
-    async def test_recall_similar(self):
-        mem = self._make_memory()
-        await mem.store(self._make_episode(symbol="SOL", text="SOL trending up breakout volume"))
-        await mem.store(self._make_episode(symbol="BTC", text="BTC ranging low volume"))
-
-        results = await mem.recall_similar("SOL breakout volume trending", symbol="SOL")
-        assert len(results) >= 1
-        assert results[0].symbol == "SOL"
-
-    @pytest.mark.asyncio
-    async def test_recall_prefers_profitable(self):
-        mem = self._make_memory()
-        await mem.store(self._make_episode(pnl=-10, text="SOL breakout"))
-        await mem.store(self._make_episode(pnl=50, text="SOL breakout"))
-        results = await mem.recall_similar("SOL breakout", prefer_profitable=True)
-        # Profitable one should rank higher
-        assert results[0].was_profitable()
-
-    @pytest.mark.asyncio
-    async def test_get_lessons_for_context(self):
-        mem = self._make_memory()
-        ep = self._make_episode(symbol="SOL", pnl=50, lesson="Ride momentum", text="SOL LONG")
-        await mem.store(ep)
-        lessons_text = await mem.get_lessons_for_context("SOL", "LONG")
-        assert "Ride momentum" in lessons_text
-
-    @pytest.mark.asyncio
-    async def test_get_lessons_empty(self):
-        mem = self._make_memory()
-        result = await mem.get_lessons_for_context("SOL", "LONG")
-        assert result == ""
-
-    def test_get_recent(self):
-        mem = self._make_memory()
-        # Store synchronously for simplicity
-        ep = self._make_episode()
-        mem._episodes[ep.episode_id] = ep
-        mem._recent_queue.append(ep.episode_id)
-        recent = mem.get_recent(5)
-        assert len(recent) == 1
-
-    def test_get_stats(self):
-        mem = self._make_memory()
-        stats = mem.get_stats()
-        assert stats["total_stored"] == 0
-        assert stats["in_memory"] == 0
-
-    @pytest.mark.asyncio
-    async def test_prune_old_episodes(self):
-        mem = EpisodicMemory(max_memory_episodes=3, max_recent_episodes=3)
-        for i in range(5):
-            ep = self._make_episode(text=f"episode {i}")
-            ep.timestamp = datetime.now() - timedelta(days=5 - i)
-            await mem.store(ep)
-        # Should have pruned to 3
-        assert len(mem._episodes) <= 3
-
-    @pytest.mark.asyncio
-    async def test_persistence(self, tmp_path):
-        mem = self._make_memory(tmp_path)
-        await mem.store(self._make_episode())
-        # Check file was written
-        files = list(Path(str(tmp_path)).glob("*.json"))
-        assert len(files) == 1
-
-    def test_calculate_similarity(self):
-        mem = self._make_memory()
-        assert mem._calculate_similarity("", "") == 0.0
-        assert mem._calculate_similarity("hello world", "hello world") == 1.0
-        sim = mem._calculate_similarity("SOL trending up breakout", "SOL breakout volume")
-        assert 0 < sim < 1
-
-
-# ── Reflection Agent ────────────────────────────────────────────
-
-from cloud_trader.memory.reflection_agent import ReflectionAgent
-
-
-class TestReflectionAgent:
-    def _make_episode(self, outcome_kw=None, signal_type="LONG"):
-        ep = create_episode(
-            symbol="SOL",
-            signal_type=signal_type,
-            entry_price=145.0,
-            market_state_text="SOL trending up",
-        )
-        if outcome_kw:
-            ep.outcome = TradeOutcome(**outcome_kw)
-        return ep
-
-    @pytest.mark.asyncio
-    async def test_reflect_no_outcome_returns_empty(self):
-        agent = ReflectionAgent()
-        ep = self._make_episode()
-        result = await agent.reflect(ep)
-        assert result["lesson"] == ""
-
-    @pytest.mark.asyncio
-    async def test_rule_based_profitable_trade(self):
-        agent = ReflectionAgent()
-        ep = self._make_episode(
-            outcome_kw=dict(
-                success=True,
-                pnl=100,
-                pnl_percent=6.0,
-                exit_reason="take_profit",
-                hold_duration_seconds=300,
-                max_drawdown=20,
-                max_profit=110,
-            )
-        )
-        result = await agent.reflect(ep)
-        assert "profitable" in result["what_worked"].lower() or "TP" in result["what_worked"]
-        assert result["lesson"]
-
-    @pytest.mark.asyncio
-    async def test_rule_based_stop_loss_hit(self):
-        agent = ReflectionAgent()
-        ep = self._make_episode(
-            outcome_kw=dict(
-                success=False,
-                pnl=-50,
-                pnl_percent=-3.0,
-                exit_reason="stop_loss",
-                hold_duration_seconds=600,
-                max_drawdown=60,
-                max_profit=10,
-            )
-        )
-        result = await agent.reflect(ep)
-        assert "SL" in result["what_failed"] or "stop" in result["lesson"].lower()
-
-    @pytest.mark.asyncio
-    async def test_rule_based_exited_too_quickly(self):
-        agent = ReflectionAgent()
-        ep = self._make_episode(
-            outcome_kw=dict(
-                success=False,
-                pnl=-5,
-                hold_duration_seconds=30,
-                max_drawdown=5,
-                max_profit=2,
-            )
-        )
-        result = await agent.reflect(ep)
-        assert "quickly" in result["what_failed"].lower()
-
-    @pytest.mark.asyncio
-    async def test_rule_based_held_too_long(self):
-        agent = ReflectionAgent()
-        ep = self._make_episode(
-            outcome_kw=dict(
-                success=False,
-                pnl=-20,
-                hold_duration_seconds=7200,
-                max_drawdown=30,
-                max_profit=5,
-            )
-        )
-        result = await agent.reflect(ep)
-        assert "long" in result["what_failed"].lower()
-
-    @pytest.mark.asyncio
-    async def test_rule_based_gave_back_profit(self):
-        agent = ReflectionAgent()
-        ep = self._make_episode(
-            outcome_kw=dict(
-                success=False,
-                pnl=5,
-                max_profit=50,
-                hold_duration_seconds=300,
-                max_drawdown=10,
-            )
-        )
-        result = await agent.reflect(ep)
-        assert "profit" in result["what_failed"].lower()
-
-    @pytest.mark.asyncio
-    async def test_rule_based_short_signal(self):
-        agent = ReflectionAgent()
-        ep = self._make_episode(
-            signal_type="SHORT",
-            outcome_kw=dict(
-                success=True,
-                pnl=50,
-                hold_duration_seconds=300,
-                max_drawdown=5,
-                max_profit=55,
-                exit_reason="take_profit",
-            ),
-        )
-        result = await agent.reflect(ep)
-        assert "Shorting" in result["lesson"] or "SHORT" in result["lesson"].upper()
-
-    @pytest.mark.asyncio
-    async def test_batch_reflect(self):
-        agent = ReflectionAgent()
-        ep1 = self._make_episode(
-            outcome_kw=dict(success=True, pnl=50, hold_duration_seconds=300, max_drawdown=5, max_profit=55)
-        )
-        ep2 = self._make_episode()  # no outcome
-        count = await agent.batch_reflect([ep1, ep2])
-        assert count == 1
-        assert ep1.lesson  # should be filled
-
-    def test_get_stats(self):
-        agent = ReflectionAgent()
-        stats = agent.get_stats()
-        assert stats["total_reflections"] == 0
+        assert stats["total_trades"] == 1
+        assert stats["total_pnl"] == 100.0
+        assert "regime_distribution" in stats
+        assert "temporal_insights" in stats
+
+
+class TestEnhancedGlobalInstance:
+    def test_get_enhanced_memory(self):
+        import shared.enhanced_episodic_memory as module
+
+        module._enhanced_memory = None
+        with patch.dict(os.environ, {}, clear=True):
+            os.environ.pop("GEMINI_API_KEY", None)
+            os.environ.pop("GOOGLE_API_KEY", None)
+            inst = get_enhanced_memory()
+            assert inst is not None
+            inst2 = get_enhanced_memory()
+            assert inst is inst2
+        module._enhanced_memory = None
