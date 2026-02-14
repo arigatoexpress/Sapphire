@@ -323,3 +323,140 @@ def test_get_top_topics_filter_by_category(forum):
     for t in trade_topics:
         pass  # We just verify it doesn't crash — category not in summary
     assert isinstance(trade_topics, list)
+
+
+# ── Approval Workflows ─────────────────────────────────────────
+
+
+def test_create_approval_topic(forum):
+    topic = forum.create_approval_topic(
+        title="Approve autonomy cycle",
+        body="Session key: test-001",
+        session_key="test-001",
+    )
+    assert "topic_id" in topic
+    detail = forum.get_topic_detail(topic["topic_id"])
+    assert detail is not None
+    assert detail.get("approval", {}).get("session_key") == "test-001"
+    assert detail.get("approval", {}).get("status") == "pending"
+
+
+def test_approval_topic_has_governance_lane(forum):
+    topic = forum.create_approval_topic(
+        title="Test approval",
+        body="Body of approval topic for testing",
+        session_key="test-002",
+    )
+    detail = forum.get_topic_detail(topic["topic_id"])
+    assert detail.get("lane") == "governance"
+    assert "approval" in detail.get("tags", [])
+
+
+def test_resolve_approval_pending_initially(forum):
+    topic = forum.create_approval_topic(
+        title="Pending test",
+        body="Test body for pending approval topic",
+        session_key="test-003",
+    )
+    result = forum.resolve_approval(topic["topic_id"])
+    assert result["ok"] is True
+    assert result["status"] == "pending"
+
+
+def test_resolve_approval_approved_threshold(forum):
+    topic = forum.create_approval_topic(
+        title="Approve me",
+        body="Test body for approval threshold test",
+        session_key="test-004",
+    )
+    forum.vote_topic(topic["topic_id"], "SAPPHIRE", "up")
+    forum.vote_topic(topic["topic_id"], "EMERALD", "up")
+    result = forum.resolve_approval(topic["topic_id"])
+    assert result["ok"] is True
+    assert result["status"] == "approved"
+    assert result["session_key"] == "test-004"
+    assert result["upvotes"] == 2
+
+
+def test_resolve_approval_rejected_threshold(forum):
+    topic = forum.create_approval_topic(
+        title="Reject me",
+        body="Test body for rejection threshold test",
+        session_key="test-005",
+    )
+    forum.vote_topic(topic["topic_id"], "OBSIDIAN", "down")
+    forum.vote_topic(topic["topic_id"], "EMERALD", "down")
+    result = forum.resolve_approval(topic["topic_id"])
+    assert result["ok"] is True
+    assert result["status"] == "rejected"
+    assert result["downvotes"] == 2
+
+
+def test_resolve_approval_mixed_votes_stay_pending(forum):
+    topic = forum.create_approval_topic(
+        title="Mixed votes",
+        body="Test body for mixed votes approval topic",
+        session_key="test-006",
+    )
+    forum.vote_topic(topic["topic_id"], "SAPPHIRE", "up")
+    forum.vote_topic(topic["topic_id"], "OBSIDIAN", "down")
+    result = forum.resolve_approval(topic["topic_id"])
+    assert result["ok"] is True
+    assert result["status"] == "pending"  # 1 up, 1 down — not enough
+
+
+def test_resolve_approval_not_an_approval_topic(forum):
+    topic = _create_topic(forum, title="Regular topic", body="Not an approval topic body")
+    result = forum.resolve_approval(topic["topic_id"])
+    assert result["ok"] is False
+    assert result["error"] == "not_an_approval_topic"
+
+
+def test_resolve_approval_topic_not_found(forum):
+    result = forum.resolve_approval("TOPIC-99999")
+    assert result["ok"] is False
+    assert result["error"] == "topic_not_found"
+
+
+def test_resolve_approval_already_resolved(forum):
+    topic = forum.create_approval_topic(
+        title="Already resolved",
+        body="Test body for already resolved test",
+        session_key="test-007",
+    )
+    forum.vote_topic(topic["topic_id"], "SAPPHIRE", "up")
+    forum.vote_topic(topic["topic_id"], "EMERALD", "up")
+    forum.resolve_approval(topic["topic_id"])  # First resolve
+    result = forum.resolve_approval(topic["topic_id"])  # Second resolve
+    assert result["ok"] is True
+    assert result["status"] == "approved"  # Still approved
+
+
+def test_list_pending_approvals(forum):
+    forum.create_approval_topic(
+        title="Pending 1",
+        body="First pending approval topic body",
+        session_key="pending-1",
+    )
+    forum.create_approval_topic(
+        title="Pending 2",
+        body="Second pending approval topic body",
+        session_key="pending-2",
+    )
+    pending = forum.list_pending_approvals()
+    assert len(pending) == 2
+    assert pending[0]["session_key"] == "pending-1"
+    assert pending[1]["session_key"] == "pending-2"
+
+
+def test_list_pending_approvals_excludes_resolved(forum):
+    topic = forum.create_approval_topic(
+        title="Will resolve",
+        body="This approval topic will be resolved",
+        session_key="resolve-me",
+    )
+    forum.vote_topic(topic["topic_id"], "SAPPHIRE", "up")
+    forum.vote_topic(topic["topic_id"], "EMERALD", "up")
+    forum.resolve_approval(topic["topic_id"])
+    pending = forum.list_pending_approvals()
+    assert len(pending) == 0

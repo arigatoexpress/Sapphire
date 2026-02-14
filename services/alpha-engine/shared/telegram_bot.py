@@ -845,7 +845,8 @@ class TelegramPlatformBot:
             "• `forum vote TOPIC-XXXXX up|down` — vote on a topic\n"
             "• `forum agents` — agent personality profiles\n"
             "• `forum thread TOPIC-XXXXX` — threaded replies\n"
-            "• `/forum post Title | Body category:trade_idea` — create topic\n\n"
+            "• `/forum post Title | Body category:trade_idea` — create topic\n"
+            "• `forum approvals` — pending approval workflows\n\n"
             "Slash commands still work (`/status`, `/kill`, etc.) but aren't required.\n"
             "When an agent asks you something, just reply — we'll figure out the rest."
         )
@@ -1092,6 +1093,16 @@ class TelegramPlatformBot:
                 "quantity": 0.0,
                 "agent": EMERALD,
                 "ack": f"Loading thread for `{topic_id}`.",
+            }
+
+        if re.search(r"\bforum\s+approvals\b", normalized):
+            return {
+                "platform": "CONTROL",
+                "symbol": "ALL",
+                "action": "FORUM_PENDING_APPROVALS",
+                "quantity": 0.0,
+                "agent": EMERALD,
+                "ack": "Checking pending approval workflows.",
             }
 
         if re.search(r"\b(what'?s\s+status|status)\b", normalized):
@@ -1503,6 +1514,13 @@ class TelegramPlatformBot:
             )
             await self.send_as(SAPPHIRE, f"Creating forum topic: *{title[:60]}*")
             await self._dispatch_callback("CONTROL", payload, "FORUM_CREATE_TOPIC", 0.0)
+            return
+
+        # /forum approvals
+        forum_approvals = re.search(r"^/forum\s+approvals$", text, flags=re.IGNORECASE)
+        if forum_approvals:
+            await self.send_as(EMERALD, "Checking pending approval workflows.")
+            await self._dispatch_callback("CONTROL", "ALL", "FORUM_PENDING_APPROVALS", 0.0)
             return
 
         # VirusTotal security commands

@@ -1001,3 +1001,30 @@ def test_forum_thread_plain_text(telegram_module):
     assert result["action"] == "FORUM_THREAD"
     payload = json.loads(result["symbol"])
     assert payload["topic_id"] == "TOPIC-00003"
+
+
+def test_forum_approvals_slash_command(telegram_module):
+    """'/forum approvals' dispatches FORUM_PENDING_APPROVALS."""
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/forum approvals"}}
+        )
+    )
+    callback.assert_awaited_once()
+    _, _, action, _ = callback.await_args.args
+    assert action == "FORUM_PENDING_APPROVALS"
+
+
+def test_forum_approvals_plain_text(telegram_module):
+    """Plain text 'forum approvals' dispatches FORUM_PENDING_APPROVALS."""
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=AsyncMock(),
+    )
+    result = bot._parse_plain_text_command("forum approvals")
+    assert result is not None
+    assert result["action"] == "FORUM_PENDING_APPROVALS"
