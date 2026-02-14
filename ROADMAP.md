@@ -154,4 +154,6 @@ Harden        Security       Forum          Swarm          Tracking       Social
 - ✅ PR #30: Molthub Outreach (template library, regex credential leak detection, inbound idea validation)
 - ✅ PR #31: Task Management System (CRUD, milestones, deliverables, progress reports, 6 Telegram commands)
 - ✅ PR #32: Phase 6 Social Media Automation (AI content gen, anti-slop quality controls, 7 Telegram commands, 67 tests)
+- ✅ PR #33: Masterplan Improvements (security hardening, frontend redesign, 3 test suites, new modules)
+- ✅ PR #34: Telegram Handler Extraction (1,632 lines extracted from main.py → telegram_handlers.py)
 - ✅ 847 tests passing
