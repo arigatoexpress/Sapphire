@@ -83,21 +83,21 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div class="trade-view fade-in">
-        <div v-if="loading && !lastFetchAt" class="status-bar loading-bar">
-            <span class="pulse-dot"></span> Connecting to Sapphire...
+    <div class="trade-view fade-in" aria-label="Trade dashboard">
+        <div v-if="loading && !lastFetchAt" class="status-bar loading-bar" role="status" aria-live="polite">
+            <span class="pulse-dot" aria-hidden="true"></span> Connecting to Sapphire...
         </div>
-        <div v-else-if="fetchError" class="status-bar error-bar" @click="reload">
+        <div v-else-if="fetchError" class="status-bar error-bar" role="alert" tabindex="0" @click="reload" @keydown.enter="reload" @keydown.space.prevent="reload">
             {{ fetchError }} — tap to retry
         </div>
-        <div v-else-if="isStale" class="status-bar stale-bar">
+        <div v-else-if="isStale" class="status-bar stale-bar" role="status" aria-live="polite">
             Data {{ dataAge }}s old — awaiting refresh
         </div>
 
         <div class="topstrip">
             <label class="symbol-picker">
-                <span class="font-mono">SYMBOL</span>
-                <select v-model="selectedSymbol">
+                <span class="font-mono" id="symbol-label-trade">SYMBOL</span>
+                <select v-model="selectedSymbol" aria-labelledby="symbol-label-trade">
                     <option v-for="s in SYMBOLS" :key="s" :value="s">{{ s }}</option>
                 </select>
             </label>
@@ -127,25 +127,25 @@ onUnmounted(() => {
         </template>
 
         <template v-else>
-        <section class="ops-strip">
-            <article class="ops-card card glass-lift">
+        <section class="ops-strip" aria-label="Trading operations summary" aria-live="polite">
+            <article class="ops-card card glass-lift" aria-label="Total trades">
                 <p class="font-mono">Trades</p>
                 <strong class="glow">{{ ctrl.totalTrades }}</strong>
             </article>
-            <article class="ops-card card glass-lift">
+            <article class="ops-card card glass-lift" aria-label="Win rate">
                 <p class="font-mono">Win Rate</p>
                 <strong class="glow">{{ ctrl.winRate.toFixed(1) }}%</strong>
             </article>
-            <article class="ops-card card glass-lift">
+            <article class="ops-card card glass-lift" :aria-label="`Profit and loss: ${ctrl.realizedPnl >= 0 ? 'positive' : 'negative'} ${Math.abs(ctrl.realizedPnl).toFixed(4)}`">
                 <p class="font-mono">PnL</p>
                 <strong class="glow" :class="ctrl.realizedPnl >= 0 ? 'tone-calm' : 'tone-hot'">{{ ctrl.realizedPnl >= 0 ? '+' : '' }}{{ ctrl.realizedPnl.toFixed(4) }}</strong>
             </article>
-            <article class="ops-card card glass-lift">
+            <article class="ops-card card glass-lift" :aria-label="`Execution stage: ${ctrl.executionStage}, multiplier ${ctrl.stageMultiplier.toFixed(2)}x`">
                 <p class="font-mono">Stage</p>
                 <strong class="glow" :class="ctrl.executionStage === 'LIVE' ? 'tone-calm' : 'tone-warm'">{{ ctrl.executionStage }}</strong>
                 <small>{{ ctrl.stageMultiplier.toFixed(2) }}x</small>
             </article>
-            <article class="ops-card card glass-lift">
+            <article class="ops-card card glass-lift" :aria-label="`Dispatch: ${ctrl.killSwitchActive ? 'kill switch active' : ctrl.dexLiveDispatch ? 'live' : 'off'}`">
                 <p class="font-mono">Dispatch</p>
                 <strong :class="ctrl.killSwitchActive ? 'tone-hot' : ctrl.dexLiveDispatch ? 'tone-calm' : 'tone-warm'">{{ ctrl.killSwitchActive ? 'KILL' : ctrl.dexLiveDispatch ? 'LIVE' : 'OFF' }}</strong>
             </article>
@@ -201,7 +201,7 @@ onUnmounted(() => {
                     </header>
                     <strong>{{ formatPrice(snap.price) }}</strong>
                     <small>4h {{ formatPct(snap.change4h) }} · vol {{ formatPct(snap.volatility) }}</small>
-                    <svg class="sparkline" viewBox="0 0 100 38" preserveAspectRatio="none">
+                    <svg class="sparkline" viewBox="0 0 100 38" preserveAspectRatio="none" role="img" :aria-label="`${snap.symbol} price sparkline`">
                         <polyline :points="sparklinePoints(snap.history)" />
                     </svg>
                 </article>

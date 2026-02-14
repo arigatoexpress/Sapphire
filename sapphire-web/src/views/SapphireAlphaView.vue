@@ -248,21 +248,21 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div class="alpha-view fade-in">
-        <div v-if="loading && !lastFetchAt" class="status-bar loading-bar">
-            <span class="pulse-dot"></span> Initializing Alpha Engine...
+    <div class="alpha-view fade-in" aria-label="Alpha engine dashboard">
+        <div v-if="loading && !lastFetchAt" class="status-bar loading-bar" role="status" aria-live="polite">
+            <span class="pulse-dot" aria-hidden="true"></span> Initializing Alpha Engine...
         </div>
-        <div v-else-if="fetchError" class="status-bar error-bar" @click="reload">
+        <div v-else-if="fetchError" class="status-bar error-bar" role="alert" tabindex="0" @click="reload" @keydown.enter="reload" @keydown.space.prevent="reload">
             {{ fetchError }} — tap to retry
         </div>
-        <div v-else-if="isStale" class="status-bar stale-bar">
+        <div v-else-if="isStale" class="status-bar stale-bar" role="status" aria-live="polite">
             Data {{ dataAge }}s old — awaiting refresh
         </div>
 
         <div class="topstrip">
             <label class="symbol-picker">
-                <span class="font-mono">FOCUS</span>
-                <select v-model="selectedSymbol">
+                <span class="font-mono" id="symbol-label-alpha">FOCUS</span>
+                <select v-model="selectedSymbol" aria-labelledby="symbol-label-alpha">
                     <option v-for="s in SYMBOLS" :key="s" :value="s">{{ s }}</option>
                 </select>
             </label>
@@ -296,21 +296,21 @@ onUnmounted(() => {
         </template>
 
         <template v-else>
-        <section class="insights-grid">
-            <article v-for="card in insightCards" :key="card.title" class="insight card glass-lift">
+        <section class="insights-grid" aria-label="Alpha engine insights" aria-live="polite">
+            <article v-for="card in insightCards" :key="card.title" class="insight card glass-lift" :aria-label="`${card.title}: ${card.value}`">
                 <p class="font-mono">{{ card.title }}</p>
                 <strong class="glow" :class="card.title === 'Avg RSI (14)' ? rsiTone : ''">{{ card.value }}</strong>
                 <small>{{ card.detail }}</small>
             </article>
         </section>
 
-        <section class="rail card glass-lift">
+        <section class="rail card glass-lift" aria-label="Strategy readiness pipeline">
             <header>
                 <h3 class="font-mono">Strategy Readiness</h3>
-                <span class="rail-score" :class="readinessTone">{{ readinessScore }}%</span>
+                <span class="rail-score" :class="readinessTone" :aria-label="`Readiness score: ${readinessScore} percent`">{{ readinessScore }}%</span>
             </header>
-            <div class="rail-grid">
-                <article v-for="stage in strategyRail" :key="stage.label" class="rail-stage" :class="`stage-${stage.status}`">
+            <div class="rail-grid" role="list">
+                <article v-for="stage in strategyRail" :key="stage.label" class="rail-stage" :class="`stage-${stage.status}`" role="listitem" :aria-label="`${stage.label}: ${stage.status === 'ready' ? 'ready' : 'pending'} — ${stage.detail}`">
                     <p class="font-mono">{{ stage.label }}</p>
                     <strong>{{ stage.status === 'ready' ? 'READY' : 'PENDING' }}</strong>
                     <small>{{ stage.detail }}</small>
@@ -363,7 +363,7 @@ onUnmounted(() => {
                         </span>
                     </div>
                     <small>6h {{ formatPct(snap.change6h) }} · conf {{ snap.confidence }}%</small>
-                    <svg class="sparkline" viewBox="0 0 100 34" preserveAspectRatio="none">
+                    <svg class="sparkline" viewBox="0 0 100 34" preserveAspectRatio="none" role="img" :aria-label="`${snap.symbol} price trend`">
                         <polyline :points="sparklinePoints(snap.history)" />
                     </svg>
                 </article>

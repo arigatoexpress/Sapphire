@@ -175,9 +175,9 @@ watch(
 </script>
 
 <template>
-    <div class="chart-wrapper">
-        <div ref="chartContainer" class="chart-canvas"></div>
-        <div v-if="!hasData" class="empty-state">Waiting for live OHLC feed...</div>
+    <div class="chart-wrapper" role="img" :aria-label="hasData ? `Candlestick chart with ${normalizedCandles.length} candles` : 'Chart awaiting data'">
+        <div ref="chartContainer" class="chart-canvas" aria-hidden="true"></div>
+        <div v-if="!hasData" class="empty-state" role="status">Waiting for live OHLC feed...</div>
     </div>
 </template>
 
