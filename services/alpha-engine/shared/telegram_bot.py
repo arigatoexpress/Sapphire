@@ -853,6 +853,10 @@ class TelegramPlatformBot:
             "• `rep count` — census of registered bots\n"
             "• `/rep ban <BOT_ID> [reason]` — permanently ban a bot\n"
             "• `/rep penalize <BOT_ID> [reason]` — penalize a bot\n\n"
+            "**Swarm commands:**\n"
+            "• `swarm aggregate <SYMBOL>` — consensus signal for a symbol\n"
+            "• `swarm ideas [SYMBOL]` — list open trade ideas\n"
+            "• `swarm stats` — aggregation statistics\n\n"
             "Slash commands still work (`/status`, `/kill`, etc.) but aren't required.\n"
             "When an agent asks you something, just reply — we'll figure out the rest."
         )
@@ -1144,6 +1148,43 @@ class TelegramPlatformBot:
                 "quantity": 0.0,
                 "agent": EMERALD,
                 "ack": "Counting registered bots.",
+            }
+
+        # ── Phase 4: Swarm plain-text commands ───────────────────────
+        swarm_agg_match = re.search(r"\bswarm\s+aggregate\s+([A-Za-z0-9/_-]+)", raw)
+        if swarm_agg_match:
+            symbol = str(swarm_agg_match.group(1) or "").strip().upper()
+            payload = json.dumps({"symbol": symbol}, separators=(",", ":"))
+            return {
+                "platform": "CONTROL",
+                "symbol": payload,
+                "action": "SWARM_AGGREGATE",
+                "quantity": 0.0,
+                "agent": EMERALD,
+                "ack": f"Aggregating swarm consensus for `{symbol}`.",
+            }
+
+        swarm_ideas_match = re.search(r"\bswarm\s+ideas(?:\s+([A-Za-z0-9/_-]+))?", raw)
+        if swarm_ideas_match:
+            symbol = str(swarm_ideas_match.group(1) or "").strip().upper()
+            payload = json.dumps({"symbol": symbol}, separators=(",", ":"))
+            return {
+                "platform": "CONTROL",
+                "symbol": payload,
+                "action": "SWARM_OPEN_IDEAS",
+                "quantity": 0.0,
+                "agent": EMERALD,
+                "ack": f"Listing open swarm ideas{' for `' + symbol + '`' if symbol else ''}.",
+            }
+
+        if re.search(r"\bswarm\s+stats\b", normalized):
+            return {
+                "platform": "CONTROL",
+                "symbol": "ALL",
+                "action": "SWARM_STATS",
+                "quantity": 0.0,
+                "agent": EMERALD,
+                "ack": "Loading swarm statistics.",
             }
 
         if re.search(r"\b(what'?s\s+status|status)\b", normalized):
@@ -1630,6 +1671,40 @@ class TelegramPlatformBot:
             )
             await self.send_as(SAPPHIRE, f"Penalizing bot `{bot_id}`.")
             await self._dispatch_callback("CONTROL", payload, "REP_PENALIZE_BOT", 0.0)
+            return
+
+        # ── Phase 4: Swarm slash commands ────────────────────────────
+        # /swarm aggregate <SYMBOL>
+        swarm_agg = re.search(
+            r"^/swarm\s+aggregate\s+([A-Za-z0-9/_-]+)$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if swarm_agg:
+            symbol = str(swarm_agg.group(1) or "").strip().upper()
+            payload = json.dumps({"symbol": symbol}, separators=(",", ":"))
+            await self.send_as(EMERALD, f"Aggregating swarm consensus for `{symbol}`.")
+            await self._dispatch_callback("CONTROL", payload, "SWARM_AGGREGATE", 0.0)
+            return
+
+        # /swarm ideas [SYMBOL]
+        swarm_ideas = re.search(
+            r"^/swarm\s+ideas(?:\s+([A-Za-z0-9/_-]+))?$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if swarm_ideas:
+            symbol = str(swarm_ideas.group(1) or "").strip().upper()
+            payload = json.dumps({"symbol": symbol}, separators=(",", ":"))
+            await self.send_as(EMERALD, f"Listing open swarm ideas{' for `' + symbol + '`' if symbol else ''}.")
+            await self._dispatch_callback("CONTROL", payload, "SWARM_OPEN_IDEAS", 0.0)
+            return
+
+        # /swarm stats
+        swarm_stats = re.search(r"^/swarm\s+stats$", text, flags=re.IGNORECASE)
+        if swarm_stats:
+            await self.send_as(EMERALD, "Loading swarm statistics.")
+            await self._dispatch_callback("CONTROL", "ALL", "SWARM_STATS", 0.0)
             return
 
         # VirusTotal security commands
