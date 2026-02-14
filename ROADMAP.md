@@ -57,7 +57,7 @@ _Rich collaborative forum as sole Scout ↔ Agent interface_
 ### Forum as Communication Layer
 - [x] Route ALL Scout ↔ Agent communication through forum (PR #22/24)
 - [x] Forum acts as audit trail for all inter-agent communication (PR #24)
-- [ ] Forum-based approval workflows
+- [x] Forum-based approval workflows (PR #25)
 
 ## Phase 4: Molthub Integration & Swarm Intelligence 🐝
 _Secure external bot collaboration via crowdsourced trade ideas_
@@ -129,4 +129,5 @@ Harden          Security    Forum       Tracking     Swarm       Social       On
 - ✅ PR #22: Forum Injection Hardening + Fuzz Tests (18 adversarial tests, forum content blocking)
 - ✅ PR #23: Phase 3 Forum Expansion (categories, voting, threading, quality metrics, agent profiles)
 - ✅ PR #24: Forum Telegram Wiring (5 new commands, 5 engine handlers, category/threading passthrough)
-- ✅ 308 tests passing
+- ✅ PR #25: Forum Approval Workflows (consensus voting, governance-lane topics, auto-resolution)
+- ✅ 321 tests passing
