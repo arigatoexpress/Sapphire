@@ -138,11 +138,13 @@ class TelegramPlatformBot:
         bot_token: str,
         chat_id: str,
         command_callback: Optional[Callable[[str, str, str, float], Any]] = None,
+        message_callback: Optional[Callable[[str], Any]] = None,
     ):
         self.bot_token = bot_token.strip() if bot_token else ""
         self.chat_id = str(chat_id).strip() if chat_id else ""
         self.base_url = f"https://api.telegram.org/bot{self.bot_token}" if self.bot_token else ""
         self.command_callback = command_callback
+        self.message_callback = message_callback
         self.last_update_id = 0
         self.running = False
         self.message_buffer: List[str] = []
@@ -2067,12 +2069,12 @@ class TelegramPlatformBot:
 
         # Media workflow commands (Twitter + Substack automation plane)
         slash_media_cmd = re.search(
-            r"^/media\s+(status|mode|draft|publish|queue|approve|reject)(?:\s+(.+))?$",
+            r"^/media\s+(status|mode|draft|publish|queue|approve|reject|generate)(?:\s+(.+))?$",
             text,
             flags=re.IGNORECASE,
         )
         mention_media_cmd = re.search(
-            r"@(alpha|control)\s+media\s+(status|mode|draft|publish|queue|approve|reject)(?:\s+(.+))?$",
+            r"@(alpha|control)\s+media\s+(status|mode|draft|publish|queue|approve|reject|generate)(?:\s+(.+))?$",
             text,
             flags=re.IGNORECASE,
         )
@@ -2105,6 +2107,21 @@ class TelegramPlatformBot:
                 payload = json.dumps({"mode": media_arg}, separators=(",", ":"))
                 await self.send_as(EMERALD, f"Switching media mode to `{media_arg}`.")
                 await self._dispatch_callback("CONTROL", payload, "MEDIA_SET_MODE", 0.0)
+                return
+
+            if media_command == "generate":
+                # Parse: /media generate [platform] [topic]
+                parts = media_arg.split(None, 1) if media_arg else []
+                platform = parts[0].lower() if parts else "twitter"
+                topic = parts[1] if len(parts) > 1 else ""
+                payload = json.dumps(
+                    {"platform": platform, "topic": topic}, separators=(",", ":")
+                )
+                await self.send_as(
+                    EMERALD,
+                    f"Generating AI content for `{platform}`{f' on topic: {topic}' if topic else ''}...",
+                )
+                await self._dispatch_callback("CONTROL", payload, "MEDIA_GENERATE", 0.0)
                 return
 
             if media_command == "publish":
@@ -2568,6 +2585,14 @@ class TelegramPlatformBot:
             return
 
         # ── Freeform conversation / steering ──────────────────────
+        if self.message_callback and directive:
+            # Use the intelligent intent engine if available
+            try:
+                await self.message_callback(directive)
+                return
+            except Exception as exc:
+                logger.error(f"Message callback failed: {exc}")
+
         if directive:
             if len(directive) > 500:
                 directive = directive[:500]
