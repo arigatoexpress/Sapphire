@@ -10,6 +10,7 @@ from typing import Any, Deque, Dict, List, Optional, Set
 
 import aiohttp
 import uvloop
+from src.ai.chat_intent import ChatIntentEngine
 from src.ai.gemini_guard import GeminiGuard
 from src.collaboration.forum import SapphireForumService
 from src.collaboration.reputation import BotReputationService
@@ -20,7 +21,27 @@ from src.collaboration.task_manager import TaskManager
 from src.execution.dispatcher import dispatcher
 from src.execution.portfolio import PortfolioTracker
 from src.feeds.market_data import MarketDataAggregator
-from src.integrations.tradingview_autonomy import TradingViewAutonomyPlugin
+from src.signals.alpha_scanner import AlphaSignalScanner
+
+
+from src.api_handlers import (
+    handle_market_ohlc,
+    handle_platform_status,
+    handle_routing_info,
+    handle_performance_stats,
+    handle_system_logs,
+    handle_control_status,
+
+    handle_security_skills_status,
+    handle_security_skill_scan,
+    handle_forum_topics,
+    handle_forum_topic_detail,
+    handle_forum_create_topic,
+    handle_forum_replies,
+    handle_forum_scout_status,
+    handle_forum_scout_register,
+    handle_forum_scout_publish,
+)
 from src.security.skill_auditor import SkillAuditor
 from src.security.virustotal_scanner import VirusTotalSkillScanner
 from src.security.prompt_sanitizer import sanitize_for_prompt, log_injection_attempt
@@ -46,9 +67,67 @@ logger.remove()
 logger.add(sys.stderr, level="INFO")
 
 
+class TelegramRateLimiter:
+    """Per-action rate limiter for Telegram commands."""
+
+    # Critical actions (mutable trading state)
+    CRITICAL_ACTIONS = frozenset({
+        "KILL", "HALT", "HALT_TRADING", "RESUME", "RESUME_TRADING",
+        "BUY", "SELL", "CLOSE", "SET_EXECUTION_STAGE", "SET_DEX_EXECUTION_STAGE",
+        "SET_ALLOCATION", "DEALLOCATE", "APPROVE_SESSION", "REJECT_SESSION",
+        "APPROVE_ALL_SESSIONS", "REP_BAN_BOT", "MEDIA_PUBLISH", "MEDIA_DISPATCH",
+    })
+
+    # Read-only actions (safe, higher limit)
+    READONLY_ACTIONS = frozenset({
+        "STATUS", "CONTROL_STATUS", "HEARTBEAT", "PING", "MARKET_PRICES", "PRICES",
+        "PORTFOLIO", "POSITIONS", "MEMORY_STATUS", "COGNITION_STATUS",
+        "GATE_STATS", "PERMISSIONS", "PERM_STATS", "SKILL_AUDIT_STATS",
+        "FORUM_TOP_TOPICS", "FORUM_AGENTS", "REP_LEADERBOARD", "SWARM_STATS",
+        "LEARN_REPORT", "LEARN_SUMMARY", "TASK_LIST", "TASK_REPORT",
+        "SCOUT_STATUS", "FORUM_SCOUT_STATUS", "SECURITY_STATUS", "VT_STATUS",
+        "MEDIA_STATUS", "MEDIA_QUEUE_STATUS", "OUTREACH_STATS",
+    })
+
+    def __init__(self):
+        self._windows: Dict[str, Deque[float]] = defaultdict(deque)
+        self._limits = {
+            "critical": 3,   # 3/min for trading-critical
+            "default": 10,   # 10/min for standard
+            "readonly": 30,  # 30/min for read-only
+        }
+
+    def _tier(self, action: str) -> str:
+        upper = action.upper()
+        if upper in self.CRITICAL_ACTIONS:
+            return "critical"
+        if upper in self.READONLY_ACTIONS:
+            return "readonly"
+        return "default"
+
+    def check(self, action: str) -> bool:
+        tier = self._tier(action)
+        limit = self._limits[tier]
+        now = time.time()
+        key = f"tg:{tier}"
+        window = self._windows[key]
+
+        # Purge entries older than 60s
+        while window and now - window[0] > 60:
+            window.popleft()
+
+        if len(window) >= limit:
+            logger.warning(f"🛡️ Telegram rate limit ({tier}:{limit}/min) hit for action={action}")
+            return False
+
+        window.append(now)
+        return True
+
+
 class AlphaEngine:
     def __init__(self):
         self.running = False
+        self._telegram_rate_limiter = TelegramRateLimiter()
         self.market_data = MarketDataAggregator()
         self.strategy = AlphaStrategyEngine(self.market_data)
         self.portfolio = PortfolioTracker()
@@ -85,17 +164,22 @@ class AlphaEngine:
         self._telegram_chat_id = str(chat_id or "").strip()
         logger.info(f"Alpha Hub: TELEGRAM_BOT_TOKEN is {'set' if token else 'NOT SET'}")
         self.telegram = TelegramPlatformBot(
-            bot_token=token, chat_id=chat_id, command_callback=self._handle_telegram_command
+            bot_token=token, 
+            chat_id=chat_id, 
+            command_callback=self._handle_telegram_command,
+            message_callback=self._handle_telegram_message
         )
         # Initialize Gemini Guard
         self.ai = GeminiGuard(telegram_bot=self.telegram)
-        self.tv_autonomy = TradingViewAutonomyPlugin(
-            market_data=self.market_data,
-            default_chat_id=self._telegram_chat_id,
-        )
+        self.chat_intent = ChatIntentEngine(self.ai)
+
+        self.tv_autonomy = None
+
         self._heartbeat_task = None
         self._autonomy_task = None
-        self._kill_switch_active = False
+        self._kill_switch_active = self._env_flag(
+            "SAPPHIRE_KILL_SWITCH_ACTIVE", default=False
+        )
         self._heartbeat_interval_seconds = int(os.getenv("TELEGRAM_HEARTBEAT_INTERVAL_SECONDS", "900"))
         self._deallocation_failure_threshold = int(os.getenv("DEALLOCATION_FAILURE_THRESHOLD", "3"))
         self._deallocation_cooldown_seconds = int(os.getenv("DEALLOCATION_COOLDOWN_SECONDS", "900"))
@@ -107,69 +191,12 @@ class AlphaEngine:
         self._control_api_token = os.getenv("SAPPHIRE_CONTROL_API_TOKEN", "").strip()
         self._telegram_webhook_mode = bool(self._telegram_webhook_url)
         self._tradingview_webhook_secret = os.getenv("TRADINGVIEW_WEBHOOK_SECRET", "").strip()
-        self._tradingview_integration_enabled = self._env_flag(
-            "SAPPHIRE_TRADINGVIEW_INTEGRATION_ENABLED",
-            default=False,
-        )
-        self._tradingview_execution_enabled = (
-            self._tradingview_integration_enabled
-            and (
-            os.getenv("TRADINGVIEW_EXECUTION_ENABLED", "false").strip().lower()
-            in {"1", "true", "yes", "on"}
-            )
-        )
-        self._tradingview_default_quantity = max(
-            0.0, float(os.getenv("TRADINGVIEW_DEFAULT_QUANTITY", "0.0"))
-        )
-        self._tradingview_allowed_symbols = self._parse_symbol_set(
-            os.getenv("TRADINGVIEW_ALLOWED_SYMBOLS", "")
-        )
-        self._tradingview_allowed_symbols_by_venue: Dict[str, Set[str]] = {
-            "ASTER": self._parse_symbol_set(os.getenv("TRADINGVIEW_ALLOWED_SYMBOLS_ASTER", "")),
-            "LIGHTER": self._parse_symbol_set(os.getenv("TRADINGVIEW_ALLOWED_SYMBOLS_LIGHTER", "")),
-        }
-        self._tradingview_max_quantity_default = max(
-            0.0, float(os.getenv("TRADINGVIEW_MAX_QUANTITY", "0.0"))
-        )
-        self._tradingview_max_quantity_by_venue: Dict[str, float] = {
-            "ASTER": max(0.0, float(os.getenv("TRADINGVIEW_MAX_QUANTITY_ASTER", "0.0"))),
-            "LIGHTER": max(0.0, float(os.getenv("TRADINGVIEW_MAX_QUANTITY_LIGHTER", "0.0"))),
-        }
-        self._tradingview_idempotency_window_seconds = max(
-            30, int(os.getenv("TRADINGVIEW_IDEMPOTENCY_WINDOW_SECONDS", "300"))
-        )
-        self._tradingview_idempotency_max_keys = max(
-            100, int(os.getenv("TRADINGVIEW_IDEMPOTENCY_MAX_KEYS", "2000"))
-        )
-        self._tradingview_enforce_strategy_rules = (
-            os.getenv("TRADINGVIEW_ENFORCE_STRATEGY_RULES", "false").strip().lower()
-            in {"1", "true", "yes", "on"}
-        )
-        self._tradingview_strategy_rules = self._parse_strategy_rules(
-            os.getenv("TRADINGVIEW_STRATEGY_RULES_JSON", "")
-        )
-        self._trading_gate_max_failure_pressure = max(
-            0, int(os.getenv("TRADING_GATE_MAX_FAILURE_PRESSURE", "2"))
-        )
-        self._trading_gate_min_active_venues = max(
-            0, int(os.getenv("TRADING_GATE_MIN_ACTIVE_VENUES", "1"))
-        )
-        self._tradingview_signal_seen_at: Dict[str, float] = {}
-        self._failure_counts: Dict[str, int] = defaultdict(int)
-        self._auto_deallocated: Set[str] = set()
-        self._manual_review_venues: Set[str] = set()
-        self._hard_failure_cooldown_seconds = max(
-            self._deallocation_cooldown_seconds,
-            int(os.getenv("SAPPHIRE_HARD_FAILURE_COOLDOWN_SECONDS", "21600")),
-        )
-        self._owner_directive = str(os.getenv("SAPPHIRE_OWNER_DIRECTIVE", "")).strip()
-        self._owner_directive_updated_at = int(time.time()) if self._owner_directive else 0
         self._full_autonomy_enabled = self._env_flag("SAPPHIRE_FULL_AUTONOMY_ENABLED", default=True)
         self._autonomy_allow_code_changes = self._env_flag(
-            "SAPPHIRE_AUTONOMY_ALLOW_CODE_CHANGES", default=True
+            "SAPPHIRE_AUTONOMY_ALLOW_CODE_CHANGES", default=False
         )
         self._autonomy_allow_gcloud_changes = self._env_flag(
-            "SAPPHIRE_AUTONOMY_ALLOW_GCLOUD_CHANGES", default=True
+            "SAPPHIRE_AUTONOMY_ALLOW_GCLOUD_CHANGES", default=False
         )
         self._autonomy_dry_run = self._env_flag("SAPPHIRE_AUTONOMY_DRY_RUN", default=False)
         self._autonomy_require_owner_approval = self._env_flag(
@@ -200,42 +227,21 @@ class AlphaEngine:
         self.outreach = MolthubOutreach()
         self.tasks = TaskManager()
         self.vt_scanner = VirusTotalSkillScanner()
-        requested_media_mode = self._normalize_media_mode(
-            os.getenv("SAPPHIRE_MEDIA_MODE", "owner_approval")
-        )
-        self._media_mode = requested_media_mode or "owner_approval"
-        self._media_twitter_enabled = self._env_flag("SAPPHIRE_MEDIA_TWITTER_ENABLED", default=True)
-        self._media_substack_enabled = self._env_flag("SAPPHIRE_MEDIA_SUBSTACK_ENABLED", default=True)
-        self._media_twitter_handle = str(os.getenv("SAPPHIRE_TWITTER_HANDLE", "")).strip()
-        self._media_substack_publication = str(
-            os.getenv("SAPPHIRE_SUBSTACK_PUBLICATION_URL", "")
-        ).strip()
-        self._media_twitter_post_url = str(os.getenv("SAPPHIRE_MEDIA_TWITTER_POST_URL", "")).strip()
-        self._media_substack_post_url = str(os.getenv("SAPPHIRE_MEDIA_SUBSTACK_POST_URL", "")).strip()
-        self._media_twitter_api_token = str(os.getenv("SAPPHIRE_TWITTER_API_TOKEN", "")).strip()
-        self._media_substack_api_token = str(os.getenv("SAPPHIRE_SUBSTACK_API_TOKEN", "")).strip()
-        self._media_publish_max_attempts = max(1, int(os.getenv("SAPPHIRE_MEDIA_MAX_ATTEMPTS", "4")))
-        self._media_retry_base_seconds = max(
-            10, int(os.getenv("SAPPHIRE_MEDIA_RETRY_BASE_SECONDS", "120"))
-        )
-        self._media_publish_timeout_seconds = max(
-            5, int(os.getenv("SAPPHIRE_MEDIA_POST_TIMEOUT_SECONDS", "20"))
-        )
-        self._media_publish_poll_seconds = max(5, int(os.getenv("SAPPHIRE_MEDIA_POLL_SECONDS", "20")))
-        self._media_queue_max_items = max(20, int(os.getenv("SAPPHIRE_MEDIA_QUEUE_MAX_ITEMS", "200")))
-        self._media_queue: Deque[Dict[str, Any]] = deque(maxlen=self._media_queue_max_items)
-        self._media_pending_approvals: Dict[str, Dict[str, Any]] = {}
-        self._media_recent_results: Deque[Dict[str, Any]] = deque(maxlen=50)
-        self._media_last_draft_payload: Dict[str, Any] = {}
-        self._media_last_draft: Dict[str, Any] = {"topic": "", "title": "", "timestamp": 0}
-        self._media_last_publish: Dict[str, Any] = {
-            "target": "",
-            "status": "none",
-            "detail": "",
-            "timestamp": 0,
-        }
-        self._media_publish_sequence = 0
+        # Phase 6: Social Media Manager
+        from src.media.manager import MediaManager
+        from src.media.content_generator import ContentGenerator
+        self.media_manager = MediaManager(telegram_bot=self.telegram)
+        self.content_generator = ContentGenerator(gemini_guard=self.gemini)
         self._media_publish_task: Optional[asyncio.Task[Any]] = None
+        # Internal alpha signal scanner — autonomous trade idea generation
+        self.alpha_scanner = AlphaSignalScanner(
+            market_data=self.market_data,
+            cognition=self.cognition,
+            memory=self.memory,
+            strategy=self.strategy,
+        )
+        self._alpha_scanner_task: Optional[asyncio.Task[Any]] = None
+
         self._trade_metrics: Dict[str, float] = {
             "total_trades": 0.0,
             "wins": 0.0,
@@ -252,6 +258,10 @@ class AlphaEngine:
         self._min_trade_quantity_floor = max(
             0.0, float(os.getenv("SAPPHIRE_MIN_TRADE_QUANTITY_FLOOR", "0.0001"))
         )
+        self._failure_counts: Dict[str, int] = defaultdict(int)
+        self._owner_directive: str = os.getenv("SAPPHIRE_OWNER_DIRECTIVE", "").strip()
+        self._trading_gate_max_failure_pressure = int(os.getenv("SAPPHIRE_TRADING_GATE_MAX_FAILURE_PRESSURE", "3"))
+        self._manual_review_venues: Set[str] = set()
 
     @staticmethod
     def _env_flag(name: str, default: bool = False) -> bool:
@@ -335,440 +345,6 @@ class AlphaEngine:
         }
         return aliases.get(value, "")
 
-    @staticmethod
-    def _normalize_media_mode(raw: Any) -> str:
-        value = str(raw or "").strip().lower().replace("-", "_")
-        aliases = {
-            "draft": "draft_only",
-            "draft_only": "draft_only",
-            "owner": "owner_approval",
-            "owner_approval": "owner_approval",
-            "approval": "owner_approval",
-            "manual": "owner_approval",
-            "auto": "auto_post",
-            "auto_post": "auto_post",
-            "autopost": "auto_post",
-        }
-        return aliases.get(value, "")
-
-    @staticmethod
-    def _normalize_media_targets(raw_targets: Any) -> List[str]:
-        if isinstance(raw_targets, list):
-            tokens = [str(item or "").strip().lower() for item in raw_targets]
-        else:
-            text = str(raw_targets or "").strip().lower()
-            if not text:
-                text = "both"
-            for separator in (";", "|"):
-                text = text.replace(separator, ",")
-            tokens = [chunk.strip() for chunk in text.split(",") if chunk.strip()]
-            if len(tokens) == 1 and " " in tokens[0]:
-                tokens = [chunk.strip() for chunk in tokens[0].split(" ") if chunk.strip()]
-
-        normalized: List[str] = []
-        for token in tokens:
-            if token in {"both", "all", "x+substack", "twitter+substack"}:
-                normalized.extend(["twitter", "substack"])
-                continue
-            if token in {"x", "twitter", "tweet"}:
-                normalized.append("twitter")
-                continue
-            if token in {"substack", "newsletter"}:
-                normalized.append("substack")
-                continue
-
-        if not normalized:
-            normalized = ["twitter", "substack"]
-
-        deduped: List[str] = []
-        for target in normalized:
-            if target not in deduped:
-                deduped.append(target)
-        return deduped
-
-    def _next_media_request_id(self) -> str:
-        self._media_publish_sequence += 1
-        return f"media:{int(time.time())}:{self._media_publish_sequence:04d}"
-
-    def _media_channel_config(self, channel: str) -> Dict[str, Any]:
-        target = str(channel or "").strip().lower()
-        if target == "twitter":
-            enabled = bool(self._media_twitter_enabled)
-            token = str(self._media_twitter_api_token or "").strip()
-            endpoint = str(self._media_twitter_post_url or "").strip()
-            ready = bool(enabled and endpoint and token)
-            return {
-                "channel": "twitter",
-                "enabled": enabled,
-                "ready": ready,
-                "endpoint": endpoint,
-                "token": token,
-                "handle": self._media_twitter_handle or "",
-                "publication": "",
-            }
-        if target == "substack":
-            enabled = bool(self._media_substack_enabled)
-            token = str(self._media_substack_api_token or "").strip()
-            endpoint = str(self._media_substack_post_url or "").strip()
-            ready = bool(enabled and endpoint and token)
-            return {
-                "channel": "substack",
-                "enabled": enabled,
-                "ready": ready,
-                "endpoint": endpoint,
-                "token": token,
-                "handle": "",
-                "publication": self._media_substack_publication or "",
-            }
-        return {
-            "channel": target or "unknown",
-            "enabled": False,
-            "ready": False,
-            "endpoint": "",
-            "token": "",
-            "handle": "",
-            "publication": "",
-        }
-
-    def _resolve_media_request_id(self, raw_request_id: str) -> str:
-        candidate = str(raw_request_id or "").strip()
-        if candidate and candidate.lower() != "latest":
-            return candidate
-
-        if self._media_pending_approvals:
-            latest_pending = sorted(
-                self._media_pending_approvals.values(),
-                key=lambda item: int(item.get("created_at", 0)),
-                reverse=True,
-            )
-            if latest_pending:
-                return str(latest_pending[0].get("request_id", "")).strip()
-
-        if self._media_queue:
-            latest_queued = sorted(
-                list(self._media_queue),
-                key=lambda item: int(item.get("created_at", 0)),
-                reverse=True,
-            )
-            if latest_queued:
-                return str(latest_queued[0].get("request_id", "")).strip()
-
-        return ""
-
-    def _enqueue_media_publish_request(
-        self,
-        draft: Dict[str, Any],
-        targets: List[str],
-        source: str,
-        require_approval: bool,
-        note: str = "",
-    ) -> Dict[str, Any]:
-        now = int(time.time())
-        request_id = self._next_media_request_id()
-        item = {
-            "request_id": request_id,
-            "created_at": now,
-            "updated_at": now,
-            "source": str(source or "manual").strip() or "manual",
-            "topic": str(draft.get("topic", "")).strip(),
-            "title": str(draft.get("title", "")).strip(),
-            "body": str(draft.get("body", "")).strip(),
-            "targets": self._normalize_media_targets(targets),
-            "status": "pending_approval" if require_approval else "queued",
-            "attempts": 0,
-            "max_attempts": int(self._media_publish_max_attempts),
-            "next_attempt_at": now,
-            "note": str(note or "").strip(),
-        }
-
-        if require_approval:
-            self._media_pending_approvals[request_id] = item
-        else:
-            self._media_queue.append(item)
-
-        self._record_system_log(
-            f"Media publish request {request_id} created ({item['status']})",
-            level="info",
-            tags=["media", "queue"],
-            metadata={
-                "targets": item["targets"],
-                "source": item["source"],
-                "mode": self._media_mode,
-            },
-        )
-        return item
-
-    def _approve_media_publish_request(self, raw_request_id: str, note: str = "") -> Dict[str, Any]:
-        request_id = self._resolve_media_request_id(raw_request_id)
-        if not request_id:
-            return {"ok": False, "error": "request_not_found", "request_id": ""}
-
-        item = self._media_pending_approvals.pop(request_id, None)
-        if not item:
-            return {"ok": False, "error": "request_not_pending", "request_id": request_id}
-
-        item["status"] = "queued"
-        item["updated_at"] = int(time.time())
-        if note:
-            item["approval_note"] = str(note).strip()[:400]
-        self._media_queue.append(item)
-        self._record_system_log(
-            f"Media publish request {request_id} approved",
-            level="info",
-            tags=["media", "approval"],
-            metadata={"targets": item.get("targets", [])},
-        )
-        return {
-            "ok": True,
-            "request_id": request_id,
-            "targets": list(item.get("targets", [])),
-            "queue_depth": len(self._media_queue),
-        }
-
-    def _reject_media_publish_request(self, raw_request_id: str, reason: str = "") -> Dict[str, Any]:
-        request_id = self._resolve_media_request_id(raw_request_id)
-        if not request_id:
-            return {"ok": False, "error": "request_not_found", "request_id": ""}
-
-        item = self._media_pending_approvals.pop(request_id, None)
-        if not item:
-            return {"ok": False, "error": "request_not_pending", "request_id": request_id}
-
-        reason_text = str(reason or "").strip()[:400]
-        self._record_system_log(
-            f"Media publish request {request_id} rejected",
-            level="warning",
-            tags=["media", "approval"],
-            metadata={"reason": reason_text},
-        )
-        return {
-            "ok": True,
-            "request_id": request_id,
-            "reason": reason_text,
-            "targets": list(item.get("targets", [])),
-        }
-
-    @staticmethod
-    def _compose_twitter_text(title: str, body: str, limit: int = 280) -> str:
-        headline = str(title or "").strip() or "Sapphire update"
-        summary = " ".join(str(body or "").split())
-        if summary:
-            text = f"{headline} | {summary}"
-        else:
-            text = headline
-        if len(text) <= limit:
-            return text
-        return text[: max(0, limit - 3)].rstrip() + "..."
-
-    def _build_media_channel_payload(self, channel: str, item: Dict[str, Any]) -> Dict[str, Any]:
-        base = {
-            "request_id": str(item.get("request_id", "")).strip(),
-            "topic": str(item.get("topic", "")).strip(),
-            "title": str(item.get("title", "")).strip(),
-            "body": str(item.get("body", "")).strip(),
-            "source": str(item.get("source", "manual")).strip(),
-            "attempt": int(item.get("attempts", 0)) + 1,
-            "timestamp": int(time.time()),
-        }
-        if channel == "twitter":
-            base.update(
-                {
-                    "text": self._compose_twitter_text(
-                        str(item.get("title", "")).strip(),
-                        str(item.get("body", "")).strip(),
-                    ),
-                    "handle": self._media_twitter_handle or "",
-                }
-            )
-            return base
-        if channel == "substack":
-            base.update(
-                {
-                    "markdown": str(item.get("body", "")).strip(),
-                    "publication": self._media_substack_publication or "",
-                }
-            )
-            return base
-        return base
-
-    async def _publish_media_channel(self, channel: str, item: Dict[str, Any]) -> Dict[str, Any]:
-        config = self._media_channel_config(channel)
-        target = str(config.get("channel", channel)).strip() or str(channel or "unknown")
-        if not config.get("enabled"):
-            return {
-                "channel": target,
-                "ok": False,
-                "retryable": False,
-                "reason": "channel_disabled",
-                "detail": "channel is disabled",
-            }
-        if not config.get("ready"):
-            return {
-                "channel": target,
-                "ok": False,
-                "retryable": False,
-                "reason": "channel_not_ready",
-                "detail": "endpoint/token not configured",
-            }
-
-        payload = self._build_media_channel_payload(target, item)
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {config.get('token', '')}",
-        }
-        timeout = aiohttp.ClientTimeout(total=self._media_publish_timeout_seconds)
-        try:
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.post(str(config.get("endpoint", "")), json=payload, headers=headers) as resp:
-                    body = (await resp.text())[:300]
-                    if 200 <= resp.status < 300:
-                        return {
-                            "channel": target,
-                            "ok": True,
-                            "retryable": False,
-                            "reason": "ok",
-                            "detail": body,
-                            "status_code": resp.status,
-                        }
-                    retryable = resp.status == 429 or resp.status >= 500
-                    return {
-                        "channel": target,
-                        "ok": False,
-                        "retryable": retryable,
-                        "reason": "http_error",
-                        "detail": f"status={resp.status} body={body}",
-                        "status_code": resp.status,
-                    }
-        except (asyncio.TimeoutError, aiohttp.ClientError) as exc:
-            return {
-                "channel": target,
-                "ok": False,
-                "retryable": True,
-                "reason": "network_error",
-                "detail": str(exc)[:300],
-            }
-
-    async def _process_media_queue_item(self, item: Dict[str, Any]) -> None:
-        now = int(time.time())
-        item["attempts"] = int(item.get("attempts", 0)) + 1
-        item["updated_at"] = now
-        targets = self._normalize_media_targets(item.get("targets", []))
-        results: List[Dict[str, Any]] = []
-        retryable_failure = False
-        non_retryable_failure = False
-
-        for target in targets:
-            result = await self._publish_media_channel(target, item)
-            results.append(result)
-            if not result.get("ok") and result.get("retryable"):
-                retryable_failure = True
-            if not result.get("ok") and not result.get("retryable"):
-                non_retryable_failure = True
-
-        success_targets = [r["channel"] for r in results if r.get("ok")]
-        failed_results = [r for r in results if not r.get("ok")]
-        failed_targets = [r.get("channel", "unknown") for r in failed_results]
-        max_attempts = int(item.get("max_attempts", self._media_publish_max_attempts))
-
-        if not failed_results:
-            self._media_last_publish = {
-                "target": ",".join(success_targets) or "none",
-                "status": "success",
-                "detail": f"request {item.get('request_id', 'n/a')} published",
-                "timestamp": now,
-            }
-            self._media_recent_results.append(
-                {
-                    "request_id": item.get("request_id", ""),
-                    "status": "success",
-                    "targets": success_targets,
-                    "timestamp": now,
-                }
-            )
-            await self.telegram.send_message(
-                (
-                    "✅ Media publish completed.\n"
-                    f"Request: `{item.get('request_id', 'n/a')}`\n"
-                    f"Targets: `{', '.join(success_targets) if success_targets else 'none'}`\n"
-                    "Benefit: Sapphire external narrative is synchronized with internal operations."
-                ),
-                priority="high",
-            )
-            return
-
-        if retryable_failure and int(item.get("attempts", 0)) < max_attempts:
-            delay_seconds = int(self._media_retry_base_seconds * int(item.get("attempts", 0)))
-            item["status"] = "queued"
-            item["next_attempt_at"] = now + delay_seconds
-            self._media_queue.append(item)
-            await self.telegram.send_message(
-                (
-                    "⚠️ Media publish encountered retryable failure.\n"
-                    f"Request: `{item.get('request_id', 'n/a')}`\n"
-                    f"Failed targets: `{', '.join(failed_targets)}`\n"
-                    f"Retry: `{item.get('attempts', 0)}/{max_attempts}` in `{delay_seconds}s`"
-                ),
-                priority="high",
-            )
-            return
-
-        failure_reason = "; ".join(
-            [f"{r.get('channel', 'unknown')}:{r.get('reason', 'error')}" for r in failed_results]
-        )[:300]
-        status = "partial_failed" if success_targets else "failed"
-        self._media_last_publish = {
-            "target": ",".join(targets) or "none",
-            "status": status,
-            "detail": failure_reason,
-            "timestamp": now,
-        }
-        self._media_recent_results.append(
-            {
-                "request_id": item.get("request_id", ""),
-                "status": status,
-                "targets": targets,
-                "failed_targets": failed_targets,
-                "timestamp": now,
-            }
-        )
-        await self.telegram.send_message(
-            (
-                "❌ Media publish failed.\n"
-                f"Request: `{item.get('request_id', 'n/a')}`\n"
-                f"Successful targets: `{', '.join(success_targets) if success_targets else 'none'}`\n"
-                f"Failed targets: `{', '.join(failed_targets) if failed_targets else 'none'}`\n"
-                f"Reason: `{failure_reason}`\n"
-                + (
-                    "Benefit retained: published channels remain delivered."
-                    if non_retryable_failure and success_targets
-                    else "Action: adjust channel credentials/endpoints and re-run `/media publish`."
-                )
-            ),
-            priority="high",
-        )
-
-    async def _process_media_queue_once(self) -> None:
-        if not self._media_queue:
-            return
-
-        now = int(time.time())
-        queue_len = len(self._media_queue)
-        for _ in range(queue_len):
-            item = self._media_queue.popleft()
-            if int(item.get("next_attempt_at", 0)) > now:
-                self._media_queue.append(item)
-                continue
-            await self._process_media_queue_item(item)
-
-    async def _media_publish_loop(self) -> None:
-        while self.running:
-            try:
-                await asyncio.sleep(self._media_publish_poll_seconds)
-                await self._process_media_queue_once()
-            except asyncio.CancelledError:
-                break
-            except Exception as exc:
-                logger.error(f"Media publish loop error: {exc}")
 
     def _set_execution_stage(self, stage: str, source: str = "manual", agent_id: str = "OBSIDIAN") -> Dict[str, Any]:
         gate.require(agent_id, Capability.SYSTEM_CONFIG, f"set_execution_stage({stage!r})")
@@ -1094,18 +670,18 @@ class AlphaEngine:
             ),
             (
                 "TradingView autonomy plugin enabled",
-                self.tv_autonomy.enabled,
-                "TRADINGVIEW_AUTONOMY_ENABLED is not true",
+                getattr(self.tv_autonomy, "enabled", False) if self.tv_autonomy else False,
+                "TRADINGVIEW_AUTONOMY_ENABLED is not true (or TV integration disabled)",
             ),
             (
                 "TradingView full asset access enabled",
-                self.tv_autonomy.allow_all_assets,
-                "TRADINGVIEW_ALLOW_ALL_ASSETS is not true",
+                getattr(self.tv_autonomy, "allow_all_assets", False) if self.tv_autonomy else False,
+                "TRADINGVIEW_ALLOW_ALL_ASSETS is not true (or TV integration disabled)",
             ),
             (
                 "TradingView community script access enabled",
-                self.tv_autonomy.community_access_enabled,
-                "TRADINGVIEW_COMMUNITY_ACCESS_ENABLED is not true",
+                getattr(self.tv_autonomy, "community_access_enabled", False) if self.tv_autonomy else False,
+                "TRADINGVIEW_COMMUNITY_ACCESS_ENABLED is not true (or TV integration disabled)",
             ),
             (
                 "Full autonomy mode enabled",
@@ -1147,13 +723,15 @@ class AlphaEngine:
                 f"DEX live dispatch: `{bool(strategy_state.get('stage_multiplier', 0) > 0)}`",
                 f"DEX effective qty: `{strategy_state.get('effective_quantity', 0.0)}`",
                 f"Rules configured: `{len(self._tradingview_strategy_rules)}`",
-                f"TV autonomy enabled: `{self.tv_autonomy.enabled}`",
+                f"TV autonomy enabled: `{getattr(self.tv_autonomy, 'enabled', False) if self.tv_autonomy else 'DISABLED'}`",
                 (
                     "TV signal mode: `LIVE`"
                     if self._tradingview_execution_enabled
                     else "TV signal mode: `WORKBENCH_DRY_RUN`"
+                    if self._tradingview_integration_enabled
+                    else "TV signal mode: `DISABLED`"
                 ),
-                f"TV hook configured: `{bool(self.tv_autonomy.hook_url and self.tv_autonomy.hook_token)}`",
+                f"TV hook configured: `{bool(getattr(self.tv_autonomy, 'hook_url', '') and getattr(self.tv_autonomy, 'hook_token', '')) if self.tv_autonomy else False}`",
             ]
         )
 
@@ -1547,7 +1125,7 @@ class AlphaEngine:
     def _control_snapshot(self) -> Dict[str, Any]:
         state = dispatcher.get_control_state()
         strategy_state = self.strategy.execution_state()
-        media_snapshot = self._media_status_snapshot()
+        media_snapshot = self.media_manager.get_status_snapshot()
         pending_sessions = [
             session
             for session in self._autonomy_sessions.values()
@@ -1614,66 +1192,13 @@ class AlphaEngine:
             "memory_enabled": self._memory_enabled,
             "cognition_metrics": self.cognition.get_metrics() if self._cognition_enabled else {},
             "memory_stats": self.memory.get_stats() if self._memory_enabled else {},
+            "alpha_scanner": self.alpha_scanner.get_metrics(),
             "timestamp": int(time.time()),
         }
 
-    def _media_queue_snapshot(self) -> Dict[str, Any]:
-        pending_items = sorted(
-            self._media_pending_approvals.values(),
-            key=lambda item: int(item.get("created_at", 0)),
-            reverse=True,
-        )
-        queued_items = sorted(
-            list(self._media_queue),
-            key=lambda item: int(item.get("created_at", 0)),
-            reverse=True,
-        )
-        recent_items = sorted(
-            list(self._media_recent_results),
-            key=lambda item: int(item.get("timestamp", 0)),
-            reverse=True,
-        )
 
-        def _summarize_request(item: Dict[str, Any]) -> Dict[str, Any]:
-            return {
-                "request_id": str(item.get("request_id", "")).strip(),
-                "status": str(item.get("status", "")).strip(),
-                "targets": list(item.get("targets", [])),
-                "topic": str(item.get("topic", "")).strip(),
-                "created_at": int(item.get("created_at", 0)),
-                "updated_at": int(item.get("updated_at", 0)),
-                "attempts": int(item.get("attempts", 0)),
-                "max_attempts": int(item.get("max_attempts", self._media_publish_max_attempts)),
-                "next_attempt_at": int(item.get("next_attempt_at", 0)),
-            }
 
-        return {
-            "pending_count": len(pending_items),
-            "queued_count": len(queued_items),
-            "pending_items": [_summarize_request(item) for item in pending_items[:10]],
-            "queued_items": [_summarize_request(item) for item in queued_items[:10]],
-            "recent_results": list(recent_items[:10]),
-        }
 
-    def _media_status_snapshot(self) -> Dict[str, Any]:
-        twitter_config = self._media_channel_config("twitter")
-        substack_config = self._media_channel_config("substack")
-        queue_snapshot = self._media_queue_snapshot()
-        return {
-            "mode": self._media_mode,
-            "twitter_enabled": bool(self._media_twitter_enabled),
-            "twitter_ready": bool(twitter_config.get("ready")),
-            "twitter_handle": self._media_twitter_handle or "",
-            "twitter_endpoint_configured": bool(twitter_config.get("endpoint")),
-            "substack_enabled": bool(self._media_substack_enabled),
-            "substack_ready": bool(substack_config.get("ready")),
-            "substack_publication": self._media_substack_publication or "",
-            "substack_endpoint_configured": bool(substack_config.get("endpoint")),
-            "last_draft": dict(self._media_last_draft),
-            "last_publish": dict(self._media_last_publish),
-            "queue": queue_snapshot,
-            "timestamp": int(time.time()),
-        }
 
     @staticmethod
     def _fmt_unix_ts(timestamp: Any) -> str:
@@ -1685,95 +1210,40 @@ class AlphaEngine:
             return "n/a"
         return time.strftime("%Y-%m-%d %H:%M:%SZ", time.gmtime(value))
 
-    async def _send_media_status(self) -> None:
-        snapshot = self._media_status_snapshot()
-        last_draft = snapshot.get("last_draft", {}) if isinstance(snapshot, dict) else {}
-        last_publish = snapshot.get("last_publish", {}) if isinstance(snapshot, dict) else {}
-        queue = snapshot.get("queue", {}) if isinstance(snapshot, dict) else {}
-        pending_items = queue.get("pending_items", []) if isinstance(queue, dict) else []
-        queued_items = queue.get("queued_items", []) if isinstance(queue, dict) else []
-        recent_results = queue.get("recent_results", []) if isinstance(queue, dict) else []
-        mode = str(snapshot.get("mode", "owner_approval"))
-        policy_explainer = {
-            "draft_only": "generates drafts only; no outbound publishing.",
-            "owner_approval": "prepares drafts and waits for owner confirmation before publishing.",
-            "auto_post": "publishes automatically when channel credentials are ready.",
+
+
+
+
+    def _collect_media_context(self) -> Dict[str, Any]:
+        """Collect system context for AI content generation."""
+        snapshot = self._control_snapshot()
+        return {
+            "metrics": {
+                "total_trades": int(self._trade_metrics.get("total_trades", 0)),
+                "wins": int(self._trade_metrics.get("wins", 0)),
+                "losses": int(self._trade_metrics.get("losses", 0)),
+                "win_rate": round(
+                    (self._trade_metrics["wins"] / max(1, self._trade_metrics["total_trades"])) * 100, 1
+                ),
+                "realized_pnl": round(float(self._trade_metrics.get("realized_pnl", 0)), 4),
+                "uptime_hours": round((time.time() - self._started_at) / 3600, 1),
+                "autonomy_dispatches": int(self._autonomy_dispatch_count),
+            },
+            "execution": {
+                "stage": str(snapshot.get("dex_execution_stage", "paper")),
+                "autonomy": "ON" if snapshot.get("full_autonomy_enabled") else "OFF",
+                "failure_pressure": int(snapshot.get("failure_pressure", 0)),
+                "kill_switch": bool(self._kill_switch_active),
+            },
+            "forum_topics": [
+                {"title": t.get("title", ""), "lane": t.get("lane", "")}
+                for t in list(self.forum.list_topics({}).get("topics", []))[:5]
+            ],
+            "events": [
+                str(e.get("message", ""))
+                for e in list(self._system_logs)[-10:]
+            ],
         }
-        mode_note = policy_explainer.get(mode, "uses configured media policy.")
-
-        lines = [
-            "📰 **SAPPHIRE MEDIA STATUS**",
-            f"Mode: `{mode}` ({mode_note})",
-            (
-                f"X/Twitter: `{'READY' if snapshot.get('twitter_ready') else 'NOT_READY'}`"
-                f" | enabled `{'YES' if snapshot.get('twitter_enabled') else 'NO'}`"
-                f" | handle `{snapshot.get('twitter_handle') or 'n/a'}`"
-            ),
-            (
-                f"Substack: `{'READY' if snapshot.get('substack_ready') else 'NOT_READY'}`"
-                f" | enabled `{'YES' if snapshot.get('substack_enabled') else 'NO'}`"
-                f" | publication `{snapshot.get('substack_publication') or 'n/a'}`"
-            ),
-            (
-                f"Last draft: `{last_draft.get('title') or 'none'}`"
-                f" at `{self._fmt_unix_ts(last_draft.get('timestamp'))}`"
-            ),
-            (
-                f"Last publish: `{last_publish.get('status') or 'none'}`"
-                f" target `{last_publish.get('target') or 'n/a'}`"
-                f" at `{self._fmt_unix_ts(last_publish.get('timestamp'))}`"
-            ),
-            (
-                f"Queue: pending approvals `{queue.get('pending_count', 0)}`"
-                f" | queued publishes `{queue.get('queued_count', 0)}`"
-            ),
-            "",
-            (
-                "Commands: `/media mode <draft_only|owner_approval|auto_post>`, `/media draft <topic>`, "
-                "`/media publish [topic:<name>] [targets:<x|substack|both>]`, `/media queue`, "
-                "`/media approve <request_id|latest>`, `/media reject <request_id|latest>`"
-            ),
-        ]
-        if pending_items:
-            latest = pending_items[0]
-            lines.append(
-                "Latest pending: "
-                f"`{latest.get('request_id', 'n/a')}` -> `{', '.join(latest.get('targets', [])) or 'none'}`"
-            )
-        if queued_items:
-            latest = queued_items[0]
-            lines.append(
-                "Latest queued: "
-                f"`{latest.get('request_id', 'n/a')}` retry `{latest.get('attempts', 0)}/{latest.get('max_attempts', 0)}` "
-                f"next `{self._fmt_unix_ts(latest.get('next_attempt_at'))}`"
-            )
-        if recent_results:
-            latest = recent_results[0]
-            lines.append(
-                "Latest outcome: "
-                f"`{latest.get('request_id', 'n/a')}` status `{latest.get('status', 'unknown')}`"
-            )
-        await self.telegram.send_message("\n".join(lines), priority="medium")
-
-    def _set_media_mode(self, requested_mode: str, source: str = "manual", agent_id: str = "OBSIDIAN") -> Dict[str, Any]:
-        gate.require(agent_id, Capability.SYSTEM_CONFIG, f"set_media_mode({requested_mode!r})")
-        normalized = self._normalize_media_mode(requested_mode)
-        if not normalized:
-            return {
-                "ok": False,
-                "error": "invalid_mode",
-                "allowed_modes": ["draft_only", "owner_approval", "auto_post"],
-            }
-
-        previous = self._media_mode
-        self._media_mode = normalized
-        self._record_system_log(
-            f"Media mode set to {normalized}",
-            level="warning",
-            tags=["media", "control"],
-            metadata={"source": source, "previous_mode": previous, "new_mode": normalized},
-        )
-        return {"ok": True, "previous_mode": previous, "new_mode": normalized}
 
     def _build_media_draft(self, topic: str) -> Dict[str, Any]:
         normalized_topic = str(topic or "").strip() or "weekly operations update"
@@ -1809,26 +1279,18 @@ class AlphaEngine:
             "- Track expected benefit and stop conditions before promotion.",
         ]
         body = "\n".join(body_lines)
-        self._media_last_draft = {"topic": normalized_topic, "title": title, "timestamp": timestamp}
-        self._media_last_draft_payload = {
-            "topic": normalized_topic,
-            "title": title,
-            "body": body,
-            "timestamp": timestamp,
-            "mode": self._media_mode,
-        }
         self._record_system_log(
             f"Media draft generated for topic '{normalized_topic}'",
             level="info",
             tags=["media", "draft"],
-            metadata={"mode": self._media_mode, "topic": normalized_topic},
+            metadata={"mode": self.media_manager.mode, "topic": normalized_topic},
         )
         return {
             "topic": normalized_topic,
             "title": title,
             "body": body,
             "timestamp": timestamp,
-            "mode": self._media_mode,
+            "mode": self.media_manager.mode,
         }
 
     def _resolve_media_draft_for_publish(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -1836,16 +1298,13 @@ class AlphaEngine:
         if requested_topic:
             return self._build_media_draft(requested_topic)
 
-        if self._media_last_draft_payload and self._media_last_draft_payload.get("body"):
-            return dict(self._media_last_draft_payload)
-
-        fallback_topic = str(self._media_last_draft.get("topic", "")).strip() or "weekly operations update"
-        return self._build_media_draft(fallback_topic)
+        # Fallback to a default topic if none provided
+        return self._build_media_draft("weekly operations update")
 
     async def _send_focus_snapshot(self) -> None:
         state = dispatcher.get_control_state()
         strategy_state = self.strategy.execution_state()
-        media_snapshot = self._media_status_snapshot()
+        media_snapshot = self.media_manager.get_status_snapshot()
         venue_summary = ", ".join(sorted(state.keys())) if state else "none"
 
         directive = self._owner_directive.strip() or "none"
@@ -1880,12 +1339,12 @@ class AlphaEngine:
                 else "TradingView signal mode: `WORKBENCH_DRY_RUN`"
             ),
             (
-                f"TradingView autonomy: `{'ON' if self.tv_autonomy.enabled else 'OFF'}`"
+                f"TradingView autonomy: `{'ON' if self.tv_autonomy and self.tv_autonomy.enabled else 'OFF'}`"
                 if self._tradingview_integration_enabled
                 else "TradingView autonomy: `OFF (integration disabled)`"
             ),
             (
-                f"Community scripts: `{'ON' if self.tv_autonomy.community_access_enabled else 'OFF'}`"
+                f"Community scripts: `{'ON' if self.tv_autonomy and self.tv_autonomy.community_access_enabled else 'OFF'}`"
                 if self._tradingview_integration_enabled
                 else "Community scripts: `OFF (integration disabled)`"
             ),
@@ -1926,7 +1385,7 @@ class AlphaEngine:
             )
         else:
             why_now = "Execution and control state are inside configured guardrails."
-        media_snapshot = self._media_status_snapshot()
+        media_snapshot = self.media_manager.get_status_snapshot()
 
         lines = [
             f"💓 **SAPPHIRE HEARTBEAT** (`{reason}`)",
@@ -1950,7 +1409,7 @@ class AlphaEngine:
                 f" | default qty `{self._tradingview_default_quantity}`"
             ),
             (
-                f"- Media mode: `{self._media_mode}`"
+                f"- Media mode: `{self.media_manager.mode}`"
                 f" | X `{'READY' if media_snapshot.get('twitter_ready') else 'NOT_READY'}`"
                 f" | Substack `{'READY' if media_snapshot.get('substack_ready') else 'NOT_READY'}`"
             ),
@@ -1988,8 +1447,8 @@ class AlphaEngine:
             "owner_directive": self._owner_directive or "",
             "enabled_venues": sorted(list(dispatcher.bot_urls.keys())),
             "autonomy_dispatch_count": self._autonomy_dispatch_count,
-            "allowed_repo_scope": sorted(list(getattr(self.tv_autonomy, "allowed_repo_scope", set()))),
-            "allowed_project_scope": sorted(list(getattr(self.tv_autonomy, "allowed_project_scope", set()))),
+            "allowed_repo_scope": sorted(list(getattr(self.tv_autonomy, "allowed_repo_scope", set()))) if self.tv_autonomy else [],
+            "allowed_project_scope": sorted(list(getattr(self.tv_autonomy, "allowed_project_scope", set()))) if self.tv_autonomy else [],
             "dex_execution_stage": strategy_state.get("dex_execution_stage", "paper"),
             "dex_live_dispatch": bool(strategy_state.get("stage_multiplier", 0) > 0),
             "dex_effective_quantity": float(strategy_state.get("effective_quantity", 0.0)),
@@ -2245,11 +1704,14 @@ class AlphaEngine:
         entry["decision_source"] = source
         self._autonomy_sessions[resolved_key] = entry
 
-        hook_result = await self.tv_autonomy.dispatch_session_decision(
-            session_key=resolved_key,
-            decision=normalized_decision,
-            note=trimmed_note,
-        )
+        if self.tv_autonomy:
+            hook_result = await self.tv_autonomy.dispatch_session_decision(
+                session_key=resolved_key,
+                decision=normalized_decision,
+                note=trimmed_note,
+            )
+        else:
+            hook_result = {"dispatched": False, "reason": "tv_integration_disabled"}
         dispatched = bool(hook_result.get("dispatched"))
         reason = str(hook_result.get("reason", "")).strip()
         log_level = "info" if dispatched else "warning"
@@ -2357,6 +1819,8 @@ class AlphaEngine:
             )
             return {"dispatched": False, "reason": "dry_run", "trigger": trigger}
 
+        if not self.tv_autonomy:
+            return {"dispatched": False, "reason": "tv_integration_disabled", "trigger": trigger}
         hook_result = await self.tv_autonomy.dispatch_environment_instruction(
             instruction=instruction,
             trigger=trigger,
@@ -2433,20 +1897,19 @@ class AlphaEngine:
                 "dry_run",
                 "full_autonomy_disabled",
             }
-            self._record_system_log(
-                f"Full autonomy dispatch unavailable ({trigger}): {reason}",
-                level="info" if reason in config_reasons else "warning",
-                tags=["autonomy", "dispatch"],
-            )
-            if reason not in config_reasons:
+            if reason in config_reasons:
+                # Silently skip — these are expected when the TV autonomy
+                # plugin or OpenClaw hook is intentionally unconfigured.
+                logger.debug(f"Autonomy dispatch skipped ({trigger}): {reason}")
+            else:
+                self._record_system_log(
+                    f"Full autonomy dispatch unavailable ({trigger}): {reason}",
+                    level="warning",
+                    tags=["autonomy", "dispatch"],
+                )
                 await self.telegram.send_as(
                     OBSIDIAN,
                     f"Autonomy dispatch unavailable — `{trigger}`: {reason}",
-                )
-            else:
-                logger.debug(
-                    f"Autonomy dispatch skipped ({trigger}): {reason} — "
-                    "configure TV autonomy plugin to enable."
                 )
         return hook_result
 
@@ -2466,28 +1929,20 @@ class AlphaEngine:
         normalized_action = action.upper()
 
         if normalized_action in {"MEDIA_STATUS", "MEDIA_QUEUE_STATUS", "MEDIA_QUEUE", "COMMUNICATION_STATUS"}:
-            await self._send_media_status()
+            report = self.media_manager.get_status_report()
+            await self.telegram.send_message(report, priority="medium")
             return
 
         if normalized_action in {"MEDIA_SET_MODE", "SET_MEDIA_MODE"}:
+            gate.require("OBSIDIAN", Capability.SYSTEM_CONFIG, f"set_media_mode({target!r})")
             payload = self._parse_json_payload(target)
             requested_mode = str(payload.get("mode", "")).strip() or str(target or "").strip()
-            result = self._set_media_mode(requested_mode, source="telegram")
-            if not result.get("ok"):
-                await self.telegram.send_message(
-                    (
-                        "❌ Invalid media mode.\n"
-                        "Use one of: `draft_only`, `owner_approval`, `auto_post`."
-                    ),
-                    priority="high",
-                )
-                return
-
-            snapshot = self._media_status_snapshot()
+            new_mode = self.media_manager.set_mode(requested_mode)
+            
+            snapshot = self.media_manager.get_status_snapshot()
             await self.telegram.send_message(
-                (
-                    f"✅ Media mode updated to `{result.get('new_mode', self._media_mode)}`.\n"
-                    f"Previous mode: `{result.get('previous_mode', 'unknown')}`\n"
+                 (
+                    f"✅ Media mode updated to `{new_mode}`.\n"
                     f"X ready: `{'YES' if snapshot.get('twitter_ready') else 'NO'}` | "
                     f"Substack ready: `{'YES' if snapshot.get('substack_ready') else 'NO'}`\n"
                     "Expected outcome: publication workflow now follows the updated automation policy."
@@ -2496,18 +1951,47 @@ class AlphaEngine:
             )
             return
 
+        if normalized_action in {"MEDIA_GENERATE", "MEDIA_AI_DRAFT"}:
+            gate.require("EMERALD", Capability.AI_PROMPT, f"media_generate({target!r})")
+            payload = self._parse_json_payload(target)
+            platform = str(payload.get("platform", "twitter")).strip().lower()
+            topic = str(payload.get("topic", "")).strip() or str(target or "").strip()
+            context = self._collect_media_context()
+            result = await self.content_generator.generate_for_platform(platform, context, topic)
+            if result.get("ok"):
+                quality = result.get("quality", {})
+                content = str(result.get("content", ""))
+                preview = content[:500] + ("..." if len(content) > 500 else "")
+                await self.telegram.send_message(
+                    (
+                        f"📰 AI-generated {platform} content ready.\n"
+                        f"Quality: `{quality.get('score', 0)}`\n"
+                        f"Topic: `{topic or 'auto'}`\n\n"
+                        f"Preview:\n{preview}\n\n"
+                        "Use `/media publish` to queue for delivery."
+                    ),
+                    priority="high",
+                )
+            else:
+                reason = result.get("reason", "unknown")
+                await self.telegram.send_message(
+                    f"⚠️ Content generation failed: `{reason}`",
+                    priority="high",
+                )
+            return
+
         if normalized_action in {"MEDIA_DRAFT", "PREPARE_MEDIA_DRAFT"}:
             payload = self._parse_json_payload(target)
             topic = str(payload.get("topic", "")).strip() or str(target or "").strip()
             draft = self._build_media_draft(topic)
-            snapshot = self._media_status_snapshot()
+            snapshot = self.media_manager.get_status_snapshot()
+            
             publish_note = {
                 "draft_only": "Draft created only; no publish attempts will run.",
                 "owner_approval": "Draft created; await owner approval before publishing.",
-                "auto_post": (
-                    "Draft created; auto-post is enabled when channel credentials are ready."
-                ),
+                "auto_post": "Draft created; auto-post is enabled when channel credentials are ready.",
             }.get(draft.get("mode", "owner_approval"), "Draft created.")
+            
             await self.telegram.send_message(
                 (
                     "📰 Sapphire media draft generated.\n"
@@ -2523,112 +2007,55 @@ class AlphaEngine:
             return
 
         if normalized_action in {"MEDIA_PUBLISH", "MEDIA_DISPATCH"}:
+            gate.require("SAPPHIRE", Capability.MEDIA_PUBLISH, f"media_publish({target!r})")
             payload = self._parse_json_payload(target)
             draft = self._resolve_media_draft_for_publish(payload)
-            targets = self._normalize_media_targets(payload.get("targets", []))
-            note = str(payload.get("note", "")).strip()
-            mode = self._media_mode
-
-            if mode == "draft_only":
-                await self.telegram.send_message(
-                    (
-                        "📰 Media publish request captured, but mode is `draft_only`.\n"
-                        f"Draft retained: `{draft.get('title', 'n/a')}`\n"
-                        "Expected outcome: no outbound post until mode changes to owner approval or auto-post."
-                    ),
-                    priority="high",
-                )
-                return
-
-            require_approval = mode == "owner_approval"
-            request = self._enqueue_media_publish_request(
-                draft=draft,
+            targets = payload.get("targets", [])
+            
+            request = self.media_manager.request_publish(
+                topic=draft.get("topic", ""),
+                title=draft.get("title", ""),
+                body=draft.get("body", ""),
                 targets=targets,
-                source="telegram",
-                require_approval=require_approval,
-                note=note,
+                source="telegram"
             )
-            request_id = str(request.get("request_id", "n/a")).strip() or "n/a"
-            targets_text = ", ".join(request.get("targets", [])) or "none"
 
-            if require_approval:
-                await self.telegram.send_message(
-                    (
-                        "📰 Media publish request is pending owner approval.\n"
-                        f"Request: `{request_id}`\n"
-                        f"Targets: `{targets_text}`\n"
-                        "Expected outcome: publish starts after `/media approve <request_id|latest>`.\n"
-                        "Benefit: keeps outbound messaging aligned with operator intent."
-                    ),
-                    priority="high",
+            request_id = request.get("request_id")
+            status = request.get("status")
+
+            if status == "draft":
+                 await self.telegram.send_message(
+                    "📰 Request ignored (mode=draft_only).",
+                    priority="high"
                 )
-                return
-
-            await self.telegram.send_message(
-                (
-                    "📰 Media publish request queued for immediate delivery.\n"
-                    f"Request: `{request_id}`\n"
-                    f"Targets: `{targets_text}`\n"
-                    "Expected outcome: queue worker will post to ready channels now."
-                ),
-                priority="high",
-            )
-            await self._process_media_queue_once()
+            elif status == "pending_approval":
+                await self.telegram.send_message(
+                    f"📰 Request `{request_id}` is pending approval.",
+                    priority="high"
+                )
+            else:
+                await self.telegram.send_message(
+                    f"📰 Request `{request_id}` queued for delivery.",
+                    priority="high"
+                )
             return
 
         if normalized_action in {"MEDIA_APPROVE", "MEDIA_REQUEST_APPROVE"}:
             payload = self._parse_json_payload(target)
             request_id = str(payload.get("request_id", "")).strip() or str(target or "").strip()
-            note = str(payload.get("note", "")).strip()
-            result = self._approve_media_publish_request(request_id, note=note)
-            if not result.get("ok"):
-                await self.telegram.send_message(
-                    (
-                        "❌ Media approval failed.\n"
-                        f"Request: `{result.get('request_id', request_id or 'n/a')}`\n"
-                        f"Reason: `{result.get('error', 'unknown')}`"
-                    ),
-                    priority="high",
-                )
-                return
-
-            await self.telegram.send_message(
-                (
-                    "✅ Media request approved and queued.\n"
-                    f"Request: `{result.get('request_id', 'n/a')}`\n"
-                    f"Targets: `{', '.join(result.get('targets', [])) or 'none'}`\n"
-                    f"Queue depth: `{result.get('queue_depth', 0)}`"
-                ),
-                priority="high",
-            )
-            await self._process_media_queue_once()
+            if self.media_manager.approve_request(request_id):
+                await self.telegram.send_message(f"✅ Approved `{request_id}`.", priority="high")
+            else:
+                await self.telegram.send_message(f"❌ Failed to approve `{request_id}`.", priority="high")
             return
 
         if normalized_action in {"MEDIA_REJECT", "MEDIA_REQUEST_REJECT"}:
             payload = self._parse_json_payload(target)
             request_id = str(payload.get("request_id", "")).strip() or str(target or "").strip()
-            reason = str(payload.get("reason", "")).strip() or str(payload.get("note", "")).strip()
-            result = self._reject_media_publish_request(request_id, reason=reason)
-            if not result.get("ok"):
-                await self.telegram.send_message(
-                    (
-                        "❌ Media rejection failed.\n"
-                        f"Request: `{result.get('request_id', request_id or 'n/a')}`\n"
-                        f"Reason: `{result.get('error', 'unknown')}`"
-                    ),
-                    priority="high",
-                )
-                return
-
-            await self.telegram.send_message(
-                (
-                    "🛑 Media request rejected.\n"
-                    f"Request: `{result.get('request_id', 'n/a')}`\n"
-                    f"Targets: `{', '.join(result.get('targets', [])) or 'none'}`\n"
-                    f"Reason: `{result.get('reason', 'none') or 'none'}`"
-                ),
-                priority="high",
-            )
+            if self.media_manager.reject_request(request_id):
+                await self.telegram.send_message(f"🛑 Rejected `{request_id}`.", priority="high")
+            else:
+                await self.telegram.send_message(f"❌ Failed to reject `{request_id}`.", priority="high")
             return
 
         if normalized_action in {"SECURITY_STATUS", "VT_STATUS", "SKILL_SECURITY_STATUS"}:
@@ -2948,7 +2375,7 @@ class AlphaEngine:
             return
 
         if normalized_action == "REP_BAN_BOT":
-            gate.require(Capability.REPUTATION_ADMIN, agent="SAPPHIRE")
+            gate.require("SAPPHIRE", Capability.REPUTATION_ADMIN, "ban_bot_via_telegram")
             payload = self._parse_json_payload(target)
             bot_id = str(payload.get("bot_id", "")).strip()
             reason = str(payload.get("reason", "manual ban via Telegram"))[:200]
@@ -2967,7 +2394,7 @@ class AlphaEngine:
             return
 
         if normalized_action == "REP_PENALIZE_BOT":
-            gate.require(Capability.REPUTATION_ADMIN, agent="SAPPHIRE")
+            gate.require("SAPPHIRE", Capability.REPUTATION_ADMIN, "penalize_bot_via_telegram")
             payload = self._parse_json_payload(target)
             bot_id = str(payload.get("bot_id", "")).strip()
             reason = str(payload.get("reason", "manual penalty via Telegram"))[:200]
@@ -4043,7 +3470,7 @@ class AlphaEngine:
             agent = EMERALD if any(w in directive.lower() for w in ("strategy", "optimize", "improve", "review")) else SAPPHIRE
             await self.telegram.send_as(agent, f"Got it — steering updated: *{directive[:100]}*")
 
-            hook_result = await self.tv_autonomy.dispatch_owner_instruction(directive)
+            hook_result = await self.tv_autonomy.dispatch_owner_instruction(directive) if self.tv_autonomy else {"dispatched": False}
             if hook_result.get("dispatched"):
                 await self.telegram.send_message(
                     f"Dispatched to OpenClaw agents (`{hook_result.get('session_key', 'n/a')}`).",
@@ -4130,460 +3557,55 @@ class AlphaEngine:
             f"❌ Unknown control action `{normalized_action}`", priority="high"
         )
 
-    async def _handle_tradingview_signal(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """Process TradingView alerts into heartbeat/control/trade actions."""
+    async def _handle_alpha_scanner_signal(self, signal: Dict[str, Any]) -> None:
+        """Callback for internal alpha scanner — feeds signals into the execution pipeline."""
+        source = signal.get("source", "alpha_scanner")
+        symbol = signal.get("symbol", "")
+        action = signal.get("action", "")
+        confidence = signal.get("_confidence", 0)
+        reasoning = signal.get("_reasoning", "")[:200]
+
+        logger.info(
+            f"🔍 Alpha scanner signal: {action.upper()} {symbol} "
+            f"(conf={confidence:.2f}, source={source})"
+        )
+
+        # Record activity under EMERALD (strategy/analysis agent)
+        self.telegram.record_activity(
+            EMERALD, "alpha_signal",
+            f"{action.upper()} {symbol} (conf={confidence:.0%})",
+        )
+
+        # Feed into the same pipeline as TradingView signals
         try:
-            return await self._handle_tradingview_signal_inner(payload)
-        except PermissionDenied as exc:
-            logger.error(f"🚫 TV signal blocked by AgentGate: {exc}")
-            return {"accepted": "denied", "reason": str(exc)}
+            result = await self._handle_tradingview_signal(signal)
+            accepted = result.get("accepted", "unknown")
 
-    async def _handle_tradingview_signal_inner(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        merged_payload: Dict[str, Any] = dict(payload or {})
-        message_payload = self._parse_tradingview_message(merged_payload.get("message", ""))
-        if isinstance(message_payload, dict):
-            merged_payload.update({k: v for k, v in message_payload.items() if k not in merged_payload})
-
-        action_raw = self._extract_text_value(
-            merged_payload,
-            ["action", "side", "command", "signal", "event", "type"],
-        ).lower()
-        venue_raw = self._extract_text_value(
-            merged_payload,
-            ["venue", "platform", "exchange", "target", "bot"],
-            default="ALL",
-        )
-        symbol = self._extract_text_value(
-            merged_payload,
-            ["symbol", "ticker", "pair", "instrument"],
-            default="USDC",
-        ).upper()
-        quantity = self._extract_float_value(
-            merged_payload,
-            ["quantity", "qty", "size", "contracts", "notional"],
-            default=self._tradingview_default_quantity,
-        )
-        strategy_label = self._extract_text_value(
-            merged_payload,
-            ["strategy", "strategy_name", "alert_name", "name"],
-        ).strip().lower()
-        strategy_rule = (
-            self._tradingview_strategy_rules.get(strategy_label) if strategy_label else None
-        )
-        allocation_percent = self._extract_float_value(
-            merged_payload,
-            ["allocation", "allocation_percent", "percent"],
-            default=100.0,
-        )
-
-        normalized_action = action_raw.replace("-", "_")
-        normalized_target = self._normalize_platform(venue_raw or "ALL")
-
-        if not self._tradingview_integration_enabled:
-            return {
-                "accepted": "disabled",
-                "reason": "tradingview_integration_disabled",
-                "action": normalized_action or "unknown",
-                "target": normalized_target,
-            }
-
-        if self.tv_autonomy.is_workspace_action(normalized_action):
-            workspace_result = await self.tv_autonomy.handle_action(normalized_action, merged_payload)
-            result_type = workspace_result.get("accepted", "unknown")
-            if result_type in {
-                "workspace_updated",
-                "workspace_noop",
-                "scan_requested",
-                "backtest_requested",
-                "custom_requested",
-            }:
-                dispatch = workspace_result.get("dispatch", {})
-                dispatch_status = "yes" if dispatch.get("dispatched") else f"no ({dispatch.get('reason', 'n/a')})"
-                await self.telegram.send_message(
-                    (
-                        f"🧩 Workspace `{normalized_action}` -> `{result_type}`"
-                        f" (dispatch `{dispatch_status}`)"
-                    ),
-                    priority="medium",
+            if accepted == "executed":
+                await self.telegram.send_as(
+                    EMERALD,
+                    f"🔍 Internal alpha executed: `{action.upper()} {symbol}` "
+                    f"(conf={confidence:.0%})\n"
+                    f"Reasoning: {reasoning}",
                 )
-            elif result_type == "blocked":
-                await self.telegram.send_message(
-                    f"⚠️ TradingView workspace action blocked: `{workspace_result.get('reason', 'unknown')}`.",
-                    priority="high",
+            elif accepted == "dry_run":
+                await self.telegram.send_as(
+                    EMERALD,
+                    f"🔍 Alpha signal (dry-run): `{action.upper()} {symbol}` "
+                    f"(conf={confidence:.0%}) — enable `TRADINGVIEW_EXECUTION_ENABLED=true` to execute",
                 )
-            return workspace_result
+            else:
+                logger.info(f"Alpha signal {symbol}: pipeline returned {accepted}")
 
-        if normalized_action in {"heartbeat", "ping"}:
-            await self._send_heartbeat("tradingview")
-            return {"accepted": "heartbeat"}
-
-        if normalized_action in {"status", "control_status"}:
-            await self._send_control_status()
-            return {"accepted": "status"}
-
-        if normalized_action in {"kill", "halt", "halt_trading"}:
-            await self._handle_control_command(normalized_target, "HALT_TRADING", 0.0)
-            return {"accepted": "kill"}
-
-        if normalized_action in {"resume", "resume_trading"}:
-            await self._handle_control_command(normalized_target, "RESUME_TRADING", 0.0)
-            return {"accepted": "resume"}
-
-        if normalized_action in {"deallocate", "pause"}:
-            await self._handle_control_command(normalized_target, "SET_ALLOCATION", 0.0)
-            return {"accepted": "deallocate", "target": normalized_target}
-
-        if normalized_action in {"allocate", "set_allocation"}:
-            bounded = max(0.0, min(1.0, allocation_percent / 100.0))
-            await self._handle_control_command(normalized_target, "SET_ALLOCATION", bounded)
-            return {"accepted": "allocate", "target": normalized_target, "allocation": bounded}
-
-        if normalized_action not in {"buy", "sell", "close"}:
-            await self.telegram.send_message(
-                f"⚠️ TradingView alert ignored: unsupported action `{action_raw or 'missing'}`.",
-                priority="medium",
+            # Resolve pending count
+            self.alpha_scanner.resolve_signal(
+                result.get("signal_key", ""), accepted == "executed"
             )
-            return {"accepted": "ignored", "reason": "unsupported_action"}
+        except Exception as exc:
+            logger.error(f"Alpha scanner pipeline error: {exc}")
+            self.alpha_scanner.resolve_signal("", False)
 
-        if normalized_target == "ALL":
-            targets = list(dispatcher.bot_urls.keys())
-        else:
-            targets = [normalized_target]
 
-        unknown = [venue for venue in targets if venue not in dispatcher.bot_urls]
-        if unknown:
-            await self.telegram.send_message(
-                f"❌ TradingView target not enabled: `{', '.join(unknown)}`", priority="high"
-            )
-            return {"accepted": "rejected", "reason": "unknown_target"}
-
-        if self._tradingview_enforce_strategy_rules:
-            if not strategy_label:
-                await self.telegram.send_message(
-                    "⚠️ TradingView alert blocked: strategy label is required.",
-                    priority="high",
-                )
-                return {"accepted": "blocked", "reason": "missing_strategy"}
-            if strategy_rule is None:
-                await self.telegram.send_message(
-                    f"⚠️ TradingView alert blocked: unknown strategy `{strategy_label}`.",
-                    priority="high",
-                )
-                return {"accepted": "blocked", "reason": "unknown_strategy", "strategy": strategy_label}
-
-        if strategy_rule is not None:
-            strategy_venues = strategy_rule.get("venues", set())
-            if strategy_venues:
-                disallowed_strategy_targets = [venue for venue in targets if venue not in strategy_venues]
-                if disallowed_strategy_targets:
-                    await self.telegram.send_message(
-                        (
-                            f"⚠️ TradingView alert blocked: strategy `{strategy_label}` cannot target "
-                            f"`{', '.join(disallowed_strategy_targets)}`."
-                        ),
-                        priority="high",
-                    )
-                    return {
-                        "accepted": "blocked",
-                        "reason": "strategy_venue_mismatch",
-                        "targets": disallowed_strategy_targets,
-                        "strategy": strategy_label,
-                    }
-
-            strategy_symbols = strategy_rule.get("symbols", set())
-            if strategy_symbols and symbol not in strategy_symbols:
-                await self.telegram.send_message(
-                    (
-                        f"⚠️ TradingView alert blocked: `{symbol}` not allowed for strategy "
-                        f"`{strategy_label}`."
-                    ),
-                    priority="high",
-                )
-                return {
-                    "accepted": "blocked",
-                    "reason": "strategy_symbol_mismatch",
-                    "strategy": strategy_label,
-                }
-
-        disallowed_targets = [venue for venue in targets if not self._symbol_allowed_for_venue(venue, symbol)]
-        if disallowed_targets:
-            await self.telegram.send_message(
-                f"⚠️ TradingView alert blocked: `{symbol}` not allowed for `{', '.join(disallowed_targets)}`.",
-                priority="high",
-            )
-            return {"accepted": "blocked", "reason": "symbol_not_allowed", "targets": disallowed_targets}
-
-        if self._kill_switch_active:
-            await self.telegram.send_message(
-                "🛑 TradingView alert blocked because kill switch is active.",
-                priority="high",
-            )
-            return {"accepted": "blocked", "reason": "kill_switch"}
-
-        if quantity <= 0:
-            await self.telegram.send_message(
-                "⚠️ TradingView alert ignored: quantity missing or invalid.",
-                priority="medium",
-            )
-            return {"accepted": "ignored", "reason": "invalid_quantity"}
-
-        signal_key = self._build_signal_key(
-            merged_payload,
-            normalized_action.upper(),
-            targets,
-            symbol,
-            quantity,
-        )
-        if self._is_duplicate_signal(signal_key):
-            await self.telegram.send_message(
-                f"♻️ TradingView duplicate ignored: `{signal_key}` within {self._tradingview_idempotency_window_seconds}s window.",
-                priority="medium",
-            )
-            return {"accepted": "ignored", "reason": "duplicate_signal", "signal_key": signal_key}
-
-        per_target_quantity: Dict[str, float] = {}
-        capped_targets: List[str] = []
-        notional_adjusted_targets: List[str] = []
-        notional_blocked_targets: Dict[str, Dict[str, Any]] = {}
-        for venue in targets:
-            venue_cap = self._max_quantity_for_venue(venue)
-            strategy_cap = strategy_rule.get("max_quantity") if strategy_rule else None
-            if strategy_cap is not None:
-                venue_cap = strategy_cap if venue_cap is None else min(venue_cap, strategy_cap)
-            venue_qty = quantity
-            if venue_cap is not None and venue_qty > venue_cap:
-                venue_qty = venue_cap
-                capped_targets.append(venue)
-            quantity_guard = self._apply_min_notional_guard(venue, symbol, venue_qty)
-            if quantity_guard.get("blocked"):
-                notional_blocked_targets[venue] = quantity_guard
-                continue
-            if quantity_guard.get("adjusted"):
-                notional_adjusted_targets.append(venue)
-            per_target_quantity[venue] = float(quantity_guard.get("quantity", venue_qty))
-
-        executable_targets = [venue for venue in targets if venue not in notional_blocked_targets]
-        if not executable_targets:
-            blocked_fragments = [
-                f"{venue}:{details.get('reason', 'guard_blocked')}"
-                for venue, details in sorted(notional_blocked_targets.items())
-            ]
-            await self.telegram.send_message(
-                (
-                    "⚠️ TradingView alert blocked by min-notional guard on all targets.\n"
-                    f"Targets: `{'; '.join(blocked_fragments)}`"
-                ),
-                priority="high",
-            )
-            return {
-                "accepted": "blocked",
-                "reason": "min_notional_guard",
-                "targets": targets,
-                "blocked_targets": sorted(list(notional_blocked_targets.keys())),
-                "signal_key": signal_key,
-                "strategy": strategy_label or None,
-            }
-
-        if not self._tradingview_execution_enabled:
-            qty_parts = [f"{venue}:{per_target_quantity[venue]}" for venue in sorted(executable_targets)]
-            cap_note = (
-                f" Caps applied on `{', '.join(sorted(set(capped_targets)))}`."
-                if capped_targets
-                else ""
-            )
-            adjust_note = (
-                f" Min-notional adjustment applied on `{', '.join(sorted(set(notional_adjusted_targets)))}`."
-                if notional_adjusted_targets
-                else ""
-            )
-            blocked_note = (
-                f" Guard-blocked targets `{', '.join(sorted(notional_blocked_targets.keys()))}`."
-                if notional_blocked_targets
-                else ""
-            )
-            await self.telegram.send_message(
-                (
-                    f"📥 TradingView signal captured (workbench dry-run): `{normalized_action.upper()} {symbol}` "
-                    f"with quantities `{', '.join(qty_parts)}`. Set `TRADINGVIEW_EXECUTION_ENABLED=true` to execute."
-                    f"{cap_note}"
-                    f"{adjust_note}"
-                    f"{blocked_note}"
-                ),
-                priority="medium",
-            )
-            return {
-                "accepted": "dry_run",
-                "targets": executable_targets,
-                "signal_key": signal_key,
-                "quantities": per_target_quantity,
-                "capped_targets": sorted(set(capped_targets)),
-                "adjusted_targets": sorted(set(notional_adjusted_targets)),
-                "blocked_targets": sorted(list(notional_blocked_targets.keys())),
-                "strategy": strategy_label or None,
-            }
-
-        # ── Dual-Speed Cognition Pre-Trade Check ──────────────────
-        cognition_override = False
-        if self._cognition_enabled and normalized_action in ("buy", "sell"):
-            try:
-                snapshot = self.market_data.get_multi_symbol_snapshot()
-                # Build memory recall context
-                memory_advice = ""
-                if self._memory_enabled:
-                    market_snap = MarketSnapshot(prices={symbol: snapshot.get("ASTER", {}).get(symbol, {}).get("price", 0)})
-                    memory_advice = await self.memory.recall_for_decision(
-                        symbol=symbol,
-                        snapshot=market_snap,
-                        context=f"TradingView signal: {normalized_action.upper()} {symbol}",
-                    ) or ""
-
-                cognition_prompt = (
-                    f"TradingView signal: {normalized_action.upper()} {symbol}\n"
-                    f"Strategy: {strategy_label or 'default'}\n"
-                    f"Targets: {', '.join(executable_targets)}\n"
-                )
-                if memory_advice:
-                    safe_advice, advice_detection = sanitize_for_prompt(
-                        memory_advice, max_length=400, wrap_boundary=False,
-                    )
-                    if advice_detection.is_suspicious:
-                        log_injection_attempt(
-                            "memory_recall", advice_detection, agent_id="cognition",
-                        )
-                    cognition_prompt += f"Past experience: {safe_advice}\n"
-                cognition_prompt += (
-                    "Should we execute this trade? Consider risk and market conditions.\n"
-                    "Respond with DECISION: BUY/SELL/HOLD, CONFIDENCE: 0-1, REASONING: <why>"
-                )
-
-                cog_result = await self.cognition.process(
-                    CognitionRequest(
-                        prompt=cognition_prompt,
-                        speed=CognitionSpeed.DUAL,
-                        max_latency_ms=5000,
-                    )
-                )
-                logger.info(
-                    f"🧠 Cognition: {cog_result.decision} (conf={cog_result.confidence:.2f}, "
-                    f"override={cog_result.was_overridden}, latency={cog_result.latency_ms:.0f}ms)"
-                )
-                self.telegram.record_activity(
-                    EMERALD, "cognition",
-                    f"{cog_result.decision} {symbol} (conf={cog_result.confidence:.0%}, {cog_result.latency_ms:.0f}ms)",
-                )
-
-                # If cognition says HOLD with high confidence, block the trade
-                if cog_result.decision == "HOLD" and cog_result.confidence >= 0.7:
-                    cognition_override = True
-                    await self.telegram.send_as(
-                        SAPPHIRE,
-                        f"🧠 Cognition blocked {normalized_action.upper()} {symbol}: "
-                        f"{cog_result.reasoning[:200]}",
-                    )
-                    self._record_system_log(
-                        f"Cognition override: blocked {normalized_action.upper()} {symbol}",
-                        level="warning",
-                        tags=["cognition", "override"],
-                        metadata={"confidence": cog_result.confidence, "reasoning": cog_result.reasoning[:300]},
-                    )
-            except Exception as e:
-                logger.warning(f"Cognition pre-check failed (non-blocking): {e}")
-
-        if cognition_override:
-            return {
-                "accepted": "cognition_blocked",
-                "signal_key": signal_key,
-                "targets": executable_targets,
-                "reason": "Dual-speed cognition overrode the signal",
-            }
-
-        # ── Record episodic memory event ──────────────────────────
-        if self._memory_enabled:
-            try:
-                self.memory.record_action(
-                    f"Executing {normalized_action.upper()} {symbol} across {', '.join(executable_targets)}",
-                    {"action": normalized_action.upper(), "symbol": symbol, "signal_key": signal_key},
-                )
-            except Exception:
-                pass  # Memory is non-critical
-
-        # ── Permission gate: only SAPPHIRE may execute trades ────
-        gate.require("SAPPHIRE", Capability.TRADE_EXECUTE, f"tv_signal({normalized_action} {symbol})")
-
-        dispatch_results: Dict[str, bool] = {}
-        for venue in executable_targets:
-            dispatch_results[venue] = await dispatcher.send_command(
-                venue,
-                {
-                    "action": normalized_action.upper(),
-                    "symbol": symbol,
-                    "quantity": per_target_quantity[venue],
-                    "source": "tradingview_webhook",
-                    "signal_key": signal_key,
-                },
-            )
-            self.telegram.record_activity(
-                SAPPHIRE, "trade",
-                f"Dispatched {normalized_action.upper()} {per_target_quantity[venue]} {symbol} → {venue}",
-            )
-
-        failed_targets = [venue for venue, ok in dispatch_results.items() if not ok]
-        if failed_targets:
-            failed_details: List[str] = []
-            for venue in failed_targets:
-                dispatch_error = dispatcher.get_last_dispatch_error(venue)
-                failed_details.append(
-                    f"{venue}:{dispatch_error.get('reason', 'unknown')}:{dispatch_error.get('status', 'n/a')}"
-                )
-            if notional_blocked_targets:
-                failed_details.extend(
-                    [
-                        f"{venue}:{details.get('reason', 'guard_blocked')}:guard"
-                        for venue, details in sorted(notional_blocked_targets.items())
-                    ]
-                )
-            await self.telegram.send_message(
-                (
-                    f"❌ TradingView dispatch failed (`{signal_key}`).\n"
-                    f"Details: `{'; '.join(failed_details[:6])}`"
-                ),
-                priority="high",
-            )
-            return {
-                "accepted": "partial_failure",
-                "targets": executable_targets,
-                "failed_targets": failed_targets,
-                "signal_key": signal_key,
-                "quantities": per_target_quantity,
-                "capped_targets": sorted(set(capped_targets)),
-                "adjusted_targets": sorted(set(notional_adjusted_targets)),
-                "blocked_targets": sorted(list(notional_blocked_targets.keys())),
-                "strategy": strategy_label or None,
-            }
-
-        qty_parts = [f"{venue}:{per_target_quantity[venue]}" for venue in sorted(executable_targets)]
-        blocked_note = (
-            f" Blocked targets: `{', '.join(sorted(notional_blocked_targets.keys()))}`."
-            if notional_blocked_targets
-            else ""
-        )
-        await self.telegram.send_message(
-            (
-                f"✅ TradingView executed: `{normalized_action.upper()} {symbol}` with "
-                f"`{', '.join(qty_parts)}` (`{signal_key}`).{blocked_note}"
-            ),
-            priority="high",
-        )
-        return {
-            "accepted": "executed",
-            "targets": executable_targets,
-            "signal_key": signal_key,
-            "quantities": per_target_quantity,
-            "capped_targets": sorted(set(capped_targets)),
-            "adjusted_targets": sorted(set(notional_adjusted_targets)),
-            "blocked_targets": sorted(list(notional_blocked_targets.keys())),
-            "strategy": strategy_label or None,
-        }
 
     async def _record_trade_outcome(self, platform: str, success: bool, error_message: str = "") -> None:
         venue = self._normalize_platform(platform)
@@ -4748,10 +3770,66 @@ class AlphaEngine:
             except Exception as exc:
                 logger.error(f"Heartbeat loop error: {exc}")
 
+    async def _handle_telegram_message(self, text: str):
+        """Handle conversational messages via ChatIntentEngine."""
+        try:
+            intent = await self.chat_intent.analyze(text)
+            intent_type = intent.get("intent")
+            params = intent.get("parameters", {})
+
+            if intent_type == "status_report":
+                await self._send_status_snapshot()
+                
+            elif intent_type == "control_trading":
+                action = params.get("action", "").upper()
+                target = params.get("target", "ALL").upper()
+                value = float(params.get("value", 0.0))
+                
+                # Map generic actions to specifc control commands
+                if action == "PAUSE":
+                    await dispatcher.send_command(target, {"action": "HALT_TRADING", "quantity": 0.0, "source": "chat"})
+                    await self.telegram.send_message(f"🛑 Paused trading on `{target}`.")
+                elif action == "RESUME":
+                    await dispatcher.send_command(target, {"action": "RESUME_TRADING", "quantity": 0.0, "source": "chat"})
+                    await self.telegram.send_message(f"✅ Resumed trading on `{target}`.")
+                elif action == "SET_ALLOCATION":
+                    await dispatcher.send_command(target, {"action": "SET_ALLOCATION", "quantity": value, "source": "chat"})
+                    await self.telegram.send_message(f"⚖️ Set allocation for `{target}` to `{value:.2%}`.")
+                    
+            elif intent_type == "media_publish":
+                topic = params.get("topic", "market update")
+                targets = params.get("channels", ["twitter", "substack"])
+                await self.media_manager.request_publish(topic=topic, targets=targets)
+                await self.telegram.send_message(f"📝 Drafting content about `{topic}` for `{', '.join(targets)}`.")
+                
+            elif intent_type == "media_status":
+                status = self.media_manager.get_status_snapshot()
+                await self.telegram.send_message(f"📊 **Media Status**\nMode: `{status['mode']}`\nPending: `{status['pending_requests']}`")
+                
+            elif intent_type == "general_chat":
+                reply = params.get("reply")
+                if reply:
+                     await self.telegram.send_as(SAPPHIRE, reply)
+            
+            else:
+                 # Fallback
+                 await self.telegram.send_as(SAPPHIRE, "I heard you, but I'm not sure what action to take yet.")
+
+        except Exception as e:
+            logger.error(f"Chat intent handling failed: {e}")
+            await self.telegram.send_message("❌ I'm having trouble understanding that request right now.")
+
     async def _handle_telegram_command(
         self, platform: str, symbol: str, action: str, quantity: float
     ):
         """Callback for Telegram @mentions to trigger manual overrides."""
+        if not self._telegram_rate_limiter.check(action):
+            await self.telegram.send_message(
+                f"🛡️ Rate limit reached for `{action}`. Please wait before retrying.",
+                priority="medium",
+            )
+            return
+
         logger.warning(f"🚨 TELEGRAM OVERRIDE: {platform} {action} {quantity} {symbol}")
 
         try:
@@ -4859,21 +3937,30 @@ class AlphaEngine:
             tags=["system", "startup"],
         )
 
+        if self._kill_switch_active:
+            logger.warning(
+                "⚠️ Kill switch ACTIVE on startup (SAPPHIRE_KILL_SWITCH_ACTIVE=true). "
+                "Trading is halted until manually resumed."
+            )
+            self._record_system_log(
+                "Kill switch active on startup via SAPPHIRE_KILL_SWITCH_ACTIVE env var",
+                level="warning",
+                tags=["risk", "kill_switch", "startup"],
+            )
+
+        # Start Health Server (Cloud Run)
         # Start Health Server (Cloud Run)
         if self._telegram_webhook_mode:
             await start_health_server(
                 telegram_update_handler=self.telegram._process_update,
                 telegram_webhook_secret=self._telegram_webhook_secret,
                 control_api_token=self._control_api_token,
-                tradingview_update_handler=self._handle_tradingview_signal,
-                tradingview_webhook_secret=self._tradingview_webhook_secret,
                 market_ohlc_handler=self._handle_market_ohlc_request,
                 platform_status_handler=self._handle_platform_status_request,
                 control_status_handler=self._handle_control_status_request,
                 routing_info_handler=self._handle_routing_info_request,
                 performance_stats_handler=self._handle_performance_stats_request,
                 system_logs_handler=self._handle_system_logs_request,
-                tradingview_workspace_handler=self._handle_tradingview_workspace_request,
                 forum_topics_handler=self._handle_forum_topics_request,
                 forum_create_topic_handler=self._handle_forum_create_topic_request,
                 forum_topic_detail_handler=self._handle_forum_topic_detail_request,
@@ -4887,17 +3974,15 @@ class AlphaEngine:
         else:
             await start_health_server(
                 control_api_token=self._control_api_token,
-                tradingview_update_handler=self._handle_tradingview_signal,
-                tradingview_webhook_secret=self._tradingview_webhook_secret,
                 market_ohlc_handler=self._handle_market_ohlc_request,
                 platform_status_handler=self._handle_platform_status_request,
                 control_status_handler=self._handle_control_status_request,
                 routing_info_handler=self._handle_routing_info_request,
                 performance_stats_handler=self._handle_performance_stats_request,
                 system_logs_handler=self._handle_system_logs_request,
-                tradingview_workspace_handler=self._handle_tradingview_workspace_request,
                 forum_topics_handler=self._handle_forum_topics_request,
                 forum_create_topic_handler=self._handle_forum_create_topic_request,
+
                 forum_topic_detail_handler=self._handle_forum_topic_detail_request,
                 forum_replies_handler=self._handle_forum_replies_request,
                 forum_scout_status_handler=self._handle_forum_scout_status_request,
@@ -4922,7 +4007,7 @@ class AlphaEngine:
         else:
             asyncio.create_task(self.telegram.start_listener())
         self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
-        self._media_publish_task = asyncio.create_task(self._media_publish_loop())
+        await self.media_manager.start()
 
         # 2. Start Pub/Sub Listener for Trade Results
         asyncio.create_task(self._listen_for_trades())
@@ -4943,6 +4028,19 @@ class AlphaEngine:
             await self._dispatch_full_autonomy_cycle(trigger="startup_bootstrap", force=True)
         else:
             logger.info("Full autonomy loop disabled (SAPPHIRE_FULL_AUTONOMY_ENABLED=false)")
+
+        # 6. Start Internal Alpha Scanner (autonomous signal generation)
+        if self.alpha_scanner.enabled:
+            self._alpha_scanner_task = asyncio.create_task(
+                self.alpha_scanner.run_loop(self._handle_alpha_scanner_signal)
+            )
+            logger.info("🔍 Internal alpha scanner task started")
+            self.telegram.record_activity(
+                EMERALD, "alpha",
+                f"Alpha scanner active — symbols: {','.join(self.alpha_scanner._scan_symbols[:5])}",
+            )
+        else:
+            logger.info("Internal alpha scanner disabled (SAPPHIRE_ALPHA_SCANNER_ENABLED=false)")
 
         # Keep-alive loop
         while self.running:
@@ -5079,365 +4177,51 @@ class AlphaEngine:
         await subscribe("trade-executed", handle_trade)
 
     async def _handle_market_ohlc_request(self, query: Dict[str, Any]) -> Dict[str, Any]:
-        venue = self._normalize_platform(str(query.get("venue", "ASTER")))
-        if venue not in {"ASTER", "LIGHTER"}:
-            return {
-                "error": "unsupported_venue",
-                "message": "venue must be ASTER or LIGHTER",
-                "venue": venue,
-                "candles": [],
-            }
-
-        symbol = str(query.get("symbol", "SOL")).strip().upper() or "SOL"
-        interval = str(query.get("interval", "1m")).strip().lower() or "1m"
-        limit_raw = query.get("limit", "120")
-        try:
-            limit = int(limit_raw)
-        except (TypeError, ValueError):
-            limit = 120
-        limit = max(10, min(limit, 500))
-
-        ohlc = await self.market_data.fetch_ohlc(
-            venue=venue,
-            symbol=symbol,
-            interval=interval,
-            limit=limit,
-        )
-        ohlc["generated_at"] = int(time.time())
-        return ohlc
+        return await handle_market_ohlc(self, query)
 
     async def _handle_platform_status_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
-        snapshot = self.market_data.get_market_snapshot(symbol="SOL")
-        control_state = dispatcher.get_control_state()
-        strategy_state = self.strategy.execution_state()
-        platforms: Dict[str, Dict[str, Any]] = {}
-
-        for venue in ("ASTER", "LIGHTER"):
-            venue_state = control_state.get(venue, {"paused": True, "allocation": 0.0, "cooldown_until": 0.0})
-            market = snapshot.get(
-                venue,
-                {"price": 0.0, "status": "offline", "age_seconds": None, "last_tick_ts": None},
-            )
-            paused = bool(venue_state.get("paused", False) or venue_state.get("allocation", 0.0) <= 0)
-            feed_status = str(market.get("status", "offline")).lower()
-
-            if self._kill_switch_active:
-                status = "degraded"
-                mode = "Kill-switch halted"
-            elif paused:
-                status = "degraded" if feed_status in {"healthy", "degraded"} else "offline"
-                mode = "Paused allocation"
-            else:
-                status = "healthy" if feed_status == "healthy" else "degraded"
-                mode = "Autonomous ready" if status == "healthy" else "Awaiting fresh market ticks"
-
-            note = (
-                f"Allocation {float(venue_state.get('allocation', 0.0)) * 100:.0f}% | "
-                f"Tick age {market.get('age_seconds', 'n/a')}s"
-            )
-            platforms[venue.lower()] = {
-                "status": status,
-                "health": status,
-                "mode": mode,
-                "routing": "autonomous",
-                "note": note,
-                "price": market.get("price", 0.0),
-                "last_tick_ts": market.get("last_tick_ts"),
-                "age_seconds": market.get("age_seconds"),
-                "allocation": float(venue_state.get("allocation", 0.0)),
-                "paused": paused,
-            }
-
-        return {
-            "platforms": platforms,
-            "kill_switch_active": self._kill_switch_active,
-            "dex_execution_stage": strategy_state.get("dex_execution_stage", "paper"),
-            "dex_live_dispatch": bool(strategy_state.get("stage_multiplier", 0) > 0),
-            "dex_effective_quantity": float(strategy_state.get("effective_quantity", 0.0)),
-            "timestamp": int(time.time()),
-        }
+        return await handle_platform_status(self, _)
 
     async def _handle_control_status_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
-        return self._control_snapshot()
+        return await handle_control_status(self, _)
 
     async def _handle_routing_info_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
-        state = dispatcher.get_control_state()
-        strategy_state = self.strategy.execution_state()
-        active = [venue for venue, item in state.items() if not item.get("paused") and item.get("allocation", 0) > 0]
-        paused = [venue for venue, item in state.items() if item.get("paused") or item.get("allocation", 0) <= 0]
-        failure_pressure = int(sum(self._failure_counts.values()))
-        snapshot = self.market_data.get_market_snapshot(symbol="SOL")
-
-        if self._kill_switch_active:
-            confidence = 0.0
-            mode = "halted"
-        else:
-            healthy_active = sum(
-                1 for venue in active if snapshot.get(venue, {}).get("status") == "healthy"
-            )
-            confidence = 0.92
-            confidence -= min(0.45, failure_pressure * 0.08)
-            if len(active) < max(1, self._trading_gate_min_active_venues):
-                confidence -= 0.25
-            elif len(active) < 2:
-                confidence -= 0.08
-            if active and healthy_active < len(active):
-                confidence -= 0.15
-            confidence = max(0.05, min(0.99, confidence))
-            mode = "autonomous" if confidence >= 0.7 else "guarded"
-
-        return {
-            "mode": mode,
-            "strategy": "policy-gated",
-            "confidence": float(round(confidence, 4)),
-            "data": {
-                "confidence": float(round(confidence, 4)),
-            },
-            "routing": {
-                "confidence": float(round(confidence, 4)),
-                "active_venues": active,
-                "paused_venues": paused,
-                "failure_pressure": failure_pressure,
-                "kill_switch_active": self._kill_switch_active,
-                "dex_execution_stage": strategy_state.get("dex_execution_stage", "paper"),
-                "dex_live_dispatch": bool(strategy_state.get("stage_multiplier", 0) > 0),
-            },
-            "timestamp": int(time.time()),
-        }
+        return await handle_routing_info(self, _)
 
     async def _handle_performance_stats_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
-        total_trades = int(self._trade_metrics["total_trades"])
-        wins = int(self._trade_metrics["wins"])
-        losses = int(self._trade_metrics["losses"])
-        win_rate = float((wins / total_trades) * 100.0) if total_trades > 0 else 0.0
-        uptime_seconds = int(max(0, time.time() - self._started_at))
-        failure_pressure = int(sum(self._failure_counts.values()))
-
-        return {
-            "metrics": {
-                "system": {
-                    "total_trades": total_trades,
-                    "wins": wins,
-                    "losses": losses,
-                    "win_rate": round(win_rate, 2),
-                    "realized_pnl": float(round(self._trade_metrics["realized_pnl"], 6)),
-                    "uptime_seconds": uptime_seconds,
-                    "failure_pressure": failure_pressure,
-                    "autonomy_dispatch_count": int(self._autonomy_dispatch_count),
-                }
-            },
-            "timestamp": int(time.time()),
-        }
+        return await handle_performance_stats(self, _)
 
     async def _handle_system_logs_request(self, payload: Dict[str, Any]) -> List[Dict[str, Any]]:
-        limit_raw = payload.get("limit", 80)
-        try:
-            limit = int(limit_raw)
-        except (TypeError, ValueError):
-            limit = 80
-        limit = max(1, min(limit, self._system_log_max_entries))
-        return list(self._system_logs)[-limit:]
+        return await handle_system_logs(self, payload)
 
-    async def _handle_tradingview_workspace_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
-        if not self._tradingview_integration_enabled:
-            snapshot = self.tv_autonomy.status_snapshot()
-            snapshot["enabled"] = False
-            snapshot["reason"] = "tradingview_integration_disabled"
-            return {
-                "workspace": snapshot,
-                "timestamp": int(time.time()),
-            }
 
-        snapshot = self.tv_autonomy.status_snapshot()
-        return {
-            "workspace": snapshot,
-            "timestamp": int(time.time()),
-        }
 
     async def _handle_security_skills_status_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
-        status = self.vt_scanner.status()
-        status["timestamp"] = int(time.time())
-        return status
+        return await handle_security_skills_status(self, _)
 
     async def _handle_security_skill_scan_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        requested_skill = str(payload.get("skill", "")).strip()
-        upload_if_missing_raw = payload.get("upload_if_missing", self.vt_scanner.upload_if_missing_default)
-        upload_if_missing = str(upload_if_missing_raw).strip().lower() in {"1", "true", "yes", "on"}
-
-        if requested_skill and requested_skill.lower() != "all":
-            result = await self.vt_scanner.scan_skill(
-                requested_skill,
-                upload_if_missing=upload_if_missing,
-            )
-            if result.get("ok"):
-                security = result.get("security", {})
-                self._record_system_log(
-                    f"VirusTotal scan completed for {requested_skill}",
-                    level="info",
-                    tags=["security", "virustotal", "skills"],
-                    metadata={
-                        "skill": requested_skill,
-                        "verdict": security.get("verdict", "unknown"),
-                        "policy_blocked": bool(
-                            (security.get("policy", {}) or {}).get("blocked", False)
-                        ),
-                    },
-                )
-            return result
-
-        batch_result = await self.vt_scanner.scan_all_skills(upload_if_missing=upload_if_missing)
-        if batch_result.get("ok"):
-            self._record_system_log(
-                "VirusTotal batch scan completed",
-                level="info",
-                tags=["security", "virustotal", "skills"],
-                metadata={
-                    "skills_scanned": int(batch_result.get("skills_scanned", 0)),
-                    "counts": batch_result.get("counts", {}),
-                    "blocked_count": int(batch_result.get("blocked_count", 0)),
-                },
-            )
-        return batch_result
+        return await handle_security_skill_scan(self, payload)
 
     async def _handle_forum_topics_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        board = self.forum.list_topics(payload)
-        control = self._control_snapshot()
-        return {
-            **board,
-            "control": {
-                "pending_autonomy_decisions": int(control.get("pending_autonomy_decisions", 0)),
-                "owner_directive": str(control.get("owner_directive", "") or ""),
-                "failure_pressure": int(control.get("failure_pressure", 0)),
-            },
-            "timestamp": int(time.time()),
-        }
+        return await handle_forum_topics(self, payload)
 
     async def _handle_forum_topic_detail_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        topic_id = str(payload.get("topic_id", "")).strip()
-        if not topic_id:
-            return {"error": "topic_id_required"}
-        topic = self.forum.get_topic_detail(topic_id)
-        if not topic:
-            return {"error": "topic_not_found", "topic_id": topic_id}
-        return {"topic": topic, "timestamp": int(time.time())}
+        return await handle_forum_topic_detail(self, payload)
 
     async def _handle_forum_create_topic_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        author = str(payload.get("author", "SAPPHIRE")).strip().upper()
-        gate.require(author, Capability.FORUM_WRITE, f"create_topic(author={author})")
-        try:
-            topic = self.forum.create_topic(
-                {
-                    "title": payload.get("title", ""),
-                    "body": payload.get("body", ""),
-                    "lane": payload.get("lane", "research"),
-                    "category": payload.get("category", "general"),
-                    "state": payload.get("state", "open"),
-                    "priority": payload.get("priority", "medium"),
-                    "author": payload.get("author", "SAPPHIRE"),
-                    "tags": payload.get("tags", []),
-                    "source": payload.get("source", "internal"),
-                }
-            )
-        except ValueError as exc:
-            return {"error": str(exc)}
-
-        self._record_system_log(
-            f"Forum topic created: {topic.get('topic_id', 'unknown')}",
-            level="info",
-            tags=["forum", "topic"],
-            metadata={
-                "topic_id": topic.get("topic_id", ""),
-                "lane": topic.get("lane", ""),
-                "priority": topic.get("priority", ""),
-            },
-        )
-        return {"topic": topic, "timestamp": int(time.time())}
+        return await handle_forum_create_topic(self, payload)
 
     async def _handle_forum_replies_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        topic_id = str(payload.get("topic_id", "")).strip()
-        if not topic_id:
-            return {"error": "topic_id_required"}
-
-        body = str(payload.get("body", "")).strip()
-        if not body:
-            return {"error": "body_required"}
-
-        try:
-            reply = self.forum.add_reply(
-                topic_id,
-                {
-                    "body": body,
-                    "author": payload.get("author", "SAPPHIRE"),
-                    "kind": payload.get("kind", "comment"),
-                    "state": payload.get("state", ""),
-                    "source": payload.get("source", "internal"),
-                    "parent_reply_id": payload.get("parent_reply_id", ""),
-                },
-            )
-        except ValueError as exc:
-            return {"error": str(exc)}
-
-        self._record_system_log(
-            f"Forum reply added to {topic_id}",
-            level="info",
-            tags=["forum", "reply"],
-            metadata={"topic_id": topic_id, "reply_id": reply.get("reply_id", "")},
-        )
-        return {"reply": reply, "timestamp": int(time.time())}
+        return await handle_forum_replies(self, payload)
 
     async def _handle_forum_scout_status_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
-        return self.forum.scout_status()
+        return await handle_forum_scout_status(self, _)
 
     async def _handle_forum_scout_register_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        result = await self.forum.register_scout_account(payload)
-        if result.get("ok"):
-            dispatch = result.get("dispatch", {}) or {}
-            mode = str(dispatch.get("mode", "none")).strip() or "none"
-            metadata = dispatch.get("metadata", {}) if isinstance(dispatch, dict) else {}
-            metadata = metadata if isinstance(metadata, dict) else {}
-            username = result.get("registration", {}).get("username", "unknown")
-            if dispatch.get("dispatched"):
-                lines = [
-                    "🛰️ Scout registration processed.",
-                    f"Mode: `{mode}`",
-                    f"User: `@{username}`",
-                    "Outcome: least-privilege external collaboration scout is active.",
-                ]
-                if metadata.get("claim_url"):
-                    lines.append(f"Action: complete claim in Moltbook once using `{metadata.get('claim_url')}`.")
-                elif metadata.get("already_registered"):
-                    lines.append("Action: existing claimed scout account detected; no re-registration needed.")
-                await self.telegram.send_message(
-                    "\n".join(lines),
-                    priority="medium",
-                )
-            else:
-                lines = [
-                    "🛰️ Scout registration prepared locally; external provider blocked dispatch.",
-                    f"Mode: `{mode}`",
-                    f"Reason: `{dispatch.get('reason', 'not_configured')}`",
-                    "Benefit preserved: local SapphireBook record exists for retry/audit without exposing sensitive data.",
-                ]
-                if metadata.get("hint"):
-                    lines.append(f"Hint: {metadata.get('hint')}")
-                await self.telegram.send_message(
-                    "\n".join(lines),
-                    priority="medium",
-                )
-        return result
+        return await handle_forum_scout_register(self, payload)
 
     async def _handle_forum_scout_publish_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        result = await self.forum.publish_scout_note(payload)
-        if result.get("ok"):
-            dispatch = result.get("dispatch", {}) or {}
-            if not dispatch.get("dispatched"):
-                self._record_system_log(
-                    "Scout outbound note stored locally; external publish pending",
-                    level="warning",
-                    tags=["forum", "scout"],
-                    metadata={"reason": dispatch.get("reason", "not_configured")},
-                )
-        return result
+        return await handle_forum_scout_publish(self, payload)
 
     async def stop(self):
         logger.info("🛑 Stopping Alpha Engine...")
@@ -5446,8 +4230,7 @@ class AlphaEngine:
             self._heartbeat_task.cancel()
         if self._autonomy_task:
             self._autonomy_task.cancel()
-        if self._media_publish_task:
-            self._media_publish_task.cancel()
+        await self.media_manager.stop()
         await self.market_data.stop()
         await self.strategy.stop()
         await dispatcher.stop()

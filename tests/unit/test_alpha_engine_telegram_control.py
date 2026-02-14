@@ -9,7 +9,6 @@ import pytest
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 TELEGRAM_BOT_PATH = ROOT_DIR / "services/alpha-engine/shared/telegram_bot.py"
-AUTONOMY_PLUGIN_PATH = ROOT_DIR / "services/alpha-engine/src/integrations/tradingview_autonomy.py"
 
 
 def _load_module(path: Path, module_name: str):
@@ -30,9 +29,6 @@ def telegram_module():
     return _load_module(TELEGRAM_BOT_PATH, "alpha_engine_telegram_bot")
 
 
-@pytest.fixture(scope="module")
-def autonomy_module():
-    return _load_module(AUTONOMY_PLUGIN_PATH, "alpha_engine_tradingview_autonomy")
 
 
 def test_approve_command_dispatches_session_payload(telegram_module):
@@ -754,91 +750,6 @@ def test_digest_builder_summarizes_structured_ack_messages(telegram_module):
     assert any("VirusTotal scan request queued" in line for line in lines)
     assert any("outcome" in line for line in lines)
     assert any("x2" in line for line in lines)
-
-
-def test_dispatch_session_decision_payload(autonomy_module, monkeypatch):
-    plugin = autonomy_module.TradingViewAutonomyPlugin(_DummyMarketData(), default_chat_id="12345")
-
-    async def fake_dispatch(action, payload, note, agent_id=""):
-        return {
-            "dispatched": True,
-            "action": action,
-            "payload": payload,
-            "note": note,
-            "agent_id": agent_id,
-            "session_key": "dispatch-session-key",
-        }
-
-    monkeypatch.setattr(plugin, "_dispatch_to_openclaw", fake_dispatch)
-
-    result = asyncio.run(
-        plugin.dispatch_session_decision(
-            session_key="hook:tradingview:abc123",
-            decision="approve",
-            note="looks good",
-        )
-    )
-
-    assert result["dispatched"] is True
-    assert result["action"] == "session_approve"
-    assert result["payload"]["decision"] == "APPROVE"
-    assert result["payload"]["session_key"] == "hook:tradingview:abc123"
-    assert result["payload"]["note"] == "looks good"
-
-
-def test_dispatch_session_decision_rejects_invalid_inputs(autonomy_module):
-    plugin = autonomy_module.TradingViewAutonomyPlugin(_DummyMarketData(), default_chat_id="12345")
-
-    missing_key = asyncio.run(
-        plugin.dispatch_session_decision(
-            session_key="",
-            decision="approve",
-            note="",
-        )
-    )
-    assert missing_key["dispatched"] is False
-    assert missing_key["reason"] == "session_key_missing"
-
-    invalid_decision = asyncio.run(
-        plugin.dispatch_session_decision(
-            session_key="hook:one",
-            decision="maybe",
-            note="",
-        )
-    )
-    assert invalid_decision["dispatched"] is False
-    assert invalid_decision["reason"] == "invalid_decision"
-
-
-def test_tradingview_backtest_action_dispatches_workbench_request(autonomy_module, monkeypatch):
-    plugin = autonomy_module.TradingViewAutonomyPlugin(_DummyMarketData(), default_chat_id="12345")
-
-    async def fake_dispatch(action, payload, note, agent_id=""):
-        return {
-            "dispatched": True,
-            "action": action,
-            "payload": payload,
-            "note": note,
-            "agent_id": agent_id,
-        }
-
-    monkeypatch.setattr(plugin, "_dispatch_to_openclaw", fake_dispatch)
-
-    result = asyncio.run(
-        plugin.handle_action(
-            "tv_backtest",
-            {
-                "strategy": "tv-aster-breakout",
-                "symbol": "SOL",
-                "timeframe": "15",
-            },
-        )
-    )
-
-    assert result["accepted"] == "backtest_requested"
-    assert result["dispatch"]["dispatched"] is True
-    assert result["dispatch"]["action"] == "tv_backtest"
-    assert "workspace" in result
 
 
 # ── Phase 3: Forum Telegram command parsing ────────────────────
