@@ -91,6 +91,17 @@ ADVERSARIAL_STRINGS = [
     "outreach post '; DROP TABLE-- BTC",
     "/outreach post general_invite",
     "/outreach post __proto__",
+    "task create '; DROP TABLE--",
+    "task list",
+    "task list SAPPHIRE",
+    "task update TASK-00001 completed",
+    "task report",
+    "task summary",
+    "task agent EMERALD",
+    "/task create __proto__",
+    "/task list '; DROP TABLE--",
+    "/task update TASK-00001 '; DROP TABLE--",
+    "/task agent __proto__",
 ]
 
 

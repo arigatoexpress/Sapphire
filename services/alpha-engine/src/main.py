@@ -16,6 +16,7 @@ from src.collaboration.reputation import BotReputationService
 from src.collaboration.swarm import SwarmAggregator
 from src.collaboration.learning import SwarmLearning
 from src.collaboration.molthub_outreach import MolthubOutreach
+from src.collaboration.task_manager import TaskManager
 from src.execution.dispatcher import dispatcher
 from src.execution.portfolio import PortfolioTracker
 from src.feeds.market_data import MarketDataAggregator
@@ -197,6 +198,7 @@ class AlphaEngine:
         self.swarm = SwarmAggregator(reputation=self.reputation)
         self.learning = SwarmLearning()
         self.outreach = MolthubOutreach()
+        self.tasks = TaskManager()
         self.vt_scanner = VirusTotalSkillScanner()
         requested_media_mode = self._normalize_media_mode(
             os.getenv("SAPPHIRE_MEDIA_MODE", "owner_approval")
@@ -3239,6 +3241,216 @@ class AlphaEngine:
             for t in templates:
                 sym_note = " _(requires symbol)_" if t["requires_symbol"] else ""
                 lines.append(f"• `{t['name']}` — {t['title']}{sym_note}")
+            await self.telegram.send_message("\n".join(lines), priority="medium")
+            return
+
+        # ── Phase 5: Task Management ──────────────────────────────────
+
+        if normalized_action == "TASK_CREATE":
+            payload = self._parse_json_payload(target)
+            title = str(payload.get("title", "")).strip()
+            if not title:
+                parts = str(target or "").strip().split("|")
+                title = parts[0].strip() if parts else ""
+            if not title:
+                await self.telegram.send_message(
+                    "❌ Task title required. Use `task create <title>`.",
+                    priority="high",
+                )
+                return
+            phase = str(payload.get("phase", "")).strip()
+            agent = str(payload.get("agent", "UNASSIGNED")).strip()
+            priority = str(payload.get("priority", "medium")).strip()
+            description = str(payload.get("description", "")).strip()
+            tags_raw = payload.get("tags")
+            tags = tags_raw if isinstance(tags_raw, list) else None
+            result = self.tasks.create_task(
+                title=title,
+                phase=phase,
+                agent=agent,
+                priority=priority,
+                description=description,
+                tags=tags,
+            )
+            if result.get("ok"):
+                task = result["task"]
+                self.telegram.record_activity(
+                    EMERALD, "task", f"Created {task['task_id']}: {task['title']}"
+                )
+                await self.telegram.send_message(
+                    f"✅ Task created: `{task['task_id']}`\n"
+                    f"Title: {task['title']}\n"
+                    f"Agent: {task['agent']} | Priority: {task['priority']}\n"
+                    f"Status: {task['status']}",
+                    priority="medium",
+                )
+            else:
+                await self.telegram.send_message(
+                    f"❌ Task creation failed: {result.get('error', 'unknown')}",
+                    priority="high",
+                )
+            return
+
+        if normalized_action == "TASK_LIST":
+            payload = self._parse_json_payload(target)
+            phase = str(payload.get("phase", "")).strip()
+            agent = str(payload.get("agent", "")).strip()
+            status_filter = str(payload.get("status", "")).strip()
+            result = self.tasks.list_tasks(
+                phase=phase, agent=agent, status=status_filter, limit=20
+            )
+            tasks_list = result.get("tasks", [])
+            if not tasks_list:
+                await self.telegram.send_message(
+                    "📋 No tasks found matching filters.",
+                    priority="medium",
+                )
+                return
+            lines = [f"📋 **Tasks** ({result['showing']}/{result['total']})\n"]
+            status_emoji = {
+                "pending": "⏳", "in_progress": "🔄",
+                "completed": "✅", "blocked": "🚫", "cancelled": "❌",
+            }
+            for t in tasks_list:
+                emoji = status_emoji.get(t["status"], "•")
+                lines.append(
+                    f"{emoji} `{t['task_id']}` — {t['title']}\n"
+                    f"   Agent: {t['agent']} | {t['priority']} | {t['status']}"
+                )
+            await self.telegram.send_message("\n".join(lines), priority="medium")
+            return
+
+        if normalized_action == "TASK_UPDATE":
+            payload = self._parse_json_payload(target)
+            task_id = str(payload.get("task_id", "")).strip()
+            if not task_id:
+                parts = str(target or "").strip().split()
+                task_id = parts[0] if parts else ""
+            if not task_id:
+                await self.telegram.send_message(
+                    "❌ Task ID required. Use `task update <TASK-ID> <status>`.",
+                    priority="high",
+                )
+                return
+            new_status = str(payload.get("status", "")).strip()
+            new_priority = str(payload.get("priority", "")).strip()
+            new_agent = str(payload.get("agent", "")).strip()
+            result = self.tasks.update_task(
+                task_id=task_id,
+                status=new_status,
+                priority=new_priority,
+                agent=new_agent,
+            )
+            if result.get("ok"):
+                task = result["task"]
+                self.telegram.record_activity(
+                    EMERALD, "task", f"Updated {task['task_id']}: status={task['status']}"
+                )
+                await self.telegram.send_message(
+                    f"✅ Task updated: `{task['task_id']}`\n"
+                    f"Status: {task['status']} | Priority: {task['priority']}\n"
+                    f"Agent: {task['agent']}",
+                    priority="medium",
+                )
+            else:
+                await self.telegram.send_message(
+                    f"❌ Update failed: {result.get('error', 'unknown')}",
+                    priority="high",
+                )
+            return
+
+        if normalized_action == "TASK_REPORT":
+            payload = self._parse_json_payload(target)
+            phase = str(payload.get("phase", "")).strip()
+            agent = str(payload.get("agent", "")).strip()
+            result = self.tasks.progress_report(phase=phase, agent=agent)
+            if result["total"] == 0:
+                await self.telegram.send_message(
+                    "📊 No tasks to report on.",
+                    priority="medium",
+                )
+                return
+            ms = result["milestones_summary"]
+            dlv = result["deliverables_summary"]
+            lines = [
+                "📊 **Task Progress Report**\n",
+                f"Total tasks: {result['total']}",
+                f"Completion: {result['completion_rate'] * 100:.1f}%\n",
+                "**By status:**",
+            ]
+            for s, count in sorted(result["by_status"].items()):
+                lines.append(f"  • {s}: {count}")
+            lines.append("\n**By agent:**")
+            for a, info in sorted(result["by_agent"].items()):
+                lines.append(
+                    f"  • {a}: {info['completed']}/{info['total']} done"
+                    + (f" ({info['in_progress']} active)" if info.get("in_progress") else "")
+                )
+            lines.append(
+                f"\nMilestones: {ms['completed']}/{ms['total']} done"
+            )
+            lines.append(
+                f"Deliverables: {dlv['verified']}/{dlv['total']} verified"
+            )
+            await self.telegram.send_message("\n".join(lines), priority="medium")
+            return
+
+        if normalized_action == "TASK_SUMMARY":
+            result = self.tasks.summary()
+            lines = [
+                "📋 **Task Summary**\n",
+                f"Tasks: {result['total_tasks']}",
+                f"Milestones: {result['total_milestones']}",
+                f"Deliverables: {result['total_deliverables']}",
+            ]
+            if result.get("by_status"):
+                lines.append("\n**Status:**")
+                for s, c in sorted(result["by_status"].items()):
+                    lines.append(f"  • {s}: {c}")
+            if result.get("agents"):
+                lines.append("\n**Agents:**")
+                for a, c in sorted(result["agents"].items()):
+                    lines.append(f"  • {a}: {c}")
+            await self.telegram.send_message("\n".join(lines), priority="medium")
+            return
+
+        if normalized_action == "TASK_AGENT_REPORT":
+            payload = self._parse_json_payload(target)
+            agent = str(payload.get("agent", "")).strip().upper()
+            if not agent:
+                agent = str(target or "").strip().upper().split()[0] if target else ""
+            if not agent:
+                await self.telegram.send_message(
+                    "❌ Agent name required. Use `task agent <AGENT>`.",
+                    priority="high",
+                )
+                return
+            result = self.tasks.agent_report(agent)
+            if not result.get("ok"):
+                await self.telegram.send_message(
+                    f"❌ {result.get('error', 'Agent report failed.')}",
+                    priority="high",
+                )
+                return
+            if result["total"] == 0:
+                await self.telegram.send_message(
+                    f"📊 No tasks assigned to {agent}.",
+                    priority="medium",
+                )
+                return
+            lines = [
+                f"📊 **{agent} Task Report**\n",
+                f"Total: {result['total']} | Done: {result['completed']} | Active: {result['in_progress']}",
+                f"Blocked: {result['blocked']} | Completion: {result['completion_rate'] * 100:.1f}%\n",
+            ]
+            status_emoji = {
+                "pending": "⏳", "in_progress": "🔄",
+                "completed": "✅", "blocked": "🚫", "cancelled": "❌",
+            }
+            for t in result["tasks"][:15]:
+                emoji = status_emoji.get(t["status"], "•")
+                ms_str = f" MS:{t['milestones_done']}/{t['milestones_total']}" if t["milestones_total"] else ""
+                lines.append(f"{emoji} `{t['task_id']}` {t['title']}{ms_str}")
             await self.telegram.send_message("\n".join(lines), priority="medium")
             return
 
