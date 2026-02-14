@@ -2,8 +2,10 @@ import asyncio
 import json
 import logging
 import os
-from typing import Any, Awaitable, Callable, Optional
+import time
+from typing import Any, Awaitable, Callable, List, Optional, Set
 
+import aiohttp
 from aiohttp import web
 
 logger = logging.getLogger(__name__)
@@ -490,6 +492,137 @@ async def prediction_dashboard(request: web.Request) -> web.Response:
     return web.json_response({"ok": True}, status=200)
 
 
+# ── WebSocket Dashboard Push ─────────────────────────────────────────
+
+_WS_PUSH_INTERVAL = float(os.getenv("WS_PUSH_INTERVAL", "5"))  # seconds
+_WS_MAX_CLIENTS = int(os.getenv("WS_MAX_CLIENTS", "50"))
+
+
+async def _ws_dashboard_handler(request: web.Request) -> web.WebSocketResponse:
+    """WebSocket endpoint that pushes dashboard snapshots to connected frontends.
+
+    The frontend connects once, receives an initial snapshot immediately, then
+    gets periodic pushes every WS_PUSH_INTERVAL seconds.  The client can send
+    'ping' for keep-alive; all other incoming data is ignored.
+
+    Origin is validated against the CORS allowlist to prevent abuse.
+    """
+    ws = web.WebSocketResponse(heartbeat=30.0)
+
+    # Validate origin
+    origin = (request.headers.get("Origin") or "").strip()
+    allowed: set[str] = request.app.get("cors_allowlist", set())
+    if origin and allowed and "*" not in allowed and origin not in allowed:
+        return web.Response(text="FORBIDDEN", status=403)
+
+    clients: list[web.WebSocketResponse] = request.app["_ws_clients"]
+    if len(clients) >= _WS_MAX_CLIENTS:
+        return web.Response(text="TOO_MANY_CONNECTIONS", status=503)
+
+    await ws.prepare(request)
+    clients.append(ws)
+    logger.info(f"WS client connected (origin={origin}). Total: {len(clients)}")
+
+    try:
+        # Send initial snapshot immediately
+        snapshot = await _build_dashboard_snapshot(request.app)
+        await ws.send_json({"type": "init", **snapshot})
+
+        # Keep alive: respond to pings, ignore other messages
+        async for msg in ws:
+            if msg.type == aiohttp.WSMsgType.TEXT:
+                if msg.data == "ping":
+                    await ws.send_str("pong")
+            elif msg.type in (aiohttp.WSMsgType.ERROR, aiohttp.WSMsgType.CLOSE):
+                break
+    finally:
+        if ws in clients:
+            clients.remove(ws)
+        logger.info(f"WS client disconnected. Total: {len(clients)}")
+
+    return ws
+
+
+async def _build_dashboard_snapshot(app: web.Application) -> dict[str, Any]:
+    """Gather a full dashboard snapshot from registered handlers.
+
+    Calls the same handlers the REST endpoints use so the frontend gets
+    identical data structures.  Each handler is called with best-effort —
+    if any fails the corresponding key is set to None.
+    """
+    async def _safe_call(key: str, payload: dict[str, Any] | None = None) -> Any:
+        handler = app.get(key)
+        if handler is None:
+            return None
+        try:
+            return await handler(payload or {})
+        except Exception as exc:
+            logger.debug(f"WS snapshot handler '{key}' error: {exc}")
+            return None
+
+    control, perf, platforms = await asyncio.gather(
+        _safe_call("control_status_handler"),
+        _safe_call("performance_stats_handler"),
+        _safe_call("platform_status_handler"),
+        return_exceptions=True,
+    )
+
+    return {
+        "control": control if isinstance(control, dict) else None,
+        "performance": perf if isinstance(perf, dict) else None,
+        "platforms": platforms if isinstance(platforms, dict) else None,
+        "timestamp": time.time(),
+    }
+
+
+async def _ws_push_loop(app: web.Application) -> None:
+    """Background task that pushes snapshots to all connected WS clients."""
+    while True:
+        await asyncio.sleep(_WS_PUSH_INTERVAL)
+        clients: list[web.WebSocketResponse] = app.get("_ws_clients", [])
+        if not clients:
+            continue
+
+        try:
+            snapshot = await _build_dashboard_snapshot(app)
+            payload = json.dumps({"type": "snapshot", **snapshot})
+        except Exception as exc:
+            logger.debug(f"WS push snapshot build error: {exc}")
+            continue
+
+        dead: list[web.WebSocketResponse] = []
+        for ws in clients:
+            if ws.closed:
+                dead.append(ws)
+                continue
+            try:
+                await ws.send_str(payload)
+            except Exception:
+                dead.append(ws)
+
+        for ws in dead:
+            if ws in clients:
+                clients.remove(ws)
+
+
+async def _start_ws_push(app: web.Application) -> None:
+    app["_ws_push_task"] = asyncio.create_task(_ws_push_loop(app))
+
+
+async def _stop_ws_push(app: web.Application) -> None:
+    task = app.get("_ws_push_task")
+    if task and not task.done():
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+    # Close any remaining WS connections
+    for ws in list(app.get("_ws_clients", [])):
+        if not ws.closed:
+            await ws.close()
+
+
 async def start_health_server(
     telegram_update_handler: Optional[Callable[[dict[str, Any]], Awaitable[None]]] = None,
     telegram_webhook_secret: str = "",
@@ -521,9 +654,13 @@ async def start_health_server(
     app = web.Application(middlewares=[cors_middleware])
     app["cors_allowlist"] = _build_cors_allowlist()
     app["control_api_token"] = (control_api_token or "").strip()
+    app["_ws_clients"] = []
+    app.on_startup.append(_start_ws_push)
+    app.on_cleanup.append(_stop_ws_push)
     app.router.add_get("/", health_check)
     app.router.add_get("/health", health_check)
     app.router.add_get("/readiness", readiness_check)
+    app.router.add_get("/ws", _ws_dashboard_handler)
     if telegram_update_handler is not None:
         app["telegram_update_handler"] = telegram_update_handler
         app["telegram_webhook_secret"] = (telegram_webhook_secret or "").strip()
