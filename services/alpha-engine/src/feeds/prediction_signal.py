@@ -47,6 +47,7 @@ class PredictionSignal:
     # Optional enrichment
     probability_1h_ago: Optional[float] = None
     probability_24h_ago: Optional[float] = None
+    volume_1h_ago: Optional[float] = None
     end_date: Optional[datetime] = None
     category: str = ""
     tags: List[str] = field(default_factory=list)
@@ -73,6 +74,58 @@ class PredictionSignal:
         return "neutral"
 
     @property
+    def volume_change(self) -> Optional[float]:
+        """Volume change over last hour (ratio). >2.0 = doubled."""
+        if self.volume_1h_ago is not None and self.volume_1h_ago > 0:
+            return self.volume_usd / self.volume_1h_ago
+        return None
+
+    @property
+    def is_volume_spike(self) -> bool:
+        """Detect unusual volume spike (>3x in 1 hour)."""
+        vc = self.volume_change
+        return vc is not None and vc >= 3.0
+
+    @property
+    def is_whale_activity(self) -> bool:
+        """Detect whale-like behavior: large volume spike with significant price move.
+
+        Pattern: >2x volume AND >5% probability shift in same hour = likely large player.
+        """
+        vc = self.volume_change
+        m = self.momentum
+        if vc is None or m is None:
+            return False
+        return vc >= 2.0 and abs(m) >= 0.05
+
+    @property
+    def manipulation_risk(self) -> str:
+        """Assess manipulation risk level based on observable patterns.
+
+        Flags:
+        - wash_trading: Volume spike with no price movement (inflated liquidity)
+        - insider_pattern: Large probability jump before any public catalyst
+        - low_liquidity_pump: High volume relative to liquidity (easy to manipulate)
+        - clean: No red flags detected
+        """
+        vc = self.volume_change
+        m = self.momentum
+
+        # Wash trading: big volume spike but price didn't move
+        if vc is not None and vc >= 3.0 and (m is None or abs(m) < 0.01):
+            return "wash_trading"
+
+        # Low liquidity pump: volume >> liquidity (easy to push price)
+        if self.liquidity_usd > 0 and self.volume_usd > self.liquidity_usd * 10:
+            return "low_liquidity_pump"
+
+        # Insider pattern: large sudden probability jump with moderate volume
+        if m is not None and abs(m) >= 0.15 and (vc is None or vc < 2.0):
+            return "insider_pattern"
+
+        return "clean"
+
+    @property
     def is_high_conviction(self) -> bool:
         """Signal has enough volume and probability skew to be actionable."""
         return self.volume_usd >= 50_000 and (
@@ -91,7 +144,11 @@ class PredictionSignal:
             "symbols": self.symbols,
             "sentiment": self.sentiment,
             "momentum": round(self.momentum, 4) if self.momentum is not None else None,
+            "volume_change": round(self.volume_change, 2) if self.volume_change is not None else None,
             "is_high_conviction": self.is_high_conviction,
+            "is_volume_spike": self.is_volume_spike,
+            "is_whale_activity": self.is_whale_activity,
+            "manipulation_risk": self.manipulation_risk,
             "timestamp": self.timestamp.isoformat(),
             "end_date": self.end_date.isoformat() if self.end_date else None,
             "category": self.category,
@@ -104,10 +161,19 @@ class PredictionSignal:
         if self.momentum is not None:
             direction = "↑" if self.momentum > 0 else "↓" if self.momentum < 0 else "→"
             momentum_str = f" ({direction}{abs(self.momentum):.1%} 1h)"
+        flags = []
+        if self.is_whale_activity:
+            flags.append("🐋WHALE")
+        if self.is_volume_spike:
+            flags.append("📈SPIKE")
+        risk = self.manipulation_risk
+        if risk != "clean":
+            flags.append(f"⚠️{risk.upper()}")
+        flag_str = f" [{', '.join(flags)}]" if flags else ""
         return (
             f"[{self.source.value}] {self.question}: "
             f"{self.probability:.1%}{momentum_str} "
-            f"(vol=${self.volume_usd:,.0f}, {self.sentiment})"
+            f"(vol=${self.volume_usd:,.0f}, {self.sentiment}){flag_str}"
         )
 
 
@@ -174,6 +240,7 @@ class PredictionMarketFeed(ABC):
         self.running = False
         self._signals: Dict[str, PredictionSignal] = {}
         self._history: Dict[str, List[float]] = {}  # market_id → [prob_t-1, prob_t-2, ...]
+        self._volume_history: Dict[str, List[float]] = {}  # market_id → [vol_t-1, vol_t-2, ...]
         self._last_fetch_ts = 0.0
         self._consecutive_errors = 0
         self._max_consecutive_errors = 10
@@ -243,16 +310,22 @@ class PredictionMarketFeed(ABC):
         }
 
     def _update_history(self, signal: PredictionSignal) -> None:
-        """Track probability history for momentum calculation."""
+        """Track probability and volume history for momentum + whale detection."""
+        # Probability history
         history = self._history.setdefault(signal.market_id, [])
         history.append(signal.probability)
-        # Keep last 120 data points (~2h at 60s interval)
         if len(history) > 120:
             history[:] = history[-120:]
-
-        # Set 1h-ago probability (index ~60 at 60s poll)
         if len(history) >= 60:
             signal.probability_1h_ago = history[-60]
+
+        # Volume history — track for spike / whale detection
+        vol_history = self._volume_history.setdefault(signal.market_id, [])
+        vol_history.append(signal.volume_usd)
+        if len(vol_history) > 120:
+            vol_history[:] = vol_history[-120:]
+        if len(vol_history) >= 60:
+            signal.volume_1h_ago = vol_history[-60]
 
     def _log_error(self, message: str) -> None:
         """Deduplicated error logging."""
