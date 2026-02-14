@@ -77,7 +77,8 @@ class WebSocketClient:
             await self.websocket.send_json({"type": "ping", "timestamp_us": get_timestamp_us()})
             self.last_activity = get_timestamp_us()
             return True
-        except Exception:
+        except Exception as e:
+            logger.debug(f"WebSocket ping failed for {self.client_id}: {e}")
             return False
 
 
@@ -414,15 +415,19 @@ class WebSocketManager:
 
 # Global WebSocket manager instance
 _websocket_manager: Optional[WebSocketManager] = None
+_websocket_manager_lock = asyncio.Lock()
 
 
 async def get_websocket_manager() -> WebSocketManager:
-    """Get global WebSocket manager instance."""
+    """Get global WebSocket manager instance (thread-safe)."""
     global _websocket_manager
-    if _websocket_manager is None:
-        _websocket_manager = WebSocketManager()
-        await _websocket_manager.start()
-    return _websocket_manager
+    if _websocket_manager is not None:
+        return _websocket_manager
+    async with _websocket_manager_lock:
+        if _websocket_manager is None:
+            _websocket_manager = WebSocketManager()
+            await _websocket_manager.start()
+        return _websocket_manager
 
 
 # Utility functions for common message types
@@ -501,9 +506,6 @@ async def broadcast_market_regime(regime_data: Dict[str, Any]) -> None:
         )
         await manager.broadcast_message(message)
         print("✅ Market Regime broadcasted successfully")
-    except Exception as e:
-        print(f"❌ Failed to broadcast market regime: {e}")
-
     except Exception as e:
         print(f"❌ Failed to broadcast market regime: {e}")
 

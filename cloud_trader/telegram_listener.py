@@ -264,7 +264,9 @@ class TelegramListener:
             return
 
         self._running = True
-        self._session = aiohttp.ClientSession()
+        self._session = aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=60, connect=10, sock_read=40)
+        )
 
         logger.info("📡 Starting Telegram listener...")
         asyncio.create_task(self._poll_loop())

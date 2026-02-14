@@ -15,7 +15,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any, Optional
 
@@ -131,7 +131,7 @@ class MITActivationProgress:
             trades=[MITTrade.from_dict(t) for t in data.get("trades", [])],
             activation_started=datetime.fromisoformat(data["activation_started"]) if data.get("activation_started") else None,
             activation_completed=datetime.fromisoformat(data["activation_completed"]) if data.get("activation_completed") else None,
-            last_updated=datetime.fromisoformat(data.get("last_updated", datetime.utcnow().isoformat())),
+            last_updated=datetime.fromisoformat(data.get("last_updated", datetime.now(timezone.utc).isoformat())),
         )
         progress._persisted = True
         return progress
@@ -267,7 +267,7 @@ class AsterMITTracker:
         try:
             async with self._lock:
                 doc_ref = self._db.collection(self.FIRESTORE_COLLECTION).document(self.FIRESTORE_DOC_ID)
-                self.progress.last_updated = datetime.utcnow()
+                self.progress.last_updated = datetime.now(timezone.utc)
                 await doc_ref.set(self.progress.to_dict())
                 self.progress._persisted = True
                 
@@ -313,7 +313,7 @@ class AsterMITTracker:
             side=side,
             quantity=quantity,
             price=price,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             status=status,
             platform_response=platform_response or {},
         )
@@ -323,14 +323,14 @@ class AsterMITTracker:
             
             # Update state machine
             if self.progress.activation_started is None:
-                self.progress.activation_started = datetime.utcnow()
+                self.progress.activation_started = datetime.now(timezone.utc)
                 self.progress.state = MITActivationState.PENDING
                 logger.info(f"🎯 [MIT Tracker] Activation sequence STARTED")
             
             # Check for activation
             if self.progress.completed_trades >= self.progress.ACTIVATION_THRESHOLD:
                 self.progress.state = MITActivationState.ACTIVE
-                self.progress.activation_completed = datetime.utcnow()
+                self.progress.activation_completed = datetime.now(timezone.utc)
                 logger.info(
                     f"🎉 [MIT Tracker] MIT ACTIVATED! | "
                     f"Completed {self.progress.completed_trades} trades | "
@@ -385,7 +385,7 @@ class AsterMITTracker:
                         and self.progress.state != MITActivationState.ACTIVE
                     ):
                         self.progress.state = MITActivationState.ACTIVE
-                        self.progress.activation_completed = datetime.utcnow()
+                        self.progress.activation_completed = datetime.now(timezone.utc)
                         logger.info(f"🎉 [MIT Tracker] MIT ACTIVATED after trade confirmation!")
                     
                     await self._persist_progress()
@@ -432,7 +432,7 @@ class AsterMITTracker:
         
         async with self._lock:
             self._progress = MITActivationProgress()
-            self._progress.last_updated = datetime.utcnow()
+            self._progress.last_updated = datetime.now(timezone.utc)
         
         await self._persist_progress()
         logger.info(f"✅ [MIT Tracker] Activation reset complete")

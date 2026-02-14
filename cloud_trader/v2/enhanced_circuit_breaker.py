@@ -19,7 +19,7 @@ import asyncio
 import functools
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any, Callable, Generic, Optional, TypeVar
 
@@ -103,7 +103,7 @@ class CircuitOpenError(Exception):
         
         message = f"🔴 Circuit OPEN for {platform}"
         if recovery_time:
-            wait = (recovery_time - datetime.utcnow()).total_seconds()
+            wait = (recovery_time - datetime.now(timezone.utc)).total_seconds()
             message += f" | Recovery in {wait:.0f}s"
         super().__init__(message)
 
@@ -162,7 +162,7 @@ class CircuitBreaker(Generic[T]):
                 return
             
             if self._state == CircuitState.OPEN:
-                if self._opened_at and datetime.utcnow() >= self._opened_at + self.config.recovery_timeout:
+                if self._opened_at and datetime.now(timezone.utc) >= self._opened_at + self.config.recovery_timeout:
                     self._transition_to(CircuitState.HALF_OPEN)
                     logger.info(f"⚡ [Circuit:{self.name}] OPEN → HALF_OPEN")
                 else:
@@ -180,7 +180,7 @@ class CircuitBreaker(Generic[T]):
     async def _on_success(self) -> None:
         async with self._lock:
             self._metrics.successful_calls += 1
-            self._metrics.last_success_time = datetime.utcnow()
+            self._metrics.last_success_time = datetime.now(timezone.utc)
             self._metrics.consecutive_successes += 1
             self._metrics.consecutive_failures = 0
             
@@ -193,7 +193,7 @@ class CircuitBreaker(Generic[T]):
     async def _on_failure(self, error: Exception) -> None:
         async with self._lock:
             self._metrics.failed_calls += 1
-            self._metrics.last_failure_time = datetime.utcnow()
+            self._metrics.last_failure_time = datetime.now(timezone.utc)
             self._metrics.consecutive_failures += 1
             self._metrics.consecutive_successes = 0
             
@@ -211,15 +211,15 @@ class CircuitBreaker(Generic[T]):
     
     def _transition_to(self, new_state: CircuitState) -> None:
         self._state = new_state
-        self._metrics.last_state_change = datetime.utcnow()
+        self._metrics.last_state_change = datetime.now(timezone.utc)
         
         if new_state == CircuitState.OPEN:
-            self._opened_at = datetime.utcnow()
+            self._opened_at = datetime.now(timezone.utc)
         elif new_state == CircuitState.HALF_OPEN:
             self._half_open_calls = 0
         elif new_state == CircuitState.CLOSED:
             if self._opened_at:
-                self._metrics.time_in_open += datetime.utcnow() - self._opened_at
+                self._metrics.time_in_open += datetime.now(timezone.utc) - self._opened_at
             self._opened_at = None
             self._metrics.consecutive_failures = 0
     

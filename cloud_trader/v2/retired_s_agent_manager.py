@@ -19,7 +19,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any, Optional
 
@@ -182,7 +182,7 @@ class AsterAgent:
         """Record a new trade for this agent."""
         self.trades.append(trade)
         self.last_trade_at = trade.timestamp
-        self.last_updated = datetime.utcnow()
+        self.last_updated = datetime.now(timezone.utc)
         
         if trade.status == "filled":
             self.total_volume += trade.quantity * trade.price
@@ -197,7 +197,7 @@ class AsterAgent:
             # Check activation
             if not self.is_active and self.activation_progress >= self.config.activation_threshold:
                 self.status = AgentStatus.ACTIVE
-                self.activation_completed = datetime.utcnow()
+                self.activation_completed = datetime.now(timezone.utc)
                 logger.info(
                     f"🎉 [Aster:{self.ticker}] AGENT ACTIVATED! | "
                     f"Trades: {self.activation_progress} | "
@@ -323,7 +323,7 @@ class AsterAgentManager:
             
             # Mark activation times for already-active agents
             if initial_status == AgentStatus.ACTIVE:
-                agent.activation_completed = datetime.utcnow() - timedelta(days=1)  # Assumed past
+                agent.activation_completed = datetime.now(timezone.utc) - timedelta(days=1)  # Assumed past
                 # Simulate that they had 5 activation trades
                 agent.activation_started = agent.activation_completed - timedelta(hours=1)
             
@@ -463,7 +463,7 @@ class AsterAgentManager:
                 and agent.activation_started is None
                 and status == "filled"
             ):
-                agent.activation_started = datetime.utcnow()
+                agent.activation_started = datetime.now(timezone.utc)
                 logger.info(f"🎯 [Aster:{agent.ticker}] Activation sequence STARTED")
             
             # Create trade record
@@ -474,7 +474,7 @@ class AsterAgentManager:
                 side=side,
                 quantity=quantity,
                 price=price,
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 status=status,
                 pnl=pnl,
                 platform_order_id=platform_order_id,
@@ -542,7 +542,7 @@ class AsterAgentManager:
         # Generate trade ID
         import hashlib
         trade_id = hashlib.sha256(
-            f"MIT:{symbol}:{side}:{quantity}:{datetime.utcnow().timestamp()}".encode()
+            f"MIT:{symbol}:{side}:{quantity}:{datetime.now(timezone.utc).timestamp()}".encode()
         ).hexdigest()[:16]
         
         logger.info(
@@ -629,7 +629,7 @@ class AsterAgentManager:
         # Generate batch ID
         import hashlib
         batch_id = hashlib.sha256(
-            f"MIT_BATCH:{datetime.utcnow().timestamp()}".encode()
+            f"MIT_BATCH:{datetime.now(timezone.utc).timestamp()}".encode()
         ).hexdigest()[:12]
         
         results = []

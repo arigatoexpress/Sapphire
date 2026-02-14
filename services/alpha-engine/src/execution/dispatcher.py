@@ -43,7 +43,9 @@ class ExecutionDispatcher:
         self._pending_confirmations: Dict[Tuple[str, str], asyncio.Future] = {}
 
     async def start(self):
-        self.session = aiohttp.ClientSession()
+        self.session = aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=30, connect=5, sock_read=20)
+        )
         logger.info("🚀 Execution Dispatcher Started")
 
     async def stop(self):

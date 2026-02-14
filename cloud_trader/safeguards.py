@@ -6,7 +6,7 @@ import asyncio
 import logging
 from collections import deque
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from .config import Settings
@@ -67,14 +67,14 @@ class CircuitBreaker:
     def record_failure(self) -> None:
         """Record failed operation."""
         self.state.failure_count += 1
-        self.state.last_failure = datetime.utcnow()
+        self.state.last_failure = datetime.now(timezone.utc)
 
         if self.state.is_open:
             # Failed in half-open state
             self.state.half_open_attempts += 1
             if self.state.half_open_attempts >= self.half_open_max:
                 # Reset timeout
-                self.state.opened_at = datetime.utcnow()
+                self.state.opened_at = datetime.now(timezone.utc)
                 logger.warning(
                     f"Circuit breaker {self.name} failed in half-open state, resetting timeout"
                 )
@@ -82,7 +82,7 @@ class CircuitBreaker:
             # Check if we should open
             if self.state.failure_count >= self.failure_threshold:
                 self.state.is_open = True
-                self.state.opened_at = datetime.utcnow()
+                self.state.opened_at = datetime.now(timezone.utc)
                 logger.error(
                     f"Circuit breaker {self.name} OPENED after {self.state.failure_count} failures"
                 )
@@ -94,7 +94,7 @@ class CircuitBreaker:
 
         # Check if timeout has elapsed
         if self.state.opened_at:
-            elapsed = (datetime.utcnow() - self.state.opened_at).total_seconds()
+            elapsed = (datetime.now(timezone.utc) - self.state.opened_at).total_seconds()
             if elapsed >= self.timeout_seconds:
                 # Move to half-open state
                 logger.info(f"Circuit breaker {self.name} moving to half-open state")
@@ -167,7 +167,7 @@ class TradingSafeguards:
         self._heat.position_count = len(
             [p for p in portfolio.positions.values() if p.notional != 0]
         )
-        self._heat.last_updated = datetime.utcnow()
+        self._heat.last_updated = datetime.now(timezone.utc)
 
         # Update portfolio peak for drawdown calculation
         current_value = portfolio.balance + portfolio.total_exposure
@@ -181,7 +181,7 @@ class TradingSafeguards:
 
     def update_daily_pnl(self, current_pnl: float) -> None:
         """Update daily P&L tracking."""
-        self._daily_pnl_history.append((datetime.utcnow(), current_pnl))
+        self._daily_pnl_history.append((datetime.now(timezone.utc), current_pnl))
 
         # Calculate daily loss
         if self._daily_pnl_start == 0.0:
@@ -237,7 +237,7 @@ class TradingSafeguards:
 
     def check_rate_limits(self) -> bool:
         """Check if order rate is within limits."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         # Remove timestamps older than 1 minute
         cutoff = now - timedelta(minutes=1)
@@ -253,7 +253,7 @@ class TradingSafeguards:
 
     def record_order(self) -> None:
         """Record order timestamp for rate limiting."""
-        self._order_timestamps.append(datetime.utcnow())
+        self._order_timestamps.append(datetime.now(timezone.utc))
 
     def can_trade(self) -> Tuple[bool, Optional[str]]:
         """Comprehensive check if trading can proceed."""

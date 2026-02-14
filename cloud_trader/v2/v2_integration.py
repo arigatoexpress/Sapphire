@@ -19,7 +19,7 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException
@@ -166,7 +166,7 @@ async def initialize_v2_components(
         return state
     
     logger.info("🚀 [V2] Initializing Sapphire V2 (Multi-Platform Edition)...")
-    state.startup_time = datetime.utcnow()
+    state.startup_time = datetime.now(timezone.utc)
     
     # 1. Initialize Circuit Manager
     logger.info("  🔧 Initializing Circuit Manager...")

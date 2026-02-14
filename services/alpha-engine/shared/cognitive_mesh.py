@@ -16,7 +16,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
 
@@ -168,7 +168,7 @@ class ConsensusState:
         if avg_confidence >= self.required_confidence:
             self.decision = winning_action[0]
             self.decision_reasoning = " | ".join(winning_action[1]["reasoning"])
-            self.finalized_at = datetime.utcnow()
+            self.finalized_at = datetime.now(timezone.utc)
 
             return {
                 "status": "consensus_reached",
@@ -230,7 +230,7 @@ class CognitiveMesh:
             self.agents[agent_id] = {
                 "role": role,
                 "capabilities": capabilities or [],
-                "registered_at": datetime.utcnow(),
+                "registered_at": datetime.now(timezone.utc),
                 "message_count": 0,
             }
             logger.info(f"🔗 Agent registered: {agent_id} ({role.value})")
@@ -289,13 +289,13 @@ class CognitiveMesh:
 
         Returns the ConsensusState which can be polled for completion.
         """
-        consensus_id = f"consensus-{symbol}-{int(datetime.utcnow().timestamp())}"
+        consensus_id = f"consensus-{symbol}-{int(datetime.now(timezone.utc).timestamp())}"
 
         state = ConsensusState(
             consensus_id=consensus_id,
             symbol=symbol,
             initiated_by=initiator_id,
-            initiated_at=datetime.utcnow(),
+            initiated_at=datetime.now(timezone.utc),
             required_agents=required_agents,
         )
 
