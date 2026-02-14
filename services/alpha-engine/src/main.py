@@ -234,12 +234,18 @@ class AlphaEngine:
         self.media_manager = MediaManager(telegram_bot=self.telegram)
         self.content_generator = ContentGenerator(gemini_guard=self.gemini)
         self._media_publish_task: Optional[asyncio.Task[Any]] = None
+        # Phase 8: Prediction Market Intelligence
+        from src.feeds.prediction_aggregator import PredictionAggregator
+        self.prediction_aggregator = PredictionAggregator()
+        self._prediction_market_task: Optional[asyncio.Task[Any]] = None
+        self._prediction_forum_task: Optional[asyncio.Task[Any]] = None
         # Internal alpha signal scanner — autonomous trade idea generation
         self.alpha_scanner = AlphaSignalScanner(
             market_data=self.market_data,
             cognition=self.cognition,
             memory=self.memory,
             strategy=self.strategy,
+            prediction_aggregator=self.prediction_aggregator,
         )
         self._alpha_scanner_task: Optional[asyncio.Task[Any]] = None
 
@@ -2301,6 +2307,29 @@ class AlphaEngine:
             priority="high",
         )
 
+    async def _prediction_market_forum_loop(self) -> None:
+        """Periodically post prediction market summaries to the forum."""
+        while self.running:
+            try:
+                await asyncio.sleep(300)  # Check every 5 min
+                summary = self.prediction_aggregator.generate_forum_summary()
+                if summary:
+                    await self.forum.create_topic(
+                        lane=summary["lane"],
+                        category=summary["category"],
+                        title=summary["title"],
+                        body=summary["body"],
+                        author=summary["author"],
+                        tags=summary.get("tags", []),
+                        priority=summary.get("priority", "medium"),
+                    )
+                    logger.info(f"🔮 Posted prediction market summary to forum")
+            except asyncio.CancelledError:
+                break
+            except Exception as exc:
+                logger.warning(f"Prediction market forum loop error: {exc}")
+                await asyncio.sleep(60)
+
     async def start(self):
         logger.info("🚀 Sapphire Alpha Engine Starting (uvloop enabled)")
         self.running = True
@@ -2414,6 +2443,20 @@ class AlphaEngine:
             )
         else:
             logger.info("Internal alpha scanner disabled (SAPPHIRE_ALPHA_SCANNER_ENABLED=false)")
+
+        # 7. Start Prediction Market Intelligence (Phase 8)
+        if self.prediction_aggregator.enabled:
+            await self.prediction_aggregator.start()
+            self._prediction_forum_task = asyncio.create_task(
+                self._prediction_market_forum_loop()
+            )
+            logger.info("🔮 Prediction market intelligence active")
+            self.telegram.record_activity(
+                SCOUT, "prediction_market",
+                "Prediction market feeds started (Polymarket + Kalshi)",
+            )
+        else:
+            logger.info("Prediction market feeds disabled (SAPPHIRE_PREDICTION_MARKET_ENABLED=false)")
 
         # Keep-alive loop
         while self.running:
@@ -2604,6 +2647,9 @@ class AlphaEngine:
         if self._autonomy_task:
             self._autonomy_task.cancel()
         await self.media_manager.stop()
+        await self.prediction_aggregator.stop()
+        if self._prediction_forum_task:
+            self._prediction_forum_task.cancel()
         await self.market_data.stop()
         await self.strategy.stop()
         await dispatcher.stop()

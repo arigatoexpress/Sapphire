@@ -50,6 +50,7 @@ class AlphaSignalScanner:
         memory: Any,
         strategy: Any,
         *,
+        prediction_aggregator: Any = None,
         scan_interval_seconds: int = 0,
         enabled: bool = False,
         scan_symbols: Optional[List[str]] = None,
@@ -58,6 +59,7 @@ class AlphaSignalScanner:
         self.cognition = cognition
         self.memory = memory
         self.strategy = strategy
+        self.prediction_aggregator = prediction_aggregator
 
         self._enabled = enabled or _env_flag(
             "SAPPHIRE_ALPHA_SCANNER_ENABLED", default=False
@@ -285,6 +287,17 @@ class AlphaSignalScanner:
         except Exception:
             pass  # Memory is non-critical
 
+        # Prediction market context
+        pm_context = ""
+        if self.prediction_aggregator:
+            try:
+                pm_context = self.prediction_aggregator.get_cognition_context(symbol)
+                macro_ctx = self.prediction_aggregator.get_macro_context()
+                if macro_ctx:
+                    pm_context = f"{pm_context}\n{macro_ctx}" if pm_context else macro_ctx
+            except Exception:
+                pass  # Prediction market data is non-critical
+
         prompt = (
             f"INTERNAL ALPHA SCAN — {symbol}\n"
             f"Current price: ${price:,.2f}\n"
@@ -295,8 +308,10 @@ class AlphaSignalScanner:
         )
         if memory_advice:
             prompt += f"Past experience: {memory_advice[:300]}\n"
+        if pm_context:
+            prompt += f"\n{pm_context}\n"
         prompt += (
-            "\nBased on momentum, price action, and market conditions:\n"
+            "\nBased on momentum, price action, prediction market probabilities, and market conditions:\n"
             "Should we BUY, SELL, or HOLD this asset?\n"
             "Only recommend BUY/SELL if you see a clear short-term opportunity.\n"
             "Default to HOLD if uncertain.\n"
