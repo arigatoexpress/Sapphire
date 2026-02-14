@@ -269,7 +269,28 @@ class AlphaEngine:
         self._failure_counts: Dict[str, int] = defaultdict(int)
         self._owner_directive: str = os.getenv("SAPPHIRE_OWNER_DIRECTIVE", "").strip()
         self._trading_gate_max_failure_pressure = max(1, int(os.getenv("SAPPHIRE_TRADING_GATE_MAX_FAILURE_PRESSURE", "3")))
+        self._trading_gate_min_active_venues = max(1, int(os.getenv("SAPPHIRE_TRADING_GATE_MIN_ACTIVE_VENUES", "1")))
+        self._hard_failure_cooldown_seconds = max(60, int(os.getenv("HARD_FAILURE_COOLDOWN_SECONDS", "3600")))
         self._manual_review_venues: Set[str] = set()
+        self._auto_deallocated: Set[str] = set()
+        self._owner_directive_updated_at: int = 0
+        # TradingView integration attributes (disabled by default, wired by TradingViewAutonomyPlugin if enabled)
+        self._tradingview_integration_enabled = self._env_flag("SAPPHIRE_TRADINGVIEW_INTEGRATION_ENABLED", default=False)
+        self._tradingview_execution_enabled = False
+        self._tradingview_enforce_strategy_rules = False
+        self._tradingview_strategy_rules: Dict[str, Dict[str, Any]] = {}
+        self._tradingview_allowed_symbols: Set[str] = set()
+        self._tradingview_allowed_symbols_by_venue: Dict[str, Set[str]] = {}
+        self._tradingview_max_quantity_by_venue: Dict[str, float] = {}
+        self._tradingview_max_quantity_default: float = 0.0
+        self._tradingview_default_quantity: float = 0.0
+        self._tradingview_signal_seen_at: Dict[str, float] = {}
+        self._tradingview_idempotency_window_seconds = max(
+            30, int(os.getenv("SAPPHIRE_TRADINGVIEW_IDEMPOTENCY_WINDOW_SECONDS", "300"))
+        )
+        self._tradingview_idempotency_max_keys = max(
+            50, int(os.getenv("SAPPHIRE_TRADINGVIEW_IDEMPOTENCY_MAX_KEYS", "500"))
+        )
 
     @staticmethod
     def _env_flag(name: str, default: bool = False) -> bool:
