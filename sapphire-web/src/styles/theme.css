@@ -166,3 +166,42 @@ body::before {
     background: rgba(32, 194, 14, 0.25);
     color: var(--color-terminal-bright);
 }
+
+/* ── Accessibility: Focus Visible ── */
+:focus-visible {
+    outline: 2px solid var(--color-terminal);
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
+}
+
+/* Skip link for keyboard navigation */
+.skip-link {
+    position: absolute;
+    top: -100%;
+    left: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: var(--bg-card);
+    color: var(--color-terminal);
+    border: 1px solid var(--border-accent);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    z-index: 10000;
+    text-decoration: none;
+    transition: top 0.15s;
+}
+
+.skip-link:focus {
+    top: 0.5rem;
+}
+
+/* ── Reduced Motion ── */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}

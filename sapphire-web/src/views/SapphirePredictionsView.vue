@@ -13,6 +13,10 @@ const data = ref<PredictionDashboardResponse | null>(null)
 const fetchError = ref('')
 const lastSyncEpoch = ref(0)
 const activeTab = ref<'signals' | 'arbitrage' | 'accuracy' | 'whales'>('signals')
+type TabKey = 'signals' | 'arbitrage' | 'accuracy' | 'whales'
+const TAB_ORDER: TabKey[] = ['signals', 'arbitrage', 'accuracy', 'whales']
+const nextTab = (tab: TabKey): TabKey => TAB_ORDER[(TAB_ORDER.indexOf(tab) + 1) % 4]!
+const prevTab = (tab: TabKey): TabKey => TAB_ORDER[(TAB_ORDER.indexOf(tab) + 3) % 4]!
 
 let refreshTimer: ReturnType<typeof setInterval> | null = null
 
@@ -93,15 +97,15 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div class="predictions-view">
+    <div class="predictions-view" aria-label="Prediction markets dashboard">
         <!-- Status Bar -->
-        <div v-if="loading && !lastSyncEpoch" class="status-bar loading-bar">
-            <span class="pulse-dot"></span> Connecting to prediction feeds...
+        <div v-if="loading && !lastSyncEpoch" class="status-bar loading-bar" role="status" aria-live="polite">
+            <span class="pulse-dot" aria-hidden="true"></span> Connecting to prediction feeds...
         </div>
-        <div v-else-if="fetchError" class="status-bar error-bar" @click="fetchData">
+        <div v-else-if="fetchError" class="status-bar error-bar" role="alert" tabindex="0" @click="fetchData" @keydown.enter="fetchData" @keydown.space.prevent="fetchData">
             {{ fetchError }} — tap to retry
         </div>
-        <div v-else-if="isStale" class="status-bar stale-bar">
+        <div v-else-if="isStale" class="status-bar stale-bar" role="status" aria-live="polite">
             Data {{ dataAge }}s old — awaiting refresh
         </div>
 
@@ -178,12 +182,19 @@ onUnmounted(() => {
         </div>
 
         <!-- Tabs -->
-        <div class="tab-bar">
+        <div class="tab-bar" role="tablist" aria-label="Prediction data categories">
             <button
                 v-for="tab in ['signals', 'arbitrage', 'accuracy', 'whales'] as const"
                 :key="tab"
                 :class="['tab-btn', { active: activeTab === tab }]"
+                role="tab"
+                :id="`tab-${tab}`"
+                :aria-selected="activeTab === tab"
+                :aria-controls="`panel-${tab}`"
+                :tabindex="activeTab === tab ? 0 : -1"
                 @click="activeTab = tab"
+                @keydown.right.prevent="activeTab = nextTab(tab)"
+                @keydown.left.prevent="activeTab = prevTab(tab)"
             >
                 {{ tab === 'signals' ? `Signals (${data?.signals?.length ?? 0})` :
                    tab === 'arbitrage' ? `Arbitrage (${arbCount})` :
@@ -193,7 +204,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Signals Tab -->
-        <div v-if="activeTab === 'signals'" class="tab-content">
+        <div v-if="activeTab === 'signals'" id="panel-signals" role="tabpanel" aria-labelledby="tab-signals" class="tab-content">
             <div v-if="loading" class="empty-state">Loading prediction markets...</div>
             <div v-else-if="!data?.signals?.length" class="empty-state">No signals tracked.</div>
             <div v-else class="signal-grid">
@@ -234,7 +245,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Arbitrage Tab -->
-        <div v-if="activeTab === 'arbitrage'" class="tab-content">
+        <div v-if="activeTab === 'arbitrage'" id="panel-arbitrage" role="tabpanel" aria-labelledby="tab-arbitrage" class="tab-content">
             <div v-if="!data?.arbitrage?.length" class="empty-state">No arbitrage opportunities detected.</div>
             <div v-else class="arb-grid">
                 <div
@@ -263,7 +274,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Accuracy Tab -->
-        <div v-if="activeTab === 'accuracy'" class="tab-content">
+        <div v-if="activeTab === 'accuracy'" id="panel-accuracy" role="tabpanel" aria-labelledby="tab-accuracy" class="tab-content">
             <div v-if="!accuracy || accuracy.total_tracked === 0" class="empty-state">No predictions tracked yet.</div>
             <div v-else class="accuracy-panel">
                 <div class="accuracy-stats">
@@ -310,7 +321,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Whales Tab -->
-        <div v-if="activeTab === 'whales'" class="tab-content">
+        <div v-if="activeTab === 'whales'" id="panel-whales" role="tabpanel" aria-labelledby="tab-whales" class="tab-content">
             <div v-if="!data?.whale_alerts?.length" class="empty-state">No suspicious activity detected.</div>
             <div v-else class="whale-list">
                 <div

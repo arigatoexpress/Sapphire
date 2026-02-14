@@ -349,14 +349,14 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div class="book-view fade-in">
-        <div v-if="loading && !lastSyncEpoch" class="status-bar loading-bar">
-            <span class="pulse-dot"></span> Syncing architecture mesh...
+    <div class="book-view fade-in" aria-label="System architecture dashboard">
+        <div v-if="loading && !lastSyncEpoch" class="status-bar loading-bar" role="status" aria-live="polite">
+            <span class="pulse-dot" aria-hidden="true"></span> Syncing architecture mesh...
         </div>
-        <div v-else-if="fetchError" class="status-bar error-bar" @click="loadBoard">
+        <div v-else-if="fetchError" class="status-bar error-bar" role="alert" tabindex="0" @click="loadBoard" @keydown.enter="loadBoard" @keydown.space.prevent="loadBoard">
             {{ fetchError }} — tap to retry
         </div>
-        <div v-else-if="isStale" class="status-bar stale-bar">
+        <div v-else-if="isStale" class="status-bar stale-bar" role="status" aria-live="polite">
             Data {{ dataAge }}s old — awaiting refresh
         </div>
 
@@ -376,8 +376,8 @@ onUnmounted(() => {
 
         <template v-else>
         <!-- KPI Strip -->
-        <section class="kpi-strip">
-            <article class="kpi card glass-lift">
+        <section class="kpi-strip" aria-label="Key performance indicators" aria-live="polite">
+            <article class="kpi card glass-lift" aria-label="System health score">
                 <span class="font-mono">System</span>
                 <strong class="glow">{{ architectureHealthScore }}%</strong>
             </article>

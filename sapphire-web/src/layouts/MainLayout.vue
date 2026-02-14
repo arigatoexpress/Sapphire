@@ -90,37 +90,39 @@ onUnmounted(() => {
 
 <template>
     <div class="layout-shell">
-        <header class="topbar fade-in">
+        <a href="#main-content" class="skip-link">Skip to content</a>
+        <header class="topbar fade-in" role="banner">
             <div class="topbar-brand">
-                <span class="brand-icon">&#9670;</span>
-                <span class="brand-name">SAPPHIRE</span>
+                <span class="brand-icon" aria-hidden="true">&#9670;</span>
+                <h1 class="brand-name">SAPPHIRE</h1>
             </div>
 
-            <nav class="nav-group">
+            <nav class="nav-group" aria-label="Main navigation">
                 <RouterLink
                     v-for="item in navItems"
                     :key="item.to"
                     :to="item.to"
                     class="nav-link"
                     active-class="active"
+                    :aria-current="route.path.startsWith(item.to) ? 'page' : undefined"
                 >
-                    <component :is="item.icon" :size="15" />
+                    <component :is="item.icon" :size="15" aria-hidden="true" />
                     <span>{{ item.label }}</span>
                 </RouterLink>
             </nav>
 
             <div class="topbar-right">
-                <span class="topbar-meta">{{ formatUtcClock() }} UTC</span>
-                <span class="topbar-meta hide-mobile">{{ formatUptime(uptime) }}</span>
-                <span class="status-pill" :class="systemStatus">
-                    <span class="status-dot"></span>
+                <span class="topbar-meta" aria-label="Current UTC time">{{ formatUtcClock() }} UTC</span>
+                <span class="topbar-meta hide-mobile" aria-label="System uptime">{{ formatUptime(uptime) }}</span>
+                <span class="status-pill" :class="systemStatus" role="status" :aria-label="`System status: ${statusText}`">
+                    <span class="status-dot" aria-hidden="true"></span>
                     <span class="hide-mobile">{{ statusText }}</span>
                 </span>
             </div>
         </header>
 
-        <main class="main-panel">
-            <section class="content">
+        <main class="main-panel" id="main-content">
+            <section class="content" :aria-label="`${activeLabel} dashboard view`">
                 <RouterView v-slot="{ Component }">
                     <Transition name="view-fade" mode="out-in">
                         <component :is="Component" />
@@ -128,7 +130,7 @@ onUnmounted(() => {
                 </RouterView>
             </section>
 
-            <section class="terminal-panel fade-in stagger-2">
+            <section class="terminal-panel fade-in stagger-2" aria-label="System terminal log">
                 <TerminalLog
                     :logs="systemLogs"
                     :collapsed="terminalCollapsed"
@@ -176,7 +178,8 @@ onUnmounted(() => {
     line-height: 1;
 }
 
-.brand-name {
+h1.brand-name {
+    margin: 0;
     font-family: var(--font-mono);
     font-size: 0.88rem;
     font-weight: 700;
