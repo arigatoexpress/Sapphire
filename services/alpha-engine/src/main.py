@@ -15,6 +15,7 @@ from src.collaboration.forum import SapphireForumService
 from src.collaboration.reputation import BotReputationService
 from src.collaboration.swarm import SwarmAggregator
 from src.collaboration.learning import SwarmLearning
+from src.collaboration.molthub_outreach import MolthubOutreach
 from src.execution.dispatcher import dispatcher
 from src.execution.portfolio import PortfolioTracker
 from src.feeds.market_data import MarketDataAggregator
@@ -195,6 +196,7 @@ class AlphaEngine:
         self.reputation = BotReputationService()
         self.swarm = SwarmAggregator(reputation=self.reputation)
         self.learning = SwarmLearning()
+        self.outreach = MolthubOutreach()
         self.vt_scanner = VirusTotalSkillScanner()
         requested_media_mode = self._normalize_media_mode(
             os.getenv("SAPPHIRE_MEDIA_MODE", "owner_approval")
@@ -3164,6 +3166,79 @@ class AlphaEngine:
                 lines.append(f"Direction `{direction}`: bias = {dir_bias:+.2f}")
             lines.append(f"Timeframe `{timeframe}`: bias = {tf_bias:+.2f}")
             lines.append(f"\nAdaptive confidence (raw 50%): **{adjusted:.0%}**")
+            await self.telegram.send_message("\n".join(lines), priority="medium")
+            return
+
+        if normalized_action == "OUTREACH_COMPOSE":
+            payload = self._parse_json_payload(target)
+            template = str(payload.get("template", "general_invite")).strip()
+            symbol = str(payload.get("symbol", "")).strip().upper()
+            custom_body = str(payload.get("custom_body", ""))
+            # Pull learning stats for performance updates
+            s = self.learning.summary()
+            post = self.outreach.compose_outreach(
+                template=template,
+                symbol=symbol,
+                custom_body=custom_body,
+                total_ideas=s.get("total_records", 0),
+                win_rate=round(s.get("overall_win_rate", 0) * 100, 1),
+            )
+            if not post.get("ok"):
+                await self.telegram.send_message(
+                    f"❌ Outreach compose failed: {post.get('error', 'unknown')}",
+                    priority="medium",
+                )
+                return
+            # Dispatch via scout bridge
+            cooldown = self.outreach.can_post()
+            if not cooldown["allowed"]:
+                await self.telegram.send_message(
+                    f"⏳ Outreach on cooldown — wait {cooldown['wait_seconds']}s.",
+                    priority="medium",
+                )
+                return
+            dispatch_result = self.forum.publish_scout_note({
+                "title": post["title"],
+                "body": post["body"],
+                "category": post.get("category", "trade_idea"),
+                "lane": post.get("lane", "external"),
+                "source": "molthub_outreach",
+            })
+            self.outreach.record_dispatch(post, dispatch_result)
+            ok = dispatch_result.get("ok", False)
+            mode = dispatch_result.get("mode", "local")
+            await self.telegram.send_message(
+                f"📡 **Outreach {'dispatched' if ok else 'failed'}** "
+                f"(template=`{template}`, mode=`{mode}`"
+                + (f", symbol=`{symbol}`" if symbol else "")
+                + ")",
+                priority="medium",
+            )
+            return
+
+        if normalized_action == "OUTREACH_STATS":
+            s = self.outreach.stats()
+            lines = [
+                "📊 **Outreach Statistics**\n",
+                f"Total dispatched: {s['total_dispatched']}",
+                f"Successful: {s['successful']}",
+                f"Failed: {s['failed']}",
+            ]
+            if s["total_dispatched"] > 0:
+                lines.append(f"Success rate: {s.get('success_rate', 0):.0%}")
+            if s.get("symbols_targeted"):
+                lines.append(f"Symbols: {', '.join(s['symbols_targeted'])}")
+            if s.get("total_redactions", 0) > 0:
+                lines.append(f"⚠️ Redactions: {s['total_redactions']}")
+            await self.telegram.send_message("\n".join(lines), priority="medium")
+            return
+
+        if normalized_action == "OUTREACH_TEMPLATES":
+            templates = self.outreach.available_templates()
+            lines = ["📋 **Available Outreach Templates**\n"]
+            for t in templates:
+                sym_note = " _(requires symbol)_" if t["requires_symbol"] else ""
+                lines.append(f"• `{t['name']}` — {t['title']}{sym_note}")
             await self.telegram.send_message("\n".join(lines), priority="medium")
             return
 

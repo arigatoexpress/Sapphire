@@ -1395,3 +1395,112 @@ def test_learn_bias_plain_text(telegram_module):
     assert payload["symbol"] == "SOL"
     assert payload["direction"] == "SHORT"
     assert payload["timeframe"] == "4h"
+
+
+# ── Phase 4: Outreach Telegram Commands ─────────────────────────
+
+
+def test_outreach_post_slash_command(telegram_module):
+    """'/outreach post general_invite' dispatches OUTREACH_COMPOSE."""
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/outreach post general_invite"}}
+        )
+    )
+    callback.assert_awaited_once()
+    _, symbol, action, _ = callback.await_args.args
+    assert action == "OUTREACH_COMPOSE"
+    payload = json.loads(symbol)
+    assert payload["template"] == "general_invite"
+
+
+def test_outreach_post_with_symbol(telegram_module):
+    """'/outreach post symbol_specific BTC' passes symbol in payload."""
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/outreach post symbol_specific BTC"}}
+        )
+    )
+    callback.assert_awaited_once()
+    _, symbol, action, _ = callback.await_args.args
+    assert action == "OUTREACH_COMPOSE"
+    payload = json.loads(symbol)
+    assert payload["template"] == "symbol_specific"
+    assert payload["symbol"] == "BTC"
+
+
+def test_outreach_stats_slash_command(telegram_module):
+    """'/outreach stats' dispatches OUTREACH_STATS."""
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/outreach stats"}}
+        )
+    )
+    callback.assert_awaited_once()
+    _, _, action, _ = callback.await_args.args
+    assert action == "OUTREACH_STATS"
+
+
+def test_outreach_templates_slash_command(telegram_module):
+    """'/outreach templates' dispatches OUTREACH_TEMPLATES."""
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/outreach templates"}}
+        )
+    )
+    callback.assert_awaited_once()
+    _, _, action, _ = callback.await_args.args
+    assert action == "OUTREACH_TEMPLATES"
+
+
+def test_outreach_post_plain_text(telegram_module):
+    """Plain text 'outreach post symbol_specific ETH' dispatches OUTREACH_COMPOSE."""
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=AsyncMock(),
+    )
+    result = bot._parse_plain_text_command("outreach post symbol_specific ETH")
+    assert result is not None
+    assert result["action"] == "OUTREACH_COMPOSE"
+    payload = json.loads(result["symbol"])
+    assert payload["template"] == "symbol_specific"
+    assert payload["symbol"] == "ETH"
+
+
+def test_outreach_stats_plain_text(telegram_module):
+    """Plain text 'outreach stats' dispatches OUTREACH_STATS."""
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=AsyncMock(),
+    )
+    result = bot._parse_plain_text_command("outreach stats")
+    assert result is not None
+    assert result["action"] == "OUTREACH_STATS"
+
+
+def test_outreach_templates_plain_text(telegram_module):
+    """Plain text 'outreach templates' dispatches OUTREACH_TEMPLATES."""
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=AsyncMock(),
+    )
+    result = bot._parse_plain_text_command("outreach templates")
+    assert result is not None
+    assert result["action"] == "OUTREACH_TEMPLATES"

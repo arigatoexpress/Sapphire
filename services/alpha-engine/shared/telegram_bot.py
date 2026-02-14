@@ -861,6 +861,10 @@ class TelegramPlatformBot:
             "• `learn report` — full collaborative learning report\n"
             "• `learn summary` — quick learning stats\n"
             "• `learn bias <SYMBOL> [LONG|SHORT] [timeframe]` — bias & adaptive confidence\n\n"
+            "**Outreach commands:**\n"
+            "• `outreach post [template] [SYMBOL]` — compose & send outreach\n"
+            "• `outreach stats` — outreach dispatch statistics\n"
+            "• `outreach templates` — list available templates\n\n"
             "Slash commands still work (`/status`, `/kill`, etc.) but aren't required.\n"
             "When an agent asks you something, just reply — we'll figure out the rest."
         )
@@ -1232,6 +1236,50 @@ class TelegramPlatformBot:
                 "quantity": 0.0,
                 "agent": EMERALD,
                 "ack": f"Checking learning bias for `{symbol}` {direction} {timeframe}.",
+            }
+
+        # ── Phase 4: Outreach plain-text commands ──────────────────────
+        outreach_post_match = re.search(
+            r"\boutreach\s+post(?:\s+([A-Za-z0-9_-]+))?(?:\s+([A-Za-z0-9/_-]+))?",
+            raw,
+            flags=re.IGNORECASE,
+        )
+        if outreach_post_match:
+            template = str(outreach_post_match.group(1) or "general_invite").strip()
+            symbol = str(outreach_post_match.group(2) or "").strip().upper()
+            payload = json.dumps(
+                {"template": template, "symbol": symbol},
+                separators=(",", ":"),
+            )
+            return {
+                "platform": "CONTROL",
+                "symbol": payload,
+                "action": "OUTREACH_COMPOSE",
+                "quantity": 0.0,
+                "agent": EMERALD,
+                "ack": f"Composing outreach (template=`{template}`"
+                       + (f", symbol=`{symbol}`" if symbol else "")
+                       + ").",
+            }
+
+        if re.search(r"\boutreach\s+stats\b", normalized):
+            return {
+                "platform": "CONTROL",
+                "symbol": "ALL",
+                "action": "OUTREACH_STATS",
+                "quantity": 0.0,
+                "agent": EMERALD,
+                "ack": "Loading outreach statistics.",
+            }
+
+        if re.search(r"\boutreach\s+templates\b", normalized):
+            return {
+                "platform": "CONTROL",
+                "symbol": "ALL",
+                "action": "OUTREACH_TEMPLATES",
+                "quantity": 0.0,
+                "agent": EMERALD,
+                "ack": "Listing available outreach templates.",
             }
 
         if re.search(r"\b(what'?s\s+status|status)\b", normalized):
@@ -1785,6 +1833,43 @@ class TelegramPlatformBot:
             )
             await self.send_as(EMERALD, f"Checking learning bias for `{symbol}` {direction} {timeframe}.")
             await self._dispatch_callback("CONTROL", payload, "LEARN_BIAS", 0.0)
+            return
+
+        # ── Phase 4: Outreach slash commands ──────────────────────────
+        # /outreach post [template] [SYMBOL]
+        outreach_post = re.search(
+            r"^/outreach\s+post(?:\s+([A-Za-z0-9_-]+))?(?:\s+([A-Za-z0-9/_-]+))?$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if outreach_post:
+            template = str(outreach_post.group(1) or "general_invite").strip()
+            symbol = str(outreach_post.group(2) or "").strip().upper()
+            payload = json.dumps(
+                {"template": template, "symbol": symbol},
+                separators=(",", ":"),
+            )
+            await self.send_as(
+                EMERALD,
+                f"Composing outreach (template=`{template}`"
+                + (f", symbol=`{symbol}`" if symbol else "")
+                + ").",
+            )
+            await self._dispatch_callback("CONTROL", payload, "OUTREACH_COMPOSE", 0.0)
+            return
+
+        # /outreach stats
+        outreach_stats = re.search(r"^/outreach\s+stats$", text, flags=re.IGNORECASE)
+        if outreach_stats:
+            await self.send_as(EMERALD, "Loading outreach statistics.")
+            await self._dispatch_callback("CONTROL", "ALL", "OUTREACH_STATS", 0.0)
+            return
+
+        # /outreach templates
+        outreach_tpl = re.search(r"^/outreach\s+templates$", text, flags=re.IGNORECASE)
+        if outreach_tpl:
+            await self.send_as(EMERALD, "Listing available outreach templates.")
+            await self._dispatch_callback("CONTROL", "ALL", "OUTREACH_TEMPLATES", 0.0)
             return
 
         # VirusTotal security commands
