@@ -60,12 +60,13 @@ Harden       Security      Forum        Swarm        Tracking    Social        O
 
 ## 🏗 Architecture
 
-### Core Engine (4637 lines — `src/main.py`)
-`AlphaEngine` is the monolithic orchestrator. Key subsystems:
+### Core Engine (2626 lines — `src/main.py`)
+`AlphaEngine` is the orchestrator. Key subsystems:
 
 | Subsystem | File | Lines | Purpose |
 |-----------|------|-------|---------|
-| **Main Engine** | `src/main.py` | 4637 | Orchestrator: signal routing, trade dispatch, Telegram commands |
+| **Main Engine** | `src/main.py` | 2626 | Orchestrator: signal routing, trade dispatch, lifecycle |
+| **Telegram Handlers** | `src/telegram_handlers.py` | 1492 | All control command handlers (media, forum, rep, swarm, learning, tasks, scout, execution) |
 | **Gemini Guard** | `src/ai/gemini_guard.py` | 321 | AI sentinel: hourly/daily recaps, owner chat, market checks |
 | **Telegram Bot** | `shared/telegram_bot.py` | 1904 | Multi-agent Telegram interface, activity feed, command routing |
 | **Forum** | `src/collaboration/forum.py` | 1668 | Internal forum: topics, replies, Scout communication layer |
