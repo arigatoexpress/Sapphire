@@ -1459,6 +1459,57 @@ async def handle_core_control_commands(engine: "AlphaEngine", target: str, actio
     return False
 
 
+# ── Prediction Market Intelligence ────────────────────────────────────
+
+async def handle_prediction_commands(engine: "AlphaEngine", target: str, action: str, value: float) -> bool:
+    """Handle /predictions and /prediction commands (Phase 8)."""
+    normalized = action.upper()
+
+    if normalized in {"PREDICTIONS", "PREDICTION_STATUS", "PM_STATUS"}:
+        msg = engine.prediction_aggregator.format_telegram_status()
+        await engine.telegram.send_message(msg, priority="medium")
+        return True
+
+    if normalized in {"PREDICTION", "PM_SIGNAL", "PM_SIGNALS"}:
+        symbol = str(target or "").strip().upper() or None
+        msg = engine.prediction_aggregator.format_telegram_signals(symbol=symbol)
+        await engine.telegram.send_message(msg, priority="medium")
+        return True
+
+    if normalized in {"PREDICTION_SENTIMENT", "PM_SENTIMENT"}:
+        symbol = str(target or "").strip().upper() or "BTC"
+        sent = engine.prediction_aggregator.get_symbol_sentiment(symbol)
+        lines = [
+            f"🔮 **{symbol} Prediction Sentiment**\n",
+            f"Consensus: {sent['sentiment']}",
+            f"Weighted probability: {sent['weighted_probability']:.1%}",
+            f"Confidence: {sent['confidence']:.2f}",
+            f"Signal count: {sent['signal_count']}",
+            f"Total volume: ${sent['total_volume_usd']:,.0f}",
+            f"Sources: {', '.join(sent['sources']) or 'none'}",
+        ]
+        await engine.telegram.send_message("\n".join(lines), priority="medium")
+        return True
+
+    if normalized in {"PREDICTION_HIGH", "PM_HIGH", "PM_CONVICTION"}:
+        signals = engine.prediction_aggregator.get_high_conviction_signals()
+        if not signals:
+            await engine.telegram.send_message(
+                "🔮 No high-conviction prediction signals at this time.", priority="medium"
+            )
+            return True
+        lines = [f"🔮 **High-Conviction Prediction Signals** ({len(signals)})\n"]
+        for sig in signals[:8]:
+            lines.append(
+                f"• [{sig.source.value}] {sig.question[:55]}\n"
+                f"  {sig.probability:.1%} | ${sig.volume_usd:,.0f} vol | {sig.sentiment}"
+            )
+        await engine.telegram.send_message("\n".join(lines), priority="medium")
+        return True
+
+    return False
+
+
 # ── Master Dispatch Table ─────────────────────────────────────────────
 
 # Ordered list of handler functions. Each is tried in order;
@@ -1472,6 +1523,7 @@ CONTROL_HANDLER_CHAIN = [
     handle_learning_commands,
     handle_task_commands,
     handle_scout_commands,
+    handle_prediction_commands,
     handle_execution_commands,
     handle_core_control_commands,
 ]
