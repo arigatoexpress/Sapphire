@@ -450,6 +450,108 @@ export const publishForumScoutNote = async (payload: {
         payload as Record<string, unknown>,
     )
 
+// ── Prediction Market Dashboard ─────────────────────────────────────
+
+export interface PredictionSignalDto {
+    market_id: string
+    source: string
+    question: string
+    probability: number
+    volume_usd: number
+    liquidity_usd: number
+    relevance: string
+    symbols: string[]
+    sentiment: string
+    momentum: number | null
+    volume_change: number | null
+    is_high_conviction: boolean
+    is_volume_spike: boolean
+    is_whale_activity: boolean
+    manipulation_risk: string
+    timestamp: string
+    end_date: string | null
+    category: string
+    tags: string[]
+}
+
+export interface ArbitrageOpportunityDto {
+    id: string
+    market_name: string
+    venue_a: string
+    price_a: number
+    venue_b: string
+    price_b: number
+    spread: number
+    spread_pct: number
+    confidence: number
+    symbols: string[]
+    direction: string
+}
+
+export interface PredictionAccuracyStats {
+    total_tracked: number
+    total_resolved: number
+    total_pending: number
+    overall_accuracy_pct: number
+    overall_brier: number
+    high_conviction_resolved: number
+    high_conviction_accuracy_pct: number
+    high_conviction_brier: number
+    by_source: Record<string, {
+        total: number
+        correct: number
+        incorrect: number
+        accuracy_pct: number
+        brier: number
+    }>
+}
+
+export interface SymbolSentiment {
+    symbol: string
+    sentiment: string
+    weighted_probability: number
+    confidence: number
+    signal_count: number
+    total_volume_usd: number
+    sources: string[]
+}
+
+export interface PredictionDashboardResponse {
+    ok: boolean
+    status: {
+        enabled: boolean
+        feeds: Record<string, {
+            source: string
+            running: boolean
+            market_count: number
+            consecutive_errors: number
+        }>
+        total_signals: number
+        high_conviction_signals: number
+        arbitrage_opportunities: number
+        accuracy_tracked: number
+        accuracy_resolved: number
+    }
+    accuracy: PredictionAccuracyStats
+    signals: PredictionSignalDto[]
+    high_conviction: PredictionSignalDto[]
+    arbitrage: ArbitrageOpportunityDto[]
+    sentiments: Record<string, SymbolSentiment>
+    whale_alerts: string[]
+    pending_accuracy: Array<{
+        market_id: string
+        source: string
+        question: string
+        probability: number
+        snapshot_time: string
+    }>
+}
+
+export const fetchPredictionDashboard = async (): Promise<PredictionDashboardResponse | null> =>
+    safeGet<PredictionDashboardResponse>('/api/v2/predictions/dashboard')
+
+// ── Security Skills ─────────────────────────────────────────────────
+
 export const fetchSecuritySkillsStatus = async (): Promise<SecuritySkillsStatusResponse | null> =>
     safeGet<SecuritySkillsStatusResponse>('/api/v2/security/skills/status')
 
