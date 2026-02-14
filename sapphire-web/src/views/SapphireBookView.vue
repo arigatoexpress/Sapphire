@@ -1,221 +1,111 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, nextTick } from 'vue'
 import {
-    createForumReply,
-    createForumTopic,
+    connectionHealth,
     fetchControlStatus,
     fetchForumScoutStatus,
-    fetchForumTopicDetail,
     fetchForumTopics,
-    fetchPerformanceStats,
     fetchPlatformStatus,
+    fetchPerformanceStats,
     fetchSystemLogs,
-    publishForumScoutNote,
-    registerForumScout,
     type ControlStatusResponse,
-    type ForumLane,
-    type ForumPriority,
-    type ForumReply,
     type ForumScoutStatusResponse,
-    type ForumState,
     type ForumTopic,
-    type PerformanceStatsResponse,
     type PlatformStatusResponse,
+    type PerformanceStatsResponse,
     type SystemLogEntry,
 } from '../api/client'
 
 const loading = ref(true)
-const creatingTopic = ref(false)
-const postingReply = ref(false)
-const registeringScout = ref(false)
-const publishingScout = ref(false)
-
 const topics = ref<ForumTopic[]>([])
-const selectedTopicId = ref('')
-const selectedTopic = ref<(ForumTopic & { replies: ForumReply[] }) | null>(null)
 const boardMeta = ref<{
     total: number
     lane_counts: Record<string, number>
     state_counts: Record<string, number>
-    control: {
-        pending_autonomy_decisions: number
-        owner_directive: string
-        failure_pressure: number
-    }
+    control: { pending_autonomy_decisions: number; owner_directive: string; failure_pressure: number }
 } | null>(null)
-
 const control = ref<ControlStatusResponse | null>(null)
 const scout = ref<ForumScoutStatusResponse | null>(null)
 const platform = ref<PlatformStatusResponse | null>(null)
 const performance = ref<PerformanceStatsResponse | null>(null)
-const systemLogs = ref<SystemLogEntry[]>([])
-const venuePriceHistory = ref<Record<string, number[]>>({
-    ASTER: [],
-    LIGHTER: [],
-})
-const showOperationsBoard = ref(false)
-const feedback = ref('')
+const recentOps = ref<SystemLogEntry[]>([])
 const nowEpoch = ref(Date.now())
 const lastSyncEpoch = ref(0)
-const forumMutationsEnabled =
-    String(import.meta.env.VITE_SAPPHIREBOOK_MUTATIONS || 'false')
-        .trim()
-        .toLowerCase() === 'true'
+const hoveredNode = ref<string | null>(null)
+const fetchError = ref('')
 
-const laneFilter = ref('')
-const stateFilter = ref('')
-const queryFilter = ref('')
-
-const newTopic = ref({
-    title: '',
-    body: '',
-    lane: 'research' as ForumLane,
-    state: 'open' as ForumState,
-    priority: 'medium' as ForumPriority,
-    tags: 'coordination,workflow',
-    author: 'SAPPHIRE',
+const dataAge = computed(() => {
+    if (!lastSyncEpoch.value) return null
+    return Math.floor((Date.now() - lastSyncEpoch.value) / 1000)
 })
-
-const replyDraft = ref({
-    body: '',
-    author: 'SAPPHIRE',
-    kind: 'comment',
-    state: '' as '' | ForumState,
-})
-
-const scoutRegistration = ref({
-    username: '',
-    display_name: 'Sapphire Scout',
-    bio: 'Least-privilege scout for public collaboration. No secrets, no trading actions.',
-})
-
-const scoutNote = ref({
-    title: '',
-    body: '',
-    tags: 'scout,external,ideas',
-    author: 'SAPPHIRE_SCOUT',
-})
+const isStale = computed(() => (dataAge.value ?? 999) > 30)
 
 let refreshTimer: ReturnType<typeof setInterval> | null = null
 let clockTimer: ReturnType<typeof setInterval> | null = null
+let particleTimer: ReturnType<typeof setInterval> | null = null
 
-const lanes = [
-    { value: '', label: 'All lanes' },
-    { value: 'security', label: 'Security' },
-    { value: 'deploy', label: 'Deploy' },
-    { value: 'research', label: 'Research' },
-    { value: 'trading', label: 'Trading' },
-    { value: 'governance', label: 'Governance' },
-    { value: 'external', label: 'External' },
-]
+/* ── Particles for animated data flow ── */
+interface FlowParticle {
+    id: number
+    fromX: number; fromY: number
+    toX: number; toY: number
+    progress: number
+    speed: number
+    opacity: number
+    linkKey: string
+}
 
-const states = [
-    { value: '', label: 'All states' },
-    { value: 'open', label: 'Open' },
-    { value: 'queued', label: 'Queued' },
-    { value: 'needs_owner', label: 'Needs owner' },
-    { value: 'blocked', label: 'Blocked' },
-    { value: 'resolved', label: 'Resolved' },
-]
+const particles = ref<FlowParticle[]>([])
+let particleIdCounter = 0
 
+const spawnParticle = (fromX: number, fromY: number, toX: number, toY: number, linkKey: string) => {
+    particles.value.push({
+        id: particleIdCounter++,
+        fromX, fromY, toX, toY,
+        progress: 0,
+        speed: 0.008 + Math.random() * 0.012,
+        opacity: 0.6 + Math.random() * 0.4,
+        linkKey,
+    })
+}
+
+const tickParticles = () => {
+    particles.value = particles.value
+        .map((p) => ({ ...p, progress: p.progress + p.speed, opacity: p.progress > 0.8 ? p.opacity * 0.92 : p.opacity }))
+        .filter((p) => p.progress < 1)
+}
+
+const particleX = (p: FlowParticle) => p.fromX + (p.toX - p.fromX) * p.progress
+const particleY = (p: FlowParticle) => p.fromY + (p.toY - p.fromY) * p.progress
+
+/* ── Derived metrics ── */
 const totalTopics = computed(() => Number(boardMeta.value?.total || topics.value.length || 0))
-
-const syncAge = computed(() => {
-    if (!lastSyncEpoch.value) return 'pending'
-    const seconds = Math.max(0, Math.round((nowEpoch.value - lastSyncEpoch.value) / 1000))
-    return `${seconds}s ago`
-})
-
 const pendingDecisions = computed(() =>
-    Number(
-        control.value?.pending_autonomy_decisions ??
-            boardMeta.value?.control?.pending_autonomy_decisions ??
-            0,
-    ),
+    Number(control.value?.pending_autonomy_decisions ?? boardMeta.value?.control?.pending_autonomy_decisions ?? 0),
 )
-
 const failurePressure = computed(() =>
     Number(control.value?.failure_pressure ?? boardMeta.value?.control?.failure_pressure ?? 0),
 )
-
-const ownerDirective = computed(() => {
-    const raw = String(control.value?.owner_directive || boardMeta.value?.control?.owner_directive || '').trim()
-    if (!raw) return 'none'
-    return raw.length > 170 ? `${raw.slice(0, 167)}...` : raw
+const syncAge = computed(() => {
+    if (!lastSyncEpoch.value) return '--'
+    return `${Math.max(0, Math.round((nowEpoch.value - lastSyncEpoch.value) / 1000))}s`
 })
 
-const asRecord = (value: unknown): Record<string, unknown> =>
-    value && typeof value === 'object' && !Array.isArray(value)
-        ? (value as Record<string, unknown>)
-        : {}
-
-const scoutBridge = computed(() => scout.value?.external_bridge || null)
-const scoutRegistrationState = computed(() => scout.value?.registration || null)
-
-const scoutReady = computed(() => Boolean(scoutRegistrationState.value?.registered))
-
-const scoutBridgeReady = computed(() => {
-    const bridge = scoutBridge.value
-    if (!bridge) return false
-    const externalReady = Boolean(
-        bridge.external_ready ??
-            (bridge.register_url_configured && bridge.post_url_configured && bridge.api_token_configured),
-    )
-    return externalReady || Boolean(bridge.fallback_ready)
+const totalTrades = computed(() => Number(performance.value?.metrics?.system?.total_trades || 0))
+const winRatePercent = computed(() => {
+    const raw = Number(performance.value?.metrics?.system?.win_rate || 0)
+    return Math.max(0, Math.min(100, raw <= 1 ? raw * 100 : raw))
 })
-
-const scoutProviderLabel = computed(() => String(scoutBridge.value?.provider || 'unknown'))
-const scoutBridgeModeLabel = computed(() => String(scoutBridge.value?.dispatch_mode || 'none'))
-const scoutStateLabel = computed(() =>
-    String(scoutBridge.value?.provider_state || 'unknown')
-        .replace(/_/g, ' ')
-        .toUpperCase(),
+const formatUptime = (seconds: number) => {
+    const rounded = Math.max(0, Math.round(Number(seconds || 0)))
+    if (rounded < 60) return `${rounded}s`
+    if (rounded < 3600) return `${Math.floor(rounded / 60)}m`
+    return `${Math.floor(rounded / 3600)}h ${Math.floor((rounded % 3600) / 60)}m`
+}
+const uptimeLabel = computed(() =>
+    formatUptime(Number(performance.value?.metrics?.system?.uptime_seconds || 0)),
 )
-const scoutOperatorHint = computed(
-    () =>
-        String(scoutBridge.value?.operator_hint || '').trim() ||
-        'Use /scout status for current bridge diagnostics and next actions.',
-)
-const scoutRegistrationLabel = computed(() => {
-    const registration = scoutRegistrationState.value
-    if (!registration?.registered) return 'NOT REGISTERED'
-    if (registration.assumed_registered) return 'ACTIVE (TOKEN-BACKED)'
-    return 'ACTIVE'
-})
-const scoutRegistrationSourceLabel = computed(() => {
-    const source = String(scoutRegistrationState.value?.registered_source || '').trim().toLowerCase()
-    if (source === 'api_token') return 'token assumption'
-    if (source === 'runtime_state') return 'runtime state'
-    return 'unknown'
-})
-const scoutLastDispatch = computed(() => asRecord(scoutRegistrationState.value?.last_dispatch))
-const scoutLastDispatchMode = computed(
-    () => String(scoutLastDispatch.value.mode || scoutBridgeModeLabel.value || 'none'),
-)
-const scoutLastDispatchReason = computed(() => String(scoutLastDispatch.value.reason || 'none'))
-const scoutLastDispatchDetail = computed(() => {
-    const metadata = asRecord(scoutLastDispatch.value.metadata)
-    const hint = String(metadata.hint || '').trim()
-    const claimUrl = String(metadata.claim_url || '').trim()
-    if (claimUrl) return `Claim URL: ${claimUrl}`
-    if (hint) return hint
-    const excerpt = String(scoutLastDispatch.value.response_excerpt || '').trim()
-    return excerpt ? excerpt.slice(0, 180) : 'none'
-})
-
-const laneSummary = computed(() => {
-    const source = boardMeta.value?.lane_counts || {}
-    return Object.keys(source)
-        .sort()
-        .map((key) => ({ lane: key, count: Number(source[key] || 0) }))
-})
-
-const stateSummary = computed(() => {
-    const source = boardMeta.value?.state_counts || {}
-    return Object.keys(source)
-        .sort()
-        .map((key) => ({ state: key, count: Number(source[key] || 0) }))
-})
+const realizedPnl = computed(() => Number(performance.value?.metrics?.system?.realized_pnl || 0))
 
 const forumHealthScore = computed(() => {
     const openCount = Number(boardMeta.value?.state_counts?.open || 0)
@@ -225,43 +115,6 @@ const forumHealthScore = computed(() => {
     return Math.max(5, Math.min(99, Math.round(raw)))
 })
 
-const pushVenuePriceHistory = (venue: string, price: number) => {
-    if (!Number.isFinite(price) || price <= 0) return
-    const key = String(venue || '').toUpperCase()
-    const current = Array.isArray(venuePriceHistory.value[key]) ? venuePriceHistory.value[key] : []
-    venuePriceHistory.value = {
-        ...venuePriceHistory.value,
-        [key]: [...current.slice(-35), Number(price)],
-    }
-}
-
-const formatCompactNumber = (value: number, digits = 2) => {
-    if (!Number.isFinite(value)) return 'n/a'
-    const abs = Math.abs(value)
-    if (abs >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(digits)}B`
-    if (abs >= 1_000_000) return `${(value / 1_000_000).toFixed(digits)}M`
-    if (abs >= 1_000) return `${(value / 1_000).toFixed(digits)}K`
-    return value.toFixed(digits)
-}
-
-const formatUptime = (seconds: number) => {
-    const rounded = Math.max(0, Math.round(Number(seconds || 0)))
-    if (rounded < 60) return `${rounded}s`
-    if (rounded < 3600) return `${Math.floor(rounded / 60)}m`
-    if (rounded < 86400) return `${Math.floor(rounded / 3600)}h ${Math.floor((rounded % 3600) / 60)}m`
-    return `${Math.floor(rounded / 86400)}d ${Math.floor((rounded % 86400) / 3600)}h`
-}
-
-const totalTrades = computed(() => Number(performance.value?.metrics?.system?.total_trades || 0))
-const winRatePercent = computed(() => {
-    const raw = Number(performance.value?.metrics?.system?.win_rate || 0)
-    const normalized = raw <= 1 ? raw * 100 : raw
-    return Math.max(0, Math.min(100, normalized))
-})
-const realizedPnl = computed(() => Number(performance.value?.metrics?.system?.realized_pnl || 0))
-const uptimeLabel = computed(() =>
-    formatUptime(Number(performance.value?.metrics?.system?.uptime_seconds || 0)),
-)
 const architectureHealthScore = computed(() => {
     const killPenalty = control.value?.kill_switch_active ? 35 : 0
     const failurePenalty = failurePressure.value * 7
@@ -272,1778 +125,914 @@ const architectureHealthScore = computed(() => {
     return Math.max(8, Math.min(99, Math.round(raw)))
 })
 
+const scoutReady = computed(() => Boolean(scout.value?.registration?.registered))
+const scoutBridgeReady = computed(() => {
+    const bridge = scout.value?.external_bridge
+    if (!bridge) return false
+    return Boolean(bridge.external_ready ?? (bridge.register_url_configured && bridge.post_url_configured && bridge.api_token_configured)) || Boolean(bridge.fallback_ready)
+})
+
+/* ── Platform venue status ── */
+const VENUES = ['aster', 'lighter'] as const
+type VenueId = typeof VENUES[number]
+
+const venueDisplayNames: Record<VenueId, string> = {
+    aster: 'ASTER',
+    lighter: 'LIGHTER',
+}
+
+const venueStatus = computed(() => {
+    const plats = platform.value?.platforms || {}
+    return VENUES.map((id) => {
+        const p = plats[id]
+        return {
+            id,
+            name: venueDisplayNames[id],
+            status: p?.status || 'offline',
+            health: p?.health || 'unknown',
+            mode: p?.mode || '—',
+            routing: p?.routing || '—',
+            allocation: Number(p?.allocation || 0),
+            paused: Boolean(p?.paused),
+            price: Number(p?.price || 0),
+        }
+    })
+})
+
+/* ── Architecture Nodes ── */
 const architectureNodes = computed(() => {
     const alphaHealthy = !control.value?.kill_switch_active
     const venuesHealthyCount = Object.values(platform.value?.platforms || {}).filter((item) => item.status === 'healthy').length
     const venuesHealthy = venuesHealthyCount >= 2
     const vtReady = Boolean(control.value?.vt_security_enabled && control.value?.vt_api_key_configured)
     const dexLive = Boolean(control.value?.dex_live_dispatch_enabled && !control.value?.kill_switch_active)
-    const scoutOperational = Boolean(scoutReady.value && scoutBridgeReady.value)
-    const scoutDegraded = Boolean(scoutReady.value || scoutBridgeReady.value)
-    const scoutName = String(scoutRegistrationState.value?.username || '').trim()
-    const pending = pendingDecisions.value
+    const scoutOk = Boolean(scoutReady.value && scoutBridgeReady.value)
     const autonomyOn = Boolean(control.value?.full_autonomy_enabled)
+    const pending = pendingDecisions.value
 
     return [
-        {
-            id: 'owner',
-            title: 'Owner Channel',
-            status: 'healthy',
-            detail: 'Telegram plain-text control',
-        },
-        {
-            id: 'sapphire',
-            title: 'SAPPHIRE (Security)',
-            status: vtReady ? 'healthy' : 'degraded',
-            detail: vtReady ? `VT ${String(control.value?.vt_enforcement_mode || 'guard')} policy` : 'security guard degraded',
-        },
-        {
-            id: 'obsidian',
-            title: 'OBSIDIAN (Ops)',
-            status: alphaHealthy && venuesHealthy ? 'healthy' : 'degraded',
-            detail: venuesHealthy ? 'runtime + deploy lane stable' : `venue health ${venuesHealthyCount}/2`,
-        },
-        {
-            id: 'emerald',
-            title: 'EMERALD (Autonomy)',
-            status: autonomyOn && pending === 0 ? 'healthy' : 'degraded',
-            detail:
-                pending > 0
-                    ? `${pending} queued decisions`
-                    : autonomyOn
-                      ? 'self-improvement loop active'
-                      : 'autonomy disabled',
-        },
-        {
-            id: 'alpha',
-            title: 'Alpha Orchestrator',
-            status: alphaHealthy ? 'healthy' : 'degraded',
-            detail: alphaHealthy ? 'policy + routing online' : 'kill-switch constrained',
-        },
-        {
-            id: 'execution',
-            title: 'Execution Plane',
-            status: dexLive && venuesHealthy ? 'healthy' : 'degraded',
-            detail: dexLive ? 'ASTER + LIGHTER live dispatch' : 'workbench / staged mode',
-        },
-        {
-            id: 'security',
-            title: 'Security Guard',
-            status: vtReady ? 'healthy' : 'degraded',
-            detail: vtReady ? 'skill scanning + enforcement' : 'policy/data incomplete',
-        },
-        {
-            id: 'sapphirebook',
-            title: 'SapphireBook UI',
-            status: lastSyncEpoch.value ? 'healthy' : 'degraded',
-            detail: `sync ${syncAge.value}`,
-        },
-        {
-            id: 'scout',
-            title: 'Scout Collaboration',
-            status: scoutOperational ? 'healthy' : scoutDegraded ? 'degraded' : 'offline',
-            detail: scoutOperational
-                ? `@${scoutName || 'sapphire_scout'} · ${scoutStateLabel.value.toLowerCase()}`
-                : `${scoutStateLabel.value.toLowerCase()} · ${scoutBridgeModeLabel.value}`,
-        },
+        { id: 'owner', title: 'OWNER', status: 'healthy', detail: 'Telegram control', tier: 'command' as const },
+        { id: 'sapphire', title: 'SAPPHIRE', status: vtReady ? 'healthy' : 'degraded', detail: vtReady ? `VT ${control.value?.vt_enforcement_mode || 'guard'}` : 'guard degraded', tier: 'core' as const },
+        { id: 'obsidian', title: 'OBSIDIAN', status: alphaHealthy && venuesHealthy ? 'healthy' : 'degraded', detail: venuesHealthy ? 'runtime stable' : `${venuesHealthyCount}/2 venues`, tier: 'core' as const },
+        { id: 'emerald', title: 'EMERALD', status: autonomyOn && pending === 0 ? 'healthy' : 'degraded', detail: pending > 0 ? `${pending} queued` : autonomyOn ? 'loop active' : 'disabled', tier: 'core' as const },
+        { id: 'alpha', title: 'ORCHESTRATOR', status: alphaHealthy ? 'healthy' : 'degraded', detail: alphaHealthy ? 'routing online' : 'kill-switch', tier: 'orchestrator' as const },
+        { id: 'execution', title: 'EXECUTION', status: dexLive && venuesHealthy ? 'healthy' : 'degraded', detail: dexLive ? 'live dispatch' : 'staged mode', tier: 'execution' as const },
+        { id: 'security', title: 'GUARD', status: vtReady ? 'healthy' : 'degraded', detail: vtReady ? 'scanning active' : 'incomplete', tier: 'execution' as const },
+        { id: 'scout', title: 'SCOUT', status: scoutOk ? 'healthy' : 'degraded', detail: scoutOk ? 'bridge active' : 'pending', tier: 'execution' as const },
     ]
 })
 
-const departmentCards = computed(() => [
-    {
-        id: 'security',
-        title: 'SAPPHIRE',
-        status: control.value?.vt_security_enabled ? 'healthy' : 'degraded',
-        detail:
-            'Security & code quality lead. Owns skill security scans, policy guardrails, and release hardening.',
-    },
-    {
-        id: 'ops',
-        title: 'OBSIDIAN',
-        status: control.value?.kill_switch_active ? 'degraded' : 'healthy',
-        detail:
-            'Deployment and runtime operations lead. Owns Cloud Run stability, CI gates, and venue uptime.',
-    },
-    {
-        id: 'innovation',
-        title: 'EMERALD',
-        status: pendingDecisions.value > 0 ? 'degraded' : 'healthy',
-        detail:
-            'Innovation and self-improvement architect. Owns autonomous upgrades, experiments, and feedback loops.',
-    },
-    {
-        id: 'scout',
-        title: 'SAPPHIRE_SCOUT',
-        status: scoutReady.value && scoutBridgeReady.value ? 'healthy' : 'degraded',
-        detail:
-            'External collaboration scout with least privilege. No secrets, no cloud mutations, no trade execution.',
-    },
-])
-
-const meshLayout: Record<string, { x: number; y: number; label: string }> = {
-    owner: { x: 10, y: 10, label: 'Owner' },
-    sapphire: { x: 30, y: 10, label: 'Security' },
-    obsidian: { x: 50, y: 10, label: 'Ops' },
-    emerald: { x: 70, y: 10, label: 'Autonomy' },
-    alpha: { x: 50, y: 28, label: 'Orchestrator' },
-    execution: { x: 80, y: 44, label: 'Execution' },
-    security: { x: 20, y: 44, label: 'Guard' },
-    scout: { x: 50, y: 52, label: 'Scout' },
-    sapphirebook: { x: 6, y: 30, label: 'SapphireBook' },
+/* ── Mesh Layout — expanded with venue nodes ── */
+const meshLayout: Record<string, { x: number; y: number }> = {
+    /* Command tier */
+    owner: { x: 50, y: 6 },
+    /* Core tier */
+    sapphire: { x: 20, y: 20 },
+    obsidian: { x: 50, y: 20 },
+    emerald: { x: 80, y: 20 },
+    /* Orchestrator */
+    alpha: { x: 50, y: 38 },
+    /* Execution tier */
+    security: { x: 18, y: 52 },
+    execution: { x: 50, y: 52 },
+    scout: { x: 82, y: 52 },
+    /* Venue tier */
+    aster: { x: 35, y: 72 },
+    lighter: { x: 65, y: 72 },
 }
 
-const architectureMeshNodes = computed(() =>
+const meshNodes = computed(() =>
     architectureNodes.value
-        .filter((node) => Boolean(meshLayout[node.id]))
-        .map((node) => ({
-            ...node,
-            ...meshLayout[node.id],
-        })),
+        .filter((n) => Boolean(meshLayout[n.id]))
+        .map((n) => {
+            const layout = meshLayout[n.id]!
+            return { ...n, x: layout.x, y: layout.y }
+        }),
 )
 
-const architectureMeshLinks: Array<{ from: string; to: string }> = [
-    { from: 'owner', to: 'sapphire' },
-    { from: 'owner', to: 'obsidian' },
-    { from: 'owner', to: 'emerald' },
-    { from: 'sapphire', to: 'alpha' },
-    { from: 'obsidian', to: 'alpha' },
-    { from: 'emerald', to: 'alpha' },
-    { from: 'alpha', to: 'execution' },
-    { from: 'alpha', to: 'security' },
-    { from: 'alpha', to: 'scout' },
-    { from: 'sapphirebook', to: 'scout' },
-    { from: 'sapphirebook', to: 'alpha' },
+const venueNodes = computed(() =>
+    venueStatus.value.map((v) => {
+        const layout = meshLayout[v.id]
+        return layout ? { ...v, x: layout.x, y: layout.y } : null
+    }).filter(Boolean) as Array<{ id: VenueId; name: string; status: string; health: string; mode: string; routing: string; allocation: number; paused: boolean; price: number; x: number; y: number }>
+)
+
+/* ── Links between nodes ── */
+const coreLinks = [
+    { from: 'owner', to: 'sapphire', type: 'command' },
+    { from: 'owner', to: 'obsidian', type: 'command' },
+    { from: 'owner', to: 'emerald', type: 'command' },
+    { from: 'sapphire', to: 'alpha', type: 'data' },
+    { from: 'obsidian', to: 'alpha', type: 'data' },
+    { from: 'emerald', to: 'alpha', type: 'data' },
+    { from: 'alpha', to: 'execution', type: 'signal' },
+    { from: 'alpha', to: 'security', type: 'signal' },
+    { from: 'alpha', to: 'scout', type: 'signal' },
 ]
 
-const architectureMeshNodeMap = computed(() =>
-    architectureMeshNodes.value.reduce<Record<string, { x: number; y: number; status: string; title: string }>>(
-        (acc, node) => {
-            acc[node.id] = {
-                x: Number(node.x),
-                y: Number(node.y),
-                status: String(node.status),
-                title: String(node.title),
-            }
-            return acc
-        },
-        {},
-    ),
+const venueLinks = computed(() =>
+    VENUES.map((v) => ({ from: 'execution', to: v, type: 'dispatch' as const }))
 )
 
-const venuePulse = computed(() => {
-    const source = platform.value?.platforms || {}
-    return Object.keys(source)
-        .sort()
-        .map((venueKey) => {
-            const venue = source[venueKey]
-            const history = venuePriceHistory.value[venueKey.toUpperCase()] || []
-            const latest = Number(venue?.price || 0)
-            const previous = history.length > 1 ? Number(history[history.length - 2] || latest) : latest
-            const delta = latest - previous
-            return {
-                venue: venueKey.toUpperCase(),
-                status: String(venue?.status || 'unknown'),
-                mode: String(venue?.mode || ''),
-                price: latest,
-                ageSeconds: Number(venue?.age_seconds || 0),
-                allocation: Number(venue?.allocation || 0),
-                paused: Boolean(venue?.paused),
-                delta,
-                history,
-            }
-        })
+const allLinks = computed(() => [...coreLinks, ...venueLinks.value])
+
+const meshNodeMap = computed(() => {
+    const map: Record<string, { x: number; y: number; status: string }> = {}
+    for (const n of meshNodes.value) {
+        map[n.id] = { x: n.x, y: n.y, status: n.status }
+    }
+    for (const v of venueNodes.value) {
+        map[v.id] = { x: v.x, y: v.y, status: v.status }
+    }
+    return map
 })
 
-const recentEvents = computed(() =>
-    [...systemLogs.value]
-        .sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0))
-        .slice(0, 10),
+/* ── Curved path for links ── */
+const linkPath = (from: { x: number; y: number }, to: { x: number; y: number }) => {
+    const dx = to.x - from.x
+    const dy = to.y - from.y
+    const cx = from.x + dx * 0.5
+    const cy = from.y + dy * 0.3
+    return `M ${from.x} ${from.y} Q ${cx} ${cy} ${to.x} ${to.y}`
+}
+
+/* ── Recent operations feed ── */
+const recentOpsFeed = computed(() =>
+    recentOps.value
+        .slice(0, 8)
+        .map((op) => {
+            const ts = new Date(op.timestamp * 1000)
+            const time = `${String(ts.getHours()).padStart(2, '0')}:${String(ts.getMinutes()).padStart(2, '0')}:${String(ts.getSeconds()).padStart(2, '0')}`
+            const levelTag = op.level === 'error' ? 'ERR' : op.level === 'warning' ? 'WRN' : 'INF'
+            return { time, level: op.level, tag: levelTag, message: op.message, id: `${op.timestamp}-${op.message.slice(0, 20)}` }
+        })
 )
 
-const sparklinePoints = (values: number[]) => {
-    if (!Array.isArray(values) || values.length < 2) return ''
-    const min = Math.min(...values)
-    const max = Math.max(...values)
-    const spread = Math.max(0.000001, max - min)
-    return values
-        .map((value, index) => {
-            const x = (index / (values.length - 1)) * 100
-            const y = 32 - ((value - min) / spread) * 26 - 3
-            return `${x.toFixed(2)},${y.toFixed(2)}`
-        })
-        .join(' ')
-}
-
-const parseTags = (raw: string) =>
-    raw
-        .split(',')
-        .map((token) => token.trim())
-        .filter(Boolean)
-
-const formatAge = (epochSeconds: number) => {
-    const delta = Math.max(0, Math.floor(Date.now() / 1000) - Number(epochSeconds || 0))
-    if (delta < 60) return `${delta}s`
-    if (delta < 3600) return `${Math.floor(delta / 60)}m`
-    if (delta < 86400) return `${Math.floor(delta / 3600)}h`
-    return `${Math.floor(delta / 86400)}d`
-}
-
-const laneClass = (lane: string) => `lane-${lane || 'research'}`
-const stateClass = (state: string) => `state-${state || 'open'}`
-const priorityClass = (priority: string) => `priority-${priority || 'medium'}`
-
-const loadSelectedTopic = async () => {
-    if (!selectedTopicId.value) {
-        selectedTopic.value = null
-        return
-    }
-    const detail = await fetchForumTopicDetail(selectedTopicId.value)
-    if (detail?.ok && detail.topic) {
-        selectedTopic.value = detail.topic as ForumTopic & { replies: ForumReply[] }
-        return
-    }
-    selectedTopic.value = null
-}
-
+/* ── Data fetch ── */
 const loadBoard = async () => {
+    fetchError.value = ''
     try {
         const settled = await Promise.allSettled([
-            fetchForumTopics({
-                lane: laneFilter.value,
-                state: stateFilter.value,
-                q: queryFilter.value,
-                limit: 120,
-            }),
+            fetchForumTopics({ limit: 120 }),
             fetchControlStatus(),
             fetchForumScoutStatus(),
             fetchPlatformStatus(),
             fetchPerformanceStats(),
-            fetchSystemLogs(80),
+            fetchSystemLogs(20),
         ])
-        const pick = <T>(index: number): T | null => {
-            const result = settled[index]
-            if (!result || result.status !== 'fulfilled') return null
-            return (result.value as T | null) || null
+        const pick = <T>(i: number): T | null => {
+            const r = settled[i]
+            return r?.status === 'fulfilled' ? (r.value as T | null) || null : null
         }
 
-        const board = pick<{
-            ok?: boolean
-            topics?: ForumTopic[]
-            total?: number
-            lane_counts?: Record<string, number>
-            state_counts?: Record<string, number>
-            control?: {
-                pending_autonomy_decisions: number
-                owner_directive: string
-                failure_pressure: number
-            }
-        }>(0)
-        const controlPayload = pick<ControlStatusResponse>(1)
-        const scoutPayload = pick<ForumScoutStatusResponse>(2)
-        const platformPayload = pick<PlatformStatusResponse>(3)
-        const performancePayload = pick<PerformanceStatsResponse>(4)
-        const systemLogPayload = pick<SystemLogEntry[] | null>(5)
-
+        const board = pick<any>(0)
         if (board?.ok) {
             topics.value = Array.isArray(board.topics) ? board.topics : []
             boardMeta.value = {
                 total: Number(board.total || topics.value.length),
                 lane_counts: board.lane_counts || {},
                 state_counts: board.state_counts || {},
-                control: board.control || {
-                    pending_autonomy_decisions: 0,
-                    owner_directive: '',
-                    failure_pressure: 0,
-                },
-            }
-
-            const hasSelected = topics.value.some((topic) => topic.topic_id === selectedTopicId.value)
-            if (!hasSelected) {
-                selectedTopicId.value = topics.value[0]?.topic_id || ''
-            }
-        } else if (!topics.value.length) {
-            boardMeta.value = null
-            selectedTopicId.value = ''
-        }
-
-        if (controlPayload?.ok) control.value = controlPayload
-        if (scoutPayload?.ok) scout.value = scoutPayload
-        if (platformPayload?.ok) {
-            platform.value = platformPayload
-            for (const [venueName, venue] of Object.entries(platformPayload.platforms || {})) {
-                pushVenuePriceHistory(venueName, Number(venue?.price || 0))
+                control: board.control || { pending_autonomy_decisions: 0, owner_directive: '', failure_pressure: 0 },
             }
         }
-        if (performancePayload?.ok) performance.value = performancePayload
-        if (Array.isArray(systemLogPayload)) systemLogs.value = systemLogPayload
+        const cp = pick<ControlStatusResponse>(1)
+        if (cp?.ok) control.value = cp
+        const sp = pick<ForumScoutStatusResponse>(2)
+        if (sp?.ok) scout.value = sp
+        const pp = pick<PlatformStatusResponse>(3)
+        if (pp?.ok) platform.value = pp
+        const perf = pick<PerformanceStatsResponse>(4)
+        if (perf?.ok) performance.value = perf
+        const logs = pick<SystemLogEntry[]>(5)
+        if (Array.isArray(logs)) recentOps.value = logs
 
-        await loadSelectedTopic()
         lastSyncEpoch.value = Date.now()
-        const failedCount = settled.filter((result) => result.status === 'rejected').length
-        feedback.value =
-            failedCount > 0
-                ? `Partial sync: ${failedCount} endpoint${failedCount === 1 ? '' : 's'} unavailable.`
-                : ''
+
+        /* Spawn particles along active links after data load */
+        await nextTick()
+        spawnDataParticles()
     } catch (error) {
-        console.error('Failed to load SapphireBook forum:', error)
-        feedback.value = 'Forum sync failed. Check alpha-engine API health.'
+        fetchError.value = connectionHealth.lastErrorMessage || 'Connection failed'
+        console.error('Board sync failed:', error)
     } finally {
         loading.value = false
     }
 }
 
-const submitNewTopic = async () => {
-    if (!forumMutationsEnabled) {
-        feedback.value = 'SapphireBook is in read-only mode. Use Telegram commands for control actions.'
-        return
-    }
-    if (!newTopic.value.title.trim() || !newTopic.value.body.trim()) {
-        feedback.value = 'Topic title and body are required.'
-        return
-    }
-    creatingTopic.value = true
-    feedback.value = ''
-    try {
-        const created = await createForumTopic({
-            title: newTopic.value.title,
-            body: newTopic.value.body,
-            lane: newTopic.value.lane,
-            state: newTopic.value.state,
-            priority: newTopic.value.priority,
-            author: newTopic.value.author,
-            tags: parseTags(newTopic.value.tags),
-        })
-        if (!created?.ok || !created.topic) {
-            feedback.value = 'Topic creation failed.'
-            return
+const spawnDataParticles = () => {
+    for (const link of allLinks.value) {
+        const fromNode = meshNodeMap.value[link.from]
+        const toNode = meshNodeMap.value[link.to]
+        if (!fromNode || !toNode) continue
+        /* Only spawn for healthy/active links */
+        if (toNode.status === 'offline') continue
+        if (Math.random() > 0.5) {
+            spawnParticle(fromNode.x, fromNode.y, toNode.x, toNode.y, `${link.from}-${link.to}`)
         }
-        selectedTopicId.value = created.topic.topic_id
-        newTopic.value.title = ''
-        newTopic.value.body = ''
-        await loadBoard()
-        feedback.value = `Topic ${created.topic.topic_id} created.`
-    } finally {
-        creatingTopic.value = false
     }
 }
-
-const submitReply = async () => {
-    if (!forumMutationsEnabled) {
-        feedback.value = 'SapphireBook is in read-only mode. Use Telegram commands for control actions.'
-        return
-    }
-    if (!selectedTopicId.value || !replyDraft.value.body.trim()) {
-        feedback.value = 'Select a topic and add a reply body.'
-        return
-    }
-    postingReply.value = true
-    feedback.value = ''
-    try {
-        const response = await createForumReply(selectedTopicId.value, {
-            body: replyDraft.value.body,
-            author: replyDraft.value.author,
-            kind: replyDraft.value.kind,
-            state: replyDraft.value.state || undefined,
-        })
-        if (!response?.ok || !response.reply) {
-            feedback.value = 'Reply failed to post.'
-            return
-        }
-        replyDraft.value.body = ''
-        await loadBoard()
-        feedback.value = `Reply ${response.reply.reply_id} posted.`
-    } finally {
-        postingReply.value = false
-    }
-}
-
-const submitScoutRegistration = async () => {
-    if (!forumMutationsEnabled) {
-        feedback.value = 'SapphireBook is in read-only mode. Use Telegram commands for control actions.'
-        return
-    }
-    if (!scoutRegistration.value.username.trim()) {
-        feedback.value = 'Scout username is required.'
-        return
-    }
-    registeringScout.value = true
-    feedback.value = ''
-    try {
-        const response = await registerForumScout({
-            username: scoutRegistration.value.username,
-            display_name: scoutRegistration.value.display_name,
-            bio: scoutRegistration.value.bio,
-        })
-        if (!response?.ok) {
-            feedback.value = 'Scout registration request failed.'
-            return
-        }
-        await loadBoard()
-        const dispatch = response.dispatch || { dispatched: false, reason: 'unknown' }
-        const metadata = asRecord(dispatch.metadata)
-        const reason = String(dispatch.reason || 'unknown')
-        const mode = String(dispatch.mode || 'none')
-        if (dispatch.dispatched) {
-            if (metadata.already_registered) {
-                feedback.value = `Scout already registered (${mode}). Token-backed dispatch is active.`
-            } else if (reason === 'ok_pending_verification' || metadata.verification_required) {
-                feedback.value =
-                    'Scout registration accepted but pending verification. Complete claim/verification before broad posting.'
-            } else {
-                feedback.value = `Scout registration dispatched (${mode}).`
-            }
-        } else {
-            const hint = String(metadata.hint || '').trim()
-            feedback.value = hint
-                ? `Scout registration pending (${reason}). ${hint}`
-                : `Scout registration pending (${reason}).`
-        }
-    } finally {
-        registeringScout.value = false
-    }
-}
-
-const submitScoutNote = async () => {
-    if (!forumMutationsEnabled) {
-        feedback.value = 'SapphireBook is in read-only mode. Use Telegram commands for control actions.'
-        return
-    }
-    if (!scoutNote.value.body.trim()) {
-        feedback.value = 'Scout note body is required.'
-        return
-    }
-    publishingScout.value = true
-    feedback.value = ''
-    try {
-        const response = await publishForumScoutNote({
-            topic_id: selectedTopicId.value || undefined,
-            title: scoutNote.value.title || undefined,
-            body: scoutNote.value.body,
-            author: scoutNote.value.author,
-            tags: parseTags(scoutNote.value.tags),
-            lane: 'external',
-            kind: 'note',
-        })
-        if (!response?.ok) {
-            feedback.value = 'Scout note publish failed.'
-            return
-        }
-        scoutNote.value.title = ''
-        scoutNote.value.body = ''
-        await loadBoard()
-        const dispatch = response.dispatch || { dispatched: false, reason: 'unknown' }
-        const metadata = asRecord(dispatch.metadata)
-        const reason = String(dispatch.reason || 'unknown')
-        if (dispatch.dispatched) {
-            if (reason === 'ok_pending_verification' || metadata.verification_required) {
-                feedback.value = 'Scout note accepted by Moltbook and pending verification visibility.'
-            } else {
-                feedback.value = 'Scout note published to external bridge.'
-            }
-        } else {
-            const retryMinutes = Number(metadata.retry_after_minutes || 0)
-            if (reason === 'moltbook_rate_limited' && retryMinutes > 0) {
-                feedback.value = `Scout note stored locally; Moltbook cooldown active (~${retryMinutes}m).`
-            } else if (reason === 'moltbook_pending_claim') {
-                feedback.value = 'Scout note stored locally; account claim is still pending.'
-            } else {
-                feedback.value = `Scout note stored locally; external pending (${reason}).`
-            }
-        }
-    } finally {
-        publishingScout.value = false
-    }
-}
-
-watch(selectedTopicId, async () => {
-    await loadSelectedTopic()
-})
 
 onMounted(() => {
     loadBoard()
     refreshTimer = setInterval(loadBoard, 15000)
-    clockTimer = setInterval(() => {
-        nowEpoch.value = Date.now()
-    }, 1000)
+    clockTimer = setInterval(() => { nowEpoch.value = Date.now() }, 1000)
+    particleTimer = setInterval(() => {
+        tickParticles()
+        if (Math.random() > 0.6) spawnDataParticles()
+    }, 60)
 })
-
 onUnmounted(() => {
     if (refreshTimer) clearInterval(refreshTimer)
     if (clockTimer) clearInterval(clockTimer)
+    if (particleTimer) clearInterval(particleTimer)
 })
 </script>
 
 <template>
-    <div class="book-forum fade-in">
-        <section class="hero card glass-lift">
-            <div>
-                <span class="font-mono kicker">SAPPHIREBOOK FORUM</span>
-                <h2>Full-stack operations theater for Sapphire autonomy.</h2>
-                <p>
-                    SapphireBook now presents the organization as a live operating system: owner channel, the three Sapphire agents, alpha
-                    orchestration, execution venues, scout bridge, and security guardrails.
-                </p>
-            </div>
-            <div class="hero-meta">
-                <span class="meta-chip">Topics {{ totalTopics }}</span>
-                <span class="meta-chip">Pending {{ pendingDecisions }}</span>
-                <span class="meta-chip">Forum health {{ forumHealthScore }}%</span>
-                <span class="meta-chip">Sync {{ syncAge }}</span>
-                <button class="ghost-btn" type="button" @click="showOperationsBoard = !showOperationsBoard">
-                    {{ showOperationsBoard ? 'Hide detailed board' : 'Show detailed board' }}
-                </button>
-            </div>
-            <div class="filter-row">
-                <select v-model="laneFilter">
-                    <option v-for="lane in lanes" :key="lane.value" :value="lane.value">{{ lane.label }}</option>
-                </select>
-                <select v-model="stateFilter">
-                    <option v-for="state in states" :key="state.value" :value="state.value">{{ state.label }}</option>
-                </select>
-                <input v-model="queryFilter" type="text" placeholder="Search title, body, tags" />
-                <button class="btn" :disabled="loading" @click="loadBoard">Apply</button>
-            </div>
+    <div class="book-view fade-in">
+        <div v-if="loading && !lastSyncEpoch" class="status-bar loading-bar">
+            <span class="pulse-dot"></span> Syncing architecture mesh...
+        </div>
+        <div v-else-if="fetchError" class="status-bar error-bar" @click="loadBoard">
+            {{ fetchError }} — tap to retry
+        </div>
+        <div v-else-if="isStale" class="status-bar stale-bar">
+            Data {{ dataAge }}s old — awaiting refresh
+        </div>
+
+        <!-- KPI Strip -->
+        <section class="kpi-strip">
+            <article class="kpi card glass-lift">
+                <span class="font-mono">System</span>
+                <strong class="glow">{{ architectureHealthScore }}%</strong>
+            </article>
+            <article class="kpi card glass-lift">
+                <span class="font-mono">Forum</span>
+                <strong>{{ forumHealthScore }}%</strong>
+            </article>
+            <article class="kpi card glass-lift">
+                <span class="font-mono">Topics</span>
+                <strong>{{ totalTopics }}</strong>
+            </article>
+            <article class="kpi card glass-lift">
+                <span class="font-mono">Pending</span>
+                <strong :class="pendingDecisions > 0 ? 'warn' : ''">{{ pendingDecisions }}</strong>
+            </article>
+            <article class="kpi card glass-lift">
+                <span class="font-mono">Trades</span>
+                <strong>{{ totalTrades }}</strong>
+            </article>
+            <article class="kpi card glass-lift">
+                <span class="font-mono">Win Rate</span>
+                <strong>{{ winRatePercent.toFixed(1) }}%</strong>
+            </article>
+            <article class="kpi card glass-lift">
+                <span class="font-mono">PnL</span>
+                <strong :class="realizedPnl >= 0 ? 'pnl-up' : 'pnl-down'">{{ realizedPnl >= 0 ? '+' : '' }}{{ realizedPnl.toFixed(4) }}</strong>
+            </article>
+            <article class="kpi card glass-lift">
+                <span class="font-mono">Uptime</span>
+                <strong>{{ uptimeLabel }}</strong>
+            </article>
         </section>
 
-        <section class="architecture card glass-lift">
-            <header class="architecture-head">
-                <div>
-                    <h3 class="font-mono">Organization Pulse</h3>
-                    <p>Live responsibilities and health by owner channel, agent departments, and runtime systems.</p>
-                </div>
-                <div class="architecture-score">
-                    <span class="font-mono">System score</span>
-                    <strong>{{ architectureHealthScore }}%</strong>
+        <!-- Architecture Mesh — full system visualization -->
+        <section class="mesh-section card">
+            <header class="section-header">
+                <h3 class="font-mono glow-strong">System Architecture</h3>
+                <div class="header-badges">
+                    <span class="sync-badge pulse-badge" :class="{ 'badge-kill': control?.kill_switch_active }">
+                        {{ control?.kill_switch_active ? 'KILL SWITCH' : 'LIVE' }}
+                    </span>
+                    <span class="sync-badge">sync {{ syncAge }}</span>
                 </div>
             </header>
-            <div class="architecture-grid">
-                <article v-for="node in architectureNodes" :key="node.id" class="architecture-node">
-                    <header>
-                        <strong>{{ node.title }}</strong>
-                        <span class="node-status" :class="`status-${node.status}`">{{ node.status }}</span>
-                    </header>
-                    <p>{{ node.detail }}</p>
-                </article>
-            </div>
-        </section>
 
-        <section class="mesh-panel card glass-lift">
-            <header class="mesh-head">
-                <div>
-                    <h3 class="font-mono">Live Org Flow Map</h3>
-                    <p>Owner to agent-to-system flow with live health and responsibility context.</p>
-                </div>
-                <span class="mesh-sync">sync {{ syncAge }}</span>
-            </header>
-            <svg class="mesh-svg" viewBox="0 0 100 60" role="img" aria-label="Sapphire architecture mesh">
-                <line
-                    v-for="link in architectureMeshLinks"
-                    :key="`${link.from}-${link.to}`"
-                    :x1="architectureMeshNodeMap[link.from]?.x || 0"
-                    :y1="architectureMeshNodeMap[link.from]?.y || 0"
-                    :x2="architectureMeshNodeMap[link.to]?.x || 0"
-                    :y2="architectureMeshNodeMap[link.to]?.y || 0"
+            <!-- Tier labels -->
+            <div class="tier-legend">
+                <span class="tier-label">COMMAND</span>
+                <span class="tier-label">CORE AGENTS</span>
+                <span class="tier-label">ORCHESTRATION</span>
+                <span class="tier-label">EXECUTION LAYER</span>
+                <span class="tier-label">VENUE CONNECTIONS</span>
+            </div>
+
+            <svg class="mesh-svg" viewBox="0 0 100 82" role="img" aria-label="Sapphire system architecture">
+                <defs>
+                    <radialGradient id="nodeGlow">
+                        <stop offset="0%" stop-color="#20C20E" stop-opacity="0.4" />
+                        <stop offset="100%" stop-color="#20C20E" stop-opacity="0" />
+                    </radialGradient>
+                    <radialGradient id="nodeGlowWarn">
+                        <stop offset="0%" stop-color="#ffb000" stop-opacity="0.4" />
+                        <stop offset="100%" stop-color="#ffb000" stop-opacity="0" />
+                    </radialGradient>
+                    <radialGradient id="nodeGlowErr">
+                        <stop offset="0%" stop-color="#ff4444" stop-opacity="0.35" />
+                        <stop offset="100%" stop-color="#ff4444" stop-opacity="0" />
+                    </radialGradient>
+                    <filter id="glowFilter">
+                        <feGaussianBlur stdDeviation="0.8" result="blur" />
+                        <feMerge>
+                            <feMergeNode in="blur" />
+                            <feMergeNode in="SourceGraphic" />
+                        </feMerge>
+                    </filter>
+                </defs>
+
+                <!-- Tier separator lines -->
+                <line x1="3" y1="13" x2="97" y2="13" class="tier-line" />
+                <line x1="3" y1="29" x2="97" y2="29" class="tier-line" />
+                <line x1="3" y1="45" x2="97" y2="45" class="tier-line" />
+                <line x1="3" y1="63" x2="97" y2="63" class="tier-line" />
+
+                <!-- Links (curved paths) -->
+                <path
+                    v-for="link in allLinks"
+                    :key="`link-${link.from}-${link.to}`"
+                    :d="linkPath(
+                        meshNodeMap[link.from] || { x: 0, y: 0 },
+                        meshNodeMap[link.to] || { x: 0, y: 0 }
+                    )"
                     class="mesh-link"
+                    :class="[
+                        `link-${link.type}`,
+                        { 'link-active': meshNodeMap[link.to]?.status === 'healthy' },
+                        { 'link-highlight': hoveredNode === link.from || hoveredNode === link.to },
+                    ]"
+                    fill="none"
                 />
-                <g v-for="node in architectureMeshNodes" :key="`mesh-${node.id}`" :transform="`translate(${node.x}, ${node.y})`">
-                    <circle class="mesh-node-halo" :class="`mesh-${node.status}`" r="4.8" />
-                    <circle class="mesh-node-core" :class="`mesh-${node.status}`" r="2.2" />
-                    <text class="mesh-node-label" x="0" y="-6.3">{{ node.title }}</text>
-                    <text class="mesh-node-sub" x="0" y="8.2">{{ node.detail }}</text>
+
+                <!-- Data flow particles -->
+                <circle
+                    v-for="p in particles"
+                    :key="p.id"
+                    :cx="particleX(p)"
+                    :cy="particleY(p)"
+                    r="0.5"
+                    class="flow-particle"
+                    :style="{ opacity: p.opacity }"
+                />
+
+                <!-- Core architecture nodes -->
+                <g
+                    v-for="node in meshNodes"
+                    :key="`node-${node.id}`"
+                    :transform="`translate(${node.x}, ${node.y})`"
+                    class="mesh-node-group"
+                    @mouseenter="hoveredNode = node.id"
+                    @mouseleave="hoveredNode = null"
+                >
+                    <circle
+                        class="mesh-aura"
+                        :r="hoveredNode === node.id ? 7 : 5.5"
+                        :fill="node.status === 'healthy' ? 'url(#nodeGlow)' : node.status === 'degraded' ? 'url(#nodeGlowWarn)' : 'url(#nodeGlowErr)'"
+                    />
+                    <circle
+                        class="mesh-halo"
+                        :class="`mesh-${node.status}`"
+                        :r="node.tier === 'orchestrator' ? 3.2 : 2.5"
+                    />
+                    <circle
+                        class="mesh-core"
+                        :class="`mesh-${node.status}`"
+                        :r="node.tier === 'orchestrator' ? 1.6 : 1.2"
+                        filter="url(#glowFilter)"
+                    />
+                    <text class="mesh-label" x="0" :y="node.tier === 'orchestrator' ? -5.5 : -4.5">{{ node.title }}</text>
+                    <text class="mesh-sub" x="0" :y="node.tier === 'orchestrator' ? 7.5 : 5.5">{{ node.detail }}</text>
+                </g>
+
+                <!-- Venue / platform nodes -->
+                <g
+                    v-for="venue in venueNodes"
+                    :key="`venue-${venue.id}`"
+                    :transform="`translate(${venue.x}, ${venue.y})`"
+                    class="mesh-node-group venue-group"
+                    @mouseenter="hoveredNode = venue.id"
+                    @mouseleave="hoveredNode = null"
+                >
+                    <rect
+                        class="venue-box"
+                        :class="[`venue-${venue.status}`, { 'venue-paused': venue.paused }]"
+                        x="-7" y="-3.5" width="14" height="7" rx="1"
+                    />
+                    <text class="venue-label" x="0" y="0.5">{{ venue.name }}</text>
+                    <text class="venue-alloc" x="0" y="5.5">
+                        {{ venue.paused ? 'PAUSED' : venue.status === 'offline' ? 'OFFLINE' : `${(venue.allocation * 100).toFixed(0)}%` }}
+                    </text>
                 </g>
             </svg>
-            <div class="department-grid">
-                <article v-for="dept in departmentCards" :key="dept.id" class="department-card">
-                    <header>
-                        <strong>{{ dept.title }}</strong>
-                        <span class="node-status" :class="`status-${dept.status}`">{{ dept.status }}</span>
-                    </header>
-                    <p>{{ dept.detail }}</p>
-                </article>
-            </div>
         </section>
 
-        <section class="event-stream card glass-lift">
-            <header class="event-head">
-                <h3 class="font-mono">Real-Time Event Stream</h3>
-                <small>Top system log events driving autonomous behavior.</small>
-            </header>
-            <div class="event-list">
-                <article v-for="event in recentEvents" :key="`${event.timestamp}-${event.message}`" class="event-row">
-                    <div class="event-meta">
-                        <span class="font-mono">{{ formatAge(event.timestamp) }} ago</span>
-                        <span class="node-status" :class="`status-${event.level === 'warning' ? 'degraded' : 'healthy'}`">
-                            {{ event.level }}
-                        </span>
-                    </div>
-                    <p>{{ event.message }}</p>
-                    <footer class="event-tags">
-                        <span v-for="tag in event.tags.slice(0, 4)" :key="`${event.timestamp}-${tag}`">{{ tag }}</span>
-                    </footer>
-                </article>
-                <p v-if="!recentEvents.length" class="empty">No system events returned from alpha logs.</p>
-            </div>
-        </section>
-
-        <section class="board-toggle card glass-lift">
-            <header class="board-toggle-head">
-                <div>
-                    <h3 class="font-mono">Operations Collaboration Board</h3>
-                    <p>
-                        Detailed forum threads, scout actions, and execution control artifacts for operator-level workflows.
-                    </p>
-                </div>
-                <button class="btn" type="button" @click="showOperationsBoard = !showOperationsBoard">
-                    {{ showOperationsBoard ? 'Collapse board' : 'Expand board' }}
-                </button>
-            </header>
-        </section>
-
-        <section v-if="showOperationsBoard" class="board-layout">
-            <article class="topic-column card">
-                <header class="column-head">
-                    <h3 class="font-mono">Topic Board</h3>
-                    <small>{{ topics.length }} visible</small>
+        <!-- System Nodes + Venues side by side -->
+        <div class="details-grid">
+            <!-- Node Status -->
+            <section class="node-list card">
+                <header class="section-header">
+                    <h3 class="font-mono">Core Nodes</h3>
                 </header>
-
-                <p v-if="!forumMutationsEnabled" class="read-only-note">
-                    Read-only mode: create/reply/scout actions are locked to Telegram control commands.
-                </p>
-
-                <form v-if="forumMutationsEnabled" class="compose" @submit.prevent="submitNewTopic">
-                    <input v-model="newTopic.title" type="text" placeholder="New topic title" maxlength="140" />
-                    <textarea v-model="newTopic.body" rows="3" placeholder="Describe context, objective, and expected outcome" />
-                    <div class="compose-grid">
-                        <select v-model="newTopic.lane">
-                            <option value="security">Security</option>
-                            <option value="deploy">Deploy</option>
-                            <option value="research">Research</option>
-                            <option value="trading">Trading</option>
-                            <option value="governance">Governance</option>
-                            <option value="external">External</option>
-                        </select>
-                        <select v-model="newTopic.state">
-                            <option value="open">Open</option>
-                            <option value="queued">Queued</option>
-                            <option value="needs_owner">Needs owner</option>
-                            <option value="blocked">Blocked</option>
-                            <option value="resolved">Resolved</option>
-                        </select>
-                        <select v-model="newTopic.priority">
-                            <option value="low">Low</option>
-                            <option value="medium">Medium</option>
-                            <option value="high">High</option>
-                            <option value="critical">Critical</option>
-                        </select>
-                        <input v-model="newTopic.tags" type="text" placeholder="tags,comma,separated" />
-                    </div>
-                    <button class="btn" :disabled="creatingTopic">{{ creatingTopic ? 'Creating...' : 'Create Topic' }}</button>
-                </form>
-
-                <div class="topic-list">
-                    <button
-                        v-for="topic in topics"
-                        :key="topic.topic_id"
-                        class="topic-item glass-lift"
-                        :class="{ active: topic.topic_id === selectedTopicId }"
-                        @click="selectedTopicId = topic.topic_id"
+                <div class="node-grid">
+                    <article
+                        v-for="node in architectureNodes"
+                        :key="node.id"
+                        class="node-row"
+                        @mouseenter="hoveredNode = node.id"
+                        @mouseleave="hoveredNode = null"
                     >
-                        <header>
-                            <span class="topic-id font-mono">{{ topic.topic_id }}</span>
-                            <span class="pill" :class="stateClass(topic.state)">{{ topic.state }}</span>
-                        </header>
-                        <h4>{{ topic.title }}</h4>
-                        <p>{{ topic.summary }}</p>
-                        <footer>
-                            <span class="pill" :class="laneClass(topic.lane)">{{ topic.lane }}</span>
-                            <span class="pill" :class="priorityClass(topic.priority)">{{ topic.priority }}</span>
-                            <span class="meta">{{ topic.reply_count }} replies</span>
-                            <span class="meta">{{ formatAge(topic.last_reply_at) }} ago</span>
-                        </footer>
-                    </button>
-                    <p v-if="!topics.length" class="empty">No topics matched current filters.</p>
-                </div>
-            </article>
-
-            <article class="thread-column card" v-if="selectedTopic">
-                <header class="column-head">
-                    <div>
-                        <span class="topic-id font-mono">{{ selectedTopic.topic_id }}</span>
-                        <h3>{{ selectedTopic.title }}</h3>
-                    </div>
-                    <div class="head-pills">
-                        <span class="pill" :class="laneClass(selectedTopic.lane)">{{ selectedTopic.lane }}</span>
-                        <span class="pill" :class="stateClass(selectedTopic.state)">{{ selectedTopic.state }}</span>
-                        <span class="pill" :class="priorityClass(selectedTopic.priority)">{{ selectedTopic.priority }}</span>
-                    </div>
-                </header>
-
-                <article class="opening-post">
-                    <p>{{ selectedTopic.body }}</p>
-                    <small>
-                        by {{ selectedTopic.author }} · {{ formatAge(selectedTopic.created_at) }} ago · source {{ selectedTopic.source }}
-                    </small>
-                </article>
-
-                <section class="reply-stream">
-                    <article v-for="reply in selectedTopic.replies" :key="reply.reply_id" class="reply-row">
-                        <header>
-                            <span class="font-mono">{{ reply.reply_id }}</span>
-                            <span class="pill" :class="laneClass(reply.source === 'scout' ? 'external' : selectedTopic.lane)">{{ reply.kind }}</span>
-                        </header>
-                        <p>{{ reply.body }}</p>
-                        <footer>{{ reply.author }} · {{ formatAge(reply.created_at) }} ago · {{ reply.source }}</footer>
+                        <span class="node-dot" :class="`dot-${node.status}`"></span>
+                        <span class="node-name">{{ node.title }}</span>
+                        <span class="node-status-label" :class="`status-${node.status}`">{{ node.status }}</span>
+                        <span class="node-detail">{{ node.detail }}</span>
                     </article>
-                    <p v-if="!selectedTopic.replies.length" class="empty">No replies yet. Add the first collaboration note.</p>
-                </section>
+                </div>
+            </section>
 
-                <p v-if="!forumMutationsEnabled" class="read-only-note">
-                    Reply actions are disabled in UI. Use Telegram (`/steer`, `/answer`, `/approve`, `/reject`) for execution control.
-                </p>
-
-                <form v-if="forumMutationsEnabled" class="reply-compose" @submit.prevent="submitReply">
-                    <textarea v-model="replyDraft.body" rows="3" placeholder="Post a reply, decision, or execution update" />
-                    <div class="compose-grid">
-                        <input v-model="replyDraft.author" type="text" placeholder="Author" />
-                        <select v-model="replyDraft.kind">
-                            <option value="comment">Comment</option>
-                            <option value="proposal">Proposal</option>
-                            <option value="question">Question</option>
-                            <option value="decision">Decision</option>
-                            <option value="note">Note</option>
-                        </select>
-                        <select v-model="replyDraft.state">
-                            <option value="">Keep state</option>
-                            <option value="open">Open</option>
-                            <option value="queued">Queued</option>
-                            <option value="needs_owner">Needs owner</option>
-                            <option value="blocked">Blocked</option>
-                            <option value="resolved">Resolved</option>
-                        </select>
-                        <button class="btn" :disabled="postingReply">{{ postingReply ? 'Posting...' : 'Post Reply' }}</button>
-                    </div>
-                </form>
-            </article>
-
-            <article class="thread-column card empty-thread" v-else>
-                <h3 class="font-mono">Select a topic</h3>
-                <p>Choose a topic from the board to inspect full thread context and replies.</p>
-            </article>
-
-            <aside class="side-column">
-                <article class="card glass-lift side-card">
-                    <h3 class="font-mono">Control Pulse</h3>
-                    <p><strong>Directive:</strong> {{ ownerDirective }}</p>
-                    <p><strong>Autonomy:</strong> {{ control?.full_autonomy_enabled ? 'ON' : 'OFF' }}</p>
-                    <p><strong>Owner approvals:</strong> {{ control?.owner_approval_required ? 'required' : 'auto-approve' }}</p>
-                    <p><strong>Failure pressure:</strong> {{ failurePressure }}</p>
-                    <p><strong>Security mode:</strong> {{ control?.vt_enforcement_mode || 'warn' }}</p>
-                    <div class="summary-grid">
-                        <span v-for="item in laneSummary" :key="`lane-${item.lane}`" class="pill" :class="laneClass(item.lane)">
-                            {{ item.lane }} {{ item.count }}
+            <!-- Venue Status -->
+            <section class="venue-list card">
+                <header class="section-header">
+                    <h3 class="font-mono">Trading Venues</h3>
+                </header>
+                <div class="venue-grid">
+                    <article
+                        v-for="v in venueStatus"
+                        :key="v.id"
+                        class="venue-row"
+                        :class="{ 'venue-row-paused': v.paused }"
+                        @mouseenter="hoveredNode = v.id"
+                        @mouseleave="hoveredNode = null"
+                    >
+                        <span class="node-dot" :class="v.paused ? 'dot-degraded' : `dot-${v.status === 'healthy' ? 'healthy' : v.status === 'offline' ? 'offline' : 'degraded'}`"></span>
+                        <span class="node-name">{{ venueDisplayNames[v.id] }}</span>
+                        <span class="venue-mode">{{ v.mode }}</span>
+                        <span class="venue-routing">{{ v.routing }}</span>
+                        <span class="venue-allocation" :class="{ 'alloc-zero': v.allocation === 0 }">
+                            {{ v.paused ? 'paused' : `${(v.allocation * 100).toFixed(0)}%` }}
                         </span>
-                    </div>
-                    <div class="summary-grid">
-                        <span v-for="item in stateSummary" :key="`state-${item.state}`" class="pill" :class="stateClass(item.state)">
-                            {{ item.state }} {{ item.count }}
-                        </span>
-                    </div>
-                </article>
+                    </article>
+                </div>
+            </section>
+        </div>
 
-                <article class="card glass-lift side-card">
-                    <h3 class="font-mono">Scout Bridge</h3>
-                    <p>
-                        Agent: <strong>{{ scout?.profile.agent_id || 'SAPPHIRE_SCOUT' }}</strong> · Sensitive access:
-                        <strong>{{ scout?.profile.sensitive_data_access || 'none' }}</strong>
-                    </p>
-                    <p>
-                        Registration: <strong>{{ scoutRegistrationLabel }}</strong>
-                        <span v-if="scout?.registration.username">(@{{ scout.registration.username }})</span>
-                        <small> · source {{ scoutRegistrationSourceLabel }}</small>
-                    </p>
-                    <p>
-                        Provider: <strong>{{ scoutProviderLabel }}</strong> · mode: <strong>{{ scoutBridgeModeLabel }}</strong>
-                    </p>
-                    <p>
-                        Bridge state: <strong>{{ scoutStateLabel }}</strong>
-                    </p>
-                    <p>
-                        External path: <strong>{{ scoutBridge?.external_ready ? 'READY' : 'NOT READY' }}</strong> ·
-                        fallback: <strong>{{ scoutBridge?.fallback_ready ? 'READY' : 'NOT READY' }}</strong>
-                    </p>
-                    <p class="hint-line">
-                        {{ scoutOperatorHint }}
-                    </p>
-                    <p>
-                        Last dispatch: <strong>{{ scoutLastDispatchMode }}</strong> · <strong>{{ scoutLastDispatchReason }}</strong>
-                    </p>
-                    <p v-if="scoutLastDispatchDetail !== 'none'" class="dispatch-line">
-                        {{ scoutLastDispatchDetail }}
-                    </p>
-                    <p v-if="!forumMutationsEnabled" class="read-only-note">
-                        Scout register/publish actions are Telegram-only in this hardened mode.
-                    </p>
-                    <form v-if="forumMutationsEnabled" class="scout-form" @submit.prevent="submitScoutRegistration">
-                        <input v-model="scoutRegistration.username" type="text" placeholder="Scout username" />
-                        <input v-model="scoutRegistration.display_name" type="text" placeholder="Display name" />
-                        <textarea v-model="scoutRegistration.bio" rows="2" placeholder="Scout profile bio" />
-                        <button class="btn" :disabled="registeringScout">
-                            {{ registeringScout ? 'Submitting...' : 'Register Scout' }}
-                        </button>
-                    </form>
-                    <form v-if="forumMutationsEnabled" class="scout-form" @submit.prevent="submitScoutNote">
-                        <input v-model="scoutNote.title" type="text" placeholder="External note title (optional)" />
-                        <textarea v-model="scoutNote.body" rows="2" placeholder="Scout outbound summary (sanitized)" />
-                        <input v-model="scoutNote.tags" type="text" placeholder="tags,comma,separated" />
-                        <button class="btn" :disabled="publishingScout">
-                            {{ publishingScout ? 'Publishing...' : 'Publish Scout Note' }}
-                        </button>
-                    </form>
+        <!-- Recent Operations Feed -->
+        <section class="ops-feed card">
+            <header class="section-header">
+                <h3 class="font-mono">Recent Operations</h3>
+                <span class="sync-badge">{{ recentOps.length }} events</span>
+            </header>
+            <div class="ops-grid">
+                <article v-for="op in recentOpsFeed" :key="op.id" class="ops-row" :class="`ops-${op.level}`">
+                    <span class="ops-time">{{ op.time }}</span>
+                    <span class="ops-tag" :class="`tag-${op.level}`">{{ op.tag }}</span>
+                    <span class="ops-msg">{{ op.message }}</span>
                 </article>
-
-                <article class="card glass-lift side-card" v-if="feedback">
-                    <h3 class="font-mono">Operator Feedback</h3>
-                    <p>{{ feedback }}</p>
+                <article v-if="!recentOpsFeed.length" class="ops-row ops-empty">
+                    <span class="ops-msg">Awaiting system events...</span>
                 </article>
-            </aside>
-        </section>
-
-        <section v-else class="board-collapsed card glass-lift">
-            <p>
-                Detailed collaboration threads are collapsed to keep this surface clean for visitors. Use “Expand board” when you need
-                full operator workflows, thread-level context, or scout publish controls.
-            </p>
+            </div>
         </section>
     </div>
 </template>
 
 <style scoped>
-.book-forum {
+.book-view {
     display: grid;
-    gap: 0.9rem;
+    gap: 1rem;
 }
 
-.hero {
+/* ── KPI Strip ── */
+.kpi-strip {
     display: grid;
-    gap: 0.7rem;
-    background:
-        radial-gradient(circle at 82% 8%, rgba(76, 194, 255, 0.24), transparent 45%),
-        linear-gradient(135deg, rgba(8, 23, 44, 0.96), rgba(6, 20, 39, 0.82));
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 0.6rem;
 }
 
-.kicker {
-    font-size: 0.66rem;
-    letter-spacing: 0.08em;
-    color: #95e5ff;
-}
-
-.hero h2 {
-    margin: 0.25rem 0;
-    font-size: 1.12rem;
-}
-
-.hero p {
-    margin: 0;
-    color: var(--text-secondary);
-    max-width: 88ch;
-}
-
-.hero-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-}
-
-.meta-chip {
-    font-size: 0.72rem;
-    border: 1px solid rgba(113, 204, 255, 0.4);
-    border-radius: 999px;
-    padding: 0.2rem 0.58rem;
-    color: #bdeeff;
-    background: rgba(8, 29, 56, 0.65);
-}
-
-.filter-row {
+.kpi {
     display: grid;
-    grid-template-columns: 0.9fr 0.9fr 1.3fr auto;
-    gap: 0.5rem;
+    gap: 0.2rem;
+    text-align: center;
+    padding: 0.65rem 0.5rem;
 }
 
-.filter-row select,
-.filter-row input,
-.compose input,
-.compose textarea,
-.reply-compose textarea,
-.reply-compose input,
-.reply-compose select,
-.compose-grid select,
-.compose-grid input,
-.scout-form input,
-.scout-form textarea,
-.scout-form select {
-    background: rgba(7, 21, 42, 0.82);
-    border: 1px solid rgba(115, 178, 222, 0.3);
+.kpi span {
+    font-size: 0.62rem;
+    color: var(--text-tertiary);
+}
+
+.kpi strong {
+    font-size: 1.15rem;
     color: var(--text-primary);
-    border-radius: 10px;
-    padding: 0.46rem 0.56rem;
-    font-family: var(--font-ui);
-    font-size: 0.8rem;
 }
 
-textarea {
-    resize: vertical;
+.kpi strong.warn {
+    color: var(--color-warning);
+    text-shadow: 0 0 6px rgba(255, 176, 0, 0.4);
 }
 
-.btn {
-    border: 1px solid rgba(123, 202, 255, 0.45);
-    border-radius: 10px;
-    background: linear-gradient(135deg, rgba(20, 95, 161, 0.9), rgba(29, 137, 214, 0.84));
-    color: #eff9ff;
-    font-weight: 600;
-    font-size: 0.78rem;
-    padding: 0.48rem 0.7rem;
-    cursor: pointer;
-}
+.pnl-up { color: var(--color-terminal); }
+.pnl-down { color: var(--color-error); text-shadow: 0 0 4px rgba(255, 68, 68, 0.3); }
 
-.btn:disabled {
-    opacity: 0.65;
-    cursor: not-allowed;
-}
-
-.ghost-btn {
-    border: 1px solid rgba(124, 195, 239, 0.38);
-    border-radius: 999px;
-    background: rgba(8, 24, 45, 0.62);
-    color: #d9f2ff;
-    padding: 0.24rem 0.62rem;
-    font-size: 0.68rem;
-    cursor: pointer;
-}
-
-.architecture {
+/* ── Mesh Section ── */
+.mesh-section {
     display: grid;
-    gap: 0.72rem;
-    background:
-        radial-gradient(circle at 84% 10%, rgba(95, 195, 255, 0.22), transparent 42%),
-        linear-gradient(136deg, rgba(8, 24, 44, 0.9), rgba(6, 20, 36, 0.86));
+    gap: 0.5rem;
+    padding: 1rem;
 }
 
-.architecture-head {
+.section-header {
     display: flex;
     justify-content: space-between;
-    gap: 0.8rem;
-    align-items: flex-start;
-}
-
-.architecture-head h3 {
-    margin: 0;
-}
-
-.architecture-head p {
-    margin: 0.25rem 0 0;
-    color: var(--text-secondary);
-    font-size: 0.79rem;
-}
-
-.architecture-score {
-    display: grid;
-    justify-items: end;
-    gap: 0.18rem;
-    padding: 0.36rem 0.6rem;
-    border: 1px solid rgba(112, 197, 255, 0.34);
-    border-radius: 10px;
-    background: rgba(7, 22, 43, 0.7);
-}
-
-.architecture-score span {
-    font-size: 0.66rem;
-    color: #9cdbff;
-}
-
-.architecture-score strong {
-    font-size: 1rem;
-    color: #e8f7ff;
-}
-
-.architecture-grid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    align-items: center;
     gap: 0.5rem;
 }
 
-.architecture-node {
-    border: 1px solid rgba(120, 186, 231, 0.28);
-    border-radius: 12px;
-    padding: 0.52rem 0.56rem;
-    background: rgba(7, 22, 42, 0.74);
-    display: grid;
-    gap: 0.3rem;
+.section-header h3 {
+    margin: 0;
 }
 
-.architecture-node header {
+.header-badges {
     display: flex;
-    justify-content: space-between;
     gap: 0.4rem;
     align-items: center;
 }
 
-.architecture-node strong {
-    font-size: 0.74rem;
+.sync-badge {
+    font-size: 0.62rem;
+    color: var(--text-tertiary);
+    letter-spacing: 0.04em;
+    border: 1px solid var(--border-subtle);
+    border-radius: 999px;
+    padding: 0.15rem 0.5rem;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
 }
 
-.architecture-node p {
-    margin: 0;
-    color: var(--text-secondary);
-    font-size: 0.72rem;
-    line-height: 1.35;
+.pulse-badge {
+    color: var(--color-terminal);
+    border-color: rgba(32, 194, 14, 0.4);
+    animation: badgePulse 2s ease-in-out infinite;
 }
 
-.mesh-panel {
-    display: grid;
-    gap: 0.72rem;
-    background:
-        radial-gradient(circle at 8% 10%, rgba(80, 184, 255, 0.2), transparent 34%),
-        linear-gradient(138deg, rgba(7, 23, 44, 0.88), rgba(7, 21, 39, 0.82));
+.badge-kill {
+    color: var(--color-error) !important;
+    border-color: rgba(255, 68, 68, 0.5) !important;
+    animation: badgeKill 1s ease-in-out infinite !important;
 }
 
-.mesh-head {
+@keyframes badgePulse {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; }
+}
+
+@keyframes badgeKill {
+    0%, 100% { opacity: 0.5; box-shadow: 0 0 4px rgba(255, 68, 68, 0.3); }
+    50% { opacity: 1; box-shadow: 0 0 10px rgba(255, 68, 68, 0.5); }
+}
+
+/* ── Tier legend ── */
+.tier-legend {
     display: flex;
     justify-content: space-between;
-    align-items: baseline;
-    gap: 0.85rem;
+    padding: 0 0.3rem;
 }
 
-.mesh-head h3 {
-    margin: 0;
+.tier-label {
+    font-size: 0.5rem;
+    font-family: var(--font-mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(32, 194, 14, 0.22);
 }
 
-.mesh-head p {
-    margin: 0.22rem 0 0;
-    color: var(--text-secondary);
-    font-size: 0.77rem;
-    max-width: 76ch;
-}
-
-.mesh-sync {
-    border: 1px solid rgba(114, 193, 251, 0.36);
-    border-radius: 999px;
-    padding: 0.15rem 0.52rem;
-    color: #a5e3ff;
-    font-size: 0.68rem;
-    white-space: nowrap;
-}
-
+/* ── SVG Mesh ── */
 .mesh-svg {
     width: 100%;
-    height: 280px;
-    border-radius: 12px;
-    border: 1px solid rgba(117, 180, 226, 0.24);
+    height: 420px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-subtle);
     background:
-        radial-gradient(circle at 15% 20%, rgba(83, 196, 255, 0.14), transparent 42%),
-        linear-gradient(160deg, rgba(7, 22, 40, 0.88), rgba(6, 19, 33, 0.82));
+        radial-gradient(ellipse at 50% 40%, rgba(32, 194, 14, 0.03) 0%, transparent 70%),
+        rgba(5, 10, 5, 0.6);
+    cursor: default;
 }
 
+.tier-line {
+    stroke: rgba(32, 194, 14, 0.06);
+    stroke-width: 0.15;
+    stroke-dasharray: 1 2;
+}
+
+/* ── Links ── */
 .mesh-link {
-    stroke: rgba(128, 196, 241, 0.38);
-    stroke-width: 0.45;
-    stroke-dasharray: 1.4 1.4;
-    animation: mesh-flow 4.4s linear infinite;
+    stroke: rgba(32, 194, 14, 0.12);
+    stroke-width: 0.3;
+    stroke-dasharray: 1.2 1.2;
+    animation: meshFlow 4s linear infinite;
+    transition: stroke 0.3s, stroke-width 0.3s;
 }
 
-.mesh-node-halo {
-    fill: rgba(112, 194, 255, 0.18);
-    animation: mesh-pulse 2.6s ease-in-out infinite;
+.mesh-link.link-active {
+    stroke: rgba(32, 194, 14, 0.25);
 }
 
-.mesh-node-core {
-    stroke: rgba(233, 246, 255, 0.7);
-    stroke-width: 0.24;
+.mesh-link.link-highlight {
+    stroke: rgba(32, 194, 14, 0.55);
+    stroke-width: 0.5;
 }
 
-.mesh-healthy {
-    fill: rgba(88, 230, 171, 0.92);
+.link-command { stroke-dasharray: 0.8 1.6; }
+.link-signal { stroke-dasharray: 2 0.8; }
+.link-dispatch { stroke-dasharray: 0.6 1; animation-duration: 2.5s; }
+
+/* ── Particles ── */
+.flow-particle {
+    fill: var(--color-terminal);
+    filter: url(#glowFilter);
 }
 
-.mesh-degraded {
-    fill: rgba(255, 202, 117, 0.94);
+/* ── Nodes ── */
+.mesh-node-group {
+    cursor: pointer;
+    transition: transform 0.2s;
 }
 
-.mesh-offline {
-    fill: rgba(255, 149, 149, 0.94);
+.mesh-aura {
+    transition: r 0.3s ease;
 }
 
-.mesh-node-label,
-.mesh-node-sub {
+.mesh-halo {
+    fill: rgba(32, 194, 14, 0.08);
+    animation: meshPulse 3s ease-in-out infinite;
+}
+
+.mesh-core {
+    stroke-width: 0.15;
+}
+
+.mesh-healthy { fill: var(--color-terminal); stroke: rgba(32, 194, 14, 0.7); }
+.mesh-degraded { fill: var(--color-warning); stroke: rgba(255, 176, 0, 0.6); }
+.mesh-offline { fill: var(--color-error); stroke: rgba(255, 68, 68, 0.5); }
+
+.mesh-label, .mesh-sub {
     text-anchor: middle;
-    font-size: 1.9px;
-    fill: #d7ecff;
     pointer-events: none;
 }
 
-.mesh-node-sub {
-    font-size: 1.35px;
-    fill: rgba(199, 224, 245, 0.85);
+.mesh-label {
+    font-size: 1.6px;
+    fill: var(--text-primary);
+    font-family: var(--font-mono);
+    letter-spacing: 0.1px;
 }
 
-.department-grid {
+.mesh-sub {
+    font-size: 1px;
+    fill: var(--text-tertiary);
+    font-family: var(--font-mono);
+}
+
+/* ── Venue nodes ── */
+.venue-box {
+    fill: rgba(10, 20, 10, 0.7);
+    stroke: rgba(32, 194, 14, 0.25);
+    stroke-width: 0.2;
+    rx: 1;
+    transition: stroke 0.3s, fill 0.3s;
+}
+
+.venue-box.venue-healthy {
+    stroke: rgba(32, 194, 14, 0.45);
+}
+
+.venue-box.venue-offline {
+    stroke: rgba(255, 68, 68, 0.3);
+    fill: rgba(25, 10, 10, 0.5);
+}
+
+.venue-box.venue-paused {
+    stroke: rgba(255, 176, 0, 0.35);
+    stroke-dasharray: 0.6 0.4;
+}
+
+.venue-group:hover .venue-box {
+    stroke: rgba(32, 194, 14, 0.7);
+    fill: rgba(20, 35, 20, 0.7);
+}
+
+.venue-label {
+    text-anchor: middle;
+    font-size: 1.2px;
+    fill: var(--text-primary);
+    font-family: var(--font-mono);
+    letter-spacing: 0.08px;
+    pointer-events: none;
+}
+
+.venue-alloc {
+    text-anchor: middle;
+    font-size: 0.9px;
+    fill: var(--text-tertiary);
+    font-family: var(--font-mono);
+    pointer-events: none;
+}
+
+@keyframes meshFlow {
+    0% { stroke-dashoffset: 6; }
+    100% { stroke-dashoffset: 0; }
+}
+
+@keyframes meshPulse {
+    0%, 100% { opacity: 0.25; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.08); }
+}
+
+/* ── Details Grid ── */
+.details-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.58rem;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.7rem;
 }
 
-.department-card {
-    border: 1px solid rgba(120, 186, 231, 0.3);
-    border-radius: 12px;
-    background: rgba(7, 22, 42, 0.7);
-    padding: 0.58rem 0.62rem;
-    display: grid;
-    gap: 0.3rem;
-}
+/* ── Node List ── */
+.node-list, .venue-list { display: grid; gap: 0.4rem; }
 
-.department-card header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 0.55rem;
-}
-
-.department-card strong {
-    font-size: 0.73rem;
-}
-
-.department-card p {
-    margin: 0;
-    color: var(--text-secondary);
-    font-size: 0.74rem;
-    line-height: 1.32;
-}
-
-.node-status {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 999px;
-    border: 1px solid transparent;
-    padding: 0.12rem 0.45rem;
-    font-size: 0.64rem;
-    text-transform: lowercase;
-}
-
-.status-healthy {
-    color: #8df5c8;
-    border-color: rgba(108, 226, 172, 0.48);
-}
-
-.status-degraded {
-    color: #ffd493;
-    border-color: rgba(255, 194, 104, 0.48);
-}
-
-.status-offline {
-    color: #ffb5b5;
-    border-color: rgba(255, 128, 128, 0.48);
-}
-
-@keyframes mesh-flow {
-    0% {
-        stroke-dashoffset: 6;
-    }
-    100% {
-        stroke-dashoffset: 0;
-    }
-}
-
-@keyframes mesh-pulse {
-    0%,
-    100% {
-        opacity: 0.35;
-        transform: scale(1);
-    }
-    50% {
-        opacity: 0.8;
-        transform: scale(1.08);
-    }
-}
-
-.architecture-kpis {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.5rem;
-}
-
-.kpi-card {
-    border: 1px solid rgba(118, 184, 229, 0.28);
-    border-radius: 11px;
-    background: rgba(7, 22, 42, 0.66);
-    padding: 0.48rem 0.56rem;
+.node-grid, .venue-grid {
     display: grid;
     gap: 0.2rem;
 }
 
-.kpi-card span {
-    font-size: 0.63rem;
-    color: var(--text-tertiary);
-}
-
-.kpi-card strong {
-    font-size: 0.83rem;
-}
-
-.kpi-card small {
-    font-size: 0.69rem;
-    color: var(--text-secondary);
-}
-
-.positive {
-    color: #88f4d0;
-}
-
-.negative {
-    color: #ffb3b3;
-}
-
-.venue-pulse-grid {
+.node-row, .venue-row {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.72rem;
-}
-
-.venue-card {
-    display: grid;
-    gap: 0.48rem;
-    background: rgba(8, 23, 43, 0.82);
-}
-
-.venue-head {
-    display: flex;
-    justify-content: space-between;
-    gap: 0.5rem;
-}
-
-.venue-head h4 {
-    margin: 0.18rem 0 0;
-    font-size: 0.82rem;
-    color: var(--text-secondary);
-}
-
-.venue-price-line {
-    display: flex;
-    align-items: baseline;
-    gap: 0.45rem;
-}
-
-.venue-price-line strong {
-    font-size: 1.08rem;
-    letter-spacing: 0.01em;
-}
-
-.venue-price-line span {
-    font-size: 0.78rem;
-}
-
-.sparkline {
-    width: 100%;
-    height: 42px;
-    border-radius: 8px;
-    background: linear-gradient(180deg, rgba(15, 45, 73, 0.34), rgba(9, 26, 42, 0.24));
-}
-
-.sparkline polyline {
-    fill: none;
-    stroke: #86dcff;
-    stroke-width: 2.2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-
-.venue-card footer {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.45rem;
-    font-size: 0.7rem;
-    color: var(--text-secondary);
-}
-
-.venue-empty {
-    display: grid;
-    place-items: center;
-    min-height: 130px;
-    color: var(--text-tertiary);
-}
-
-.event-stream {
-    display: grid;
-    gap: 0.6rem;
-    background:
-        radial-gradient(circle at 6% 5%, rgba(52, 192, 173, 0.2), transparent 35%),
-        rgba(8, 23, 43, 0.72);
-}
-
-.event-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 0.8rem;
-}
-
-.event-head h3 {
-    margin: 0;
-}
-
-.event-head small {
-    color: var(--text-tertiary);
-}
-
-.event-list {
-    display: grid;
-    gap: 0.45rem;
-    max-height: 250px;
-    overflow: auto;
-    padding-right: 0.14rem;
-}
-
-.event-row {
-    border: 1px solid rgba(123, 187, 232, 0.24);
-    border-radius: 10px;
-    background: rgba(8, 23, 42, 0.63);
-    padding: 0.48rem 0.56rem;
-    display: grid;
-    gap: 0.3rem;
-}
-
-.event-meta {
-    display: flex;
-    justify-content: space-between;
-    gap: 0.5rem;
+    grid-template-columns: 10px 115px 70px 1fr;
+    gap: 0.4rem;
     align-items: center;
+    padding: 0.3rem 0.35rem;
+    border-radius: var(--radius-xs);
+    border: 1px solid transparent;
+    transition: border-color 0.15s, background 0.15s;
 }
 
-.event-row p {
-    margin: 0;
-    font-size: 0.78rem;
-    color: #d4e9fb;
+.node-row:hover, .venue-row:hover {
+    border-color: var(--border-subtle);
+    background: rgba(32, 194, 14, 0.03);
 }
 
-.event-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.3rem;
+.venue-row {
+    grid-template-columns: 10px 100px 60px 60px 50px;
 }
 
-.event-tags span {
-    border-radius: 999px;
-    border: 1px solid rgba(120, 181, 224, 0.32);
+.venue-row-paused {
+    opacity: 0.6;
+}
+
+.node-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+}
+
+.dot-healthy { background: var(--color-terminal); box-shadow: 0 0 4px rgba(32, 194, 14, 0.5); }
+.dot-degraded { background: var(--color-warning); box-shadow: 0 0 4px rgba(255, 176, 0, 0.4); }
+.dot-offline { background: var(--color-error); box-shadow: 0 0 4px rgba(255, 68, 68, 0.4); }
+
+.node-name {
+    font-size: 0.76rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+}
+
+.node-status-label {
+    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+}
+
+.status-healthy { color: var(--color-terminal); }
+.status-degraded { color: var(--color-warning); }
+.status-offline { color: var(--color-error); }
+
+.node-detail {
+    font-size: 0.7rem;
     color: var(--text-tertiary);
-    padding: 0.06rem 0.4rem;
-    font-size: 0.63rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.board-toggle {
-    background:
-        radial-gradient(circle at 8% 8%, rgba(96, 200, 255, 0.18), transparent 34%),
-        rgba(8, 23, 43, 0.74);
-}
-
-.board-toggle-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 0.8rem;
-}
-
-.board-toggle-head h3 {
-    margin: 0;
-}
-
-.board-toggle-head p {
-    margin: 0.28rem 0 0;
+.venue-mode, .venue-routing, .venue-allocation {
+    font-size: 0.68rem;
     color: var(--text-secondary);
-    font-size: 0.78rem;
-    max-width: 72ch;
+    font-family: var(--font-mono);
 }
 
-.board-collapsed {
-    border: 1px dashed rgba(117, 180, 226, 0.32);
-    background: rgba(8, 23, 43, 0.64);
-}
+.alloc-zero { color: var(--text-tertiary); }
 
-.board-collapsed p {
-    margin: 0;
-    color: var(--text-secondary);
-    font-size: 0.82rem;
-    line-height: 1.45;
-}
+/* ── Ops Feed ── */
+.ops-feed { display: grid; gap: 0.4rem; }
 
-.board-layout {
+.ops-grid {
     display: grid;
-    grid-template-columns: 1.08fr 1.25fr 0.9fr;
-    gap: 0.85rem;
+    gap: 0.2rem;
+    max-height: 220px;
+    overflow-y: auto;
 }
 
-.topic-column,
-.thread-column,
-.side-card {
-    background: rgba(8, 22, 41, 0.75);
-}
-
-.topic-column,
-.thread-column {
+.ops-row {
     display: grid;
-    align-content: start;
-    gap: 0.75rem;
-    min-height: 620px;
+    grid-template-columns: 58px 32px 1fr;
+    gap: 0.4rem;
+    align-items: center;
+    padding: 0.3rem 0.4rem;
+    border-radius: var(--radius-xs);
+    font-size: 0.72rem;
+    font-family: var(--font-mono);
+    border-left: 2px solid transparent;
 }
 
-.column-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 0.6rem;
-}
+.ops-row.ops-info { border-left-color: rgba(32, 194, 14, 0.3); }
+.ops-row.ops-warning { border-left-color: rgba(255, 176, 0, 0.4); }
+.ops-row.ops-error { border-left-color: rgba(255, 68, 68, 0.4); background: rgba(255, 68, 68, 0.04); }
 
-.column-head h3 {
-    margin: 0;
-}
-
-.column-head small {
+.ops-time {
     color: var(--text-tertiary);
+    font-size: 0.65rem;
 }
 
-.compose,
-.reply-compose,
-.scout-form {
-    display: grid;
-    gap: 0.5rem;
+.ops-tag {
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
 }
 
-.read-only-note {
-    margin: 0;
-    border: 1px solid rgba(120, 179, 219, 0.28);
-    border-radius: 10px;
-    padding: 0.5rem 0.62rem;
-    background: rgba(8, 22, 41, 0.62);
+.tag-info { color: var(--color-terminal); }
+.tag-warning { color: var(--color-warning); }
+.tag-error { color: var(--color-error); }
+
+.ops-msg {
     color: var(--text-secondary);
-    font-size: 0.77rem;
-    line-height: 1.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.compose-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.45rem;
+.ops-empty { grid-template-columns: 1fr; }
+.ops-empty .ops-msg { color: var(--text-tertiary); font-style: italic; }
+
+/* ── Responsive ── */
+@media (max-width: 1100px) {
+    .kpi-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .details-grid { grid-template-columns: 1fr; }
 }
 
-.topic-list {
-    display: grid;
-    gap: 0.55rem;
-    max-height: 610px;
-    overflow: auto;
-    padding-right: 0.18rem;
+@media (max-width: 760px) {
+    .kpi-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .node-row { grid-template-columns: 10px 1fr 60px; }
+    .venue-row { grid-template-columns: 10px 1fr 45px; }
+    .node-detail, .venue-mode, .venue-routing { display: none; }
+    .tier-legend { display: none; }
 }
 
-.topic-item {
-    border: 1px solid rgba(121, 181, 224, 0.23);
-    background: rgba(7, 21, 40, 0.82);
-    border-radius: 12px;
-    padding: 0.68rem;
-    text-align: left;
-    color: inherit;
+/* ── Status Bars ── */
+.status-bar {
+    padding: 0.45rem 0.8rem;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    border-radius: var(--radius-sm);
+    text-align: center;
+    margin-bottom: 0.5rem;
+}
+
+.loading-bar {
+    background: rgba(32, 194, 14, 0.08);
+    color: var(--color-terminal);
+    border: 1px solid rgba(32, 194, 14, 0.15);
+}
+
+.error-bar {
+    background: rgba(255, 68, 68, 0.08);
+    color: var(--color-error);
+    border: 1px solid rgba(255, 68, 68, 0.2);
     cursor: pointer;
 }
 
-.topic-item.active {
-    border-color: rgba(110, 211, 255, 0.8);
-    background: linear-gradient(140deg, rgba(16, 45, 81, 0.9), rgba(9, 26, 49, 0.88));
-    box-shadow: 0 0 0 1px rgba(110, 211, 255, 0.35);
+.stale-bar {
+    background: rgba(255, 200, 50, 0.06);
+    color: var(--color-warning);
+    border: 1px solid rgba(255, 200, 50, 0.15);
 }
 
-.topic-item header,
-.reply-row header {
-    display: flex;
-    justify-content: space-between;
-    gap: 0.45rem;
-}
-
-.topic-id {
-    font-size: 0.64rem;
-    color: #9ce8ff;
-}
-
-.topic-item h4 {
-    margin: 0.3rem 0 0.25rem;
-    font-size: 0.9rem;
-}
-
-.topic-item p {
-    margin: 0;
-    font-size: 0.79rem;
-    color: var(--text-secondary);
-}
-
-.topic-item footer {
-    margin-top: 0.52rem;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-    align-items: center;
-}
-
-.meta {
-    font-size: 0.68rem;
-    color: var(--text-tertiary);
-}
-
-.pill {
-    font-size: 0.64rem;
-    border-radius: 999px;
-    padding: 0.14rem 0.5rem;
-    border: 1px solid transparent;
-}
-
-.lane-security {
-    color: #9be7ff;
-    border-color: rgba(94, 206, 255, 0.45);
-}
-
-.lane-deploy {
-    color: #9bc9ff;
-    border-color: rgba(117, 164, 255, 0.45);
-}
-
-.lane-research {
-    color: #88f4d5;
-    border-color: rgba(98, 232, 193, 0.45);
-}
-
-.lane-trading {
-    color: #ffd8a4;
-    border-color: rgba(255, 193, 111, 0.45);
-}
-
-.lane-governance {
-    color: #e7c9ff;
-    border-color: rgba(206, 146, 255, 0.45);
-}
-
-.lane-external {
-    color: #ffd7ee;
-    border-color: rgba(255, 166, 219, 0.45);
-}
-
-.state-open {
-    color: #7de9c3;
-    border-color: rgba(86, 216, 166, 0.5);
-}
-
-.state-queued {
-    color: #9cdfff;
-    border-color: rgba(96, 194, 255, 0.5);
-}
-
-.state-needs_owner {
-    color: #ffd79a;
-    border-color: rgba(255, 185, 92, 0.5);
-}
-
-.state-blocked {
-    color: #ffb2b2;
-    border-color: rgba(255, 120, 120, 0.55);
-}
-
-.state-resolved {
-    color: #9ef7a8;
-    border-color: rgba(109, 233, 126, 0.5);
-}
-
-.priority-low {
-    color: #a8c7e1;
-    border-color: rgba(126, 184, 229, 0.38);
-}
-
-.priority-medium {
-    color: #d1e9ff;
-    border-color: rgba(163, 214, 255, 0.42);
-}
-
-.priority-high {
-    color: #ffd296;
-    border-color: rgba(255, 187, 101, 0.52);
-}
-
-.priority-critical {
-    color: #ffb2b2;
-    border-color: rgba(255, 120, 120, 0.58);
-}
-
-.opening-post {
-    border: 1px solid rgba(127, 185, 224, 0.26);
-    border-radius: 12px;
-    background: rgba(8, 24, 45, 0.75);
-    padding: 0.72rem;
-}
-
-.opening-post p {
-    margin: 0;
-    color: #d5eaff;
-    line-height: 1.45;
-}
-
-.opening-post small {
+.pulse-dot {
     display: inline-block;
-    margin-top: 0.5rem;
-    color: var(--text-tertiary);
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-terminal);
+    margin-right: 0.4rem;
+    animation: pulse 1.2s ease-in-out infinite;
 }
 
-.reply-stream {
-    display: grid;
-    gap: 0.52rem;
-    max-height: 420px;
-    overflow: auto;
-    padding-right: 0.18rem;
-}
-
-.reply-row {
-    border: 1px solid rgba(120, 179, 219, 0.22);
-    border-radius: 10px;
-    padding: 0.62rem;
-    background: rgba(8, 22, 41, 0.62);
-}
-
-.reply-row p {
-    margin: 0.42rem 0 0;
-    font-size: 0.81rem;
-    color: #d4e9fb;
-}
-
-.reply-row footer {
-    margin-top: 0.4rem;
-    color: var(--text-tertiary);
-    font-size: 0.7rem;
-}
-
-.side-column {
-    display: grid;
-    gap: 0.75rem;
-    align-content: start;
-}
-
-.side-card {
-    display: grid;
-    gap: 0.45rem;
-}
-
-.side-card h3 {
-    margin: 0;
-}
-
-.side-card p {
-    margin: 0;
-    font-size: 0.8rem;
-    color: #c5dff7;
-}
-
-.side-card p small {
-    color: var(--text-tertiary);
-    font-size: 0.7rem;
-}
-
-.hint-line {
-    border: 1px solid rgba(114, 180, 223, 0.28);
-    border-radius: 10px;
-    padding: 0.42rem 0.54rem;
-    background: rgba(8, 24, 44, 0.62);
-    color: var(--text-secondary);
-    font-size: 0.74rem;
-    line-height: 1.35;
-}
-
-.dispatch-line {
-    color: #d8ecff;
-    font-size: 0.74rem;
-    line-height: 1.3;
-}
-
-.summary-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.34rem;
-}
-
-.empty {
-    margin: 0;
-    color: var(--text-tertiary);
-    font-size: 0.77rem;
-}
-
-.empty-thread {
-    align-content: center;
-    text-align: center;
-}
-
-@media (max-width: 1420px) {
-    .architecture-grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-
-    .department-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .board-layout {
-        grid-template-columns: 1fr 1fr;
-    }
-
-    .side-column {
-        grid-column: 1 / -1;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-}
-
-@media (max-width: 980px) {
-    .architecture-head {
-        display: grid;
-        gap: 0.55rem;
-    }
-
-    .architecture-score {
-        justify-items: start;
-    }
-
-    .architecture-grid {
-        grid-template-columns: 1fr 1fr;
-    }
-
-    .filter-row {
-        grid-template-columns: 1fr;
-    }
-
-    .board-layout {
-        grid-template-columns: 1fr;
-    }
-
-    .side-column {
-        grid-template-columns: 1fr;
-    }
-
-    .topic-column,
-    .thread-column {
-        min-height: auto;
-    }
-}
-
-@media (max-width: 680px) {
-    .architecture-grid,
-    .department-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .mesh-head {
-        display: grid;
-        gap: 0.5rem;
-    }
-
-    .mesh-svg {
-        height: 320px;
-    }
+@keyframes pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
 }
 </style>

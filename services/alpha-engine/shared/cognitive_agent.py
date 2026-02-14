@@ -80,18 +80,19 @@ class CognitiveAgent(ABC):
         self,
         agent_id: str,
         role: AgentRole,
-        model_name: str = "gemini-2.0-flash",
+        model_name: str = "",
     ):
         self.agent_id = agent_id
         self.role = role
-        self.model_name = model_name
+        _default_model = os.getenv("SAPPHIRE_SYSTEM1_MODEL", "gemini-2.5-flash")
+        self.model_name = model_name or _default_model
         self.mesh: Optional[CognitiveMesh] = None
 
         # Initialize Gemini
         api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         if api_key:
             genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel(model_name)
+            self.model = genai.GenerativeModel(self.model_name)
             logger.info(f"🧠 Agent {agent_id} using {model_name}")
         else:
             logger.warning(f"⚠️ Agent {agent_id}: No API key, running in mock mode")
@@ -209,7 +210,7 @@ class ScoutAgent(CognitiveAgent):
     """
 
     def __init__(self, agent_id: str = "scout-1"):
-        super().__init__(agent_id, AgentRole.SCOUT, "gemini-2.0-flash")
+        super().__init__(agent_id, AgentRole.SCOUT)
 
     def get_capabilities(self) -> List[str]:
         return ["market_observation", "pattern_detection", "anomaly_detection"]
@@ -278,7 +279,7 @@ class SniperAgent(CognitiveAgent):
     """
 
     def __init__(self, agent_id: str = "sniper-1"):
-        super().__init__(agent_id, AgentRole.SNIPER, "gemini-2.0-flash")
+        super().__init__(agent_id, AgentRole.SNIPER)
 
     def get_capabilities(self) -> List[str]:
         return ["execution_timing", "entry_analysis", "exit_analysis", "order_book_reading"]
@@ -346,7 +347,7 @@ class OracleAgent(CognitiveAgent):
     """
 
     def __init__(self, agent_id: str = "oracle-1"):
-        super().__init__(agent_id, AgentRole.ORACLE, "gemini-2.0-flash")
+        super().__init__(agent_id, AgentRole.ORACLE)
 
     def get_capabilities(self) -> List[str]:
         return ["consensus_arbitration", "risk_assessment", "final_decision", "strategy_synthesis"]

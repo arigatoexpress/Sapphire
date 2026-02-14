@@ -57,7 +57,7 @@ ADVERSARIAL_STRINGS = [
     "\u200b\u200c\u200d\ufeffhidden zero-width",
     "obsidian deploy gcloud docker server",  # Should route to Obsidian
     "emerald strategy improve optimize review masterplan",  # Should route to Emerald
-    "buy 100 SOL on drift",
+    "buy 100 SOL on aster",
     "а]dmin оverride",  # Cyrillic homoglyphs
     "normal message about trading",
     "/kill\x00switch",

@@ -2,22 +2,42 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import TradingChart from '../components/TradingChart.vue'
 import {
-    fetchControlStatus,
-    fetchMarketOHLC,
-    fetchPerformanceStats,
+    connectionHealth,
     fetchRoutingInfo,
     fetchSecuritySkillsStatus,
-    fetchTradingViewWorkspace,
-    type OhlcCandle,
     type SecuritySkillsStatusResponse,
 } from '../api/client'
+import { useControlStore } from '../stores/control'
+import { useMarketStore, SYMBOLS } from '../stores/market'
+import { formatPrice, formatPct } from '../utils/formatters'
+import { sparklinePoints, computeRSI, computeMomentum } from '../utils/market'
 
-interface InsightCard {
-    title: string
-    value: string
-    detail: string
-}
+const ctrl = useControlStore()
+const mkt = useMarketStore()
 
+const selectedSymbol = ref('BTC')
+
+/* ── Alpha-specific state (routing, security — not shared) ── */
+const routingConfidence = ref<number | null>(null)
+const routingMode = ref('guarded')
+const security = ref<SecuritySkillsStatusResponse | null>(null)
+
+/* ── Chart candles from market store ── */
+const alphaCandles = computed(() => mkt.getCandles('ASTER', selectedSymbol.value, '1m'))
+const lighterCandles = computed(() => mkt.getCandles('LIGHTER', selectedSymbol.value, '1m'))
+
+const chartSourceLabel = computed(() =>
+    alphaCandles.value.length > 0
+        ? `ASTER · ${mkt.asterMeta.trackingSymbol} (${mkt.asterMeta.source})`
+        : 'Awaiting OHLC feed'
+)
+const compareSourceLabel = computed(() =>
+    lighterCandles.value.length > 0
+        ? `LIGHTER · ${mkt.lighterMeta.trackingSymbol} (${mkt.lighterMeta.source})`
+        : 'Awaiting venue feed'
+)
+
+/* ── Extended snapshots with RSI + momentum (Alpha adds these on top of market store) ── */
 interface AlphaSnapshot {
     symbol: string
     price: number | null
@@ -25,189 +45,152 @@ interface AlphaSnapshot {
     change6h: number | null
     volatility: number | null
     confidence: number
+    rsi: number | null
+    momentum: number | null
     history: number[]
 }
 
-const INSIGHT_SYMBOLS = ['BTC', 'ETH', 'SOL', 'AVAX', 'DOGE', 'HYPE']
-
-const selectedSymbol = ref('BTC')
-const alphaCandles = ref<OhlcCandle[]>([])
-const lighterCandles = ref<OhlcCandle[]>([])
-const snapshots = ref<AlphaSnapshot[]>([])
-const chartSourceLabel = ref('Waiting for live OHLC feed')
-const compareSourceLabel = ref('Waiting for venue comparison feed')
-const routingConfidencePct = ref<number | null>(null)
-const totalTrades = ref(0)
-const winRate = ref(0)
-const realizedPnl = ref(0)
-const routingMode = ref('guarded')
-const control = ref<any>(null)
-const workspace = ref<any>(null)
-const security = ref<SecuritySkillsStatusResponse | null>(null)
-const lastRefreshEpoch = ref(0)
-const nowEpoch = ref(Date.now())
-let refreshTimer: ReturnType<typeof setInterval> | null = null
-let clockTimer: ReturnType<typeof setInterval> | null = null
-
-const refreshAge = computed(() => {
-    if (!lastRefreshEpoch.value) return 'sync pending'
-    return `${Math.max(0, Math.round((nowEpoch.value - lastRefreshEpoch.value) / 1000))}s ago`
-})
-
-const tradingWorkbenchEnabled = computed(() =>
-    Boolean(control.value?.tradingview_integration_enabled ?? false),
+const snapshots = computed<AlphaSnapshot[]>(() =>
+    mkt.snapshots.map((s) => {
+        const rsi = computeRSI(s.history, 14)
+        const momentum = computeMomentum(s.history, 10)
+        const confidence = Math.max(0, Math.min(100, Math.round(
+            (s.change1h || 0) * 12 + (s.change6h || 0) * 4 - (s.volatility || 0) * 2 + 50
+        )))
+        return { ...s, rsi, momentum, confidence }
+    })
 )
 
+/* ── Freshness (unified from both stores + alpha-specific fetches) ── */
+const loading = computed(() => ctrl.loading || mkt.loading)
+const fetchError = computed(() => ctrl.fetchError || mkt.fetchError)
+const lastFetchAt = computed(() => Math.max(ctrl.lastFetchAt, mkt.lastFetchAt))
+const dataAge = computed(() => {
+    if (!lastFetchAt.value) return null
+    return Math.floor((Date.now() - lastFetchAt.value) / 1000)
+})
+const isStale = computed(() => (dataAge.value ?? 999) > 30)
+
+/* ── Derived ── */
+
+const pendingDecisions = computed(() => ctrl.pendingDecisions)
+
 const executionMode = computed(() => {
-    if (!tradingWorkbenchEnabled.value) return 'Workbench disabled'
-    return control.value?.tradingview_execution_enabled ? 'TV signals live' : 'TV workbench dry-run'
+    const stage = ctrl.executionStage
+    if (stage === 'FULL_LIVE') return 'DEX live'
+    if (stage === 'STAGED_LIVE') return 'DEX staged'
+    if (stage === 'PAPER') return 'Paper mode'
+    return stage
 })
-
-const pendingDecisions = computed(() => Number(control.value?.pending_autonomy_decisions || 0))
-
-const workspaceState = computed(() => workspace.value?.workspace?.state || {})
-
-const watchlists = computed(() => {
-    if (!tradingWorkbenchEnabled.value) return []
-    const raw = workspaceState.value?.watchlists || {}
-    return Object.entries(raw).map(([name, symbols]) => ({
-        name,
-        symbols: Array.isArray(symbols) ? symbols.join(', ') : '',
-    }))
-})
-
-const strategyIntake = computed(() => {
-    if (!tradingWorkbenchEnabled.value) {
-        return ['TradingView workbench is paused while DEX-native execution hardening is in progress.']
-    }
-    const indicators = Array.isArray(workspaceState.value?.indicators) ? workspaceState.value.indicators : []
-    const strategies = Array.isArray(workspaceState.value?.strategies) ? workspaceState.value.strategies : []
-    const scripts = Array.isArray(workspaceState.value?.community_scripts) ? workspaceState.value.community_scripts : []
-    const merged = [
-        ...strategies.map((name: string) => `Strategy: ${name}`),
-        ...indicators.map((name: string) => `Indicator: ${name}`),
-        ...scripts.map((name: string) => `Community script: ${name}`),
-    ]
-    return merged.length > 0 ? merged : ['No active strategy assets in workspace state']
-})
-
-const formatPct = (value: number | null, digits = 2) => {
-    if (value === null || !Number.isFinite(value)) return 'n/a'
-    return `${value >= 0 ? '+' : ''}${value.toFixed(digits)}%`
-}
-
-const formatPrice = (value: number | null) => {
-    if (value === null || !Number.isFinite(value) || value <= 0) return 'n/a'
-    if (value >= 1000) return `$${value.toFixed(2)}`
-    if (value >= 100) return `$${value.toFixed(3)}`
-    return `$${value.toFixed(4)}`
-}
-
-const normalizeCandles = (candles: OhlcCandle[] | null | undefined): OhlcCandle[] =>
-    (candles || [])
-        .map((item) => ({
-            time: Number(item.time),
-            open: Number(item.open),
-            high: Number(item.high),
-            low: Number(item.low),
-            close: Number(item.close),
-            volume: Number(item.volume || 0),
-        }))
-        .filter(
-            (item) =>
-                Number.isFinite(item.time) &&
-                Number.isFinite(item.open) &&
-                Number.isFinite(item.high) &&
-                Number.isFinite(item.low) &&
-                Number.isFinite(item.close),
-        )
-        .sort((a, b) => a.time - b.time)
-
-const computeChangePct = (history: number[], lookback: number): number | null => {
-    if (!Array.isArray(history) || history.length <= lookback) return null
-    const latest = Number(history[history.length - 1] || 0)
-    const anchor = Number(history[Math.max(0, history.length - 1 - lookback)] || 0)
-    if (!Number.isFinite(latest) || !Number.isFinite(anchor) || anchor <= 0) return null
-    return ((latest - anchor) / anchor) * 100
-}
-
-const estimateVolatility = (history: number[]): number | null => {
-    if (!Array.isArray(history) || history.length < 8) return null
-    const returns: number[] = []
-    for (let i = 1; i < history.length; i += 1) {
-        const prev = Number(history[i - 1] || 0)
-        const curr = Number(history[i] || 0)
-        if (!Number.isFinite(prev) || !Number.isFinite(curr) || prev <= 0) continue
-        returns.push((curr - prev) / prev)
-    }
-    if (returns.length < 5) return null
-    const mean = returns.reduce((sum, value) => sum + value, 0) / returns.length
-    const variance = returns.reduce((sum, value) => sum + (value - mean) ** 2, 0) / returns.length
-    return Math.sqrt(Math.max(variance, 0)) * 100
-}
-
-const sparklinePoints = (values: number[]) => {
-    if (!Array.isArray(values) || values.length < 2) return ''
-    const min = Math.min(...values)
-    const max = Math.max(...values)
-    const spread = Math.max(0.000001, max - min)
-    return values
-        .map((value, index) => {
-            const x = (index / (values.length - 1)) * 100
-            const y = 28 - ((value - min) / spread) * 22 - 3
-            return `${x.toFixed(2)},${y.toFixed(2)}`
-        })
-        .join(' ')
-}
 
 const marketBreadth = computed(() => {
-    const active = snapshots.value.filter((item) => item.change1h !== null)
-    const advancing = active.filter((item) => (item.change1h || 0) > 0).length
-    const breadth = active.length ? Math.round((advancing / active.length) * 100) : 0
-    return { advancing, declining: Math.max(0, active.length - advancing), breadth }
+    const active = snapshots.value.filter((s) => s.change1h !== null)
+    const adv = active.filter((s) => (s.change1h || 0) > 0).length
+    return { advancing: adv, declining: Math.max(0, active.length - adv), breadth: active.length ? Math.round((adv / active.length) * 100) : 0 }
 })
 
 const macroRegime = computed(() => {
-    const score = marketBreadth.value.breadth
-    if (score >= 65) return 'Expansion / risk-on'
-    if (score >= 45) return 'Rotation / mixed'
-    return 'Contraction / risk-off'
+    const b = marketBreadth.value.breadth
+    if (b >= 65) return 'Expansion'
+    if (b >= 45) return 'Rotation'
+    return 'Contraction'
 })
 
-const strongestMover = computed(() =>
-    [...snapshots.value]
-        .filter((item) => item.change1h !== null)
-        .sort((a, b) => Number(b.change1h || 0) - Number(a.change1h || 0))[0] || null,
-)
+const avgRSI = computed(() => {
+    const valid = snapshots.value.filter((s) => s.rsi !== null).map((s) => s.rsi!)
+    if (!valid.length) return null
+    return Math.round(valid.reduce((a, b) => a + b, 0) / valid.length)
+})
 
-const selectedSnapshot = computed(
-    () => snapshots.value.find((item) => item.symbol === selectedSymbol.value) || null,
-)
+const rsiTone = computed(() => {
+    if (avgRSI.value === null) return ''
+    if (avgRSI.value >= 70) return 'tone-hot'
+    if (avgRSI.value <= 30) return 'tone-cold'
+    return 'tone-neutral'
+})
+
+const insightCards = computed(() => [
+    {
+        title: 'Market Breadth',
+        value: `${marketBreadth.value.breadth}%`,
+        detail: `${marketBreadth.value.advancing} adv · ${marketBreadth.value.declining} dec · ${macroRegime.value}`,
+    },
+    {
+        title: 'Avg RSI (14)',
+        value: avgRSI.value !== null ? `${avgRSI.value}` : 'n/a',
+        detail: avgRSI.value !== null ? (avgRSI.value >= 70 ? 'Overbought zone' : avgRSI.value <= 30 ? 'Oversold zone' : 'Neutral range') : 'Calculating...',
+    },
+    {
+        title: 'Routing Confidence',
+        value: routingConfidence.value === null ? 'n/a' : `${routingConfidence.value}%`,
+        detail: `Mode: ${routingMode.value}`,
+    },
+    {
+        title: 'Signal Throughput',
+        value: `${ctrl.totalTrades} trades`,
+        detail: `Win ${ctrl.winRate}% · PnL ${ctrl.realizedPnl.toFixed(4)}`,
+    },
+    {
+        title: 'Execution Stage',
+        value: ctrl.executionStage,
+        detail: `Multiplier ${ctrl.stageMultiplier.toFixed(2)}x`,
+    },
+    {
+        title: 'Skill Security',
+        value: security.value?.enabled
+            ? security.value?.api_key_configured ? `VT ${security.value.enforcement_mode}` : 'VT key missing'
+            : 'VT disabled',
+        detail: security.value?.enabled
+            ? `Skills ${security.value.skills_dir_exists ? 'ready' : 'missing'} · auto-upload ${security.value.upload_if_missing_default ? 'on' : 'off'}`
+            : 'Enable VT for skill scanning',
+    },
+])
+
+const readinessScore = computed(() => {
+    const conf = routingConfidence.value ?? 0
+    const execBoost = ctrl.dexLiveDispatch ? 5 : 0
+    const qPenalty = Math.min(20, pendingDecisions.value * 4)
+    const breadthBoost = Math.round((marketBreadth.value.breadth - 50) * 0.2)
+    return Math.max(0, Math.min(100, Math.round(conf + execBoost + breadthBoost - qPenalty)))
+})
+
+const readinessTone = computed(() => {
+    if (readinessScore.value >= 70) return 'tone-strong'
+    if (readinessScore.value >= 50) return 'tone-balanced'
+    return 'tone-guarded'
+})
+
+const strategyRail = computed(() => [
+    { label: 'Ingest', detail: alphaCandles.value.length > 0 ? 'Live DEX feeds active' : 'Awaiting data', status: alphaCandles.value.length > 0 ? 'ready' : 'pending' },
+    { label: 'Synthesize', detail: `${snapshots.value.length} assets tracked`, status: snapshots.value.length > 0 ? 'ready' : 'pending' },
+    { label: 'Validate', detail: `${pendingDecisions.value} decision(s) pending`, status: pendingDecisions.value > 0 ? 'pending' : 'ready' },
+    { label: 'Route', detail: executionMode.value, status: ctrl.rawControl ? 'ready' : 'pending' },
+])
 
 const alphaIdeas = computed(() => {
     const ideas: Array<{ title: string; detail: string; tone: 'bullish' | 'neutral' | 'defensive' }> = []
-    const leader = strongestMover.value
+    const leader = [...snapshots.value].filter((s) => s.change1h !== null).sort((a, b) => Number(b.change1h || 0) - Number(a.change1h || 0))[0]
 
     if (leader && (leader.change1h || 0) > 1.25) {
         ideas.push({
             title: `${leader.symbol} leadership continuation`,
-            detail: `${formatPct(leader.change1h)} in 1h with macro breadth at ${marketBreadth.value.breadth}%. Favor trend-confirmation setups over countertrend fades.`,
+            detail: `${formatPct(leader.change1h)} in 1h with breadth at ${marketBreadth.value.breadth}%.`,
             tone: 'bullish',
         })
     }
 
-    if ((selectedSnapshot.value?.volatility || 0) > 0.8) {
+    if (avgRSI.value !== null && avgRSI.value >= 70) {
         ideas.push({
-            title: `${selectedSymbol.value} high-volatility watch`,
-            detail: `Estimated volatility ${formatPct(selectedSnapshot.value?.volatility || null)} suggests wider ranges. Prefer adaptive stops and smaller initial sizing.`,
-            tone: 'neutral',
+            title: 'Overbought market conditions',
+            detail: `Average RSI at ${avgRSI.value} — consider defensive positioning.`,
+            tone: 'defensive',
         })
     }
 
     if (marketBreadth.value.breadth <= 40) {
         ideas.push({
             title: 'Defensive allocation posture',
-            detail: `Breadth is ${marketBreadth.value.breadth}% with ${marketBreadth.value.declining} assets declining. Preserve capital and tighten idea acceptance thresholds.`,
+            detail: `Breadth ${marketBreadth.value.breadth}% — ${marketBreadth.value.declining} assets declining. Tighten filters.`,
             tone: 'defensive',
         })
     }
@@ -215,7 +198,7 @@ const alphaIdeas = computed(() => {
     if (!ideas.length) {
         ideas.push({
             title: 'Neutral discovery regime',
-            detail: 'Signals are balanced across assets. Focus on high-conviction dislocations and wait for regime expansion.',
+            detail: 'Balanced signals. Focus on high-conviction dislocations.',
             tone: 'neutral',
         })
     }
@@ -223,230 +206,79 @@ const alphaIdeas = computed(() => {
     return ideas.slice(0, 3)
 })
 
-const insightCards = computed<InsightCard[]>(() => [
-    {
-        title: 'Market Breadth',
-        value: `${marketBreadth.value.breadth}%`,
-        detail: `${marketBreadth.value.advancing} advancing · ${marketBreadth.value.declining} declining · ${macroRegime.value}`,
-    },
-    {
-        title: 'Routing Confidence',
-        value: routingConfidencePct.value === null ? 'n/a' : `${routingConfidencePct.value}%`,
-        detail: `Mode: ${routingMode.value}`,
-    },
-    {
-        title: 'Signal Throughput',
-        value: `${totalTrades.value} trades`,
-        detail: `Win rate ${winRate.value}% · Realized PnL ${realizedPnl.value.toFixed(4)}`,
-    },
-    {
-        title: 'Skill Security',
-        value: security.value?.enabled
-            ? security.value?.api_key_configured
-                ? `VT ${security.value.enforcement_mode}`
-                : 'VT key missing'
-            : 'VT disabled',
-        detail: security.value?.enabled
-            ? `Skills dir ${security.value.skills_dir_exists ? 'ready' : 'missing'} · upload-on-miss ${security.value.upload_if_missing_default ? 'on' : 'off'}`
-            : 'Enable VT guardrail for skill scanning.',
-    },
-])
+/* ── Alpha-specific fetch (routing + security — not in shared stores) ── */
 
-const riskTone = computed(() => {
-    if ((routingConfidencePct.value || 0) >= 70) return 'tone-offensive'
-    if ((routingConfidencePct.value || 0) >= 45) return 'tone-balanced'
-    return 'tone-guarded'
-})
+let _alphaTimer: ReturnType<typeof setInterval> | null = null
 
-const readinessScore = computed(() => {
-    const confidence = routingConfidencePct.value ?? 0
-    const executionBoost = control.value?.tradingview_execution_enabled ? 5 : 0
-    const queuePenalty = Math.min(20, pendingDecisions.value * 4)
-    const breadthBoost = Math.round((marketBreadth.value.breadth - 50) * 0.2)
-    const composite = Math.round(confidence + executionBoost + breadthBoost - queuePenalty)
-    return Math.max(0, Math.min(100, composite))
-})
-
-const readinessTone = computed(() => {
-    if (readinessScore.value >= 70) return 'readiness-strong'
-    if (readinessScore.value >= 50) return 'readiness-balanced'
-    return 'readiness-guarded'
-})
-
-const strategyRail = computed(() => [
-    {
-        label: 'Ingest',
-        detail: tradingWorkbenchEnabled.value
-            ? `Assets scope ${workspaceState.value?.assets_scope || 'n/a'}`
-            : 'DEX-native feeds only (workbench paused)',
-        status: alphaCandles.value.length > 0 ? 'ready' : 'pending',
-    },
-    {
-        label: 'Synthesize',
-        detail: tradingWorkbenchEnabled.value
-            ? `${strategyIntake.value.length} active strategy assets`
-            : 'Workbench assets intentionally disabled',
-        status: tradingWorkbenchEnabled.value && strategyIntake.value[0]?.startsWith('No ') ? 'pending' : 'ready',
-    },
-    {
-        label: 'Validate',
-        detail: `${pendingDecisions.value} decision(s) pending`,
-        status: pendingDecisions.value > 0 ? 'pending' : 'ready',
-    },
-    {
-        label: 'Route',
-        detail: executionMode.value,
-        status: control.value ? 'ready' : 'pending',
-    },
-])
-
-const loadAlphaStatus = async () => {
+const fetchAlphaExtras = async () => {
     try {
-        const [stats, routing, controlPayload, securityPayload] = await Promise.all([
-            fetchPerformanceStats(),
+        const [routing, securityPayload] = await Promise.all([
             fetchRoutingInfo(),
-            fetchControlStatus(),
             fetchSecuritySkillsStatus(),
         ])
-
-        if (controlPayload?.ok) control.value = controlPayload
         if (securityPayload?.ok) security.value = securityPayload
-        const workbenchEnabled = Boolean(controlPayload?.tradingview_integration_enabled ?? false)
-
-        if (workbenchEnabled) {
-            const workspacePayload = await fetchTradingViewWorkspace()
-            if (workspacePayload?.ok) {
-                workspace.value = workspacePayload
-                const workspaceSymbol = String(workspacePayload.workspace?.state?.selected_symbol || '').toUpperCase()
-                if (workspaceSymbol && !selectedSymbol.value) selectedSymbol.value = workspaceSymbol
-            } else {
-                workspace.value = null
-            }
-        } else {
-            workspace.value = null
-        }
-
-        totalTrades.value = Number(stats?.metrics?.system?.total_trades || 0)
-        winRate.value = Number(stats?.metrics?.system?.win_rate || 0)
-        realizedPnl.value = Number(stats?.metrics?.system?.realized_pnl || 0)
-
-        const confidenceRaw = Number(routing?.confidence ?? 0)
-        routingConfidencePct.value = Number.isFinite(confidenceRaw)
-            ? Math.max(0, Math.min(100, Math.round(confidenceRaw * 100)))
-            : null
+        const confRaw = Number(routing?.confidence ?? 0)
+        routingConfidence.value = Number.isFinite(confRaw) ? Math.max(0, Math.min(100, Math.round(confRaw * 100))) : null
         routingMode.value = String(routing?.mode || 'guarded')
-
-        const [asterOhlc, lighterOhlc, basketPayloads] = await Promise.all([
-            fetchMarketOHLC({ venue: 'ASTER', symbol: selectedSymbol.value, interval: '1m', limit: 220 }),
-            fetchMarketOHLC({ venue: 'LIGHTER', symbol: selectedSymbol.value, interval: '1m', limit: 220 }),
-            Promise.all(
-                INSIGHT_SYMBOLS.map((symbol) =>
-                    fetchMarketOHLC({ venue: 'ASTER', symbol, interval: '5m', limit: 120 }),
-                ),
-            ),
-        ])
-
-        alphaCandles.value = normalizeCandles(asterOhlc?.candles)
-        lighterCandles.value = normalizeCandles(lighterOhlc?.candles)
-
-        chartSourceLabel.value =
-            alphaCandles.value.length > 0
-                ? `ASTER · ${asterOhlc?.symbol || selectedSymbol.value} (${asterOhlc?.source || 'market feed'})`
-                : 'Waiting for live OHLC feed'
-
-        compareSourceLabel.value =
-            lighterCandles.value.length > 0
-                ? `LIGHTER · ${lighterOhlc?.symbol || selectedSymbol.value} (${lighterOhlc?.source || 'market feed'})`
-                : 'Waiting for venue comparison feed'
-
-        snapshots.value = INSIGHT_SYMBOLS.map((symbol, index) => {
-            const payload = basketPayloads[index]
-            const candles = normalizeCandles(payload?.candles)
-            const history = candles.map((item) => Number(item.close)).filter((value) => Number.isFinite(value))
-            const price = history.length ? Number(history[history.length - 1]) : null
-            const change1h = computeChangePct(history, 12)
-            const change6h = computeChangePct(history, 72)
-            const volatility = estimateVolatility(history.slice(-72))
-            const confidence = Math.max(
-                0,
-                Math.min(
-                    100,
-                    Math.round((change1h || 0) * 12 + (change6h || 0) * 4 - (volatility || 0) * 2 + 50),
-                ),
-            )
-            return {
-                symbol,
-                price,
-                change1h,
-                change6h,
-                volatility,
-                confidence,
-                history: history.slice(-30),
-            }
-        })
-
-        lastRefreshEpoch.value = Date.now()
-    } catch (error) {
-        console.error('Failed to load alpha status:', error)
+    } catch (err) {
+        console.error('Alpha extras fetch error:', err)
     }
 }
 
-watch(selectedSymbol, () => {
-    loadAlphaStatus()
-})
+const reload = () => {
+    ctrl.refresh()
+    mkt.fetchAll(selectedSymbol.value)
+    fetchAlphaExtras()
+}
+
+watch(selectedSymbol, () => mkt.fetchAll(selectedSymbol.value))
 
 onMounted(() => {
-    loadAlphaStatus()
-    refreshTimer = setInterval(loadAlphaStatus, 15000)
-    clockTimer = setInterval(() => {
-        nowEpoch.value = Date.now()
-    }, 1000)
+    ctrl.subscribe()
+    mkt.startPolling(() => selectedSymbol.value)
+    fetchAlphaExtras()
+    _alphaTimer = setInterval(fetchAlphaExtras, 15_000)
 })
 
 onUnmounted(() => {
-    if (refreshTimer) clearInterval(refreshTimer)
-    if (clockTimer) clearInterval(clockTimer)
+    ctrl.unsubscribe()
+    mkt.stopPolling()
+    if (_alphaTimer) { clearInterval(_alphaTimer); _alphaTimer = null }
 })
 </script>
 
 <template>
     <div class="alpha-view fade-in">
-        <section class="hero card glass-lift">
-            <div class="hero-copy">
-                <span class="font-mono kicker">SAPPHIRE ALPHA LIVE</span>
-                <h2>Broad-market intelligence workbench for idea discovery and strategy validation.</h2>
-                <p>
-                    DEX-native feeds currently drive the full analysis loop while external workbench integrations are paused. Alpha outputs
-                    span BTC, ETH, SOL, AVAX, DOGE, and HYPE for broader market context.
-                </p>
-            </div>
-            <div class="hero-controls">
-                <label class="symbol-picker">
-                    <span class="font-mono">Focus asset</span>
-                    <select v-model="selectedSymbol">
-                        <option v-for="symbol in INSIGHT_SYMBOLS" :key="symbol" :value="symbol">{{ symbol }}</option>
-                    </select>
-                </label>
-            </div>
-            <div class="meta-line">
-                <span class="chip">Last sync {{ refreshAge }}</span>
-                <span class="chip">{{ executionMode }}</span>
-                <span class="chip" :class="riskTone">{{ routingMode }}</span>
-                <span class="chip">Breadth {{ marketBreadth.breadth }}%</span>
-            </div>
-        </section>
+        <div v-if="loading && !lastFetchAt" class="status-bar loading-bar">
+            <span class="pulse-dot"></span> Initializing Alpha Engine...
+        </div>
+        <div v-else-if="fetchError" class="status-bar error-bar" @click="reload">
+            {{ fetchError }} — tap to retry
+        </div>
+        <div v-else-if="isStale" class="status-bar stale-bar">
+            Data {{ dataAge }}s old — awaiting refresh
+        </div>
+
+        <div class="topstrip">
+            <label class="symbol-picker">
+                <span class="font-mono">FOCUS</span>
+                <select v-model="selectedSymbol">
+                    <option v-for="s in SYMBOLS" :key="s" :value="s">{{ s }}</option>
+                </select>
+            </label>
+        </div>
 
         <section class="insights-grid">
             <article v-for="card in insightCards" :key="card.title" class="insight card glass-lift">
-                <h3>{{ card.title }}</h3>
-                <strong class="font-mono">{{ card.value }}</strong>
-                <p>{{ card.detail }}</p>
+                <p class="font-mono">{{ card.title }}</p>
+                <strong class="glow" :class="card.title === 'Avg RSI (14)' ? rsiTone : ''">{{ card.value }}</strong>
+                <small>{{ card.detail }}</small>
             </article>
         </section>
 
-        <section class="strategy-rail card glass-lift">
+        <section class="rail card glass-lift">
             <header>
-                <h3 class="font-mono">Strategy Readiness Rail</h3>
+                <h3 class="font-mono">Strategy Readiness</h3>
                 <span class="rail-score" :class="readinessTone">{{ readinessScore }}%</span>
             </header>
             <div class="rail-grid">
@@ -458,80 +290,66 @@ onUnmounted(() => {
             </div>
         </section>
 
-        <section class="grid">
-            <article class="chart-panel card">
+        <section class="chart-row">
+            <article class="chart-panel card glass-lift">
                 <header>
-                    <h3 class="font-mono">ASTER Strategy Canvas</h3>
+                    <h3 class="font-mono">ASTER Canvas</h3>
                     <small>{{ chartSourceLabel }}</small>
                 </header>
-                <TradingChart :candles="alphaCandles" :height="270" />
+                <TradingChart :candles="alphaCandles" :height="400" />
             </article>
-
-            <article class="chart-panel card">
+            <article class="chart-panel card glass-lift">
                 <header>
-                    <h3 class="font-mono">LIGHTER Comparison Canvas</h3>
+                    <h3 class="font-mono">LIGHTER Canvas</h3>
                     <small>{{ compareSourceLabel }}</small>
                 </header>
-                <TradingChart :candles="lighterCandles" :height="270" />
-            </article>
-
-            <article class="panel card matrix-panel">
-                <h3 class="font-mono">Market Intelligence Matrix</h3>
-                <div class="matrix-grid">
-                    <article v-for="snapshot in snapshots" :key="snapshot.symbol" class="matrix-item">
-                        <header>
-                            <strong>{{ snapshot.symbol }}</strong>
-                            <span :class="(snapshot.change1h || 0) >= 0 ? 'tone-offensive' : 'tone-guarded'">{{ formatPct(snapshot.change1h) }}</span>
-                        </header>
-                        <p>price {{ formatPrice(snapshot.price) }}</p>
-                        <small>6h {{ formatPct(snapshot.change6h) }} · confidence {{ snapshot.confidence }}%</small>
-                        <svg class="sparkline" viewBox="0 0 100 28" preserveAspectRatio="none">
-                            <polyline :points="sparklinePoints(snapshot.history)" />
-                        </svg>
-                    </article>
-                </div>
+                <TradingChart :candles="lighterCandles" :height="400" />
             </article>
         </section>
 
-        <section class="idea-feed card glass-lift">
+        <section class="matrix card glass-lift">
+            <h3 class="font-mono">Market Intelligence Matrix</h3>
+            <div class="matrix-grid">
+                <article v-for="snap in snapshots" :key="snap.symbol" class="matrix-item">
+                    <header>
+                        <strong>{{ snap.symbol }}</strong>
+                        <span :class="(snap.change1h || 0) >= 0 ? 'tone-strong' : 'tone-guarded'">{{ formatPct(snap.change1h) }}</span>
+                    </header>
+                    <p class="matrix-price">{{ formatPrice(snap.price) }}</p>
+                    <div class="matrix-indicators">
+                        <span class="indicator">
+                            <em>RSI</em>
+                            <b :class="snap.rsi !== null ? (snap.rsi >= 70 ? 'rsi-hot' : snap.rsi <= 30 ? 'rsi-cold' : 'rsi-neutral') : ''">
+                                {{ snap.rsi !== null ? snap.rsi.toFixed(0) : '—' }}
+                            </b>
+                        </span>
+                        <span class="indicator">
+                            <em>MOM</em>
+                            <b :class="snap.momentum !== null ? ((snap.momentum || 0) >= 0 ? 'mom-up' : 'mom-down') : ''">
+                                {{ snap.momentum !== null ? formatPct(snap.momentum, 1) : '—' }}
+                            </b>
+                        </span>
+                        <span class="indicator">
+                            <em>VOL</em>
+                            <b>{{ formatPct(snap.volatility, 2) }}</b>
+                        </span>
+                    </div>
+                    <small>6h {{ formatPct(snap.change6h) }} · conf {{ snap.confidence }}%</small>
+                    <svg class="sparkline" viewBox="0 0 100 34" preserveAspectRatio="none">
+                        <polyline :points="sparklinePoints(snap.history)" />
+                    </svg>
+                </article>
+            </div>
+        </section>
+
+        <section class="ideas card glass-lift">
             <header>
-                <h3 class="font-mono">Alpha Idea Feed</h3>
-                <small>Candidate setups generated from live market breadth + volatility + routing context</small>
+                <h3 class="font-mono">Alpha Ideas</h3>
+                <small>Auto-generated from breadth + RSI + volatility + routing</small>
             </header>
             <article v-for="idea in alphaIdeas" :key="idea.title" class="idea-item" :class="`idea-${idea.tone}`">
                 <h4>{{ idea.title }}</h4>
                 <p>{{ idea.detail }}</p>
-            </article>
-        </section>
-
-        <section class="workspace-grid" v-if="tradingWorkbenchEnabled">
-            <article class="panel card">
-                <h3 class="font-mono">Managed Watchlists</h3>
-                <div class="watchlist" v-for="item in watchlists" :key="item.name">
-                    <span>{{ item.name }}</span>
-                    <small>{{ item.symbols || 'No symbols configured' }}</small>
-                </div>
-            </article>
-
-            <article class="panel card">
-                <h3 class="font-mono">Strategy Asset Intake</h3>
-                <ol>
-                    <li v-for="scriptName in strategyIntake" :key="scriptName">{{ scriptName }}</li>
-                </ol>
-                <p class="hint">
-                    Workspace: {{ workspace?.workspace?.workspace_label || 'n/a' }} · Active watchlist
-                    {{ workspaceState?.active_watchlist || 'n/a' }}
-                </p>
-            </article>
-        </section>
-
-        <section class="workspace-grid" v-else>
-            <article class="panel card">
-                <h3 class="font-mono">Workbench Status</h3>
-                <p class="hint">
-                    TradingView integration is currently disabled by policy to focus on DEX-native execution reliability and autonomous
-                    runtime hardening.
-                </p>
             </article>
         </section>
     </div>
@@ -540,246 +358,160 @@ onUnmounted(() => {
 <style scoped>
 .alpha-view {
     display: grid;
-    gap: 0.9rem;
+    gap: 1rem;
 }
 
-.hero {
-    display: grid;
-    gap: 0.74rem;
-    background:
-        radial-gradient(circle at 92% 6%, rgba(103, 208, 255, 0.24), transparent 40%),
-        linear-gradient(130deg, rgba(6, 22, 44, 0.92), rgba(8, 24, 43, 0.76));
-}
-
-.kicker {
-    color: #9de4ff;
-    letter-spacing: 0.08em;
-    font-size: 0.65rem;
-}
-
-.hero h2 {
-    margin: 0.35rem 0 0.25rem;
-    font-size: 1.1rem;
-}
-
-.hero p {
-    margin: 0;
-    color: var(--text-secondary);
-    max-width: 74ch;
-}
-
-.hero-controls {
+.topstrip {
     display: flex;
     justify-content: flex-end;
+    align-items: center;
 }
 
 .symbol-picker {
-    display: grid;
-    gap: 0.22rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .symbol-picker span {
-    font-size: 0.64rem;
-    color: #9ddfff;
+    font-size: 0.72rem;
+    color: var(--text-tertiary);
+    letter-spacing: 0.06em;
 }
 
 .symbol-picker select {
-    background: rgba(8, 24, 43, 0.8);
-    border: 1px solid rgba(108, 188, 244, 0.42);
-    color: #d7eeff;
-    border-radius: 10px;
-    padding: 0.34rem 0.52rem;
-    font-size: 0.78rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-accent);
+    color: var(--text-primary);
+    border-radius: var(--radius-sm);
+    padding: 0.4rem 0.6rem;
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    cursor: pointer;
 }
 
-.meta-line {
-    display: flex;
-    gap: 0.44rem;
-    flex-wrap: wrap;
-}
-
-.chip {
-    border-radius: 999px;
-    padding: 0.2rem 0.56rem;
-    font-size: 0.73rem;
-    border: 1px solid rgba(95, 181, 241, 0.55);
-    color: #9cdcff;
-}
-
-.tone-offensive {
-    color: #78efbf;
-}
-
-.tone-balanced {
-    color: #ffd79a;
-}
-
-.tone-guarded {
-    color: #ffb1b1;
-}
-
+/* ── Insight Cards ── */
 .insights-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-    gap: 0.75rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.8rem;
 }
 
 .insight {
-    background: rgba(8, 22, 40, 0.74);
-}
-
-.insight h3 {
-    margin: 0;
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-}
-
-.insight strong {
-    margin-top: 0.52rem;
-    display: inline-block;
-    font-size: 1.04rem;
-    color: #d6ecff;
+    display: grid;
+    gap: 0.3rem;
 }
 
 .insight p {
-    margin: 0.46rem 0 0;
+    margin: 0;
     color: var(--text-secondary);
-    font-size: 0.84rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
 }
 
-.strategy-rail {
-    background: rgba(8, 22, 40, 0.74);
-    border: 1px solid rgba(127, 188, 236, 0.32);
+.insight strong {
+    font-size: 1.25rem;
+    color: var(--text-primary);
 }
 
-.strategy-rail header {
+.insight small {
+    color: var(--text-tertiary);
+    font-size: 0.72rem;
+}
+
+.tone-hot { color: var(--color-error); text-shadow: 0 0 4px rgba(255, 68, 68, 0.3); }
+.tone-cold { color: #4488ff; text-shadow: 0 0 4px rgba(68, 136, 255, 0.3); }
+.tone-neutral { color: var(--text-primary); }
+
+/* ── Readiness Rail ── */
+.rail header {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    gap: 0.7rem;
-    margin-bottom: 0.72rem;
+    margin-bottom: 0.7rem;
 }
 
-.strategy-rail h3 {
+.rail h3 {
     margin: 0;
-    font-size: 0.84rem;
-    letter-spacing: 0.05em;
+    font-size: 0.85rem;
 }
 
 .rail-score {
     border-radius: 999px;
-    padding: 0.2rem 0.56rem;
-    font-size: 0.73rem;
-    border: 1px solid rgba(95, 181, 241, 0.55);
-    color: #9cdcff;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.78rem;
+    border: 1px solid var(--border-accent);
+    font-family: var(--font-mono);
 }
 
-.readiness-strong {
-    border-color: rgba(23, 200, 136, 0.55);
-    color: #78efbf;
-}
-
-.readiness-balanced {
-    border-color: rgba(244, 180, 68, 0.56);
-    color: #ffd79a;
-}
-
-.readiness-guarded {
-    border-color: rgba(255, 116, 116, 0.58);
-    color: #ffb1b1;
-}
+.tone-strong { color: var(--color-terminal); border-color: rgba(32, 194, 14, 0.4); }
+.tone-balanced { color: var(--color-warning); border-color: rgba(255, 176, 0, 0.4); }
+.tone-guarded { color: var(--color-error); border-color: rgba(255, 68, 68, 0.4); }
 
 .rail-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.56rem;
+    gap: 0.6rem;
 }
 
 .rail-stage {
-    border-radius: var(--radius-md);
-    border: 1px solid rgba(124, 184, 232, 0.28);
-    background: rgba(8, 22, 40, 0.7);
-    padding: 0.56rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+    background: rgba(10, 20, 10, 0.4);
+    padding: 0.6rem;
     display: grid;
     gap: 0.2rem;
 }
 
 .rail-stage p {
     margin: 0;
-    font-size: 0.64rem;
-    letter-spacing: 0.08em;
-    color: #98d8fb;
-}
-
-.rail-stage strong {
-    font-size: 0.78rem;
-}
-
-.rail-stage small {
+    font-size: 0.68rem;
+    letter-spacing: 0.06em;
     color: var(--text-secondary);
-    font-size: 0.72rem;
 }
 
-.stage-ready strong {
-    color: #7beec2;
-}
+.rail-stage strong { font-size: 0.82rem; }
+.rail-stage small { color: var(--text-tertiary); font-size: 0.72rem; }
 
-.stage-pending strong {
-    color: #ffbbac;
-}
+.stage-ready strong { color: var(--color-terminal); }
+.stage-pending strong { color: var(--color-error); }
 
-.grid {
+/* ── Charts ── */
+.chart-row {
     display: grid;
-    grid-template-columns: 1fr 1fr 1.2fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.8rem;
 }
 
-.chart-panel,
-.panel,
-.idea-feed {
-    background: rgba(8, 22, 40, 0.74);
-}
-
-.chart-panel header,
-.idea-feed header {
+.chart-panel header {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
     margin-bottom: 0.7rem;
 }
 
-.chart-panel h3,
-.idea-feed h3,
-.panel h3 {
-    margin: 0;
-}
+.chart-panel h3 { margin: 0; font-size: 0.85rem; }
+.chart-panel small { color: var(--text-tertiary); font-size: 0.72rem; }
 
-.chart-panel small,
-.idea-feed small {
-    color: var(--text-tertiary);
-    font-size: 0.72rem;
-}
-
-.matrix-panel {
-    display: grid;
-    gap: 0.6rem;
+/* ── Matrix ── */
+.matrix h3 {
+    margin: 0 0 0.7rem;
+    font-size: 0.85rem;
 }
 
 .matrix-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.5rem;
+    grid-template-columns: repeat(3, minmax(170px, 1fr));
+    gap: 0.7rem;
 }
 
 .matrix-item {
-    border: 1px solid rgba(125, 186, 232, 0.28);
-    border-radius: 10px;
-    padding: 0.45rem 0.52rem;
-    background: rgba(8, 22, 40, 0.66);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: 0.6rem 0.7rem;
+    background: rgba(10, 20, 10, 0.35);
     display: grid;
-    gap: 0.18rem;
+    gap: 0.2rem;
 }
 
 .matrix-item header {
@@ -788,124 +520,158 @@ onUnmounted(() => {
     align-items: center;
 }
 
-.matrix-item p,
-.matrix-item small {
+.matrix-item header strong { font-size: 0.85rem; }
+.matrix-item header span { font-size: 0.82rem; }
+
+.matrix-price {
     margin: 0;
+    color: var(--text-primary);
+    font-size: 0.92rem;
+    font-weight: 500;
+}
+
+.matrix-indicators {
+    display: flex;
+    gap: 0.6rem;
+    margin-top: 0.15rem;
+}
+
+.indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.68rem;
+}
+
+.indicator em {
+    font-style: normal;
+    color: var(--text-tertiary);
+    font-size: 0.6rem;
+    letter-spacing: 0.04em;
+}
+
+.indicator b {
+    font-weight: 600;
     color: var(--text-secondary);
-    font-size: 0.74rem;
+}
+
+.rsi-hot { color: var(--color-error) !important; }
+.rsi-cold { color: #4488ff !important; }
+.rsi-neutral { color: var(--text-secondary); }
+.mom-up { color: var(--color-terminal) !important; }
+.mom-down { color: var(--color-error) !important; }
+
+.matrix-item small {
+    color: var(--text-tertiary);
+    font-size: 0.68rem;
 }
 
 .sparkline {
     width: 100%;
-    height: 34px;
-    border-radius: 8px;
-    background: linear-gradient(180deg, rgba(15, 45, 73, 0.34), rgba(9, 26, 42, 0.24));
+    height: 38px;
+    border-radius: var(--radius-xs);
+    background: rgba(10, 20, 10, 0.4);
 }
 
 .sparkline polyline {
     fill: none;
-    stroke: #86dcff;
+    stroke: var(--color-terminal);
     stroke-width: 2;
     stroke-linecap: round;
     stroke-linejoin: round;
+    filter: drop-shadow(0 0 3px rgba(32, 194, 14, 0.4));
 }
 
+/* ── Ideas ── */
+.ideas header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 0.6rem;
+}
+
+.ideas h3 { margin: 0; font-size: 0.85rem; }
+.ideas small { color: var(--text-tertiary); font-size: 0.72rem; }
+
 .idea-item {
-    border: 1px solid rgba(123, 187, 232, 0.25);
-    border-radius: 12px;
-    background: rgba(8, 22, 41, 0.66);
-    padding: 0.62rem;
-    margin-top: 0.52rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: rgba(10, 20, 10, 0.3);
+    padding: 0.7rem;
+    margin-top: 0.5rem;
 }
 
 .idea-item h4 {
     margin: 0;
-    font-size: 0.83rem;
+    font-size: 0.85rem;
+    color: var(--text-primary);
 }
 
 .idea-item p {
-    margin: 0.3rem 0 0;
+    margin: 0.25rem 0 0;
     font-size: 0.78rem;
     color: var(--text-secondary);
-    line-height: 1.35;
+    line-height: 1.5;
 }
 
-.idea-bullish {
-    border-color: rgba(108, 226, 172, 0.42);
-}
+.idea-bullish { border-color: rgba(32, 194, 14, 0.35); }
+.idea-neutral { border-color: var(--border-accent); }
+.idea-defensive { border-color: rgba(255, 176, 0, 0.35); }
 
-.idea-neutral {
-    border-color: rgba(117, 188, 241, 0.42);
-}
-
-.idea-defensive {
-    border-color: rgba(255, 175, 121, 0.45);
-}
-
-.workspace-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.75rem;
-}
-
-.panel ol {
-    margin: 0;
-    padding-left: 1.04rem;
-    display: grid;
-    gap: 0.42rem;
-    color: #d4ebff;
-    font-size: 0.83rem;
-}
-
-.watchlist {
-    display: grid;
-    gap: 0.2rem;
-    padding: 0.44rem 0;
-    border-bottom: 1px solid rgba(126, 185, 232, 0.22);
-}
-
-.watchlist:last-child {
-    border-bottom: none;
-}
-
-.watchlist span {
-    color: #e8f4ff;
-    font-size: 0.87rem;
-}
-
-.watchlist small {
-    color: var(--text-secondary);
-    font-size: 0.76rem;
-}
-
-.hint {
-    margin: 0.72rem 0 0;
-    color: var(--text-tertiary);
-    font-size: 0.74rem;
-}
-
+/* ── Responsive ── */
 @media (max-width: 1320px) {
-    .grid {
-        grid-template-columns: 1fr;
-    }
-
-    .workspace-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .rail-grid {
-        grid-template-columns: 1fr 1fr;
-    }
+    .insights-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .chart-row { grid-template-columns: 1fr; }
+    .matrix-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 760px) {
-    .matrix-grid,
-    .rail-grid {
-        grid-template-columns: 1fr;
-    }
+    .insights-grid,
+    .rail-grid,
+    .matrix-grid { grid-template-columns: 1fr; }
+}
 
-    .hero-controls {
-        justify-content: flex-start;
-    }
+/* ── Status Bars ── */
+.status-bar {
+    padding: 0.45rem 0.8rem;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    border-radius: var(--radius-sm);
+    text-align: center;
+}
+
+.loading-bar {
+    background: rgba(32, 194, 14, 0.08);
+    color: var(--color-terminal);
+    border: 1px solid rgba(32, 194, 14, 0.15);
+}
+
+.error-bar {
+    background: rgba(255, 68, 68, 0.08);
+    color: var(--color-error);
+    border: 1px solid rgba(255, 68, 68, 0.2);
+    cursor: pointer;
+}
+
+.stale-bar {
+    background: rgba(255, 200, 50, 0.06);
+    color: var(--color-warning);
+    border: 1px solid rgba(255, 200, 50, 0.15);
+}
+
+.pulse-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-terminal);
+    margin-right: 0.4rem;
+    animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
 }
 </style>

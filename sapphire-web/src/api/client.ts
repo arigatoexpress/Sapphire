@@ -12,12 +12,35 @@ const api = axios.create({
     },
 })
 
+/** Reactive connection health tracker. Views can read these to show status. */
+export const connectionHealth = {
+    lastSuccessAt: 0,
+    lastErrorAt: 0,
+    lastErrorMessage: '',
+    consecutiveFailures: 0,
+}
+
+const markSuccess = () => {
+    connectionHealth.lastSuccessAt = Date.now()
+    connectionHealth.consecutiveFailures = 0
+    connectionHealth.lastErrorMessage = ''
+}
+
+const markError = (path: string, error: unknown) => {
+    connectionHealth.lastErrorAt = Date.now()
+    connectionHealth.consecutiveFailures += 1
+    const msg = error instanceof Error ? error.message : String(error)
+    connectionHealth.lastErrorMessage = `${path}: ${msg}`
+    console.error(`Failed API request: ${path}`, error)
+}
+
 const safeGet = async <T>(path: string, params?: Record<string, unknown>): Promise<T | null> => {
     try {
         const response = await api.get(path, { params })
+        markSuccess()
         return response.data as T
     } catch (error) {
-        console.error(`Failed API request: ${path}`, error)
+        markError(path, error)
         return null
     }
 }
@@ -25,9 +48,10 @@ const safeGet = async <T>(path: string, params?: Record<string, unknown>): Promi
 const safePost = async <T>(path: string, payload?: Record<string, unknown>): Promise<T | null> => {
     try {
         const response = await api.post(path, payload || {})
+        markSuccess()
         return response.data as T
     } catch (error) {
-        console.error(`Failed API request: ${path}`, error)
+        markError(path, error)
         return null
     }
 }
@@ -172,35 +196,6 @@ export interface OhlcResponse {
     source: string
     candles: OhlcCandle[]
     generated_at: number
-}
-
-export interface TradingViewWorkspaceResponse {
-    ok: boolean
-    workspace: {
-        enabled: boolean
-        allow_mutations: boolean
-        allow_all_assets: boolean
-        community_access_enabled: boolean
-        hook_url_set: boolean
-        hook_token_set: boolean
-        agent_id: string
-        workspace_label: string
-        allowed_repo_scope: string[]
-        allowed_project_scope: string[]
-        state: {
-            active_watchlist: string
-            watchlists: Record<string, string[]>
-            selected_symbol: string
-            selected_timeframe: string
-            indicators: string[]
-            strategies: string[]
-            community_scripts: string[]
-            assets_scope: string
-            last_action: string | null
-            last_updated_at: number
-        }
-    }
-    timestamp: number
 }
 
 export interface SystemLogEntry {
@@ -364,9 +359,6 @@ export const fetchRoutingInfo = async (): Promise<RoutingInfoResponse | null> =>
 
 export const fetchPerformanceStats = async (): Promise<PerformanceStatsResponse | null> =>
     safeGet<PerformanceStatsResponse>('/api/analytics/performance/stats')
-
-export const fetchTradingViewWorkspace = async (): Promise<TradingViewWorkspaceResponse | null> =>
-    safeGet<TradingViewWorkspaceResponse>('/api/v2/tradingview/workspace')
 
 export const fetchMarketOHLC = async (params?: {
     venue?: 'ASTER' | 'LIGHTER'

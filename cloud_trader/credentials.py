@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import logging
 import os
 from dataclasses import dataclass
 from typing import Dict, Optional
@@ -10,6 +11,7 @@ from typing import Dict, Optional
 from .api_secrets import GcpSecretManager
 from .config import get_settings
 
+logger = logging.getLogger(__name__)
 _secret_manager = GcpSecretManager()
 
 
@@ -74,17 +76,11 @@ def load_credentials(gcp_secret_project: Optional[str] = None) -> Credentials:
     # ASTER CREDENTIALS
     # ==========================================================================
     if not api_key and gcp_secret_project:
-        print(
-            f"DEBUG: Fetching ASTER_API_KEY from Secret Manager (project={gcp_secret_project})...",
-            flush=True,
-        )
+        logger.debug("Fetching ASTER_API_KEY from Secret Manager")
         api_key = _secret_manager.get_secret("ASTER_API_KEY", gcp_secret_project)
 
     if not api_secret and gcp_secret_project:
-        print(
-            f"DEBUG: Fetching ASTER_SECRET_KEY from Secret Manager (project={gcp_secret_project})...",
-            flush=True,
-        )
+        logger.debug("Fetching ASTER_SECRET_KEY from Secret Manager")
         api_secret = _secret_manager.get_secret("ASTER_SECRET_KEY", gcp_secret_project)
 
     # It's possible the secret is base64-encoded
@@ -98,44 +94,44 @@ def load_credentials(gcp_secret_project: Optional[str] = None) -> Credentials:
 
     if api_key:
         api_key = api_key.strip()
-        print(f"DEBUG: Loaded API Key: {api_key[:4]}... (len={len(api_key)})")
+        logger.debug("Loaded API Key (configured)")
 
     if api_secret:
         api_secret = api_secret.strip()
-        print(f"DEBUG: Loaded API Secret (len={len(api_secret)})")
+        logger.debug("Loaded API Secret (configured)")
 
     # ==========================================================================
     # AI MODEL API KEYS
     # ==========================================================================
     vertex_key = os.environ.get("VERTEX_API_KEY")
     if not vertex_key and gcp_secret_project:
-        print(f"DEBUG: Fetching VERTEX_API_KEY from Secret Manager...")
+        logger.debug("Fetching VERTEX_API_KEY from Secret Manager")
         vertex_key = _secret_manager.get_secret("vertex_api_key_v1", gcp_secret_project)
         if not vertex_key:
             vertex_key = _secret_manager.get_secret("VERTEX_API_KEY", gcp_secret_project)
 
     if vertex_key:
-        print(f"DEBUG: Loaded Vertex API Key: {vertex_key[:4]}... (len={len(vertex_key)})")
+        logger.debug("Loaded Vertex API Key (configured)")
 
     # Gemini API Key
     gemini_key = os.environ.get("GEMINI_API_KEY")
     if not gemini_key and gcp_secret_project:
-        print(f"DEBUG: Fetching GEMINI_API_KEY from Secret Manager...")
+        logger.debug("Fetching GEMINI_API_KEY from Secret Manager")
         gemini_key = _secret_manager.get_secret("GEMINI_API_KEY", gcp_secret_project)
     
     if gemini_key:
         gemini_key = gemini_key.strip()
-        print(f"DEBUG: Loaded Gemini API Key: {gemini_key[:4]}... (len={len(gemini_key)})")
+        logger.debug("Loaded Gemini API Key (configured)")
 
     # Grok API Key
     grok_key = os.environ.get("GROK_API_KEY")
     if not grok_key and gcp_secret_project:
-        print(f"DEBUG: Fetching GROK_API_KEY from Secret Manager...")
+        logger.debug("Fetching GROK_API_KEY from Secret Manager")
         grok_key = _secret_manager.get_secret("GROK_API_KEY", gcp_secret_project)
     
     if grok_key:
         grok_key = grok_key.strip()
-        print(f"DEBUG: Loaded Grok API Key: {grok_key[:4]}... (len={len(grok_key)})")
+        logger.debug("Loaded Grok API Key (configured)")
 
     # ==========================================================================
     # TELEGRAM NOTIFICATIONS
@@ -144,40 +140,40 @@ def load_credentials(gcp_secret_project: Optional[str] = None) -> Credentials:
     tg_chat = settings.telegram_chat_id
 
     if not tg_token and gcp_secret_project:
-        print(f"DEBUG: Fetching TELEGRAM_BOT_TOKEN from Secret Manager...")
+        logger.debug("Fetching TELEGRAM_BOT_TOKEN from Secret Manager")
         tg_token = _secret_manager.get_secret("TELEGRAM_BOT_TOKEN", gcp_secret_project)
     if not tg_chat and gcp_secret_project:
-        print(f"DEBUG: Fetching TELEGRAM_CHAT_ID from Secret Manager...")
+        logger.debug("Fetching TELEGRAM_CHAT_ID from Secret Manager")
         tg_chat = _secret_manager.get_secret("TELEGRAM_CHAT_ID", gcp_secret_project)
 
     if tg_token:
-        print(f"DEBUG: Loaded Telegram Bot Token (len={len(tg_token)})")
+        logger.debug("Loaded Telegram Bot Token (configured)")
     if tg_chat:
-        print(f"DEBUG: Loaded Telegram Chat ID: {tg_chat}")
+        logger.debug("Loaded Telegram Chat ID (configured)")
 
     # ==========================================================================
     # SOLANA / ASTER (Using ASTER_SOLANA_PRIVATE_KEY - original key compromised)
     # ==========================================================================
     solana_key = settings.solana_private_key
     if not solana_key and gcp_secret_project:
-        print(f"DEBUG: Fetching ASTER_SOLANA_PRIVATE_KEY from Secret Manager...")
+        logger.debug("Fetching ASTER_SOLANA_PRIVATE_KEY from Secret Manager")
         solana_key = _secret_manager.get_secret("ASTER_SOLANA_PRIVATE_KEY", gcp_secret_project)
 
     if solana_key:
         solana_key = solana_key.strip()
-        print(f"DEBUG: Loaded Solana Private Key (len={len(solana_key)})")
+        logger.debug("Loaded Solana Private Key (configured)")
 
     # ==========================================================================
     # ASTER (MONAD)
     # ==========================================================================
     aster_key = settings.aster_api_key
     if not aster_key and gcp_secret_project:
-        print(f"DEBUG: Fetching ASTER_API_KEY from Secret Manager...")
+        logger.debug("Fetching ASTER_API_KEY from Secret Manager")
         aster_key = _secret_manager.get_secret("ASTER_API_KEY", gcp_secret_project)
     
     if aster_key:
         aster_key = aster_key.strip()
-        print(f"DEBUG: Loaded Aster API Key (len={len(aster_key)})")
+        logger.debug("Loaded Aster API Key (configured)")
 
     # ==========================================================================
     # LIGHTER
@@ -186,19 +182,19 @@ def load_credentials(gcp_secret_project: Optional[str] = None) -> Credentials:
     hl_account_address = os.environ.get("HL_ACCOUNT_ADDRESS")
     
     if not hl_private_key and gcp_secret_project:
-        print(f"DEBUG: Fetching HL_SECRET_KEY from Secret Manager...")
+        logger.debug("Fetching HL_SECRET_KEY from Secret Manager")
         hl_private_key = _secret_manager.get_secret("HL_SECRET_KEY", gcp_secret_project)
     
     if not hl_account_address and gcp_secret_project:
-        print(f"DEBUG: Fetching HL_ACCOUNT_ADDRESS from Secret Manager...")
+        logger.debug("Fetching HL_ACCOUNT_ADDRESS from Secret Manager")
         hl_account_address = _secret_manager.get_secret("HL_ACCOUNT_ADDRESS", gcp_secret_project)
     
     if hl_private_key:
         hl_private_key = hl_private_key.strip()
-        print(f"DEBUG: Loaded Lighter Private Key (len={len(hl_private_key)})")
+        logger.debug("Loaded Lighter Private Key (configured)")
     if hl_account_address:
         hl_account_address = hl_account_address.strip()
-        print(f"DEBUG: Loaded Lighter Account: {hl_account_address[:10]}...")
+        logger.debug("Loaded Lighter Account (configured)")
 
     # ==========================================================================
     # LIGHTER (supports separate account_index and api_key_index)
@@ -207,19 +203,19 @@ def load_credentials(gcp_secret_project: Optional[str] = None) -> Credentials:
     lighter_priv_key = os.environ.get("LIGHTER_PRIV_KEY")
 
     if not lighter_pub_key and gcp_secret_project:
-        print(f"DEBUG: Fetching LIGHTER_PUB_KEY from Secret Manager...")
+        logger.debug("Fetching LIGHTER_PUB_KEY from Secret Manager")
         lighter_pub_key = _secret_manager.get_secret("LIGHTER_PUB_KEY", gcp_secret_project)
 
     if not lighter_priv_key and gcp_secret_project:
-        print(f"DEBUG: Fetching LIGHTER_PRIV_KEY from Secret Manager...")
+        logger.debug("Fetching LIGHTER_PRIV_KEY from Secret Manager")
         lighter_priv_key = _secret_manager.get_secret("LIGHTER_PRIV_KEY", gcp_secret_project)
 
     if lighter_pub_key:
         lighter_pub_key = lighter_pub_key.strip()
-        print(f"DEBUG: Loaded Lighter Pub Key (len={len(lighter_pub_key)})")
+        logger.debug("Loaded Lighter Pub Key (configured)")
     if lighter_priv_key:
         lighter_priv_key = lighter_priv_key.strip()
-        print(f"DEBUG: Loaded Lighter Priv Key (len={len(lighter_priv_key)})")
+        logger.debug("Loaded Lighter Priv Key (configured)")
 
     # Lighter account_index / api_key_index from env
     lighter_account_index = int(os.environ.get("LIGHTER_ACCOUNT_INDEX", "699444"))
@@ -239,15 +235,15 @@ def load_credentials(gcp_secret_project: Optional[str] = None) -> Credentials:
     # ==========================================================================
     # JUPITER
     # ==========================================================================
-    jupiter_api_key = os.environ.get("JUPITER_API_KEY", "d1302809-3996-4ceb-aad0-7da8a71d6149")
+    jupiter_api_key = os.environ.get("JUPITER_API_KEY", "")
 
     if not jupiter_api_key and gcp_secret_project:
-        print(f"DEBUG: Fetching JUPITER_API_KEY from Secret Manager...")
+        logger.debug("Fetching JUPITER_API_KEY from Secret Manager")
         jupiter_api_key = _secret_manager.get_secret("JUPITER_API_KEY", gcp_secret_project)
 
     if jupiter_api_key:
         jupiter_api_key = jupiter_api_key.strip()
-        print(f"DEBUG: Loaded Jupiter API Key: {jupiter_api_key[:8]}... (len={len(jupiter_api_key)})")
+        logger.debug("Loaded Jupiter API Key (configured)")
 
     # ==========================================================================
     # RETURN CREDENTIALS

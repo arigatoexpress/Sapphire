@@ -22,4 +22,9 @@ ENV SAPPHIRE_SKILLS_DIR=/app/skills
 # Port for Health Check
 ENV PORT=8080
 
+# Run as non-root user for security
+RUN addgroup --system sapphire && adduser --system --ingroup sapphire sapphire
+RUN chown -R sapphire:sapphire /app
+USER sapphire
+
 CMD ["python", "-m", "src.main"]

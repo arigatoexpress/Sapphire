@@ -468,9 +468,10 @@ class EnhancedMemoryBank:
 
         # AI for lesson extraction
         api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        _model_name = os.getenv("SAPPHIRE_SYSTEM1_MODEL", "gemini-2.5-flash")
         if api_key:
             genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel("gemini-2.0-flash")
+            self.model = genai.GenerativeModel(_model_name)
         else:
             self.model = None
 

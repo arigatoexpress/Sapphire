@@ -50,7 +50,9 @@ const normalizedCandles = computed(() =>
 
 const hasData = computed(() => normalizedCandles.value.length > 0)
 
-const renderChart = async () => {
+let lastCandleCount = 0
+
+const initChart = async () => {
     if (!chartContainer.value) return
 
     await nextTick()
@@ -62,33 +64,33 @@ const renderChart = async () => {
         height: props.height,
         layout: {
             background: { type: ColorType.Solid, color: 'transparent' },
-            textColor: 'rgba(184, 214, 245, 0.82)',
+            textColor: 'rgba(32, 194, 14, 0.7)',
             attributionLogo: false,
         },
         grid: {
-            vertLines: { color: 'rgba(110, 164, 212, 0.12)' },
-            horzLines: { color: 'rgba(110, 164, 212, 0.12)' },
+            vertLines: { color: 'rgba(32, 194, 14, 0.08)' },
+            horzLines: { color: 'rgba(32, 194, 14, 0.08)' },
         },
         rightPriceScale: {
-            borderColor: 'rgba(110, 164, 212, 0.2)',
+            borderColor: 'rgba(32, 194, 14, 0.15)',
         },
         timeScale: {
-            borderColor: 'rgba(110, 164, 212, 0.2)',
+            borderColor: 'rgba(32, 194, 14, 0.15)',
             timeVisible: true,
             secondsVisible: false,
         },
         crosshair: {
-            horzLine: { color: 'rgba(120, 199, 255, 0.4)' },
-            vertLine: { color: 'rgba(120, 199, 255, 0.4)' },
+            horzLine: { color: 'rgba(32, 194, 14, 0.3)' },
+            vertLine: { color: 'rgba(32, 194, 14, 0.3)' },
         },
     })
 
     candleSeries = chart.addSeries(CandlestickSeries, {
-        upColor: '#17c888',
-        downColor: '#ff7474',
+        upColor: '#20C20E',
+        downColor: '#ff4444',
         borderVisible: false,
-        wickUpColor: '#17c888',
-        wickDownColor: '#ff7474',
+        wickUpColor: '#20C20E',
+        wickDownColor: '#ff4444',
     })
 
     volumeSeries = chart.addSeries(HistogramSeries, {
@@ -96,22 +98,54 @@ const renderChart = async () => {
         priceScaleId: '',
     })
 
-    if (candleSeries) candleSeries.setData(normalizedCandles.value)
-    if (volumeSeries) {
-        volumeSeries.setData(
-            normalizedCandles.value.map((item) => ({
-                time: item.time,
-                value: Math.max(item.volume || 0, 0),
-                color: item.close >= item.open ? 'rgba(23,200,136,0.45)' : 'rgba(255,116,116,0.45)',
-            })),
-        )
-    }
-
+    setFullData()
     chart.timeScale().fitContent()
 }
 
+const setFullData = () => {
+    const candles = normalizedCandles.value
+    lastCandleCount = candles.length
+    if (candleSeries) candleSeries.setData(candles)
+    if (volumeSeries) {
+        volumeSeries.setData(
+            candles.map((item) => ({
+                time: item.time,
+                value: Math.max(item.volume || 0, 0),
+                color: item.close >= item.open ? 'rgba(32,194,14,0.4)' : 'rgba(255,68,68,0.4)',
+            })),
+        )
+    }
+}
+
+const updateChart = () => {
+    if (!chart || !candleSeries || !volumeSeries) {
+        initChart()
+        return
+    }
+
+    const candles = normalizedCandles.value
+    if (candles.length === 0) return
+
+    // Full re-render if candle count changed significantly (symbol switch or large gap)
+    if (Math.abs(candles.length - lastCandleCount) > 5) {
+        setFullData()
+        return
+    }
+
+    // Incremental update: update only the last candle (tip)
+    const last = candles[candles.length - 1]
+    if (!last) return
+    candleSeries.update(last)
+    volumeSeries.update({
+        time: last.time,
+        value: Math.max(last.volume || 0, 0),
+        color: last.close >= last.open ? 'rgba(32,194,14,0.4)' : 'rgba(255,68,68,0.4)',
+    })
+    lastCandleCount = candles.length
+}
+
 onMounted(() => {
-    renderChart()
+    initChart()
     resizeHandler = () => {
         if (!chartContainer.value || !chart) return
         chart.applyOptions({ width: chartContainer.value.clientWidth })
@@ -127,14 +161,14 @@ onUnmounted(() => {
 watch(
     () => props.height,
     () => {
-        renderChart()
+        initChart()
     },
 )
 
 watch(
     normalizedCandles,
     () => {
-        renderChart()
+        updateChart()
     },
     { deep: true },
 )
@@ -168,10 +202,10 @@ watch(
     align-items: center;
     justify-content: center;
     text-align: center;
-    color: rgba(184, 214, 245, 0.78);
+    color: rgba(32, 194, 14, 0.6);
     font-size: 0.8rem;
     letter-spacing: 0.02em;
     pointer-events: none;
-    background: linear-gradient(180deg, rgba(8, 22, 40, 0.22), rgba(8, 22, 40, 0.4));
+    background: linear-gradient(180deg, rgba(10, 20, 10, 0.2), rgba(5, 10, 5, 0.4));
 }
 </style>
