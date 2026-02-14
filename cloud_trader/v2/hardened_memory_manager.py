@@ -29,7 +29,7 @@ import pickle
 import tempfile
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any, Optional, TypeVar
@@ -118,7 +118,7 @@ class Memory:
     
     def mark_accessed(self) -> None:
         """Update access tracking."""
-        self.accessed_at = datetime.utcnow()
+        self.accessed_at = datetime.now(timezone.utc)
         self.access_count += 1
     
     def to_dict(self) -> dict:
@@ -436,7 +436,7 @@ class HardenedMemoryManager:
         
         # Try to read a document
         test_ref = self._db.collection(self.FIRESTORE_COLLECTION).document("_health_check")
-        await test_ref.set({"timestamp": datetime.utcnow().isoformat()})
+        await test_ref.set({"timestamp": datetime.now(timezone.utc).isoformat()})
         return True
     
     async def _load_from_firestore(self) -> None:
@@ -511,7 +511,7 @@ class HardenedMemoryManager:
         
         # Generate memory ID
         memory_id = hashlib.sha256(
-            f"{memory_type.value}:{content}:{datetime.utcnow().timestamp()}".encode()
+            f"{memory_type.value}:{content}:{datetime.now(timezone.utc).timestamp()}".encode()
         ).hexdigest()[:16]
         
         # Generate embedding
@@ -592,7 +592,7 @@ class HardenedMemoryManager:
                 
                 # Mark as committed
                 memory.persistence_state = PersistenceState.COMMITTED
-                memory.last_persisted = datetime.utcnow()
+                memory.last_persisted = datetime.now(timezone.utc)
                 self._health.last_commit_time = memory.last_persisted
                 
                 # Clear WAL entry

@@ -115,11 +115,8 @@ class ConnectionPoolManager:
         # Platform-specific connection pool sizes
         # HFT platforms get larger pools
         self.pool_sizes = {
-            "aster": 10,
+            "aster": 15,
             "lighter": 10,
-            "aster": 15,  # Larger pool for HFT Shield strategy
-            "aster": 5,
-            "lighter": 8
         }
 
     def get_pool(self, platform: str) -> PlatformConnectionPool:

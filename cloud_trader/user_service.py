@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
 from google.cloud import firestore
@@ -28,7 +28,7 @@ class UserService:
         user_data = {
             "uid": uid,
             "email": email,
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "total_points": 0,
             "streak_days": 0,
             "last_checkin": None,
@@ -98,7 +98,7 @@ class UserService:
         # Check if already checked in today
         if last_checkin:
             last_checkin_date = datetime.fromisoformat(last_checkin).date()
-            today = datetime.utcnow().date()
+            today = datetime.now(timezone.utc).date()
 
             if last_checkin_date == today:
                 return {"message": "Already checked in today", "points_awarded": 0}
@@ -128,7 +128,7 @@ class UserService:
             {
                 "total_points": firestore.Increment(points_awarded),
                 "streak_days": new_streak,
-                "last_checkin": datetime.utcnow().isoformat(),
+                "last_checkin": datetime.now(timezone.utc).isoformat(),
             }
         )
 
@@ -136,7 +136,7 @@ class UserService:
         self.db.collection("points_history").add(
             {
                 "uid": uid,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "action": "daily_checkin",
                 "points": points_awarded,
                 "reason": f"Daily check-in (Streak: {new_streak})",

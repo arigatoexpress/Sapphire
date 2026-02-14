@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from google.cloud import firestore
@@ -38,7 +38,7 @@ class VotingService:
             return {"error": "Confidence must be between 0.0 and 1.0"}
 
         # Check if user already voted for this symbol today
-        today = datetime.utcnow().date().isoformat()
+        today = datetime.now(timezone.utc).date().isoformat()
         existing_votes = (
             self.db.collection("daily_votes")
             .where("uid", "==", uid)
@@ -71,7 +71,7 @@ class VotingService:
             "date": today,
             "prediction": prediction,
             "confidence": confidence,
-            "voted_at": datetime.utcnow().isoformat(),
+            "voted_at": datetime.now(timezone.utc).isoformat(),
             "entry_price": entry_price,
             "scored": False,
             "correct": None,
@@ -88,7 +88,7 @@ class VotingService:
         self.db.collection("points_history").add(
             {
                 "uid": uid,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "action": "vote_submitted",
                 "points": 5,
                 "reason": f"Voted {prediction} on {symbol}",
@@ -117,7 +117,7 @@ class VotingService:
                 avg_confidence
             }
         """
-        today = datetime.utcnow().date().isoformat()
+        today = datetime.now(timezone.utc).date().isoformat()
 
         votes = (
             self.db.collection("daily_votes")
@@ -175,7 +175,7 @@ class VotingService:
         - +50 points for correct prediction
         - +100 points for high-confidence correct (>80%)
         """
-        yesterday = (datetime.utcnow().date() - timedelta(days=1)).isoformat()
+        yesterday = (datetime.now(timezone.utc).date() - timedelta(days=1)).isoformat()
 
         # Get all unscored votes from yesterday
         votes = (
@@ -251,7 +251,7 @@ class VotingService:
                 self.db.collection("points_history").add(
                     {
                         "uid": uid,
-                        "timestamp": datetime.utcnow().isoformat(),
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
                         "action": "prediction_correct",
                         "points": points,
                         "reason": f"Correct prediction: {symbol} {prediction} ({price_change_pct:+.2%})",

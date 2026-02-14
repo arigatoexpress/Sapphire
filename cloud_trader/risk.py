@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict
 
 from .config import Settings
@@ -407,7 +407,7 @@ class RiskManager:
         Monitor positions for age and excessive drawdown.
         Aggressively close violations.
         """
-        current_time = datetime.utcnow()
+        current_time = datetime.now(timezone.utc)
 
         for symbol, position in portfolio.positions.items():
             # Check Position Age (Max 2 hours)

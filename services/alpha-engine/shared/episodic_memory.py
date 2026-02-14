@@ -16,7 +16,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import google.generativeai as genai
@@ -164,7 +164,7 @@ class EpisodicMemoryBank:
         try:
             data = {
                 "episodes": [ep.to_dict() for ep in self.episodes.values()],
-                "saved_at": datetime.utcnow().isoformat(),
+                "saved_at": datetime.now(timezone.utc).isoformat(),
             }
             with open(self.storage_path, "w") as f:
                 json.dump(data, f, indent=2)
@@ -178,12 +178,12 @@ class EpisodicMemoryBank:
         symbols: List[str] = None,
     ) -> MarketEpisode:
         """Start recording a new market episode."""
-        episode_id = f"ep-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}"
+        episode_id = f"ep-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
 
         self.current_episode = MarketEpisode(
             episode_id=episode_id,
             name=name,
-            start_time=datetime.utcnow(),
+            start_time=datetime.now(timezone.utc),
             regime=regime,
             symbols_involved=symbols or [],
         )
@@ -202,7 +202,7 @@ class EpisodicMemoryBank:
             return None
 
         ep = self.current_episode
-        ep.end_time = datetime.utcnow()
+        ep.end_time = datetime.now(timezone.utc)
         ep.price_change_pct = price_change_pct
         ep.volume_change_pct = volume_change_pct
         ep.max_drawdown_pct = max_drawdown_pct
@@ -407,7 +407,7 @@ async def demo_episodic_memory():
             "entry_price": 142.50,
             "exit_price": 158.00,
             "pnl": 155.00,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     )
 

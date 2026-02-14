@@ -51,7 +51,7 @@ class BacktestDataManager:
                 if resp.status_code == 429:
                     logger.warning("CoinGecko Rate Limit! Waiting...")
                     await asyncio.sleep(65)  # Free tier has 1 min limit
-                    resp = await client.get(url, params=params)
+                    resp = await client.get(url, params=params, timeout=30.0)
 
                 resp.raise_for_status()
                 data = resp.json()

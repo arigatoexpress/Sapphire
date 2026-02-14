@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -62,7 +62,7 @@ class ChatLogger:
     ) -> bool:
         """Log a chat message from an agent."""
         try:
-            timestamp = datetime.utcnow()
+            timestamp = datetime.now(timezone.utc)
             message_data = {
                 "id": f"{timestamp.timestamp()}-{agent_id}",
                 "timestamp": timestamp.isoformat(),

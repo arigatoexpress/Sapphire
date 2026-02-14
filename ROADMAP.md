@@ -1,6 +1,6 @@
 # Sapphire Master Roadmap
 
-> Last Updated: Feb 14, 2026 | Status: Phase 6 Complete ✅ | Deploy: sapphire-alpha-00173-dvc
+> Last Updated: Feb 14, 2026 | Status: Phase 7 Complete ✅ | Tests: 898 | Deploy: sapphire-alpha-00173-dvc
 
 ## Vision
 Build a top-tier autonomous crypto trading platform with secure multi-agent collaboration, crowdsourced swarm intelligence, and automated public presence.
@@ -129,7 +129,43 @@ _Verify and upgrade autonomous agent models_
 - [ ] Run comparison tests: old vs new model quality
 - [ ] Update model configuration and redeploy
 
-## Phase 8: Virtuals Integration (Base) 🔮 (DEFERRED)
+## Phase 8: Prediction Market Intelligence 🔮
+_Polymarket + Kalshi data as trading signal sources_
+
+### Data Infrastructure
+- [ ] Build `PredictionMarketFeed` base class (async polling + WebSocket)
+- [ ] Implement Polymarket client (Gamma API for discovery, CLOB API for pricing)
+  - Public endpoints, no auth required for reads
+  - Endpoints: `/events`, `/markets`, `/price`, `/midpoint`, `/book`
+  - WebSocket: `wss://ws-subscriptions-clob.polymarket.com/ws/` for real-time prices
+  - Python SDK: `py-clob-client`
+- [ ] Implement Kalshi client (REST API v2 for market data)
+  - Public endpoints, no auth required for reads
+  - Endpoints: `/markets`, `/events`, `/series`, orderbook
+  - WebSocket: `wss://api.elections.kalshi.com/trade-api/ws/v2` (ticker channel)
+  - Python SDK: `kalshi-python`
+- [ ] Rate limiting: Polymarket 1,000/hr, Kalshi tiered
+- [ ] Unified `PredictionSignal` dataclass (market_id, question, probability, volume, source)
+
+### Signal Integration
+- [ ] Crypto-relevant market filter (BTC price, ETH price, crypto regulation, macro events)
+- [ ] Probability-to-sentiment mapper (>70% bullish → positive signal, <30% → negative)
+- [ ] Feed prediction signals into DualSpeedCognition context
+- [ ] Weight prediction data by market liquidity and volume
+- [ ] Macro event calendar from Kalshi series (jobs reports, CPI, Fed decisions)
+
+### Forum & Swarm Integration
+- [ ] Scout posts prediction market summaries to forum
+- [ ] Agents can reference prediction probabilities in trade idea reasoning
+- [ ] Swarm consensus incorporates prediction market sentiment
+
+### Monitoring & Quality
+- [ ] Track prediction accuracy vs actual crypto price moves
+- [ ] Dashboard widget showing active prediction markets + probabilities
+- [ ] Telegram commands: `/predictions`, `/prediction <market>`, `/prediction signals`
+- [ ] Unit tests for feed clients, signal mapping, and integration (target: 40+ tests)
+
+## Phase 9: Virtuals Integration (Base) 🌐 (DEFERRED)
 _On-chain agent presence via Virtuals protocol — revisit later_
 
 - [ ] Research Virtuals protocol on Base
@@ -141,8 +177,8 @@ _On-chain agent presence via Virtuals protocol — revisit later_
 
 ## Execution Priority
 ```
-Phase 1 ✅  →  Phase 2 ✅  →  Phase 3 ✅  →  Phase 4 ✅  →  Phase 5 ✅  →  Phase 6 ✅  →  Phase 7 (NEXT)
-Harden        Security       Forum          Swarm          Tracking       Social           OpenClaw
+Phase 1 ✅  →  Phase 2 ✅  →  Phase 3 ✅  →  Phase 4 ✅  →  Phase 5 ✅  →  Phase 6 ✅  →  Phase 7 ✅  →  Phase 8 (NEXT)
+Harden        Security       Forum          Swarm          Tracking       Social           OpenClaw       Predictions
 ```
 
 ## Completed Milestones
@@ -167,4 +203,6 @@ Harden        Security       Forum          Swarm          Tracking       Social
 - ✅ PR #33: Masterplan Improvements (security hardening, frontend redesign, 3 test suites, new modules)
 - ✅ PR #34: Telegram Handler Extraction (1,632 lines extracted from main.py → telegram_handlers.py)
 - ✅ PR #35: OpenClaw Model Upgrade (18 files upgraded: gemini-2.0→2.5, gemini-3.0→3-flash-preview across all services)
-- ✅ 847 tests passing
+- ✅ PR #36: Cognition/Memory Test Suite (118 tests for dual-speed cognition, episodic memory, enhanced memory)
+- ✅ PR #37: Fill Confirmation Test Expansion (16 new tests: venue normalization, pause/resume, allocation bounds, retry logic)
+- ✅ 898 tests passing

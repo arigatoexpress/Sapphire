@@ -15,7 +15,7 @@ import logging
 import os
 import signal
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 # Configure logging
@@ -141,7 +141,7 @@ class ACTSOrchestrator:
 
         # Create initial snapshot (simulated)
         snapshot = MarketSnapshot(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             prices={"SOL": 145.0, "BTC": 65000.0},
             volatility={"SOL": 0.05, "BTC": 0.02},
         )
@@ -174,7 +174,7 @@ class ACTSOrchestrator:
         if self.memory.current_episode:
             # Create end snapshot (simulated)
             snapshot = MarketSnapshot(
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 prices={"SOL": 145.0, "BTC": 65000.0},
                 volatility={"SOL": 0.05, "BTC": 0.02},
             )
@@ -293,7 +293,7 @@ class ACTSOrchestrator:
         # 3. Memory recall
         # Create snapshot for memory recall (simulated for now)
         snapshot = MarketSnapshot(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             prices={symbol: context.current_price},
             volatility={symbol: abs(context.price_change_1h) / 100},
             order_book_imbalance={symbol: context.order_book_imbalance},
@@ -354,7 +354,7 @@ Should we trade? If yes, BUY or SELL?
                             "quantity": execution_request.quantity,
                             "platform": platform,
                             "avg_price": report.avg_price,
-                            "timestamp": datetime.utcnow().isoformat(),
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
                         }
                     )
 

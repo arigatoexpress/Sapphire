@@ -23,7 +23,7 @@ import asyncio
 import logging
 import random
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Optional
 
@@ -389,7 +389,7 @@ class DualPlatformRouter:
         if not self._initialized:
             await self.initialize()
         
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
         
         # Get routing decision
         decision = self.decide_route(symbol, strategy)
@@ -443,7 +443,7 @@ class DualPlatformRouter:
                 self._failovers += 1
         
         # Calculate latency
-        result.latency_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
+        result.latency_ms = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
         
         # Track metrics
         self._executions.append(result)

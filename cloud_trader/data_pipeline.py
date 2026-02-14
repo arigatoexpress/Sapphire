@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import redis.asyncio as redis
@@ -145,7 +145,7 @@ class DataPipeline:
 
             payload = json.loads(payload_data)
             timestamp = datetime.fromisoformat(
-                payload.get("timestamp", datetime.utcnow().isoformat())
+                payload.get("timestamp", datetime.now(timezone.utc).isoformat())
             )
 
             if stream_type == "decision":
@@ -203,7 +203,7 @@ class DataPipeline:
             try:
                 await self._storage.insert_trade(
                     timestamp=datetime.fromisoformat(
-                        trade.get("timestamp", datetime.utcnow().isoformat())
+                        trade.get("timestamp", datetime.now(timezone.utc).isoformat())
                     ),
                     symbol=trade.get("symbol", ""),
                     side=trade.get("side", "BUY"),
