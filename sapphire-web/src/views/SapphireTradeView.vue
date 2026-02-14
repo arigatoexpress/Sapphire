@@ -103,6 +103,30 @@ onUnmounted(() => {
             </label>
         </div>
 
+        <!-- Skeleton loading state -->
+        <template v-if="loading && !lastFetchAt">
+            <section class="ops-strip">
+                <article v-for="i in 5" :key="i" class="ops-card card glass-lift">
+                    <div class="skel-line skel-sm"></div>
+                    <div class="skel-line skel-lg"></div>
+                </article>
+            </section>
+            <section class="metric-strip">
+                <article v-for="i in 4" :key="i" class="metric card glass-lift">
+                    <div class="skel-line skel-sm"></div>
+                    <div class="skel-line skel-lg"></div>
+                    <div class="skel-line skel-xs"></div>
+                </article>
+            </section>
+            <section class="chart-grid">
+                <article v-for="i in 2" :key="i" class="chart-panel card glass-lift">
+                    <div class="skel-line skel-sm" style="margin-bottom: 0.7rem"></div>
+                    <div class="skel-chart"></div>
+                </article>
+            </section>
+        </template>
+
+        <template v-else>
         <section class="ops-strip">
             <article class="ops-card card glass-lift">
                 <p class="font-mono">Trades</p>
@@ -183,6 +207,7 @@ onUnmounted(() => {
                 </article>
             </div>
         </section>
+        </template>
     </div>
 </template>
 
@@ -424,5 +449,45 @@ onUnmounted(() => {
     .ops-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .metric-strip,
     .breadth-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Skeleton Loading ── */
+.skel-line {
+    border-radius: var(--radius-xs);
+    animation: skelPulse 1.6s ease-in-out infinite;
+}
+
+.skel-lg {
+    width: 55%;
+    height: 1.15rem;
+    margin: 0 auto;
+    background: rgba(32, 194, 14, 0.08);
+}
+
+.skel-sm {
+    width: 40%;
+    height: 0.6rem;
+    margin: 0 auto 0.3rem;
+    background: rgba(32, 194, 14, 0.05);
+}
+
+.skel-xs {
+    width: 50%;
+    height: 0.5rem;
+    margin: 0.2rem auto 0;
+    background: rgba(32, 194, 14, 0.04);
+}
+
+.skel-chart {
+    width: 100%;
+    height: 400px;
+    border-radius: var(--radius-sm);
+    background: rgba(32, 194, 14, 0.03);
+    animation: skelPulse 1.6s ease-in-out infinite 0.2s;
+}
+
+@keyframes skelPulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.85; }
 }
 </style>
