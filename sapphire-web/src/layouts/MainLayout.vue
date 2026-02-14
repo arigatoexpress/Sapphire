@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
-import { BookOpenText, LineChart, Radar } from 'lucide-vue-next'
+import { BookOpenText, LineChart, Radar, Eye } from 'lucide-vue-next'
 import { fetchHealth, fetchSystemLogs, type SystemLogEntry } from '../api/client'
 import TerminalLog from '../components/TerminalLog.vue'
 
@@ -19,6 +19,7 @@ const navItems = [
     { to: '/sapphirebook', label: 'Book', icon: BookOpenText },
     { to: '/sapphiretrade', label: 'Trade', icon: LineChart },
     { to: '/sapphirealpha', label: 'Alpha', icon: Radar },
+    { to: '/predictions', label: 'Predict', icon: Eye },
 ]
 
 const activeLabel = computed(() => {

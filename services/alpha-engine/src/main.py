@@ -232,7 +232,7 @@ class AlphaEngine:
         from src.media.manager import MediaManager
         from src.media.content_generator import ContentGenerator
         self.media_manager = MediaManager(telegram_bot=self.telegram)
-        self.content_generator = ContentGenerator(gemini_guard=self.gemini)
+        self.content_generator = ContentGenerator(gemini_guard=self.ai)
         self._media_publish_task: Optional[asyncio.Task[Any]] = None
         # Phase 8: Prediction Market Intelligence
         from src.feeds.prediction_aggregator import PredictionAggregator

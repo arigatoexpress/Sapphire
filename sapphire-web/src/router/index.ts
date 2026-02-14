@@ -24,6 +24,11 @@ const router = createRouter({
             component: () => import('../views/SapphireAlphaView.vue'),
         },
         {
+            path: '/predictions',
+            name: 'predictions',
+            component: () => import('../views/SapphirePredictionsView.vue'),
+        },
+        {
             path: '/:pathMatch(.*)*',
             redirect: '/sapphirebook',
         },
