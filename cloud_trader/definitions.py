@@ -23,7 +23,7 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
     {
         "id": "aster-autonomous-trader",
         "name": "Aster Autonomous Trader",
-        "model": "gemini-3.0-flash-001",
+        "model": "gemini-3-flash-preview",
         "system": "aster",
         "emoji": "⚡",
         "type": "adaptive_learning",  # Self-improving agent
@@ -55,7 +55,7 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
     {
         "id": "market-maker-agent",
         "name": "Market Maker",
-        "model": "gemini-3.0-flash-001",
+        "model": "gemini-3-flash-preview",
         "system": "aster",
         "emoji": "⚡",
         "type": "market_maker",
@@ -87,7 +87,7 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
     {
         "id": "swing-trader-agent",
         "name": "Swing Trader",
-        "model": "gemini-3.0-flash-001",
+        "model": "gemini-3-flash-preview",
         "system": "aster",
         "emoji": "🧠",
         "type": "swing",
@@ -121,7 +121,7 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
     {
         "id": "monad-treasury-agent",  # Formerly MILF
         "name": "Monad Implementation Treasury Agent",
-        "model": "gemini-3.0-flash-001",
+        "model": "gemini-3-flash-preview",
         "system": "aster",
         "emoji": "🏛️",
         "type": "swap",
@@ -148,7 +148,7 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
     {
         "id": "ari-gold-fund",  # Formerly AGDG
         "name": "The Ari Gold Fund",
-        "model": "gemini-3.0-flash-001",
+        "model": "gemini-3-flash-preview",
         "system": "aster",
         "emoji": "🚁",
         "type": "perps",
@@ -176,7 +176,7 @@ AGENT_DEFINITIONS: List[Dict[str, Any]] = [
     {
         "id": "aster-autonomous-trader",
         "name": "Aster Autonomous Trader",
-        "model": "gemini-3.0-flash-001",
+        "model": "gemini-3-flash-preview",
         "system": "aster",
         "emoji": "🌀",
         "type": "adaptive_learning",

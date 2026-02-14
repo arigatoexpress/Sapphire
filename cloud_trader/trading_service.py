@@ -317,7 +317,7 @@ class TradingService:
                     performance_score=0.0,
                     emoji=config.get("emoji", "🤖"),
                     type=config.get("type", "General"),
-                    model="gemini-2.0-flash-exp",
+                    model="gemini-2.5-flash",
                     system=config.get(
                         "system", "aster"
                     ),  # Use system from config or default to aster for these
@@ -1047,7 +1047,7 @@ class TradingService:
             # Upgrade older models to newest available
             model = agent_def["model"]
             if model == "codey-001":
-                model = "gemini-1.5-flash"  # Upgrade Codey to Gemini 1.5 Flash
+                model = "gemini-2.5-flash"  # Upgrade Codey to Gemini 2.5 Flash
 
             from .vertex_ai_client import get_vertex_client
 
@@ -3859,7 +3859,7 @@ SOURCE: *Source:* Sapphire Duality System"""
                 id="reviewer",
                 name="Portfolio Reviewer",
                 type="reviewer",
-                model="gemini-2.0-flash-exp",
+                model="gemini-2.5-flash",
                 emoji="🕵️",
                 symbols=[symbol],
             )
@@ -4861,7 +4861,7 @@ SOURCE: *Source:* Sapphire Duality System"""
                             id="risk_bot",
                             name="Risk Bot",
                             type="risk",
-                            model="gemini-2.0-flash-exp",
+                            model="gemini-2.5-flash",
                             emoji="🚑",
                             symbols=[symbol],
                         )
