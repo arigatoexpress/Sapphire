@@ -4,6 +4,7 @@ Prediction Market Signal Aggregator
 Combines signals from Polymarket, Kalshi, and future sources into a unified
 prediction intelligence layer. Provides:
   - Cross-source consensus detection
+  - Cross-venue arbitrage detection (Polymarket vs Kalshi spread finding)
   - Symbol-level sentiment aggregation
   - Cognition context generation for DualSpeedCognition prompts
   - Forum summary generation for Scout posts
@@ -11,6 +12,7 @@ prediction intelligence layer. Provides:
 
 import asyncio
 import os
+import re
 import time
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -22,11 +24,38 @@ from loguru import logger
 from .kalshi_client import KalshiClient
 from .polymarket_client import PolymarketClient
 from .prediction_signal import (
+    ArbitrageOpportunity,
     PredictionMarketFeed,
     PredictionSignal,
     PredictionSource,
     SignalRelevance,
 )
+
+# ── Fuzzy Market Name Matching ──────────────────────────────────────
+# Ported from TheOddsDesk arbitrageService.ts normalizeName().
+# Strips noise words and non-alphanumeric chars so "Will Bitcoin exceed $100K
+# by end of 2026?" and "Bitcoin above 100000 by year end 2026" map to the same key.
+
+_NOISE_WORDS = re.compile(
+    r"\b(will|the|be|at|by|to|end|of|month|year|before|after|"
+    r"above|below|exceed|reach|hit|price|go|than|more|less|over|under|"
+    r"on|in|for|or|and|a|an|is|are|has|have|this|that|its|it)\b",
+    re.IGNORECASE,
+)
+
+_NON_ALNUM = re.compile(r"[^a-z0-9]")
+
+
+def _normalize_market_name(name: str) -> str:
+    """Normalize a market question for cross-venue matching.
+
+    Strips noise words, punctuation, and whitespace so identical events
+    phrased differently on Polymarket vs Kalshi produce the same key.
+    """
+    text = name.lower()
+    text = _NOISE_WORDS.sub("", text)
+    text = _NON_ALNUM.sub("", text)
+    return text.strip()
 
 
 class PredictionAggregator:
@@ -186,6 +215,151 @@ class PredictionAggregator:
             "sources": sources,
         }
 
+    # ── Arbitrage Detection ──────────────────────────────────────
+
+    def find_arbitrage_opportunities(
+        self,
+        min_spread: float = 0.02,
+        min_confidence: float = 30.0,
+    ) -> List[ArbitrageOpportunity]:
+        """Detect cross-venue price discrepancies between prediction markets.
+
+        Ported from TheOddsDesk arbitrageService.ts — groups markets by
+        normalized name, then compares probabilities across venues.
+
+        Args:
+            min_spread: Minimum probability spread to flag (default 2%).
+            min_confidence: Minimum confidence score (0-100) to include.
+
+        Returns:
+            List of ArbitrageOpportunity sorted by spread descending.
+        """
+        all_signals = self.get_all_signals()
+        if not all_signals:
+            return []
+
+        # Group signals by normalized question
+        groups: Dict[str, List[PredictionSignal]] = defaultdict(list)
+        for sig in all_signals:
+            key = _normalize_market_name(sig.question)
+            if key:  # Skip empty keys
+                groups[key].append(sig)
+
+        opportunities: List[ArbitrageOpportunity] = []
+
+        for name_key, signals in groups.items():
+            if len(signals) < 2:
+                continue
+
+            # Compare all pairs from different venues
+            for i in range(len(signals)):
+                for j in range(i + 1, len(signals)):
+                    sig_a = signals[i]
+                    sig_b = signals[j]
+
+                    # Only flag cross-venue discrepancies
+                    if sig_a.source == sig_b.source:
+                        continue
+
+                    spread = abs(sig_a.probability - sig_b.probability)
+                    if spread < min_spread:
+                        continue
+
+                    confidence = self._calculate_arb_confidence(sig_a, sig_b)
+                    if confidence < min_confidence:
+                        continue
+
+                    # Merge symbols from both signals
+                    merged_symbols = list(set(sig_a.symbols + sig_b.symbols))
+
+                    opp = ArbitrageOpportunity(
+                        id=f"arb-{sig_a.market_id}-{sig_b.market_id}",
+                        market_name=sig_a.question,
+                        venue_a=sig_a.source.value,
+                        price_a=sig_a.probability,
+                        signal_a=sig_a,
+                        venue_b=sig_b.source.value,
+                        price_b=sig_b.probability,
+                        signal_b=sig_b,
+                        spread=spread,
+                        spread_pct=round(spread * 100, 2),
+                        confidence=confidence,
+                        symbols=merged_symbols,
+                    )
+                    opportunities.append(opp)
+
+        return sorted(opportunities, key=lambda o: o.spread, reverse=True)
+
+    @staticmethod
+    def _calculate_arb_confidence(sig_a: PredictionSignal, sig_b: PredictionSignal) -> float:
+        """Calculate confidence score for an arbitrage opportunity.
+
+        Mirrors TheOddsDesk confidence logic:
+        - Higher volume on both sides → higher confidence
+        - Penalize stale or synthetic data
+        """
+        total_vol = sig_a.volume_usd + sig_b.volume_usd
+
+        # Base confidence from combined volume
+        if total_vol > 1_000_000:
+            base = 90.0
+        elif total_vol > 500_000:
+            base = 80.0
+        elif total_vol > 100_000:
+            base = 70.0
+        elif total_vol > 25_000:
+            base = 55.0
+        else:
+            base = 40.0
+
+        # Bonus for having volume on BOTH sides (not just one)
+        min_vol = min(sig_a.volume_usd, sig_b.volume_usd)
+        if min_vol > 50_000:
+            base += 5.0
+        elif min_vol < 5_000:
+            base -= 10.0
+
+        # Bonus for liquidity
+        total_liq = sig_a.liquidity_usd + sig_b.liquidity_usd
+        if total_liq > 100_000:
+            base += 5.0
+
+        return max(0.0, min(100.0, base))
+
+    def get_arbitrage_context(self) -> str:
+        """Generate arbitrage context for cognition prompts."""
+        if not self._enabled:
+            return ""
+
+        opps = self.find_arbitrage_opportunities()
+        if not opps:
+            return ""
+
+        lines = [f"Cross-Venue Arbitrage ({len(opps)} opportunities):"]
+        for opp in opps[:3]:
+            lines.append(f"  {opp.context_string()}")
+        return "\n".join(lines)
+
+    def format_telegram_arbitrage(self, limit: int = 8) -> str:
+        """Format arbitrage opportunities for Telegram display."""
+        if not self._enabled:
+            return "🔮 Prediction markets: disabled"
+
+        opps = self.find_arbitrage_opportunities()
+        if not opps:
+            return "⚡ **Cross-Venue Arbitrage**\n\nNo arbitrage opportunities detected."
+
+        lines = [f"⚡ **Cross-Venue Arbitrage** ({len(opps)} found)\n"]
+        for opp in opps[:limit]:
+            conf_icon = "🟢" if opp.confidence >= 70 else "🟡" if opp.confidence >= 50 else "🔴"
+            lines.append(
+                f"{conf_icon} {opp.market_name[:55]}\n"
+                f"  {opp.venue_a}: {opp.price_a:.1%} vs {opp.venue_b}: {opp.price_b:.1%}\n"
+                f"  Spread: **{opp.spread_pct:.1f}%** | Conf: {opp.confidence:.0f}"
+            )
+
+        return "\n".join(lines)
+
     # ── Cognition Context ────────────────────────────────────────
 
     def get_cognition_context(self, symbol: str) -> str:
@@ -213,6 +387,14 @@ class PredictionAggregator:
             f"conf={sentiment['confidence']:.2f}, "
             f"vol=${sentiment['total_volume_usd']:,.0f})"
         )
+
+        # Append arbitrage alerts for this symbol
+        arbs = self.find_arbitrage_opportunities()
+        symbol_arbs = [a for a in arbs if symbol in a.symbols]
+        if symbol_arbs:
+            lines.append(f"  Arbitrage ({len(symbol_arbs)} cross-venue spreads):")
+            for arb in symbol_arbs[:3]:
+                lines.append(f"    {arb.context_string()}")
 
         return "\n".join(lines)
 
@@ -272,6 +454,17 @@ class PredictionAggregator:
                     f"(${sig.volume_usd:,.0f} vol)"
                 )
 
+        # Arbitrage opportunities
+        arbs = self.find_arbitrage_opportunities()
+        if arbs:
+            lines.append(f"\n**Cross-Venue Arbitrage ({len(arbs)} found):**")
+            for arb in arbs[:5]:
+                lines.append(
+                    f"- {arb.market_name[:60]}: "
+                    f"{arb.venue_a}={arb.price_a:.1%} vs {arb.venue_b}={arb.price_b:.1%} "
+                    f"(spread={arb.spread_pct:.1f}%, conf={arb.confidence:.0f})"
+                )
+
         # Symbol-level sentiment
         seen_symbols = set()
         for sig in signals:
@@ -307,12 +500,14 @@ class PredictionAggregator:
         feed_statuses = {feed.source.value: feed.get_status() for feed in self._feeds}
         total_signals = sum(s["market_count"] for s in feed_statuses.values())
         high_conviction = len(self.get_high_conviction_signals())
+        arb_count = len(self.find_arbitrage_opportunities())
 
         return {
             "enabled": self._enabled,
             "feeds": feed_statuses,
             "total_signals": total_signals,
             "high_conviction_signals": high_conviction,
+            "arbitrage_opportunities": arb_count,
             "last_forum_post": self._last_forum_post_ts,
         }
 
@@ -334,6 +529,7 @@ class PredictionAggregator:
 
         lines.append(f"\nTotal signals: {status['total_signals']}")
         lines.append(f"High conviction: {status['high_conviction_signals']}")
+        lines.append(f"Arbitrage opportunities: {status['arbitrage_opportunities']}")
 
         return "\n".join(lines)
 

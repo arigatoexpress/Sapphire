@@ -10,6 +10,7 @@ Endpoints:
   - Markets: GET /markets?status=open&limit=200
 """
 
+import os
 import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -93,11 +94,13 @@ class KalshiClient(PredictionMarketFeed):
         poll_interval: float = 90.0,
         min_volume: int = 100,
         max_markets: int = 50,
+        api_key: Optional[str] = None,
     ):
         super().__init__(source=PredictionSource.KALSHI, poll_interval=poll_interval)
         self.min_volume = min_volume
         self.max_markets = max_markets
         self._api_base = KALSHI_API_BASE
+        self._api_key = api_key or os.getenv("KALSHI_API_KEY", "")
 
     async def _fetch_markets(self, session: aiohttp.ClientSession) -> List[PredictionSignal]:
         """Fetch active Kalshi markets and filter for crypto/macro relevance."""
@@ -108,10 +111,14 @@ class KalshiClient(PredictionMarketFeed):
                 "status": "open",
                 "limit": "200",
             }
+            headers = {}
+            if self._api_key:
+                headers["Authorization"] = f"Bearer {self._api_key}"
             timeout = aiohttp.ClientTimeout(total=15, connect=5)
             async with session.get(
                 f"{self._api_base}/markets",
                 params=params,
+                headers=headers if headers else None,
                 timeout=timeout,
             ) as resp:
                 if resp.status != 200:

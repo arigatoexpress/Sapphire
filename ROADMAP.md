@@ -1,6 +1,6 @@
 # Sapphire Master Roadmap
 
-> Last Updated: Feb 14, 2026 | Status: Phase 7 Complete ✅ | Tests: 898 | Deploy: sapphire-alpha-00173-dvc
+> Last Updated: Feb 14, 2026 | Status: Phase 8 In Progress 🔮 | Tests: 1042 | Deploy: sapphire-alpha-00173-dvc
 
 ## Vision
 Build a top-tier autonomous crypto trading platform with secure multi-agent collaboration, crowdsourced swarm intelligence, and automated public presence.
@@ -133,37 +133,42 @@ _Verify and upgrade autonomous agent models_
 _Polymarket + Kalshi data as trading signal sources_
 
 ### Data Infrastructure
-- [ ] Build `PredictionMarketFeed` base class (async polling + WebSocket)
-- [ ] Implement Polymarket client (Gamma API for discovery, CLOB API for pricing)
-  - Public endpoints, no auth required for reads
-  - Endpoints: `/events`, `/markets`, `/price`, `/midpoint`, `/book`
-  - WebSocket: `wss://ws-subscriptions-clob.polymarket.com/ws/` for real-time prices
-  - Python SDK: `py-clob-client`
-- [ ] Implement Kalshi client (REST API v2 for market data)
-  - Public endpoints, no auth required for reads
-  - Endpoints: `/markets`, `/events`, `/series`, orderbook
-  - WebSocket: `wss://api.elections.kalshi.com/trade-api/ws/v2` (ticker channel)
-  - Python SDK: `kalshi-python`
+- [x] Build `PredictionMarketFeed` base class (async polling + error backoff) (PR #40)
+- [x] Implement Polymarket client (Gamma API for discovery, public endpoints) (PR #40)
+- [x] Implement Kalshi client (REST API v2 for market data, public endpoints) (PR #40)
+- [x] Unified `PredictionSignal` dataclass (market_id, question, probability, volume, source) (PR #40)
+- [ ] Add WebSocket real-time feeds (Polymarket RTDS, Kalshi ticker channel)
 - [ ] Rate limiting: Polymarket 1,000/hr, Kalshi tiered
-- [ ] Unified `PredictionSignal` dataclass (market_id, question, probability, volume, source)
+- [x] Kalshi authenticated API support (API key from env/constructor) (PR #41)
 
 ### Signal Integration
-- [ ] Crypto-relevant market filter (BTC price, ETH price, crypto regulation, macro events)
-- [ ] Probability-to-sentiment mapper (>70% bullish → positive signal, <30% → negative)
-- [ ] Feed prediction signals into DualSpeedCognition context
-- [ ] Weight prediction data by market liquidity and volume
-- [ ] Macro event calendar from Kalshi series (jobs reports, CPI, Fed decisions)
+- [x] Crypto-relevant market filter (BTC price, ETH price, crypto regulation, macro events) (PR #40)
+- [x] Probability-to-sentiment mapper (>70% bullish → positive signal, <30% → negative) (PR #40)
+- [x] Feed prediction signals into DualSpeedCognition context (PR #40)
+- [x] Weight prediction data by market liquidity and volume (PR #40)
+- [x] Macro event calendar from Kalshi categories (jobs reports, CPI, Fed decisions) (PR #40)
+
+### Cross-Venue Arbitrage Detection
+- [x] Fuzzy market name normalization for cross-venue matching (PR #41)
+- [x] ArbitrageOpportunity dataclass (spread, confidence, direction) (PR #41)
+- [x] Cross-venue spread detection (Polymarket vs Kalshi, >2% threshold) (PR #41)
+- [x] Volume-weighted confidence scoring (balanced vs one-sided liquidity) (PR #41)
+- [x] Arbitrage context injection into cognition prompts (PR #41)
+- [x] Forum summaries include arbitrage alerts (PR #41)
+- [x] Telegram `/arbitrage` command (PR #41)
 
 ### Forum & Swarm Integration
-- [ ] Scout posts prediction market summaries to forum
-- [ ] Agents can reference prediction probabilities in trade idea reasoning
+- [x] Scout posts prediction market summaries to forum (PR #40)
+- [x] Agents can reference prediction probabilities in trade idea reasoning (PR #40)
 - [ ] Swarm consensus incorporates prediction market sentiment
 
 ### Monitoring & Quality
 - [ ] Track prediction accuracy vs actual crypto price moves
 - [ ] Dashboard widget showing active prediction markets + probabilities
-- [ ] Telegram commands: `/predictions`, `/prediction <market>`, `/prediction signals`
-- [ ] Unit tests for feed clients, signal mapping, and integration (target: 40+ tests)
+- [x] Telegram commands: `/predictions`, `/prediction <market>`, `/prediction_sentiment`, `/pm_high` (PR #40)
+- [x] Telegram commands: `/arbitrage`, `/pm_arb` (PR #41)
+- [x] Unit tests for feed clients, signal mapping, and integration (97 tests) (PR #40)
+- [x] Unit tests for arbitrage detection, fuzzy matching, confidence scoring (47 new tests, 144 total) (PR #41)
 
 ## Phase 9: Virtuals Integration (Base) 🌐 (DEFERRED)
 _On-chain agent presence via Virtuals protocol — revisit later_
@@ -205,4 +210,8 @@ Harden        Security       Forum          Swarm          Tracking       Social
 - ✅ PR #35: OpenClaw Model Upgrade (18 files upgraded: gemini-2.0→2.5, gemini-3.0→3-flash-preview across all services)
 - ✅ PR #36: Cognition/Memory Test Suite (118 tests for dual-speed cognition, episodic memory, enhanced memory)
 - ✅ PR #37: Fill Confirmation Test Expansion (16 new tests: venue normalization, pause/resume, allocation bounds, retry logic)
-- ✅ 898 tests passing
+- ✅ PR #38: Resilience Loop 1 (critical fixes, datetime modernization, prediction market roadmap)
+- ✅ PR #39: Hardening Loop 2 (retry logic, fill cleanup, observability, config validation)
+- ✅ PR #40: Phase 8 Prediction Market Intelligence (Polymarket + Kalshi feeds, 97 tests, 4 Telegram commands)
+- ✅ PR #41: Cross-Venue Arbitrage Detection (fuzzy matching, spread detection, confidence scoring, 47 new tests)
+- ✅ 995 tests passing
