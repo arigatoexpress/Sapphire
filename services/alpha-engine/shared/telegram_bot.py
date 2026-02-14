@@ -865,6 +865,13 @@ class TelegramPlatformBot:
             "• `outreach post [template] [SYMBOL]` — compose & send outreach\n"
             "• `outreach stats` — outreach dispatch statistics\n"
             "• `outreach templates` — list available templates\n\n"
+            "**Task commands:**\n"
+            "• `task create <title>` — create a new task\n"
+            "• `task list [agent|status]` — list tasks with optional filter\n"
+            "• `task update <TASK-ID> <status>` — update task status\n"
+            "• `task report` — progress report\n"
+            "• `task summary` — quick summary\n"
+            "• `task agent <AGENT>` — agent-specific report\n\n"
             "Slash commands still work (`/status`, `/kill`, etc.) but aren't required.\n"
             "When an agent asks you something, just reply — we'll figure out the rest."
         )
@@ -1280,6 +1287,94 @@ class TelegramPlatformBot:
                 "quantity": 0.0,
                 "agent": EMERALD,
                 "ack": "Listing available outreach templates.",
+            }
+
+        # ── Phase 5: Task Management plain-text commands ──────────────
+        task_create_match = re.search(
+            r"\btask\s+create\s+(.+)", normalized
+        )
+        if task_create_match:
+            title = str(task_create_match.group(1) or "").strip()
+            payload = json.dumps({"title": title})
+            return {
+                "platform": "CONTROL",
+                "symbol": payload,
+                "action": "TASK_CREATE",
+                "quantity": 0.0,
+                "agent": EMERALD,
+                "ack": f"Creating task: {title[:80]}",
+            }
+
+        if re.search(r"\btask\s+list\b", normalized):
+            # Parse optional filter: task list <agent|status>
+            list_match = re.search(
+                r"\btask\s+list\s+(\S+)", normalized
+            )
+            filter_val = str(list_match.group(1)).strip().upper() if list_match else ""
+            payload_dict: Dict[str, str] = {}
+            if filter_val in ("SAPPHIRE", "EMERALD", "OBSIDIAN"):
+                payload_dict["agent"] = filter_val
+            elif filter_val in ("PENDING", "IN_PROGRESS", "COMPLETED", "BLOCKED"):
+                payload_dict["status"] = filter_val.lower()
+            payload = json.dumps(payload_dict) if payload_dict else "ALL"
+            return {
+                "platform": "CONTROL",
+                "symbol": payload,
+                "action": "TASK_LIST",
+                "quantity": 0.0,
+                "agent": EMERALD,
+                "ack": "Loading task list.",
+            }
+
+        task_update_match = re.search(
+            r"\btask\s+update\s+(TASK-\d+)\s+(\S+)", normalized, flags=re.IGNORECASE
+        )
+        if task_update_match:
+            task_id = str(task_update_match.group(1)).strip().upper()
+            new_status = str(task_update_match.group(2)).strip().lower()
+            payload = json.dumps({"task_id": task_id, "status": new_status})
+            return {
+                "platform": "CONTROL",
+                "symbol": payload,
+                "action": "TASK_UPDATE",
+                "quantity": 0.0,
+                "agent": EMERALD,
+                "ack": f"Updating {task_id} → {new_status}.",
+            }
+
+        if re.search(r"\btask\s+report\b", normalized):
+            return {
+                "platform": "CONTROL",
+                "symbol": "ALL",
+                "action": "TASK_REPORT",
+                "quantity": 0.0,
+                "agent": EMERALD,
+                "ack": "Generating task progress report.",
+            }
+
+        if re.search(r"\btask\s+summary\b", normalized):
+            return {
+                "platform": "CONTROL",
+                "symbol": "ALL",
+                "action": "TASK_SUMMARY",
+                "quantity": 0.0,
+                "agent": EMERALD,
+                "ack": "Loading task summary.",
+            }
+
+        task_agent_match = re.search(
+            r"\btask\s+agent\s+(\S+)", normalized, flags=re.IGNORECASE
+        )
+        if task_agent_match:
+            agent_name = str(task_agent_match.group(1)).strip().upper()
+            payload = json.dumps({"agent": agent_name})
+            return {
+                "platform": "CONTROL",
+                "symbol": payload,
+                "action": "TASK_AGENT_REPORT",
+                "quantity": 0.0,
+                "agent": EMERALD,
+                "ack": f"Loading task report for {agent_name}.",
             }
 
         if re.search(r"\b(what'?s\s+status|status)\b", normalized):
@@ -1870,6 +1965,65 @@ class TelegramPlatformBot:
         if outreach_tpl:
             await self.send_as(EMERALD, "Listing available outreach templates.")
             await self._dispatch_callback("CONTROL", "ALL", "OUTREACH_TEMPLATES", 0.0)
+            return
+
+        # ── Phase 5: Task Management slash commands ───────────────────
+        # /task create <title>
+        task_create = re.search(r"^/task\s+create\s+(.+)$", text, flags=re.IGNORECASE)
+        if task_create:
+            title = str(task_create.group(1) or "").strip()
+            payload = json.dumps({"title": title})
+            await self.send_as(EMERALD, f"Creating task: {title[:80]}")
+            await self._dispatch_callback("CONTROL", payload, "TASK_CREATE", 0.0)
+            return
+
+        # /task list [filter]
+        task_list = re.search(r"^/task\s+list(?:\s+(\S+))?$", text, flags=re.IGNORECASE)
+        if task_list:
+            filter_val = str(task_list.group(1) or "").strip().upper()
+            payload_dict: Dict[str, str] = {}
+            if filter_val in ("SAPPHIRE", "EMERALD", "OBSIDIAN"):
+                payload_dict["agent"] = filter_val
+            elif filter_val in ("PENDING", "IN_PROGRESS", "COMPLETED", "BLOCKED"):
+                payload_dict["status"] = filter_val.lower()
+            payload = json.dumps(payload_dict) if payload_dict else "ALL"
+            await self.send_as(EMERALD, "Loading task list.")
+            await self._dispatch_callback("CONTROL", payload, "TASK_LIST", 0.0)
+            return
+
+        # /task update <TASK-ID> <status>
+        task_update = re.search(
+            r"^/task\s+update\s+(TASK-\d+)\s+(\S+)$", text, flags=re.IGNORECASE
+        )
+        if task_update:
+            task_id = str(task_update.group(1)).strip().upper()
+            new_status = str(task_update.group(2)).strip().lower()
+            payload = json.dumps({"task_id": task_id, "status": new_status})
+            await self.send_as(EMERALD, f"Updating {task_id} → {new_status}.")
+            await self._dispatch_callback("CONTROL", payload, "TASK_UPDATE", 0.0)
+            return
+
+        # /task report
+        task_report = re.search(r"^/task\s+report$", text, flags=re.IGNORECASE)
+        if task_report:
+            await self.send_as(EMERALD, "Generating task progress report.")
+            await self._dispatch_callback("CONTROL", "ALL", "TASK_REPORT", 0.0)
+            return
+
+        # /task summary
+        task_summary = re.search(r"^/task\s+summary$", text, flags=re.IGNORECASE)
+        if task_summary:
+            await self.send_as(EMERALD, "Loading task summary.")
+            await self._dispatch_callback("CONTROL", "ALL", "TASK_SUMMARY", 0.0)
+            return
+
+        # /task agent <AGENT>
+        task_agent = re.search(r"^/task\s+agent\s+(\S+)$", text, flags=re.IGNORECASE)
+        if task_agent:
+            agent_name = str(task_agent.group(1)).strip().upper()
+            payload = json.dumps({"agent": agent_name})
+            await self.send_as(EMERALD, f"Loading task report for {agent_name}.")
+            await self._dispatch_callback("CONTROL", payload, "TASK_AGENT_REPORT", 0.0)
             return
 
         # VirusTotal security commands

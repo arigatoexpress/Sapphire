@@ -1504,3 +1504,163 @@ def test_outreach_templates_plain_text(telegram_module):
     result = bot._parse_plain_text_command("outreach templates")
     assert result is not None
     assert result["action"] == "OUTREACH_TEMPLATES"
+
+
+# ── Phase 5: Task Management Slash Commands ─────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_slash_task_create(telegram_module):
+    """/task create <title> dispatches TASK_CREATE."""
+    mock_cb = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=mock_cb,
+    )
+    bot.send_as = AsyncMock()
+    await bot._process_update({"message": {"text": "/task create Build forum expansion", "chat": {"id": 12345}}})
+    mock_cb.assert_called_once()
+    args = mock_cb.call_args[0]
+    assert args[2] == "TASK_CREATE"
+    assert "Build forum expansion" in args[1]
+
+
+@pytest.mark.asyncio
+async def test_slash_task_list(telegram_module):
+    """/task list dispatches TASK_LIST."""
+    mock_cb = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=mock_cb,
+    )
+    bot.send_as = AsyncMock()
+    await bot._process_update({"message": {"text": "/task list", "chat": {"id": 12345}}})
+    mock_cb.assert_called_once()
+    assert mock_cb.call_args[0][2] == "TASK_LIST"
+
+
+@pytest.mark.asyncio
+async def test_slash_task_list_with_agent_filter(telegram_module):
+    """/task list SAPPHIRE dispatches TASK_LIST with agent filter."""
+    mock_cb = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=mock_cb,
+    )
+    bot.send_as = AsyncMock()
+    await bot._process_update({"message": {"text": "/task list SAPPHIRE", "chat": {"id": 12345}}})
+    mock_cb.assert_called_once()
+    assert mock_cb.call_args[0][2] == "TASK_LIST"
+    assert "SAPPHIRE" in args[1] if (args := mock_cb.call_args[0]) else True
+
+
+@pytest.mark.asyncio
+async def test_slash_task_update(telegram_module):
+    """/task update TASK-00001 completed dispatches TASK_UPDATE."""
+    mock_cb = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=mock_cb,
+    )
+    bot.send_as = AsyncMock()
+    await bot._process_update({"message": {"text": "/task update TASK-00001 completed", "chat": {"id": 12345}}})
+    mock_cb.assert_called_once()
+    assert mock_cb.call_args[0][2] == "TASK_UPDATE"
+
+
+@pytest.mark.asyncio
+async def test_slash_task_report(telegram_module):
+    """/task report dispatches TASK_REPORT."""
+    mock_cb = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=mock_cb,
+    )
+    bot.send_as = AsyncMock()
+    await bot._process_update({"message": {"text": "/task report", "chat": {"id": 12345}}})
+    mock_cb.assert_called_once()
+    assert mock_cb.call_args[0][2] == "TASK_REPORT"
+
+
+@pytest.mark.asyncio
+async def test_slash_task_summary(telegram_module):
+    """/task summary dispatches TASK_SUMMARY."""
+    mock_cb = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=mock_cb,
+    )
+    bot.send_as = AsyncMock()
+    await bot._process_update({"message": {"text": "/task summary", "chat": {"id": 12345}}})
+    mock_cb.assert_called_once()
+    assert mock_cb.call_args[0][2] == "TASK_SUMMARY"
+
+
+@pytest.mark.asyncio
+async def test_slash_task_agent(telegram_module):
+    """/task agent EMERALD dispatches TASK_AGENT_REPORT."""
+    mock_cb = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=mock_cb,
+    )
+    bot.send_as = AsyncMock()
+    await bot._process_update({"message": {"text": "/task agent EMERALD", "chat": {"id": 12345}}})
+    mock_cb.assert_called_once()
+    assert mock_cb.call_args[0][2] == "TASK_AGENT_REPORT"
+
+
+# ── Phase 5: Task Management Plain-Text Commands ────────────────────────────
+
+
+def test_task_create_plain_text(telegram_module):
+    """Plain text 'task create <title>' dispatches TASK_CREATE."""
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=AsyncMock(),
+    )
+    result = bot._parse_plain_text_command("task create Build the reputation engine")
+    assert result is not None
+    assert result["action"] == "TASK_CREATE"
+
+
+def test_task_list_plain_text(telegram_module):
+    """Plain text 'task list' dispatches TASK_LIST."""
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=AsyncMock(),
+    )
+    result = bot._parse_plain_text_command("task list")
+    assert result is not None
+    assert result["action"] == "TASK_LIST"
+
+
+def test_task_update_plain_text(telegram_module):
+    """Plain text 'task update TASK-00001 completed' dispatches TASK_UPDATE."""
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=AsyncMock(),
+    )
+    result = bot._parse_plain_text_command("task update TASK-00001 completed")
+    assert result is not None
+    assert result["action"] == "TASK_UPDATE"
+
+
+def test_task_report_plain_text(telegram_module):
+    """Plain text 'task report' dispatches TASK_REPORT."""
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=AsyncMock(),
+    )
+    result = bot._parse_plain_text_command("task report")
+    assert result is not None
+    assert result["action"] == "TASK_REPORT"
+
+
+def test_task_summary_plain_text(telegram_module):
+    """Plain text 'task summary' dispatches TASK_SUMMARY."""
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=AsyncMock(),
+    )
+    result = bot._parse_plain_text_command("task summary")
+    assert result is not None
+    assert result["action"] == "TASK_SUMMARY"
+
+
+def test_task_agent_plain_text(telegram_module):
+    """Plain text 'task agent SAPPHIRE' dispatches TASK_AGENT_REPORT."""
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=AsyncMock(),
+    )
+    result = bot._parse_plain_text_command("task agent SAPPHIRE")
+    assert result is not None
+    assert result["action"] == "TASK_AGENT_REPORT"
