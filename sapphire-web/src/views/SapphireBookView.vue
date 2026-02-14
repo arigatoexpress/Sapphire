@@ -360,6 +360,21 @@ onUnmounted(() => {
             Data {{ dataAge }}s old — awaiting refresh
         </div>
 
+        <!-- Skeleton loading state -->
+        <template v-if="loading && !lastSyncEpoch">
+            <section class="kpi-strip">
+                <article v-for="i in 8" :key="i" class="kpi card glass-lift">
+                    <div class="skel-line skel-sm"></div>
+                    <div class="skel-line skel-lg"></div>
+                </article>
+            </section>
+            <section class="mesh-section card">
+                <div class="skel-line skel-sm" style="width: 30%; margin: 0 0 0.5rem"></div>
+                <div class="skel-mesh"></div>
+            </section>
+        </template>
+
+        <template v-else>
         <!-- KPI Strip -->
         <section class="kpi-strip">
             <article class="kpi card glass-lift">
@@ -591,6 +606,7 @@ onUnmounted(() => {
                 </article>
             </div>
         </section>
+        </template>
     </div>
 </template>
 
@@ -989,6 +1005,42 @@ onUnmounted(() => {
     .venue-row { grid-template-columns: 10px 1fr 45px; }
     .node-detail, .venue-mode, .venue-routing { display: none; }
     .tier-legend { display: none; }
+}
+
+/* ── Skeleton Loading ── */
+.skel-line {
+    border-radius: var(--radius-xs);
+    animation: skelPulse 1.6s ease-in-out infinite;
+}
+
+.skel-lg {
+    width: 50%;
+    height: 1.15rem;
+    margin: 0 auto;
+    background: rgba(32, 194, 14, 0.08);
+}
+
+.skel-sm {
+    width: 40%;
+    height: 0.6rem;
+    margin: 0 auto 0.3rem;
+    background: rgba(32, 194, 14, 0.05);
+}
+
+.skel-mesh {
+    width: 100%;
+    height: 420px;
+    border-radius: var(--radius-md);
+    background:
+        radial-gradient(ellipse at 50% 40%, rgba(32, 194, 14, 0.03) 0%, transparent 70%),
+        rgba(5, 10, 5, 0.6);
+    border: 1px solid var(--border-subtle);
+    animation: skelPulse 1.6s ease-in-out infinite 0.2s;
+}
+
+@keyframes skelPulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.85; }
 }
 
 /* ── Status Bars ── */

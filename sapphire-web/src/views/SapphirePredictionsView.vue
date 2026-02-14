@@ -16,10 +16,12 @@ const activeTab = ref<'signals' | 'arbitrage' | 'accuracy' | 'whales'>('signals'
 
 let refreshTimer: ReturnType<typeof setInterval> | null = null
 
-const isStale = computed(() => {
-    if (!lastSyncEpoch.value) return true
-    return (Date.now() - lastSyncEpoch.value) > 30000
+const dataAge = computed(() => {
+    if (!lastSyncEpoch.value) return null
+    return Math.floor((Date.now() - lastSyncEpoch.value) / 1000)
 })
+
+const isStale = computed(() => (dataAge.value ?? 999) > 30)
 
 const totalSignals = computed(() => data.value?.status?.total_signals ?? 0)
 const highConviction = computed(() => data.value?.status?.high_conviction_signals ?? 0)
@@ -92,6 +94,36 @@ onUnmounted(() => {
 
 <template>
     <div class="predictions-view">
+        <!-- Status Bar -->
+        <div v-if="loading && !lastSyncEpoch" class="status-bar loading-bar">
+            <span class="pulse-dot"></span> Connecting to prediction feeds...
+        </div>
+        <div v-else-if="fetchError" class="status-bar error-bar" @click="fetchData">
+            {{ fetchError }} — tap to retry
+        </div>
+        <div v-else-if="isStale" class="status-bar stale-bar">
+            Data {{ dataAge }}s old — awaiting refresh
+        </div>
+
+        <!-- Skeleton loading state -->
+        <template v-if="loading && !data">
+            <div class="stats-bar">
+                <div v-for="i in 5" :key="i" class="stat-card skeleton-card">
+                    <div class="skeleton-value"></div>
+                    <div class="skeleton-label"></div>
+                </div>
+            </div>
+            <div class="signal-grid">
+                <div v-for="i in 6" :key="i" class="signal-card skeleton-card">
+                    <div class="skeleton-header"></div>
+                    <div class="skeleton-question"></div>
+                    <div class="skeleton-stats"></div>
+                </div>
+            </div>
+        </template>
+
+        <!-- Real content -->
+        <template v-else>
         <!-- Header Stats -->
         <div class="stats-bar">
             <div class="stat-card">
@@ -290,6 +322,7 @@ onUnmounted(() => {
                 </div>
             </div>
         </div>
+        </template>
     </div>
 </template>
 
@@ -578,5 +611,105 @@ onUnmounted(() => {
     color: #fca5a5;
     font-size: 0.75rem;
     line-height: 1.4;
+}
+
+/* ── Status Bars ── */
+.status-bar {
+    padding: 0.45rem 0.8rem;
+    font-family: 'JetBrains Mono', 'SF Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    border-radius: 0.375rem;
+    text-align: center;
+    margin-bottom: 0.75rem;
+}
+
+.loading-bar {
+    background: rgba(16, 185, 129, 0.08);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.error-bar {
+    background: rgba(239, 68, 68, 0.08);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    cursor: pointer;
+}
+
+.stale-bar {
+    background: rgba(250, 204, 21, 0.06);
+    color: #fbbf24;
+    border: 1px solid rgba(250, 204, 21, 0.15);
+}
+
+.pulse-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #34d399;
+    margin-right: 0.4rem;
+    animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+}
+
+/* ── Skeleton Loading ── */
+.skeleton-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.skeleton-value {
+    width: 40%;
+    height: 1.5rem;
+    margin: 0 auto 0.35rem;
+    background: rgba(63, 63, 70, 0.3);
+    border-radius: 0.25rem;
+    animation: skeletonPulse 1.6s ease-in-out infinite;
+}
+
+.skeleton-label {
+    width: 60%;
+    height: 0.6rem;
+    margin: 0 auto;
+    background: rgba(63, 63, 70, 0.2);
+    border-radius: 0.15rem;
+    animation: skeletonPulse 1.6s ease-in-out infinite 0.2s;
+}
+
+.skeleton-header {
+    width: 30%;
+    height: 0.7rem;
+    background: rgba(63, 63, 70, 0.3);
+    border-radius: 0.2rem;
+    margin-bottom: 0.5rem;
+    animation: skeletonPulse 1.6s ease-in-out infinite;
+}
+
+.skeleton-question {
+    width: 90%;
+    height: 0.75rem;
+    background: rgba(63, 63, 70, 0.2);
+    border-radius: 0.15rem;
+    margin-bottom: 0.4rem;
+    animation: skeletonPulse 1.6s ease-in-out infinite 0.15s;
+}
+
+.skeleton-stats {
+    width: 50%;
+    height: 0.65rem;
+    background: rgba(63, 63, 70, 0.15);
+    border-radius: 0.15rem;
+    animation: skeletonPulse 1.6s ease-in-out infinite 0.3s;
+}
+
+@keyframes skeletonPulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.8; }
 }
 </style>

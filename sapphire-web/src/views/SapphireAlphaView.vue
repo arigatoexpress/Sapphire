@@ -268,6 +268,34 @@ onUnmounted(() => {
             </label>
         </div>
 
+        <!-- Skeleton loading state -->
+        <template v-if="loading && !lastFetchAt">
+            <section class="insights-grid">
+                <article v-for="i in 6" :key="i" class="insight card glass-lift">
+                    <div class="skel-line skel-sm"></div>
+                    <div class="skel-line skel-lg"></div>
+                    <div class="skel-line skel-xs"></div>
+                </article>
+            </section>
+            <section class="rail card glass-lift">
+                <div class="skel-line skel-sm" style="width: 25%; margin: 0 0 0.7rem"></div>
+                <div class="rail-grid">
+                    <article v-for="i in 4" :key="i" class="rail-stage">
+                        <div class="skel-line skel-sm"></div>
+                        <div class="skel-line skel-lg"></div>
+                        <div class="skel-line skel-xs"></div>
+                    </article>
+                </div>
+            </section>
+            <section class="chart-row">
+                <article v-for="i in 2" :key="i" class="chart-panel card glass-lift">
+                    <div class="skel-line skel-sm" style="margin-bottom: 0.7rem"></div>
+                    <div class="skel-chart"></div>
+                </article>
+            </section>
+        </template>
+
+        <template v-else>
         <section class="insights-grid">
             <article v-for="card in insightCards" :key="card.title" class="insight card glass-lift">
                 <p class="font-mono">{{ card.title }}</p>
@@ -352,6 +380,7 @@ onUnmounted(() => {
                 <p>{{ idea.detail }}</p>
             </article>
         </section>
+        </template>
     </div>
 </template>
 
@@ -629,6 +658,46 @@ onUnmounted(() => {
     .insights-grid,
     .rail-grid,
     .matrix-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Skeleton Loading ── */
+.skel-line {
+    border-radius: var(--radius-xs);
+    animation: skelPulse 1.6s ease-in-out infinite;
+}
+
+.skel-lg {
+    width: 55%;
+    height: 1.15rem;
+    margin: 0 auto;
+    background: rgba(32, 194, 14, 0.08);
+}
+
+.skel-sm {
+    width: 40%;
+    height: 0.6rem;
+    margin: 0 auto 0.3rem;
+    background: rgba(32, 194, 14, 0.05);
+}
+
+.skel-xs {
+    width: 50%;
+    height: 0.5rem;
+    margin: 0.2rem auto 0;
+    background: rgba(32, 194, 14, 0.04);
+}
+
+.skel-chart {
+    width: 100%;
+    height: 400px;
+    border-radius: var(--radius-sm);
+    background: rgba(32, 194, 14, 0.03);
+    animation: skelPulse 1.6s ease-in-out infinite 0.2s;
+}
+
+@keyframes skelPulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.85; }
 }
 
 /* ── Status Bars ── */
