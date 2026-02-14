@@ -181,9 +181,9 @@ class AlphaEngine:
         self._kill_switch_active = self._env_flag(
             "SAPPHIRE_KILL_SWITCH_ACTIVE", default=False
         )
-        self._heartbeat_interval_seconds = int(os.getenv("TELEGRAM_HEARTBEAT_INTERVAL_SECONDS", "900"))
-        self._deallocation_failure_threshold = int(os.getenv("DEALLOCATION_FAILURE_THRESHOLD", "3"))
-        self._deallocation_cooldown_seconds = int(os.getenv("DEALLOCATION_COOLDOWN_SECONDS", "900"))
+        self._heartbeat_interval_seconds = max(60, int(os.getenv("TELEGRAM_HEARTBEAT_INTERVAL_SECONDS", "900")))
+        self._deallocation_failure_threshold = max(1, int(os.getenv("DEALLOCATION_FAILURE_THRESHOLD", "3")))
+        self._deallocation_cooldown_seconds = max(60, int(os.getenv("DEALLOCATION_COOLDOWN_SECONDS", "900")))
         self._default_venue_allocation = max(
             0.0, min(1.0, float(os.getenv("DEFAULT_VENUE_ALLOCATION", "1.0")))
         )
@@ -261,7 +261,7 @@ class AlphaEngine:
         )
         self._failure_counts: Dict[str, int] = defaultdict(int)
         self._owner_directive: str = os.getenv("SAPPHIRE_OWNER_DIRECTIVE", "").strip()
-        self._trading_gate_max_failure_pressure = int(os.getenv("SAPPHIRE_TRADING_GATE_MAX_FAILURE_PRESSURE", "3"))
+        self._trading_gate_max_failure_pressure = max(1, int(os.getenv("SAPPHIRE_TRADING_GATE_MAX_FAILURE_PRESSURE", "3")))
         self._manual_review_venues: Set[str] = set()
 
     @staticmethod

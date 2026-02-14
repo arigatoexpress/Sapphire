@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from typing import Any, Dict, Optional
@@ -73,12 +74,19 @@ class PubSubClient:
 
         topic_path = self._publisher.topic_path(self._project_id, topic_name)
         data = json.dumps(payload, default=str).encode("utf-8")
-        try:
-            future = self._publisher.publish(topic_path, data)
-        except Exception as exc:
-            PUBSUB_PUBLISH_FAILURES.labels(topic=topic_name).inc()
-            logger.error("Failed to publish to Pub/Sub topic %s: %s", topic_name, exc)
-            return
+        last_exc = None
+        for attempt in range(3):
+            try:
+                future = self._publisher.publish(topic_path, data)
+                break
+            except Exception as exc:
+                last_exc = exc
+                if attempt < 2:
+                    await asyncio.sleep(0.5 * (2 ** attempt))
+                    continue
+                PUBSUB_PUBLISH_FAILURES.labels(topic=topic_name).inc()
+                logger.error("Failed to publish to Pub/Sub topic %s after 3 attempts: %s", topic_name, exc)
+                return
 
         def _on_publish_done(result_future: Any) -> None:
             exception = result_future.exception()

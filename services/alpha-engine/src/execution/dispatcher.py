@@ -235,35 +235,57 @@ class ExecutionDispatcher:
             command_payload["quantity"] = round(float(quantity) * allocation, 8)
             command_payload["allocation_factor"] = allocation
 
-        try:
-            async with self.session.post(full_url, json=command_payload, headers=auth_headers) as val:
-                if val.status == 200:
-                    self._last_dispatch_errors.pop(normalized_venue, None)
-                    logger.info(f"✅ Command Sent to {normalized_venue}: {command_payload}")
-                    return True
-                elif val.status == 403:
-                    body = await val.text()
-                    logger.error(
-                        f"🚫 Permission Denied (403): Ensure Hub service account has 'run.invoker' on {normalized_venue} | {body[:240]}"
+        max_retries = 3
+        for attempt in range(1, max_retries + 1):
+            try:
+                async with self.session.post(full_url, json=command_payload, headers=auth_headers) as val:
+                    if val.status == 200:
+                        self._last_dispatch_errors.pop(normalized_venue, None)
+                        logger.info(f"✅ Command Sent to {normalized_venue}: {command_payload}")
+                        return True
+                    elif val.status == 403:
+                        body = await val.text()
+                        logger.error(
+                            f"🚫 Permission Denied (403): Ensure Hub service account has 'run.invoker' on {normalized_venue} | {body[:240]}"
+                        )
+                        self._record_dispatch_error(normalized_venue, "permission_denied", status=403, body=body)
+                        return False
+                    elif val.status >= 500 and attempt < max_retries:
+                        body = await val.text()
+                        delay = 0.5 * (2 ** (attempt - 1))
+                        logger.warning(
+                            f"⚠️ {normalized_venue} returned {val.status}, retrying in {delay:.1f}s (attempt {attempt}/{max_retries})"
+                        )
+                        await asyncio.sleep(delay)
+                        continue
+                    else:
+                        body = await val.text()
+                        logger.error(
+                            f"❌ Command Failed {normalized_venue}: status={val.status} body={body[:240]}"
+                        )
+                        self._record_dispatch_error(
+                            normalized_venue,
+                            "http_error",
+                            status=int(val.status),
+                            body=body,
+                        )
+                        return False
+            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                if attempt < max_retries:
+                    delay = 0.5 * (2 ** (attempt - 1))
+                    logger.warning(
+                        f"⚠️ Dispatch to {normalized_venue} failed ({e}), retrying in {delay:.1f}s (attempt {attempt}/{max_retries})"
                     )
-                    self._record_dispatch_error(normalized_venue, "permission_denied", status=403, body=body)
-                    return False
-                else:
-                    body = await val.text()
-                    logger.error(
-                        f"❌ Command Failed {normalized_venue}: status={val.status} body={body[:240]}"
-                    )
-                    self._record_dispatch_error(
-                        normalized_venue,
-                        "http_error",
-                        status=int(val.status),
-                        body=body,
-                    )
-                    return False
-        except Exception as e:
-            logger.error(f"Dispatch Error ({normalized_venue}): {e}")
-            self._record_dispatch_error(normalized_venue, "dispatch_exception", body=str(e))
-            return False
+                    await asyncio.sleep(delay)
+                    continue
+                logger.error(f"Dispatch Error ({normalized_venue}) after {max_retries} attempts: {e}")
+                self._record_dispatch_error(normalized_venue, "dispatch_exception", body=str(e))
+                return False
+            except Exception as e:
+                logger.error(f"Dispatch Error ({normalized_venue}): {e}")
+                self._record_dispatch_error(normalized_venue, "dispatch_exception", body=str(e))
+                return False
+        return False
 
     # ── Fill Confirmation ─────────────────────────────────────────
 
@@ -311,7 +333,6 @@ class ExecutionDispatcher:
                 )
                 return fill_data
             except asyncio.TimeoutError:
-                self._pending_confirmations.pop(confirm_key, None)
                 if attempt < retries:
                     logger.warning(
                         f"⏳ Fill timeout for {confirm_key} (attempt {attempt}/{retries}), retrying..."
@@ -326,6 +347,8 @@ class ExecutionDispatcher:
                         "platform": normalized_venue,
                         "symbol": raw_symbol,
                     }
+            finally:
+                self._pending_confirmations.pop(confirm_key, None)
 
         # Should not reach here, but just in case
         return {

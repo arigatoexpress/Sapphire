@@ -141,16 +141,38 @@ class EnhancedTelegramService:
             "disable_web_page_preview": True,
         }
 
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(url, json=payload, timeout=10) as resp:
-                    if resp.status != 200:
-                        err_text = await resp.text()
-                        logger.error(f"Telegram API Error {resp.status}: {err_text}")
-                    else:
-                        logger.info(f"Sent Telegram message (len={len(full_message)})")
-        except Exception as e:
-            logger.error(f"Failed to send Telegram message: {e}")
+        max_retries = 3
+        for attempt in range(1, max_retries + 1):
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(url, json=payload, timeout=10) as resp:
+                        if resp.status == 200:
+                            logger.info(f"Sent Telegram message (len={len(full_message)})")
+                            return
+                        elif resp.status == 429 and attempt < max_retries:
+                            retry_after = int(resp.headers.get("Retry-After", "3"))
+                            logger.warning(f"Telegram rate limited, retrying in {retry_after}s")
+                            await asyncio.sleep(retry_after)
+                            continue
+                        elif resp.status >= 500 and attempt < max_retries:
+                            delay = 1.0 * (2 ** (attempt - 1))
+                            logger.warning(f"Telegram server error {resp.status}, retrying in {delay:.1f}s")
+                            await asyncio.sleep(delay)
+                            continue
+                        else:
+                            err_text = await resp.text()
+                            logger.error(f"Telegram API Error {resp.status}: {err_text}")
+                            return
+            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                if attempt < max_retries:
+                    delay = 1.0 * (2 ** (attempt - 1))
+                    logger.warning(f"Telegram send failed ({e}), retrying in {delay:.1f}s")
+                    await asyncio.sleep(delay)
+                    continue
+                logger.error(f"Failed to send Telegram message after {max_retries} attempts: {e}")
+            except Exception as e:
+                logger.error(f"Failed to send Telegram message: {e}")
+                return
 
     async def send_startup_notification(self):
         await self.send_message(
