@@ -847,6 +847,12 @@ class TelegramPlatformBot:
             "• `forum thread TOPIC-XXXXX` — threaded replies\n"
             "• `/forum post Title | Body category:trade_idea` — create topic\n"
             "• `forum approvals` — pending approval workflows\n\n"
+            "**Reputation commands:**\n"
+            "• `rep leaderboard` — top bots by composite score\n"
+            "• `rep info <BOT_ID>` — reputation details for a bot\n"
+            "• `rep count` — census of registered bots\n"
+            "• `/rep ban <BOT_ID> [reason]` — permanently ban a bot\n"
+            "• `/rep penalize <BOT_ID> [reason]` — penalize a bot\n\n"
             "Slash commands still work (`/status`, `/kill`, etc.) but aren't required.\n"
             "When an agent asks you something, just reply — we'll figure out the rest."
         )
@@ -1103,6 +1109,41 @@ class TelegramPlatformBot:
                 "quantity": 0.0,
                 "agent": EMERALD,
                 "ack": "Checking pending approval workflows.",
+            }
+
+        # ── Phase 4: Reputation plain-text commands ──────────────────
+        if re.search(r"\brep\s+leaderboard\b", normalized):
+            payload = json.dumps({"limit": 10}, separators=(",", ":"))
+            return {
+                "platform": "CONTROL",
+                "symbol": payload,
+                "action": "REP_LEADERBOARD",
+                "quantity": 0.0,
+                "agent": EMERALD,
+                "ack": "Loading bot reputation leaderboard.",
+            }
+
+        rep_info_match = re.search(r"\brep\s+info\s+([A-Za-z0-9_-]+)", raw)
+        if rep_info_match:
+            bot_id = str(rep_info_match.group(1) or "").strip()
+            payload = json.dumps({"bot_id": bot_id}, separators=(",", ":"))
+            return {
+                "platform": "CONTROL",
+                "symbol": payload,
+                "action": "REP_BOT_INFO",
+                "quantity": 0.0,
+                "agent": EMERALD,
+                "ack": f"Looking up reputation for `{bot_id}`.",
+            }
+
+        if re.search(r"\brep\s+count\b", normalized):
+            return {
+                "platform": "CONTROL",
+                "symbol": "ALL",
+                "action": "REP_BOT_COUNT",
+                "quantity": 0.0,
+                "agent": EMERALD,
+                "ack": "Counting registered bots.",
             }
 
         if re.search(r"\b(what'?s\s+status|status)\b", normalized):
@@ -1521,6 +1562,74 @@ class TelegramPlatformBot:
         if forum_approvals:
             await self.send_as(EMERALD, "Checking pending approval workflows.")
             await self._dispatch_callback("CONTROL", "ALL", "FORUM_PENDING_APPROVALS", 0.0)
+            return
+
+        # ── Phase 4: Reputation slash commands ───────────────────────
+        # /rep leaderboard [limit]
+        rep_leaderboard = re.search(
+            r"^/rep\s+leaderboard(?:\s+(\d+))?$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if rep_leaderboard:
+            limit = max(1, min(25, int(rep_leaderboard.group(1) or "10")))
+            payload = json.dumps({"limit": limit}, separators=(",", ":"))
+            await self.send_as(EMERALD, "Loading bot reputation leaderboard.")
+            await self._dispatch_callback("CONTROL", payload, "REP_LEADERBOARD", 0.0)
+            return
+
+        # /rep info <BOT_ID>
+        rep_info = re.search(
+            r"^/rep\s+info\s+([A-Za-z0-9_-]+)$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if rep_info:
+            bot_id = str(rep_info.group(1) or "").strip()
+            payload = json.dumps({"bot_id": bot_id}, separators=(",", ":"))
+            await self.send_as(EMERALD, f"Looking up reputation for `{bot_id}`.")
+            await self._dispatch_callback("CONTROL", payload, "REP_BOT_INFO", 0.0)
+            return
+
+        # /rep count
+        rep_count = re.search(r"^/rep\s+count$", text, flags=re.IGNORECASE)
+        if rep_count:
+            await self.send_as(EMERALD, "Counting registered bots.")
+            await self._dispatch_callback("CONTROL", "ALL", "REP_BOT_COUNT", 0.0)
+            return
+
+        # /rep ban <BOT_ID> [reason]
+        rep_ban = re.search(
+            r"^/rep\s+ban\s+([A-Za-z0-9_-]+)(?:\s+(.+))?$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if rep_ban:
+            bot_id = str(rep_ban.group(1) or "").strip()
+            reason = str(rep_ban.group(2) or "manual ban via Telegram").strip()
+            payload = json.dumps(
+                {"bot_id": bot_id, "reason": reason},
+                separators=(",", ":"),
+            )
+            await self.send_as(SAPPHIRE, f"Banning bot `{bot_id}`.")
+            await self._dispatch_callback("CONTROL", payload, "REP_BAN_BOT", 0.0)
+            return
+
+        # /rep penalize <BOT_ID> [reason]
+        rep_penalize = re.search(
+            r"^/rep\s+penalize\s+([A-Za-z0-9_-]+)(?:\s+(.+))?$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if rep_penalize:
+            bot_id = str(rep_penalize.group(1) or "").strip()
+            reason = str(rep_penalize.group(2) or "manual penalty via Telegram").strip()
+            payload = json.dumps(
+                {"bot_id": bot_id, "reason": reason},
+                separators=(",", ":"),
+            )
+            await self.send_as(SAPPHIRE, f"Penalizing bot `{bot_id}`.")
+            await self._dispatch_callback("CONTROL", payload, "REP_PENALIZE_BOT", 0.0)
             return
 
         # VirusTotal security commands

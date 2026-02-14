@@ -63,6 +63,10 @@ class Capability(Enum):
     # ── Media ──
     MEDIA_PUBLISH = auto()       # Publish media content
 
+    # ── Reputation ──
+    REPUTATION_READ = auto()     # Read bot reputation data / leaderboard
+    REPUTATION_ADMIN = auto()    # Ban, penalize, reward bots
+
 
 # ── Agent Role Definitions ──────────────────────────────────────────
 
@@ -86,6 +90,8 @@ SAPPHIRE_CAPABILITIES: FrozenSet[Capability] = frozenset({
     Capability.TELEGRAM_SEND,
     Capability.AI_PROMPT,
     Capability.MEDIA_PUBLISH,
+    Capability.REPUTATION_READ,
+    Capability.REPUTATION_ADMIN,
 })
 
 # Obsidian 🖤: Infrastructure & deployments — system control, no direct trading
@@ -104,6 +110,7 @@ OBSIDIAN_CAPABILITIES: FrozenSet[Capability] = frozenset({
     Capability.AUTONOMY_DISPATCH,
     Capability.TELEGRAM_SEND,
     Capability.AI_PROMPT,
+    Capability.REPUTATION_READ,
 })
 
 # Emerald 💚: Strategy & improvement — cognition, memory, auditing, no secrets
@@ -121,6 +128,8 @@ EMERALD_CAPABILITIES: FrozenSet[Capability] = frozenset({
     Capability.SKILL_AUDIT,
     Capability.TELEGRAM_SEND,
     Capability.AI_PROMPT,
+    Capability.REPUTATION_READ,
+    Capability.REPUTATION_ADMIN,
 })
 
 # Scout 🔍: External-facing — MOST RESTRICTED, Forum-only communication
