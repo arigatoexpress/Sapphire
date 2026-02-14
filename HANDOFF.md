@@ -1,6 +1,6 @@
 # Sapphire Codex Handoff Package
 
-> Generated: Feb 13, 2026 | Deploy: sapphire-alpha-00151-2xr | Tests: 203 passing
+> Generated: Feb 13, 2026 | Deploy: sapphire-alpha-00153-xvp | Tests: 308 passing
 
 ---
 
@@ -20,7 +20,7 @@ Harden         Security   Forum      Tracking    Swarm      Social    On-chain
 
 ## 📍 Current State
 
-### What's Live (sapphire-alpha-00151-2xr)
+### What's Live (sapphire-alpha-00153-xvp)
 - **Multi-venue trading**: Drift, Hyperliquid, Aster, Symphony, Lighter
 - **TradingView webhook integration**: Signal → cognition → execution pipeline
 - **Dual-speed cognition**: Fast (Flash) + deep (Pro) AI pre-trade validation
@@ -30,8 +30,9 @@ Harden         Security   Forum      Tracking    Swarm      Social    On-chain
 - **Skill security auditor**: 8 threat categories, isnad provenance chains, 24 injection patterns
 - **Agent activity feed**: Periodic Telegram digests every 5 min, grouped by agent/category
 - **Prompt injection defense**: Sanitizer on all LLM prompt paths (Telegram → Gemini, memory → cognition, trade data → recap)
-- **Agent permission system**: 24 atomic capabilities, 4 role definitions (Sapphire/Obsidian/Emerald/Scout)
-- **Forum service**: Internal Sapphire Forum with topics, replies, content redaction
+- **Agent permission system**: 24 atomic capabilities, 4 role definitions, 12 runtime gates enforced
+- **Forum service**: Rich collaborative forum with categories, voting, threading, quality metrics, agent profiles
+- **Forum Telegram commands**: `/forum top`, `/forum vote`, `/forum agents`, `/forum thread`, `/forum post`
 
 ### Repo & Infra
 - **Repo**: `arigatoexpress/Sapphire` (PRIVATE) — `/Users/aribs/Documents/Projects/AI Repo Manager/repos/Sapphire/`
@@ -83,13 +84,16 @@ Harden         Security   Forum      Tracking    Swarm      Social    On-chain
 
 ---
 
-## 📊 Test Coverage (203 passing)
+## 📊 Test Coverage (308 passing)
 
 | Test File | Tests | Covers |
 |-----------|-------|--------|
+| `test_forum_phase3.py` | 39 | Categories, voting, threading, quality metrics, agent profiles, top topics |
+| `test_gate_enforcement.py` | 38 | AgentGate capability boundaries, all 4 agents + rogue, 13 capabilities |
 | `test_agent_permissions.py` | 37 | Per-agent caps, PermissionDenied, unknown agents, stats, registration |
 | `test_prompt_sanitizer.py` | 35 | Role override, exfil, code exec, boundary, clean, scoring, trade data |
-| `test_alpha_engine_telegram_control.py` | 30 | Telegram commands, routing, kill switch, venue control |
+| `test_alpha_engine_telegram_control.py` | 40 | Telegram commands, routing, kill switch, venue control, forum commands |
+| `test_security_fuzz.py` | 18 | Adversarial strings, injection payloads, forum sanitizer, prompt detection |
 | `test_sapphire_forum_service.py` | 18 | Forum topics, replies, redaction, content filtering |
 | `test_skill_auditor.py` | 17 | Credential theft, exfil, injection, obfuscation, isnad, reporting |
 | `test_portfolio_tracker.py` | 13 | Position lifecycle, P&L, ring buffer, edge cases |
@@ -115,30 +119,17 @@ Harden         Security   Forum      Tracking    Swarm      Social    On-chain
 | #18 | Skill Security Auditor | 8 threat categories, isnad chains |
 | #19 | Smart Notifications | Autonomy spam fix, agent activity feed |
 | #20 | Security Hardening Phase 2 | Agent permissions, prompt injection defense, sanitizer |
+| #21 | AgentGate Enforcement | 12 critical operation gates, /permissions command |
+| #22 | Forum Injection Hardening | 18 adversarial tests, forum content blocking |
+| #23 | Phase 3 Forum Expansion | Categories, voting, threading, quality metrics, agent profiles |
+| #24 | Forum Telegram Wiring | 5 new commands, 5 engine handlers, category/threading passthrough |
 
 ---
 
 ## 🔜 What To Do Next
 
-### Immediate (Phase 2 Remaining)
-1. **Wire AgentGate.require() into main.py** — Add enforcement at critical operation points:
-   - `_execute_trade()` → require `Capability.TRADE_EXECUTE`
-   - Kill switch handlers → require `Capability.KILL_SWITCH`
-   - Venue control → require `Capability.VENUE_CONTROL`
-   - Secret access points → require `Capability.SECRET_ACCESS`
-   - Autonomy dispatch → require `Capability.AUTONOMY_DISPATCH`
-   - Currently the permission system is defined but not enforced at runtime
-
-2. **Harden forum post content** — Forum posts from external sources (Moltbook) should pass through `sanitize_for_prompt()` before being displayed or processed
-
-3. **Fuzz-test Telegram command handlers** — Programmatic testing of all `/commands` with adversarial input
-
-### Phase 3: Forum Expansion
-- Upgrade forum from simple topic/reply to rich entities (Posts, Comments, Ideas)
-- Topic categories: Trade Ideas, Strategy, Market Analysis, Platform
-- Threading, reply chains, post scoring, quality metrics
-- Agent personality profiles: distinct voice per agent
-- Route ALL Scout ↔ Agent communication through forum (audit trail)
+### Immediate (Phase 3 Remaining)
+1. **Forum-based approval workflows** — Route pending decisions (autonomy cycles, trade approvals) through forum topics with agent voting
 
 ### Phase 4: Molthub Swarm Intelligence
 - Scout posts on Molthub inviting external bots (TRADE IDEAS ONLY)
@@ -155,9 +146,8 @@ Harden         Security   Forum      Tracking    Swarm      Social    On-chain
 1. **Pytest plugins**: Always use `-p no:anchorpy -p no:xprocess` — they fail to import
 2. **Integration tests broken**: `test_retired_d_integration.py` has `ModuleNotFoundError: No module named 'cloud_trader.aster_client'` — only run `tests/unit/`
 3. **Cloud Build substitution**: Must pass `--substitutions=_IMAGE=gcr.io/sapphire-479610/sapphire-alpha` or build fails
-4. **AgentGate not enforced yet**: Permission system is defined but `gate.require()` is not wired into main.py operations — this is the top remaining security task
-5. **Monolithic architecture**: All agents share the same process (`main.py` is 4637 lines). Agent permissions are logical, not process-level isolation
-6. **Autonomy disabled by default**: `TRADINGVIEW_AUTONOMY_ENABLED` is not set in Cloud Run, so TV autonomy dispatch is silently skipped (this is intentional for now)
+4. **Monolithic architecture**: All agents share the same process (`main.py` is 4800+ lines). Agent permissions are logical, not process-level isolation
+5. **Autonomy disabled by default**: `TRADINGVIEW_AUTONOMY_ENABLED` is not set in Cloud Run, so TV autonomy dispatch is silently skipped (this is intentional for now)
 
 ---
 
