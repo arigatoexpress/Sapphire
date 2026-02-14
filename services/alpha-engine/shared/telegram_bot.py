@@ -857,6 +857,10 @@ class TelegramPlatformBot:
             "• `swarm aggregate <SYMBOL>` — consensus signal for a symbol\n"
             "• `swarm ideas [SYMBOL]` — list open trade ideas\n"
             "• `swarm stats` — aggregation statistics\n\n"
+            "**Learning commands:**\n"
+            "• `learn report` — full collaborative learning report\n"
+            "• `learn summary` — quick learning stats\n"
+            "• `learn bias <SYMBOL> [LONG|SHORT] [timeframe]` — bias & adaptive confidence\n\n"
             "Slash commands still work (`/status`, `/kill`, etc.) but aren't required.\n"
             "When an agent asks you something, just reply — we'll figure out the rest."
         )
@@ -1185,6 +1189,49 @@ class TelegramPlatformBot:
                 "quantity": 0.0,
                 "agent": EMERALD,
                 "ack": "Loading swarm statistics.",
+            }
+
+        # ── Phase 4: Learning plain-text commands ──────────────────────
+        if re.search(r"\blearn\s+report\b", normalized):
+            return {
+                "platform": "CONTROL",
+                "symbol": "ALL",
+                "action": "LEARN_REPORT",
+                "quantity": 0.0,
+                "agent": EMERALD,
+                "ack": "Generating collaborative learning report.",
+            }
+
+        if re.search(r"\blearn\s+summary\b", normalized):
+            return {
+                "platform": "CONTROL",
+                "symbol": "ALL",
+                "action": "LEARN_SUMMARY",
+                "quantity": 0.0,
+                "agent": EMERALD,
+                "ack": "Loading learning summary.",
+            }
+
+        learn_bias_match = re.search(
+            r"\blearn\s+bias\s+([A-Za-z0-9/_-]+)(?:\s+(LONG|SHORT))?(?:\s+(\S+))?",
+            raw,
+            flags=re.IGNORECASE,
+        )
+        if learn_bias_match:
+            symbol = str(learn_bias_match.group(1) or "").strip().upper()
+            direction = str(learn_bias_match.group(2) or "LONG").strip().upper()
+            timeframe = str(learn_bias_match.group(3) or "1h").strip()
+            payload = json.dumps(
+                {"symbol": symbol, "direction": direction, "timeframe": timeframe},
+                separators=(",", ":"),
+            )
+            return {
+                "platform": "CONTROL",
+                "symbol": payload,
+                "action": "LEARN_BIAS",
+                "quantity": 0.0,
+                "agent": EMERALD,
+                "ack": f"Checking learning bias for `{symbol}` {direction} {timeframe}.",
             }
 
         if re.search(r"\b(what'?s\s+status|status)\b", normalized):
@@ -1705,6 +1752,39 @@ class TelegramPlatformBot:
         if swarm_stats:
             await self.send_as(EMERALD, "Loading swarm statistics.")
             await self._dispatch_callback("CONTROL", "ALL", "SWARM_STATS", 0.0)
+            return
+
+        # ── Phase 4: Learning slash commands ───────────────────────────
+        # /learn report
+        learn_report = re.search(r"^/learn\s+report$", text, flags=re.IGNORECASE)
+        if learn_report:
+            await self.send_as(EMERALD, "Generating collaborative learning report.")
+            await self._dispatch_callback("CONTROL", "ALL", "LEARN_REPORT", 0.0)
+            return
+
+        # /learn summary
+        learn_summary = re.search(r"^/learn\s+summary$", text, flags=re.IGNORECASE)
+        if learn_summary:
+            await self.send_as(EMERALD, "Loading learning summary.")
+            await self._dispatch_callback("CONTROL", "ALL", "LEARN_SUMMARY", 0.0)
+            return
+
+        # /learn bias <SYMBOL> [LONG|SHORT] [timeframe]
+        learn_bias = re.search(
+            r"^/learn\s+bias\s+([A-Za-z0-9/_-]+)(?:\s+(LONG|SHORT))?(?:\s+(\S+))?$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if learn_bias:
+            symbol = str(learn_bias.group(1) or "").strip().upper()
+            direction = str(learn_bias.group(2) or "LONG").strip().upper()
+            timeframe = str(learn_bias.group(3) or "1h").strip()
+            payload = json.dumps(
+                {"symbol": symbol, "direction": direction, "timeframe": timeframe},
+                separators=(",", ":"),
+            )
+            await self.send_as(EMERALD, f"Checking learning bias for `{symbol}` {direction} {timeframe}.")
+            await self._dispatch_callback("CONTROL", payload, "LEARN_BIAS", 0.0)
             return
 
         # VirusTotal security commands

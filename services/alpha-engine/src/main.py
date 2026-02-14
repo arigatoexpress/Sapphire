@@ -14,6 +14,7 @@ from src.ai.gemini_guard import GeminiGuard
 from src.collaboration.forum import SapphireForumService
 from src.collaboration.reputation import BotReputationService
 from src.collaboration.swarm import SwarmAggregator
+from src.collaboration.learning import SwarmLearning
 from src.execution.dispatcher import dispatcher
 from src.execution.portfolio import PortfolioTracker
 from src.feeds.market_data import MarketDataAggregator
@@ -193,6 +194,7 @@ class AlphaEngine:
         self.forum = SapphireForumService()
         self.reputation = BotReputationService()
         self.swarm = SwarmAggregator(reputation=self.reputation)
+        self.learning = SwarmLearning()
         self.vt_scanner = VirusTotalSkillScanner()
         requested_media_mode = self._normalize_media_mode(
             os.getenv("SAPPHIRE_MEDIA_MODE", "owner_approval")
@@ -3073,6 +3075,96 @@ class AlphaEngine:
                         f"by `{idea['bot_id']}` (conf: {idea['confidence']:.0%}, weight: {idea['reputation_weight']:.2f})"
                     )
                 await self.telegram.send_message("\n".join(lines), priority="medium")
+            return
+
+        # ── Phase 4: Collaborative Learning ──────────────────────────
+
+        if normalized_action == "LEARN_REPORT":
+            report = self.learning.generate_report()
+            if report.get("total_records", 0) == 0:
+                await self.telegram.send_as(EMERALD, "📚 No learning data recorded yet.")
+                return
+            overall = report.get("overall", {})
+            lines = [
+                f"📚 **Swarm Learning Report** ({report['total_records']} outcomes)\n",
+                f"Win rate: **{overall.get('win_rate', 0):.0%}** | "
+                f"PnL: **${overall.get('total_pnl', 0):+,.2f}** | "
+                f"Avg: ${overall.get('avg_pnl', 0):+,.2f}",
+            ]
+            # Top symbols
+            symbols = report.get("symbols", [])
+            if symbols:
+                lines.append("\n**Symbols:**")
+                for s in symbols[:5]:
+                    edge_emoji = "🟢" if s["edge"] == "positive" else ("🔴" if s["edge"] == "negative" else "⚪")
+                    lines.append(
+                        f"  {edge_emoji} `{s['symbol']}` — {s['win_rate']:.0%} win "
+                        f"({s['count']} trades, ${s['total_pnl']:+,.2f})"
+                    )
+            # Directions
+            directions = report.get("directions", {})
+            if any(directions.get(d, {}).get("count", 0) > 0 for d in ("LONG", "SHORT")):
+                lines.append("\n**Directions:**")
+                for d in ("LONG", "SHORT"):
+                    dd = directions.get(d, {})
+                    if dd.get("count", 0) > 0:
+                        lines.append(
+                            f"  {'🟢' if d == 'LONG' else '🔴'} {d}: {dd['win_rate']:.0%} win ({dd['count']} trades)"
+                        )
+            # Conviction calibration
+            cal = report.get("conviction_calibration", [])
+            if cal:
+                lines.append("\n**Conviction Calibration:**")
+                for c in cal:
+                    cal_ok = "✅" if c.get("calibrated") else "⚠️"
+                    lines.append(
+                        f"  {cal_ok} {c['conviction_range']}: {c['actual_win_rate']:.0%} actual ({c['count']} trades)"
+                    )
+            # Bot synergy
+            synergy = report.get("bot_synergy", [])
+            if synergy:
+                lines.append("\n**Bot Synergy:**")
+                for s in synergy[:5]:
+                    syn_emoji = "🤝" if s["synergy"] == "strong" else ("💥" if s["synergy"] == "weak" else "🤷")
+                    lines.append(
+                        f"  {syn_emoji} `{s['pair']}` — {s['win_rate']:.0%} ({s['count']} trades)"
+                    )
+            await self.telegram.send_message("\n".join(lines), priority="medium")
+            return
+
+        if normalized_action == "LEARN_SUMMARY":
+            s = self.learning.summary()
+            await self.telegram.send_message(
+                f"📚 **Learning Summary**\n"
+                f"Records: {s['total_records']} | "
+                f"Win rate: {s.get('overall_win_rate', 0):.0%}\n"
+                f"PnL: ${s.get('total_pnl', 0):+,.2f}\n"
+                f"Symbols: {s['symbols_tracked']} | "
+                f"Timeframes: {s['timeframes_tracked']} | "
+                f"Bot pairs: {s['bot_pairs_tracked']}",
+                priority="medium",
+            )
+            return
+
+        if normalized_action == "LEARN_BIAS":
+            payload = self._parse_json_payload(target)
+            symbol = str(payload.get("symbol", "")).strip().upper()
+            direction = str(payload.get("direction", "")).strip().upper()
+            timeframe = str(payload.get("timeframe", "1h")).strip()
+            sym_bias = self.learning.get_symbol_bias(symbol) if symbol else 0.0
+            dir_bias = self.learning.get_direction_bias(direction) if direction else 0.0
+            tf_bias = self.learning.get_timeframe_bias(timeframe)
+            adjusted = self.learning.adaptive_confidence(
+                symbol or "?", direction or "LONG", timeframe, 0.5
+            )
+            lines = [f"📚 **Learning Bias Check**\n"]
+            if symbol:
+                lines.append(f"Symbol `{symbol}`: bias = {sym_bias:+.2f}")
+            if direction:
+                lines.append(f"Direction `{direction}`: bias = {dir_bias:+.2f}")
+            lines.append(f"Timeframe `{timeframe}`: bias = {tf_bias:+.2f}")
+            lines.append(f"\nAdaptive confidence (raw 50%): **{adjusted:.0%}**")
+            await self.telegram.send_message("\n".join(lines), priority="medium")
             return
 
         if normalized_action in {"SCOUT_STATUS", "FORUM_SCOUT_STATUS"}:
