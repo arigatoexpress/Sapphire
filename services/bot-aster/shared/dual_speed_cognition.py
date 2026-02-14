@@ -76,8 +76,8 @@ class DualSpeedCognition:
     - System 2 validates and can reverse within a "cognitive window"
     """
 
-    SYSTEM_1_MODEL = "gemini-2.0-flash"
-    SYSTEM_2_MODEL = "gemini-2.0-pro-exp-02-05"
+    SYSTEM_1_MODEL = "gemini-2.5-flash"
+    SYSTEM_2_MODEL = "gemini-2.5-pro"
 
     # Thresholds
     INSTANT_ACTION_THRESHOLD = 0.85  # System 1 confidence to act immediately

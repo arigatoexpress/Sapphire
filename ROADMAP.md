@@ -119,8 +119,18 @@ _Automated public presence across platforms_
 - [ ] Configure LinkedIn API credentials
 - [ ] Mirror key Substack content with professional framing
 
-## Phase 7: Virtuals Integration (Base) 🔮
-_On-chain agent presence via Virtuals protocol_
+## Phase 7: OpenClaw Agent Upgrade 🤖
+_Verify and upgrade autonomous agent models_
+
+- [x] Verify existing OpenClaw agents are working properly (dispatch, sessions, instruction routing) (PR #35)
+- [x] Test all agent dispatch paths end-to-end (PR #35)
+- [x] Identify current model versions used by each agent (PR #35)
+- [x] Upgrade agent models to latest available versions (PR #35)
+- [ ] Run comparison tests: old vs new model quality
+- [ ] Update model configuration and redeploy
+
+## Phase 8: Virtuals Integration (Base) 🔮 (DEFERRED)
+_On-chain agent presence via Virtuals protocol — revisit later_
 
 - [ ] Research Virtuals protocol on Base
 - [ ] Identify integration points with Sapphire agents
@@ -132,7 +142,7 @@ _On-chain agent presence via Virtuals protocol_
 ## Execution Priority
 ```
 Phase 1 ✅  →  Phase 2 ✅  →  Phase 3 ✅  →  Phase 4 ✅  →  Phase 5 ✅  →  Phase 6 ✅  →  Phase 7 (NEXT)
-Harden        Security       Forum          Swarm          Tracking       Social           On-chain
+Harden        Security       Forum          Swarm          Tracking       Social           OpenClaw
 ```
 
 ## Completed Milestones
@@ -156,4 +166,5 @@ Harden        Security       Forum          Swarm          Tracking       Social
 - ✅ PR #32: Phase 6 Social Media Automation (AI content gen, anti-slop quality controls, 7 Telegram commands, 67 tests)
 - ✅ PR #33: Masterplan Improvements (security hardening, frontend redesign, 3 test suites, new modules)
 - ✅ PR #34: Telegram Handler Extraction (1,632 lines extracted from main.py → telegram_handlers.py)
+- ✅ PR #35: OpenClaw Model Upgrade (18 files upgraded: gemini-2.0→2.5, gemini-3.0→3-flash-preview across all services)
 - ✅ 847 tests passing
