@@ -2,10 +2,138 @@ import asyncio
 import os
 import re
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from collections import deque
+from typing import Any, Deque, Dict, List, Optional, Tuple
 
 import aiohttp
 from loguru import logger
+
+
+# ── Per-Venue Rate Limiter ───────────────────────────────────────────
+
+class VenueRateLimiter:
+    """Token-bucket rate limiter per venue.
+
+    Prevents API ban from rapid-fire dispatches. Default: 10 commands/min
+    per venue, configurable via env SAPPHIRE_VENUE_RATE_LIMIT_<VENUE>.
+    """
+
+    def __init__(self, default_per_minute: int = 10):
+        self._default_per_minute = max(1, default_per_minute)
+        self._windows: Dict[str, Deque[float]] = {}
+        self._limits: Dict[str, int] = {}
+
+    def _get_limit(self, venue: str) -> int:
+        if venue not in self._limits:
+            env_key = f"SAPPHIRE_VENUE_RATE_LIMIT_{venue}"
+            raw = os.getenv(env_key, "").strip()
+            self._limits[venue] = max(1, int(raw)) if raw.isdigit() else self._default_per_minute
+        return self._limits[venue]
+
+    def check(self, venue: str) -> bool:
+        """Return True if the dispatch is allowed; False if rate-limited."""
+        now = time.time()
+        limit = self._get_limit(venue)
+        window = self._windows.setdefault(venue, deque())
+
+        # Purge entries older than 60 seconds
+        while window and window[0] < now - 60:
+            window.popleft()
+
+        if len(window) >= limit:
+            return False
+
+        window.append(now)
+        return True
+
+    def get_status(self) -> Dict[str, Dict[str, Any]]:
+        now = time.time()
+        result: Dict[str, Dict[str, Any]] = {}
+        for venue, window in self._windows.items():
+            # Count active in window
+            active = sum(1 for t in window if t >= now - 60)
+            result[venue] = {
+                "requests_last_60s": active,
+                "limit_per_minute": self._get_limit(venue),
+                "headroom": max(0, self._get_limit(venue) - active),
+            }
+        return result
+
+
+# ── Dead-Letter Tracker ──────────────────────────────────────────────
+
+class UnconfirmedFillTracker:
+    """Track dispatched commands that timed out without fill confirmation.
+
+    These represent potential orphaned positions that need reconciliation.
+    Persisted in-memory with a fixed-size ring buffer.
+    """
+
+    def __init__(self, max_entries: int = 200):
+        self._entries: Deque[Dict[str, Any]] = deque(maxlen=max_entries)
+
+    def record(
+        self,
+        venue: str,
+        symbol: str,
+        command: Dict[str, Any],
+        timeout_seconds: float,
+        attempt: int,
+        retries: int,
+    ) -> None:
+        self._entries.append({
+            "venue": venue,
+            "symbol": symbol,
+            "side": command.get("side") or command.get("action", "UNKNOWN"),
+            "quantity": command.get("quantity"),
+            "dispatched_at": time.time(),
+            "timeout_seconds": timeout_seconds,
+            "attempt": attempt,
+            "retries": retries,
+            "reconciled": False,
+            "reconciled_at": None,
+        })
+        logger.warning(
+            f"📋 DEAD LETTER: {venue} {symbol} {command.get('side', '?')} — "
+            f"fill not confirmed after {timeout_seconds}s (attempt {attempt}/{retries})"
+        )
+
+    def reconcile(self, venue: str, symbol: str) -> bool:
+        """Mark the most recent unreconciled entry as resolved."""
+        for entry in reversed(self._entries):
+            if (
+                entry["venue"] == venue
+                and entry["symbol"] == symbol
+                and not entry["reconciled"]
+            ):
+                entry["reconciled"] = True
+                entry["reconciled_at"] = time.time()
+                return True
+        return False
+
+    @property
+    def unreconciled_count(self) -> int:
+        return sum(1 for e in self._entries if not e["reconciled"])
+
+    def get_unreconciled(self) -> List[Dict[str, Any]]:
+        return [e for e in self._entries if not e["reconciled"]]
+
+    def get_all(self, limit: int = 50) -> List[Dict[str, Any]]:
+        return list(self._entries)[-limit:]
+
+    def format_telegram_status(self) -> str:
+        unreconciled = self.get_unreconciled()
+        if not unreconciled:
+            return "📋 **Dead Letter Queue**\n\nNo unconfirmed fills. All clear."
+        lines = [f"📋 **Dead Letter Queue** ({len(unreconciled)} unconfirmed)\n"]
+        for entry in unreconciled[-10:]:
+            age = time.time() - entry["dispatched_at"]
+            age_str = f"{age / 60:.0f}m" if age < 3600 else f"{age / 3600:.1f}h"
+            lines.append(
+                f"⚠️ {entry['venue']} {entry['symbol']} {entry['side']} — "
+                f"{age_str} ago (timeout: {entry['timeout_seconds']}s)"
+            )
+        return "\n".join(lines)
 
 
 class ExecutionDispatcher:
@@ -41,6 +169,14 @@ class ExecutionDispatcher:
         self._last_dispatch_errors: Dict[str, Dict[str, Any]] = {}
         # Fill confirmation: maps (VENUE, SYMBOL) → Future resolved by Pub/Sub listener
         self._pending_confirmations: Dict[Tuple[str, str], asyncio.Future] = {}
+        # Dead-letter queue for unconfirmed fills
+        self._dead_letters = UnconfirmedFillTracker(
+            max_entries=max(50, int(os.getenv("SAPPHIRE_DEAD_LETTER_MAX", "200")))
+        )
+        # Per-venue rate limiter
+        self._rate_limiter = VenueRateLimiter(
+            default_per_minute=max(1, int(os.getenv("SAPPHIRE_VENUE_RATE_LIMIT", "10")))
+        )
 
     async def start(self):
         self.session = aiohttp.ClientSession(
@@ -213,6 +349,14 @@ class ExecutionDispatcher:
             self._record_dispatch_error(normalized_venue, "venue_not_dispatchable")
             return False
 
+        # Per-venue rate limiting
+        if not self._rate_limiter.check(normalized_venue):
+            logger.warning(
+                f"🚫 Rate-limited: {normalized_venue} exceeded dispatch limit"
+            )
+            self._record_dispatch_error(normalized_venue, "rate_limited")
+            return False
+
         full_url = f"{url}/execute"
         auth_headers = await self._get_auth_header(url)
         allocation = self._venue_allocations.get(normalized_venue, 1.0)
@@ -341,6 +485,15 @@ class ExecutionDispatcher:
                     logger.warning(
                         f"⏳ Fill timeout for {confirm_key} after {retries} attempt(s)"
                     )
+                    # Record to dead-letter queue for reconciliation
+                    self._dead_letters.record(
+                        venue=normalized_venue,
+                        symbol=raw_symbol,
+                        command=command,
+                        timeout_seconds=timeout_seconds,
+                        attempt=attempt,
+                        retries=retries,
+                    )
                     return {
                         "success": False,
                         "error_message": f"Fill confirmation timeout after {timeout_seconds}s x {retries}",
@@ -374,12 +527,45 @@ class ExecutionDispatcher:
             future.set_result(fill_data)
             logger.debug(f"🔗 Fill confirmation resolved for {confirm_key}")
             return True
+
+        # No pending future — try to reconcile a dead-letter entry
+        if self._dead_letters.reconcile(venue, match_symbol):
+            logger.info(f"🔗 Dead-letter reconciled for {venue}:{match_symbol}")
         return False
 
     @property
     def pending_confirmation_count(self) -> int:
         """Number of commands waiting for fill confirmation."""
         return len(self._pending_confirmations)
+
+    @property
+    def dead_letters(self) -> UnconfirmedFillTracker:
+        return self._dead_letters
+
+    @property
+    def rate_limiter(self) -> VenueRateLimiter:
+        return self._rate_limiter
+
+    def get_hardening_status(self) -> Dict[str, Any]:
+        """Return combined rate-limit + dead-letter status for APIs/Telegram."""
+        return {
+            "rate_limiter": self._rate_limiter.get_status(),
+            "dead_letters": {
+                "total": len(self._dead_letters._entries),
+                "unreconciled": self._dead_letters.unreconciled_count,
+                "recent": [
+                    {
+                        "venue": e["venue"],
+                        "symbol": e["symbol"],
+                        "side": e["side"],
+                        "age_seconds": round(time.time() - e["dispatched_at"], 1),
+                        "reconciled": e["reconciled"],
+                    }
+                    for e in self._dead_letters.get_all(limit=10)
+                ],
+            },
+            "pending_confirmations": self.pending_confirmation_count,
+        }
 
 
 # Singleton

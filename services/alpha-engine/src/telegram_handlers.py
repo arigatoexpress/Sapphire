@@ -1429,6 +1429,44 @@ async def handle_core_control_commands(engine: "AlphaEngine", target: str, actio
             engine._owner_directive_updated_at = int(time.time())
         return True
 
+    if normalized in {"DEAD_LETTER", "DLQ", "DEAD_LETTERS", "UNCONFIRMED"}:
+        msg = dispatcher.dead_letters.format_telegram_status()
+        await engine.telegram.send_message(msg, priority="medium")
+        return True
+
+    if normalized in {"RATE_LIMIT", "RATE_LIMITS", "DISPATCH_RATES", "VENUE_RATES"}:
+        status = dispatcher.rate_limiter.get_status()
+        if not status:
+            await engine.telegram.send_message(
+                "📊 **Venue Rate Limits**\n\nNo dispatch activity yet.", priority="medium"
+            )
+            return True
+        lines = ["📊 **Venue Rate Limits**\n"]
+        for venue, info in status.items():
+            lines.append(
+                f"• {venue}: {info['requests_last_60s']}/{info['limit_per_minute']} "
+                f"(headroom: {info['headroom']})"
+            )
+        await engine.telegram.send_message("\n".join(lines), priority="medium")
+        return True
+
+    if normalized in {"DISPATCH_STATUS", "DISPATCHER_STATUS", "DISPATCH_HEALTH"}:
+        hardening = dispatcher.get_hardening_status()
+        rl = hardening["rate_limiter"]
+        dl = hardening["dead_letters"]
+        lines = [
+            "🔧 **Dispatcher Health**\n",
+            f"Pending confirmations: {hardening['pending_confirmations']}",
+            f"Dead letters: {dl['unreconciled']} unreconciled / {dl['total']} total",
+        ]
+        if rl:
+            for venue, info in rl.items():
+                lines.append(
+                    f"Rate [{venue}]: {info['requests_last_60s']}/{info['limit_per_minute']}"
+                )
+        await engine.telegram.send_message("\n".join(lines), priority="medium")
+        return True
+
     if normalized in {"OWNER_STEER", "STEER"}:
         directive = str(target or "").strip()
         if not directive:

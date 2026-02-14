@@ -527,3 +527,352 @@ def test_resume_expired_venues():
     resumed = disp.resume_expired_venues()
     assert "ASTER" in resumed
     assert "LIGHTER" not in resumed
+
+
+# ── VenueRateLimiter Tests ─────────────────────────────────────────
+
+
+class TestVenueRateLimiter:
+    def _limiter_cls(self):
+        mod = _load_module(DISPATCHER_PATH, f"rl_{id(self)}")
+        return mod.VenueRateLimiter
+
+    def test_allows_within_limit(self):
+        rl = self._limiter_cls()(default_per_minute=5)
+        for _ in range(5):
+            assert rl.check("ASTER") is True
+
+    def test_blocks_over_limit(self):
+        rl = self._limiter_cls()(default_per_minute=3)
+        assert rl.check("ASTER") is True
+        assert rl.check("ASTER") is True
+        assert rl.check("ASTER") is True
+        assert rl.check("ASTER") is False
+
+    def test_separate_venues_independent(self):
+        rl = self._limiter_cls()(default_per_minute=2)
+        assert rl.check("ASTER") is True
+        assert rl.check("ASTER") is True
+        assert rl.check("ASTER") is False  # ASTER blocked
+        assert rl.check("LIGHTER") is True  # LIGHTER still open
+
+    def test_expired_entries_purged(self):
+        import time as _time
+        rl = self._limiter_cls()(default_per_minute=2)
+        assert rl.check("ASTER") is True
+        assert rl.check("ASTER") is True
+        assert rl.check("ASTER") is False
+        # Manually age the entries
+        for entry_idx in range(len(rl._windows["ASTER"])):
+            rl._windows["ASTER"][entry_idx] -= 61
+        assert rl.check("ASTER") is True  # Window cleared
+
+    def test_env_override_limit(self, monkeypatch):
+        monkeypatch.setenv("SAPPHIRE_VENUE_RATE_LIMIT_ASTER", "2")
+        rl = self._limiter_cls()(default_per_minute=100)
+        assert rl.check("ASTER") is True
+        assert rl.check("ASTER") is True
+        assert rl.check("ASTER") is False  # Env override caps at 2
+
+    def test_invalid_env_uses_default(self, monkeypatch):
+        monkeypatch.setenv("SAPPHIRE_VENUE_RATE_LIMIT_ASTER", "not_a_number")
+        rl = self._limiter_cls()(default_per_minute=5)
+        # Should fall back to default of 5
+        for _ in range(5):
+            assert rl.check("ASTER") is True
+        assert rl.check("ASTER") is False
+
+    def test_minimum_limit_is_one(self):
+        rl = self._limiter_cls()(default_per_minute=0)
+        assert rl.check("ASTER") is True  # min 1
+        assert rl.check("ASTER") is False
+
+    def test_get_status_empty(self):
+        rl = self._limiter_cls()(default_per_minute=10)
+        assert rl.get_status() == {}
+
+    def test_get_status_after_checks(self):
+        rl = self._limiter_cls()(default_per_minute=10)
+        rl.check("ASTER")
+        rl.check("ASTER")
+        rl.check("LIGHTER")
+        status = rl.get_status()
+        assert status["ASTER"]["requests_last_60s"] == 2
+        assert status["ASTER"]["limit_per_minute"] == 10
+        assert status["ASTER"]["headroom"] == 8
+        assert status["LIGHTER"]["requests_last_60s"] == 1
+
+
+# ── UnconfirmedFillTracker Tests ──────────────────────────────────
+
+
+class TestUnconfirmedFillTracker:
+    def _tracker_cls(self):
+        mod = _load_module(DISPATCHER_PATH, f"dlt_{id(self)}")
+        return mod.UnconfirmedFillTracker
+
+    def test_record_and_retrieve(self):
+        tracker = self._tracker_cls()(max_entries=100)
+        tracker.record("ASTER", "SOL", {"side": "BUY", "quantity": 1.0}, 30.0, 1, 1)
+        assert tracker.unreconciled_count == 1
+        entries = tracker.get_unreconciled()
+        assert len(entries) == 1
+        assert entries[0]["venue"] == "ASTER"
+        assert entries[0]["symbol"] == "SOL"
+        assert entries[0]["side"] == "BUY"
+        assert entries[0]["reconciled"] is False
+
+    def test_reconcile_marks_resolved(self):
+        tracker = self._tracker_cls()(max_entries=100)
+        tracker.record("ASTER", "SOL", {"side": "BUY"}, 30.0, 1, 1)
+        assert tracker.reconcile("ASTER", "SOL") is True
+        assert tracker.unreconciled_count == 0
+
+    def test_reconcile_returns_false_when_none(self):
+        tracker = self._tracker_cls()(max_entries=100)
+        assert tracker.reconcile("ASTER", "SOL") is False
+
+    def test_reconcile_most_recent_first(self):
+        tracker = self._tracker_cls()(max_entries=100)
+        tracker.record("ASTER", "SOL", {"side": "BUY", "quantity": 1.0}, 30.0, 1, 1)
+        tracker.record("ASTER", "SOL", {"side": "SELL", "quantity": 2.0}, 30.0, 1, 1)
+        # Reconcile should mark the most recent (SELL)
+        assert tracker.reconcile("ASTER", "SOL") is True
+        unreconciled = tracker.get_unreconciled()
+        assert len(unreconciled) == 1
+        assert unreconciled[0]["side"] == "BUY"
+
+    def test_ring_buffer_eviction(self):
+        tracker = self._tracker_cls()(max_entries=3)
+        tracker.record("ASTER", "SOL", {"side": "BUY"}, 30.0, 1, 1)
+        tracker.record("ASTER", "ETH", {"side": "BUY"}, 30.0, 1, 1)
+        tracker.record("ASTER", "BTC", {"side": "BUY"}, 30.0, 1, 1)
+        tracker.record("ASTER", "DOGE", {"side": "BUY"}, 30.0, 1, 1)  # Evicts SOL
+        all_entries = tracker.get_all(limit=100)
+        assert len(all_entries) == 3
+        symbols = [e["symbol"] for e in all_entries]
+        assert "SOL" not in symbols
+        assert "DOGE" in symbols
+
+    def test_get_all_with_limit(self):
+        tracker = self._tracker_cls()(max_entries=100)
+        for i in range(10):
+            tracker.record("ASTER", f"SYM{i}", {"side": "BUY"}, 30.0, 1, 1)
+        assert len(tracker.get_all(limit=5)) == 5
+        assert len(tracker.get_all(limit=100)) == 10
+
+    def test_format_telegram_empty(self):
+        tracker = self._tracker_cls()(max_entries=100)
+        msg = tracker.format_telegram_status()
+        assert "All clear" in msg
+
+    def test_format_telegram_with_entries(self):
+        tracker = self._tracker_cls()(max_entries=100)
+        tracker.record("ASTER", "SOL", {"side": "BUY"}, 30.0, 1, 1)
+        tracker.record("LIGHTER", "ETH", {"side": "SELL"}, 15.0, 2, 3)
+        msg = tracker.format_telegram_status()
+        assert "2 unconfirmed" in msg
+        assert "ASTER" in msg
+        assert "LIGHTER" in msg
+
+    def test_reconciled_not_in_unreconciled(self):
+        tracker = self._tracker_cls()(max_entries=100)
+        tracker.record("ASTER", "SOL", {"side": "BUY"}, 30.0, 1, 1)
+        tracker.record("ASTER", "ETH", {"side": "BUY"}, 30.0, 1, 1)
+        tracker.reconcile("ASTER", "SOL")
+        unreconciled = tracker.get_unreconciled()
+        assert len(unreconciled) == 1
+        assert unreconciled[0]["symbol"] == "ETH"
+
+    def test_reconcile_sets_timestamp(self):
+        import time as _time
+        tracker = self._tracker_cls()(max_entries=100)
+        tracker.record("ASTER", "SOL", {"side": "BUY"}, 30.0, 1, 1)
+        before = _time.time()
+        tracker.reconcile("ASTER", "SOL")
+        after = _time.time()
+        entry = tracker.get_all(limit=1)[0]
+        assert entry["reconciled"] is True
+        assert before <= entry["reconciled_at"] <= after
+
+    def test_record_missing_side_defaults_unknown(self):
+        tracker = self._tracker_cls()(max_entries=100)
+        tracker.record("ASTER", "SOL", {}, 30.0, 1, 1)
+        assert tracker.get_all(limit=1)[0]["side"] == "UNKNOWN"
+
+
+# ── Rate Limiter Integration with send_command ────────────────────
+
+
+def test_send_command_blocked_by_rate_limiter(monkeypatch):
+    """send_command returns False when venue is rate-limited."""
+    mod = _load_module(DISPATCHER_PATH, "disp_rl_block")
+    disp = mod.ExecutionDispatcher()
+    disp.bot_urls = {"ASTER": "https://example.run.app"}
+    disp._venue_allocations["ASTER"] = 1.0
+    disp._venue_paused_until.clear()
+    disp.session = _FakeSession(status=200)
+    monkeypatch.setattr(disp, "_get_auth_header", _fake_auth_header)
+
+    # Set rate limit to 2
+    disp._rate_limiter = mod.VenueRateLimiter(default_per_minute=2)
+
+    # First two succeed
+    assert asyncio.run(disp.send_command("ASTER", {"action": "BUY", "symbol": "SOL", "quantity": 1.0})) is True
+    assert asyncio.run(disp.send_command("ASTER", {"action": "BUY", "symbol": "SOL", "quantity": 1.0})) is True
+    # Third is blocked
+    assert asyncio.run(disp.send_command("ASTER", {"action": "BUY", "symbol": "SOL", "quantity": 1.0})) is False
+    err = disp.get_last_dispatch_error("ASTER")
+    assert err["reason"] == "rate_limited"
+
+
+def test_rate_limit_does_not_affect_other_venues(monkeypatch):
+    """Rate limiting on one venue doesn't block another."""
+    mod = _load_module(DISPATCHER_PATH, "disp_rl_isolation")
+    disp = mod.ExecutionDispatcher()
+    disp.bot_urls = {"ASTER": "https://a.run.app", "LIGHTER": "https://b.run.app"}
+    disp._venue_allocations = {"ASTER": 1.0, "LIGHTER": 1.0}
+    disp._venue_paused_until.clear()
+    disp.session = _FakeSession(status=200)
+    monkeypatch.setattr(disp, "_get_auth_header", _fake_auth_header)
+
+    disp._rate_limiter = mod.VenueRateLimiter(default_per_minute=1)
+
+    assert asyncio.run(disp.send_command("ASTER", {"action": "BUY", "symbol": "SOL", "quantity": 1.0})) is True
+    assert asyncio.run(disp.send_command("ASTER", {"action": "BUY", "symbol": "SOL", "quantity": 1.0})) is False
+    # LIGHTER still works
+    assert asyncio.run(disp.send_command("LIGHTER", {"action": "BUY", "symbol": "SOL", "quantity": 1.0})) is True
+
+
+# ── Dead-Letter Integration with send_and_confirm ────────────────
+
+
+def test_send_and_confirm_timeout_records_dead_letter(monkeypatch):
+    """Timeout in send_and_confirm should add entry to dead-letter queue."""
+    mod = _load_module(DISPATCHER_PATH, "disp_dl_timeout")
+    disp = mod.ExecutionDispatcher()
+    disp.bot_urls = {"ASTER": "https://example.run.app"}
+    disp._venue_allocations["ASTER"] = 1.0
+    disp._venue_paused_until.clear()
+    disp.session = _FakeSession(status=200)
+    monkeypatch.setattr(disp, "_get_auth_header", _fake_auth_header)
+
+    result = asyncio.run(
+        disp.send_and_confirm(
+            "ASTER",
+            {"action": "BUY", "symbol": "SOL", "quantity": 1.0},
+            timeout_seconds=0.05,
+            retries=1,
+        )
+    )
+    assert result["success"] is False
+    assert disp._dead_letters.unreconciled_count == 1
+    entry = disp._dead_letters.get_unreconciled()[0]
+    assert entry["venue"] == "ASTER"
+    assert entry["symbol"] == "SOL"
+    assert entry["side"] == "BUY"
+
+
+def test_send_and_confirm_retries_only_record_dead_letter_on_final(monkeypatch):
+    """Dead-letter should only be recorded on the final timeout, not intermediate retries."""
+    mod = _load_module(DISPATCHER_PATH, "disp_dl_retry_final")
+    disp = mod.ExecutionDispatcher()
+    disp.bot_urls = {"ASTER": "https://example.run.app"}
+    disp._venue_allocations["ASTER"] = 1.0
+    disp._venue_paused_until.clear()
+    disp.session = _FakeSession(status=200)
+    monkeypatch.setattr(disp, "_get_auth_header", _fake_auth_header)
+
+    result = asyncio.run(
+        disp.send_and_confirm(
+            "ASTER",
+            {"action": "BUY", "symbol": "SOL", "quantity": 1.0},
+            timeout_seconds=0.05,
+            retries=3,
+        )
+    )
+    assert result["success"] is False
+    # Only one dead-letter entry despite 3 retries
+    assert disp._dead_letters.unreconciled_count == 1
+
+
+def test_resolve_fill_reconciles_dead_letter():
+    """resolve_fill with no pending future should reconcile a dead-letter."""
+    mod = _load_module(DISPATCHER_PATH, "disp_dl_reconcile")
+    disp = mod.ExecutionDispatcher()
+
+    # Manually add a dead-letter entry
+    disp._dead_letters.record("ASTER", "SOL", {"side": "BUY"}, 30.0, 1, 1)
+    assert disp._dead_letters.unreconciled_count == 1
+
+    # resolve_fill with no pending confirmation
+    resolved = disp.resolve_fill({
+        "platform": "ASTER",
+        "symbol": "SOLUSDT",  # Should strip to SOL
+        "side": "BUY",
+        "success": True,
+    })
+    assert resolved is False  # No Future resolved
+    assert disp._dead_letters.unreconciled_count == 0  # But dead-letter reconciled
+
+
+def test_successful_confirm_does_not_create_dead_letter(monkeypatch):
+    """send_and_confirm that receives a fill should NOT create a dead-letter."""
+    mod = _load_module(DISPATCHER_PATH, "disp_dl_no_entry")
+    disp = mod.ExecutionDispatcher()
+    disp.bot_urls = {"ASTER": "https://example.run.app"}
+    disp._venue_allocations["ASTER"] = 1.0
+    disp._venue_paused_until.clear()
+    disp.session = _FakeSession(status=200)
+    monkeypatch.setattr(disp, "_get_auth_header", _fake_auth_header)
+
+    fill_data = {
+        "platform": "ASTER",
+        "symbol": "SOLUSDT",
+        "side": "BUY",
+        "success": True,
+    }
+
+    async def _run():
+        async def _delayed_resolve():
+            await asyncio.sleep(0.02)
+            disp.resolve_fill(fill_data)
+        asyncio.create_task(_delayed_resolve())
+        return await disp.send_and_confirm(
+            "ASTER",
+            {"action": "BUY", "symbol": "SOL", "quantity": 1.0},
+            timeout_seconds=2.0,
+        )
+
+    result = asyncio.run(_run())
+    assert result["success"] is True
+    assert disp._dead_letters.unreconciled_count == 0
+
+
+# ── get_hardening_status Tests ────────────────────────────────────
+
+
+def test_get_hardening_status_structure():
+    mod = _load_module(DISPATCHER_PATH, "disp_hardening_status")
+    disp = mod.ExecutionDispatcher()
+    status = disp.get_hardening_status()
+    assert "rate_limiter" in status
+    assert "dead_letters" in status
+    assert "pending_confirmations" in status
+    assert status["dead_letters"]["total"] == 0
+    assert status["dead_letters"]["unreconciled"] == 0
+    assert status["pending_confirmations"] == 0
+
+
+def test_get_hardening_status_with_data(monkeypatch):
+    mod = _load_module(DISPATCHER_PATH, "disp_hardening_data")
+    disp = mod.ExecutionDispatcher()
+    disp._dead_letters.record("ASTER", "SOL", {"side": "BUY"}, 30.0, 1, 1)
+    disp._rate_limiter.check("LIGHTER")
+
+    status = disp.get_hardening_status()
+    assert status["dead_letters"]["total"] == 1
+    assert status["dead_letters"]["unreconciled"] == 1
+    assert len(status["dead_letters"]["recent"]) == 1
+    assert status["dead_letters"]["recent"][0]["venue"] == "ASTER"
+    assert "LIGHTER" in status["rate_limiter"]
