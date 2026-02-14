@@ -1028,3 +1028,150 @@ def test_forum_approvals_plain_text(telegram_module):
     result = bot._parse_plain_text_command("forum approvals")
     assert result is not None
     assert result["action"] == "FORUM_PENDING_APPROVALS"
+
+
+# ── Phase 4: Reputation Telegram Commands ────────────────────────
+
+
+def test_rep_leaderboard_slash_command(telegram_module):
+    """'/rep leaderboard' dispatches REP_LEADERBOARD."""
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/rep leaderboard"}}
+        )
+    )
+    callback.assert_awaited_once()
+    _, _, action, _ = callback.await_args.args
+    assert action == "REP_LEADERBOARD"
+
+
+def test_rep_leaderboard_with_limit(telegram_module):
+    """'/rep leaderboard 5' passes limit in payload."""
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/rep leaderboard 5"}}
+        )
+    )
+    callback.assert_awaited_once()
+    platform, symbol, action, _ = callback.await_args.args
+    assert action == "REP_LEADERBOARD"
+    payload = json.loads(symbol)
+    assert payload["limit"] == 5
+
+
+def test_rep_info_slash_command(telegram_module):
+    """'/rep info BOT_ALPHA' dispatches REP_BOT_INFO."""
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/rep info BOT_ALPHA"}}
+        )
+    )
+    callback.assert_awaited_once()
+    _, symbol, action, _ = callback.await_args.args
+    assert action == "REP_BOT_INFO"
+    payload = json.loads(symbol)
+    assert payload["bot_id"] == "BOT_ALPHA"
+
+
+def test_rep_count_slash_command(telegram_module):
+    """'/rep count' dispatches REP_BOT_COUNT."""
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/rep count"}}
+        )
+    )
+    callback.assert_awaited_once()
+    _, _, action, _ = callback.await_args.args
+    assert action == "REP_BOT_COUNT"
+
+
+def test_rep_ban_slash_command(telegram_module):
+    """'/rep ban BOT_EVIL spam bot' dispatches REP_BAN_BOT."""
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/rep ban BOT_EVIL spam bot"}}
+        )
+    )
+    callback.assert_awaited_once()
+    _, symbol, action, _ = callback.await_args.args
+    assert action == "REP_BAN_BOT"
+    payload = json.loads(symbol)
+    assert payload["bot_id"] == "BOT_EVIL"
+    assert payload["reason"] == "spam bot"
+
+
+def test_rep_penalize_slash_command(telegram_module):
+    """'/rep penalize BOT_BAD low quality' dispatches REP_PENALIZE_BOT."""
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/rep penalize BOT_BAD low quality"}}
+        )
+    )
+    callback.assert_awaited_once()
+    _, symbol, action, _ = callback.await_args.args
+    assert action == "REP_PENALIZE_BOT"
+    payload = json.loads(symbol)
+    assert payload["bot_id"] == "BOT_BAD"
+    assert payload["reason"] == "low quality"
+
+
+def test_rep_leaderboard_plain_text(telegram_module):
+    """Plain text 'rep leaderboard' dispatches REP_LEADERBOARD."""
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=AsyncMock(),
+    )
+    result = bot._parse_plain_text_command("rep leaderboard")
+    assert result is not None
+    assert result["action"] == "REP_LEADERBOARD"
+
+
+def test_rep_info_plain_text(telegram_module):
+    """Plain text 'rep info BOT_TEST' dispatches REP_BOT_INFO."""
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=AsyncMock(),
+    )
+    result = bot._parse_plain_text_command("rep info BOT_TEST")
+    assert result is not None
+    assert result["action"] == "REP_BOT_INFO"
+    payload = json.loads(result["symbol"])
+    assert payload["bot_id"] == "BOT_TEST"
+
+
+def test_rep_count_plain_text(telegram_module):
+    """Plain text 'rep count' dispatches REP_BOT_COUNT."""
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=AsyncMock(),
+    )
+    result = bot._parse_plain_text_command("rep count")
+    assert result is not None
+    assert result["action"] == "REP_BOT_COUNT"

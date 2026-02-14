@@ -12,6 +12,7 @@ import aiohttp
 import uvloop
 from src.ai.gemini_guard import GeminiGuard
 from src.collaboration.forum import SapphireForumService
+from src.collaboration.reputation import BotReputationService
 from src.execution.dispatcher import dispatcher
 from src.execution.portfolio import PortfolioTracker
 from src.feeds.market_data import MarketDataAggregator
@@ -189,6 +190,7 @@ class AlphaEngine:
         self._system_log_max_entries = max(100, int(os.getenv("SYSTEM_LOG_MAX_ENTRIES", "500")))
         self._system_logs: Deque[Dict[str, Any]] = deque(maxlen=self._system_log_max_entries)
         self.forum = SapphireForumService()
+        self.reputation = BotReputationService()
         self.vt_scanner = VirusTotalSkillScanner()
         requested_media_mode = self._normalize_media_mode(
             os.getenv("SAPPHIRE_MEDIA_MODE", "owner_approval")
@@ -2866,6 +2868,114 @@ class AlphaEngine:
                     )
                 lines.append(f"\n_Threshold: {self.forum.APPROVAL_THRESHOLD} votes to resolve._")
                 await self.telegram.send_message("\n".join(lines), priority="medium")
+            return
+
+        # ── Phase 4: Bot Reputation & Points ─────────────────────────
+
+        if normalized_action == "REP_LEADERBOARD":
+            payload = self._parse_json_payload(target)
+            limit = max(1, min(25, int(payload.get("limit", 10))))
+            board = self.reputation.leaderboard(limit=limit)
+            if not board:
+                await self.telegram.send_as(EMERALD, "🏆 Leaderboard is empty — no bots registered yet.")
+            else:
+                lines = [f"🏆 **Bot Leaderboard** (top {len(board)})\n"]
+                for i, entry in enumerate(board, 1):
+                    bid = entry.get("bot_id", "?")
+                    comp = entry.get("composite", 0)
+                    score = entry.get("score", 0)
+                    ideas = entry.get("ideas_submitted", 0)
+                    accurate = entry.get("ideas_accurate", 0)
+                    pnl = entry.get("total_pnl", 0.0)
+                    status = entry.get("status", "active")
+                    medal = "🥇" if i == 1 else ("🥈" if i == 2 else ("🥉" if i == 3 else f"{i}."))
+                    lines.append(
+                        f"{medal} `{bid}` — composite: {comp:.1f} | score: {score:.0f}\n"
+                        f"   Ideas: {ideas} | Accurate: {accurate} | PnL: ${pnl:+,.2f} | {status}"
+                    )
+                await self.telegram.send_message("\n".join(lines), priority="medium")
+            return
+
+        if normalized_action == "REP_BOT_INFO":
+            payload = self._parse_json_payload(target)
+            bot_id = str(payload.get("bot_id", "")).strip()
+            if not bot_id:
+                await self.telegram.send_as(EMERALD, "⚠️ Please specify a bot ID.")
+                return
+            result = self.reputation.get_reputation(bot_id)
+            if not result.get("ok"):
+                await self.telegram.send_as(EMERALD, f"⚠️ Bot `{bot_id.upper()}` not found.")
+            else:
+                status_emoji = {"active": "🟢", "warned": "🟡", "banned": "🔴"}.get(
+                    result.get("status", ""), "⚪"
+                )
+                lines = [
+                    f"📊 **Bot Reputation: `{result['bot_id']}`** {status_emoji}\n",
+                    f"Score: **{result.get('score', 0):.0f}** | Composite: **{result.get('composite', 0):.1f}**",
+                    f"Status: `{result.get('status', 'active')}`",
+                    f"Ideas: {result.get('ideas_submitted', 0)} "
+                    f"(✅ {result.get('ideas_accurate', 0)} / ❌ {result.get('ideas_inaccurate', 0)})",
+                    f"Profitable: {result.get('ideas_profitable', 0)} "
+                    f"/ Unprofitable: {result.get('ideas_unprofitable', 0)}",
+                    f"Total PnL: ${result.get('total_pnl', 0.0):+,.2f}",
+                    f"Quality avg: {result.get('quality_avg', 0.0):.2f}",
+                    f"Penalties: {result.get('penalties', 0)} | Rewards: {result.get('rewards', 0)}",
+                ]
+                if result.get("ban_reason"):
+                    lines.append(f"Ban reason: _{result['ban_reason']}_")
+                await self.telegram.send_message("\n".join(lines), priority="medium")
+            return
+
+        if normalized_action == "REP_BOT_COUNT":
+            counts = self.reputation.bot_count()
+            total = sum(counts.values())
+            await self.telegram.send_message(
+                f"🤖 **Bot Census**\n"
+                f"Total: **{total}**\n"
+                f"🟢 Active: {counts.get('active', 0)}\n"
+                f"🟡 Warned: {counts.get('warned', 0)}\n"
+                f"🔴 Banned: {counts.get('banned', 0)}",
+                priority="medium",
+            )
+            return
+
+        if normalized_action == "REP_BAN_BOT":
+            gate.require(Capability.REPUTATION_ADMIN, agent="SAPPHIRE")
+            payload = self._parse_json_payload(target)
+            bot_id = str(payload.get("bot_id", "")).strip()
+            reason = str(payload.get("reason", "manual ban via Telegram"))[:200]
+            if not bot_id:
+                await self.telegram.send_as(SAPPHIRE, "⚠️ Please specify a bot ID to ban.")
+                return
+            result = self.reputation.ban(bot_id, reason)
+            if result.get("ok"):
+                await self.telegram.send_as(
+                    SAPPHIRE,
+                    f"🔴 **Bot banned:** `{bot_id.upper()}`\n"
+                    f"Reason: _{reason}_\nScore: {result.get('score', 0):.0f}",
+                )
+            else:
+                await self.telegram.send_as(SAPPHIRE, f"⚠️ Failed to ban `{bot_id}`.")
+            return
+
+        if normalized_action == "REP_PENALIZE_BOT":
+            gate.require(Capability.REPUTATION_ADMIN, agent="SAPPHIRE")
+            payload = self._parse_json_payload(target)
+            bot_id = str(payload.get("bot_id", "")).strip()
+            reason = str(payload.get("reason", "manual penalty via Telegram"))[:200]
+            points = float(payload.get("points", 0))
+            if not bot_id:
+                await self.telegram.send_as(SAPPHIRE, "⚠️ Please specify a bot ID to penalize.")
+                return
+            result = self.reputation.penalize(bot_id, reason, points=points)
+            if result.get("ok"):
+                await self.telegram.send_as(
+                    SAPPHIRE,
+                    f"⚠️ **Bot penalized:** `{bot_id.upper()}`\n"
+                    f"Reason: _{reason}_ | Score: {result.get('score', 0):.0f} | Status: {result.get('status', '?')}",
+                )
+            else:
+                await self.telegram.send_as(SAPPHIRE, f"⚠️ Failed to penalize `{bot_id}`.")
             return
 
         if normalized_action in {"SCOUT_STATUS", "FORUM_SCOUT_STATUS"}:

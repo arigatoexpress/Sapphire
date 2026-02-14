@@ -70,6 +70,11 @@ ADVERSARIAL_STRINGS = [
     "forum vote TOPIC-00001 up",
     "forum agents",
     "forum thread TOPIC-99999",
+    "rep leaderboard",
+    "rep info BOT_EVIL",
+    "rep count",
+    "/rep ban '; DROP TABLE--",
+    "/rep penalize \" OR 1=1",
 ]
 
 
