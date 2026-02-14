@@ -6,6 +6,7 @@ signal by the bot's reputation score.  Supports:
 - Submitting trade ideas from external bots
 - Reputation-weighted consensus aggregation
 - Conviction scoring (strong consensus vs. split opinions)
+- Prediction market sentiment as a virtual voter (Phase 8)
 - Idea lifecycle: open → aggregated → expired
 - Integration with BotReputationService for weights + recording
 """
@@ -13,11 +14,14 @@ signal by the bot's reputation score.  Supports:
 import threading
 import time
 from collections import defaultdict
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from loguru import logger
 
 from src.collaboration.reputation import BotReputationService
+
+if TYPE_CHECKING:
+    from src.feeds.prediction_aggregator import PredictionAggregator
 
 
 class SwarmAggregator:
@@ -31,8 +35,17 @@ class SwarmAggregator:
     IDEA_TTL_SECONDS = 3600  # Ideas expire after 1 hour
     MAX_IDEAS_PER_SYMBOL = 50  # Max open ideas per symbol
 
-    def __init__(self, reputation: BotReputationService):
+    # Prediction market virtual voter weight (0.0–1.0)
+    # Controls how much prediction market sentiment influences consensus.
+    PM_WEIGHT = 0.25  # 25% of a top-reputation bot
+
+    def __init__(
+        self,
+        reputation: BotReputationService,
+        prediction_aggregator: Optional["PredictionAggregator"] = None,
+    ):
         self._reputation = reputation
+        self._prediction_aggregator = prediction_aggregator
         self._lock = threading.Lock()
         # {symbol: [idea_dict, ...]}
         self._ideas: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
@@ -163,6 +176,13 @@ class SwarmAggregator:
             # Weighted sums
             weighted_long = sum(i["weighted_score"] for i in long_ideas)
             weighted_short = sum(i["weighted_score"] for i in short_ideas)
+
+            # Inject prediction market sentiment as virtual voter (Phase 8)
+            pm_adjustment = self._get_pm_adjustment(symbol)
+            if pm_adjustment:
+                weighted_long += pm_adjustment.get("long_boost", 0.0)
+                weighted_short += pm_adjustment.get("short_boost", 0.0)
+
             total_weight = weighted_long + weighted_short
 
             # Net directional score
@@ -214,6 +234,19 @@ class SwarmAggregator:
             if stop_count > 0:
                 avg_stop /= dominant_total_weight
 
+            # Include PM virtual voter in contributors if it contributed
+            if pm_adjustment:
+                contributors.append({
+                    "bot_id": "__PREDICTION_MARKET__",
+                    "direction": pm_adjustment["direction"],
+                    "confidence": pm_adjustment["confidence"],
+                    "reputation_weight": self.PM_WEIGHT,
+                    "weighted_score": pm_adjustment.get("long_boost", 0.0) + pm_adjustment.get("short_boost", 0.0),
+                    "idea_id": "pm_virtual_voter",
+                    "source": "prediction_market",
+                    "sentiment": pm_adjustment.get("sentiment", "neutral"),
+                })
+
             return {
                 "ok": True,
                 "symbol": symbol,
@@ -228,6 +261,7 @@ class SwarmAggregator:
                 "avg_target_price": round(avg_target, 6) if avg_target else 0.0,
                 "avg_stop_loss": round(avg_stop, 6) if avg_stop else 0.0,
                 "contributors": contributors,
+                "pm_adjustment": pm_adjustment,
             }
 
     def get_idea(self, idea_id: str) -> Optional[Dict[str, Any]]:
@@ -341,6 +375,59 @@ class SwarmAggregator:
                 "expired_ideas": total_expired,
                 "active_symbols": symbols_active,
             }
+
+    def _get_pm_adjustment(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """Derive a virtual vote from prediction market sentiment.
+
+        Translates PM consensus (probability-based) into a directional
+        weight boost for the swarm aggregation. Returns None if PM
+        data is unavailable or neutral.
+        """
+        if not self._prediction_aggregator or not self._prediction_aggregator.enabled:
+            return None
+
+        try:
+            sent = self._prediction_aggregator.get_symbol_sentiment(symbol)
+        except Exception:
+            return None
+
+        if sent["signal_count"] == 0:
+            return None
+
+        sentiment = sent["sentiment"]
+        confidence = sent["confidence"]
+        prob = sent["weighted_probability"]
+
+        # Map sentiment to directional boost
+        if sentiment in ("strongly_bullish", "bullish"):
+            direction = "LONG"
+            # Strength scales with distance from 0.5
+            strength = (prob - 0.5) * 2  # 0.6→0.2, 0.75→0.5, 0.9→0.8
+            long_boost = self.PM_WEIGHT * strength * confidence
+            return {
+                "direction": direction,
+                "sentiment": sentiment,
+                "confidence": round(confidence, 4),
+                "probability": round(prob, 4),
+                "long_boost": round(max(0.0, long_boost), 4),
+                "short_boost": 0.0,
+                "signal_count": sent["signal_count"],
+            }
+        elif sentiment in ("strongly_bearish", "bearish"):
+            direction = "SHORT"
+            strength = (0.5 - prob) * 2  # 0.4→0.2, 0.25→0.5, 0.1→0.8
+            short_boost = self.PM_WEIGHT * strength * confidence
+            return {
+                "direction": direction,
+                "sentiment": sentiment,
+                "confidence": round(confidence, 4),
+                "probability": round(prob, 4),
+                "long_boost": 0.0,
+                "short_boost": round(max(0.0, short_boost), 4),
+                "signal_count": sent["signal_count"],
+            }
+
+        return None  # Neutral — no adjustment
 
     def _prune_expired_locked(self, symbol: str) -> None:
         """Mark expired ideas (must be called under lock)."""

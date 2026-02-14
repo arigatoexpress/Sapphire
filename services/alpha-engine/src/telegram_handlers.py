@@ -1496,6 +1496,16 @@ async def handle_prediction_commands(engine: "AlphaEngine", target: str, action:
         await engine.telegram.send_message(msg, priority="high")
         return True
 
+    if normalized in {"PREDICTION_ACCURACY", "PM_ACCURACY"}:
+        msg = engine.prediction_aggregator.format_telegram_accuracy()
+        await engine.telegram.send_message(msg, priority="medium")
+        return True
+
+    if normalized in {"PM_WHALE", "PM_WHALES", "PREDICTION_WHALE", "PM_MANIPULATION"}:
+        msg = engine.prediction_aggregator.format_telegram_whale_alerts()
+        await engine.telegram.send_message(msg, priority="high")
+        return True
+
     if normalized in {"PREDICTION_HIGH", "PM_HIGH", "PM_CONVICTION"}:
         signals = engine.prediction_aggregator.get_high_conviction_signals()
         if not signals:

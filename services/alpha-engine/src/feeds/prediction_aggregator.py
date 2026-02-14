@@ -23,6 +23,7 @@ from loguru import logger
 
 from .kalshi_client import KalshiClient
 from .polymarket_client import PolymarketClient
+from .prediction_accuracy import PredictionAccuracyTracker
 from .prediction_signal import (
     ArbitrageOpportunity,
     PredictionMarketFeed,
@@ -93,6 +94,7 @@ class PredictionAggregator:
         self._forum_post_interval = max(
             300, int(os.getenv("SAPPHIRE_PM_FORUM_INTERVAL", "3600"))
         )
+        self._accuracy_tracker = PredictionAccuracyTracker(max_snapshots=500)
 
     @property
     def enabled(self) -> bool:
@@ -396,6 +398,13 @@ class PredictionAggregator:
             for arb in symbol_arbs[:3]:
                 lines.append(f"    {arb.context_string()}")
 
+        # Whale activity & manipulation warnings for this symbol
+        whale_alerts = self._detect_whale_and_manipulation(symbol)
+        if whale_alerts:
+            lines.append(f"  ⚠️ Market Intelligence Alerts:")
+            for alert in whale_alerts[:5]:
+                lines.append(f"    {alert}")
+
         return "\n".join(lines)
 
     def get_macro_context(self) -> str:
@@ -414,6 +423,71 @@ class PredictionAggregator:
         lines = ["Macro Prediction Markets:"]
         for sig in macro[:5]:
             lines.append(f"  {sig.context_string()}")
+        return "\n".join(lines)
+
+    # ── Whale & Manipulation Detection ──────────────────────────
+
+    def _detect_whale_and_manipulation(self, symbol: str = "") -> List[str]:
+        """Detect whale activity and manipulation patterns in prediction markets.
+
+        Returns human-readable alert strings for cognition context.
+        """
+        alerts: List[str] = []
+        signals = self.get_signals_for_symbol(symbol) if symbol else self.get_all_signals()
+
+        for sig in signals:
+            if sig.is_whale_activity:
+                vc = sig.volume_change
+                m = sig.momentum
+                vc_str = f"{vc:.1f}x" if vc is not None else "?"
+                m_str = f"{m:+.1%}" if m is not None else "?"
+                alerts.append(
+                    f"🐋 WHALE [{sig.source.value}] {sig.question[:50]}: "
+                    f"vol {vc_str} spike, prob {m_str} shift"
+                )
+
+            risk = sig.manipulation_risk
+            if risk == "wash_trading":
+                alerts.append(
+                    f"⚠️ WASH TRADE [{sig.source.value}] {sig.question[:50]}: "
+                    f"volume spike with no price movement — possible fake liquidity"
+                )
+            elif risk == "low_liquidity_pump":
+                ratio = sig.volume_usd / sig.liquidity_usd if sig.liquidity_usd > 0 else 0
+                alerts.append(
+                    f"⚠️ LOW LIQ [{sig.source.value}] {sig.question[:50]}: "
+                    f"vol/liq ratio {ratio:.0f}x — easily manipulated"
+                )
+            elif risk == "insider_pattern":
+                m = sig.momentum
+                m_str = f"{m:+.1%}" if m is not None else "?"
+                alerts.append(
+                    f"⚠️ INSIDER [{sig.source.value}] {sig.question[:50]}: "
+                    f"{m_str} prob jump without volume catalyst"
+                )
+
+            if sig.is_volume_spike and not sig.is_whale_activity:
+                vc = sig.volume_change
+                alerts.append(
+                    f"📈 VOL SPIKE [{sig.source.value}] {sig.question[:50]}: "
+                    f"{vc:.1f}x volume increase"
+                )
+
+        return alerts
+
+    def format_telegram_whale_alerts(self, limit: int = 10) -> str:
+        """Format whale activity and manipulation alerts for Telegram."""
+        if not self._enabled:
+            return "🔮 Prediction markets: disabled"
+
+        alerts = self._detect_whale_and_manipulation()
+        if not alerts:
+            return "🐋 **Whale & Manipulation Monitor**\n\nNo suspicious activity detected."
+
+        lines = [f"🐋 **Whale & Manipulation Monitor** ({len(alerts)} alerts)\n"]
+        for alert in alerts[:limit]:
+            lines.append(alert)
+
         return "\n".join(lines)
 
     # ── Forum Summaries ──────────────────────────────────────────
@@ -465,6 +539,13 @@ class PredictionAggregator:
                     f"(spread={arb.spread_pct:.1f}%, conf={arb.confidence:.0f})"
                 )
 
+        # Whale & Manipulation alerts
+        whale_alerts = self._detect_whale_and_manipulation()
+        if whale_alerts:
+            lines.append(f"\n**⚠️ Market Intelligence ({len(whale_alerts)} alerts):**")
+            for alert in whale_alerts[:5]:
+                lines.append(f"- {alert}")
+
         # Symbol-level sentiment
         seen_symbols = set()
         for sig in signals:
@@ -502,12 +583,16 @@ class PredictionAggregator:
         high_conviction = len(self.get_high_conviction_signals())
         arb_count = len(self.find_arbitrage_opportunities())
 
+        accuracy = self._accuracy_tracker.get_accuracy_stats()
+
         return {
             "enabled": self._enabled,
             "feeds": feed_statuses,
             "total_signals": total_signals,
             "high_conviction_signals": high_conviction,
             "arbitrage_opportunities": arb_count,
+            "accuracy_tracked": accuracy["total_tracked"],
+            "accuracy_resolved": accuracy["total_resolved"],
             "last_forum_post": self._last_forum_post_ts,
         }
 
@@ -530,6 +615,7 @@ class PredictionAggregator:
         lines.append(f"\nTotal signals: {status['total_signals']}")
         lines.append(f"High conviction: {status['high_conviction_signals']}")
         lines.append(f"Arbitrage opportunities: {status['arbitrage_opportunities']}")
+        lines.append(f"Accuracy tracked: {status['accuracy_tracked']} ({status['accuracy_resolved']} resolved)")
 
         return "\n".join(lines)
 
@@ -570,3 +656,66 @@ class PredictionAggregator:
             )
 
         return "\n".join(lines)
+
+    # ── Accuracy Tracking ─────────────────────────────────────────
+
+    @property
+    def accuracy_tracker(self) -> PredictionAccuracyTracker:
+        return self._accuracy_tracker
+
+    def record_signals_for_accuracy(self) -> int:
+        """Snapshot all current signals for accuracy tracking.
+
+        Should be called periodically (e.g., in the poll loop).
+        Returns the number of new signals recorded.
+        """
+        recorded = 0
+        for signal in self.get_all_signals():
+            # Only record if not already tracked
+            if signal.market_id not in self._accuracy_tracker._snapshots:
+                self._accuracy_tracker.record_signal(signal)
+                recorded += 1
+        return recorded
+
+    def format_telegram_accuracy(self) -> str:
+        """Format prediction accuracy stats for Telegram display."""
+        return self._accuracy_tracker.format_telegram_accuracy()
+
+    def get_prediction_dashboard_data(self) -> Dict[str, Any]:
+        """Get full prediction market data for the dashboard API.
+
+        Combines status, signals, arbitrage, accuracy, and sentiment.
+        """
+        status = self.get_status()
+        accuracy = self._accuracy_tracker.get_accuracy_stats()
+
+        # Top signals by volume
+        top_signals = [s.to_dict() for s in self.get_all_signals(min_volume=10_000)[:15]]
+
+        # High conviction signals
+        hc_signals = [s.to_dict() for s in self.get_high_conviction_signals()[:10]]
+
+        # Arbitrage opportunities
+        arb_opps = [o.to_dict() for o in self.find_arbitrage_opportunities()[:10]]
+
+        # Symbol sentiments
+        symbols_seen: set[str] = set()
+        for s in self.get_all_signals():
+            symbols_seen.update(s.symbols)
+        sentiments = {}
+        for sym in sorted(symbols_seen):
+            sentiments[sym] = self.get_symbol_sentiment(sym)
+
+        # Whale & manipulation alerts
+        whale_alerts = self._detect_whale_and_manipulation()
+
+        return {
+            "status": status,
+            "accuracy": accuracy,
+            "signals": top_signals,
+            "high_conviction": hc_signals,
+            "arbitrage": arb_opps,
+            "sentiments": sentiments,
+            "whale_alerts": whale_alerts[:20],
+            "pending_accuracy": self._accuracy_tracker.get_pending_markets()[:20],
+        }

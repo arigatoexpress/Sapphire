@@ -1275,6 +1275,809 @@ class TestAlphaScannerPredictionIntegration:
         assert scanner.prediction_aggregator is None
 
 
+# ── Swarm PM Integration ────────────────────────────────────────────
+
+from src.collaboration.swarm import SwarmAggregator
+from src.collaboration.reputation import BotReputationService
+from src.feeds.prediction_accuracy import PredictionAccuracyTracker, PredictionSnapshot
+
+
+class TestSwarmPMIntegration:
+    """Test prediction market sentiment injection into swarm consensus."""
+
+    def _make_swarm_with_pm(self, sentiment_result=None):
+        """Create a SwarmAggregator with a mocked prediction aggregator."""
+        rep = BotReputationService()
+        pm_agg = MagicMock()
+        pm_agg.enabled = True
+        if sentiment_result:
+            pm_agg.get_symbol_sentiment.return_value = sentiment_result
+        swarm = SwarmAggregator(reputation=rep, prediction_aggregator=pm_agg)
+        return swarm, rep, pm_agg
+
+    def test_swarm_pm_aggregator_stored(self):
+        rep = BotReputationService()
+        pm_agg = MagicMock()
+        swarm = SwarmAggregator(reputation=rep, prediction_aggregator=pm_agg)
+        assert swarm._prediction_aggregator is pm_agg
+
+    def test_swarm_pm_aggregator_none_by_default(self):
+        rep = BotReputationService()
+        swarm = SwarmAggregator(reputation=rep)
+        assert swarm._prediction_aggregator is None
+
+    def test_pm_adjustment_bullish(self):
+        swarm, _, pm_agg = self._make_swarm_with_pm({
+            "sentiment": "bullish",
+            "confidence": 0.8,
+            "weighted_probability": 0.65,
+            "signal_count": 3,
+        })
+        adj = swarm._get_pm_adjustment("BTC")
+        assert adj is not None
+        assert adj["direction"] == "LONG"
+        assert adj["long_boost"] > 0
+        assert adj["short_boost"] == 0.0
+
+    def test_pm_adjustment_strongly_bullish(self):
+        swarm, _, pm_agg = self._make_swarm_with_pm({
+            "sentiment": "strongly_bullish",
+            "confidence": 0.9,
+            "weighted_probability": 0.85,
+            "signal_count": 5,
+        })
+        adj = swarm._get_pm_adjustment("BTC")
+        assert adj["direction"] == "LONG"
+        # strength = (0.85 - 0.5) * 2 = 0.7, boost = 0.25 * 0.7 * 0.9 = 0.1575
+        assert adj["long_boost"] == pytest.approx(0.1575, abs=0.01)
+
+    def test_pm_adjustment_bearish(self):
+        swarm, _, pm_agg = self._make_swarm_with_pm({
+            "sentiment": "bearish",
+            "confidence": 0.7,
+            "weighted_probability": 0.35,
+            "signal_count": 2,
+        })
+        adj = swarm._get_pm_adjustment("ETH")
+        assert adj is not None
+        assert adj["direction"] == "SHORT"
+        assert adj["short_boost"] > 0
+        assert adj["long_boost"] == 0.0
+
+    def test_pm_adjustment_strongly_bearish(self):
+        swarm, _, pm_agg = self._make_swarm_with_pm({
+            "sentiment": "strongly_bearish",
+            "confidence": 0.85,
+            "weighted_probability": 0.15,
+            "signal_count": 4,
+        })
+        adj = swarm._get_pm_adjustment("SOL")
+        assert adj["direction"] == "SHORT"
+        # strength = (0.5 - 0.15) * 2 = 0.7, boost = 0.25 * 0.7 * 0.85 = 0.14875
+        assert adj["short_boost"] == pytest.approx(0.1488, abs=0.01)
+
+    def test_pm_adjustment_neutral_returns_none(self):
+        swarm, _, pm_agg = self._make_swarm_with_pm({
+            "sentiment": "neutral",
+            "confidence": 0.5,
+            "weighted_probability": 0.50,
+            "signal_count": 2,
+        })
+        adj = swarm._get_pm_adjustment("BTC")
+        assert adj is None
+
+    def test_pm_adjustment_no_signals_returns_none(self):
+        swarm, _, pm_agg = self._make_swarm_with_pm({
+            "sentiment": "neutral",
+            "confidence": 0.0,
+            "weighted_probability": 0.5,
+            "signal_count": 0,
+        })
+        adj = swarm._get_pm_adjustment("BTC")
+        assert adj is None
+
+    def test_pm_adjustment_disabled_aggregator(self):
+        rep = BotReputationService()
+        pm_agg = MagicMock()
+        pm_agg.enabled = False
+        swarm = SwarmAggregator(reputation=rep, prediction_aggregator=pm_agg)
+        adj = swarm._get_pm_adjustment("BTC")
+        assert adj is None
+
+    def test_pm_adjustment_no_aggregator(self):
+        rep = BotReputationService()
+        swarm = SwarmAggregator(reputation=rep)
+        adj = swarm._get_pm_adjustment("BTC")
+        assert adj is None
+
+    def test_pm_adjustment_exception_returns_none(self):
+        swarm, _, pm_agg = self._make_swarm_with_pm()
+        pm_agg.get_symbol_sentiment.side_effect = RuntimeError("API down")
+        adj = swarm._get_pm_adjustment("BTC")
+        assert adj is None
+
+    def test_aggregate_includes_pm_boost_long(self):
+        swarm, rep, pm_agg = self._make_swarm_with_pm({
+            "sentiment": "bullish",
+            "confidence": 0.8,
+            "weighted_probability": 0.65,
+            "signal_count": 3,
+        })
+        # Submit two LONG ideas
+        swarm.submit_idea("BOT_A", "BTC", "LONG", confidence=0.7)
+        swarm.submit_idea("BOT_B", "BTC", "LONG", confidence=0.6)
+
+        result = swarm.aggregate("BTC")
+        assert result["ok"] is True
+        assert result["pm_adjustment"] is not None
+        assert result["pm_adjustment"]["direction"] == "LONG"
+        # PM virtual voter should be in contributors
+        pm_voters = [c for c in result["contributors"] if c["bot_id"] == "__PREDICTION_MARKET__"]
+        assert len(pm_voters) == 1
+        assert pm_voters[0]["direction"] == "LONG"
+
+    def test_aggregate_includes_pm_boost_short(self):
+        swarm, rep, pm_agg = self._make_swarm_with_pm({
+            "sentiment": "bearish",
+            "confidence": 0.75,
+            "weighted_probability": 0.30,
+            "signal_count": 2,
+        })
+        swarm.submit_idea("BOT_A", "ETH", "SHORT", confidence=0.8)
+
+        result = swarm.aggregate("ETH")
+        assert result["ok"] is True
+        assert result["pm_adjustment"] is not None
+        assert result["pm_adjustment"]["direction"] == "SHORT"
+        assert result["weighted_short"] > 0
+
+    def test_aggregate_no_pm_when_neutral(self):
+        swarm, rep, pm_agg = self._make_swarm_with_pm({
+            "sentiment": "neutral",
+            "confidence": 0.5,
+            "weighted_probability": 0.50,
+            "signal_count": 2,
+        })
+        swarm.submit_idea("BOT_A", "BTC", "LONG", confidence=0.6)
+        result = swarm.aggregate("BTC")
+        assert result["pm_adjustment"] is None
+
+    def test_aggregate_pm_weight_constant(self):
+        assert SwarmAggregator.PM_WEIGHT == 0.25
+
+
+# ── Prediction Accuracy Tracker ─────────────────────────────────────
+
+class TestPredictionAccuracyTracker:
+    """Test prediction accuracy tracking and Brier score calculation."""
+
+    def test_record_signal_first_time(self):
+        tracker = PredictionAccuracyTracker(max_snapshots=100)
+        sig = _make_signal(market_id="test1")
+        tracker.record_signal(sig)
+        assert "test1" in tracker._snapshots
+        snap = tracker._snapshots["test1"]
+        assert snap.probability == 0.72
+        assert snap.resolved is False
+
+    def test_record_signal_deduplication(self):
+        tracker = PredictionAccuracyTracker(max_snapshots=100)
+        sig = _make_signal(market_id="test1")
+        tracker.record_signal(sig)
+        # Record again — should not overwrite
+        sig2 = _make_signal(market_id="test1", probability=0.99)
+        tracker.record_signal(sig2)
+        assert tracker._snapshots["test1"].probability == 0.72  # Original value
+
+    def test_record_outcome_correct_yes(self):
+        tracker = PredictionAccuracyTracker()
+        sig = _make_signal(market_id="test_yes", probability=0.80)
+        tracker.record_signal(sig)
+        result = tracker.record_outcome("test_yes", outcome=True)
+        assert result is not None
+        assert result["correct"] is True
+        # Brier: (0.8 - 1.0)^2 = 0.04
+        assert result["brier_score"] == pytest.approx(0.04, abs=0.001)
+
+    def test_record_outcome_correct_no(self):
+        tracker = PredictionAccuracyTracker()
+        sig = _make_signal(market_id="test_no", probability=0.30)
+        tracker.record_signal(sig)
+        result = tracker.record_outcome("test_no", outcome=False)
+        assert result is not None
+        assert result["correct"] is True
+        # Brier: (0.3 - 0.0)^2 = 0.09
+        assert result["brier_score"] == pytest.approx(0.09, abs=0.001)
+
+    def test_record_outcome_wrong(self):
+        tracker = PredictionAccuracyTracker()
+        sig = _make_signal(market_id="test_wrong", probability=0.80)
+        tracker.record_signal(sig)
+        result = tracker.record_outcome("test_wrong", outcome=False)
+        assert result["correct"] is False
+        # Brier: (0.8 - 0.0)^2 = 0.64
+        assert result["brier_score"] == pytest.approx(0.64, abs=0.001)
+
+    def test_record_outcome_unknown_market(self):
+        tracker = PredictionAccuracyTracker()
+        result = tracker.record_outcome("nonexistent", outcome=True)
+        assert result is None
+
+    def test_record_outcome_already_resolved(self):
+        tracker = PredictionAccuracyTracker()
+        sig = _make_signal(market_id="test_dup")
+        tracker.record_signal(sig)
+        tracker.record_outcome("test_dup", outcome=True)
+        result2 = tracker.record_outcome("test_dup", outcome=False)
+        assert result2 is None  # Cannot re-resolve
+
+    def test_accuracy_stats_empty(self):
+        tracker = PredictionAccuracyTracker()
+        stats = tracker.get_accuracy_stats()
+        assert stats["total_tracked"] == 0
+        assert stats["total_resolved"] == 0
+        assert stats["overall_accuracy_pct"] == 0.0
+        assert stats["overall_brier"] == 0.0
+
+    def test_accuracy_stats_with_outcomes(self):
+        tracker = PredictionAccuracyTracker()
+        # Add 3 signals, resolve 2
+        for i, (prob, outcome) in enumerate([(0.80, True), (0.30, False), (0.60, None)]):
+            sig = _make_signal(market_id=f"s{i}", probability=prob)
+            tracker.record_signal(sig)
+            if outcome is not None:
+                tracker.record_outcome(f"s{i}", outcome=outcome)
+
+        stats = tracker.get_accuracy_stats()
+        assert stats["total_tracked"] == 3
+        assert stats["total_resolved"] == 2
+        assert stats["total_pending"] == 1
+        assert stats["overall_accuracy_pct"] == 100.0  # Both correct
+
+    def test_accuracy_stats_per_source(self):
+        tracker = PredictionAccuracyTracker()
+        sig_poly = _make_signal(market_id="poly1", source=PredictionSource.POLYMARKET, probability=0.80)
+        sig_kalshi = _make_signal(market_id="kalshi1", source=PredictionSource.KALSHI, probability=0.30)
+        tracker.record_signal(sig_poly)
+        tracker.record_signal(sig_kalshi)
+        tracker.record_outcome("poly1", outcome=True)
+        tracker.record_outcome("kalshi1", outcome=False)
+
+        stats = tracker.get_accuracy_stats()
+        assert "polymarket" in stats["by_source"]
+        assert "kalshi" in stats["by_source"]
+        assert stats["by_source"]["polymarket"]["correct"] == 1
+        assert stats["by_source"]["kalshi"]["correct"] == 1
+
+    def test_accuracy_high_conviction_tracking(self):
+        tracker = PredictionAccuracyTracker()
+        # High conviction: volume >= 50K and prob >= 0.70
+        hc_sig = _make_signal(market_id="hc1", probability=0.85, volume_usd=100_000)
+        lc_sig = _make_signal(market_id="lc1", probability=0.55, volume_usd=5_000)
+        tracker.record_signal(hc_sig)
+        tracker.record_signal(lc_sig)
+        tracker.record_outcome("hc1", outcome=True)
+        tracker.record_outcome("lc1", outcome=True)
+
+        stats = tracker.get_accuracy_stats()
+        assert stats["high_conviction_resolved"] == 1
+        assert stats["high_conviction_accuracy_pct"] == 100.0
+
+    def test_pending_markets(self):
+        tracker = PredictionAccuracyTracker()
+        sig = _make_signal(market_id="pending1")
+        tracker.record_signal(sig)
+        pending = tracker.get_pending_markets()
+        assert len(pending) == 1
+        assert pending[0]["market_id"] == "pending1"
+
+    def test_pending_excludes_resolved(self):
+        tracker = PredictionAccuracyTracker()
+        sig = _make_signal(market_id="resolved1")
+        tracker.record_signal(sig)
+        tracker.record_outcome("resolved1", outcome=True)
+        pending = tracker.get_pending_markets()
+        assert len(pending) == 0
+
+    def test_eviction_at_capacity(self):
+        tracker = PredictionAccuracyTracker(max_snapshots=3)
+        for i in range(4):
+            sig = _make_signal(market_id=f"evict{i}", probability=0.5 + i * 0.1)
+            tracker.record_signal(sig)
+            # Resolve the first one so it gets evicted first
+            if i == 0:
+                tracker.record_outcome(f"evict{i}", outcome=True)
+
+        # Should have evicted one to stay at max
+        assert len(tracker._snapshots) <= 3
+
+    def test_eviction_prefers_resolved(self):
+        tracker = PredictionAccuracyTracker(max_snapshots=2)
+        sig1 = _make_signal(market_id="keep_pending")
+        sig2 = _make_signal(market_id="remove_resolved")
+        tracker.record_signal(sig1)
+        tracker.record_signal(sig2)
+        tracker.record_outcome("remove_resolved", outcome=True)
+        # Now add a third — should evict the resolved one
+        sig3 = _make_signal(market_id="new_one")
+        tracker.record_signal(sig3)
+        assert "keep_pending" in tracker._snapshots
+        assert "new_one" in tracker._snapshots
+
+    def test_brier_score_perfect_yes(self):
+        """prob=1.0, outcome=True → Brier=0.0 (perfect)."""
+        tracker = PredictionAccuracyTracker()
+        sig = _make_signal(market_id="perfect", probability=1.0)
+        tracker.record_signal(sig)
+        result = tracker.record_outcome("perfect", outcome=True)
+        assert result["brier_score"] == 0.0
+
+    def test_brier_score_perfect_no(self):
+        """prob=0.0, outcome=False → Brier=0.0 (perfect)."""
+        tracker = PredictionAccuracyTracker()
+        sig = _make_signal(market_id="perfect_no", probability=0.0)
+        tracker.record_signal(sig)
+        result = tracker.record_outcome("perfect_no", outcome=False)
+        assert result["brier_score"] == 0.0
+
+    def test_brier_score_worst_case(self):
+        """prob=1.0, outcome=False → Brier=1.0 (worst)."""
+        tracker = PredictionAccuracyTracker()
+        sig = _make_signal(market_id="worst", probability=1.0)
+        tracker.record_signal(sig)
+        result = tracker.record_outcome("worst", outcome=False)
+        assert result["brier_score"] == 1.0
+
+    def test_format_telegram_empty(self):
+        tracker = PredictionAccuracyTracker()
+        text = tracker.format_telegram_accuracy()
+        assert "Prediction Accuracy" in text
+        assert "No resolved predictions" in text
+
+    def test_format_telegram_with_data(self):
+        tracker = PredictionAccuracyTracker()
+        sig = _make_signal(market_id="fmt1", probability=0.75)
+        tracker.record_signal(sig)
+        tracker.record_outcome("fmt1", outcome=True)
+        text = tracker.format_telegram_accuracy()
+        assert "Resolved:" in text
+        assert "accuracy" in text.lower()
+
+
+# ── Aggregator Accuracy Integration ─────────────────────────────────
+
+class TestAggregatorAccuracyIntegration:
+    """Test accuracy tracker integration in PredictionAggregator."""
+
+    def test_aggregator_has_accuracy_tracker(self):
+        from src.feeds.prediction_aggregator import PredictionAggregator
+        agg = PredictionAggregator()
+        assert agg._accuracy_tracker is not None
+        assert isinstance(agg._accuracy_tracker, PredictionAccuracyTracker)
+
+    def test_aggregator_accuracy_tracker_property(self):
+        from src.feeds.prediction_aggregator import PredictionAggregator
+        agg = PredictionAggregator()
+        assert agg.accuracy_tracker is agg._accuracy_tracker
+
+    def test_record_signals_for_accuracy(self):
+        from src.feeds.prediction_aggregator import PredictionAggregator
+        agg = PredictionAggregator()
+        # Mock the feeds to return signals
+        sig1 = _make_signal(market_id="rec1")
+        sig2 = _make_signal(market_id="rec2")
+        agg._polymarket.get_signals = MagicMock(return_value=[sig1])
+        agg._kalshi.get_signals = MagicMock(return_value=[sig2])
+        recorded = agg.record_signals_for_accuracy()
+        assert recorded == 2
+        assert "rec1" in agg._accuracy_tracker._snapshots
+        assert "rec2" in agg._accuracy_tracker._snapshots
+
+    def test_record_signals_dedup(self):
+        from src.feeds.prediction_aggregator import PredictionAggregator
+        agg = PredictionAggregator()
+        sig1 = _make_signal(market_id="dup1")
+        agg._polymarket.get_signals = MagicMock(return_value=[sig1])
+        agg._kalshi.get_signals = MagicMock(return_value=[])
+        agg.record_signals_for_accuracy()
+        count2 = agg.record_signals_for_accuracy()
+        assert count2 == 0  # Already recorded
+
+    def test_format_telegram_accuracy(self):
+        from src.feeds.prediction_aggregator import PredictionAggregator
+        agg = PredictionAggregator()
+        text = agg.format_telegram_accuracy()
+        assert "Prediction Accuracy" in text
+
+    def test_status_includes_accuracy(self):
+        from src.feeds.prediction_aggregator import PredictionAggregator
+        agg = PredictionAggregator()
+        status = agg.get_status()
+        assert "accuracy_tracked" in status
+        assert "accuracy_resolved" in status
+
+    def test_format_telegram_status_includes_accuracy(self):
+        from src.feeds.prediction_aggregator import PredictionAggregator
+        with patch.dict(os.environ, {"SAPPHIRE_PREDICTION_MARKET_ENABLED": "true"}):
+            agg = PredictionAggregator()
+        text = agg.format_telegram_status()
+        assert "Accuracy tracked:" in text
+
+    def test_dashboard_data_structure(self):
+        from src.feeds.prediction_aggregator import PredictionAggregator
+        agg = PredictionAggregator()
+        agg._polymarket.get_signals = MagicMock(return_value=[])
+        agg._kalshi.get_signals = MagicMock(return_value=[])
+        data = agg.get_prediction_dashboard_data()
+        assert "status" in data
+        assert "accuracy" in data
+        assert "signals" in data
+        assert "high_conviction" in data
+        assert "arbitrage" in data
+        assert "sentiments" in data
+        assert "pending_accuracy" in data
+
+    def test_dashboard_data_with_signals(self):
+        from src.feeds.prediction_aggregator import PredictionAggregator
+        agg = PredictionAggregator()
+        sig = _make_signal(market_id="dash1", volume_usd=100_000)
+        agg._polymarket.get_signals = MagicMock(return_value=[sig])
+        agg._kalshi.get_signals = MagicMock(return_value=[])
+        data = agg.get_prediction_dashboard_data()
+        assert len(data["signals"]) == 1
+        assert data["signals"][0]["market_id"] == "dash1"
+        assert "BTC" in data["sentiments"]
+
+
+# ── Telegram Accuracy Command ───────────────────────────────────────
+
+# ── Whale Activity & Manipulation Detection ─────────────────────────
+
+class TestWhaleActivityDetection:
+    """Test whale activity and volume spike detection on PredictionSignal."""
+
+    def test_volume_change_calculated(self):
+        sig = _make_signal(volume_usd=300_000, volume_1h_ago=100_000)
+        assert sig.volume_change == pytest.approx(3.0)
+
+    def test_volume_change_none_without_history(self):
+        sig = _make_signal(volume_usd=300_000)
+        assert sig.volume_change is None
+
+    def test_volume_change_none_when_zero(self):
+        sig = _make_signal(volume_usd=300_000, volume_1h_ago=0)
+        assert sig.volume_change is None
+
+    def test_is_volume_spike_true(self):
+        sig = _make_signal(volume_usd=400_000, volume_1h_ago=100_000)
+        assert sig.is_volume_spike is True  # 4x
+
+    def test_is_volume_spike_false(self):
+        sig = _make_signal(volume_usd=200_000, volume_1h_ago=100_000)
+        assert sig.is_volume_spike is False  # 2x < 3x threshold
+
+    def test_is_volume_spike_exactly_3x(self):
+        sig = _make_signal(volume_usd=300_000, volume_1h_ago=100_000)
+        assert sig.is_volume_spike is True
+
+    def test_whale_activity_big_volume_big_move(self):
+        sig = _make_signal(
+            probability=0.80, probability_1h_ago=0.70,
+            volume_usd=300_000, volume_1h_ago=100_000,
+        )
+        assert sig.is_whale_activity is True  # 3x vol, 10% move
+
+    def test_whale_activity_big_volume_small_move(self):
+        sig = _make_signal(
+            probability=0.72, probability_1h_ago=0.70,
+            volume_usd=300_000, volume_1h_ago=100_000,
+        )
+        assert sig.is_whale_activity is False  # 2% move < 5% threshold
+
+    def test_whale_activity_small_volume(self):
+        sig = _make_signal(
+            probability=0.80, probability_1h_ago=0.70,
+            volume_usd=150_000, volume_1h_ago=100_000,
+        )
+        assert sig.is_whale_activity is False  # 1.5x vol < 2x threshold
+
+    def test_whale_activity_no_history(self):
+        sig = _make_signal(probability=0.80)
+        assert sig.is_whale_activity is False
+
+
+class TestManipulationRisk:
+    """Test manipulation risk classification."""
+
+    def test_clean_market(self):
+        sig = _make_signal(
+            probability=0.72, probability_1h_ago=0.70,
+            volume_usd=200_000, volume_1h_ago=150_000,
+            liquidity_usd=120_000,
+        )
+        assert sig.manipulation_risk == "clean"
+
+    def test_wash_trading_volume_spike_no_price_move(self):
+        sig = _make_signal(
+            probability=0.72, probability_1h_ago=0.72,
+            volume_usd=400_000, volume_1h_ago=100_000,
+            liquidity_usd=120_000,
+        )
+        assert sig.manipulation_risk == "wash_trading"
+
+    def test_wash_trading_tiny_move(self):
+        sig = _make_signal(
+            probability=0.725, probability_1h_ago=0.72,
+            volume_usd=500_000, volume_1h_ago=100_000,
+            liquidity_usd=120_000,
+        )
+        assert sig.manipulation_risk == "wash_trading"  # 0.5% move < 1% threshold
+
+    def test_low_liquidity_pump(self):
+        sig = _make_signal(
+            volume_usd=500_000,
+            liquidity_usd=10_000,  # vol/liq = 50x
+        )
+        assert sig.manipulation_risk == "low_liquidity_pump"
+
+    def test_low_liquidity_not_triggered(self):
+        sig = _make_signal(
+            volume_usd=500_000,
+            liquidity_usd=120_000,  # vol/liq = ~4x < 10x threshold
+        )
+        # No other flags set, no momentum history
+        assert sig.manipulation_risk == "clean"
+
+    def test_insider_pattern_big_jump_no_volume(self):
+        sig = _make_signal(
+            probability=0.85, probability_1h_ago=0.65,
+            volume_usd=100_000, volume_1h_ago=80_000,
+            liquidity_usd=120_000,
+        )
+        # 20% prob jump, only 1.25x volume = suspicious
+        assert sig.manipulation_risk == "insider_pattern"
+
+    def test_insider_pattern_not_triggered_with_volume(self):
+        sig = _make_signal(
+            probability=0.85, probability_1h_ago=0.65,
+            volume_usd=200_000, volume_1h_ago=80_000,
+            liquidity_usd=120_000,
+        )
+        # 20% jump but 2.5x volume (catalyst-driven, not insider)
+        assert sig.manipulation_risk != "insider_pattern"
+
+    def test_no_history_is_clean(self):
+        sig = _make_signal()
+        assert sig.manipulation_risk == "clean"
+
+
+class TestSignalContextStringFlags:
+    """Test that context_string includes whale/manipulation flags."""
+
+    def test_context_whale_flag(self):
+        sig = _make_signal(
+            probability=0.80, probability_1h_ago=0.70,
+            volume_usd=300_000, volume_1h_ago=100_000,
+        )
+        ctx = sig.context_string()
+        assert "WHALE" in ctx
+
+    def test_context_spike_flag(self):
+        sig = _make_signal(
+            volume_usd=400_000, volume_1h_ago=100_000,
+        )
+        ctx = sig.context_string()
+        assert "SPIKE" in ctx
+
+    def test_context_wash_trading_flag(self):
+        sig = _make_signal(
+            probability=0.72, probability_1h_ago=0.72,
+            volume_usd=400_000, volume_1h_ago=100_000,
+        )
+        ctx = sig.context_string()
+        assert "WASH_TRADING" in ctx
+
+    def test_context_clean_no_flags(self):
+        sig = _make_signal()
+        ctx = sig.context_string()
+        assert "WHALE" not in ctx
+        assert "SPIKE" not in ctx
+        assert "⚠️" not in ctx
+
+    def test_to_dict_includes_manipulation_fields(self):
+        sig = _make_signal(
+            probability=0.80, probability_1h_ago=0.70,
+            volume_usd=300_000, volume_1h_ago=100_000,
+        )
+        d = sig.to_dict()
+        assert "is_volume_spike" in d
+        assert "is_whale_activity" in d
+        assert "manipulation_risk" in d
+        assert "volume_change" in d
+        assert d["volume_change"] == pytest.approx(3.0)
+
+
+class TestAggregatorWhaleDetection:
+    """Test whale/manipulation detection in aggregator."""
+
+    def test_detect_whale_with_signals(self):
+        from src.feeds.prediction_aggregator import PredictionAggregator
+        agg = PredictionAggregator()
+        # Create a whale signal
+        whale_sig = _make_signal(
+            market_id="whale1",
+            probability=0.80, probability_1h_ago=0.65,
+            volume_usd=500_000, volume_1h_ago=100_000,
+        )
+        agg._polymarket.get_signals = MagicMock(return_value=[whale_sig])
+        agg._kalshi.get_signals = MagicMock(return_value=[])
+
+        alerts = agg._detect_whale_and_manipulation("BTC")
+        assert len(alerts) > 0
+        assert any("WHALE" in a for a in alerts)
+
+    def test_detect_wash_trading(self):
+        from src.feeds.prediction_aggregator import PredictionAggregator
+        agg = PredictionAggregator()
+        wash_sig = _make_signal(
+            market_id="wash1",
+            probability=0.72, probability_1h_ago=0.72,
+            volume_usd=600_000, volume_1h_ago=100_000,
+        )
+        agg._polymarket.get_signals = MagicMock(return_value=[wash_sig])
+        agg._kalshi.get_signals = MagicMock(return_value=[])
+
+        alerts = agg._detect_whale_and_manipulation("BTC")
+        assert any("WASH" in a for a in alerts)
+
+    def test_detect_no_alerts_clean(self):
+        from src.feeds.prediction_aggregator import PredictionAggregator
+        agg = PredictionAggregator()
+        clean_sig = _make_signal(market_id="clean1")
+        agg._polymarket.get_signals = MagicMock(return_value=[clean_sig])
+        agg._kalshi.get_signals = MagicMock(return_value=[])
+
+        alerts = agg._detect_whale_and_manipulation("BTC")
+        assert len(alerts) == 0
+
+    def test_format_telegram_whale_alerts_empty(self):
+        from src.feeds.prediction_aggregator import PredictionAggregator
+        with patch.dict(os.environ, {"SAPPHIRE_PREDICTION_MARKET_ENABLED": "true"}):
+            agg = PredictionAggregator()
+        agg._polymarket.get_signals = MagicMock(return_value=[])
+        agg._kalshi.get_signals = MagicMock(return_value=[])
+        text = agg.format_telegram_whale_alerts()
+        assert "No suspicious activity" in text
+
+    def test_format_telegram_whale_alerts_with_data(self):
+        from src.feeds.prediction_aggregator import PredictionAggregator
+        with patch.dict(os.environ, {"SAPPHIRE_PREDICTION_MARKET_ENABLED": "true"}):
+            agg = PredictionAggregator()
+        whale_sig = _make_signal(
+            market_id="whale_fmt",
+            probability=0.80, probability_1h_ago=0.65,
+            volume_usd=500_000, volume_1h_ago=100_000,
+        )
+        agg._polymarket.get_signals = MagicMock(return_value=[whale_sig])
+        agg._kalshi.get_signals = MagicMock(return_value=[])
+        text = agg.format_telegram_whale_alerts()
+        assert "Whale & Manipulation Monitor" in text
+        assert "WHALE" in text
+
+    def test_dashboard_includes_whale_alerts(self):
+        from src.feeds.prediction_aggregator import PredictionAggregator
+        agg = PredictionAggregator()
+        agg._polymarket.get_signals = MagicMock(return_value=[])
+        agg._kalshi.get_signals = MagicMock(return_value=[])
+        data = agg.get_prediction_dashboard_data()
+        assert "whale_alerts" in data
+
+    def test_cognition_context_includes_whale_alerts(self):
+        from src.feeds.prediction_aggregator import PredictionAggregator
+        with patch.dict(os.environ, {"SAPPHIRE_PREDICTION_MARKET_ENABLED": "true"}):
+            agg = PredictionAggregator()
+        whale_sig = _make_signal(
+            market_id="cog_whale",
+            probability=0.80, probability_1h_ago=0.65,
+            volume_usd=500_000, volume_1h_ago=100_000,
+        )
+        agg._polymarket.get_signals = MagicMock(return_value=[whale_sig])
+        agg._kalshi.get_signals = MagicMock(return_value=[])
+        ctx = agg.get_cognition_context("BTC")
+        assert "Market Intelligence Alerts" in ctx
+
+
+class TestTelegramWhaleCommand:
+    """Test Telegram /pm_whale command."""
+
+    @pytest.mark.asyncio
+    async def test_pm_whale_command(self):
+        engine = MagicMock()
+        engine.prediction_aggregator.format_telegram_whale_alerts.return_value = "🐋 Alerts"
+        engine.telegram.send_message = AsyncMock()
+
+        from src.telegram_handlers import handle_prediction_commands
+        result = await handle_prediction_commands(engine, "", "PM_WHALE", 0.0)
+        assert result is True
+        engine.telegram.send_message.assert_called_once()
+        assert "Alerts" in engine.telegram.send_message.call_args[0][0]
+
+    @pytest.mark.asyncio
+    async def test_pm_manipulation_command(self):
+        engine = MagicMock()
+        engine.prediction_aggregator.format_telegram_whale_alerts.return_value = "⚠️ Check"
+        engine.telegram.send_message = AsyncMock()
+
+        from src.telegram_handlers import handle_prediction_commands
+        result = await handle_prediction_commands(engine, "", "PM_MANIPULATION", 0.0)
+        assert result is True
+
+
+class TestVolumeHistoryTracking:
+    """Test that PredictionMarketFeed tracks volume history."""
+
+    def test_feed_has_volume_history(self):
+        from src.feeds.prediction_signal import PredictionMarketFeed
+        # Can't instantiate ABC, so test the init attributes
+        class FakeFeed(PredictionMarketFeed):
+            async def _fetch_markets(self, session):
+                return []
+        feed = FakeFeed(source=PredictionSource.POLYMARKET)
+        assert hasattr(feed, '_volume_history')
+        assert feed._volume_history == {}
+
+    def test_update_history_tracks_volume(self):
+        class FakeFeed(PredictionMarketFeed):
+            async def _fetch_markets(self, session):
+                return []
+        feed = FakeFeed(source=PredictionSource.POLYMARKET)
+        sig = _make_signal(market_id="vol_test", volume_usd=100_000)
+        feed._update_history(sig)
+        assert "vol_test" in feed._volume_history
+        assert len(feed._volume_history["vol_test"]) == 1
+
+    def test_update_history_sets_volume_1h_ago(self):
+        class FakeFeed(PredictionMarketFeed):
+            async def _fetch_markets(self, session):
+                return []
+        feed = FakeFeed(source=PredictionSource.POLYMARKET)
+        # Simulate 60 data points (indices 0-59)
+        for i in range(60):
+            sig = _make_signal(market_id="vol_hist", volume_usd=100_000 + i * 1000)
+            feed._update_history(sig)
+        # 61st entry: history[-60] = entry at index 1 (vol=101_000)
+        final_sig = _make_signal(market_id="vol_hist", volume_usd=200_000)
+        feed._update_history(final_sig)
+        assert final_sig.volume_1h_ago is not None
+        assert final_sig.volume_1h_ago == 101_000
+
+
+class TestTelegramAccuracyCommand:
+    """Test Telegram /pm_accuracy command handler."""
+
+    @pytest.mark.asyncio
+    async def test_pm_accuracy_command(self):
+        engine = MagicMock()
+        engine.prediction_aggregator.format_telegram_accuracy.return_value = "📊 Accuracy"
+        engine.telegram.send_message = AsyncMock()
+
+        from src.telegram_handlers import handle_prediction_commands
+        result = await handle_prediction_commands(engine, "", "PM_ACCURACY", 0.0)
+        assert result is True
+        engine.telegram.send_message.assert_called_once()
+        assert "Accuracy" in engine.telegram.send_message.call_args[0][0]
+
+    @pytest.mark.asyncio
+    async def test_prediction_accuracy_command(self):
+        engine = MagicMock()
+        engine.prediction_aggregator.format_telegram_accuracy.return_value = "📊 Stats"
+        engine.telegram.send_message = AsyncMock()
+
+        from src.telegram_handlers import handle_prediction_commands
+        result = await handle_prediction_commands(engine, "", "PREDICTION_ACCURACY", 0.0)
+        assert result is True
+
+
 # ── Helpers ──────────────────────────────────────────────────────────
 
 class AsyncContextManager:

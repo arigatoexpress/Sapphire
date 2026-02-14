@@ -1,6 +1,6 @@
 # Sapphire Master Roadmap
 
-> Last Updated: Feb 14, 2026 | Status: Phase 8 In Progress 🔮 | Tests: 1042 | Deploy: sapphire-alpha-00173-dvc
+> Last Updated: Feb 14, 2026 | Status: Phase 8 Complete 🔮 | Tests: 1123 | Deploy: sapphire-alpha-00173-dvc
 
 ## Vision
 Build a top-tier autonomous crypto trading platform with secure multi-agent collaboration, crowdsourced swarm intelligence, and automated public presence.
@@ -160,15 +160,28 @@ _Polymarket + Kalshi data as trading signal sources_
 ### Forum & Swarm Integration
 - [x] Scout posts prediction market summaries to forum (PR #40)
 - [x] Agents can reference prediction probabilities in trade idea reasoning (PR #40)
-- [ ] Swarm consensus incorporates prediction market sentiment
+- [x] Swarm consensus incorporates prediction market sentiment as virtual voter (PR #42)
+
+### Whale Activity & Manipulation Awareness
+- [x] Volume history tracking in feed base class (volume_1h_ago, volume_change) (PR #42)
+- [x] Whale activity detection (>2x volume + >5% probability shift) (PR #42)
+- [x] Volume spike detection (>3x in 1 hour) (PR #42)
+- [x] Manipulation risk classification: wash_trading, insider_pattern, low_liquidity_pump (PR #42)
+- [x] Whale/manipulation flags in signal context_string for cognition (PR #42)
+- [x] Market intelligence alerts injected into cognition prompts (PR #42)
+- [x] Forum summaries include whale/manipulation alerts (PR #42)
+- [x] Telegram `/pm_whale` and `/pm_manipulation` commands (PR #42)
 
 ### Monitoring & Quality
-- [ ] Track prediction accuracy vs actual crypto price moves
-- [ ] Dashboard widget showing active prediction markets + probabilities
+- [x] Prediction accuracy tracker with Brier score calibration (PR #42)
+- [x] Per-source and high-conviction accuracy tracking (PR #42)
+- [x] Dashboard API endpoint `/api/v2/predictions/dashboard` (PR #42)
 - [x] Telegram commands: `/predictions`, `/prediction <market>`, `/prediction_sentiment`, `/pm_high` (PR #40)
 - [x] Telegram commands: `/arbitrage`, `/pm_arb` (PR #41)
+- [x] Telegram commands: `/pm_accuracy`, `/pm_whale`, `/pm_manipulation` (PR #42)
 - [x] Unit tests for feed clients, signal mapping, and integration (97 tests) (PR #40)
 - [x] Unit tests for arbitrage detection, fuzzy matching, confidence scoring (47 new tests, 144 total) (PR #41)
+- [x] Unit tests for swarm PM, accuracy, whale detection, manipulation (81 new tests, 225 total) (PR #42)
 
 ## Phase 9: Virtuals Integration (Base) 🌐 (DEFERRED)
 _On-chain agent presence via Virtuals protocol — revisit later_
@@ -182,7 +195,7 @@ _On-chain agent presence via Virtuals protocol — revisit later_
 
 ## Execution Priority
 ```
-Phase 1 ✅  →  Phase 2 ✅  →  Phase 3 ✅  →  Phase 4 ✅  →  Phase 5 ✅  →  Phase 6 ✅  →  Phase 7 ✅  →  Phase 8 (NEXT)
+Phase 1 ✅  →  Phase 2 ✅  →  Phase 3 ✅  →  Phase 4 ✅  →  Phase 5 ✅  →  Phase 6 ✅  →  Phase 7 ✅  →  Phase 8 ✅
 Harden        Security       Forum          Swarm          Tracking       Social           OpenClaw       Predictions
 ```
 
@@ -214,4 +227,5 @@ Harden        Security       Forum          Swarm          Tracking       Social
 - ✅ PR #39: Hardening Loop 2 (retry logic, fill cleanup, observability, config validation)
 - ✅ PR #40: Phase 8 Prediction Market Intelligence (Polymarket + Kalshi feeds, 97 tests, 4 Telegram commands)
 - ✅ PR #41: Cross-Venue Arbitrage Detection (fuzzy matching, spread detection, confidence scoring, 47 new tests)
-- ✅ 995 tests passing
+- ✅ PR #42: Swarm PM Integration, Accuracy Tracking, Whale Detection, Dashboard API (81 new tests)
+- ✅ 1123 tests passing

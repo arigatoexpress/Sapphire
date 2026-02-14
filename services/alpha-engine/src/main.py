@@ -237,6 +237,7 @@ class AlphaEngine:
         # Phase 8: Prediction Market Intelligence
         from src.feeds.prediction_aggregator import PredictionAggregator
         self.prediction_aggregator = PredictionAggregator()
+        self.swarm._prediction_aggregator = self.prediction_aggregator
         self._prediction_market_task: Optional[asyncio.Task[Any]] = None
         self._prediction_forum_task: Optional[asyncio.Task[Any]] = None
         # Internal alpha signal scanner — autonomous trade idea generation
@@ -2312,6 +2313,8 @@ class AlphaEngine:
         while self.running:
             try:
                 await asyncio.sleep(300)  # Check every 5 min
+                # Record current signals for accuracy tracking
+                self.prediction_aggregator.record_signals_for_accuracy()
                 summary = self.prediction_aggregator.generate_forum_summary()
                 if summary:
                     await self.forum.create_topic(
@@ -2372,6 +2375,7 @@ class AlphaEngine:
                 forum_scout_publish_handler=self._handle_forum_scout_publish_request,
                 security_skills_status_handler=self._handle_security_skills_status_request,
                 security_skills_scan_handler=self._handle_security_skill_scan_request,
+                prediction_dashboard_handler=self._handle_prediction_dashboard_request,
             )
         else:
             await start_health_server(
@@ -2392,6 +2396,7 @@ class AlphaEngine:
                 forum_scout_publish_handler=self._handle_forum_scout_publish_request,
                 security_skills_status_handler=self._handle_security_skills_status_request,
                 security_skills_scan_handler=self._handle_security_skill_scan_request,
+                prediction_dashboard_handler=self._handle_prediction_dashboard_request,
             )
 
         # 1. Start Telegram FIRST for immediate status
@@ -2638,6 +2643,9 @@ class AlphaEngine:
 
     async def _handle_forum_scout_publish_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         return await handle_forum_scout_publish(self, payload)
+
+    async def _handle_prediction_dashboard_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
+        return self.prediction_aggregator.get_prediction_dashboard_data()
 
     async def stop(self):
         logger.info("🛑 Stopping Alpha Engine...")

@@ -472,6 +472,24 @@ async def security_skills_scan(request: web.Request) -> web.Response:
     return web.json_response({"ok": True}, status=200)
 
 
+async def prediction_dashboard(request: web.Request) -> web.Response:
+    denied = _require_dashboard_access(request)
+    if denied is not None:
+        return denied
+    handler = request.app.get("prediction_dashboard_handler")
+    if handler is None:
+        return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
+    try:
+        result = await handler({})
+    except Exception as exc:
+        logger.error(f"Prediction dashboard handler error: {exc}")
+        return web.json_response({"ok": False, "error": "handler_failed"}, status=500)
+    if isinstance(result, dict):
+        status = 400 if result.get("error") else 200
+        return web.json_response({"ok": status == 200, **result}, status=status)
+    return web.json_response({"ok": True}, status=200)
+
+
 async def start_health_server(
     telegram_update_handler: Optional[Callable[[dict[str, Any]], Awaitable[None]]] = None,
     telegram_webhook_secret: str = "",
@@ -495,6 +513,7 @@ async def start_health_server(
         Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]
     ] = None,
     security_skills_scan_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
+    prediction_dashboard_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
 ):
     """Start a lightweight HTTP server for Cloud Run health checks."""
     port = int(os.getenv("PORT", "8080"))
@@ -557,6 +576,9 @@ async def start_health_server(
         app["security_skills_scan_handler"] = security_skills_scan_handler
         app.router.add_get("/api/v2/security/skills/scan", security_skills_scan)
         app.router.add_post("/api/v2/security/skills/scan", security_skills_scan)
+    if prediction_dashboard_handler is not None:
+        app["prediction_dashboard_handler"] = prediction_dashboard_handler
+        app.router.add_get("/api/v2/predictions/dashboard", prediction_dashboard)
 
     runner = web.AppRunner(app)
     await runner.setup()
