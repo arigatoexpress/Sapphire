@@ -76,7 +76,7 @@ class ExecutorAgent(CognitiveAgent, ABC):
         self,
         agent_id: str,
         platform: str,
-        model_name: str = "gemini-2.0-flash",
+        model_name: str = "",
     ):
         super().__init__(agent_id, AgentRole.EXECUTOR, model_name)
         self.platform = platform

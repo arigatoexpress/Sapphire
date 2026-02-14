@@ -62,11 +62,14 @@ async def readiness_check(request):
 
 async def telegram_webhook(request):
     """Receive Telegram webhook updates and pass them to the bot update handler."""
-    expected_secret = request.app.get("telegram_webhook_secret")
-    if expected_secret:
-        received_secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
-        if received_secret != expected_secret:
-            return web.Response(text="FORBIDDEN", status=403)
+    expected_secret = str(request.app.get("telegram_webhook_secret") or "").strip()
+    if not expected_secret:
+        logger.warning("Telegram webhook rejected: secret not configured")
+        return web.Response(text="WEBHOOK_SECRET_NOT_CONFIGURED", status=503)
+
+    received_secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+    if received_secret != expected_secret:
+        return web.Response(text="FORBIDDEN", status=403)
 
     try:
         update = await request.json()
@@ -98,6 +101,7 @@ def _extract_control_token(request: web.Request) -> str:
 
 
 def _require_control_token(request: web.Request) -> Optional[web.Response]:
+    """Require control token for admin/write operations."""
     expected_token = str(request.app.get("control_api_token") or "").strip()
     if not expected_token:
         return web.json_response({"ok": False, "error": "control_token_unconfigured"}, status=503)
@@ -107,6 +111,36 @@ def _require_control_token(request: web.Request) -> Optional[web.Response]:
         return web.json_response({"ok": False, "error": "forbidden"}, status=403)
 
     return None
+
+
+def _require_dashboard_access(request: web.Request) -> Optional[web.Response]:
+    """Allow access if request comes from an allowed CORS origin OR has a valid control token.
+
+    Read-only dashboard endpoints use this lighter check so the public frontend
+    can fetch operational state without embedding the control token in the JS bundle.
+    Requests without a recognized Origin header still need the control token (e.g. curl).
+    """
+    # Control token always grants access
+    expected_token = str(request.app.get("control_api_token") or "").strip()
+    if expected_token:
+        provided_token = _extract_control_token(request)
+        if provided_token == expected_token:
+            return None
+
+    # Allow requests from whitelisted dashboard origins
+    origin = (request.headers.get("Origin") or "").strip()
+    allowed = request.app.get("cors_allowlist", set())
+    if origin and origin in allowed:
+        return None
+
+    # Referer fallback (for same-origin GET requests that don't send Origin)
+    referer = (request.headers.get("Referer") or "").strip()
+    if referer:
+        for allowed_origin in allowed:
+            if referer.startswith(allowed_origin):
+                return None
+
+    return web.json_response({"ok": False, "error": "forbidden"}, status=403)
 
 
 def _extract_shared_secret(
@@ -124,51 +158,7 @@ def _extract_shared_secret(
     return ""
 
 
-async def tradingview_webhook(request: web.Request) -> web.Response:
-    """Receive TradingView alerts and pass them to the alpha handler."""
-    payload: dict[str, Any]
-    try:
-        payload = await request.json()
-        if not isinstance(payload, dict):
-            payload = {"payload": payload}
-    except Exception:
-        raw = (await request.text()).strip()
-        if not raw:
-            return web.json_response({"ok": False, "error": "empty_payload"}, status=400)
-        try:
-            parsed = json.loads(raw)
-            if isinstance(parsed, dict):
-                payload = parsed
-            else:
-                payload = {"payload": parsed}
-        except Exception:
-            payload = {"message": raw}
 
-    expected_secret = request.app.get("tradingview_webhook_secret", "")
-    if expected_secret:
-        received_secret = _extract_shared_secret(
-            request,
-            payload,
-            header_name="X-Sapphire-Webhook-Secret",
-        )
-        if received_secret != expected_secret:
-            return web.json_response({"ok": False, "error": "forbidden"}, status=403)
-
-    handler = request.app.get("tradingview_update_handler")
-    if handler is None:
-        return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
-
-    try:
-        result = await handler(payload)
-    except Exception as exc:
-        logger.error(f"TradingView webhook handler error: {exc}")
-        return web.json_response({"ok": False, "error": "handler_failed"}, status=500)
-
-    if isinstance(result, dict):
-        response_payload = {"ok": True, **result}
-    else:
-        response_payload = {"ok": True}
-    return web.json_response(response_payload, status=200)
 
 
 async def market_ohlc(request: web.Request) -> web.Response:
@@ -196,6 +186,9 @@ async def market_ohlc(request: web.Request) -> web.Response:
 
 
 async def platform_status(request: web.Request) -> web.Response:
+    denied = _require_dashboard_access(request)
+    if denied is not None:
+        return denied
     handler = request.app.get("platform_status_handler")
     if handler is None:
         return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
@@ -211,6 +204,9 @@ async def platform_status(request: web.Request) -> web.Response:
 
 
 async def control_status(request: web.Request) -> web.Response:
+    denied = _require_dashboard_access(request)
+    if denied is not None:
+        return denied
     handler = request.app.get("control_status_handler")
     if handler is None:
         return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
@@ -226,6 +222,9 @@ async def control_status(request: web.Request) -> web.Response:
 
 
 async def routing_info(request: web.Request) -> web.Response:
+    denied = _require_dashboard_access(request)
+    if denied is not None:
+        return denied
     handler = request.app.get("routing_info_handler")
     if handler is None:
         return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
@@ -241,6 +240,9 @@ async def routing_info(request: web.Request) -> web.Response:
 
 
 async def performance_stats(request: web.Request) -> web.Response:
+    denied = _require_dashboard_access(request)
+    if denied is not None:
+        return denied
     handler = request.app.get("performance_stats_handler")
     if handler is None:
         return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
@@ -256,6 +258,9 @@ async def performance_stats(request: web.Request) -> web.Response:
 
 
 async def system_logs(request: web.Request) -> web.Response:
+    denied = _require_dashboard_access(request)
+    if denied is not None:
+        return denied
     handler = request.app.get("system_logs_handler")
     if handler is None:
         return web.json_response([], status=200)
@@ -276,19 +281,7 @@ async def system_logs(request: web.Request) -> web.Response:
     return web.json_response([], status=200)
 
 
-async def tradingview_workspace(request: web.Request) -> web.Response:
-    handler = request.app.get("tradingview_workspace_handler")
-    if handler is None:
-        return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
-    try:
-        result = await handler({})
-    except Exception as exc:
-        logger.error(f"TradingView workspace handler error: {exc}")
-        return web.json_response({"ok": False, "error": "handler_failed"}, status=500)
-    if isinstance(result, dict):
-        status = 400 if result.get("error") else 200
-        return web.json_response({"ok": status == 200, **result}, status=status)
-    return web.json_response({"ok": True}, status=200)
+
 
 
 async def _read_json_payload(request: web.Request) -> dict[str, Any]:
@@ -376,6 +369,9 @@ async def forum_replies(request: web.Request) -> web.Response:
 
 
 async def forum_scout_status(request: web.Request) -> web.Response:
+    denied = _require_dashboard_access(request)
+    if denied is not None:
+        return denied
     handler = request.app.get("forum_scout_status_handler")
     if handler is None:
         return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
@@ -431,6 +427,9 @@ async def forum_scout_publish(request: web.Request) -> web.Response:
 
 
 async def security_skills_status(request: web.Request) -> web.Response:
+    denied = _require_dashboard_access(request)
+    if denied is not None:
+        return denied
     handler = request.app.get("security_skills_status_handler")
     if handler is None:
         return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
@@ -477,17 +476,12 @@ async def start_health_server(
     telegram_update_handler: Optional[Callable[[dict[str, Any]], Awaitable[None]]] = None,
     telegram_webhook_secret: str = "",
     control_api_token: str = "",
-    tradingview_update_handler: Optional[
-        Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]
-    ] = None,
-    tradingview_webhook_secret: str = "",
     market_ohlc_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
     platform_status_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
     control_status_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
     routing_info_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
     performance_stats_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
     system_logs_handler: Optional[Callable[[dict[str, Any]], Awaitable[Any]]] = None,
-    tradingview_workspace_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
     forum_topics_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
     forum_create_topic_handler: Optional[Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = None,
     forum_topic_detail_handler: Optional[
@@ -515,10 +509,7 @@ async def start_health_server(
         app["telegram_update_handler"] = telegram_update_handler
         app["telegram_webhook_secret"] = (telegram_webhook_secret or "").strip()
         app.router.add_post("/telegram/webhook", telegram_webhook)
-    if tradingview_update_handler is not None:
-        app["tradingview_update_handler"] = tradingview_update_handler
-        app["tradingview_webhook_secret"] = (tradingview_webhook_secret or "").strip()
-        app.router.add_post("/tradingview/webhook", tradingview_webhook)
+
     if market_ohlc_handler is not None:
         app["market_ohlc_handler"] = market_ohlc_handler
         app.router.add_get("/api/v2/market/ohlc", market_ohlc)
@@ -537,9 +528,7 @@ async def start_health_server(
     if system_logs_handler is not None:
         app["system_logs_handler"] = system_logs_handler
         app.router.add_get("/logs/system", system_logs)
-    if tradingview_workspace_handler is not None:
-        app["tradingview_workspace_handler"] = tradingview_workspace_handler
-        app.router.add_get("/api/v2/tradingview/workspace", tradingview_workspace)
+
     if forum_topics_handler is not None:
         app["forum_topics_handler"] = forum_topics_handler
         app.router.add_get("/api/v2/forum/topics", forum_topics)

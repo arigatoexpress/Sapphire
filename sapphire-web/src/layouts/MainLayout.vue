@@ -1,108 +1,35 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
-import { BookOpenText, LineChart, Radar, ShieldCheck } from 'lucide-vue-next'
-import { fetchControlStatus, fetchHealth } from '../api/client'
+import { BookOpenText, LineChart, Radar } from 'lucide-vue-next'
+import { fetchHealth, fetchSystemLogs, type SystemLogEntry } from '../api/client'
+import TerminalLog from '../components/TerminalLog.vue'
 
 const route = useRoute()
 const systemStatus = ref<'online' | 'offline' | 'connecting'>('connecting')
 const uptime = ref(0)
-const lastSyncEpoch = ref(0)
 const nowEpoch = ref(Date.now())
-const controlStatus = ref<{
-    tradingview_execution_enabled: boolean
-    tradingview_default_quantity: number
-    pending_autonomy_decisions: number
-    owner_approval_required: boolean
-    vt_security_enabled: boolean
-    vt_api_key_configured: boolean
-    vt_enforcement_mode: string
-    venues: Record<string, { allocation: number; paused: boolean }>
-} | null>(null)
-
-const buildId = String(import.meta.env.VITE_BUILD_ID || 'dev-local').trim() || 'dev-local'
-const buildTimeUtc = String(import.meta.env.VITE_BUILD_TIME_UTC || '').trim()
+const systemLogs = ref<SystemLogEntry[]>([])
+const terminalCollapsed = ref(false)
 
 let healthTimer: ReturnType<typeof setInterval> | null = null
 let clockTimer: ReturnType<typeof setInterval> | null = null
 
 const navItems = [
-    {
-        to: '/sapphirebook',
-        label: 'SapphireBook',
-        subtitle: 'Agent forum + execution notes',
-        icon: BookOpenText,
-    },
-    {
-        to: '/sapphiretrade',
-        label: 'SapphireTrade',
-        subtitle: 'Venue telemetry + routing state',
-        icon: LineChart,
-    },
-    {
-        to: '/sapphirealpha',
-        label: 'Sapphire Alpha',
-        subtitle: 'Quant research + TV workbench',
-        icon: Radar,
-    },
+    { to: '/sapphirebook', label: 'Book', icon: BookOpenText },
+    { to: '/sapphiretrade', label: 'Trade', icon: LineChart },
+    { to: '/sapphirealpha', label: 'Alpha', icon: Radar },
 ]
 
 const activeLabel = computed(() => {
     const active = navItems.find((item) => route.path.startsWith(item.to))
-    return active?.label ?? 'SapphireBook'
+    return active?.label ?? 'Book'
 })
 
 const statusText = computed(() => {
-    if (systemStatus.value === 'online') return 'SYSTEM ONLINE'
-    if (systemStatus.value === 'connecting') return 'CONNECTING'
+    if (systemStatus.value === 'online') return 'ONLINE'
+    if (systemStatus.value === 'connecting') return 'SYNC'
     return 'OFFLINE'
-})
-const runtimeHost = computed(() => (typeof window === 'undefined' ? 'local' : window.location.hostname))
-
-const syncAgeSeconds = computed(() => {
-    if (!lastSyncEpoch.value) return null
-    return Math.max(0, Math.round((nowEpoch.value - lastSyncEpoch.value) / 1000))
-})
-
-const executionModeLabel = computed(() =>
-    controlStatus.value?.tradingview_execution_enabled ? 'TV Signals Live' : 'TV Workbench Dry-Run',
-)
-
-const defaultQuantityLabel = computed(() => {
-    const qty = Number(controlStatus.value?.tradingview_default_quantity || 0)
-    return qty > 0 ? `${qty}` : 'n/a'
-})
-
-const pendingApprovals = computed(() => Number(controlStatus.value?.pending_autonomy_decisions || 0))
-
-const ownerApprovalLabel = computed(() =>
-    controlStatus.value?.owner_approval_required ? 'Owner approval required' : 'Auto-approve policy',
-)
-
-const vtSecurityLabel = computed(() => {
-    if (!controlStatus.value?.vt_security_enabled) return 'VT Security Off'
-    if (!controlStatus.value?.vt_api_key_configured) return 'VT Key Missing'
-    const mode = String(controlStatus.value?.vt_enforcement_mode || 'warn')
-    return `VT ${mode}`
-})
-
-const vtSecurityTone = computed(() => {
-    if (!controlStatus.value?.vt_security_enabled) return 'tone-off'
-    if (!controlStatus.value?.vt_api_key_configured) return 'tone-warn'
-    return 'tone-on'
-})
-
-const buildStamp = computed(() => (buildTimeUtc ? `${buildId} · ${buildTimeUtc}` : buildId))
-
-const activeVenueSummary = computed(() => {
-    const venues = controlStatus.value?.venues || {}
-    const all = Object.keys(venues)
-    if (all.length === 0) return 'venues n/a'
-    const active = all.filter((name) => {
-        const item = venues[name]
-        return Boolean(item && !item.paused && Number(item.allocation) > 0)
-    })
-    return `${active.length}/${all.length} venues active`
 })
 
 const formatUptime = (seconds: number) => {
@@ -113,12 +40,15 @@ const formatUptime = (seconds: number) => {
 
 const formatUtcClock = () => {
     const now = new Date(nowEpoch.value)
-    return now.toISOString().slice(11, 19) + ' UTC'
+    return now.toISOString().slice(11, 19)
 }
 
 const checkHealth = async () => {
     try {
-        const [health, control] = await Promise.all([fetchHealth(), fetchControlStatus()])
+        const [health, logs] = await Promise.all([
+            fetchHealth(),
+            fetchSystemLogs(40),
+        ])
         const healthy =
             (typeof health === 'string' && health.toUpperCase().includes('OK')) ||
             (typeof health === 'object' &&
@@ -126,47 +56,21 @@ const checkHealth = async () => {
                 (String((health as Record<string, unknown>).status || '').toLowerCase() === 'healthy' ||
                     (health as Record<string, unknown>).ok === true))
 
-        if (healthy || control?.ok) {
+        if (healthy) {
             systemStatus.value = 'online'
-            if (control?.ok) {
-                controlStatus.value = {
-                    tradingview_execution_enabled: Boolean(control.tradingview_execution_enabled),
-                    tradingview_default_quantity: Number(control.tradingview_default_quantity || 0),
-                    pending_autonomy_decisions: Number(control.pending_autonomy_decisions || 0),
-                    owner_approval_required: Boolean(control.owner_approval_required),
-                    vt_security_enabled: Boolean(control.vt_security_enabled),
-                    vt_api_key_configured: Boolean(control.vt_api_key_configured),
-                    vt_enforcement_mode: String(control.vt_enforcement_mode || 'warn'),
-                    venues: control.venues || {},
-                }
-            }
             const uptimeRaw =
                 typeof health === 'object' && health !== null
                     ? Number((health as Record<string, any>).orchestrator?.uptime_seconds || 0)
                     : 0
             if (Number.isFinite(uptimeRaw) && uptimeRaw > 0) uptime.value = Math.round(uptimeRaw)
-            lastSyncEpoch.value = Date.now()
-            return
+        } else {
+            systemStatus.value = 'offline'
         }
-        systemStatus.value = 'offline'
+
+        if (Array.isArray(logs)) systemLogs.value = logs
     } catch {
         systemStatus.value = 'offline'
     }
-}
-
-const forceRefresh = async () => {
-    if (typeof window === 'undefined') return
-    try {
-        if ('caches' in window) {
-            const keys = await caches.keys()
-            await Promise.all(keys.map((key) => caches.delete(key)))
-        }
-    } catch (error) {
-        console.warn('Failed to clear browser caches before refresh.', error)
-    }
-    const url = new URL(window.location.href)
-    url.searchParams.set('refresh', String(Date.now()))
-    window.location.replace(url.toString())
 }
 
 onMounted(() => {
@@ -185,15 +89,10 @@ onUnmounted(() => {
 
 <template>
     <div class="layout-shell">
-        <aside class="sidebar fade-in">
-            <div class="brand">
-                <div class="brand-mark">
-                    <ShieldCheck :size="20" />
-                </div>
-                <div class="brand-copy">
-                    <h1>SAPPHIRE COMMAND DECK</h1>
-                    <p>Autonomous Operations Grid</p>
-                </div>
+        <header class="topbar fade-in">
+            <div class="topbar-brand">
+                <span class="brand-icon">&#9670;</span>
+                <span class="brand-name">SAPPHIRE</span>
             </div>
 
             <nav class="nav-group">
@@ -201,83 +100,25 @@ onUnmounted(() => {
                     v-for="item in navItems"
                     :key="item.to"
                     :to="item.to"
-                    class="nav-link glass-lift"
+                    class="nav-link"
                     active-class="active"
                 >
-                    <component :is="item.icon" :size="16" />
-                    <div class="link-copy">
-                        <span>{{ item.label }}</span>
-                        <small>{{ item.subtitle }}</small>
-                    </div>
+                    <component :is="item.icon" :size="15" />
+                    <span>{{ item.label }}</span>
                 </RouterLink>
             </nav>
 
-            <div class="control-stack">
-                <article class="control-card">
-                    <p class="font-mono">CONTROL CHANNEL</p>
-                    <span>Telegram Heartbeat Locked</span>
-                    <small>Public prompt surfaces disabled.</small>
-                </article>
-                <article class="control-card">
-                    <p class="font-mono">SYNC STATUS</p>
-                    <span>{{ syncAgeSeconds === null ? 'awaiting sync' : `last sync ${syncAgeSeconds}s ago` }}</span>
-                    <small>Uptime: {{ formatUptime(uptime) }}</small>
-                </article>
-                <article class="control-card">
-                    <p class="font-mono">RELEASE STAMP</p>
-                    <span>{{ buildId }}</span>
-                    <small>{{ buildTimeUtc || 'build-time unavailable' }}</small>
-                </article>
+            <div class="topbar-right">
+                <span class="topbar-meta">{{ formatUtcClock() }} UTC</span>
+                <span class="topbar-meta hide-mobile">{{ formatUptime(uptime) }}</span>
+                <span class="status-pill" :class="systemStatus">
+                    <span class="status-dot"></span>
+                    <span class="hide-mobile">{{ statusText }}</span>
+                </span>
             </div>
-        </aside>
+        </header>
 
         <main class="main-panel">
-            <header class="topbar fade-in">
-                <div class="surface-title">
-                    <span class="kicker font-mono">SAPPHIRE LIVE SURFACE</span>
-                    <h2>{{ activeLabel }}</h2>
-                </div>
-                <div class="status-cluster">
-                    <span class="status-pill" :class="systemStatus">
-                        {{ statusText }}
-                    </span>
-                    <span class="meta-chip font-mono">build {{ buildId }}</span>
-                    <span class="meta-chip font-mono">{{ activeVenueSummary }}</span>
-                    <span class="meta-chip font-mono">{{ formatUptime(uptime) }}</span>
-                    <span class="meta-chip font-mono">{{ formatUtcClock() }}</span>
-                    <span class="meta-chip font-mono">{{ runtimeHost }}</span>
-                    <button class="refresh-btn font-mono" type="button" @click="forceRefresh">force refresh</button>
-                </div>
-            </header>
-
-            <section class="quick-strip fade-in stagger-1">
-                <article class="quick-card glass-lift">
-                    <p class="font-mono">Command</p>
-                    <strong>Telegram Heartbeat</strong>
-                    <small>Authenticated operator channel</small>
-                </article>
-                <article class="quick-card glass-lift">
-                    <p class="font-mono">TV Workbench</p>
-                    <strong>{{ executionModeLabel }}</strong>
-                    <small>Signal qty {{ defaultQuantityLabel }}</small>
-                </article>
-                <article class="quick-card glass-lift">
-                    <p class="font-mono">Autonomy</p>
-                    <strong>{{ ownerApprovalLabel }}</strong>
-                    <small>{{ pendingApprovals }} pending decisions</small>
-                </article>
-                <article class="quick-card glass-lift">
-                    <p class="font-mono">Skill Security</p>
-                    <strong :class="vtSecurityTone">{{ vtSecurityLabel }}</strong>
-                    <small>{{ buildStamp }}</small>
-                </article>
-            </section>
-
-            <section class="telegram-banner fade-in stagger-2">
-                <strong>Secure operations policy:</strong>
-                prompts, approvals, and direction are accepted only through your authenticated Telegram heartbeat channel.
-            </section>
-
             <section class="content">
                 <RouterView v-slot="{ Component }">
                     <Transition name="view-fade" mode="out-in">
@@ -285,316 +126,173 @@ onUnmounted(() => {
                     </Transition>
                 </RouterView>
             </section>
+
+            <section class="terminal-panel fade-in stagger-2">
+                <TerminalLog
+                    :logs="systemLogs"
+                    :collapsed="terminalCollapsed"
+                    @toggle="terminalCollapsed = !terminalCollapsed"
+                />
+            </section>
         </main>
     </div>
 </template>
 
 <style scoped>
 .layout-shell {
-    display: grid;
-    grid-template-columns: minmax(250px, 300px) 1fr;
-    min-height: 100vh;
-    width: 100%;
-    position: relative;
-}
-
-.layout-shell::before,
-.layout-shell::after {
-    content: '';
-    position: fixed;
-    z-index: -1;
-    width: 320px;
-    height: 320px;
-    border-radius: 999px;
-    filter: blur(72px);
-    opacity: 0.25;
-    pointer-events: none;
-}
-
-.layout-shell::before {
-    top: -80px;
-    left: -60px;
-    background: #1f7bd6;
-}
-
-.layout-shell::after {
-    right: -80px;
-    bottom: -70px;
-    background: #2bd0b3;
-}
-
-.sidebar {
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
-    padding: 1.2rem;
-    border-right: 1px solid var(--border-subtle);
-    background:
-        linear-gradient(180deg, rgba(4, 15, 33, 0.92), rgba(5, 16, 30, 0.84)),
-        var(--bg-ink);
-    backdrop-filter: blur(12px);
+    min-height: 100vh;
+    width: 100%;
 }
 
-.brand {
+/* ── Top Bar ── */
+.topbar {
     display: flex;
-    gap: 0.8rem;
     align-items: center;
-    padding-bottom: 1rem;
+    justify-content: space-between;
+    gap: 0.6rem;
+    padding: 0.5rem 1.2rem;
     border-bottom: 1px solid var(--border-subtle);
+    background: rgba(5, 10, 5, 0.7);
+    backdrop-filter: blur(8px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
 }
 
-.brand-mark {
-    width: 40px;
-    height: 40px;
-    border-radius: 11px;
-    background: linear-gradient(140deg, var(--color-sapphire), #57d9ff);
-    color: #062338;
-    display: grid;
-    place-items: center;
-    box-shadow: 0 10px 24px rgba(41, 151, 255, 0.4);
-}
-
-.brand-copy h1 {
-    margin: 0;
-    font-size: 0.92rem;
-    letter-spacing: 0.06em;
-    font-family: var(--font-display);
-    font-weight: 600;
-    color: #d8f3ff;
-}
-
-.brand-copy p {
-    margin: 0.15rem 0 0;
-    color: var(--text-secondary);
-    font-size: 0.74rem;
-}
-
-.nav-group {
-    display: grid;
+.topbar-brand {
+    display: flex;
+    align-items: center;
     gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.brand-icon {
+    font-size: 1.3rem;
+    color: var(--color-terminal);
+    text-shadow: 0 0 10px rgba(32, 194, 14, 0.6);
+    line-height: 1;
+}
+
+.brand-name {
+    font-family: var(--font-mono);
+    font-size: 0.88rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--text-primary);
+    text-shadow: 0 0 8px rgba(32, 194, 14, 0.4);
+}
+
+/* ── Navigation Tabs ── */
+.nav-group {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
 }
 
 .nav-link {
     display: flex;
     align-items: center;
-    gap: 0.65rem;
-    padding: 0.58rem 0.66rem;
+    gap: 0.4rem;
+    padding: 0.45rem 0.75rem;
     border-radius: var(--radius-sm);
     color: var(--text-secondary);
     text-decoration: none;
+    font-size: 0.82rem;
+    font-family: var(--font-mono);
+    letter-spacing: 0.04em;
     border: 1px solid transparent;
+    transition: all 0.15s ease;
+    white-space: nowrap;
 }
 
-.link-copy {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-}
-
-.link-copy span {
+.nav-link:hover {
     color: var(--text-primary);
-    font-size: 0.9rem;
-}
-
-.link-copy small {
-    color: var(--text-tertiary);
-    font-size: 0.7rem;
+    border-color: var(--border-subtle);
+    background: rgba(32, 194, 14, 0.03);
 }
 
 .nav-link.active {
-    border-color: rgba(111, 207, 255, 0.48);
-    background: linear-gradient(135deg, rgba(39, 130, 205, 0.24), rgba(23, 89, 142, 0.18));
-    color: #d6f2ff;
+    border-color: var(--border-accent);
+    color: var(--color-terminal);
+    background: rgba(32, 194, 14, 0.08);
+    text-shadow: 0 0 8px rgba(32, 194, 14, 0.3);
 }
 
-.control-stack {
-    margin-top: auto;
-    display: grid;
-    gap: 0.6rem;
+/* ── Right Meta ── */
+.topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    flex-shrink: 0;
 }
 
-.control-card {
-    border-radius: var(--radius-sm);
-    border: 1px solid rgba(105, 179, 233, 0.38);
-    background: rgba(9, 25, 45, 0.74);
-    padding: 0.7rem 0.75rem;
-    display: grid;
-    gap: 0.18rem;
-}
-
-.control-card p {
-    margin: 0;
-    font-size: 0.64rem;
-    color: #88ddff;
-    letter-spacing: 0.05em;
-}
-
-.control-card span {
-    font-size: 0.78rem;
-    color: var(--text-primary);
-}
-
-.control-card small {
-    color: var(--text-secondary);
+.topbar-meta {
     font-size: 0.7rem;
+    color: var(--text-tertiary);
+    letter-spacing: 0.04em;
+    font-family: var(--font-mono);
 }
 
+.status-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.68rem;
+    font-family: var(--font-mono);
+    letter-spacing: 0.06em;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 999px;
+    padding: 0.2rem 0.55rem;
+}
+
+.status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.status-pill.online .status-dot {
+    background: var(--color-terminal);
+    box-shadow: 0 0 6px rgba(32, 194, 14, 0.6);
+}
+
+.status-pill.connecting .status-dot {
+    background: var(--color-warning);
+    box-shadow: 0 0 6px rgba(255, 176, 0, 0.5);
+}
+
+.status-pill.offline .status-dot {
+    background: var(--color-error);
+    box-shadow: 0 0 6px rgba(255, 68, 68, 0.5);
+}
+
+.status-pill.online { border-color: rgba(32, 194, 14, 0.25); color: var(--color-terminal); }
+.status-pill.connecting { border-color: rgba(255, 176, 0, 0.25); color: var(--color-warning); }
+.status-pill.offline { border-color: rgba(255, 68, 68, 0.25); color: var(--color-error); }
+
+/* ── Main Content ── */
 .main-panel {
     display: flex;
     flex-direction: column;
+    flex: 1;
     min-width: 0;
-    padding: 0 0.9rem 0.9rem;
-}
-
-.topbar {
-    min-height: 68px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    margin-top: 0.9rem;
-    padding: 0.75rem 0.95rem;
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
-    background: rgba(9, 22, 42, 0.74);
-}
-
-.surface-title {
-    min-width: 0;
-}
-
-.surface-title .kicker {
-    display: block;
-    color: #88ddff;
-    letter-spacing: 0.08em;
-    font-size: 0.61rem;
-}
-
-.surface-title h2 {
-    margin: 0.2rem 0 0;
-    font-size: 1.12rem;
-    font-weight: 600;
-}
-
-.status-cluster {
-    display: flex;
-    align-items: center;
-    gap: 0.48rem;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-}
-
-.status-pill,
-.meta-chip {
-    border-radius: 999px;
-    padding: 0.24rem 0.55rem;
-    font-size: 0.64rem;
-    letter-spacing: 0.04em;
-}
-
-.meta-chip {
-    color: var(--text-secondary);
-    border: 1px solid rgba(129, 174, 214, 0.28);
-}
-
-.status-pill.online {
-    color: #17c888;
-    background: rgba(23, 200, 136, 0.17);
-}
-
-.status-pill.connecting {
-    color: #f4b444;
-    background: rgba(244, 180, 68, 0.2);
-}
-
-.status-pill.offline {
-    color: #ff8f8f;
-    background: rgba(255, 116, 116, 0.19);
-}
-
-.refresh-btn {
-    border-radius: 999px;
-    border: 1px solid rgba(131, 214, 255, 0.5);
-    background: rgba(21, 60, 89, 0.46);
-    color: #c8ecff;
-    font-size: 0.62rem;
-    letter-spacing: 0.04em;
-    padding: 0.28rem 0.62rem;
-    text-transform: uppercase;
-    cursor: pointer;
-}
-
-.refresh-btn:hover {
-    border-color: rgba(131, 214, 255, 0.82);
-    background: rgba(34, 90, 130, 0.56);
-}
-
-.quick-strip {
-    margin-top: 0.9rem;
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.65rem;
-}
-
-.quick-card {
-    border: 1px solid rgba(124, 191, 239, 0.34);
-    border-radius: var(--radius-md);
-    background: rgba(9, 24, 43, 0.72);
-    padding: 0.58rem 0.72rem;
-    display: grid;
-    gap: 0.2rem;
-}
-
-.quick-card p {
-    margin: 0;
-    font-size: 0.63rem;
-    color: var(--text-tertiary);
-    letter-spacing: 0.06em;
-}
-
-.quick-card strong {
-    font-size: 0.79rem;
-    font-weight: 600;
-}
-
-.quick-card strong.tone-on {
-    color: #79ebbc;
-}
-
-.quick-card strong.tone-warn {
-    color: #ffd38d;
-}
-
-.quick-card strong.tone-off {
-    color: #ffb2b2;
-}
-
-.quick-card small {
-    color: var(--text-secondary);
-    font-size: 0.7rem;
-}
-
-.telegram-banner {
-    margin-top: 0.8rem;
-    padding: 0.75rem 0.9rem;
-    border: 1px solid rgba(45, 196, 175, 0.5);
-    background: linear-gradient(90deg, rgba(18, 67, 71, 0.66), rgba(10, 34, 56, 0.62));
-    color: #b7fff2;
-    border-radius: var(--radius-md);
-    font-size: 0.86rem;
-}
-
-.telegram-banner strong {
-    margin-right: 0.25rem;
+    padding: 0.8rem 1.2rem;
 }
 
 .content {
     flex: 1;
     overflow: auto;
-    margin-top: 0.9rem;
-    padding-bottom: 0.3rem;
 }
 
+.terminal-panel {
+    margin-top: 0.8rem;
+}
+
+/* ── View Transitions ── */
 .view-fade-enter-active,
 .view-fade-leave-active {
     transition: opacity 0.2s ease, transform 0.2s ease;
@@ -603,49 +301,29 @@ onUnmounted(() => {
 .view-fade-enter-from,
 .view-fade-leave-to {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(4px);
 }
 
-@media (max-width: 1080px) {
-    .quick-strip {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-}
-
-@media (max-width: 940px) {
-    .layout-shell {
-        grid-template-columns: 1fr;
-    }
-
-    .sidebar {
-        border-right: none;
-        border-bottom: 1px solid var(--border-subtle);
-    }
-
-    .nav-group {
-        grid-template-columns: 1fr;
-    }
-
+/* ── Responsive ── */
+@media (max-width: 640px) {
     .topbar {
-        margin-top: 0.7rem;
+        padding: 0.4rem 0.6rem;
+        gap: 0.4rem;
     }
+    .brand-name { display: none; }
+    .brand-icon { font-size: 1.1rem; }
+    .nav-link {
+        padding: 0.4rem 0.55rem;
+        font-size: 0.75rem;
+        gap: 0.3rem;
+    }
+    .main-panel { padding: 0.5rem 0.6rem; }
+    .hide-mobile { display: none; }
 }
 
-@media (max-width: 680px) {
-    .main-panel {
-        padding: 0 0.65rem 0.65rem;
-    }
-
-    .topbar {
-        padding: 0.65rem 0.7rem;
-    }
-
-    .surface-title h2 {
-        font-size: 1rem;
-    }
-
-    .quick-strip {
-        grid-template-columns: 1fr;
-    }
+@media (max-width: 400px) {
+    .nav-link span { display: none; }
+    .nav-link { padding: 0.4rem 0.5rem; }
+    .topbar-meta { font-size: 0.62rem; }
 }
 </style>

@@ -317,5 +317,24 @@ class GeminiGuard:
             logger.error(f"Chat generation failed: {e}")
             return None
 
+    async def classify_intent(self, prompt: str) -> str | None:
+        """
+        Generate a structured JSON response for intent classification.
+        Uses Flash model for speed.
+        """
+        model = self.flash_model or self.pro_model
+        if not model:
+            return None
+            
+        try:
+            loop = asyncio.get_running_loop()
+            response = await loop.run_in_executor(
+                None, lambda: model.generate_content(prompt)
+            )
+            return (response.text or "").strip() if response else None
+        except Exception as e:
+            logger.error(f"Intent classification generation failed: {e}")
+            return None
+
     async def stop(self):
         self.running = False

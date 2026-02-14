@@ -40,7 +40,6 @@ class Settings(BaseSettings):
     solana_rpc_url: str = Field(
         default="https://api.mainnet-beta.solana.com", validation_alias="SOLANA_RPC_URL"
     )
-    aster_api_key: str | None = Field(default=None, validation_alias="ASTER_API_KEY")
     telegram_summary_interval_seconds: int = Field(
         default=14_400,
         ge=0,
@@ -58,12 +57,8 @@ class Settings(BaseSettings):
     admin_api_token: str | None = Field(default=None, validation_alias="ADMIN_API_TOKEN")
 
     # Platform enable flags (for platform-specific symbol defaults)
-    enable_jupiter: bool = Field(default=False, validation_alias="ENABLE_JUPITER")
-    enable_aster: bool = Field(default=False, validation_alias="ENABLE_ASTER")
-    enable_aster: bool = Field(default=False, validation_alias="ENABLE_ASTER")
-    enable_lighter: bool = Field(default=False, validation_alias="ENABLE_LIGHTER")
-    enable_aster: bool = Field(default=False, validation_alias="ENABLE_ASTER")
-    enable_lighter: bool = Field(default=False, validation_alias="ENABLE_LIGHTER")
+    # NOTE: Canonical definitions are in the Feature Flags / Microservices section below.
+    # These early defaults ensure the symbols property works when accessed before the full model loads.
     sapphire_focused_mode: bool = Field(
         default=True,
         validation_alias="SAPPHIRE_FOCUSED_MODE",
@@ -118,17 +113,11 @@ class Settings(BaseSettings):
             return ["SOL", "BONK", "WIF", "JUP", "JTO"]  # Solana tokens
         elif getattr(self, 'enable_aster', False):
             return ["SOL-PERP", "BTC-PERP", "ETH-PERP"]  # Aster perps
-        elif getattr(self, 'enable_aster', False):
-            return ["BTCUSDT", "ETHUSDT", "SOLUSDT"]  # CEX-style
         elif getattr(self, 'enable_lighter', False):
             return ["BTC", "ETH", "SOL"]  # Lighter perps
-        elif getattr(self, 'enable_aster', False):
-            return ["ETH", "MON", "USDC"]  # Monad/Base tokens
-        elif getattr(self, 'enable_lighter', False):
-            return ["SOL", "ETH", "BTC"]  # L2 tokens
         else:
             # Fallback to conservative defaults
-            return ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+            return ["BTC", "ETH", "SOL"]
     decision_interval_seconds: int = Field(
         default=10, ge=5, le=300
     )  # Faster decisions for PvP trading
@@ -212,7 +201,6 @@ class Settings(BaseSettings):
     aster_mit_agent_id: str | None = Field(
         default="ee5bcfda-0919-469c-ac8f-d665a5dd444e", validation_alias="ASTER_MIT_AGENT_ID"
     )
-    aster_api_key: str | None = Field(default=None, validation_alias="ASTER_API_KEY")
     aster_strategy_id: str = Field(default="default", validation_alias="ASTER_STRATEGY_ID")
 
     # Vertex AI Configuration
@@ -265,9 +253,6 @@ class Settings(BaseSettings):
     min_position_size: float = Field(
         default=0.001, gt=0, description="Minimum viable position size"
     )
-
-    # Gemini AI configuration
-    gemini_api_key: str | None = Field(default=None, validation_alias="GEMINI_API_KEY")
 
     # Sui integrations
     sui_walrus_endpoint: str | None = Field(default=None, validation_alias="SUI_WALRUS_ENDPOINT")
@@ -360,33 +345,22 @@ class Settings(BaseSettings):
     )
     enable_telegram: bool = Field(default=True, validation_alias="ENABLE_TELEGRAM")
     enable_pubsub: bool = Field(default=False, validation_alias="ENABLE_PUBSUB")
-    enable_aster: bool = Field(default=True, validation_alias="ENABLE_ASTER")
-    
-    # Microservices Platform Flags (Platform Isolation)
-    enable_lighter: bool = Field(
-        default=True, 
-        validation_alias="ENABLE_LIGHTER",
-        description="Enable Lighter integration"
-    )
-    enable_lighter: bool = Field(
-        default=True, 
-        validation_alias="ENABLE_LIGHTER",
-        description="Enable Lighter.xyz integration"
-    )
-    enable_aster: bool = Field(
-        default=True, 
-        validation_alias="ENABLE_ASTER",
-        description="Enable Aster Protocol integration"
-    )
+
+    # Platform Flags (canonical definitions — one per platform)
     enable_aster: bool = Field(
         default=True,
         validation_alias="ENABLE_ASTER",
-        description="Enable Aster Agent integration"
+        description="Enable Aster Protocol integration",
+    )
+    enable_lighter: bool = Field(
+        default=True,
+        validation_alias="ENABLE_LIGHTER",
+        description="Enable Lighter.xyz integration",
     )
     enable_jupiter: bool = Field(
         default=False,
         validation_alias="ENABLE_JUPITER",
-        description="Enable Jupiter DEX aggregator integration"
+        description="Enable Jupiter DEX aggregator integration",
     )
     sapphire_focused_mode: bool = Field(
         default=True,

@@ -5,6 +5,7 @@ import time
 from typing import Any, Dict, List, Set
 
 from loguru import logger
+from shared.position_sizing import SizingConfig, apply_stage_multiplier
 from src.feeds.market_data import MarketDataAggregator
 
 
@@ -42,7 +43,7 @@ VENUE_PROFILES: Dict[str, Dict[str, Any]] = {
 # Agents may still trade any symbol at their discretion.
 # ---------------------------------------------------------------------------
 
-_DEFAULT_PREFERRED_SYMBOLS = "BTC,ETH,SOL,ZEC,XMR,PENGU,MON,LIT,ASTER"
+_DEFAULT_PREFERRED_SYMBOLS = "BTC,ETH,SOL,BCH,ZEC,XMR,PENGU,MON,LIT,ASTER"
 
 
 def _parse_preferred_symbols(raw: str) -> List[str]:
@@ -77,6 +78,9 @@ class AlphaStrategyEngine:
     def __init__(self, market_data: MarketDataAggregator):
         self.market_data = market_data
         self.running = False
+
+        # --- Unified position sizing config (canonical source of truth) -------
+        self.sizing_config = SizingConfig()
 
         # --- Execution stage --------------------------------------------------
         self.staged_live_multiplier = self._bounded_multiplier(
@@ -162,11 +166,26 @@ class AlphaStrategyEngine:
         return state
 
     def _stage_multiplier(self) -> float:
+        """Stage multiplier delegated to unified position_sizing module.
+
+        Uses env-var overrides (SAPPHIRE_STAGED_LIVE_SIZE_MULTIPLIER /
+        SAPPHIRE_FULL_LIVE_SIZE_MULTIPLIER) when they differ from the
+        canonical defaults, otherwise falls through to the shared config.
+        """
         if self.dex_execution_stage == "full_live":
             return self.full_live_multiplier
         if self.dex_execution_stage == "staged_live":
             return self.staged_live_multiplier
         return 0.0
+
+    def apply_stage_to_quantity(self, base_qty: float) -> float:
+        """Apply the current execution stage multiplier to a quantity.
+
+        Uses the unified position_sizing module with the engine's
+        stage-specific override multiplier.
+        """
+        mult = self._stage_multiplier()
+        return apply_stage_multiplier(base_qty, self.dex_execution_stage, multiplier_override=mult)
 
     # ------------------------------------------------------------------
     # Execution state
@@ -174,7 +193,7 @@ class AlphaStrategyEngine:
 
     def execution_state(self) -> Dict[str, Any]:
         multiplier = self._stage_multiplier()
-        effective_quantity = float(self.default_quantity * multiplier)
+        effective_quantity = self.apply_stage_to_quantity(self.default_quantity)
         return {
             "dex_execution_stage": self.dex_execution_stage,
             "stage_multiplier": float(multiplier),
@@ -183,6 +202,12 @@ class AlphaStrategyEngine:
             "min_notional": float(self.min_notional),
             "min_notional_buffer_pct": float(self.notional_buffer_pct),
             "max_quantity": float(self.max_quantity),
+            "sizing_config": {
+                "kelly_cap": float(self.sizing_config.kelly_cap),
+                "max_position_pct": float(self.sizing_config.max_position_pct),
+                "max_total_exposure_pct": float(self.sizing_config.max_total_exposure_pct),
+                "min_position_usd": float(self.sizing_config.min_position_usd),
+            },
             "preferred_symbols": list(self.preferred_symbols),
             "venue_profiles": {
                 venue: {

@@ -53,17 +53,34 @@ class PrecisionNormalizer:
         # Common symbol constants for instant performance (zero network latency)
         # Updated with Aster-compatible precision (smaller lot sizes for flexibility)
         self._fast_path = {
+            # ── Tier 1: Majors ──
             "BTC": {"tick": Decimal("0.1"), "lot": Decimal("0.00001"), "min": Decimal("5")},
             "ETH": {"tick": Decimal("0.01"), "lot": Decimal("0.0001"), "min": Decimal("5")},
             "SOL": {"tick": Decimal("0.001"), "lot": Decimal("0.001"), "min": Decimal("5")},
             "BNB": {"tick": Decimal("0.01"), "lot": Decimal("0.001"), "min": Decimal("5")},
+            # ── Tier 2: Alt-Majors ──
             "XRP": {"tick": Decimal("0.0001"), "lot": Decimal("0.1"), "min": Decimal("5")},
-            "DOGE": {"tick": Decimal("0.00001"), "lot": Decimal("1"), "min": Decimal("5")},  # DOGE requires integer qty on Aster
             "AVAX": {"tick": Decimal("0.001"), "lot": Decimal("0.01"), "min": Decimal("5")},
+            "DOGE": {"tick": Decimal("0.00001"), "lot": Decimal("1"), "min": Decimal("5")},  # Integer qty on Aster
+            "HYPE": {"tick": Decimal("0.001"), "lot": Decimal("0.01"), "min": Decimal("5")},  # Hyperliquid token
+            # ── Tier 3: Privacy / Mining ──
+            "ZEC": {"tick": Decimal("0.01"), "lot": Decimal("0.001"), "min": Decimal("5")},   # Zcash
+            "XMR": {"tick": Decimal("0.01"), "lot": Decimal("0.001"), "min": Decimal("5")},   # Monero
+            "XAU": {"tick": Decimal("0.01"), "lot": Decimal("0.001"), "min": Decimal("5")},   # Gold token
+            # ── Tier 4: Solana Ecosystem ──
+            "JUP": {"tick": Decimal("0.0001"), "lot": Decimal("0.1"), "min": Decimal("5")},   # Jupiter
+            "PYTH": {"tick": Decimal("0.0001"), "lot": Decimal("0.1"), "min": Decimal("5")},  # Pyth Network
+            "BONK": {"tick": Decimal("0.00000001"), "lot": Decimal("100"), "min": Decimal("5")},  # Bonk meme
+            "WIF": {"tick": Decimal("0.0001"), "lot": Decimal("0.1"), "min": Decimal("5")},   # Dogwifhat
+            "PENGU": {"tick": Decimal("0.00001"), "lot": Decimal("1"), "min": Decimal("5")},  # Pudgy Penguins
+            # ── Tier 5: Ecosystem / New Chains ──
+            "MON": {"tick": Decimal("0.001"), "lot": Decimal("0.01"), "min": Decimal("5")},   # Monad
+            "LIT": {"tick": Decimal("0.0001"), "lot": Decimal("0.1"), "min": Decimal("5")},   # Litentry
+            "ASTER": {"tick": Decimal("0.0001"), "lot": Decimal("0.1"), "min": Decimal("5")}, # Aster token
+            # ── Legacy ──
             "MATIC": {"tick": Decimal("0.0001"), "lot": Decimal("0.1"), "min": Decimal("5")},
-            "WIF": {"tick": Decimal("0.0001"), "lot": Decimal("0.1"), "min": Decimal("5")},  # Dogwifhat
-            "PEPE": {"tick": Decimal("0.00000001"), "lot": Decimal("100"), "min": Decimal("5")},  # 1000PEPE contract
-            "SHIB": {"tick": Decimal("0.000000001"), "lot": Decimal("100"), "min": Decimal("5")},  # 1000SHIB contract
+            "PEPE": {"tick": Decimal("0.00000001"), "lot": Decimal("100"), "min": Decimal("5")},  # 1000PEPE
+            "SHIB": {"tick": Decimal("0.000000001"), "lot": Decimal("100"), "min": Decimal("5")},  # 1000SHIB
         }
 
         # Default fallbacks when exchange info unavailable
@@ -77,16 +94,6 @@ class PrecisionNormalizer:
                 "tick_size": Decimal("0.0001"),  # Smaller tick for better price precision
                 "lot_size": Decimal("0.00001"),  # Much smaller lot size to avoid precision errors
                 "min_notional": Decimal("5"),
-            },
-            "aster": {
-                "tick_size": Decimal("0.0001"),
-                "lot_size": Decimal("0.0001"),
-                "min_notional": Decimal("5"),
-            },
-            "aster": {
-                "tick_size": Decimal("0.001"),
-                "lot_size": Decimal("0.01"),
-                "min_notional": Decimal("10"),
             },
         }
 
@@ -219,8 +226,6 @@ class PrecisionNormalizer:
             return await self._fetch_lighter_info(symbol)
         elif platform == "aster":
             return await self._fetch_aster_info(symbol)
-        elif platform == "aster":
-            return self._get_default_info(symbol, platform)  # Aster doesn't expose this
         else:
             return self._get_default_info(symbol, platform)
 

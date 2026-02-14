@@ -63,6 +63,7 @@ class MarketDataAggregator:
             os.getenv("LIGHTER_MARKET_SYMBOL", "SOL")
         ).strip().upper() or "SOL"
         self._lighter_market_id = str(os.getenv("LIGHTER_MARKET_ID", "2")).strip() or "2"
+        self._lighter_market_ids = self._parse_lighter_market_ids()
         self._lighter_logs_url = str(
             os.getenv(
                 "LIGHTER_LOGS_URL",
@@ -117,7 +118,7 @@ class MarketDataAggregator:
     def _parse_extra_symbols() -> List[str]:
         """Parse SAPPHIRE_PREFERRED_SYMBOLS for multi-symbol feeds."""
         import re as _re
-        raw = os.getenv("SAPPHIRE_PREFERRED_SYMBOLS", "BTC,ETH,SOL,ZEC,XMR,PENGU,MON,LIT,ASTER")
+        raw = os.getenv("SAPPHIRE_PREFERRED_SYMBOLS", "BTC,ETH,SOL,BCH,ZEC,XMR,PENGU,MON,LIT,ASTER")
         tokens = _re.split(r"[,;|\s]+", str(raw or "").strip())
         seen: set[str] = set()
         result: List[str] = []
@@ -127,6 +128,29 @@ class MarketDataAggregator:
                 seen.add(sym)
                 result.append(sym)
         return result
+
+    def _parse_lighter_market_ids(self) -> Dict[str, str]:
+        """Parse LIGHTER_MARKET_IDS env var (e.g. 'BTC:0,ETH:1,SOL:2') into a mapping."""
+        result: Dict[str, str] = {}
+        _default_ids = "BTC:1,ETH:0,SOL:2,BCH:58,ZEC:90,PENGU:47,XMR:77,MON:91,LIT:120,ASTER:83"
+        raw = os.getenv("LIGHTER_MARKET_IDS", _default_ids).strip()
+        if raw:
+            for pair in raw.replace(";", ",").split(","):
+                pair = pair.strip()
+                if ":" in pair:
+                    sym, mid = pair.split(":", 1)
+                    sym = sym.strip().upper()
+                    mid = mid.strip()
+                    if sym and mid:
+                        result[sym] = mid
+        # Ensure the primary chart symbol always has an entry
+        if self._chart_symbol not in result:
+            result[self._chart_symbol] = self._lighter_market_id
+        return result
+
+    def _get_lighter_market_id(self, symbol: str) -> str:
+        """Get market ID for a symbol, falling back to the default."""
+        return self._lighter_market_ids.get(symbol.upper(), self._lighter_market_id)
 
     @staticmethod
     def _env_float(name: str, default: float, minimum: float = 0.0) -> float:
@@ -320,6 +344,8 @@ class MarketDataAggregator:
 
         buckets: Dict[int, Dict[str, float]] = {}
         for ts, price, volume in sorted(samples, key=lambda item: item[0]):
+            if ts <= 0 or price <= 0:
+                continue  # Skip degenerate data
             bucket = int(ts // interval_seconds) * interval_seconds
             if bucket not in buckets:
                 buckets[bucket] = {
@@ -407,7 +433,9 @@ class MarketDataAggregator:
             self._lighter_seen_hash_set.discard(old)
         return True
 
-    def _extract_lighter_ticks_from_logs(self, payload: Any) -> List[Tuple[float, float, float]]:
+    def _extract_lighter_ticks_from_logs(
+        self, payload: Any, *, market_id_override: Optional[str] = None,
+    ) -> List[Tuple[float, float, float]]:
         entries: List[Any]
         if isinstance(payload, list):
             entries = payload
@@ -416,9 +444,11 @@ class MarketDataAggregator:
         else:
             return []
 
+        # Use per-symbol market ID when provided, else fall back to global default
+        raw_id = market_id_override if market_id_override is not None else self._lighter_market_id
         expected_market_index: Optional[int] = None
         try:
-            expected_market_index = int(str(self._lighter_market_id).strip())
+            expected_market_index = int(str(raw_id).strip())
         except (TypeError, ValueError):
             expected_market_index = None
 
@@ -466,9 +496,17 @@ class MarketDataAggregator:
     ) -> List[Dict[str, float]]:
         merged: Dict[int, Dict[str, float]] = {}
         for candle in primary:
-            merged[int(candle["time"])] = candle
+            key = int(candle.get("time", 0))
+            if key <= 0:
+                continue  # Skip degenerate timestamps
+            merged[key] = candle
         for candle in secondary:
-            merged[int(candle["time"])] = candle
+            key = int(candle.get("time", 0))
+            if key <= 0:
+                continue  # Skip degenerate timestamps
+            # Only backfill — don't overwrite authoritative klines
+            if key not in merged:
+                merged[key] = candle
         return [merged[key] for key in sorted(merged.keys())[-limit:]]
 
     async def _fetch_aster_ohlc(
@@ -576,14 +614,39 @@ class MarketDataAggregator:
                 candles = aster_candles
                 source = "aster_klines"
         elif venue_key == "LIGHTER":
-            tracking_symbol = self._lighter_market_symbol
-            lighter_candles = await self._fetch_lighter_logs_ohlc(
-                interval_seconds=interval_seconds,
-                limit=bar_limit,
-            )
-            if lighter_candles:
-                candles = lighter_candles
-                source = "lighter_logs"
+            # Primary chart symbol: fetch from dedicated logs URL
+            if symbol_key == self._chart_symbol:
+                tracking_symbol = self._lighter_market_symbol
+                lighter_candles = await self._fetch_lighter_logs_ohlc(
+                    interval_seconds=interval_seconds,
+                    limit=bar_limit,
+                )
+                if lighter_candles:
+                    candles = lighter_candles
+                    source = "lighter_logs"
+            else:
+                # Try fetching from per-symbol Lighter logs endpoint
+                tracking_symbol = symbol_key
+                try:
+                    sym_url = f"{self._lighter_base_logs_url}/{symbol_key}/logs"
+                    sym_market_id = self._get_lighter_market_id(symbol_key)
+                    timeout = aiohttp.ClientTimeout(total=self._lighter_http_timeout_seconds)
+                    async with aiohttp.ClientSession(timeout=timeout) as _session:
+                        async with _session.get(sym_url) as _resp:
+                            if _resp.status == 200:
+                                _payload = await _resp.json(content_type=None)
+                                _ticks = self._extract_lighter_ticks_from_logs(
+                                    _payload, market_id_override=sym_market_id,
+                                )
+                                for _ts, _p, _v in _ticks:
+                                    self._record_tick("LIGHTER", symbol_key, _p, volume=_v, timestamp=_ts)
+                                if _ticks:
+                                    candles = self._aggregate_samples(
+                                        _ticks, interval_seconds=interval_seconds, limit=bar_limit,
+                                    )
+                                    source = "lighter_logs"
+                except Exception:
+                    pass  # Fall through to tick-buffer below
 
         tick_fallback = self._ohlc_from_tick_buffer(
             venue=venue_key,
@@ -684,6 +747,11 @@ class MarketDataAggregator:
                     await ws_task
 
     async def _lighter_ws_feed(self):
+        max_retries = int(os.getenv("LIGHTER_WS_MAX_RETRIES", "50"))
+        base_delay = self._lighter_ws_retry_seconds
+        max_delay = 60.0
+        attempt = 0
+
         while self.running:
             for url in self._lighter_ws_urls:
                 if not self.running:
@@ -696,6 +764,7 @@ class MarketDataAggregator:
                         ping_timeout=20,
                         close_timeout=5,
                     ) as ws:
+                        attempt = 0  # Reset on successful connection
                         self._clear_lighter_issue()
                         logger.info(f"💧 Lighter WS connected: {url}")
                         await self._send_lighter_subscriptions(ws)
@@ -709,17 +778,34 @@ class MarketDataAggregator:
                 except Exception as exc:
                     self._log_lighter_issue(f"Lighter WS issue ({url}): {exc}")
 
-            await asyncio.sleep(self._lighter_ws_retry_seconds)
+            attempt += 1
+            if attempt >= max_retries:
+                logger.warning(
+                    f"⚠️ Lighter WS: {max_retries} reconnect attempts exhausted. "
+                    "Falling back to REST-only mode."
+                )
+                return  # Exit WS feed; REST feed continues independently
+
+            delay = min(base_delay * (2 ** min(attempt, 6)), max_delay)
+            logger.debug(f"💧 Lighter WS retry {attempt}/{max_retries} in {delay:.1f}s")
+            await asyncio.sleep(delay)
 
     async def _send_lighter_subscriptions(self, ws: websockets.WebSocketClientProtocol) -> None:
         # Try multiple payload variants for protocol compatibility.
+        # Subscribe to all configured market IDs (not just the primary chart symbol)
+        market_id = self._get_lighter_market_id(self._chart_symbol)
         payloads = [
-            {"type": "subscribe", "channel": f"order_book:{self._lighter_market_id}"},
-            {"type": "subscribe", "channel": "order_book", "marketId": self._lighter_market_id},
+            {"type": "subscribe", "channel": f"order_book:{market_id}"},
+            {"type": "subscribe", "channel": "order_book", "marketId": market_id},
             {"type": "subscribe", "channel": "order_book", "market": self._lighter_market_symbol},
-            {"type": "subscribe", "channel": f"trade:{self._lighter_market_id}"},
-            {"type": "subscribe", "channel": "trade", "marketId": self._lighter_market_id},
+            {"type": "subscribe", "channel": f"trade:{market_id}"},
+            {"type": "subscribe", "channel": "trade", "marketId": market_id},
         ]
+        # Also subscribe to other configured symbols
+        for sym, mid in self._lighter_market_ids.items():
+            if mid != market_id:
+                payloads.append({"type": "subscribe", "channel": f"trade:{mid}"})
+                payloads.append({"type": "subscribe", "channel": f"order_book:{mid}"})
         for payload in payloads:
             try:
                 await ws.send(json.dumps(payload))
@@ -756,7 +842,10 @@ class MarketDataAggregator:
                                     self._record_tick("LIGHTER", self._chart_symbol, price)
                                     self._clear_lighter_issue()
                                 else:
-                                    self._log_lighter_issue("Lighter REST poll returned no usable price.")
+                                    # Only warn if Lighter has no price at all (not just dedup-filtered)
+                                    current = self.prices.get("LIGHTER", {}).get(self._chart_symbol, 0)
+                                    if current <= 0:
+                                        self._log_lighter_issue("Lighter REST poll returned no usable price.")
                 except Exception as exc:
                     self._log_lighter_issue(f"Lighter REST poll error: {exc}")
 
@@ -898,10 +987,13 @@ class MarketDataAggregator:
                         break
                     try:
                         url = f"{self._lighter_base_logs_url}/{sym}/logs"
+                        sym_market_id = self._get_lighter_market_id(sym)
                         async with session.get(url) as response:
                             if response.status == 200:
                                 payload = await response.json(content_type=None)
-                                ticks = self._extract_lighter_ticks_from_logs(payload)
+                                ticks = self._extract_lighter_ticks_from_logs(
+                                    payload, market_id_override=sym_market_id,
+                                )
                                 if ticks:
                                     for ts, price, volume in ticks:
                                         self._record_tick(

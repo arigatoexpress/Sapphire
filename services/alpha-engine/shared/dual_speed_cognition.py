@@ -76,8 +76,8 @@ class DualSpeedCognition:
     - System 2 validates and can reverse within a "cognitive window"
     """
 
-    SYSTEM_1_MODEL = "gemini-2.0-flash"
-    SYSTEM_2_MODEL = "gemini-2.0-pro-exp-02-05"
+    SYSTEM_1_MODEL_DEFAULT = "gemini-2.5-flash"
+    SYSTEM_2_MODEL_DEFAULT = "gemini-2.5-pro"
 
     # Thresholds
     INSTANT_ACTION_THRESHOLD = 0.85  # System 1 confidence to act immediately
@@ -87,11 +87,15 @@ class DualSpeedCognition:
     def __init__(self):
         api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 
+        # Allow runtime model override via env vars
+        self.SYSTEM_1_MODEL = os.getenv("SAPPHIRE_SYSTEM1_MODEL", self.SYSTEM_1_MODEL_DEFAULT)
+        self.SYSTEM_2_MODEL = os.getenv("SAPPHIRE_SYSTEM2_MODEL", self.SYSTEM_2_MODEL_DEFAULT)
+
         if api_key:
             genai.configure(api_key=api_key)
             self.system1 = genai.GenerativeModel(self.SYSTEM_1_MODEL)
             self.system2 = genai.GenerativeModel(self.SYSTEM_2_MODEL)
-            logger.info(f"🧠 Dual-Speed Cognition initialized (Flash + Pro)")
+            logger.info(f"🧠 Dual-Speed Cognition initialized ({self.SYSTEM_1_MODEL} + {self.SYSTEM_2_MODEL})")
         else:
             self.system1 = None
             self.system2 = None

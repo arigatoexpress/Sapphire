@@ -14,10 +14,7 @@ LIGHTER_REGION="${LIGHTER_REGION:-europe-west1}"
 GATEWAY_REGION="${GATEWAY_REGION:-us-central1}"
 SCHEDULER_REGION="${SCHEDULER_REGION:-us-central1}"
 AUTONOMY_SA="${AUTONOMY_SA:-sapphire-main-sa@${PROJECT_ID}.iam.gserviceaccount.com}"
-EXPECTED_TV_SIGNAL_MODE="${EXPECTED_TV_SIGNAL_MODE:-live}"
-EXPECTED_TV_SIGNAL_MODE="$(echo "$EXPECTED_TV_SIGNAL_MODE" | tr '[:upper:]' '[:lower:]')"
-REQUIRE_TV_RULES_IN_LIVE="${REQUIRE_TV_RULES_IN_LIVE:-false}"
-REQUIRE_TV_RULES_IN_LIVE="$(echo "$REQUIRE_TV_RULES_IN_LIVE" | tr '[:upper:]' '[:lower:]')"
+
 
 FAILURES=0
 
@@ -198,140 +195,7 @@ else
   fail "alpha enabled venues mismatch: ${enabled_venues:-<empty>}"
 fi
 
-tv_execution_enabled=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
-  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_EXECUTION_ENABLED") | .value // empty')
-tv_integration_enabled=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
-  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="SAPPHIRE_TRADINGVIEW_INTEGRATION_ENABLED") | .value // "true"')
 
-if [[ "$tv_integration_enabled" == "false" ]]; then
-  pass "alpha TradingView integration disabled by policy"
-  if [[ "$tv_execution_enabled" == "true" ]]; then
-    fail "alpha TradingView execution unexpectedly enabled while integration is disabled"
-  else
-    pass "alpha TradingView signal mode disabled/workbench"
-  fi
-elif [[ "$EXPECTED_TV_SIGNAL_MODE" == "live" ]]; then
-  if [[ "$tv_execution_enabled" == "true" ]]; then
-    pass "alpha TradingView signal mode live"
-  else
-    fail "alpha TradingView signal mode expected live, got: ${tv_execution_enabled:-<empty>}"
-  fi
-else
-  if [[ "$tv_execution_enabled" == "true" ]]; then
-    fail "alpha TradingView signal mode expected workbench dry-run, got live"
-  else
-    pass "alpha TradingView signal mode workbench dry-run"
-  fi
-fi
-
-tv_rules_enforced=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
-  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_ENFORCE_STRATEGY_RULES") | .value // empty')
-tv_rules_json=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
-  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_STRATEGY_RULES_JSON") | .value // empty')
-if [[ "$tv_integration_enabled" == "false" ]]; then
-  pass "alpha TradingView strategy rules bypassed (integration disabled)"
-elif [[ "$tv_execution_enabled" == "true" ]]; then
-  if [[ "$REQUIRE_TV_RULES_IN_LIVE" == "true" ]]; then
-    if [[ "$tv_rules_enforced" == "true" ]]; then
-      pass "alpha enforces TradingView strategy rules in live signal mode"
-    else
-      fail "alpha strategy rule enforcement disabled in live signal mode: ${tv_rules_enforced:-<empty>}"
-    fi
-    if [[ -n "$tv_rules_json" ]]; then
-      pass "alpha TradingView strategy rules configured for live signal mode"
-    else
-      fail "alpha TradingView strategy rules missing in live signal mode"
-    fi
-  else
-    pass "alpha TradingView strategy rules optional in live signal mode"
-  fi
-else
-  pass "alpha TradingView strategy rules optional in workbench mode"
-fi
-
-tv_default_quantity=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
-  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_DEFAULT_QUANTITY") | .value // empty')
-if [[ "$tv_integration_enabled" == "false" ]]; then
-  pass "alpha TradingView default quantity check skipped (integration disabled)"
-elif [[ -n "$tv_default_quantity" ]] && awk "BEGIN {exit !($tv_default_quantity > 0)}"; then
-  pass "alpha TradingView default quantity > 0"
-else
-  fail "alpha TradingView default quantity invalid: ${tv_default_quantity:-<empty>}"
-fi
-
-tv_autonomy_enabled=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
-  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_AUTONOMY_ENABLED") | .value // empty')
-if [[ "$tv_integration_enabled" == "false" ]]; then
-  pass "alpha TradingView autonomy plugin check skipped (integration disabled)"
-elif [[ "$tv_autonomy_enabled" == "true" ]]; then
-  pass "alpha TradingView autonomy plugin enabled"
-else
-  fail "alpha TradingView autonomy plugin disabled: ${tv_autonomy_enabled:-<empty>}"
-fi
-
-full_autonomy_enabled=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
-  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="SAPPHIRE_FULL_AUTONOMY_ENABLED") | .value // empty')
-if [[ "$full_autonomy_enabled" == "true" ]]; then
-  pass "alpha full autonomy mode enabled"
-else
-  fail "alpha full autonomy mode disabled: ${full_autonomy_enabled:-<empty>}"
-fi
-
-autonomy_code_changes=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
-  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="SAPPHIRE_AUTONOMY_ALLOW_CODE_CHANGES") | .value // empty')
-if [[ "$autonomy_code_changes" == "true" ]]; then
-  pass "alpha autonomy code changes enabled"
-else
-  fail "alpha autonomy code changes disabled: ${autonomy_code_changes:-<empty>}"
-fi
-
-autonomy_gcloud_changes=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
-  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="SAPPHIRE_AUTONOMY_ALLOW_GCLOUD_CHANGES") | .value // empty')
-if [[ "$autonomy_gcloud_changes" == "true" ]]; then
-  pass "alpha autonomy gcloud changes enabled"
-else
-  fail "alpha autonomy gcloud changes disabled: ${autonomy_gcloud_changes:-<empty>}"
-fi
-
-tv_all_assets=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
-  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_ALLOW_ALL_ASSETS") | .value // empty')
-if [[ "$tv_integration_enabled" == "false" ]]; then
-  pass "alpha TradingView all-assets scope check skipped (integration disabled)"
-elif [[ "$tv_all_assets" == "true" ]]; then
-  pass "alpha TradingView all-assets scope enabled"
-else
-  fail "alpha TradingView all-assets scope disabled: ${tv_all_assets:-<empty>}"
-fi
-
-tv_community_access=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
-  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_COMMUNITY_ACCESS_ENABLED") | .value // empty')
-if [[ "$tv_integration_enabled" == "false" ]]; then
-  pass "alpha TradingView community access check skipped (integration disabled)"
-elif [[ "$tv_community_access" == "true" ]]; then
-  pass "alpha TradingView community scripts access enabled"
-else
-  fail "alpha TradingView community scripts access disabled: ${tv_community_access:-<empty>}"
-fi
-
-tv_hook_url=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
-  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_AUTONOMY_HOOK_URL") | .value // empty')
-if [[ "$tv_integration_enabled" == "false" ]]; then
-  pass "alpha TradingView autonomy hook URL check skipped (integration disabled)"
-elif [[ -n "$tv_hook_url" ]]; then
-  pass "alpha TradingView autonomy hook URL configured"
-else
-  fail "alpha TradingView autonomy hook URL missing"
-fi
-
-tv_hook_token_present=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
-  | jq -r '[.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_AUTONOMY_HOOK_TOKEN")] | length')
-if [[ "$tv_integration_enabled" == "false" ]]; then
-  pass "alpha TradingView autonomy hook token check skipped (integration disabled)"
-elif [[ "$tv_hook_token_present" -ge 1 ]]; then
-  pass "alpha TradingView autonomy hook token configured"
-else
-  fail "alpha TradingView autonomy hook token missing"
-fi
 
 required_jobs=(
   "sapphire-alpha-health-6h"
