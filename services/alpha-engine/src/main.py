@@ -13,6 +13,7 @@ import uvloop
 from src.ai.gemini_guard import GeminiGuard
 from src.collaboration.forum import SapphireForumService
 from src.collaboration.reputation import BotReputationService
+from src.collaboration.swarm import SwarmAggregator
 from src.execution.dispatcher import dispatcher
 from src.execution.portfolio import PortfolioTracker
 from src.feeds.market_data import MarketDataAggregator
@@ -191,6 +192,7 @@ class AlphaEngine:
         self._system_logs: Deque[Dict[str, Any]] = deque(maxlen=self._system_log_max_entries)
         self.forum = SapphireForumService()
         self.reputation = BotReputationService()
+        self.swarm = SwarmAggregator(reputation=self.reputation)
         self.vt_scanner = VirusTotalSkillScanner()
         requested_media_mode = self._normalize_media_mode(
             os.getenv("SAPPHIRE_MEDIA_MODE", "owner_approval")
@@ -2976,6 +2978,101 @@ class AlphaEngine:
                 )
             else:
                 await self.telegram.send_as(SAPPHIRE, f"⚠️ Failed to penalize `{bot_id}`.")
+            return
+
+        if normalized_action == "SWARM_SUBMIT_IDEA":
+            payload = self._parse_json_payload(target)
+            bot_id = str(payload.get("bot_id", "")).strip()
+            symbol = str(payload.get("symbol", "")).strip()
+            direction = str(payload.get("direction", "")).strip()
+            confidence = float(payload.get("confidence", 0.5))
+            timeframe = str(payload.get("timeframe", "1h")).strip()
+            rationale = str(payload.get("rationale", ""))[:500]
+            target_price = float(payload.get("target_price", 0))
+            stop_loss = float(payload.get("stop_loss", 0))
+            result = self.swarm.submit_idea(
+                bot_id=bot_id, symbol=symbol, direction=direction,
+                confidence=confidence, timeframe=timeframe, rationale=rationale,
+                target_price=target_price, stop_loss=stop_loss,
+            )
+            if result.get("ok"):
+                arrow = "🟢 LONG" if result["direction"] == "LONG" else "🔴 SHORT"
+                await self.telegram.send_message(
+                    f"🐝 **Swarm idea received:** `{result['idea_id']}`\n"
+                    f"Bot: `{bot_id.upper()}` | {arrow} `{symbol}`\n"
+                    f"Confidence: {confidence:.0%} | Rep weight: {result['reputation_weight']:.2f}\n"
+                    f"Weighted score: {result['weighted_score']:.3f}",
+                    priority="medium",
+                )
+            else:
+                await self.telegram.send_as(
+                    EMERALD, f"⚠️ Swarm idea rejected: {result.get('error', '?')}"
+                )
+            return
+
+        if normalized_action == "SWARM_AGGREGATE":
+            payload = self._parse_json_payload(target)
+            symbol = str(payload.get("symbol", "")).strip()
+            if not symbol:
+                await self.telegram.send_as(EMERALD, "⚠️ Please specify a symbol to aggregate.")
+                return
+            result = self.swarm.aggregate(symbol)
+            if not result.get("ok"):
+                await self.telegram.send_as(EMERALD, f"⚠️ Aggregation failed: {result.get('error', '?')}")
+                return
+            consensus_emoji = {
+                "LONG": "🟢", "SHORT": "🔴", "LEAN_LONG": "🟡↗",
+                "LEAN_SHORT": "🟡↘", "NEUTRAL": "⚪",
+            }.get(result["consensus"], "⚪")
+            lines = [
+                f"🐝 **Swarm Consensus: `{symbol}`** {consensus_emoji}\n",
+                f"Direction: **{result['consensus']}** | Conviction: **{result['conviction']:.0%}**",
+                f"Ideas: {result['total_ideas']} (🟢 {result['long_count']} long / 🔴 {result['short_count']} short)",
+                f"Weighted: Long {result['weighted_long']:.3f} | Short {result['weighted_short']:.3f}",
+                f"Net score: {result['net_score']:+.3f}",
+            ]
+            if result.get("avg_target_price"):
+                lines.append(f"Avg target: ${result['avg_target_price']:,.2f}")
+            if result.get("avg_stop_loss"):
+                lines.append(f"Avg stop: ${result['avg_stop_loss']:,.2f}")
+            if result.get("contributors"):
+                lines.append("\n**Contributors:**")
+                for c in result["contributors"][:10]:
+                    d = "🟢" if c["direction"] == "LONG" else "🔴"
+                    lines.append(
+                        f"  {d} `{c['bot_id']}` — conf: {c['confidence']:.0%}, "
+                        f"weight: {c['reputation_weight']:.2f}, score: {c['weighted_score']:.3f}"
+                    )
+            await self.telegram.send_message("\n".join(lines), priority="medium")
+            return
+
+        if normalized_action == "SWARM_STATS":
+            stats = self.swarm.stats()
+            await self.telegram.send_message(
+                f"🐝 **Swarm Statistics**\n"
+                f"Total ideas submitted: {stats['total_ideas_submitted']}\n"
+                f"Open: {stats['open_ideas']} | Resolved: {stats['resolved_ideas']} | Expired: {stats['expired_ideas']}\n"
+                f"Active symbols: {stats['active_symbols']}",
+                priority="medium",
+            )
+            return
+
+        if normalized_action == "SWARM_OPEN_IDEAS":
+            payload = self._parse_json_payload(target)
+            symbol = str(payload.get("symbol", "")).strip()
+            ideas = self.swarm.open_ideas(symbol)
+            if not ideas:
+                msg = f"🐝 No open swarm ideas" + (f" for `{symbol}`." if symbol else ".")
+                await self.telegram.send_as(EMERALD, msg)
+            else:
+                lines = [f"🐝 **Open Swarm Ideas** ({len(ideas)})\n"]
+                for idea in ideas[:15]:
+                    d = "🟢" if idea["direction"] == "LONG" else "🔴"
+                    lines.append(
+                        f"  {d} `{idea['idea_id']}` — `{idea['symbol']}` {idea['direction']} "
+                        f"by `{idea['bot_id']}` (conf: {idea['confidence']:.0%}, weight: {idea['reputation_weight']:.2f})"
+                    )
+                await self.telegram.send_message("\n".join(lines), priority="medium")
             return
 
         if normalized_action in {"SCOUT_STATUS", "FORUM_SCOUT_STATUS"}:

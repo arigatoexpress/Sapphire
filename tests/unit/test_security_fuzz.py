@@ -75,6 +75,10 @@ ADVERSARIAL_STRINGS = [
     "rep count",
     "/rep ban '; DROP TABLE--",
     "/rep penalize \" OR 1=1",
+    "swarm aggregate BTC",
+    "swarm ideas",
+    "swarm stats",
+    "/swarm aggregate '; DROP TABLE--",
 ]
 
 

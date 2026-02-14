@@ -1175,3 +1175,110 @@ def test_rep_count_plain_text(telegram_module):
     result = bot._parse_plain_text_command("rep count")
     assert result is not None
     assert result["action"] == "REP_BOT_COUNT"
+
+
+# ── Phase 4: Swarm Telegram Commands ────────────────────────────
+
+
+def test_swarm_aggregate_slash_command(telegram_module):
+    """'/swarm aggregate BTC/USDT' dispatches SWARM_AGGREGATE."""
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/swarm aggregate BTC/USDT"}}
+        )
+    )
+    callback.assert_awaited_once()
+    _, symbol, action, _ = callback.await_args.args
+    assert action == "SWARM_AGGREGATE"
+    payload = json.loads(symbol)
+    assert payload["symbol"] == "BTC/USDT"
+
+
+def test_swarm_ideas_slash_command(telegram_module):
+    """'/swarm ideas ETH' dispatches SWARM_OPEN_IDEAS."""
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/swarm ideas ETH"}}
+        )
+    )
+    callback.assert_awaited_once()
+    _, symbol, action, _ = callback.await_args.args
+    assert action == "SWARM_OPEN_IDEAS"
+    payload = json.loads(symbol)
+    assert payload["symbol"] == "ETH"
+
+
+def test_swarm_ideas_no_symbol(telegram_module):
+    """'/swarm ideas' dispatches SWARM_OPEN_IDEAS with empty symbol."""
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/swarm ideas"}}
+        )
+    )
+    callback.assert_awaited_once()
+    _, _, action, _ = callback.await_args.args
+    assert action == "SWARM_OPEN_IDEAS"
+
+
+def test_swarm_stats_slash_command(telegram_module):
+    """'/swarm stats' dispatches SWARM_STATS."""
+    callback = AsyncMock()
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=callback,
+    )
+    bot.send_message = AsyncMock()
+    asyncio.run(
+        bot._process_update(
+            {"message": {"chat": {"id": "12345"}, "text": "/swarm stats"}}
+        )
+    )
+    callback.assert_awaited_once()
+    _, _, action, _ = callback.await_args.args
+    assert action == "SWARM_STATS"
+
+
+def test_swarm_aggregate_plain_text(telegram_module):
+    """Plain text 'swarm aggregate SOL' dispatches SWARM_AGGREGATE."""
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=AsyncMock(),
+    )
+    result = bot._parse_plain_text_command("swarm aggregate SOL")
+    assert result is not None
+    assert result["action"] == "SWARM_AGGREGATE"
+    payload = json.loads(result["symbol"])
+    assert payload["symbol"] == "SOL"
+
+
+def test_swarm_ideas_plain_text(telegram_module):
+    """Plain text 'swarm ideas BTC' dispatches SWARM_OPEN_IDEAS."""
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=AsyncMock(),
+    )
+    result = bot._parse_plain_text_command("swarm ideas BTC")
+    assert result is not None
+    assert result["action"] == "SWARM_OPEN_IDEAS"
+
+
+def test_swarm_stats_plain_text(telegram_module):
+    """Plain text 'swarm stats' dispatches SWARM_STATS."""
+    bot = telegram_module.TelegramPlatformBot(
+        bot_token="token", chat_id="12345", command_callback=AsyncMock(),
+    )
+    result = bot._parse_plain_text_command("swarm stats")
+    assert result is not None
+    assert result["action"] == "SWARM_STATS"
