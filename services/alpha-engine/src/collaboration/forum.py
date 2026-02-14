@@ -315,11 +315,13 @@ class SapphireForumService:
             "body": body,
             "summary": body[:220] + ("..." if len(body) > 220 else ""),
             "lane": str(topic.get("lane", "research")),
+            "category": str(topic.get("category", "general")),
             "state": str(topic.get("state", "open")),
             "priority": str(topic.get("priority", "medium")),
             "author": str(topic.get("author", "SAPPHIRE")),
             "source": str(topic.get("source", "internal")),
             "tags": list(topic.get("tags", [])),
+            "score": float(topic.get("score", 0.0)),
             "created_at": int(topic.get("created_at", 0)),
             "updated_at": int(topic.get("updated_at", topic.get("created_at", 0))),
             "reply_count": len(replies),
@@ -335,6 +337,14 @@ class SapphireForumService:
         detail = self._topic_summary_locked(topic)
         detail["body"] = str(topic.get("body", ""))
         detail["replies"] = list(self._replies.get(topic_id, []))
+        # Phase 3 fields
+        detail["category"] = str(topic.get("category", "general"))
+        detail["upvotes"] = int(topic.get("upvotes", 0))
+        detail["downvotes"] = int(topic.get("downvotes", 0))
+        detail["score"] = float(topic.get("score", 0.0))
+        detail["voters"] = list(topic.get("voters", []))
+        if "approval" in topic:
+            detail["approval"] = dict(topic["approval"])
         return detail
 
     def _list_topics_locked(
@@ -686,6 +696,126 @@ class SapphireForumService:
                 filtered = [t for t in filtered if t.get("category") == norm_cat]
             sorted_topics = sorted(filtered, key=lambda t: float(t.get("score", 0)), reverse=True)
             return [self._topic_summary_locked(t) for t in sorted_topics[:limit]]
+
+    # ── Phase 3: Forum-based Approval Workflows ─────────────────
+
+    APPROVAL_THRESHOLD = 2  # Minimum upvotes needed for auto-approval
+    REJECTION_THRESHOLD = 2  # Minimum downvotes needed for auto-rejection
+
+    def create_approval_topic(
+        self,
+        title: str,
+        body: str,
+        session_key: str,
+        author: str = "SAPPHIRE",
+        category: str = "platform",
+    ) -> Dict[str, Any]:
+        """Create a forum topic for an approval workflow.
+
+        The topic is tagged with 'approval' and stores the session_key in metadata.
+        Agents can vote (up=approve, down=reject) and add reply comments.
+        """
+        payload = {
+            "title": title,
+            "body": body,
+            "lane": "governance",
+            "category": category,
+            "state": "open",
+            "priority": "high",
+            "author": author,
+            "tags": ["approval", "governance"],
+            "source": "system",
+        }
+        with self._lock:
+            topic = self._create_topic_locked(payload, persist=True)
+            # Store approval metadata directly on the topic
+            for t in self._topics:
+                if t.get("topic_id") == topic.get("topic_id"):
+                    t["approval"] = {
+                        "session_key": str(session_key),
+                        "status": "pending",  # pending | approved | rejected | expired
+                        "created_at": self._now(),
+                        "resolved_at": "",
+                        "resolution_reason": "",
+                    }
+                    break
+            self._save_locked()
+        return topic
+
+    def resolve_approval(self, topic_id: str) -> Dict[str, Any]:
+        """Check if an approval topic has reached a decision threshold.
+
+        Returns the current state: pending, approved, rejected, or the vote tally.
+        Auto-resolves if votes meet threshold.
+        """
+        with self._lock:
+            topic = next((t for t in self._topics if t.get("topic_id") == topic_id), None)
+            if not topic:
+                return {"ok": False, "error": "topic_not_found"}
+            approval = topic.get("approval")
+            if not approval:
+                return {"ok": False, "error": "not_an_approval_topic"}
+            if approval["status"] != "pending":
+                return {
+                    "ok": True,
+                    "status": approval["status"],
+                    "session_key": approval.get("session_key", ""),
+                    "resolved_at": approval.get("resolved_at", ""),
+                    "reason": approval.get("resolution_reason", ""),
+                    "score": float(topic.get("score", 0)),
+                    "upvotes": int(topic.get("upvotes", 0)),
+                    "downvotes": int(topic.get("downvotes", 0)),
+                }
+
+            upvotes = int(topic.get("upvotes", 0))
+            downvotes = int(topic.get("downvotes", 0))
+            score = float(topic.get("score", 0))
+
+            status = "pending"
+            reason = ""
+            if upvotes >= self.APPROVAL_THRESHOLD and score > 0:
+                status = "approved"
+                reason = f"Consensus reached: {upvotes} upvotes, {downvotes} downvotes"
+            elif downvotes >= self.REJECTION_THRESHOLD and score < 0:
+                status = "rejected"
+                reason = f"Rejected by consensus: {downvotes} downvotes, {upvotes} upvotes"
+
+            if status != "pending":
+                approval["status"] = status
+                approval["resolved_at"] = self._now()
+                approval["resolution_reason"] = reason
+                topic["state"] = "closed"
+                self._save_locked()
+
+            return {
+                "ok": True,
+                "status": status,
+                "session_key": approval.get("session_key", ""),
+                "resolved_at": approval.get("resolved_at", ""),
+                "reason": reason,
+                "score": score,
+                "upvotes": upvotes,
+                "downvotes": downvotes,
+            }
+
+    def list_pending_approvals(self) -> List[Dict[str, Any]]:
+        """Return all pending approval topics."""
+        with self._lock:
+            results = []
+            for t in self._topics:
+                approval = t.get("approval")
+                if approval and approval.get("status") == "pending":
+                    results.append({
+                        "topic_id": t.get("topic_id", ""),
+                        "title": t.get("title", ""),
+                        "session_key": approval.get("session_key", ""),
+                        "score": float(t.get("score", 0)),
+                        "upvotes": int(t.get("upvotes", 0)),
+                        "downvotes": int(t.get("downvotes", 0)),
+                        "voters": t.get("voters", []),
+                        "created_at": approval.get("created_at", ""),
+                    })
+            return results
 
     def add_reply(self, topic_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         with self._lock:

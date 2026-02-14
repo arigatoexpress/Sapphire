@@ -2154,6 +2154,23 @@ class AlphaEngine:
         }
         self._latest_autonomy_session_key = key
 
+        # Phase 3: Create forum approval topic for audit trail
+        try:
+            self.forum.create_approval_topic(
+                title=f"Autonomy session: {str(trigger or 'unknown').strip()[:50]}",
+                body=(
+                    f"**Session key:** `{key}`\n"
+                    f"**Trigger:** {str(trigger or 'manual').strip()}\n"
+                    f"**Instruction:** {trimmed_instruction}\n\n"
+                    "Vote ⬆ to approve or ⬇ to reject."
+                ),
+                session_key=key,
+                author="SAPPHIRE",
+                category="platform",
+            )
+        except Exception as exc:
+            logger.warning(f"Forum approval topic creation failed: {exc}")
+
         if len(self._autonomy_sessions) > self._autonomy_session_history_max:
             oldest = sorted(
                 self._autonomy_sessions.items(),
@@ -2728,6 +2745,29 @@ class AlphaEngine:
                     f"(⬆{result.get('upvotes', 0)} ⬇{result.get('downvotes', 0)})",
                     priority="medium",
                 )
+                # Phase 3: Check if this vote resolves an approval workflow
+                approval_result = self.forum.resolve_approval(topic_id)
+                if approval_result.get("ok") and approval_result.get("status") in ("approved", "rejected"):
+                    status = approval_result["status"]
+                    session_key = approval_result.get("session_key", "")
+                    emoji = "✅" if status == "approved" else "🚫"
+                    await self.telegram.send_message(
+                        f"{emoji} **Approval resolved:** `{topic_id}` → `{status.upper()}`\n"
+                        f"Session: `{session_key}`\n"
+                        f"Reason: {approval_result.get('reason', 'consensus reached')}",
+                        priority="high",
+                    )
+                    self._record_system_log(
+                        f"Forum approval resolved: {topic_id} → {status}",
+                        level="info",
+                        tags=["forum", "approval", "governance"],
+                        metadata={
+                            "topic_id": topic_id,
+                            "session_key": session_key,
+                            "status": status,
+                            "score": approval_result.get("score", 0),
+                        },
+                    )
             else:
                 await self.telegram.send_message(
                     f"❌ Vote failed: `{result.get('error', 'unknown')}`",
@@ -2800,6 +2840,32 @@ class AlphaEngine:
                     f"Category: `{topic.get('category', 'general')}` | Author: {topic.get('author', '?')}",
                     priority="medium",
                 )
+            return
+
+        if normalized_action == "FORUM_PENDING_APPROVALS":
+            pending = self.forum.list_pending_approvals()
+            if not pending:
+                await self.telegram.send_as(
+                    EMERALD,
+                    "📋 No pending approval workflows.",
+                )
+            else:
+                lines = [f"📋 **Pending Approvals** ({len(pending)})\n"]
+                for item in pending[:10]:
+                    tid = item.get("topic_id", "?")
+                    title = str(item.get("title", ""))[:50]
+                    score = item.get("score", 0)
+                    up = item.get("upvotes", 0)
+                    down = item.get("downvotes", 0)
+                    key = item.get("session_key", "?")
+                    voters = ", ".join(item.get("voters", [])) or "none"
+                    lines.append(
+                        f"• `{tid}` — *{title}*\n"
+                        f"  Session: `{key}` | Score: {score:+.0f} (⬆{up} ⬇{down})\n"
+                        f"  Voters: {voters}"
+                    )
+                lines.append(f"\n_Threshold: {self.forum.APPROVAL_THRESHOLD} votes to resolve._")
+                await self.telegram.send_message("\n".join(lines), priority="medium")
             return
 
         if normalized_action in {"SCOUT_STATUS", "FORUM_SCOUT_STATUS"}:
