@@ -70,12 +70,12 @@ class PositionManager:
     async def sync_from_exchange(self):
         """Sync positions from exchange to inherit existing positions on startup."""
         try:
-            print("🔍 Scanning exchange for existing positions to takeover...")
+            logger.info("🔍 Scanning exchange for existing positions to takeover...")
             # Try to get open positions from the exchange
             response = await self.exchange_client.get_position_risk()
 
             if not response:
-                print("✅ No existing positions found on exchange")
+                logger.info("✅ No existing positions found on exchange")
                 return
 
             # Parse and load positions
@@ -125,16 +125,16 @@ class PositionManager:
                     "sl_price": sl_price,
                     "actual_side": actual_side,  # Explicit tracking
                 }
-                print(
+                logger.info(
                     f"   ✅ Inheriting {symbol}: {actual_side} {abs(raw_quantity)} @ {entry_price} (TP={tp_price}, SL={sl_price})"
                 )
 
-            print(f"✅ Sync complete: Inherited {len(self.open_positions)} positions")
+            logger.info(f"✅ Sync complete: Inherited {len(self.open_positions)} positions")
 
             # NATIVE TP/SL: Place orders for ALL inherited positions
             # This ensures risk is managed even if bot goes offline
             if self.open_positions:
-                print(
+                logger.info(
                     f"🛡️ Placing native TP/SL for {len(self.open_positions)} inherited positions..."
                 )
                 for symbol, pos in self.open_positions.items():
@@ -159,12 +159,12 @@ class PositionManager:
                                     sl_pct=0.03,  # 3% SL
                                 )
                     except Exception as tpsl_err:
-                        print(f"⚠️ Failed to place native TP/SL for inherited {symbol}: {tpsl_err}")
+                        logger.warning(f"⚠️ Failed to place native TP/SL for inherited {symbol}: {tpsl_err}")
 
-                print(f"✅ Native TP/SL setup complete for inherited positions")
+                logger.info(f"✅ Native TP/SL setup complete for inherited positions")
 
         except Exception as e:
-            print(f"⚠️ Failed to sync open positions from exchange: {e}")
+            logger.warning(f"⚠️ Failed to sync open positions from exchange: {e}")
 
     async def monitor_positions(self) -> Dict[str, Any]:
         """Monitor open positions for TP/SL hits and return current ticker map."""
@@ -184,7 +184,7 @@ class PositionManager:
                     pass
 
         except Exception as e:
-            print(f"⚠️ Error fetching batched tickers: {e}")
+            logger.warning(f"⚠️ Error fetching batched tickers: {e}")
             return {}
 
         if not self.open_positions:
@@ -216,7 +216,7 @@ class PositionManager:
                 self._update_trailing_stop(symbol, pos, current_price, agent)
 
             except Exception as e:
-                print(f"⚠️ Error monitoring position {symbol}: {e}")
+                logger.warning(f"⚠️ Error monitoring position {symbol}: {e}")
 
         return ticker_map
 
@@ -231,12 +231,12 @@ class PositionManager:
                 # 1. Move to Break Even if > 1.5% profit
                 if pnl_pct > 0.015 and pos["sl_price"] < pos["entry_price"]:
                     pos["sl_price"] = pos["entry_price"] * 1.002  # BE + small profit
-                    print(f"🛡️ Trailing Stop Updated for {symbol} (Long): Moved to Break Even")
+                    logger.info(f"🛡️ Trailing Stop Updated for {symbol} (Long): Moved to Break Even")
 
                 # 2. Lock in Profit if > 3% profit
                 elif pnl_pct > 0.03 and pos["sl_price"] < (pos["entry_price"] * 1.015):
                     pos["sl_price"] = pos["entry_price"] * 1.015  # Lock 1.5%
-                    print(f"🔒 Trailing Stop Updated for {symbol} (Long): Locked 1.5% Profit")
+                    logger.info(f"🔒 Trailing Stop Updated for {symbol} (Long): Locked 1.5% Profit")
 
             elif pos["side"] == "SELL":
                 pnl_pct = (pos["entry_price"] - current_price) / pos["entry_price"]
@@ -244,14 +244,14 @@ class PositionManager:
                 # 1. Move to Break Even if > 1.5% profit
                 if pnl_pct > 0.015 and pos["sl_price"] > pos["entry_price"]:
                     pos["sl_price"] = pos["entry_price"] * 0.998  # BE + small profit
-                    print(f"🛡️ Trailing Stop Updated for {symbol} (Short): Moved to Break Even")
+                    logger.info(f"🛡️ Trailing Stop Updated for {symbol} (Short): Moved to Break Even")
 
                 # 2. Lock in Profit if > 3% profit
                 elif pnl_pct > 0.03 and pos["sl_price"] > (pos["entry_price"] * 0.985):
                     pos["sl_price"] = pos["entry_price"] * 0.985  # Lock 1.5%
-                    print(f"🔒 Trailing Stop Updated for {symbol} (Short): Locked 1.5% Profit")
+                    logger.info(f"🔒 Trailing Stop Updated for {symbol} (Short): Locked 1.5% Profit")
         except Exception as e:
-            print(f"⚠️ Error updating trailing stop for {symbol}: {e}")
+            logger.warning(f"⚠️ Error updating trailing stop for {symbol}: {e}")
 
     async def update_sl_on_exchange(self, symbol: str, sl_price: float, side: str, quantity: float):
         """
@@ -269,7 +269,7 @@ class PositionManager:
             rounded_qty = await self._round_quantity(symbol, abs(quantity))
 
             # Place STOP_MARKET order
-            print(f"🛡️ Syncing Hard Stop for {symbol}: {order_side} {rounded_qty} @ {rounded_sl}")
+            logger.info(f"🛡️ Syncing Hard Stop for {symbol}: {order_side} {rounded_qty} @ {rounded_sl}")
             await self.exchange_client.place_order(
                 symbol=symbol,
                 side=order_side,
@@ -278,10 +278,10 @@ class PositionManager:
                 stop_price=rounded_sl,
                 reduce_only=True,
             )
-            print(f"✅ NATIVE SL ORDER PLACED: {symbol} @ {rounded_sl}")
+            logger.info(f"✅ NATIVE SL ORDER PLACED: {symbol} @ {rounded_sl}")
 
         except Exception as e:
-            print(f"⚠️ Failed to sync SL to exchange for {symbol}: {e}")
+            logger.warning(f"⚠️ Failed to sync SL to exchange for {symbol}: {e}")
 
     async def update_tp_on_exchange(self, symbol: str, tp_price: float, side: str, quantity: float):
         """
@@ -299,7 +299,7 @@ class PositionManager:
             rounded_qty = await self._round_quantity(symbol, abs(quantity))
 
             # Place TAKE_PROFIT_MARKET order
-            print(f"💰 Syncing Take Profit for {symbol}: {order_side} {rounded_qty} @ {rounded_tp}")
+            logger.info(f"💰 Syncing Take Profit for {symbol}: {order_side} {rounded_qty} @ {rounded_tp}")
             await self.exchange_client.place_order(
                 symbol=symbol,
                 side=order_side,
@@ -308,10 +308,10 @@ class PositionManager:
                 stop_price=rounded_tp,
                 reduce_only=True,
             )
-            print(f"✅ NATIVE TP ORDER PLACED: {symbol} @ {rounded_tp}")
+            logger.info(f"✅ NATIVE TP ORDER PLACED: {symbol} @ {rounded_tp}")
 
         except Exception as e:
-            print(f"⚠️ Failed to sync TP to exchange for {symbol}: {e}")
+            logger.warning(f"⚠️ Failed to sync TP to exchange for {symbol}: {e}")
 
     async def place_tpsl_orders(
         self,
@@ -338,7 +338,7 @@ class PositionManager:
                 tp_price = entry_price * (1 - tp_pct)
                 sl_price = entry_price * (1 + sl_pct)
 
-            print(
+            logger.info(
                 f"📊 Placing native TP/SL for {symbol}: Entry={entry_price:.6f}, TP={tp_price:.6f} ({tp_pct*100}%), SL={sl_price:.6f} ({sl_pct*100}%)"
             )
 
@@ -357,11 +357,11 @@ class PositionManager:
             # Mark as TP/SL placed to avoid repeated cancellation/placement
             self._tpsl_placed.add(symbol)
 
-            print(f"✅ NATIVE TP/SL ACTIVE for {symbol}")
+            logger.info(f"✅ NATIVE TP/SL ACTIVE for {symbol}")
             return True
 
         except Exception as e:
-            print(f"❌ Failed to place TP/SL orders for {symbol}: {e}")
+            logger.error(f"❌ Failed to place TP/SL orders for {symbol}: {e}")
             return False
 
     async def check_profit_taking(
@@ -406,5 +406,5 @@ class PositionManager:
 
             return False, ""
         except Exception as e:
-            print(f"⚠️ Error in profit taking check: {e}")
+            logger.warning(f"⚠️ Error in profit taking check: {e}")
             return False, ""
