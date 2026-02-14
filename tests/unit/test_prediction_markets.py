@@ -3,11 +3,13 @@ Unit tests for Phase 8: Prediction Market Intelligence
 
 Covers:
   - PredictionSignal dataclass (properties, serialization)
+  - ArbitrageOpportunity dataclass (direction, serialization, context)
   - PredictionMarketFeed base class (history tracking, error handling)
   - PolymarketClient (market parsing, relevance classification, symbol extraction)
   - KalshiClient (market parsing, probability extraction, category inference)
-  - PredictionAggregator (cross-source consensus, cognition context, forum summaries)
-  - Telegram command handlers
+  - PredictionAggregator (cross-source consensus, arbitrage detection, cognition context, forum summaries)
+  - Telegram command handlers (including arbitrage)
+  - Fuzzy market name normalization
 """
 
 import asyncio
@@ -26,11 +28,13 @@ import pytest
 # ── Signal Dataclass ─────────────────────────────────────────────────
 
 from src.feeds.prediction_signal import (
+    ArbitrageOpportunity,
     PredictionMarketFeed,
     PredictionSignal,
     PredictionSource,
     SignalRelevance,
 )
+from src.feeds.prediction_aggregator import _normalize_market_name
 
 
 def _make_signal(**overrides) -> PredictionSignal:
@@ -769,6 +773,479 @@ class TestTelegramPredictionHandlers:
         engine = MagicMock()
         result = await handle_prediction_commands(engine, "", "UNKNOWN_ACTION", 0)
         assert result is False
+
+    @pytest.mark.asyncio
+    async def test_prediction_arbitrage_command(self):
+        engine = MagicMock()
+        engine.prediction_aggregator = MagicMock()
+        engine.prediction_aggregator.format_telegram_arbitrage.return_value = "⚡ test arb"
+        engine.telegram = MagicMock()
+        engine.telegram.send_message = AsyncMock()
+
+        result = await handle_prediction_commands(engine, "", "PM_ARBITRAGE", 0)
+        assert result is True
+        engine.prediction_aggregator.format_telegram_arbitrage.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_prediction_arb_alias(self):
+        engine = MagicMock()
+        engine.prediction_aggregator = MagicMock()
+        engine.prediction_aggregator.format_telegram_arbitrage.return_value = "⚡ arb"
+        engine.telegram = MagicMock()
+        engine.telegram.send_message = AsyncMock()
+
+        result = await handle_prediction_commands(engine, "", "ARBITRAGE", 0)
+        assert result is True
+
+
+# ── Fuzzy Name Normalization ──────────────────────────────────────────
+
+
+class TestFuzzyNameNormalization:
+    """Tests for cross-venue market name matching — ported from TheOddsDesk."""
+
+    def test_strips_noise_words(self):
+        assert _normalize_market_name("Will the price go above 100") == _normalize_market_name("price above 100")
+
+    def test_case_insensitive(self):
+        assert _normalize_market_name("Bitcoin Price $100K") == _normalize_market_name("bitcoin price $100k")
+
+    def test_strips_punctuation(self):
+        assert _normalize_market_name("Bitcoin > $100,000?") == _normalize_market_name("Bitcoin 100000")
+
+    def test_identical_events_different_phrasing(self):
+        poly = "Will Bitcoin exceed $100K by end of year?"
+        kalshi = "Bitcoin to exceed $100K by year end"
+        assert _normalize_market_name(poly) == _normalize_market_name(kalshi)
+
+    def test_different_events_stay_different(self):
+        a = "Bitcoin above $100K"
+        b = "Ethereum above $5K"
+        assert _normalize_market_name(a) != _normalize_market_name(b)
+
+    def test_empty_string(self):
+        assert _normalize_market_name("") == ""
+
+    def test_only_noise_words(self):
+        assert _normalize_market_name("will the be at by to") == ""
+
+    def test_fed_rate_variants(self):
+        a = "Will the Fed cut rates in March 2026?"
+        b = "Will Fed cut rates in March 2026?"
+        assert _normalize_market_name(a) == _normalize_market_name(b)
+
+
+# ── ArbitrageOpportunity Dataclass ────────────────────────────────────
+
+
+class TestArbitrageOpportunity:
+    def _make_arb(self, **overrides) -> ArbitrageOpportunity:
+        sig_a = _make_signal(
+            market_id="poly_btc100k",
+            source=PredictionSource.POLYMARKET,
+            probability=0.72,
+            volume_usd=500_000,
+        )
+        sig_b = _make_signal(
+            market_id="kalshi_btc100k",
+            source=PredictionSource.KALSHI,
+            probability=0.65,
+            volume_usd=200_000,
+        )
+        defaults = {
+            "id": "arb-poly_btc100k-kalshi_btc100k",
+            "market_name": "Bitcoin above $100K by year end",
+            "venue_a": "polymarket",
+            "price_a": 0.72,
+            "signal_a": sig_a,
+            "venue_b": "kalshi",
+            "price_b": 0.65,
+            "signal_b": sig_b,
+            "spread": 0.07,
+            "spread_pct": 7.0,
+            "confidence": 80.0,
+            "symbols": ["BTC"],
+        }
+        defaults.update(overrides)
+        return ArbitrageOpportunity(**defaults)
+
+    def test_direction_a_higher(self):
+        arb = self._make_arb(price_a=0.80, price_b=0.70)
+        assert arb.direction == "polymarket > kalshi"
+
+    def test_direction_b_higher(self):
+        arb = self._make_arb(price_a=0.60, price_b=0.75)
+        assert arb.direction == "kalshi > polymarket"
+
+    def test_to_dict_has_required_keys(self):
+        arb = self._make_arb()
+        d = arb.to_dict()
+        required_keys = {"id", "market_name", "venue_a", "price_a", "venue_b", "price_b",
+                         "spread", "spread_pct", "confidence", "direction", "symbols", "timestamp"}
+        assert required_keys == set(d.keys())
+
+    def test_to_dict_values(self):
+        arb = self._make_arb()
+        d = arb.to_dict()
+        assert d["spread_pct"] == 7.0
+        assert d["venue_a"] == "polymarket"
+        assert d["venue_b"] == "kalshi"
+
+    def test_context_string_format(self):
+        arb = self._make_arb()
+        ctx = arb.context_string()
+        assert "[ARB]" in ctx
+        assert "polymarket=" in ctx
+        assert "kalshi=" in ctx
+        assert "spread=" in ctx
+        assert "conf=" in ctx
+
+    def test_spread_pct_rounding(self):
+        arb = self._make_arb(spread=0.0333, spread_pct=3.33)
+        d = arb.to_dict()
+        assert d["spread_pct"] == 3.33
+
+
+# ── Arbitrage Detection ──────────────────────────────────────────────
+
+
+class TestArbitrageDetection:
+    def _make_aggregator(self) -> PredictionAggregator:
+        with patch.dict("os.environ", {"SAPPHIRE_PREDICTION_MARKET_ENABLED": "true"}):
+            agg = PredictionAggregator()
+        return agg
+
+    def _inject_signals(self, agg: PredictionAggregator, signals: List[PredictionSignal]):
+        for sig in signals:
+            if sig.source == PredictionSource.POLYMARKET:
+                agg._polymarket._signals[sig.market_id] = sig
+            else:
+                agg._kalshi._signals[sig.market_id] = sig
+
+    def test_no_signals_returns_empty(self):
+        agg = self._make_aggregator()
+        assert agg.find_arbitrage_opportunities() == []
+
+    def test_single_venue_no_arb(self):
+        agg = self._make_aggregator()
+        self._inject_signals(agg, [
+            _make_signal(market_id="poly_1", source=PredictionSource.POLYMARKET,
+                         question="Bitcoin above 100K", probability=0.72, volume_usd=100_000),
+            _make_signal(market_id="poly_2", source=PredictionSource.POLYMARKET,
+                         question="Bitcoin above 100K", probability=0.70, volume_usd=80_000),
+        ])
+        # Same venue — should not detect arb
+        arbs = agg.find_arbitrage_opportunities()
+        assert len(arbs) == 0
+
+    def test_cross_venue_spread_detected(self):
+        agg = self._make_aggregator()
+        self._inject_signals(agg, [
+            _make_signal(market_id="poly_btc100k", source=PredictionSource.POLYMARKET,
+                         question="Bitcoin above 100K", probability=0.72, volume_usd=200_000),
+            _make_signal(market_id="kalshi_btc100k", source=PredictionSource.KALSHI,
+                         question="Bitcoin above 100K", probability=0.60, volume_usd=100_000),
+        ])
+        arbs = agg.find_arbitrage_opportunities()
+        assert len(arbs) == 1
+        assert arbs[0].spread_pct == pytest.approx(12.0, abs=0.1)
+        assert arbs[0].venue_a == "polymarket"
+        assert arbs[0].venue_b == "kalshi"
+
+    def test_below_min_spread_filtered(self):
+        agg = self._make_aggregator()
+        self._inject_signals(agg, [
+            _make_signal(market_id="poly_1", source=PredictionSource.POLYMARKET,
+                         question="Bitcoin above 100K", probability=0.72, volume_usd=200_000),
+            _make_signal(market_id="kalshi_1", source=PredictionSource.KALSHI,
+                         question="Bitcoin above 100K", probability=0.71, volume_usd=100_000),
+        ])
+        # 1% spread < default 2% threshold
+        arbs = agg.find_arbitrage_opportunities()
+        assert len(arbs) == 0
+
+    def test_custom_min_spread(self):
+        agg = self._make_aggregator()
+        self._inject_signals(agg, [
+            _make_signal(market_id="poly_1", source=PredictionSource.POLYMARKET,
+                         question="Bitcoin above 100K", probability=0.72, volume_usd=200_000),
+            _make_signal(market_id="kalshi_1", source=PredictionSource.KALSHI,
+                         question="Bitcoin above 100K", probability=0.71, volume_usd=100_000),
+        ])
+        # Lower threshold to 0.5%
+        arbs = agg.find_arbitrage_opportunities(min_spread=0.005)
+        assert len(arbs) == 1
+
+    def test_fuzzy_matching_across_venues(self):
+        agg = self._make_aggregator()
+        self._inject_signals(agg, [
+            _make_signal(market_id="poly_btc", source=PredictionSource.POLYMARKET,
+                         question="Will Bitcoin exceed $100K by end of year?",
+                         probability=0.75, volume_usd=300_000),
+            _make_signal(market_id="kalshi_btc", source=PredictionSource.KALSHI,
+                         question="Bitcoin to exceed $100K by year end",
+                         probability=0.62, volume_usd=150_000),
+        ])
+        arbs = agg.find_arbitrage_opportunities()
+        assert len(arbs) == 1
+        assert arbs[0].spread_pct == pytest.approx(13.0, abs=0.1)
+
+    def test_different_markets_not_matched(self):
+        agg = self._make_aggregator()
+        self._inject_signals(agg, [
+            _make_signal(market_id="poly_btc", source=PredictionSource.POLYMARKET,
+                         question="Bitcoin above 100K", probability=0.75, volume_usd=300_000),
+            _make_signal(market_id="kalshi_eth", source=PredictionSource.KALSHI,
+                         question="Ethereum above 5K", probability=0.50, volume_usd=150_000),
+        ])
+        arbs = agg.find_arbitrage_opportunities()
+        assert len(arbs) == 0
+
+    def test_sorted_by_spread_descending(self):
+        agg = self._make_aggregator()
+        self._inject_signals(agg, [
+            _make_signal(market_id="poly_btc", source=PredictionSource.POLYMARKET,
+                         question="Bitcoin 100K", probability=0.72, volume_usd=200_000),
+            _make_signal(market_id="kalshi_btc", source=PredictionSource.KALSHI,
+                         question="Bitcoin 100K", probability=0.65, volume_usd=100_000),
+            _make_signal(market_id="poly_eth", source=PredictionSource.POLYMARKET,
+                         question="Ethereum 5K", probability=0.80, volume_usd=200_000),
+            _make_signal(market_id="kalshi_eth", source=PredictionSource.KALSHI,
+                         question="Ethereum 5K", probability=0.55, volume_usd=100_000),
+        ])
+        arbs = agg.find_arbitrage_opportunities()
+        assert len(arbs) == 2
+        assert arbs[0].spread >= arbs[1].spread
+
+    def test_confidence_high_volume(self):
+        agg = self._make_aggregator()
+        self._inject_signals(agg, [
+            _make_signal(market_id="poly_1", source=PredictionSource.POLYMARKET,
+                         question="Bitcoin 100K", probability=0.80, volume_usd=800_000),
+            _make_signal(market_id="kalshi_1", source=PredictionSource.KALSHI,
+                         question="Bitcoin 100K", probability=0.65, volume_usd=600_000),
+        ])
+        arbs = agg.find_arbitrage_opportunities()
+        assert len(arbs) == 1
+        # Total volume > $1M → base 90 + bonuses
+        assert arbs[0].confidence >= 90
+
+    def test_confidence_low_volume(self):
+        agg = self._make_aggregator()
+        self._inject_signals(agg, [
+            _make_signal(market_id="poly_1", source=PredictionSource.POLYMARKET,
+                         question="Bitcoin 100K", probability=0.80, volume_usd=3_000),
+            _make_signal(market_id="kalshi_1", source=PredictionSource.KALSHI,
+                         question="Bitcoin 100K", probability=0.65, volume_usd=2_000),
+        ])
+        arbs = agg.find_arbitrage_opportunities()
+        assert len(arbs) == 1
+        # Low volume + min_vol penalty
+        assert arbs[0].confidence <= 40
+
+    def test_min_confidence_filter(self):
+        agg = self._make_aggregator()
+        self._inject_signals(agg, [
+            _make_signal(market_id="poly_1", source=PredictionSource.POLYMARKET,
+                         question="Bitcoin 100K", probability=0.80, volume_usd=3_000),
+            _make_signal(market_id="kalshi_1", source=PredictionSource.KALSHI,
+                         question="Bitcoin 100K", probability=0.60, volume_usd=2_000),
+        ])
+        arbs = agg.find_arbitrage_opportunities(min_confidence=50.0)
+        assert len(arbs) == 0
+
+    def test_symbols_merged_from_both_signals(self):
+        agg = self._make_aggregator()
+        self._inject_signals(agg, [
+            _make_signal(market_id="poly_1", source=PredictionSource.POLYMARKET,
+                         question="Bitcoin 100K", probability=0.80, volume_usd=200_000,
+                         symbols=["BTC"]),
+            _make_signal(market_id="kalshi_1", source=PredictionSource.KALSHI,
+                         question="Bitcoin 100K", probability=0.65, volume_usd=100_000,
+                         symbols=["BTC", "ETH"]),
+        ])
+        arbs = agg.find_arbitrage_opportunities()
+        assert len(arbs) == 1
+        assert "BTC" in arbs[0].symbols
+        assert "ETH" in arbs[0].symbols
+
+    def test_arb_id_format(self):
+        agg = self._make_aggregator()
+        self._inject_signals(agg, [
+            _make_signal(market_id="poly_x", source=PredictionSource.POLYMARKET,
+                         question="Bitcoin 100K", probability=0.80, volume_usd=200_000),
+            _make_signal(market_id="kalshi_y", source=PredictionSource.KALSHI,
+                         question="Bitcoin 100K", probability=0.65, volume_usd=100_000),
+        ])
+        arbs = agg.find_arbitrage_opportunities()
+        assert arbs[0].id == "arb-poly_x-kalshi_y"
+
+
+# ── Arbitrage Context & Formatting ───────────────────────────────────
+
+
+class TestArbitrageFormatting:
+    def _make_aggregator(self) -> PredictionAggregator:
+        with patch.dict("os.environ", {"SAPPHIRE_PREDICTION_MARKET_ENABLED": "true"}):
+            agg = PredictionAggregator()
+        return agg
+
+    def _inject_signals(self, agg: PredictionAggregator, signals: List[PredictionSignal]):
+        for sig in signals:
+            if sig.source == PredictionSource.POLYMARKET:
+                agg._polymarket._signals[sig.market_id] = sig
+            else:
+                agg._kalshi._signals[sig.market_id] = sig
+
+    def test_get_arbitrage_context_empty(self):
+        agg = self._make_aggregator()
+        assert agg.get_arbitrage_context() == ""
+
+    def test_get_arbitrage_context_disabled(self):
+        with patch.dict("os.environ", {}, clear=True):
+            agg = PredictionAggregator()
+        assert agg.get_arbitrage_context() == ""
+
+    def test_get_arbitrage_context_with_arbs(self):
+        agg = self._make_aggregator()
+        self._inject_signals(agg, [
+            _make_signal(market_id="poly_1", source=PredictionSource.POLYMARKET,
+                         question="Bitcoin 100K", probability=0.80, volume_usd=200_000),
+            _make_signal(market_id="kalshi_1", source=PredictionSource.KALSHI,
+                         question="Bitcoin 100K", probability=0.65, volume_usd=100_000),
+        ])
+        ctx = agg.get_arbitrage_context()
+        assert "Cross-Venue Arbitrage" in ctx
+        assert "[ARB]" in ctx
+
+    def test_format_telegram_arbitrage_empty(self):
+        agg = self._make_aggregator()
+        msg = agg.format_telegram_arbitrage()
+        assert "No arbitrage" in msg
+
+    def test_format_telegram_arbitrage_disabled(self):
+        with patch.dict("os.environ", {}, clear=True):
+            agg = PredictionAggregator()
+        msg = agg.format_telegram_arbitrage()
+        assert "disabled" in msg
+
+    def test_format_telegram_arbitrage_with_arbs(self):
+        agg = self._make_aggregator()
+        self._inject_signals(agg, [
+            _make_signal(market_id="poly_1", source=PredictionSource.POLYMARKET,
+                         question="Bitcoin 100K", probability=0.80, volume_usd=200_000),
+            _make_signal(market_id="kalshi_1", source=PredictionSource.KALSHI,
+                         question="Bitcoin 100K", probability=0.65, volume_usd=100_000),
+        ])
+        msg = agg.format_telegram_arbitrage()
+        assert "Cross-Venue Arbitrage" in msg
+        assert "Spread:" in msg
+
+    def test_cognition_context_includes_arb(self):
+        agg = self._make_aggregator()
+        self._inject_signals(agg, [
+            _make_signal(market_id="poly_1", source=PredictionSource.POLYMARKET,
+                         question="Bitcoin 100K", probability=0.80, volume_usd=200_000,
+                         symbols=["BTC"]),
+            _make_signal(market_id="kalshi_1", source=PredictionSource.KALSHI,
+                         question="Bitcoin 100K", probability=0.65, volume_usd=100_000,
+                         symbols=["BTC"]),
+        ])
+        ctx = agg.get_cognition_context("BTC")
+        assert "Arbitrage" in ctx
+        assert "[ARB]" in ctx
+
+    def test_forum_summary_includes_arb(self):
+        agg = self._make_aggregator()
+        agg._last_forum_post_ts = 0  # Allow posting
+        self._inject_signals(agg, [
+            _make_signal(market_id="poly_1", source=PredictionSource.POLYMARKET,
+                         question="Bitcoin 100K", probability=0.80, volume_usd=200_000,
+                         symbols=["BTC"]),
+            _make_signal(market_id="kalshi_1", source=PredictionSource.KALSHI,
+                         question="Bitcoin 100K", probability=0.65, volume_usd=100_000,
+                         symbols=["BTC"]),
+        ])
+        summary = agg.generate_forum_summary()
+        assert summary is not None
+        assert "Cross-Venue Arbitrage" in summary["body"]
+
+    def test_status_includes_arb_count(self):
+        agg = self._make_aggregator()
+        self._inject_signals(agg, [
+            _make_signal(market_id="poly_1", source=PredictionSource.POLYMARKET,
+                         question="Bitcoin 100K", probability=0.80, volume_usd=200_000),
+            _make_signal(market_id="kalshi_1", source=PredictionSource.KALSHI,
+                         question="Bitcoin 100K", probability=0.65, volume_usd=100_000),
+        ])
+        status = agg.get_status()
+        assert "arbitrage_opportunities" in status
+        assert status["arbitrage_opportunities"] >= 1
+
+
+# ── Kalshi API Key ───────────────────────────────────────────────────
+
+
+class TestKalshiApiKey:
+    def test_api_key_from_constructor(self):
+        client = KalshiClient(api_key="test-key-123")
+        assert client._api_key == "test-key-123"
+
+    def test_api_key_from_env(self):
+        with patch.dict("os.environ", {"KALSHI_API_KEY": "env-key-456"}):
+            client = KalshiClient()
+            assert client._api_key == "env-key-456"
+
+    def test_api_key_empty_default(self):
+        with patch.dict("os.environ", {}, clear=True):
+            client = KalshiClient()
+            assert client._api_key == ""
+
+
+# ── Confidence Scoring ───────────────────────────────────────────────
+
+
+class TestArbitrageConfidence:
+    def test_high_volume_high_confidence(self):
+        sig_a = _make_signal(volume_usd=800_000, liquidity_usd=100_000)
+        sig_b = _make_signal(volume_usd=600_000, liquidity_usd=80_000)
+        conf = PredictionAggregator._calculate_arb_confidence(sig_a, sig_b)
+        assert conf >= 90  # Total >$1M
+
+    def test_medium_volume(self):
+        sig_a = _make_signal(volume_usd=300_000, liquidity_usd=50_000)
+        sig_b = _make_signal(volume_usd=250_000, liquidity_usd=40_000)
+        conf = PredictionAggregator._calculate_arb_confidence(sig_a, sig_b)
+        assert 75 <= conf <= 95
+
+    def test_low_volume_low_confidence(self):
+        sig_a = _make_signal(volume_usd=3_000, liquidity_usd=500)
+        sig_b = _make_signal(volume_usd=2_000, liquidity_usd=300)
+        conf = PredictionAggregator._calculate_arb_confidence(sig_a, sig_b)
+        assert conf <= 40
+
+    def test_one_sided_volume_penalty(self):
+        # One-sided: high total but one venue is thin
+        sig_a = _make_signal(volume_usd=800_000, liquidity_usd=100_000)
+        sig_b = _make_signal(volume_usd=2_000, liquidity_usd=500)
+        conf = PredictionAggregator._calculate_arb_confidence(sig_a, sig_b)
+        # Balanced: same bracket but both sides are strong
+        sig_c = _make_signal(volume_usd=400_000, liquidity_usd=80_000)
+        sig_d = _make_signal(volume_usd=400_000, liquidity_usd=80_000)
+        conf_balanced = PredictionAggregator._calculate_arb_confidence(sig_c, sig_d)
+        assert conf_balanced > conf  # Balanced volume is higher confidence
+
+    def test_confidence_capped_at_100(self):
+        sig_a = _make_signal(volume_usd=5_000_000, liquidity_usd=1_000_000)
+        sig_b = _make_signal(volume_usd=5_000_000, liquidity_usd=1_000_000)
+        conf = PredictionAggregator._calculate_arb_confidence(sig_a, sig_b)
+        assert conf == 100.0
+
+    def test_confidence_floor_at_zero(self):
+        sig_a = _make_signal(volume_usd=0, liquidity_usd=0)
+        sig_b = _make_signal(volume_usd=0, liquidity_usd=0)
+        conf = PredictionAggregator._calculate_arb_confidence(sig_a, sig_b)
+        assert conf >= 0
 
 
 # ── Alpha Scanner Integration ────────────────────────────────────────

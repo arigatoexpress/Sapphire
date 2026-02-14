@@ -111,6 +111,60 @@ class PredictionSignal:
         )
 
 
+@dataclass
+class ArbitrageOpportunity:
+    """Cross-venue price discrepancy detected between prediction markets.
+
+    Inspired by TheOddsDesk arbitrage detection — fuzzy-matches market
+    questions across Polymarket and Kalshi, flags spreads above threshold.
+    """
+
+    id: str
+    market_name: str          # Normalized question/title
+    venue_a: str              # Source A (e.g., "polymarket")
+    price_a: float            # Probability on venue A (0.0-1.0)
+    signal_a: PredictionSignal
+    venue_b: str              # Source B (e.g., "kalshi")
+    price_b: float            # Probability on venue B (0.0-1.0)
+    signal_b: PredictionSignal
+    spread: float             # Absolute difference (0.0-1.0)
+    spread_pct: float         # Spread as percentage (e.g., 5.2)
+    confidence: float         # 0-100, based on volume and data freshness
+    symbols: List[str]        # Affected crypto symbols
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @property
+    def direction(self) -> str:
+        """Which venue is higher — useful for cognition context."""
+        if self.price_a > self.price_b:
+            return f"{self.venue_a} > {self.venue_b}"
+        return f"{self.venue_b} > {self.venue_a}"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "market_name": self.market_name,
+            "venue_a": self.venue_a,
+            "price_a": round(self.price_a, 4),
+            "venue_b": self.venue_b,
+            "price_b": round(self.price_b, 4),
+            "spread": round(self.spread, 4),
+            "spread_pct": round(self.spread_pct, 2),
+            "confidence": round(self.confidence, 1),
+            "direction": self.direction,
+            "symbols": self.symbols,
+            "timestamp": self.timestamp.isoformat(),
+        }
+
+    def context_string(self) -> str:
+        """Compact string for LLM cognition prompts."""
+        return (
+            f"[ARB] {self.market_name[:60]}: "
+            f"{self.venue_a}={self.price_a:.1%} vs {self.venue_b}={self.price_b:.1%} "
+            f"(spread={self.spread_pct:.1f}%, conf={self.confidence:.0f})"
+        )
+
+
 class PredictionMarketFeed(ABC):
     """Base class for prediction market data feeds."""
 

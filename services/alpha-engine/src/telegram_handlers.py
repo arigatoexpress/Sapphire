@@ -1491,6 +1491,11 @@ async def handle_prediction_commands(engine: "AlphaEngine", target: str, action:
         await engine.telegram.send_message("\n".join(lines), priority="medium")
         return True
 
+    if normalized in {"PREDICTION_ARB", "PM_ARB", "PM_ARBITRAGE", "ARBITRAGE"}:
+        msg = engine.prediction_aggregator.format_telegram_arbitrage()
+        await engine.telegram.send_message(msg, priority="high")
+        return True
+
     if normalized in {"PREDICTION_HIGH", "PM_HIGH", "PM_CONVICTION"}:
         signals = engine.prediction_aggregator.get_high_conviction_signals()
         if not signals:
