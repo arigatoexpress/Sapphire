@@ -1577,6 +1577,7 @@ async def handle_proposal_commands(engine: "AlphaEngine", target: str, action: s
       /roadmap_sync     — sync roadmap items to tasks
       /ci_status        — show CI feedback processor status
       /openclaw_status  — show OpenClaw dispatcher status
+      /openclaw_smoke   — ping all 3 agents and report results
     """
     normalized = action.upper()
 
@@ -1761,6 +1762,45 @@ async def handle_proposal_commands(engine: "AlphaEngine", target: str, action: s
             await engine.telegram.send_message(
                 "⚠️ OpenClaw dispatcher not initialized.", priority="medium"
             )
+        return True
+
+    # ── /openclaw_smoke ───────────────────────────────────────
+    if normalized in {"OPENCLAW_SMOKE", "SMOKE_TEST", "AGENT_PING", "PING_AGENTS"}:
+        if not hasattr(engine, "openclaw_dispatcher"):
+            await engine.telegram.send_message(
+                "⚠️ OpenClaw dispatcher not initialized.", priority="medium"
+            )
+            return True
+
+        d = engine.openclaw_dispatcher
+        if not d.enabled:
+            await engine.telegram.send_message(
+                "⚠️ OpenClaw dispatcher disabled (token not configured).", priority="medium"
+            )
+            return True
+
+        agents = ["OBSIDIAN", "EMERALD", "SAPPHIRE"]
+        lines = ["🔬 **OpenClaw Smoke Test**\n"]
+        for agent in agents:
+            try:
+                result = await d.dispatch_instruction(
+                    agent_id=agent,
+                    instruction="Health check ping — respond with agent identity.",
+                    trigger="smoke_test",
+                )
+                if result.get("dispatched"):
+                    lines.append(
+                        f"✅ {agent}: dispatched (session `{result.get('session_key', '?')[:8]}…`)"
+                    )
+                else:
+                    reason = result.get("reason", "unknown")
+                    error = result.get("error", "")[:80]
+                    lines.append(f"❌ {agent}: {reason}" + (f" — {error}" if error else ""))
+            except Exception as exc:
+                lines.append(f"💥 {agent}: exception — {str(exc)[:80]}")
+
+        lines.append(f"\nGateway: `{d.gateway_url}`")
+        await engine.telegram.send_message("\n".join(lines), priority="high")
         return True
 
     return False

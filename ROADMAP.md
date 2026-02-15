@@ -1,6 +1,6 @@
 # Sapphire Master Roadmap
 
-> Last Updated: Feb 14, 2026 | Status: Phase 10 In Progress 🦅 | Tests: 1244 | Deploy: sapphire-alpha-00205-cpm
+> Last Updated: Feb 15, 2026 | Status: Phase 10 In Progress 🦅 | Tests: 1251 | Deploy: sapphire-alpha-00214-qsf | Gateway: openclaw-gateway-00004-dnd
 
 ## Vision
 Build a top-tier autonomous crypto trading platform with secure multi-agent collaboration, crowdsourced swarm intelligence, and automated public presence.
@@ -240,14 +240,38 @@ _Full agent autonomy — OBSIDIAN first, then multi-agent_
 - [x] Frontend builds clean
 
 ### Production Enablement
-- [ ] Set OPENCLAW_GATEWAY_TOKEN in Cloud Run env vars
-- [ ] Set SAPPHIRE_AUTONOMY_ALLOW_CODE_CHANGES=true
-- [ ] Set SAPPHIRE_AUTONOMY_ALLOW_GCLOUD_CHANGES=true
-- [ ] Run enable_full_autonomy.sh for IAM roles
-- [ ] Run autonomy_readiness_check.sh
-- [ ] Verify from Telegram: /autonomy, /health, /proposals, /roadmap_sync
-- [ ] Enable EMERALD agent (second agent)
-- [ ] Enable SAPPHIRE agent (third agent)
+- [x] Set OPENCLAW_GATEWAY_TOKEN in Cloud Run env vars
+- [x] Set SAPPHIRE_AUTONOMY_ALLOW_CODE_CHANGES=true
+- [x] Set SAPPHIRE_AUTONOMY_ALLOW_GCLOUD_CHANGES=true
+- [x] Run enable_full_autonomy.sh for IAM roles (8 roles on sapphire-main-sa)
+- [x] Run autonomy_readiness_check.sh (28/28 PASS)
+- [x] ENABLED_VENUES=ASTER;LIGHTER
+
+### OpenClaw Cloud Deployment (PR #51)
+- [x] Built OpenClaw gateway Docker image on Cloud Build
+- [x] Deployed as Cloud Run service: `openclaw-gateway`
+- [x] Gateway URL: `https://openclaw-gateway-267358751314.us-central1.run.app`
+- [x] Enabled HTTP endpoints: `/v1/chat/completions`, `/v1/responses`
+- [x] Updated OpenClawDispatcher to use OpenAI-compatible Chat Completions API
+- [x] Default gateway URL points to Cloud Run instead of localhost
+- [x] Agent routing via `x-openclaw-agent-id` header
+- [x] Updated OPENCLAW_GATEWAY_URL env var on sapphire-alpha
+- [x] Gateway correctly resolves model to `anthropic/claude-opus-4-20250514`
+
+### Multi-Agent Gateway Enablement
+- [x] OBSIDIAN 🖤: full access — read/write/edit, exec, browser, web, sessions, memory, cron, gateway
+- [x] EMERALD 💚: code-focused — read/write/edit, exec, web, sessions (inc. spawn), memory
+- [x] SAPPHIRE 💎: read-only oversight — read, exec, web, sessions (no spawn/write), memory
+- [x] All 3 agents respond HTTP 200 on `/v1/chat/completions` with proper routing
+- [x] `/openclaw_smoke` Telegram command: pings all 3 agents and reports results
+- [x] ChatIntentEngine updated: "ping agents", "smoke test" → OPENCLAW_SMOKE
+- [x] 5 new multi-agent routing tests (1251 total)
+- [x] Gateway revision: `openclaw-gateway-00004-dnd`
+
+### Remaining
+- [ ] Top up Anthropic API credits (gateway returns "credit balance too low")
+- [ ] Verify from Telegram: /autonomy, /health, /proposals, /roadmap_sync, /openclaw_smoke
+- [ ] End-to-end autonomy cycle test (trigger → dispatch → agent executes → results)
 
 ---
 

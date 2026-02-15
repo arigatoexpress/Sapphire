@@ -294,3 +294,91 @@ class TestDispatcherStatus:
         status = d.status()
         assert status["enabled"] is False
         assert status["token_configured"] is False
+
+
+# ── Multi-Agent Routing Tests ────────────────────────────────────────
+
+
+class TestMultiAgentRouting:
+    """Verify all three agents can be dispatched and routed correctly."""
+
+    @pytest.mark.asyncio
+    async def test_dispatch_to_obsidian(self):
+        d = OpenClawDispatcher(gateway_url="http://localhost:18789", gateway_token="tok")
+        fake_resp = _FakeResponse(status=200)
+        fake_session = _FakeSession(fake_resp)
+
+        with patch("openclaw_dispatch.aiohttp.ClientSession", return_value=fake_session):
+            with patch("openclaw_dispatch.aiohttp.ClientTimeout"):
+                result = await d.dispatch_instruction("OBSIDIAN", "test")
+        assert result["dispatched"]
+        assert result["agent"] == "OBSIDIAN"
+        _, kwargs = fake_session.post_calls[0]
+        assert kwargs["headers"]["x-openclaw-agent-id"] == "obsidian"
+
+    @pytest.mark.asyncio
+    async def test_dispatch_to_emerald(self):
+        d = OpenClawDispatcher(gateway_url="http://localhost:18789", gateway_token="tok")
+        fake_resp = _FakeResponse(status=200)
+        fake_session = _FakeSession(fake_resp)
+
+        with patch("openclaw_dispatch.aiohttp.ClientSession", return_value=fake_session):
+            with patch("openclaw_dispatch.aiohttp.ClientTimeout"):
+                result = await d.dispatch_instruction("EMERALD", "review code quality")
+        assert result["dispatched"]
+        assert result["agent"] == "EMERALD"
+        _, kwargs = fake_session.post_calls[0]
+        assert kwargs["headers"]["x-openclaw-agent-id"] == "emerald"
+        assert "EMERALD" in kwargs["json"]["messages"][0]["content"]
+
+    @pytest.mark.asyncio
+    async def test_dispatch_to_sapphire(self):
+        d = OpenClawDispatcher(gateway_url="http://localhost:18789", gateway_token="tok")
+        fake_resp = _FakeResponse(status=200)
+        fake_session = _FakeSession(fake_resp)
+
+        with patch("openclaw_dispatch.aiohttp.ClientSession", return_value=fake_session):
+            with patch("openclaw_dispatch.aiohttp.ClientTimeout"):
+                result = await d.dispatch_instruction("SAPPHIRE", "security audit")
+        assert result["dispatched"]
+        assert result["agent"] == "SAPPHIRE"
+        _, kwargs = fake_session.post_calls[0]
+        assert kwargs["headers"]["x-openclaw-agent-id"] == "sapphire"
+        assert "SAPPHIRE" in kwargs["json"]["messages"][0]["content"]
+
+    @pytest.mark.asyncio
+    async def test_all_agents_smoke(self):
+        """Simulate a smoke test dispatching to all 3 agents."""
+        d = OpenClawDispatcher(gateway_url="http://localhost:18789", gateway_token="tok")
+        fake_resp = _FakeResponse(status=200)
+        fake_session = _FakeSession(fake_resp)
+
+        agents = ["OBSIDIAN", "EMERALD", "SAPPHIRE"]
+        results = []
+        with patch("openclaw_dispatch.aiohttp.ClientSession", return_value=fake_session):
+            with patch("openclaw_dispatch.aiohttp.ClientTimeout"):
+                for agent in agents:
+                    result = await d.dispatch_instruction(agent, "health ping", trigger="smoke_test")
+                    results.append(result)
+
+        assert all(r["dispatched"] for r in results)
+        assert d._dispatch_count == 3
+        assert len(fake_session.post_calls) == 3
+        # Verify each call routed to the right agent
+        for i, agent in enumerate(agents):
+            _, kwargs = fake_session.post_calls[i]
+            assert kwargs["headers"]["x-openclaw-agent-id"] == agent.lower()
+
+    @pytest.mark.asyncio
+    async def test_system_context_includes_agent_identity(self):
+        d = OpenClawDispatcher(gateway_url="http://localhost:18789", gateway_token="tok")
+        ctx = d._build_system_context(
+            "EMERALD",
+            context={"task": "code_review"},
+            allow_code_changes=True,
+            trigger="scheduled_improvement",
+        )
+        assert "EMERALD" in ctx
+        assert "code_review" in ctx
+        assert "scheduled_improvement" in ctx
+        assert "allow_code_changes" in ctx
