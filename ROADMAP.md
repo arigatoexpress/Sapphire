@@ -1,6 +1,6 @@
 # Sapphire Master Roadmap
 
-> Last Updated: Feb 15, 2026 | Status: Phase 10 In Progress 🦅 | Tests: 1251 | Deploy: sapphire-alpha-00214-qsf | Gateway: openclaw-gateway-00004-dnd
+> Last Updated: Feb 15, 2026 | Status: Phase 10 In Progress 🦅 | Tests: 1256 | Deploy: sapphire-alpha-00215-p25 | Gateway: openclaw-gateway-00004-dnd
 
 ## Vision
 Build a top-tier autonomous crypto trading platform with secure multi-agent collaboration, crowdsourced swarm intelligence, and automated public presence.
@@ -258,20 +258,34 @@ _Full agent autonomy — OBSIDIAN first, then multi-agent_
 - [x] Updated OPENCLAW_GATEWAY_URL env var on sapphire-alpha
 - [x] Gateway correctly resolves model to `anthropic/claude-opus-4-20250514`
 
-### Multi-Agent Gateway Enablement
+### Multi-Agent Gateway Enablement (PR #52)
 - [x] OBSIDIAN 🖤: full access — read/write/edit, exec, browser, web, sessions, memory, cron, gateway
 - [x] EMERALD 💚: code-focused — read/write/edit, exec, web, sessions (inc. spawn), memory
 - [x] SAPPHIRE 💎: read-only oversight — read, exec, web, sessions (no spawn/write), memory
 - [x] All 3 agents respond HTTP 200 on `/v1/chat/completions` with proper routing
 - [x] `/openclaw_smoke` Telegram command: pings all 3 agents and reports results
 - [x] ChatIntentEngine updated: "ping agents", "smoke test" → OPENCLAW_SMOKE
-- [x] 5 new multi-agent routing tests (1251 total)
 - [x] Gateway revision: `openclaw-gateway-00004-dnd`
 
+### Multi-Agent Rotation (PR #53)
+- [x] True OBSIDIAN → EMERALD → SAPPHIRE round-robin in autonomy dispatch cycle
+- [x] Emergency/infra triggers always route to OBSIDIAN
+- [x] Agent-specific instruction briefs (maintenance vs improvement vs security review)
+- [x] Dynamic Telegram persona resolution per dispatched agent
+- [x] Per-agent dispatch history tracking (last 50 dispatches per agent)
+- [x] 16 new multi-agent routing tests (1256 total)
+
+### Live End-to-End Verification
+- [x] Anthropic API credits topped up ($100)
+- [x] OBSIDIAN 🖤 live response: "I'm OBSIDIAN, your infrastructure devops agent, fully operational"
+- [x] EMERALD 💚 live response: "I am EMERALD, the code quality architect agent, fully operational"
+- [x] SAPPHIRE 💎 live response: "I'm SAPPHIRE, your security oversight agent, fully operational"
+- [x] All 3 agents running on Claude Opus 4 (`anthropic/claude-opus-4-20250514`)
+- [x] Deploy: sapphire-alpha-00215-p25
+
 ### Remaining
-- [ ] Top up Anthropic API credits (gateway returns "credit balance too low")
 - [ ] Verify from Telegram: /autonomy, /health, /proposals, /roadmap_sync, /openclaw_smoke
-- [ ] End-to-end autonomy cycle test (trigger → dispatch → agent executes → results)
+- [ ] First full autonomy cycle (OBSIDIAN maintenance pass)
 
 ---
 
@@ -312,4 +326,7 @@ Harden        Security       Forum          Swarm          Tracking       Social
 - ✅ PR #42: Swarm PM Integration, Accuracy Tracking, Whale Detection, Dashboard API (81 new tests)
 - ✅ PR #43-#49: Deploy fixes, frontend, accessibility, e2e tests, skeleton loading, WebSocket dashboard
 - ✅ PR #50: OpenClaw-First Autonomous Operations (7 capabilities, OpenClawDispatcher, CI feedback, RoadmapParser, 121 new tests)
-- ✅ 1244 tests passing
+- ✅ PR #51: OpenClaw Cloud Deployment (gateway on Cloud Run, Chat Completions API, agent routing)
+- ✅ PR #52: Multi-Agent Gateway Enablement (3 agents with role-based permissions, smoke test command)
+- ✅ PR #53: Multi-Agent Rotation (OBSIDIAN→EMERALD→SAPPHIRE round-robin, agent-specific instructions, 16 routing tests)
+- ✅ 1256 tests passing | All 3 agents live on Claude Opus 4
