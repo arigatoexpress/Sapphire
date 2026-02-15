@@ -1578,6 +1578,7 @@ async def handle_proposal_commands(engine: "AlphaEngine", target: str, action: s
       /ci_status        — show CI feedback processor status
       /openclaw_status  — show OpenClaw dispatcher status
       /openclaw_smoke   — ping all 3 agents and report results
+      /agent_status     — show per-agent dispatch stats and rotation
     """
     normalized = action.upper()
 
@@ -1801,6 +1802,45 @@ async def handle_proposal_commands(engine: "AlphaEngine", target: str, action: s
 
         lines.append(f"\nGateway: `{d.gateway_url}`")
         await engine.telegram.send_message("\n".join(lines), priority="high")
+        return True
+
+    # ── /agent_status ─────────────────────────────────────────
+    if normalized in {"AGENT_STATUS", "AGENTS", "AGENT_STATS", "DISPATCH_STATS"}:
+        import time as _time
+
+        dispatch_count = getattr(engine, "_autonomy_dispatch_count", 0)
+        history = getattr(engine, "_agent_dispatch_history", {})
+        agent_emojis = {"OBSIDIAN": "🖤", "EMERALD": "💚", "SAPPHIRE": "💎"}
+        lines = [
+            "🤖 **Multi-Agent Dispatch Status**\n",
+            f"Total dispatches: `{dispatch_count}`",
+            f"Rotation cycle: `{dispatch_count % 3}` (0=OBSIDIAN, 1=EMERALD, 2=SAPPHIRE)\n",
+        ]
+        for agent_id in ["OBSIDIAN", "EMERALD", "SAPPHIRE"]:
+            emoji = agent_emojis.get(agent_id, "")
+            agent_history = history.get(agent_id, [])
+            count = len(agent_history)
+            if agent_history:
+                last = agent_history[-1]
+                last_trigger = last.get("trigger", "?")
+                last_ts = last.get("ts", 0)
+                ago = int(_time.time() - last_ts)
+                if ago < 60:
+                    ago_text = f"{ago}s ago"
+                elif ago < 3600:
+                    ago_text = f"{ago // 60}m ago"
+                else:
+                    ago_text = f"{ago // 3600}h ago"
+                lines.append(f"{emoji} **{agent_id}**: `{count}` dispatches | last: `{last_trigger}` ({ago_text})")
+            else:
+                lines.append(f"{emoji} **{agent_id}**: `{count}` dispatches | last: never")
+
+        if hasattr(engine, "openclaw_dispatcher"):
+            status = engine.openclaw_dispatcher.status()
+            lines.append(f"\nGateway: `{status['gateway_url']}`")
+            lines.append(f"Enabled: `{status['enabled']}` | Token: `{'✅' if status['token_configured'] else '❌'}`")
+
+        await engine.telegram.send_message("\n".join(lines), priority="medium")
         return True
 
     return False
