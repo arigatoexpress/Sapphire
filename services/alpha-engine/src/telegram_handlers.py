@@ -1711,7 +1711,7 @@ async def handle_proposal_commands(engine: "AlphaEngine", target: str, action: s
         try:
             from src.collaboration.task_manager import RoadmapParser
             parser = RoadmapParser()
-            result = parser.generate_tasks(engine.task_manager)
+            result = parser.generate_tasks(engine.tasks)
             await engine.telegram.send_message(
                 (
                     f"📋 Roadmap sync complete.\n"

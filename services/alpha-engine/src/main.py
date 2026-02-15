@@ -243,7 +243,7 @@ class AlphaEngine:
         from src.ci_feedback import CIFeedbackProcessor
         self.openclaw_dispatcher = OpenClawDispatcher()
         self.ci_feedback = CIFeedbackProcessor(
-            task_manager=self.task_manager,
+            task_manager=self.tasks,
             telegram_bot=self.telegram,
         )
         # Phase 8: Prediction Market Intelligence
