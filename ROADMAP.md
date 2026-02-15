@@ -1,6 +1,6 @@
 # Sapphire Master Roadmap
 
-> Last Updated: Feb 15, 2026 | Status: Phase 10 Complete 🦅✅ | Tests: 1324 | Deploy: sapphire-alpha-00227-tvg | Gateway: openclaw-gateway-00009-zll
+> Last Updated: Feb 15, 2026 | Status: Phase 10 Complete 🦅✅ | Tests: 1324 | Deploy: sapphire-alpha-00230-6bh | Gateway: openclaw-gateway-00011-r4t | Web: sapphirealpha.xyz
 
 ## Vision
 Build a top-tier autonomous crypto trading platform with secure multi-agent collaboration, crowdsourced swarm intelligence, and automated public presence.
@@ -313,10 +313,25 @@ _Full agent autonomy — OBSIDIAN first, then multi-agent_
 - [x] Gateway entrypoint updated with agent context files
 - [x] Deploy: openclaw-gateway-00009-zll
 
+### Telegram Webhook Fix
+- [x] Set TELEGRAM_WEBHOOK_URL and TELEGRAM_WEBHOOK_SECRET on Cloud Run
+- [x] Re-register Telegram webhook with secret token
+- [x] Verify /health, /openclaw_smoke, /agent_status commands process cleanly (pending 0, no errors)
+
+### Agent Infrastructure Upgrade (Gateway)
+- [x] Generate GitHub SSH deploy key (ed25519) and add to arigatoexpress/Sapphire repo
+- [x] Store deploy key in GCP Secret Manager (GITHUB_DEPLOY_KEY_SAPPHIRE)
+- [x] Install gcloud SDK in gateway Dockerfile.cloud
+- [x] Install openssh-client for git SSH authentication
+- [x] Auto-clone repo to /tmp/sapphire/ at container startup
+- [x] Configure gcloud Workload Identity auth (sapphire-main-sa)
+- [x] Update all 3 agent MEMORY.md files with new capabilities
+- [x] Deploy: openclaw-gateway-00009-zll → 00011-r4t
+- [x] Verified: Repo access: true, gcloud: true, latest commit visible
+
 ### Remaining (Optional Polish)
-- [ ] Verify from Telegram: /autonomy, /health, /openclaw_smoke, /agent_status
-- [ ] Give agents repo access (GitHub deploy key or API token) for direct codebase work
-- [ ] Install gcloud SDK in gateway container for infrastructure operations
+- [ ] Verify agents can actually git push from within dispatched sessions
+- [ ] Add gh CLI for GitHub PR creation from agents
 
 ---
 
@@ -368,4 +383,6 @@ Harden        Security       Forum          Swarm          Tracking       Social
 - ✅ PR #59: Multi-Agent AUTONOMY_DISPATCH (EMERALD + SAPPHIRE capability grant for rotation)
 - ✅ PR #60: Telegram HTML Parse Mode (safe HTML formatting across all agent messages)
 - ✅ PR #61: Conversational Assistant (two-tier intent classification, 7 intent types, agent question routing, 68 new tests)
+- ✅ Frontend Makeover v2: Tailwind CSS v4 + Shadcn/Vue (10 shared components, 40 UI primitives, 92-96% CSS reduction)
+- ✅ Firebase Hosting deploy to sapphirealpha.xyz (HTTPS, CSP, immutable asset caching, security headers)
 - ✅ 1324 tests passing | All 3 agents live on Claude Opus 4 | Phase 10 COMPLETE + Conversational Assistant
