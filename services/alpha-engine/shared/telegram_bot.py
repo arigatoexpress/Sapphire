@@ -27,29 +27,26 @@ class NotificationPriority(Enum):
     CRITICAL = "critical"
 
 
-def _sanitize_markdown(text: str) -> str:
-    """Escape characters that break Telegram legacy Markdown parsing.
+def _to_html(text: str) -> str:
+    """Convert agent messages to Telegram HTML format.
 
-    Telegram's legacy Markdown treats ``_`` as italic, ``*`` as bold,
-    backtick as inline-code, and ``[`` as link start.  Even with matched
-    delimiters, underscores inside backtick spans or nested formatting
-    can cause 400 errors.
+    Telegram HTML parse mode is far more predictable than legacy Markdown.
+    Underscores, backticks, and brackets are safe in HTML mode — only
+    ``<``, ``>``, and ``&`` need escaping.
 
-    Strategy: strip ALL backticks and replace underscores with full-width
-    equivalents.  Keep only ``*bold*`` formatting which is the primary
-    style used for agent persona names.
+    Converts common Markdown-like patterns to HTML:
+      - ``*bold*`` → ``<b>bold</b>``
+      - Backtick code → ``<code>code</code>``
+
+    This eliminates all 400 parse errors from Telegram's legacy Markdown.
     """
-    # Remove all backticks — inline code is the #1 source of parse failures
-    # because underscores inside backtick spans confuse the legacy parser.
-    text = text.replace("`", "")
-    # Replace all underscores — they interact badly with italic parsing
-    text = text.replace("_", "＿")
-    # Unmatched asterisks → full-width asterisk
-    if text.count("*") % 2 != 0:
-        text = text.replace("*", "＊")
-    # Unmatched square brackets → full-width brackets
-    if text.count("[") != text.count("]"):
-        text = text.replace("[", "［").replace("]", "］")
+    import html as _html
+    # 1. Escape HTML entities first (before adding our own tags)
+    text = _html.escape(text, quote=False)
+    # 2. Convert *bold* → <b>bold</b> (only matched pairs)
+    text = re.sub(r'\*([^*]+)\*', r'<b>\1</b>', text)
+    # 3. Convert `code` → <code>code</code> (only matched pairs)
+    text = re.sub(r'`([^`]+)`', r'<code>\1</code>', text)
     return text
 
 
@@ -62,9 +59,9 @@ class AgentPersona:
         self.role = role
 
     def speak(self, message: str) -> str:
-        """Format a message as this agent speaking."""
-        safe = _sanitize_markdown(message)
-        return f"{self.emoji} *{self.name}*: {safe}"
+        """Format a message as this agent speaking (HTML format)."""
+        safe = _to_html(message)
+        return f"{self.emoji} <b>{self.name}</b>: {safe}"
 
     def __repr__(self) -> str:
         return f"AgentPersona({self.name})"
@@ -723,8 +720,8 @@ class TelegramPlatformBot:
         if not self.base_url:
             return False
 
-        # Sanitize before sending to prevent Telegram 400 parse errors.
-        safe_text = _sanitize_markdown(text) if allow_markdown else text
+        # Convert to HTML format for Telegram — far more reliable than legacy Markdown.
+        safe_text = _to_html(text) if allow_markdown else text
 
         payload = {
             "chat_id": self.chat_id,
@@ -732,7 +729,7 @@ class TelegramPlatformBot:
             "disable_web_page_preview": True,
         }
         if allow_markdown:
-            payload["parse_mode"] = "Markdown"
+            payload["parse_mode"] = "HTML"
 
         session = await self._get_session()
         url = f"{self.base_url}/sendMessage"
@@ -751,14 +748,12 @@ class TelegramPlatformBot:
                         body[:200],
                     )
 
-                    # Retry without markdown if formatting fails.
+                    # Retry without HTML parse mode if formatting fails.
                     if resp.status == 400 and payload.get("parse_mode"):
                         payload.pop("parse_mode", None)
-                        # Strip markdown formatting chars so the plain text reads cleanly.
+                        # Strip HTML tags so the plain text reads cleanly.
                         raw = payload["text"]
-                        raw = raw.replace("**", "").replace("__", "")
-                        raw = re.sub(r"(?<!\w)\*([^*]+)\*(?!\w)", r"\1", raw)
-                        raw = re.sub(r"(?<!\w)_([^_]+)_(?!\w)", r"\1", raw)
+                        raw = re.sub(r"<[^>]+>", "", raw)
                         payload["text"] = raw
                         continue
             except Exception as exc:
