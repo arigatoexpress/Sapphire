@@ -1,6 +1,6 @@
 # Sapphire Master Roadmap
 
-> Last Updated: Feb 14, 2026 | Status: Phase 8 Complete 🔮 | Tests: 1123 | Deploy: sapphire-alpha-00173-dvc
+> Last Updated: Feb 14, 2026 | Status: Phase 10 In Progress 🦅 | Tests: 1244 | Deploy: sapphire-alpha-00205-cpm
 
 ## Vision
 Build a top-tier autonomous crypto trading platform with secure multi-agent collaboration, crowdsourced swarm intelligence, and automated public presence.
@@ -191,12 +191,70 @@ _On-chain agent presence via Virtuals protocol — revisit later_
 - [ ] Design tokenomics alignment with reputation system
 - [ ] Prototype on-chain agent identity
 
+## Phase 10: OpenClaw-First Autonomous Operations 🦅
+_Full agent autonomy — OBSIDIAN first, then multi-agent_
+
+### Permission & Escalation (PR #50)
+- [x] 7 new capabilities: CODE_READ/WRITE/DEPLOY/REVIEW, INFRASTRUCTURE_MODIFY, CI_CD_TRIGGER, HEALTH_MONITOR
+- [x] Updated agent role sets (OBSIDIAN gets full code lifecycle, EMERALD gets review, SAPPHIRE gets read-only)
+- [x] Risk tier mapping (low/medium/high) for all 31 capabilities
+- [x] ApprovalPolicy class with graduated escalation: auto_approve / notify_proceed / require_approval
+- [x] Proposal storage and decision workflow in AlphaEngine
+
+### OpenClaw Gateway Dispatcher (PR #50)
+- [x] OpenClawDispatcher class replacing tv_autonomy (was always None)
+- [x] Direct HTTP dispatch to gateway (bearer token auth, session management)
+- [x] Scope locks: allowed_repo_scope, allowed_project_scope
+- [x] Wired into autonomy dispatch cycle (OpenClaw primary, tv_autonomy fallback)
+- [x] Model switched from Gemini to Claude Opus 4.6 (anthropic/claude-opus-4-20250514)
+- [x] Single-agent mode: OBSIDIAN only (SAPPHIRE/EMERALD preserved but disabled for testing)
+
+### Multi-Agent Dispatch (PR #50)
+- [x] Structured trigger routing with _autonomy_trigger_info()
+- [x] OBSIDIAN-only initially (future multi-agent rotation ready)
+- [x] Trigger categories: emergency / infrastructure / maintenance / improvement / review
+
+### Telegram Commands (PR #50)
+- [x] `/proposals` — list pending proposals
+- [x] `/diff <key>` — show compact diff for a proposal
+- [x] `/approve_proposal <key>` — approve a pending proposal
+- [x] `/reject_proposal <key>` — reject a pending proposal
+- [x] `/health` — run health diagnostics
+- [x] `/roadmap_sync` — sync roadmap items to tasks
+- [x] `/ci_status` — show CI feedback processor status
+- [x] `/openclaw_status` — show OpenClaw dispatcher status
+- [x] ChatIntentEngine updated with operations intent type
+
+### CI/CD Feedback Loop (PR #50)
+- [x] CIFeedbackProcessor: pytest output parsing → EMERALD tasks
+- [x] Build failure parsing → OBSIDIAN tasks (critical priority)
+- [x] Capped at 10 auto-generated tasks per CI run
+
+### Roadmap-Aware Task Generation (PR #50)
+- [x] RoadmapParser scans ROADMAP.md for incomplete `- [ ]` items
+- [x] Agent inference from phase keywords (word-boundary regex)
+- [x] Deduplicated task creation (skips existing active tasks)
+
+### Testing (PR #50)
+- [x] 121 new tests (1244 total): agent permissions, OpenClaw dispatch, CI feedback, roadmap parser
+- [x] Frontend builds clean
+
+### Production Enablement
+- [ ] Set OPENCLAW_GATEWAY_TOKEN in Cloud Run env vars
+- [ ] Set SAPPHIRE_AUTONOMY_ALLOW_CODE_CHANGES=true
+- [ ] Set SAPPHIRE_AUTONOMY_ALLOW_GCLOUD_CHANGES=true
+- [ ] Run enable_full_autonomy.sh for IAM roles
+- [ ] Run autonomy_readiness_check.sh
+- [ ] Verify from Telegram: /autonomy, /health, /proposals, /roadmap_sync
+- [ ] Enable EMERALD agent (second agent)
+- [ ] Enable SAPPHIRE agent (third agent)
+
 ---
 
 ## Execution Priority
 ```
-Phase 1 ✅  →  Phase 2 ✅  →  Phase 3 ✅  →  Phase 4 ✅  →  Phase 5 ✅  →  Phase 6 ✅  →  Phase 7 ✅  →  Phase 8 ✅
-Harden        Security       Forum          Swarm          Tracking       Social           OpenClaw       Predictions
+Phase 1 ✅  →  Phase 2 ✅  →  Phase 3 ✅  →  Phase 4 ✅  →  Phase 5 ✅  →  Phase 6 ✅  →  Phase 7 ✅  →  Phase 8 ✅  →  Phase 10 🦅
+Harden        Security       Forum          Swarm          Tracking       Social           OpenClaw       Predictions      Autonomy
 ```
 
 ## Completed Milestones
@@ -228,4 +286,6 @@ Harden        Security       Forum          Swarm          Tracking       Social
 - ✅ PR #40: Phase 8 Prediction Market Intelligence (Polymarket + Kalshi feeds, 97 tests, 4 Telegram commands)
 - ✅ PR #41: Cross-Venue Arbitrage Detection (fuzzy matching, spread detection, confidence scoring, 47 new tests)
 - ✅ PR #42: Swarm PM Integration, Accuracy Tracking, Whale Detection, Dashboard API (81 new tests)
-- ✅ 1123 tests passing
+- ✅ PR #43-#49: Deploy fixes, frontend, accessibility, e2e tests, skeleton loading, WebSocket dashboard
+- ✅ PR #50: OpenClaw-First Autonomous Operations (7 capabilities, OpenClawDispatcher, CI feedback, RoadmapParser, 121 new tests)
+- ✅ 1244 tests passing

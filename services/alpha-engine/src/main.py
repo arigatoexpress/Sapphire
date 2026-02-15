@@ -739,6 +739,16 @@ class AlphaEngine:
                 self._autonomy_allow_gcloud_changes,
                 "SAPPHIRE_AUTONOMY_ALLOW_GCLOUD_CHANGES is not true",
             ),
+            (
+                "OpenClaw gateway configured",
+                self.openclaw_dispatcher.enabled,
+                "OPENCLAW_GATEWAY_URL or OPENCLAW_GATEWAY_TOKEN not set",
+            ),
+            (
+                "CI feedback processor ready",
+                self.ci_feedback is not None,
+                "CIFeedbackProcessor not initialized",
+            ),
         ]
 
         failed_checks = [item for item in checks if not item[1]]
