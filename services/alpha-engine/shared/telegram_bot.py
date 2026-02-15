@@ -30,21 +30,25 @@ class NotificationPriority(Enum):
 def _sanitize_markdown(text: str) -> str:
     """Escape characters that break Telegram legacy Markdown parsing.
 
-    Telegram's legacy Markdown treats ``_`` as italic, ``*`` as bold, and
-    backtick as inline-code.  We only need to worry about *unmatched*
-    delimiters inside running text.  Dollar signs, parentheses, dots, etc.
-    are fine in legacy mode — the failures we've seen come from unmatched
-    underscores inside role descriptions and price strings.
+    Telegram's legacy Markdown treats ``_`` as italic, ``*`` as bold,
+    backtick as inline-code, and ``[`` as link start.  Unmatched delimiters
+    cause 400 errors from the Telegram API.
 
-    Strategy: replace lone underscores that aren't part of a matched
-    ``_italic_`` pair with the Unicode full-width low line (＿) which
-    renders identically but doesn't trigger the parser.
+    Strategy: for each delimiter type, if the count is odd (unmatched),
+    replace all occurrences with a visually identical Unicode character.
     """
-    # If the count of underscores is odd, we have an unmatched delimiter.
+    # Unmatched underscores → full-width low line (＿)
     if text.count("_") % 2 != 0:
-        # Replace all underscores — they can't all be valid italic markers
-        # if the count is odd.
         text = text.replace("_", "＿")
+    # Unmatched asterisks → full-width asterisk (＊)
+    if text.count("*") % 2 != 0:
+        text = text.replace("*", "＊")
+    # Unmatched backticks → modifier letter grave accent (ˋ)
+    if text.count("`") % 2 != 0:
+        text = text.replace("`", "ˋ")
+    # Unmatched square brackets → full-width brackets
+    if text.count("[") != text.count("]"):
+        text = text.replace("[", "［").replace("]", "］")
     return text
 
 
@@ -718,9 +722,12 @@ class TelegramPlatformBot:
         if not self.base_url:
             return False
 
+        # Sanitize before sending to prevent Telegram 400 parse errors.
+        safe_text = _sanitize_markdown(text) if allow_markdown else text
+
         payload = {
             "chat_id": self.chat_id,
-            "text": text,
+            "text": safe_text,
             "disable_web_page_preview": True,
         }
         if allow_markdown:
