@@ -16,6 +16,7 @@ Usage::
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -106,6 +107,12 @@ class OpenClawDispatcher:
         Uses ``POST /v1/chat/completions`` with the ``x-openclaw-agent-id``
         header to route to the correct agent.
 
+        The gateway blocks until the full agent session completes (which can
+        take several minutes with Claude Opus 4).  To avoid blocking the
+        autonomy loop, the actual HTTP call runs in a fire-and-forget
+        background task.  This method returns immediately once the request
+        is validated and queued.
+
         Returns a dict with ``dispatched`` (bool) and ``session_key`` (str).
         """
         if not self.enabled:
@@ -129,6 +136,30 @@ class OpenClawDispatcher:
             "stream": False,
         }
 
+        # Fire the dispatch in a background task — don't block the caller.
+        asyncio.create_task(
+            self._do_dispatch(agent_id, session_key, payload, trigger)
+        )
+
+        self._last_dispatch_at = time.time()
+        self._dispatch_count += 1
+        logger.info(
+            f"[OpenClaw] Dispatched to {agent_id}: session={session_key} trigger={trigger} (async)"
+        )
+        return {
+            "dispatched": True,
+            "session_key": session_key,
+            "agent": agent_id,
+        }
+
+    async def _do_dispatch(
+        self,
+        agent_id: str,
+        session_key: str,
+        payload: Dict[str, Any],
+        trigger: str,
+    ) -> None:
+        """Background task: POST to the gateway and log the result."""
         try:
             async with aiohttp.ClientSession() as session:
                 headers = {
@@ -140,40 +171,25 @@ class OpenClawDispatcher:
                     f"{self.gateway_url}/v1/chat/completions",
                     json=payload,
                     headers=headers,
-                    timeout=aiohttp.ClientTimeout(total=300),
+                    timeout=aiohttp.ClientTimeout(total=600),
                 ) as resp:
-                    self._last_dispatch_at = time.time()
                     if resp.status in (200, 202):
-                        self._dispatch_count += 1
                         self._last_error = ""
                         logger.info(
-                            f"[OpenClaw] Dispatched to {agent_id}: session={session_key} trigger={trigger}"
+                            f"[OpenClaw] Agent session completed: {agent_id} "
+                            f"session={session_key} trigger={trigger} status={resp.status}"
                         )
-                        return {
-                            "dispatched": True,
-                            "session_key": session_key,
-                            "agent": agent_id,
-                        }
-                    body = await resp.text()
-                    self._last_error = f"HTTP {resp.status}: {body[:200]}"
-                    logger.warning(f"[OpenClaw] Gateway error: {self._last_error}")
-                    return {
-                        "dispatched": False,
-                        "reason": f"gateway_error_{resp.status}",
-                        "session_key": session_key,
-                    }
+                    else:
+                        body = await resp.text()
+                        self._last_error = f"HTTP {resp.status}: {body[:200]}"
+                        logger.warning(f"[OpenClaw] Agent session error: {self._last_error}")
         except Exception as exc:
             err_detail = f"{type(exc).__name__}: {exc}" if str(exc) else type(exc).__name__
             self._last_error = err_detail[:200]
-            logger.error(
-                f"[OpenClaw] Dispatch failed: {err_detail} | "
-                f"url={self.gateway_url}/v1/chat/completions agent={agent_id} trigger={trigger}"
+            logger.warning(
+                f"[OpenClaw] Agent session failed: {err_detail} | "
+                f"agent={agent_id} session={session_key} trigger={trigger}"
             )
-            return {
-                "dispatched": False,
-                "reason": "dispatch_exception",
-                "error": self._last_error,
-            }
 
     # ── session decision ─────────────────────────────────────────────────
 
