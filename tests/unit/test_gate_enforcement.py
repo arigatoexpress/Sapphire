@@ -98,9 +98,9 @@ def test_autonomy_dispatch_allowed_for_obsidian():
     assert gate.check("OBSIDIAN", Capability.AUTONOMY_DISPATCH) is True
 
 
-def test_autonomy_dispatch_denied_for_sapphire():
-    """SAPPHIRE does NOT have AUTONOMY_DISPATCH — only OBSIDIAN does."""
-    assert gate.check("SAPPHIRE", Capability.AUTONOMY_DISPATCH) is False
+def test_autonomy_dispatch_allowed_for_sapphire():
+    """SAPPHIRE needs AUTONOMY_DISPATCH for scheduled_review cycles."""
+    assert gate.check("SAPPHIRE", Capability.AUTONOMY_DISPATCH) is True
 
 
 def test_autonomy_dispatch_denied_for_scout():

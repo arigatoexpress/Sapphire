@@ -41,9 +41,10 @@ def test_sapphire_can_kill_switch():
     assert g.check("SAPPHIRE", Capability.KILL_SWITCH) is True
 
 
-def test_sapphire_cannot_dispatch_autonomy():
+def test_sapphire_can_dispatch_autonomy():
+    """SAPPHIRE needs AUTONOMY_DISPATCH for scheduled_review cycles."""
     g = _gate()
-    assert g.check("SAPPHIRE", Capability.AUTONOMY_DISPATCH) is False
+    assert g.check("SAPPHIRE", Capability.AUTONOMY_DISPATCH) is True
 
 
 # ── Obsidian Capabilities ────────────────────────────────────────
