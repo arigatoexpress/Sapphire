@@ -57,7 +57,13 @@ Output a JSON object with:
      - `topic`: str (the subject or content)
      - `channels`: list[str] (["twitter", "substack", "linkedin"])
 
-5. **General Chat** ("hello", "who are you?", "good job")
+5. **Operations** ("show proposals", "pending code", "health check", "sync roadmap", "ci status", "openclaw status")
+   - Intent: `operations`
+   - Params:
+     - `action`: "PROPOSALS", "DIFF", "APPROVE_PROPOSAL", "REJECT_PROPOSAL", "HEALTH", "ROADMAP_SYNC", "CI_STATUS", "OPENCLAW_STATUS"
+     - `target`: str (optional, e.g. proposal key)
+
+6. **General Chat** ("hello", "who are you?", "good job")
    - Intent: `general_chat`
    - Params: `{"reply": "str"}` (You draft a short, in-character response as 'Sapphire')
 
@@ -70,6 +76,18 @@ Output: {"intent": "media_publish", "parameters": {"topic": "new ATH", "channels
 
 User: "Status report please"
 Output: {"intent": "status_report", "parameters": {"type": "full"}}
+
+User: "show me pending proposals"
+Output: {"intent": "operations", "parameters": {"action": "PROPOSALS"}}
+
+User: "run health check"
+Output: {"intent": "operations", "parameters": {"action": "HEALTH"}}
+
+User: "approve proposal abc123"
+Output: {"intent": "operations", "parameters": {"action": "APPROVE_PROPOSAL", "target": "abc123"}}
+
+User: "sync the roadmap"
+Output: {"intent": "operations", "parameters": {"action": "ROADMAP_SYNC"}}
 """
 
     async def analyze(self, text: str) -> Dict[str, Any]:
