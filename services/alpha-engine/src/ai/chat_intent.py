@@ -57,10 +57,10 @@ Output a JSON object with:
      - `topic`: str (the subject or content)
      - `channels`: list[str] (["twitter", "substack", "linkedin"])
 
-5. **Operations** ("show proposals", "pending code", "health check", "sync roadmap", "ci status", "openclaw status")
+5. **Operations** ("show proposals", "pending code", "health check", "sync roadmap", "ci status", "openclaw status", "ping agents", "smoke test")
    - Intent: `operations`
    - Params:
-     - `action`: "PROPOSALS", "DIFF", "APPROVE_PROPOSAL", "REJECT_PROPOSAL", "HEALTH", "ROADMAP_SYNC", "CI_STATUS", "OPENCLAW_STATUS"
+     - `action`: "PROPOSALS", "DIFF", "APPROVE_PROPOSAL", "REJECT_PROPOSAL", "HEALTH", "ROADMAP_SYNC", "CI_STATUS", "OPENCLAW_STATUS", "OPENCLAW_SMOKE"
      - `target`: str (optional, e.g. proposal key)
 
 6. **General Chat** ("hello", "who are you?", "good job")
