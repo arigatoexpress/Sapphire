@@ -175,37 +175,8 @@ watch(
 </script>
 
 <template>
-    <div class="chart-wrapper" role="img" :aria-label="hasData ? `Candlestick chart with ${normalizedCandles.length} candles` : 'Chart awaiting data'">
-        <div ref="chartContainer" class="chart-canvas" aria-hidden="true"></div>
-        <div v-if="!hasData" class="empty-state" role="status">Waiting for live OHLC feed...</div>
+    <div class="relative w-full min-h-[200px]" role="img" :aria-label="hasData ? `Candlestick chart with ${normalizedCandles.length} candles` : 'Chart awaiting data'">
+        <div ref="chartContainer" class="h-full w-full overflow-hidden rounded-lg" aria-hidden="true"></div>
+        <div v-if="!hasData" class="absolute inset-0 flex items-center justify-center text-center text-sm tracking-wide text-terminal-dim pointer-events-none bg-gradient-to-b from-[rgba(10,20,10,0.2)] to-[rgba(5,10,5,0.4)]" role="status">Waiting for live OHLC feed...</div>
     </div>
 </template>
-
-<style scoped>
-.chart-wrapper {
-    position: relative;
-    width: 100%;
-    min-height: 200px;
-}
-
-.chart-canvas {
-    width: 100%;
-    height: 100%;
-    border-radius: 12px;
-    overflow: hidden;
-}
-
-.empty-state {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    color: rgba(32, 194, 14, 0.6);
-    font-size: 0.8rem;
-    letter-spacing: 0.02em;
-    pointer-events: none;
-    background: linear-gradient(180deg, rgba(10, 20, 10, 0.2), rgba(5, 10, 5, 0.4));
-}
-</style>

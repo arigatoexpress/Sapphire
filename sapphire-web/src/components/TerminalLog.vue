@@ -49,6 +49,18 @@ const levelTag = (level: string) => {
     return 'INF'
 }
 
+const levelTagColor: Record<string, string> = {
+    'log-info': 'text-terminal',
+    'log-warn': 'text-warning',
+    'log-error': 'text-error',
+}
+
+const levelMsgColor: Record<string, string> = {
+    'log-info': 'text-text-secondary',
+    'log-warn': 'text-[rgba(255,176,0,0.7)]',
+    'log-error': 'text-[rgba(255,68,68,0.8)]',
+}
+
 const scrollToBottom = async () => {
     await nextTick()
     if (scrollContainer.value) {
@@ -62,150 +74,63 @@ onMounted(scrollToBottom)
 </script>
 
 <template>
-    <div class="terminal" :class="{ collapsed: props.collapsed }">
-        <header class="terminal-header" @click="emit('toggle')">
-            <span class="terminal-title">
-                <span class="terminal-prompt">&gt;</span>
+    <div class="flex flex-col overflow-hidden rounded-md border border-border-subtle bg-[rgba(5,10,5,0.85)]">
+        <!-- Header -->
+        <header
+            class="flex cursor-pointer select-none items-center justify-between border-b border-border-subtle bg-[rgba(10,20,10,0.5)] px-3 py-1.5 transition-colors hover:bg-[rgba(15,30,15,0.5)]"
+            @click="emit('toggle')"
+        >
+            <span class="font-mono text-xs uppercase tracking-widest text-text-primary">
+                <span class="mr-1 text-terminal glow" aria-hidden="true">&gt;</span>
                 SYSTEM LOG
             </span>
-            <span class="terminal-meta">
+            <span class="font-mono text-[0.68rem] tracking-wide text-text-tertiary">
                 {{ visibleLogs.length }} entries
-                <span class="toggle-hint">{{ props.collapsed ? '[EXPAND]' : '[COLLAPSE]' }}</span>
+                <span class="ml-2 text-text-secondary">{{ props.collapsed ? '[EXPAND]' : '[COLLAPSE]' }}</span>
             </span>
         </header>
-        <div v-if="!props.collapsed" ref="scrollContainer" class="terminal-body">
+
+        <!-- Body -->
+        <div
+            v-if="!props.collapsed"
+            ref="scrollContainer"
+            class="max-h-[200px] overflow-y-auto px-3 py-2 font-mono text-[0.78rem] leading-relaxed"
+        >
             <div
                 v-for="(entry, idx) in visibleLogs"
                 :key="`${entry.timestamp}-${idx}`"
-                class="log-line"
-                :class="levelClass(entry.level)"
+                class="flex gap-1.5 overflow-hidden whitespace-nowrap"
             >
-                <span class="log-time">[{{ formatTime(entry.timestamp) }}]</span>
-                <span class="log-level">[{{ levelTag(entry.level) }}]</span>
-                <span class="log-msg">{{ entry.message }}</span>
+                <span class="shrink-0 text-text-tertiary">[{{ formatTime(entry.timestamp) }}]</span>
+                <span :class="['shrink-0 font-medium', levelTagColor[levelClass(entry.level)]]">
+                    [{{ levelTag(entry.level) }}]
+                </span>
+                <span :class="['truncate', levelMsgColor[levelClass(entry.level)]]">
+                    {{ entry.message }}
+                </span>
             </div>
-            <div v-if="!visibleLogs.length" class="log-line log-info">
-                <span class="log-time">[--:--:--]</span>
-                <span class="log-level">[SYS]</span>
-                <span class="log-msg">Awaiting telemetry stream...</span>
+
+            <div v-if="!visibleLogs.length" class="flex gap-1.5 overflow-hidden whitespace-nowrap">
+                <span class="shrink-0 text-text-tertiary">[--:--:--]</span>
+                <span class="shrink-0 font-medium text-terminal">[SYS]</span>
+                <span class="truncate text-text-secondary">Awaiting telemetry stream...</span>
             </div>
-            <div class="cursor-line">
-                <span class="cursor-prompt">&gt;</span>
-                <span class="cursor-block"></span>
+
+            <!-- Blinking cursor -->
+            <div class="mt-0.5 flex items-center gap-0.5">
+                <span class="text-terminal glow" aria-hidden="true">&gt;</span>
+                <span class="terminal-cursor" />
             </div>
         </div>
     </div>
 </template>
 
 <style scoped>
-.terminal {
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md);
-    background: rgba(5, 10, 5, 0.85);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-}
-
-.terminal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.4rem 0.7rem;
-    border-bottom: 1px solid var(--border-subtle);
-    background: rgba(10, 20, 10, 0.5);
-    cursor: pointer;
-    user-select: none;
-}
-
-.terminal-header:hover {
-    background: rgba(15, 30, 15, 0.5);
-}
-
-.terminal-title {
-    font-size: 0.76rem;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--text-primary);
-}
-
-.terminal-prompt {
-    color: var(--color-terminal);
-    margin-right: 0.3rem;
-    text-shadow: 0 0 8px rgba(32, 194, 14, 0.5);
-}
-
-.terminal-meta {
-    font-size: 0.68rem;
-    color: var(--text-tertiary);
-    letter-spacing: 0.04em;
-}
-
-.toggle-hint {
-    margin-left: 0.5rem;
-    color: var(--text-secondary);
-}
-
-.terminal-body {
-    max-height: 200px;
-    overflow-y: auto;
-    padding: 0.5rem 0.7rem;
-    font-size: 0.78rem;
-    line-height: 1.6;
-}
-
-.log-line {
-    display: flex;
-    gap: 0.4rem;
-    white-space: nowrap;
-    overflow: hidden;
-}
-
-.log-time {
-    color: var(--text-tertiary);
-    flex-shrink: 0;
-}
-
-.log-level {
-    flex-shrink: 0;
-    font-weight: 500;
-}
-
-.log-msg {
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.log-info .log-level { color: var(--color-terminal); }
-.log-info .log-msg { color: var(--text-secondary); }
-
-.log-warn .log-level { color: var(--color-warning); }
-.log-warn .log-msg { color: rgba(255, 176, 0, 0.7); }
-
-.log-error .log-level { color: var(--color-error); }
-.log-error .log-msg { color: rgba(255, 68, 68, 0.8); }
-
-.cursor-line {
-    display: flex;
-    align-items: center;
-    gap: 0.2rem;
-    margin-top: 0.15rem;
-}
-
-.cursor-prompt {
-    color: var(--color-terminal);
-    text-shadow: 0 0 6px rgba(32, 194, 14, 0.5);
-}
-
-.cursor-block {
+.terminal-cursor {
     width: 7px;
     height: 13px;
     background: var(--color-terminal);
     animation: terminalBlink 1s step-end infinite;
     box-shadow: 0 0 4px rgba(32, 194, 14, 0.5);
-}
-
-.collapsed .terminal-body {
-    display: none;
 }
 </style>

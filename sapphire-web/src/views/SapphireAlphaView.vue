@@ -248,121 +248,155 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div class="alpha-view fade-in" aria-label="Alpha engine dashboard">
-        <div v-if="loading && !lastFetchAt" class="status-bar loading-bar" role="status" aria-live="polite">
-            <span class="pulse-dot" aria-hidden="true"></span> Initializing Alpha Engine...
-        </div>
-        <div v-else-if="fetchError" class="status-bar error-bar" role="alert" tabindex="0" @click="reload" @keydown.enter="reload" @keydown.space.prevent="reload">
-            {{ fetchError }} — tap to retry
-        </div>
-        <div v-else-if="isStale" class="status-bar stale-bar" role="status" aria-live="polite">
-            Data {{ dataAge }}s old — awaiting refresh
-        </div>
+    <div class="grid gap-4 fade-in" aria-label="Alpha engine dashboard">
+        <!-- Status Bar -->
+        <StatusBar
+            :loading="loading"
+            :has-data="!!lastFetchAt"
+            :fetch-error="fetchError"
+            :is-stale="isStale"
+            :data-age="dataAge"
+            loading-message="Initializing Alpha Engine..."
+            @retry="reload"
+        />
 
-        <div class="topstrip">
-            <label class="symbol-picker">
-                <span class="font-mono" id="symbol-label-alpha">FOCUS</span>
-                <select v-model="selectedSymbol" aria-labelledby="symbol-label-alpha">
-                    <option v-for="s in SYMBOLS" :key="s" :value="s">{{ s }}</option>
-                </select>
-            </label>
+        <!-- Symbol Picker -->
+        <div class="flex items-center justify-end">
+            <SymbolPicker v-model="selectedSymbol" :symbols="SYMBOLS" label="FOCUS" />
         </div>
 
         <!-- Skeleton loading state -->
         <template v-if="loading && !lastFetchAt">
-            <section class="insights-grid">
-                <article v-for="i in 6" :key="i" class="insight card glass-lift">
-                    <div class="skel-line skel-sm"></div>
-                    <div class="skel-line skel-lg"></div>
-                    <div class="skel-line skel-xs"></div>
+            <KpiStrip :columns="3" class="max-lg:grid-cols-2 max-md:grid-cols-1">
+                <article v-for="i in 6" :key="i" class="grid gap-1 rounded-md border border-border-subtle bg-card p-4 glass-lift">
+                    <div class="mx-auto h-2.5 w-2/5 animate-pulse rounded-xs bg-terminal-ghost/50" />
+                    <div class="mx-auto h-5 w-3/5 animate-pulse rounded-xs bg-terminal-ghost/80" />
+                    <div class="mx-auto mt-0.5 h-2 w-1/2 animate-pulse rounded-xs bg-terminal-ghost/40" />
                 </article>
-            </section>
-            <section class="rail card glass-lift">
-                <div class="skel-line skel-sm" style="width: 25%; margin: 0 0 0.7rem"></div>
-                <div class="rail-grid">
-                    <article v-for="i in 4" :key="i" class="rail-stage">
-                        <div class="skel-line skel-sm"></div>
-                        <div class="skel-line skel-lg"></div>
-                        <div class="skel-line skel-xs"></div>
+            </KpiStrip>
+            <section class="rounded-md border border-border-subtle bg-card p-4 glass-lift">
+                <div class="mb-3 h-2.5 w-1/4 animate-pulse rounded-xs bg-terminal-ghost/50" />
+                <div class="grid grid-cols-4 gap-2.5 max-md:grid-cols-1">
+                    <article v-for="i in 4" :key="i" class="grid gap-1 rounded border border-border-subtle bg-terminal-ghost/20 p-2.5">
+                        <div class="mx-auto h-2.5 w-2/5 animate-pulse rounded-xs bg-terminal-ghost/50" />
+                        <div class="mx-auto h-5 w-3/5 animate-pulse rounded-xs bg-terminal-ghost/80" />
+                        <div class="mx-auto mt-0.5 h-2 w-1/2 animate-pulse rounded-xs bg-terminal-ghost/40" />
                     </article>
                 </div>
             </section>
-            <section class="chart-row">
-                <article v-for="i in 2" :key="i" class="chart-panel card glass-lift">
-                    <div class="skel-line skel-sm" style="margin-bottom: 0.7rem"></div>
-                    <div class="skel-chart"></div>
+            <section class="grid grid-cols-2 gap-3 max-lg:grid-cols-1">
+                <article v-for="i in 2" :key="i" class="rounded-md border border-border-subtle bg-card p-4 glass-lift">
+                    <div class="mb-3 h-2.5 w-2/5 animate-pulse rounded-xs bg-terminal-ghost/50" />
+                    <div class="h-[400px] w-full animate-pulse rounded bg-terminal-ghost/30" />
                 </article>
             </section>
         </template>
 
         <template v-else>
-        <section class="insights-grid" aria-label="Alpha engine insights" aria-live="polite">
-            <article v-for="card in insightCards" :key="card.title" class="insight card glass-lift" :aria-label="`${card.title}: ${card.value}`">
-                <p class="font-mono">{{ card.title }}</p>
-                <strong class="glow" :class="card.title === 'Avg RSI (14)' ? rsiTone : ''">{{ card.value }}</strong>
-                <small>{{ card.detail }}</small>
-            </article>
-        </section>
+        <!-- Insight Cards -->
+        <KpiStrip :columns="3" class="max-lg:grid-cols-2 max-md:grid-cols-1" aria-label="Alpha engine insights" aria-live="polite">
+            <div v-for="card in insightCards" :key="card.title" class="grid gap-0.5" :aria-label="`${card.title}: ${card.value}`">
+                <KpiCard
+                    :label="card.title"
+                    :value="card.value"
+                    :tone="card.title === 'Avg RSI (14)' ? (rsiTone === 'tone-hot' ? 'error' : rsiTone === 'tone-cold' ? 'cold' : 'default') : 'default'"
+                    glow
+                />
+                <small class="text-center font-mono text-[0.72rem] text-text-tertiary">{{ card.detail }}</small>
+            </div>
+        </KpiStrip>
 
-        <section class="rail card glass-lift" aria-label="Strategy readiness pipeline">
-            <header>
-                <h3 class="font-mono">Strategy Readiness</h3>
-                <span class="rail-score" :class="readinessTone" :aria-label="`Readiness score: ${readinessScore} percent`">{{ readinessScore }}%</span>
-            </header>
-            <div class="rail-grid" role="list">
-                <article v-for="stage in strategyRail" :key="stage.label" class="rail-stage" :class="`stage-${stage.status}`" role="listitem" :aria-label="`${stage.label}: ${stage.status === 'ready' ? 'ready' : 'pending'} — ${stage.detail}`">
-                    <p class="font-mono">{{ stage.label }}</p>
-                    <strong>{{ stage.status === 'ready' ? 'READY' : 'PENDING' }}</strong>
-                    <small>{{ stage.detail }}</small>
+        <!-- Strategy Readiness Rail -->
+        <section class="rounded-md border border-border-subtle bg-card p-4 backdrop-blur-sm glass-lift" aria-label="Strategy readiness pipeline">
+            <SectionHeader title="Strategy Readiness">
+                <template #actions>
+                    <SyncBadge
+                        :text="`${readinessScore}%`"
+                        :variant="readinessTone === 'tone-strong' ? 'success' : readinessTone === 'tone-balanced' ? 'warning' : 'error'"
+                        :aria-label="`Readiness score: ${readinessScore} percent`"
+                    />
+                </template>
+            </SectionHeader>
+            <div class="mt-3 grid grid-cols-4 gap-2.5 max-md:grid-cols-1" role="list">
+                <article
+                    v-for="stage in strategyRail"
+                    :key="stage.label"
+                    class="grid gap-0.5 rounded border border-border-subtle bg-terminal-ghost/40 p-2.5"
+                    role="listitem"
+                    :aria-label="`${stage.label}: ${stage.status === 'ready' ? 'ready' : 'pending'} — ${stage.detail}`"
+                >
+                    <p class="m-0 font-mono text-[0.68rem] uppercase tracking-wider text-text-secondary">{{ stage.label }}</p>
+                    <strong
+                        class="text-sm"
+                        :class="stage.status === 'ready' ? 'text-terminal' : 'text-error'"
+                    >
+                        {{ stage.status === 'ready' ? 'READY' : 'PENDING' }}
+                    </strong>
+                    <small class="text-[0.72rem] text-text-tertiary">{{ stage.detail }}</small>
                 </article>
             </div>
         </section>
 
-        <section class="chart-row">
-            <article class="chart-panel card glass-lift">
-                <header>
-                    <h3 class="font-mono">ASTER Canvas</h3>
-                    <small>{{ chartSourceLabel }}</small>
-                </header>
-                <TradingChart :candles="alphaCandles" :height="400" />
-            </article>
-            <article class="chart-panel card glass-lift">
-                <header>
-                    <h3 class="font-mono">LIGHTER Canvas</h3>
-                    <small>{{ compareSourceLabel }}</small>
-                </header>
-                <TradingChart :candles="lighterCandles" :height="400" />
-            </article>
+        <!-- Charts -->
+        <section class="grid grid-cols-2 gap-3 max-lg:grid-cols-1">
+            <ChartPanel
+                title="ASTER Canvas"
+                :subtitle="chartSourceLabel"
+                :candles="alphaCandles"
+                :height="400"
+            />
+            <ChartPanel
+                title="LIGHTER Canvas"
+                :subtitle="compareSourceLabel"
+                :candles="lighterCandles"
+                :height="400"
+            />
         </section>
 
-        <section class="matrix card glass-lift">
-            <h3 class="font-mono">Market Intelligence Matrix</h3>
-            <div class="matrix-grid">
-                <article v-for="snap in snapshots" :key="snap.symbol" class="matrix-item">
-                    <header>
-                        <strong>{{ snap.symbol }}</strong>
-                        <span :class="(snap.change1h || 0) >= 0 ? 'tone-strong' : 'tone-guarded'">{{ formatPct(snap.change1h) }}</span>
+        <!-- Market Intelligence Matrix -->
+        <section class="rounded-md border border-border-subtle bg-card p-4 backdrop-blur-sm glass-lift">
+            <h3 class="m-0 mb-3 font-mono text-sm tracking-wide text-text-primary glow">Market Intelligence Matrix</h3>
+            <div class="grid grid-cols-3 gap-3 max-lg:grid-cols-2 max-md:grid-cols-1" style="grid-template-columns: repeat(3, minmax(170px, 1fr))">
+                <article
+                    v-for="snap in snapshots"
+                    :key="snap.symbol"
+                    class="grid gap-0.5 rounded border border-border-subtle bg-terminal-ghost/35 px-3 py-2.5"
+                >
+                    <header class="flex items-center justify-between">
+                        <strong class="text-sm">{{ snap.symbol }}</strong>
+                        <span
+                            class="text-sm"
+                            :class="(snap.change1h || 0) >= 0 ? 'text-terminal' : 'text-error'"
+                        >
+                            {{ formatPct(snap.change1h) }}
+                        </span>
                     </header>
-                    <p class="matrix-price">{{ formatPrice(snap.price) }}</p>
-                    <div class="matrix-indicators">
-                        <span class="indicator">
-                            <em>RSI</em>
-                            <b :class="snap.rsi !== null ? (snap.rsi >= 70 ? 'rsi-hot' : snap.rsi <= 30 ? 'rsi-cold' : 'rsi-neutral') : ''">
+                    <p class="m-0 text-[0.92rem] font-medium text-text-primary">{{ formatPrice(snap.price) }}</p>
+                    <div class="mt-0.5 flex gap-2.5">
+                        <span class="flex items-center gap-1 text-[0.68rem]">
+                            <em class="not-italic text-[0.6rem] tracking-wide text-text-tertiary">RSI</em>
+                            <b
+                                class="font-semibold"
+                                :class="snap.rsi !== null ? (snap.rsi >= 70 ? 'text-error' : snap.rsi <= 30 ? 'text-info' : 'text-text-secondary') : 'text-text-secondary'"
+                            >
                                 {{ snap.rsi !== null ? snap.rsi.toFixed(0) : '—' }}
                             </b>
                         </span>
-                        <span class="indicator">
-                            <em>MOM</em>
-                            <b :class="snap.momentum !== null ? ((snap.momentum || 0) >= 0 ? 'mom-up' : 'mom-down') : ''">
+                        <span class="flex items-center gap-1 text-[0.68rem]">
+                            <em class="not-italic text-[0.6rem] tracking-wide text-text-tertiary">MOM</em>
+                            <b
+                                class="font-semibold"
+                                :class="snap.momentum !== null ? ((snap.momentum || 0) >= 0 ? 'text-terminal' : 'text-error') : 'text-text-secondary'"
+                            >
                                 {{ snap.momentum !== null ? formatPct(snap.momentum, 1) : '—' }}
                             </b>
                         </span>
-                        <span class="indicator">
-                            <em>VOL</em>
-                            <b>{{ formatPct(snap.volatility, 2) }}</b>
+                        <span class="flex items-center gap-1 text-[0.68rem]">
+                            <em class="not-italic text-[0.6rem] tracking-wide text-text-tertiary">VOL</em>
+                            <b class="font-semibold text-text-secondary">{{ formatPct(snap.volatility, 2) }}</b>
                         </span>
                     </div>
-                    <small>6h {{ formatPct(snap.change6h) }} · conf {{ snap.confidence }}%</small>
+                    <small class="text-[0.68rem] text-text-tertiary">6h {{ formatPct(snap.change6h) }} · conf {{ snap.confidence }}%</small>
                     <svg class="sparkline" viewBox="0 0 100 34" preserveAspectRatio="none" role="img" :aria-label="`${snap.symbol} price trend`">
                         <polyline :points="sparklinePoints(snap.history)" />
                     </svg>
@@ -370,235 +404,45 @@ onUnmounted(() => {
             </div>
         </section>
 
-        <section class="ideas card glass-lift">
-            <header>
-                <h3 class="font-mono">Alpha Ideas</h3>
-                <small>Auto-generated from breadth + RSI + volatility + routing</small>
-            </header>
-            <article v-for="idea in alphaIdeas" :key="idea.title" class="idea-item" :class="`idea-${idea.tone}`">
-                <h4>{{ idea.title }}</h4>
-                <p>{{ idea.detail }}</p>
+        <!-- Alpha Ideas -->
+        <section class="rounded-md border border-border-subtle bg-card p-4 backdrop-blur-sm glass-lift">
+            <SectionHeader title="Alpha Ideas">
+                <template #actions>
+                    <small class="font-mono text-[0.72rem] text-text-tertiary">Auto-generated from breadth + RSI + volatility + routing</small>
+                </template>
+            </SectionHeader>
+            <article
+                v-for="idea in alphaIdeas"
+                :key="idea.title"
+                class="mt-2 rounded border bg-terminal-ghost/30 p-3"
+                :class="{
+                    'border-terminal/35': idea.tone === 'bullish',
+                    'border-warning/35': idea.tone === 'defensive',
+                    'border-border-accent': idea.tone === 'neutral',
+                }"
+            >
+                <h4 class="m-0 text-sm text-text-primary">{{ idea.title }}</h4>
+                <p class="mt-1 text-[0.78rem] leading-relaxed text-text-secondary">{{ idea.detail }}</p>
             </article>
         </section>
         </template>
     </div>
 </template>
 
+<script lang="ts">
+import { StatusBar, KpiCard, KpiStrip, SectionHeader, SyncBadge, SymbolPicker, ChartPanel } from '../components/shared/index'
+
+export default {
+    components: { StatusBar, KpiCard, KpiStrip, SectionHeader, SyncBadge, SymbolPicker, ChartPanel },
+}
+</script>
+
 <style scoped>
-.alpha-view {
-    display: grid;
-    gap: 1rem;
-}
-
-.topstrip {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-}
-
-.symbol-picker {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.symbol-picker span {
-    font-size: 0.72rem;
-    color: var(--text-tertiary);
-    letter-spacing: 0.06em;
-}
-
-.symbol-picker select {
-    background: var(--bg-card);
-    border: 1px solid var(--border-accent);
-    color: var(--text-primary);
-    border-radius: var(--radius-sm);
-    padding: 0.4rem 0.6rem;
-    font-family: var(--font-mono);
-    font-size: 0.82rem;
-    cursor: pointer;
-}
-
-/* ── Insight Cards ── */
-.insights-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.8rem;
-}
-
-.insight {
-    display: grid;
-    gap: 0.3rem;
-}
-
-.insight p {
-    margin: 0;
-    color: var(--text-secondary);
-    font-size: 0.72rem;
-    letter-spacing: 0.06em;
-}
-
-.insight strong {
-    font-size: 1.25rem;
-    color: var(--text-primary);
-}
-
-.insight small {
-    color: var(--text-tertiary);
-    font-size: 0.72rem;
-}
-
-.tone-hot { color: var(--color-error); text-shadow: 0 0 4px rgba(255, 68, 68, 0.3); }
-.tone-cold { color: #4488ff; text-shadow: 0 0 4px rgba(68, 136, 255, 0.3); }
-.tone-neutral { color: var(--text-primary); }
-
-/* ── Readiness Rail ── */
-.rail header {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    margin-bottom: 0.7rem;
-}
-
-.rail h3 {
-    margin: 0;
-    font-size: 0.85rem;
-}
-
-.rail-score {
-    border-radius: 999px;
-    padding: 0.2rem 0.6rem;
-    font-size: 0.78rem;
-    border: 1px solid var(--border-accent);
-    font-family: var(--font-mono);
-}
-
-.tone-strong { color: var(--color-terminal); border-color: rgba(32, 194, 14, 0.4); }
-.tone-balanced { color: var(--color-warning); border-color: rgba(255, 176, 0, 0.4); }
-.tone-guarded { color: var(--color-error); border-color: rgba(255, 68, 68, 0.4); }
-
-.rail-grid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.6rem;
-}
-
-.rail-stage {
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border-subtle);
-    background: rgba(10, 20, 10, 0.4);
-    padding: 0.6rem;
-    display: grid;
-    gap: 0.2rem;
-}
-
-.rail-stage p {
-    margin: 0;
-    font-size: 0.68rem;
-    letter-spacing: 0.06em;
-    color: var(--text-secondary);
-}
-
-.rail-stage strong { font-size: 0.82rem; }
-.rail-stage small { color: var(--text-tertiary); font-size: 0.72rem; }
-
-.stage-ready strong { color: var(--color-terminal); }
-.stage-pending strong { color: var(--color-error); }
-
-/* ── Charts ── */
-.chart-row {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.8rem;
-}
-
-.chart-panel header {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    margin-bottom: 0.7rem;
-}
-
-.chart-panel h3 { margin: 0; font-size: 0.85rem; }
-.chart-panel small { color: var(--text-tertiary); font-size: 0.72rem; }
-
-/* ── Matrix ── */
-.matrix h3 {
-    margin: 0 0 0.7rem;
-    font-size: 0.85rem;
-}
-
-.matrix-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(170px, 1fr));
-    gap: 0.7rem;
-}
-
-.matrix-item {
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-sm);
-    padding: 0.6rem 0.7rem;
-    background: rgba(10, 20, 10, 0.35);
-    display: grid;
-    gap: 0.2rem;
-}
-
-.matrix-item header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.matrix-item header strong { font-size: 0.85rem; }
-.matrix-item header span { font-size: 0.82rem; }
-
-.matrix-price {
-    margin: 0;
-    color: var(--text-primary);
-    font-size: 0.92rem;
-    font-weight: 500;
-}
-
-.matrix-indicators {
-    display: flex;
-    gap: 0.6rem;
-    margin-top: 0.15rem;
-}
-
-.indicator {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    font-size: 0.68rem;
-}
-
-.indicator em {
-    font-style: normal;
-    color: var(--text-tertiary);
-    font-size: 0.6rem;
-    letter-spacing: 0.04em;
-}
-
-.indicator b {
-    font-weight: 600;
-    color: var(--text-secondary);
-}
-
-.rsi-hot { color: var(--color-error) !important; }
-.rsi-cold { color: #4488ff !important; }
-.rsi-neutral { color: var(--text-secondary); }
-.mom-up { color: var(--color-terminal) !important; }
-.mom-down { color: var(--color-error) !important; }
-
-.matrix-item small {
-    color: var(--text-tertiary);
-    font-size: 0.68rem;
-}
-
+/* ── Sparkline SVG — minimal scoped styles for SVG rendering ── */
 .sparkline {
     width: 100%;
     height: 38px;
-    border-radius: var(--radius-xs);
+    border-radius: 2px;
     background: rgba(10, 20, 10, 0.4);
 }
 
@@ -609,138 +453,5 @@ onUnmounted(() => {
     stroke-linecap: round;
     stroke-linejoin: round;
     filter: drop-shadow(0 0 3px rgba(32, 194, 14, 0.4));
-}
-
-/* ── Ideas ── */
-.ideas header {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    margin-bottom: 0.6rem;
-}
-
-.ideas h3 { margin: 0; font-size: 0.85rem; }
-.ideas small { color: var(--text-tertiary); font-size: 0.72rem; }
-
-.idea-item {
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-sm);
-    background: rgba(10, 20, 10, 0.3);
-    padding: 0.7rem;
-    margin-top: 0.5rem;
-}
-
-.idea-item h4 {
-    margin: 0;
-    font-size: 0.85rem;
-    color: var(--text-primary);
-}
-
-.idea-item p {
-    margin: 0.25rem 0 0;
-    font-size: 0.78rem;
-    color: var(--text-secondary);
-    line-height: 1.5;
-}
-
-.idea-bullish { border-color: rgba(32, 194, 14, 0.35); }
-.idea-neutral { border-color: var(--border-accent); }
-.idea-defensive { border-color: rgba(255, 176, 0, 0.35); }
-
-/* ── Responsive ── */
-@media (max-width: 1320px) {
-    .insights-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .chart-row { grid-template-columns: 1fr; }
-    .matrix-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-
-@media (max-width: 760px) {
-    .insights-grid,
-    .rail-grid,
-    .matrix-grid { grid-template-columns: 1fr; }
-}
-
-/* ── Skeleton Loading ── */
-.skel-line {
-    border-radius: var(--radius-xs);
-    animation: skelPulse 1.6s ease-in-out infinite;
-}
-
-.skel-lg {
-    width: 55%;
-    height: 1.15rem;
-    margin: 0 auto;
-    background: rgba(32, 194, 14, 0.08);
-}
-
-.skel-sm {
-    width: 40%;
-    height: 0.6rem;
-    margin: 0 auto 0.3rem;
-    background: rgba(32, 194, 14, 0.05);
-}
-
-.skel-xs {
-    width: 50%;
-    height: 0.5rem;
-    margin: 0.2rem auto 0;
-    background: rgba(32, 194, 14, 0.04);
-}
-
-.skel-chart {
-    width: 100%;
-    height: 400px;
-    border-radius: var(--radius-sm);
-    background: rgba(32, 194, 14, 0.03);
-    animation: skelPulse 1.6s ease-in-out infinite 0.2s;
-}
-
-@keyframes skelPulse {
-    0%, 100% { opacity: 0.4; }
-    50% { opacity: 0.85; }
-}
-
-/* ── Status Bars ── */
-.status-bar {
-    padding: 0.45rem 0.8rem;
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    letter-spacing: 0.04em;
-    border-radius: var(--radius-sm);
-    text-align: center;
-}
-
-.loading-bar {
-    background: rgba(32, 194, 14, 0.08);
-    color: var(--color-terminal);
-    border: 1px solid rgba(32, 194, 14, 0.15);
-}
-
-.error-bar {
-    background: rgba(255, 68, 68, 0.08);
-    color: var(--color-error);
-    border: 1px solid rgba(255, 68, 68, 0.2);
-    cursor: pointer;
-}
-
-.stale-bar {
-    background: rgba(255, 200, 50, 0.06);
-    color: var(--color-warning);
-    border: 1px solid rgba(255, 200, 50, 0.15);
-}
-
-.pulse-dot {
-    display: inline-block;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--color-terminal);
-    margin-right: 0.4rem;
-    animation: pulse 1.2s ease-in-out infinite;
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 0.3; }
-    50% { opacity: 1; }
 }
 </style>

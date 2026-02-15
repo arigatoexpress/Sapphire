@@ -83,303 +83,182 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div class="trade-view fade-in" aria-label="Trade dashboard">
-        <div v-if="loading && !lastFetchAt" class="status-bar loading-bar" role="status" aria-live="polite">
-            <span class="pulse-dot" aria-hidden="true"></span> Connecting to Sapphire...
-        </div>
-        <div v-else-if="fetchError" class="status-bar error-bar" role="alert" tabindex="0" @click="reload" @keydown.enter="reload" @keydown.space.prevent="reload">
-            {{ fetchError }} — tap to retry
-        </div>
-        <div v-else-if="isStale" class="status-bar stale-bar" role="status" aria-live="polite">
-            Data {{ dataAge }}s old — awaiting refresh
+    <div class="grid gap-4 fade-in" aria-label="Trade dashboard">
+        <!-- ── Status Bar ── -->
+        <StatusBar
+            :loading="loading"
+            :has-data="!!lastFetchAt"
+            :fetch-error="fetchError"
+            :is-stale="isStale"
+            :data-age="dataAge"
+            loading-message="Connecting to Sapphire..."
+            @retry="reload"
+        />
+
+        <!-- ── Symbol Picker ── -->
+        <div class="flex justify-end items-center">
+            <SymbolPicker v-model="selectedSymbol" :symbols="SYMBOLS" />
         </div>
 
-        <div class="topstrip">
-            <label class="symbol-picker">
-                <span class="font-mono" id="symbol-label-trade">SYMBOL</span>
-                <select v-model="selectedSymbol" aria-labelledby="symbol-label-trade">
-                    <option v-for="s in SYMBOLS" :key="s" :value="s">{{ s }}</option>
-                </select>
-            </label>
-        </div>
-
-        <!-- Skeleton loading state -->
+        <!-- ── Skeleton loading state ── -->
         <template v-if="loading && !lastFetchAt">
-            <section class="ops-strip">
-                <article v-for="i in 5" :key="i" class="ops-card card glass-lift">
-                    <div class="skel-line skel-sm"></div>
-                    <div class="skel-line skel-lg"></div>
-                </article>
-            </section>
-            <section class="metric-strip">
-                <article v-for="i in 4" :key="i" class="metric card glass-lift">
-                    <div class="skel-line skel-sm"></div>
-                    <div class="skel-line skel-lg"></div>
-                    <div class="skel-line skel-xs"></div>
-                </article>
-            </section>
-            <section class="chart-grid">
-                <article v-for="i in 2" :key="i" class="chart-panel card glass-lift">
-                    <div class="skel-line skel-sm" style="margin-bottom: 0.7rem"></div>
-                    <div class="skel-chart"></div>
+            <KpiStrip :columns="5" class="max-md:!grid-cols-3">
+                <KpiCard v-for="i in 5" :key="i" label="—" value="—" :loading="true" />
+            </KpiStrip>
+            <KpiStrip :columns="4" class="max-lg:!grid-cols-2 max-md:!grid-cols-1">
+                <KpiCard v-for="i in 4" :key="i" label="—" value="—" :loading="true" />
+            </KpiStrip>
+            <section class="grid grid-cols-2 gap-3 max-lg:grid-cols-1">
+                <article v-for="i in 2" :key="i" class="grid gap-3 rounded-md border border-border-subtle bg-card p-4 backdrop-blur-sm glass-lift">
+                    <div class="mx-auto h-3 w-2/5 animate-pulse rounded-xs bg-terminal-ghost/50" />
+                    <div class="h-[400px] w-full animate-pulse rounded-sm bg-terminal-ghost/30" />
                 </article>
             </section>
         </template>
 
         <template v-else>
-        <section class="ops-strip" aria-label="Trading operations summary" aria-live="polite">
-            <article class="ops-card card glass-lift" aria-label="Total trades">
-                <p class="font-mono">Trades</p>
-                <strong class="glow">{{ ctrl.totalTrades }}</strong>
-            </article>
-            <article class="ops-card card glass-lift" aria-label="Win rate">
-                <p class="font-mono">Win Rate</p>
-                <strong class="glow">{{ ctrl.winRate.toFixed(1) }}%</strong>
-            </article>
-            <article class="ops-card card glass-lift" :aria-label="`Profit and loss: ${ctrl.realizedPnl >= 0 ? 'positive' : 'negative'} ${Math.abs(ctrl.realizedPnl).toFixed(4)}`">
-                <p class="font-mono">PnL</p>
-                <strong class="glow" :class="ctrl.realizedPnl >= 0 ? 'tone-calm' : 'tone-hot'">{{ ctrl.realizedPnl >= 0 ? '+' : '' }}{{ ctrl.realizedPnl.toFixed(4) }}</strong>
-            </article>
-            <article class="ops-card card glass-lift" :aria-label="`Execution stage: ${ctrl.executionStage}, multiplier ${ctrl.stageMultiplier.toFixed(2)}x`">
-                <p class="font-mono">Stage</p>
-                <strong class="glow" :class="ctrl.executionStage === 'LIVE' ? 'tone-calm' : 'tone-warm'">{{ ctrl.executionStage }}</strong>
-                <small>{{ ctrl.stageMultiplier.toFixed(2) }}x</small>
-            </article>
-            <article class="ops-card card glass-lift" :aria-label="`Dispatch: ${ctrl.killSwitchActive ? 'kill switch active' : ctrl.dexLiveDispatch ? 'live' : 'off'}`">
-                <p class="font-mono">Dispatch</p>
-                <strong :class="ctrl.killSwitchActive ? 'tone-hot' : ctrl.dexLiveDispatch ? 'tone-calm' : 'tone-warm'">{{ ctrl.killSwitchActive ? 'KILL' : ctrl.dexLiveDispatch ? 'LIVE' : 'OFF' }}</strong>
-            </article>
-        </section>
-
-        <section class="metric-strip">
-            <article class="metric card glass-lift">
-                <p class="font-mono">{{ selectedSymbol }} ASTER</p>
-                <strong class="glow">{{ formatPrice(effectiveAster) }}</strong>
-                <small>{{ mkt.asterMeta.source }} · {{ mkt.asterMeta.interval }}</small>
-            </article>
-            <article class="metric card glass-lift">
-                <p class="font-mono">{{ selectedSymbol }} LIGHTER</p>
-                <strong class="glow">{{ formatPrice(effectiveLighter) }}</strong>
-                <small>{{ mkt.lighterMeta.source }} · {{ mkt.lighterMeta.interval }}</small>
-            </article>
-            <article class="metric card glass-lift">
-                <p class="font-mono">Cross-Venue Spread</p>
-                <strong :class="spreadTone" class="glow">{{ spreadPct === null ? 'n/a' : `${spreadPct.toFixed(3)}%` }}</strong>
-                <small>dislocation monitor</small>
-            </article>
-            <article class="metric card glass-lift">
-                <p class="font-mono">Market Breadth</p>
-                <strong class="glow">{{ marketBreadth.breadth }}%</strong>
-                <small>{{ breadthPosture }} · {{ marketBreadth.advancing }} adv / {{ marketBreadth.declining }} dec</small>
-            </article>
-        </section>
-
-        <section class="chart-grid">
-            <article class="chart-panel card glass-lift">
-                <header>
-                    <h3 class="font-mono">ASTER ({{ mkt.asterMeta.trackingSymbol }})</h3>
-                    <small>{{ mkt.asterMeta.source }} · {{ mkt.asterMeta.interval }}</small>
-                </header>
-                <TradingChart :candles="asterCandles" :height="400" />
-            </article>
-            <article class="chart-panel card glass-lift">
-                <header>
-                    <h3 class="font-mono">LIGHTER ({{ mkt.lighterMeta.trackingSymbol }})</h3>
-                    <small>{{ mkt.lighterMeta.source }} · {{ mkt.lighterMeta.interval }}</small>
-                </header>
-                <TradingChart :candles="lighterCandles" :height="400" />
-            </article>
-        </section>
-
-        <section class="breadth-section">
-            <h3 class="font-mono section-title">Market Breadth Scanner</h3>
-            <div class="breadth-grid">
-                <article v-for="snap in mkt.snapshots" :key="snap.symbol" class="breadth-card card glass-lift">
-                    <header>
-                        <span class="breadth-sym">{{ snap.symbol }}</span>
-                        <span class="breadth-change" :class="(snap.change1h || 0) >= 0 ? 'tone-calm' : 'tone-hot'">{{ formatPct(snap.change1h) }}</span>
-                    </header>
-                    <strong>{{ formatPrice(snap.price) }}</strong>
-                    <small>4h {{ formatPct(snap.change4h) }} · vol {{ formatPct(snap.volatility) }}</small>
-                    <svg class="sparkline" viewBox="0 0 100 38" preserveAspectRatio="none" role="img" :aria-label="`${snap.symbol} price sparkline`">
-                        <polyline :points="sparklinePoints(snap.history)" />
-                    </svg>
+            <!-- ── Operations Strip (5 KPIs) ── -->
+            <KpiStrip :columns="5" aria-label="Trading operations summary" aria-live="polite" class="max-md:!grid-cols-3">
+                <KpiCard
+                    label="Trades"
+                    :value="ctrl.totalTrades"
+                    :glow="true"
+                    aria-label="Total trades"
+                />
+                <KpiCard
+                    label="Win Rate"
+                    :value="`${ctrl.winRate.toFixed(1)}%`"
+                    :glow="true"
+                    aria-label="Win rate"
+                />
+                <KpiCard
+                    label="PnL"
+                    :value="`${ctrl.realizedPnl >= 0 ? '+' : ''}${ctrl.realizedPnl.toFixed(4)}`"
+                    :tone="ctrl.realizedPnl >= 0 ? 'success' : 'error'"
+                    :glow="true"
+                    :aria-label="`Profit and loss: ${ctrl.realizedPnl >= 0 ? 'positive' : 'negative'} ${Math.abs(ctrl.realizedPnl).toFixed(4)}`"
+                />
+                <!-- Stage card (has subtitle) -->
+                <article
+                    class="grid gap-0.5 rounded-md border border-border-subtle bg-card px-2 py-2.5 text-center backdrop-blur-sm glass-lift"
+                    :aria-label="`Execution stage: ${ctrl.executionStage}, multiplier ${ctrl.stageMultiplier.toFixed(2)}x`"
+                >
+                    <span class="font-mono text-[0.62rem] uppercase tracking-wider text-text-tertiary">Stage</span>
+                    <strong class="font-mono text-lg leading-tight glow" :class="ctrl.executionStage === 'LIVE' ? 'text-terminal' : 'text-warning'">
+                        {{ ctrl.executionStage }}
+                    </strong>
+                    <small class="font-mono text-[0.62rem] text-text-tertiary">{{ ctrl.stageMultiplier.toFixed(2) }}x</small>
                 </article>
-            </div>
-        </section>
+                <!-- Dispatch card -->
+                <KpiCard
+                    label="Dispatch"
+                    :value="ctrl.killSwitchActive ? 'KILL' : ctrl.dexLiveDispatch ? 'LIVE' : 'OFF'"
+                    :tone="ctrl.killSwitchActive ? 'error' : ctrl.dexLiveDispatch ? 'success' : 'warning'"
+                    :aria-label="`Dispatch: ${ctrl.killSwitchActive ? 'kill switch active' : ctrl.dexLiveDispatch ? 'live' : 'off'}`"
+                />
+            </KpiStrip>
+
+            <!-- ── Metric Strip (4 KPIs) ── -->
+            <KpiStrip :columns="4" class="max-lg:!grid-cols-2 max-md:!grid-cols-1">
+                <!-- Aster price (has subtitle) -->
+                <article class="grid gap-0.5 rounded-md border border-border-subtle bg-card px-2 py-2.5 text-center backdrop-blur-sm glass-lift">
+                    <span class="font-mono text-[0.62rem] uppercase tracking-wider text-text-tertiary">{{ selectedSymbol }} ASTER</span>
+                    <strong class="font-mono text-lg leading-tight text-text-primary glow">{{ formatPrice(effectiveAster) }}</strong>
+                    <small class="font-mono text-[0.62rem] text-text-tertiary">{{ mkt.asterMeta.source }} &middot; {{ mkt.asterMeta.interval }}</small>
+                </article>
+                <!-- Lighter price (has subtitle) -->
+                <article class="grid gap-0.5 rounded-md border border-border-subtle bg-card px-2 py-2.5 text-center backdrop-blur-sm glass-lift">
+                    <span class="font-mono text-[0.62rem] uppercase tracking-wider text-text-tertiary">{{ selectedSymbol }} LIGHTER</span>
+                    <strong class="font-mono text-lg leading-tight text-text-primary glow">{{ formatPrice(effectiveLighter) }}</strong>
+                    <small class="font-mono text-[0.62rem] text-text-tertiary">{{ mkt.lighterMeta.source }} &middot; {{ mkt.lighterMeta.interval }}</small>
+                </article>
+                <!-- Spread (has subtitle) -->
+                <article class="grid gap-0.5 rounded-md border border-border-subtle bg-card px-2 py-2.5 text-center backdrop-blur-sm glass-lift">
+                    <span class="font-mono text-[0.62rem] uppercase tracking-wider text-text-tertiary">Cross-Venue Spread</span>
+                    <strong
+                        class="font-mono text-lg leading-tight glow"
+                        :class="spreadTone === 'tone-hot' ? 'text-error' : spreadTone === 'tone-warm' ? 'text-warning' : 'text-terminal'"
+                    >
+                        {{ spreadPct === null ? 'n/a' : `${spreadPct.toFixed(3)}%` }}
+                    </strong>
+                    <small class="font-mono text-[0.62rem] text-text-tertiary">dislocation monitor</small>
+                </article>
+                <!-- Breadth (has subtitle) -->
+                <article class="grid gap-0.5 rounded-md border border-border-subtle bg-card px-2 py-2.5 text-center backdrop-blur-sm glass-lift">
+                    <span class="font-mono text-[0.62rem] uppercase tracking-wider text-text-tertiary">Market Breadth</span>
+                    <strong class="font-mono text-lg leading-tight text-text-primary glow">{{ marketBreadth.breadth }}%</strong>
+                    <small class="font-mono text-[0.62rem] text-text-tertiary">{{ breadthPosture }} &middot; {{ marketBreadth.advancing }} adv / {{ marketBreadth.declining }} dec</small>
+                </article>
+            </KpiStrip>
+
+            <!-- ── Chart Grid ── -->
+            <section class="grid grid-cols-2 gap-3 max-lg:grid-cols-1">
+                <ChartPanel
+                    :title="`ASTER (${mkt.asterMeta.trackingSymbol})`"
+                    :subtitle="`${mkt.asterMeta.source} \u00b7 ${mkt.asterMeta.interval}`"
+                    :candles="asterCandles"
+                    :height="400"
+                />
+                <ChartPanel
+                    :title="`LIGHTER (${mkt.lighterMeta.trackingSymbol})`"
+                    :subtitle="`${mkt.lighterMeta.source} \u00b7 ${mkt.lighterMeta.interval}`"
+                    :candles="lighterCandles"
+                    :height="400"
+                />
+            </section>
+
+            <!-- ── Market Breadth Scanner ── -->
+            <section class="grid gap-3">
+                <SectionHeader title="Market Breadth Scanner" />
+                <div class="grid grid-cols-[repeat(3,minmax(160px,1fr))] gap-3 max-lg:grid-cols-2 max-md:grid-cols-1">
+                    <article
+                        v-for="snap in mkt.snapshots"
+                        :key="snap.symbol"
+                        class="grid gap-1 rounded-md border border-border-subtle bg-card p-3 backdrop-blur-sm glass-lift"
+                    >
+                        <header class="flex justify-between items-center">
+                            <span class="text-sm font-semibold tracking-wide">{{ snap.symbol }}</span>
+                            <span
+                                class="text-sm font-medium"
+                                :class="(snap.change1h || 0) >= 0 ? 'text-terminal' : 'text-error'"
+                            >
+                                {{ formatPct(snap.change1h) }}
+                            </span>
+                        </header>
+                        <strong class="text-base text-text-primary">{{ formatPrice(snap.price) }}</strong>
+                        <small class="font-mono text-[0.72rem] text-text-tertiary">
+                            4h {{ formatPct(snap.change4h) }} &middot; vol {{ formatPct(snap.volatility) }}
+                        </small>
+                        <svg
+                            class="sparkline"
+                            viewBox="0 0 100 38"
+                            preserveAspectRatio="none"
+                            role="img"
+                            :aria-label="`${snap.symbol} price sparkline`"
+                        >
+                            <polyline :points="sparklinePoints(snap.history)" />
+                        </svg>
+                    </article>
+                </div>
+            </section>
         </template>
     </div>
 </template>
 
+<script lang="ts">
+import { StatusBar, KpiCard, KpiStrip, SectionHeader, SymbolPicker, ChartPanel } from '../components/shared/index'
+
+export default {
+    components: { StatusBar, KpiCard, KpiStrip, SectionHeader, SymbolPicker, ChartPanel },
+}
+</script>
+
 <style scoped>
-.trade-view {
-    display: grid;
-    gap: 1rem;
-}
-
-.topstrip {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-}
-
-.symbol-picker {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.symbol-picker span {
-    font-size: 0.72rem;
-    color: var(--text-tertiary);
-    letter-spacing: 0.06em;
-}
-
-.symbol-picker select {
-    background: var(--bg-card);
-    border: 1px solid var(--border-accent);
-    color: var(--text-primary);
-    border-radius: var(--radius-sm);
-    padding: 0.4rem 0.6rem;
-    font-family: var(--font-mono);
-    font-size: 0.82rem;
-    cursor: pointer;
-}
-
-/* ── Operations Strip ── */
-.ops-strip {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 0.6rem;
-}
-
-.ops-card {
-    display: grid;
-    gap: 0.15rem;
-    text-align: center;
-    padding: 0.55rem 0.4rem;
-}
-
-.ops-card p {
-    margin: 0;
-    color: var(--text-tertiary);
-    font-size: 0.62rem;
-    letter-spacing: 0.06em;
-}
-
-.ops-card strong {
-    font-size: 1.15rem;
-    color: var(--text-primary);
-}
-
-.ops-card small {
-    color: var(--text-tertiary);
-    font-size: 0.62rem;
-}
-
-.metric-strip {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.8rem;
-}
-
-.metric {
-    display: grid;
-    gap: 0.3rem;
-}
-
-.metric p {
-    margin: 0;
-    color: var(--text-secondary);
-    font-size: 0.72rem;
-    letter-spacing: 0.06em;
-}
-
-.metric strong {
-    font-size: 1.3rem;
-    color: var(--text-primary);
-}
-
-.metric small {
-    color: var(--text-tertiary);
-    font-size: 0.72rem;
-}
-
-.tone-hot { color: var(--color-error); }
-.tone-warm { color: var(--color-warning); }
-.tone-calm { color: var(--color-terminal); }
-
-.chart-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.8rem;
-}
-
-.chart-panel header {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    margin-bottom: 0.7rem;
-    gap: 0.5rem;
-}
-
-.chart-panel h3 {
-    margin: 0;
-    font-size: 0.85rem;
-}
-
-.chart-panel small {
-    color: var(--text-tertiary);
-    font-size: 0.72rem;
-}
-
-.section-title {
-    margin: 0 0 0.6rem;
-    font-size: 0.85rem;
-}
-
-.breadth-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(160px, 1fr));
-    gap: 0.7rem;
-}
-
-.breadth-card {
-    display: grid;
-    gap: 0.3rem;
-}
-
-.breadth-card header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.breadth-sym {
-    font-size: 0.82rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-}
-
-.breadth-change {
-    font-size: 0.82rem;
-    font-weight: 500;
-}
-
-.breadth-card strong {
-    font-size: 1.05rem;
-    color: var(--text-primary);
-}
-
-.breadth-card small {
-    color: var(--text-tertiary);
-    font-size: 0.72rem;
-}
-
+/* Sparkline SVG — cannot be expressed with Tailwind utilities */
 .sparkline {
     width: 100%;
     height: 44px;
-    border-radius: var(--radius-sm);
+    border-radius: 4px;
     background: rgba(10, 20, 10, 0.4);
 }
 
@@ -390,104 +269,5 @@ onUnmounted(() => {
     stroke-linecap: round;
     stroke-linejoin: round;
     filter: drop-shadow(0 0 4px rgba(32, 194, 14, 0.4));
-}
-
-@media (max-width: 1320px) {
-    .metric-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .breadth-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-
-@media (max-width: 1120px) {
-    .chart-grid { grid-template-columns: 1fr; }
-}
-
-/* ── Status Bars ── */
-.status-bar {
-    padding: 0.45rem 0.8rem;
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    letter-spacing: 0.04em;
-    border-radius: var(--radius-sm);
-    text-align: center;
-}
-
-.loading-bar {
-    background: rgba(32, 194, 14, 0.08);
-    color: var(--color-terminal);
-    border: 1px solid rgba(32, 194, 14, 0.15);
-}
-
-.error-bar {
-    background: rgba(255, 68, 68, 0.08);
-    color: var(--color-error);
-    border: 1px solid rgba(255, 68, 68, 0.2);
-    cursor: pointer;
-}
-
-.stale-bar {
-    background: rgba(255, 200, 50, 0.06);
-    color: var(--color-warning);
-    border: 1px solid rgba(255, 200, 50, 0.15);
-}
-
-.pulse-dot {
-    display: inline-block;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--color-terminal);
-    margin-right: 0.4rem;
-    animation: pulse 1.2s ease-in-out infinite;
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 0.3; }
-    50% { opacity: 1; }
-}
-
-@media (max-width: 760px) {
-    .ops-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .metric-strip,
-    .breadth-grid { grid-template-columns: 1fr; }
-}
-
-/* ── Skeleton Loading ── */
-.skel-line {
-    border-radius: var(--radius-xs);
-    animation: skelPulse 1.6s ease-in-out infinite;
-}
-
-.skel-lg {
-    width: 55%;
-    height: 1.15rem;
-    margin: 0 auto;
-    background: rgba(32, 194, 14, 0.08);
-}
-
-.skel-sm {
-    width: 40%;
-    height: 0.6rem;
-    margin: 0 auto 0.3rem;
-    background: rgba(32, 194, 14, 0.05);
-}
-
-.skel-xs {
-    width: 50%;
-    height: 0.5rem;
-    margin: 0.2rem auto 0;
-    background: rgba(32, 194, 14, 0.04);
-}
-
-.skel-chart {
-    width: 100%;
-    height: 400px;
-    border-radius: var(--radius-sm);
-    background: rgba(32, 194, 14, 0.03);
-    animation: skelPulse 1.6s ease-in-out infinite 0.2s;
-}
-
-@keyframes skelPulse {
-    0%, 100% { opacity: 0.4; }
-    50% { opacity: 0.85; }
 }
 </style>

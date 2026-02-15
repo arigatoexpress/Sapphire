@@ -59,12 +59,7 @@
     --glow-md: 0 0 12px rgba(32, 194, 14, 0.25);
     --glow-lg: 0 0 24px rgba(32, 194, 14, 0.2);
 
-    /* ── Spacing Scale ── */
-    --space-xs: 0.25rem;
-    --space-sm: 0.5rem;
-    --space-md: 0.75rem;
-    --space-lg: 1rem;
-    --space-xl: 1.5rem;
+    /* ── Spacing Scale (handled by Tailwind utilities now) ── */
 }
 
 /* ── Global Reset ── */
@@ -121,22 +116,8 @@ body::before {
     );
 }
 
-/* ── Card System ── */
-.card {
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md);
-    padding: 1rem 1.1rem;
-    background: var(--bg-card);
-    backdrop-filter: blur(6px);
-}
-
-.card-elevated {
-    border: 1px solid var(--border-accent);
-    border-radius: var(--radius-md);
-    padding: 1rem 1.1rem;
-    background: var(--bg-elevated);
-    backdrop-filter: blur(8px);
-}
+/* ── Card System (handled by Tailwind utilities now) ──
+   bg-card, border-border-subtle, rounded-md, p-4, backdrop-blur-sm */
 
 .glass-lift {
     transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
@@ -187,13 +168,7 @@ body::before {
     box-shadow: 0 0 6px var(--color-sapphire-glow);
 }
 
-/* ── Font Classes ── */
-.font-mono {
-    font-family: var(--font-mono);
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    font-size: 0.82rem;
-}
+/* ── Font Classes (handled by Tailwind font-mono utility now) ── */
 
 /* ── Animations ── */
 .fade-in {
