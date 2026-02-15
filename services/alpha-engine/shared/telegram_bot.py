@@ -59,9 +59,13 @@ class AgentPersona:
         self.role = role
 
     def speak(self, message: str) -> str:
-        """Format a message as this agent speaking (HTML format)."""
-        safe = _to_html(message)
-        return f"{self.emoji} <b>{self.name}</b>: {safe}"
+        """Format a message as this agent speaking.
+
+        Returns Markdown-style text.  The final ``_to_html`` conversion
+        happens once in ``_dispatch_message`` — **not** here — so we
+        never double-escape HTML entities.
+        """
+        return f"{self.emoji} *{self.name}*: {message}"
 
     def __repr__(self) -> str:
         return f"AgentPersona({self.name})"
