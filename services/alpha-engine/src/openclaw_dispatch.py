@@ -140,7 +140,7 @@ class OpenClawDispatcher:
                     f"{self.gateway_url}/v1/chat/completions",
                     json=payload,
                     headers=headers,
-                    timeout=aiohttp.ClientTimeout(total=120),
+                    timeout=aiohttp.ClientTimeout(total=300),
                 ) as resp:
                     self._last_dispatch_at = time.time()
                     if resp.status in (200, 202):
