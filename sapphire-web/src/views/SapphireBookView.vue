@@ -159,6 +159,22 @@ const venueStatus = computed(() => {
     })
 })
 
+/* ── Agent Dispatch Rotation ── */
+const DISPATCH_AGENTS = [
+    { id: 'OBSIDIAN', emoji: '🖤', colorClass: 'agent-obsidian' },
+    { id: 'EMERALD', emoji: '💚', colorClass: 'agent-emerald' },
+    { id: 'SAPPHIRE', emoji: '💎', colorClass: 'agent-sapphire' },
+] as const
+
+const dispatchCount = computed(() =>
+    Number((control.value as any)?.autonomy_dispatch_count || 0),
+)
+const activeDispatchAgent = computed(() => {
+    const cycle = dispatchCount.value % 3
+    return DISPATCH_AGENTS[cycle] ?? DISPATCH_AGENTS[0]
+})
+const autonomyEnabled = computed(() => Boolean(control.value?.full_autonomy_enabled))
+
 /* ── Architecture Nodes ── */
 const architectureNodes = computed(() => {
     const alphaHealthy = !control.value?.kill_switch_active
@@ -416,6 +432,11 @@ onUnmounted(() => {
             <header class="section-header">
                 <h3 class="font-mono glow-strong">System Architecture</h3>
                 <div class="header-badges">
+                    <span v-if="autonomyEnabled" class="dispatch-indicator" :class="activeDispatchAgent.colorClass">
+                        <span class="dispatch-dot" :class="`agent-dot-${activeDispatchAgent.id.toLowerCase()}`"></span>
+                        <span>{{ activeDispatchAgent.id }}</span>
+                        <span class="dispatch-cycle">#{{ dispatchCount }}</span>
+                    </span>
                     <span class="sync-badge pulse-badge" :class="{ 'badge-kill': control?.kill_switch_active }">
                         {{ control?.kill_switch_active ? 'KILL SWITCH' : 'LIVE' }}
                     </span>
@@ -681,6 +702,54 @@ onUnmounted(() => {
     padding: 0.15rem 0.5rem;
     font-family: var(--font-mono);
     text-transform: uppercase;
+}
+
+/* ── Dispatch Rotation Indicator ── */
+.dispatch-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.62rem;
+    font-family: var(--font-mono);
+    letter-spacing: 0.04em;
+    font-weight: 600;
+    border: 1px solid var(--border-accent);
+    border-radius: 999px;
+    padding: 0.15rem 0.55rem;
+    text-transform: uppercase;
+}
+
+.dispatch-indicator.agent-obsidian {
+    color: var(--color-obsidian);
+    border-color: rgba(160, 160, 160, 0.35);
+}
+
+.dispatch-indicator.agent-emerald {
+    color: var(--color-emerald);
+    border-color: rgba(52, 211, 153, 0.35);
+}
+
+.dispatch-indicator.agent-sapphire {
+    color: var(--color-sapphire-blue);
+    border-color: rgba(96, 165, 250, 0.35);
+}
+
+.dispatch-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    animation: dispatchPulse 2s ease-in-out infinite;
+}
+
+.dispatch-cycle {
+    opacity: 0.6;
+    font-size: 0.56rem;
+}
+
+@keyframes dispatchPulse {
+    0%, 100% { opacity: 0.5; transform: scale(0.9); }
+    50% { opacity: 1; transform: scale(1.15); }
 }
 
 .pulse-badge {
