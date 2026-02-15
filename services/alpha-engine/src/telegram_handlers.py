@@ -285,6 +285,8 @@ async def handle_security_commands(engine: "AlphaEngine", target: str, action: s
 
 async def handle_forum_commands(engine: "AlphaEngine", target: str, action: str, value: float) -> bool:
     """Handle FORUM_* control commands."""
+    if getattr(engine, "forum", None) is None:
+        return False
     normalized = action.upper()
 
     if normalized == "FORUM_TOP_TOPICS":
@@ -441,6 +443,8 @@ async def handle_forum_commands(engine: "AlphaEngine", target: str, action: str,
 
 async def handle_reputation_commands(engine: "AlphaEngine", target: str, action: str, value: float) -> bool:
     """Handle REP_* control commands."""
+    if getattr(engine, "reputation", None) is None:
+        return False
     normalized = action.upper()
 
     if normalized == "REP_LEADERBOARD":
@@ -553,6 +557,8 @@ async def handle_reputation_commands(engine: "AlphaEngine", target: str, action:
 
 async def handle_swarm_commands(engine: "AlphaEngine", target: str, action: str, value: float) -> bool:
     """Handle SWARM_* control commands."""
+    if getattr(engine, "swarm", None) is None:
+        return False
     normalized = action.upper()
 
     if normalized == "SWARM_SUBMIT_IDEA":
@@ -655,6 +661,8 @@ async def handle_swarm_commands(engine: "AlphaEngine", target: str, action: str,
 
 async def handle_learning_commands(engine: "AlphaEngine", target: str, action: str, value: float) -> bool:
     """Handle LEARN_* and OUTREACH_* control commands."""
+    if getattr(engine, "learning", None) is None:
+        return False
     normalized = action.upper()
 
     if normalized == "LEARN_REPORT":
@@ -803,6 +811,8 @@ async def handle_learning_commands(engine: "AlphaEngine", target: str, action: s
 
 async def handle_task_commands(engine: "AlphaEngine", target: str, action: str, value: float) -> bool:
     """Handle TASK_* control commands."""
+    if getattr(engine, "tasks", None) is None:
+        return False
     normalized = action.upper()
 
     if normalized == "TASK_CREATE":
@@ -958,6 +968,8 @@ async def handle_task_commands(engine: "AlphaEngine", target: str, action: str, 
 
 async def handle_scout_commands(engine: "AlphaEngine", target: str, action: str, value: float) -> bool:
     """Handle SCOUT_* and FORUM_SCOUT_* control commands."""
+    if getattr(engine, "forum", None) is None:
+        return False
     normalized = action.upper()
 
     if normalized in {"SCOUT_STATUS", "FORUM_SCOUT_STATUS"}:
@@ -1501,6 +1513,8 @@ async def handle_core_control_commands(engine: "AlphaEngine", target: str, actio
 
 async def handle_prediction_commands(engine: "AlphaEngine", target: str, action: str, value: float) -> bool:
     """Handle /predictions and /prediction commands (Phase 8)."""
+    if getattr(engine, "prediction_aggregator", None) is None:
+        return False
     normalized = action.upper()
 
     if normalized in {"PREDICTIONS", "PREDICTION_STATUS", "PM_STATUS"}:
@@ -1870,9 +1884,29 @@ async def dispatch_control_command(engine: "AlphaEngine", target: str, action: s
     """
     Master dispatcher for all control commands.
     Replaces AlphaEngine._handle_control_command.
+
+    Each handler is wrapped in try/except so a failure in one sub-service
+    (e.g. forum offline) does not crash the entire command router.
     """
     for handler in CONTROL_HANDLER_CHAIN:
-        if await handler(engine, target, action, value):
+        try:
+            if await handler(engine, target, action, value):
+                return
+        except AttributeError as exc:
+            # Sub-service not initialised (e.g. engine.forum is None)
+            svc = getattr(handler, "__name__", str(handler))
+            logger.warning(f"Handler {svc} skipped — sub-service unavailable: {exc}")
+            continue
+        except Exception as exc:
+            svc = getattr(handler, "__name__", str(handler))
+            logger.error(f"Handler {svc} raised {type(exc).__name__}: {exc}")
+            try:
+                await engine.telegram.send_message(
+                    f"⚠️ Command `{action.upper()}` failed in *{svc}*: {exc}",
+                    priority="high",
+                )
+            except Exception:
+                pass  # Don't let error-reporting itself crash the dispatcher
             return
 
     # Fallback: unknown action

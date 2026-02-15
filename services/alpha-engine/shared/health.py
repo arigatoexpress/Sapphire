@@ -83,7 +83,26 @@ async def telegram_webhook(request):
         try:
             await handler(update)
         except Exception as exc:
-            logger.error(f"Telegram webhook handler error: {exc}")
+            logger.error(f"Telegram webhook handler error: {exc}", exc_info=True)
+            # Best-effort: notify user of the failure via chat
+            try:
+                chat_id = (
+                    (update.get("message") or update.get("callback_query", {}).get("message") or {})
+                    .get("chat", {})
+                    .get("id")
+                )
+                bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+                if chat_id and bot_token:
+                    error_msg = f"⚠️ Command processing error: {type(exc).__name__}"
+                    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+                    async with aiohttp.ClientSession() as session:
+                        await session.post(url, json={
+                            "chat_id": chat_id,
+                            "text": error_msg,
+                            "parse_mode": "HTML",
+                        }, timeout=aiohttp.ClientTimeout(total=5))
+            except Exception:
+                pass  # Don't let error reporting crash the webhook
 
     return web.Response(text="OK", status=200)
 

@@ -35,7 +35,8 @@ def _to_html(text: str) -> str:
     ``<``, ``>``, and ``&`` need escaping.
 
     Converts common Markdown-like patterns to HTML:
-      - ``*bold*`` → ``<b>bold</b>``
+      - ``**bold**`` → ``<b>bold</b>``  (double-star, Markdown standard)
+      - ``*bold*``   → ``<b>bold</b>``  (single-star, legacy)
       - Backtick code → ``<code>code</code>``
 
     This eliminates all 400 parse errors from Telegram's legacy Markdown.
@@ -43,9 +44,11 @@ def _to_html(text: str) -> str:
     import html as _html
     # 1. Escape HTML entities first (before adding our own tags)
     text = _html.escape(text, quote=False)
-    # 2. Convert *bold* → <b>bold</b> (only matched pairs)
+    # 2. Convert **double-star bold** → <b>bold</b> (must come before single-star)
+    text = re.sub(r'\*\*([^*]+)\*\*', r'<b>\1</b>', text)
+    # 3. Convert *single-star bold* → <b>bold</b> (only matched pairs)
     text = re.sub(r'\*([^*]+)\*', r'<b>\1</b>', text)
-    # 3. Convert `code` → <code>code</code> (only matched pairs)
+    # 4. Convert `code` → <code>code</code> (only matched pairs)
     text = re.sub(r'`([^`]+)`', r'<code>\1</code>', text)
     return text
 
