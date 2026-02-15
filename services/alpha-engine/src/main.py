@@ -2423,7 +2423,13 @@ class AlphaEngine:
                 logger.error(f"Heartbeat loop error: {exc}")
 
     async def _handle_telegram_message(self, text: str):
-        """Handle conversational messages via ChatIntentEngine."""
+        """Handle conversational messages via ChatIntentEngine.
+
+        This is the main natural-language handler — the owner talks on
+        Telegram like a personal assistant and we route to the right action.
+        """
+        from src.telegram_handlers import dispatch_control_command
+
         try:
             intent = await self.chat_intent.analyze(text)
             intent_type = intent.get("intent")
@@ -2431,45 +2437,114 @@ class AlphaEngine:
 
             if intent_type == "status_report":
                 await self._send_status_snapshot()
-                
+
             elif intent_type == "control_trading":
                 action = params.get("action", "").upper()
                 target = params.get("target", "ALL").upper()
                 value = float(params.get("value", 0.0))
-                
-                # Map generic actions to specifc control commands
+
                 if action == "PAUSE":
-                    await dispatcher.send_command(target, {"action": "HALT_TRADING", "quantity": 0.0, "source": "chat"})
-                    await self.telegram.send_message(f"🛑 Paused trading on `{target}`.")
+                    await self._handle_control_command("ALL", "HALT_TRADING", 0.0)
+                    await self.telegram.send_as(
+                        OBSIDIAN, f"Trading halted on {target}. Say 'resume' when you're ready."
+                    )
                 elif action == "RESUME":
-                    await dispatcher.send_command(target, {"action": "RESUME_TRADING", "quantity": 0.0, "source": "chat"})
-                    await self.telegram.send_message(f"✅ Resumed trading on `{target}`.")
+                    await self._handle_control_command("ALL", "RESUME_TRADING", 0.0)
+                    await self.telegram.send_as(
+                        OBSIDIAN, f"Trading resumed on {target}. We're back in action."
+                    )
                 elif action == "SET_ALLOCATION":
-                    await dispatcher.send_command(target, {"action": "SET_ALLOCATION", "quantity": value, "source": "chat"})
-                    await self.telegram.send_message(f"⚖️ Set allocation for `{target}` to `{value:.2%}`.")
-                    
+                    await self._handle_control_command(
+                        target, "SET_ALLOCATION", value
+                    )
+                    await self.telegram.send_as(
+                        SAPPHIRE, f"Allocation for {target} set to {value:.0%}."
+                    )
+
             elif intent_type == "media_publish":
                 topic = params.get("topic", "market update")
                 targets = params.get("channels", ["twitter", "substack"])
-                await self.media_manager.request_publish(topic=topic, targets=targets)
-                await self.telegram.send_message(f"📝 Drafting content about `{topic}` for `{', '.join(targets)}`.")
-                
+                await self.media_manager.request_publish(
+                    topic=topic, targets=targets
+                )
+                await self.telegram.send_as(
+                    EMERALD,
+                    f"Drafting something about {topic} for {', '.join(targets)}. I'll send it for your review.",
+                )
+
             elif intent_type == "media_status":
                 status = self.media_manager.get_status_snapshot()
-                await self.telegram.send_message(f"📊 **Media Status**\nMode: `{status['mode']}`\nPending: `{status['pending_requests']}`")
-                
+                mode = status.get("mode", "unknown")
+                pending = status.get("pending_requests", 0)
+                if pending > 0:
+                    await self.telegram.send_as(
+                        EMERALD,
+                        f"We have {pending} piece(s) in the queue. Mode: {mode}.",
+                    )
+                else:
+                    await self.telegram.send_as(
+                        EMERALD, f"Queue is clear — nothing pending. Mode: {mode}."
+                    )
+
+            elif intent_type == "operations":
+                # Route operations to the existing control handler chain
+                action = params.get("action", "").upper()
+                target = params.get("target", "ALL")
+                await dispatch_control_command(self, target, action, 0.0)
+
+            elif intent_type == "agent_question":
+                # Owner asked a substantive question — route to the right agent
+                question = params.get("question", text)
+                agent_name = params.get("agent", "auto").upper()
+
+                # Pick agent persona for the ack message
+                if agent_name == "OBSIDIAN":
+                    agent_persona = OBSIDIAN
+                elif agent_name == "EMERALD":
+                    agent_persona = EMERALD
+                else:
+                    agent_persona = SAPPHIRE
+
+                # Try to dispatch to OpenClaw for a real agent answer
+                if hasattr(self, "openclaw_dispatcher") and self.openclaw_dispatcher.enabled:
+                    await self.telegram.send_as(
+                        agent_persona, "Let me think about that..."
+                    )
+                    agent_id = agent_name if agent_name != "AUTO" else "OBSIDIAN"
+                    await self.openclaw_dispatcher.dispatch_instruction(
+                        agent_id=agent_id,
+                        instruction=question,
+                        context={"source": "owner_question", "original_text": text},
+                        trigger="owner_question",
+                    )
+                else:
+                    # Fallback: use the general_chat reply from the LLM
+                    await self.telegram.send_as(
+                        agent_persona,
+                        "Good question — I'd need the full agent framework online to give you a proper answer. "
+                        "The gateway isn't connected right now.",
+                    )
+
             elif intent_type == "general_chat":
-                reply = params.get("reply")
+                reply = params.get("reply", "")
                 if reply:
-                     await self.telegram.send_as(SAPPHIRE, reply)
-            
+                    await self.telegram.send_as(SAPPHIRE, reply)
+                else:
+                    await self.telegram.send_as(SAPPHIRE, "I'm here — what do you need?")
+
             else:
-                 # Fallback
-                 await self.telegram.send_as(SAPPHIRE, "I heard you, but I'm not sure what action to take yet.")
+                # Unknown intent — still respond warmly
+                await self.telegram.send_as(
+                    SAPPHIRE,
+                    "I'm not sure what to do with that, but I'm listening. Try asking about status, trading, or operations.",
+                )
 
         except Exception as e:
             logger.error(f"Chat intent handling failed: {e}")
-            await self.telegram.send_message("❌ I'm having trouble understanding that request right now.")
+            await self.telegram.send_as(
+                SAPPHIRE,
+                "Something went wrong processing that. Try again or use a direct command.",
+            )
 
     async def _handle_telegram_command(
         self, platform: str, symbol: str, action: str, quantity: float
