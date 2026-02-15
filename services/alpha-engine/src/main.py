@@ -218,6 +218,11 @@ class AlphaEngine:
         )
         self._autonomy_sessions: Dict[str, Dict[str, Any]] = {}
         self._latest_autonomy_session_key = ""
+        # Multi-agent dispatch history (last N dispatches per agent)
+        self._agent_dispatch_history: Dict[str, list] = {
+            "OBSIDIAN": [], "EMERALD": [], "SAPPHIRE": [],
+        }
+        self._agent_dispatch_history_max = 50
         # Graduated escalation: risk-based approval routing
         self._approval_policy = ApprovalPolicy()
         self._proposals: Dict[str, Dict[str, Any]] = {}
@@ -1499,6 +1504,7 @@ class AlphaEngine:
             "owner_directive": self._owner_directive or "",
             "enabled_venues": sorted(list(dispatcher.bot_urls.keys())),
             "autonomy_dispatch_count": self._autonomy_dispatch_count,
+            "agent_dispatch_counts": {k: len(v) for k, v in self._agent_dispatch_history.items()},
             "allowed_repo_scope": sorted(list(getattr(self.tv_autonomy, "allowed_repo_scope", set()))) if self.tv_autonomy else [],
             "allowed_project_scope": sorted(list(getattr(self.tv_autonomy, "allowed_project_scope", set()))) if self.tv_autonomy else [],
             "dex_execution_stage": strategy_state.get("dex_execution_stage", "paper"),
@@ -1521,15 +1527,20 @@ class AlphaEngine:
         return self._autonomy_trigger_info(context)["trigger"]
 
     def _autonomy_trigger_info(self, context: Dict[str, Any]) -> Dict[str, str]:
-        """Return structured trigger info with agent routing.
+        """Return structured trigger info with multi-agent routing.
 
         Returns ``{"trigger": str, "agent": str, "category": str}``.
-        Currently routes everything to OBSIDIAN (single-agent mode).
-        Multi-agent routing will activate when EMERALD/SAPPHIRE are enabled.
+
+        Routing rules:
+        - Emergency / infrastructure → OBSIDIAN (always)
+        - Scheduled maintenance      → OBSIDIAN
+        - Scheduled improvement       → EMERALD (code quality, refactoring)
+        - Scheduled review            → SAPPHIRE (security audit, oversight)
         """
         active_count = len(context.get("active_venues", []))
         total_failures = int(context.get("total_failure_pressure", 0))
 
+        # Emergency and infrastructure triggers always go to OBSIDIAN
         if self._kill_switch_active:
             return {"trigger": "kill_switch_active", "agent": "OBSIDIAN", "category": "emergency"}
         if active_count < self._trading_gate_min_active_venues:
@@ -1537,16 +1548,14 @@ class AlphaEngine:
         if total_failures > self._trading_gate_max_failure_pressure:
             return {"trigger": "failure_pressure", "agent": "OBSIDIAN", "category": "infrastructure"}
 
-        # Rotate scheduled cycles across agents (when multi-agent is enabled)
+        # Rotate scheduled cycles across agents
         cycle = self._autonomy_dispatch_count % 3
         if cycle == 0:
             return {"trigger": "scheduled_maintenance", "agent": "OBSIDIAN", "category": "maintenance"}
         elif cycle == 1:
-            return {"trigger": "scheduled_improvement", "agent": "OBSIDIAN", "category": "improvement"}
-            # Future: "agent": "EMERALD" when multi-agent is enabled
+            return {"trigger": "scheduled_improvement", "agent": "EMERALD", "category": "improvement"}
         else:
-            return {"trigger": "scheduled_review", "agent": "OBSIDIAN", "category": "review"}
-            # Future: "agent": "SAPPHIRE" when multi-agent is enabled
+            return {"trigger": "scheduled_review", "agent": "SAPPHIRE", "category": "review"}
 
     def _autonomy_request_brief(self, trigger: str, context: Dict[str, Any]) -> Dict[str, str]:
         trigger_key = str(trigger or "").strip().lower()
@@ -1996,6 +2005,29 @@ class AlphaEngine:
             return parsed
         return {}
 
+    # Map agent ID strings to AgentPersona objects for Telegram messages
+    _AGENT_PERSONA_MAP = {
+        "OBSIDIAN": OBSIDIAN,
+        "EMERALD": EMERALD,
+        "SAPPHIRE": SAPPHIRE,
+    }
+
+    # Agent-specific instruction focuses
+    _AGENT_INSTRUCTION_FOCUS = {
+        "OBSIDIAN": (
+            "Execute an autonomous maintenance cycle for infrastructure + cloud + CI/CD. "
+            "Prioritize production safety first, then reliability, then performance."
+        ),
+        "EMERALD": (
+            "Execute an autonomous improvement cycle for code quality + architecture + testing. "
+            "Prioritize test coverage, refactoring, and clean architecture."
+        ),
+        "SAPPHIRE": (
+            "Execute an autonomous security review cycle for risk + audit + code review. "
+            "Prioritize security posture, permission boundaries, and injection hardening."
+        ),
+    }
+
     async def _dispatch_full_autonomy_cycle(self, trigger: str, force: bool = False, agent_id: str = "OBSIDIAN") -> Dict[str, Any]:
         gate.require(agent_id, Capability.AUTONOMY_DISPATCH, f"autonomy_cycle({trigger!r})")
         if not self._full_autonomy_enabled:
@@ -2016,9 +2048,9 @@ class AlphaEngine:
             f"{v}: {p.get('role', '')}" for v, p in context.get("venue_profiles", {}).items()
         )
         preferred = ", ".join(context.get("preferred_symbols", [])[:6])
+        agent_focus = self._AGENT_INSTRUCTION_FOCUS.get(agent_id.upper(), self._AGENT_INSTRUCTION_FOCUS["OBSIDIAN"])
         instruction = (
-            f"{directive} Execute an autonomous maintenance and improvement cycle for code + cloud. "
-            "Prioritize production safety first, then reliability, then performance. "
+            f"{directive} {agent_focus} "
             "IMPORTANT: Venues are segregated specialists with no cross-venue arbitrage. "
             f"Venue roles: {venue_hints}. "
             f"Preferred symbols (slight bias): {preferred}. "
@@ -2030,7 +2062,7 @@ class AlphaEngine:
             await self.telegram.send_message(
                 (
                     "🧪 Full autonomy dry-run cycle prepared.\n"
-                    f"Trigger: `{trigger}`\n"
+                    f"Agent: `{agent_id}` | Trigger: `{trigger}`\n"
                     f"Active venues: `{', '.join(context['active_venues']) if context['active_venues'] else 'none'}`\n"
                     f"Failure pressure: `{context['total_failure_pressure']}`\n"
                     f"Why now: {brief['reasoning']}\n"
@@ -2062,27 +2094,38 @@ class AlphaEngine:
         else:
             return {"dispatched": False, "reason": "no_dispatcher_available", "trigger": trigger}
 
+        # Resolve agent persona for Telegram messages
+        persona = self._AGENT_PERSONA_MAP.get(agent_id.upper(), OBSIDIAN)
+
         if hook_result.get("dispatched"):
             self._autonomy_last_dispatch_at = now
             self._autonomy_last_trigger = trigger
             self._autonomy_dispatch_count += 1
+            # Track per-agent dispatch history
+            agent_key = agent_id.upper()
+            if agent_key in self._agent_dispatch_history:
+                self._agent_dispatch_history[agent_key].append({
+                    "trigger": trigger, "ts": now,
+                })
+                if len(self._agent_dispatch_history[agent_key]) > self._agent_dispatch_history_max:
+                    self._agent_dispatch_history[agent_key] = self._agent_dispatch_history[agent_key][-self._agent_dispatch_history_max:]
             session_key = str(hook_result.get("session_key", "")).strip()
             self._record_autonomy_session(session_key, trigger, instruction)
             self._record_system_log(
-                f"Full autonomy cycle dispatched ({trigger})",
+                f"Full autonomy cycle dispatched ({trigger}) → {agent_id}",
                 level="info",
-                tags=["autonomy", "dispatch"],
-                metadata={"session_key": hook_result.get("session_key", "")},
+                tags=["autonomy", "dispatch", agent_id.lower()],
+                metadata={"session_key": hook_result.get("session_key", ""), "agent": agent_id},
             )
             self.telegram.record_activity(
-                OBSIDIAN, "autonomy",
+                persona, "autonomy",
                 f"Dispatched cycle: {trigger}",
             )
             if session_key and not self._autonomy_require_owner_approval:
                 auto_result = await self._apply_autonomy_session_decision(
                     session_key=session_key,
                     decision="APPROVE",
-                    note="Auto-approved by Sapphire autonomy policy.",
+                    note=f"Auto-approved by Sapphire autonomy policy (agent: {agent_id}).",
                     source="policy_auto",
                 )
                 decision_brief = self._format_autonomy_decision_brief(
@@ -2093,12 +2136,12 @@ class AlphaEngine:
                 )
                 if auto_result.get("dispatched"):
                     await self.telegram.send_as(
-                        OBSIDIAN,
+                        persona,
                         f"Autonomy cycle auto-approved (`{trigger}`).\n{decision_brief}",
                     )
                 else:
                     await self.telegram.send_as(
-                        OBSIDIAN,
+                        persona,
                         (
                             f"⚠️ Autonomy cycle approved locally but dispatch failed for `{session_key}`.\n"
                             f"Reason: `{auto_result.get('reason', 'unknown')}`"
@@ -2112,7 +2155,7 @@ class AlphaEngine:
                     approval_required=self._autonomy_require_owner_approval,
                 )
                 await self.telegram.send_as(
-                    OBSIDIAN,
+                    persona,
                     f"Autonomy cycle needs your approval (`{trigger}`).\n{decision_brief}",
                     expects_reply=True,
                     pending_action="APPROVE_SESSION",
@@ -2141,7 +2184,7 @@ class AlphaEngine:
                     tags=["autonomy", "dispatch"],
                 )
                 await self.telegram.send_as(
-                    OBSIDIAN,
+                    persona,
                     f"Autonomy dispatch unavailable — `{trigger}`: {reason}",
                 )
         return hook_result
