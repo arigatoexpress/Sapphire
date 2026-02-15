@@ -2704,7 +2704,14 @@ class AlphaEngine:
         )
         if self._full_autonomy_enabled:
             self._autonomy_task = asyncio.create_task(self._autonomy_ops_loop())
-            await self._dispatch_full_autonomy_cycle(trigger="startup_bootstrap", force=True)
+            # Delay startup bootstrap to let gateway warm up and avoid cold-start races
+            async def _deferred_bootstrap():
+                await asyncio.sleep(30)
+                try:
+                    await self._dispatch_full_autonomy_cycle(trigger="startup_bootstrap", force=True)
+                except Exception as exc:
+                    logger.warning(f"Startup bootstrap dispatch failed (non-fatal): {type(exc).__name__}: {exc}")
+            asyncio.create_task(_deferred_bootstrap())
         else:
             logger.info("Full autonomy loop disabled (SAPPHIRE_FULL_AUTONOMY_ENABLED=false)")
 

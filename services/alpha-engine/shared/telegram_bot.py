@@ -31,21 +31,22 @@ def _sanitize_markdown(text: str) -> str:
     """Escape characters that break Telegram legacy Markdown parsing.
 
     Telegram's legacy Markdown treats ``_`` as italic, ``*`` as bold,
-    backtick as inline-code, and ``[`` as link start.  Unmatched delimiters
-    cause 400 errors from the Telegram API.
+    backtick as inline-code, and ``[`` as link start.  Even with matched
+    delimiters, underscores inside backtick spans or nested formatting
+    can cause 400 errors.
 
-    Strategy: for each delimiter type, if the count is odd (unmatched),
-    replace all occurrences with a visually identical Unicode character.
+    Strategy: strip ALL backticks and replace underscores with full-width
+    equivalents.  Keep only ``*bold*`` formatting which is the primary
+    style used for agent persona names.
     """
-    # Unmatched underscores → full-width low line (＿)
-    if text.count("_") % 2 != 0:
-        text = text.replace("_", "＿")
-    # Unmatched asterisks → full-width asterisk (＊)
+    # Remove all backticks — inline code is the #1 source of parse failures
+    # because underscores inside backtick spans confuse the legacy parser.
+    text = text.replace("`", "")
+    # Replace all underscores — they interact badly with italic parsing
+    text = text.replace("_", "＿")
+    # Unmatched asterisks → full-width asterisk
     if text.count("*") % 2 != 0:
         text = text.replace("*", "＊")
-    # Unmatched backticks → modifier letter grave accent (ˋ)
-    if text.count("`") % 2 != 0:
-        text = text.replace("`", "ˋ")
     # Unmatched square brackets → full-width brackets
     if text.count("[") != text.count("]"):
         text = text.replace("[", "［").replace("]", "］")

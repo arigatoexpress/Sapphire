@@ -163,8 +163,12 @@ class OpenClawDispatcher:
                         "session_key": session_key,
                     }
         except Exception as exc:
-            self._last_error = str(exc)[:200]
-            logger.error(f"[OpenClaw] Dispatch failed: {exc}")
+            err_detail = f"{type(exc).__name__}: {exc}" if str(exc) else type(exc).__name__
+            self._last_error = err_detail[:200]
+            logger.error(
+                f"[OpenClaw] Dispatch failed: {err_detail} | "
+                f"url={self.gateway_url}/v1/chat/completions agent={agent_id} trigger={trigger}"
+            )
             return {
                 "dispatched": False,
                 "reason": "dispatch_exception",
