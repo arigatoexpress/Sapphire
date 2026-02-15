@@ -15,10 +15,11 @@ Features:
 import hashlib
 import json
 import os
+import re
 import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from loguru import logger
 
@@ -809,3 +810,156 @@ class TaskManager:
             )
         except Exception as exc:
             logger.warning(f"Task store load failed: {exc}")
+
+
+# ── Roadmap Parser ────────────────────────────────────────────────────
+
+# Maps phase header keywords → agent assignment.
+# Order matters: more specific patterns are tried first, then generic ones.
+# Uses word-boundary regex to avoid substring false positives (e.g. "ci" in "social").
+_PHASE_AGENT_PATTERNS: List[Tuple[re.Pattern, str]] = [
+    (re.compile(r"\bsocial\b"), "SAPPHIRE"),
+    (re.compile(r"\bmedia\b"), "SAPPHIRE"),
+    (re.compile(r"\bprediction\b"), "SAPPHIRE"),
+    (re.compile(r"\btrading\b"), "SAPPHIRE"),
+    (re.compile(r"\bsecurity\b"), "EMERALD"),
+    (re.compile(r"\bforum\b"), "EMERALD"),
+    (re.compile(r"\bswarm\b"), "EMERALD"),
+    (re.compile(r"\breputation\b"), "EMERALD"),
+    (re.compile(r"\bvirtuals\b"), "EMERALD"),
+    (re.compile(r"\btest(?:ing|s)?\b"), "EMERALD"),
+    (re.compile(r"\bhardening\b"), "OBSIDIAN"),
+    (re.compile(r"\binfrastructure\b"), "OBSIDIAN"),
+    (re.compile(r"\bdeploy\b"), "OBSIDIAN"),
+    (re.compile(r"\bci(?:/cd)?\b"), "OBSIDIAN"),
+    (re.compile(r"\bopenclaw\b"), "OBSIDIAN"),
+    (re.compile(r"\bagent\b"), "OBSIDIAN"),
+]
+
+
+class RoadmapParser:
+    """Parses ROADMAP.md and generates tasks for incomplete items.
+
+    Scans for ``- [ ]`` checkboxes, groups them by phase header, assigns
+    agents based on keyword matching, and creates tasks in the
+    ``TaskManager`` (skipping duplicates by title).
+
+    Usage::
+
+        parser = RoadmapParser("/path/to/ROADMAP.md")
+        result = parser.generate_tasks(task_manager)
+        # result: {"ok": True, "created": 5, "skipped": 2, "items_found": 7}
+    """
+
+    def __init__(self, roadmap_path: str = ""):
+        self.roadmap_path = roadmap_path or os.getenv(
+            "SAPPHIRE_ROADMAP_PATH",
+            os.path.join(os.path.dirname(__file__), "..", "..", "..", "ROADMAP.md"),
+        )
+
+    def parse_incomplete_items(self) -> List[Dict[str, str]]:
+        """Scan ROADMAP.md for unchecked ``- [ ]`` items.
+
+        Returns a list of dicts with 'title', 'phase', 'agent'.
+        """
+        path = Path(self.roadmap_path).resolve()
+        if not path.exists():
+            logger.warning(f"Roadmap file not found: {path}")
+            return []
+
+        try:
+            content = path.read_text(encoding="utf-8")
+        except Exception as exc:
+            logger.warning(f"Failed to read roadmap: {exc}")
+            return []
+
+        items: List[Dict[str, str]] = []
+        current_phase = "unknown"
+
+        for line in content.splitlines():
+            line_stripped = line.strip()
+
+            # Detect phase headers (## Phase N: Title)
+            phase_match = re.match(r"^#{1,3}\s+(?:Phase\s+\d+[:\s]*)?(.+)", line_stripped)
+            if phase_match:
+                current_phase = phase_match.group(1).strip().rstrip("✅🔮⚡🔒📖🐝📋📢🤖🌐 ")
+                continue
+
+            # Detect incomplete checkbox items
+            if re.match(r"^-\s*\[\s*\]\s+", line_stripped):
+                title = re.sub(r"^-\s*\[\s*\]\s+", "", line_stripped).strip()
+                if not title:
+                    continue
+                agent = self._infer_agent(current_phase, title)
+                items.append({
+                    "title": title[:200],
+                    "phase": self._normalize_phase(current_phase),
+                    "agent": agent,
+                })
+
+        return items
+
+    def generate_tasks(self, task_manager: "TaskManager") -> Dict[str, Any]:
+        """Create tasks for all unchecked roadmap items.
+
+        Skips items whose title already exists as an active task (pending /
+        in_progress / blocked).  Returns summary of actions taken.
+        """
+        items = self.parse_incomplete_items()
+        if not items:
+            return {"ok": True, "created": 0, "skipped": 0, "items_found": 0}
+
+        # Gather existing titles to avoid duplicates
+        existing_titles: set = set()
+        try:
+            with task_manager._lock:
+                for task in task_manager._tasks.values():
+                    if task["status"] in ("pending", "in_progress", "blocked"):
+                        existing_titles.add(task["title"].strip().lower())
+        except Exception:
+            pass
+
+        created = 0
+        skipped = 0
+        for item in items:
+            if item["title"].strip().lower() in existing_titles:
+                skipped += 1
+                continue
+
+            result = task_manager.create_task(
+                title=item["title"],
+                phase=item["phase"],
+                agent=item["agent"],
+                priority="medium",
+                description=f"Auto-generated from ROADMAP.md ({item['phase']})",
+                tags=["roadmap", "auto_generated"],
+            )
+            if result.get("ok"):
+                created += 1
+            else:
+                skipped += 1
+
+        logger.info(f"RoadmapParser: {created} tasks created, {skipped} skipped, {len(items)} items found")
+        return {
+            "ok": True,
+            "created": created,
+            "skipped": skipped,
+            "items_found": len(items),
+        }
+
+    # ── Internal helpers ─────────────────────────────────────────
+
+    @staticmethod
+    def _infer_agent(phase: str, title: str) -> str:
+        """Pick agent based on phase keywords and item text."""
+        combined = f"{phase} {title}".lower()
+        for pattern, agent in _PHASE_AGENT_PATTERNS:
+            if pattern.search(combined):
+                return agent
+        return "OBSIDIAN"  # default to OBSIDIAN
+
+    @staticmethod
+    def _normalize_phase(raw: str) -> str:
+        """Normalize a phase header into a slug."""
+        slug = re.sub(r"[^a-z0-9]+", "_", raw.lower()).strip("_")
+        return slug[:60] if slug else "unknown"

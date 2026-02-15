@@ -67,6 +67,15 @@ class Capability(Enum):
     REPUTATION_READ = auto()     # Read bot reputation data / leaderboard
     REPUTATION_ADMIN = auto()    # Ban, penalize, reward bots
 
+    # ── Code & Infrastructure (Full Autonomy) ──
+    CODE_READ = auto()           # Read source code files
+    CODE_WRITE = auto()          # Create or modify source code
+    CODE_DEPLOY = auto()         # Trigger build + deploy pipeline
+    CODE_REVIEW = auto()         # Review and approve code changes
+    INFRASTRUCTURE_MODIFY = auto()  # Modify GCP resources (Cloud Run, secrets, scheduler)
+    CI_CD_TRIGGER = auto()       # Trigger CI/CD pipeline runs
+    HEALTH_MONITOR = auto()      # Proactively monitor and diagnose system health
+
 
 # ── Agent Role Definitions ──────────────────────────────────────────
 
@@ -92,6 +101,9 @@ SAPPHIRE_CAPABILITIES: FrozenSet[Capability] = frozenset({
     Capability.MEDIA_PUBLISH,
     Capability.REPUTATION_READ,
     Capability.REPUTATION_ADMIN,
+    Capability.CODE_READ,
+    Capability.CODE_REVIEW,
+    Capability.HEALTH_MONITOR,
 })
 
 # Obsidian 🖤: Infrastructure & deployments — system control, no direct trading
@@ -111,6 +123,12 @@ OBSIDIAN_CAPABILITIES: FrozenSet[Capability] = frozenset({
     Capability.TELEGRAM_SEND,
     Capability.AI_PROMPT,
     Capability.REPUTATION_READ,
+    Capability.CODE_READ,
+    Capability.CODE_WRITE,
+    Capability.CODE_DEPLOY,
+    Capability.INFRASTRUCTURE_MODIFY,
+    Capability.CI_CD_TRIGGER,
+    Capability.HEALTH_MONITOR,
 })
 
 # Emerald 💚: Strategy & improvement — cognition, memory, auditing, no secrets
@@ -130,6 +148,10 @@ EMERALD_CAPABILITIES: FrozenSet[Capability] = frozenset({
     Capability.AI_PROMPT,
     Capability.REPUTATION_READ,
     Capability.REPUTATION_ADMIN,
+    Capability.CODE_READ,
+    Capability.CODE_WRITE,
+    Capability.CODE_REVIEW,
+    Capability.HEALTH_MONITOR,
 })
 
 # Scout 🔍: External-facing — MOST RESTRICTED, Forum-only communication
@@ -151,6 +173,76 @@ AGENT_CAPABILITY_MAP: Dict[str, FrozenSet[Capability]] = {
     "EMERALD": EMERALD_CAPABILITIES,
     "SCOUT": SCOUT_CAPABILITIES,
 }
+
+
+# ── Risk Tier Mapping ─────────────────────────────────────────────
+# Controls graduated escalation: which operations auto-execute vs. require owner approval.
+
+CAPABILITY_RISK_TIER: Dict[Capability, str] = {
+    # Tier "low": auto-approve — read-only, no side effects
+    Capability.CODE_READ: "low",
+    Capability.HEALTH_MONITOR: "low",
+    Capability.CODE_REVIEW: "low",
+    Capability.TRADE_READ: "low",
+    Capability.PORTFOLIO_READ: "low",
+    Capability.COGNITION_READ: "low",
+    Capability.MEMORY_READ: "low",
+    Capability.MARKET_DATA_READ: "low",
+    Capability.FORUM_READ: "low",
+    Capability.MOLTBOOK_READ: "low",
+    Capability.REPUTATION_READ: "low",
+    # Tier "medium": notify-then-proceed — reversible changes
+    Capability.CODE_WRITE: "medium",
+    Capability.CI_CD_TRIGGER: "medium",
+    Capability.FORUM_WRITE: "medium",
+    Capability.MEMORY_WRITE: "medium",
+    Capability.COGNITION_WRITE: "medium",
+    Capability.TELEGRAM_SEND: "medium",
+    Capability.AI_PROMPT: "medium",
+    Capability.MOLTBOOK_WRITE: "medium",
+    Capability.SKILL_AUDIT: "medium",
+    Capability.EXTERNAL_API_CALL: "medium",
+    Capability.FORUM_MODERATE: "medium",
+    Capability.MEDIA_PUBLISH: "medium",
+    # Tier "high": require owner approval — irreversible or high-impact
+    Capability.CODE_DEPLOY: "high",
+    Capability.INFRASTRUCTURE_MODIFY: "high",
+    Capability.KILL_SWITCH: "high",
+    Capability.TRADE_EXECUTE: "high",
+    Capability.PORTFOLIO_WRITE: "high",
+    Capability.VENUE_CONTROL: "high",
+    Capability.SYSTEM_CONFIG: "high",
+    Capability.SECRET_ACCESS: "high",
+    Capability.AUTONOMY_DISPATCH: "high",
+    Capability.REPUTATION_ADMIN: "high",
+}
+
+
+class ApprovalPolicy:
+    """Determines whether an operation needs owner approval based on risk tier.
+
+    Used by the graduated escalation middleware to route operations:
+    - ``auto_approve``: execute immediately, no notification
+    - ``notify_proceed``: send Telegram notification, then execute
+    - ``require_approval``: block until owner approves via Telegram
+    """
+
+    def evaluate(
+        self,
+        agent_id: str,
+        capability: Capability,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Return the approval policy for a given agent + capability combination.
+
+        Returns one of: ``'auto_approve'``, ``'notify_proceed'``, ``'require_approval'``.
+        """
+        tier = CAPABILITY_RISK_TIER.get(capability, "medium")
+        if tier == "low":
+            return "auto_approve"
+        if tier == "medium":
+            return "notify_proceed"
+        return "require_approval"
 
 
 class PermissionDenied(Exception):

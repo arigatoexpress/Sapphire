@@ -8,7 +8,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/alpha
 import pytest
 from src.security.agent_permissions import (
     AgentGate,
+    ApprovalPolicy,
     Capability,
+    CAPABILITY_RISK_TIER,
     PermissionDenied,
     SAPPHIRE_CAPABILITIES,
     OBSIDIAN_CAPABILITIES,
@@ -273,3 +275,145 @@ def test_no_agent_has_all_capabilities():
         ("SCOUT", SCOUT_CAPABILITIES),
     ]:
         assert caps < all_caps, f"{name} has ALL capabilities — violates least-privilege"
+
+
+# ── Code & Infrastructure Capabilities (Full Autonomy) ─────────────
+
+
+def test_obsidian_can_write_code():
+    g = _gate()
+    assert g.check("OBSIDIAN", Capability.CODE_WRITE) is True
+
+
+def test_obsidian_can_deploy_code():
+    g = _gate()
+    assert g.check("OBSIDIAN", Capability.CODE_DEPLOY) is True
+
+
+def test_obsidian_can_modify_infrastructure():
+    g = _gate()
+    assert g.check("OBSIDIAN", Capability.INFRASTRUCTURE_MODIFY) is True
+
+
+def test_obsidian_can_trigger_ci():
+    g = _gate()
+    assert g.check("OBSIDIAN", Capability.CI_CD_TRIGGER) is True
+
+
+def test_emerald_can_write_code():
+    g = _gate()
+    assert g.check("EMERALD", Capability.CODE_WRITE) is True
+
+
+def test_emerald_can_review_code():
+    g = _gate()
+    assert g.check("EMERALD", Capability.CODE_REVIEW) is True
+
+
+def test_emerald_cannot_deploy():
+    g = _gate()
+    assert g.check("EMERALD", Capability.CODE_DEPLOY) is False
+
+
+def test_emerald_cannot_modify_infrastructure():
+    g = _gate()
+    assert g.check("EMERALD", Capability.INFRASTRUCTURE_MODIFY) is False
+
+
+def test_sapphire_can_read_code():
+    g = _gate()
+    assert g.check("SAPPHIRE", Capability.CODE_READ) is True
+
+
+def test_sapphire_can_review_code():
+    g = _gate()
+    assert g.check("SAPPHIRE", Capability.CODE_REVIEW) is True
+
+
+def test_sapphire_cannot_write_code():
+    g = _gate()
+    assert g.check("SAPPHIRE", Capability.CODE_WRITE) is False
+
+
+def test_sapphire_cannot_deploy_code():
+    g = _gate()
+    assert g.check("SAPPHIRE", Capability.CODE_DEPLOY) is False
+
+
+def test_scout_cannot_write_code():
+    g = _gate()
+    assert g.check("SCOUT", Capability.CODE_WRITE) is False
+
+
+def test_scout_cannot_deploy_code():
+    g = _gate()
+    assert g.check("SCOUT", Capability.CODE_DEPLOY) is False
+
+
+def test_scout_cannot_monitor_health():
+    g = _gate()
+    assert g.check("SCOUT", Capability.HEALTH_MONITOR) is False
+
+
+def test_scout_has_no_new_capabilities():
+    """Scout should still have exactly 6 capabilities — unchanged from pre-autonomy."""
+    assert len(SCOUT_CAPABILITIES) == 6
+
+
+# ── Risk Tier Mapping ──────────────────────────────────────────────
+
+
+def test_risk_tier_covers_all_capabilities():
+    """Every capability should have a risk tier assigned."""
+    for cap in Capability:
+        assert cap in CAPABILITY_RISK_TIER, f"{cap.name} missing from CAPABILITY_RISK_TIER"
+
+
+def test_risk_tier_values_valid():
+    """All risk tier values should be one of the three valid tiers."""
+    valid = {"low", "medium", "high"}
+    for cap, tier in CAPABILITY_RISK_TIER.items():
+        assert tier in valid, f"{cap.name} has invalid tier '{tier}'"
+
+
+def test_code_deploy_is_high_risk():
+    assert CAPABILITY_RISK_TIER[Capability.CODE_DEPLOY] == "high"
+
+
+def test_infrastructure_modify_is_high_risk():
+    assert CAPABILITY_RISK_TIER[Capability.INFRASTRUCTURE_MODIFY] == "high"
+
+
+def test_code_write_is_medium_risk():
+    assert CAPABILITY_RISK_TIER[Capability.CODE_WRITE] == "medium"
+
+
+def test_code_read_is_low_risk():
+    assert CAPABILITY_RISK_TIER[Capability.CODE_READ] == "low"
+
+
+def test_health_monitor_is_low_risk():
+    assert CAPABILITY_RISK_TIER[Capability.HEALTH_MONITOR] == "low"
+
+
+# ── Approval Policy ───────────────────────────────────────────────
+
+
+def test_approval_policy_low_risk_auto_approves():
+    policy = ApprovalPolicy()
+    assert policy.evaluate("OBSIDIAN", Capability.CODE_READ) == "auto_approve"
+
+
+def test_approval_policy_medium_risk_notify_proceed():
+    policy = ApprovalPolicy()
+    assert policy.evaluate("OBSIDIAN", Capability.CODE_WRITE) == "notify_proceed"
+
+
+def test_approval_policy_high_risk_require_approval():
+    policy = ApprovalPolicy()
+    assert policy.evaluate("OBSIDIAN", Capability.CODE_DEPLOY) == "require_approval"
+
+
+def test_approval_policy_kill_switch_require_approval():
+    policy = ApprovalPolicy()
+    assert policy.evaluate("SAPPHIRE", Capability.KILL_SWITCH) == "require_approval"

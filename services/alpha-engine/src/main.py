@@ -46,7 +46,7 @@ from src.api_handlers import (
 from src.security.skill_auditor import SkillAuditor
 from src.security.virustotal_scanner import VirusTotalSkillScanner
 from src.security.prompt_sanitizer import sanitize_for_prompt, log_injection_attempt
-from src.security.agent_permissions import gate, Capability, PermissionDenied
+from src.security.agent_permissions import gate, Capability, PermissionDenied, ApprovalPolicy
 from src.strategy.engine import AlphaStrategyEngine
 
 # Add shared library to path
@@ -218,6 +218,10 @@ class AlphaEngine:
         )
         self._autonomy_sessions: Dict[str, Dict[str, Any]] = {}
         self._latest_autonomy_session_key = ""
+        # Graduated escalation: risk-based approval routing
+        self._approval_policy = ApprovalPolicy()
+        self._proposals: Dict[str, Dict[str, Any]] = {}
+        self._proposal_counter = 0
         self._started_at = time.time()
         self._system_log_max_entries = max(100, int(os.getenv("SYSTEM_LOG_MAX_ENTRIES", "500")))
         self._system_logs: Deque[Dict[str, Any]] = deque(maxlen=self._system_log_max_entries)
@@ -234,6 +238,14 @@ class AlphaEngine:
         self.media_manager = MediaManager(telegram_bot=self.telegram)
         self.content_generator = ContentGenerator(gemini_guard=self.ai)
         self._media_publish_task: Optional[asyncio.Task[Any]] = None
+        # Phase 9: OpenClaw Autonomous Operations
+        from src.openclaw_dispatch import OpenClawDispatcher
+        from src.ci_feedback import CIFeedbackProcessor
+        self.openclaw_dispatcher = OpenClawDispatcher()
+        self.ci_feedback = CIFeedbackProcessor(
+            task_manager=self.task_manager,
+            telegram_bot=self.telegram,
+        )
         # Phase 8: Prediction Market Intelligence
         from src.feeds.prediction_aggregator import PredictionAggregator
         self.prediction_aggregator = PredictionAggregator()
@@ -1495,16 +1507,36 @@ class AlphaEngine:
         }
 
     def _autonomy_trigger_reason(self, context: Dict[str, Any]) -> str:
+        """Legacy string-only trigger (callers that need just the string)."""
+        return self._autonomy_trigger_info(context)["trigger"]
+
+    def _autonomy_trigger_info(self, context: Dict[str, Any]) -> Dict[str, str]:
+        """Return structured trigger info with agent routing.
+
+        Returns ``{"trigger": str, "agent": str, "category": str}``.
+        Currently routes everything to OBSIDIAN (single-agent mode).
+        Multi-agent routing will activate when EMERALD/SAPPHIRE are enabled.
+        """
         active_count = len(context.get("active_venues", []))
         total_failures = int(context.get("total_failure_pressure", 0))
 
         if self._kill_switch_active:
-            return "kill_switch_active"
+            return {"trigger": "kill_switch_active", "agent": "OBSIDIAN", "category": "emergency"}
         if active_count < self._trading_gate_min_active_venues:
-            return "venue_shortfall"
+            return {"trigger": "venue_shortfall", "agent": "OBSIDIAN", "category": "infrastructure"}
         if total_failures > self._trading_gate_max_failure_pressure:
-            return "failure_pressure"
-        return "scheduled_cycle"
+            return {"trigger": "failure_pressure", "agent": "OBSIDIAN", "category": "infrastructure"}
+
+        # Rotate scheduled cycles across agents (when multi-agent is enabled)
+        cycle = self._autonomy_dispatch_count % 3
+        if cycle == 0:
+            return {"trigger": "scheduled_maintenance", "agent": "OBSIDIAN", "category": "maintenance"}
+        elif cycle == 1:
+            return {"trigger": "scheduled_improvement", "agent": "OBSIDIAN", "category": "improvement"}
+            # Future: "agent": "EMERALD" when multi-agent is enabled
+        else:
+            return {"trigger": "scheduled_review", "agent": "OBSIDIAN", "category": "review"}
+            # Future: "agent": "SAPPHIRE" when multi-agent is enabled
 
     def _autonomy_request_brief(self, trigger: str, context: Dict[str, Any]) -> Dict[str, str]:
         trigger_key = str(trigger or "").strip().lower()
@@ -1769,6 +1801,156 @@ class AlphaEngine:
             "dispatch_session_key": str(hook_result.get("session_key", "")).strip(),
         }
 
+    # ── Graduated Escalation: Code & Infrastructure Proposals ──────
+
+    def _record_proposal(
+        self,
+        agent_id: str,
+        capability: Capability,
+        description: str,
+        context: Optional[Dict[str, Any]] = None,
+        diff: str = "",
+        files_changed: Optional[List[str]] = None,
+    ) -> str:
+        """Record a pending proposal for owner review. Returns proposal key."""
+        self._proposal_counter += 1
+        key = f"P-{self._proposal_counter:04d}"
+        risk = self._approval_policy.evaluate(agent_id, capability, context)
+        self._proposals[key] = {
+            "proposal_key": key,
+            "agent_id": agent_id,
+            "capability": capability.name,
+            "description": description[:500],
+            "risk_tier": risk,
+            "diff": diff[:5000],
+            "files_changed": (files_changed or [])[:20],
+            "context": context or {},
+            "decision": "pending",
+            "decision_note": "",
+            "decision_at": 0,
+            "created_at": int(time.time()),
+        }
+        # Trim old proposals (keep last 100)
+        if len(self._proposals) > 100:
+            oldest_keys = sorted(self._proposals.keys())[:len(self._proposals) - 100]
+            for k in oldest_keys:
+                del self._proposals[k]
+        return key
+
+    async def _apply_proposal_decision(
+        self,
+        proposal_key: str,
+        decision: str,
+        note: str = "",
+        source: str = "owner",
+    ) -> Dict[str, Any]:
+        """Apply an owner decision to a pending proposal."""
+        normalized = decision.strip().upper()
+        if normalized not in ("APPROVE", "REJECT"):
+            return {"ok": False, "reason": "invalid_decision"}
+        entry = self._proposals.get(proposal_key)
+        if not entry:
+            return {"ok": False, "reason": "proposal_not_found"}
+        if entry["decision"] != "pending":
+            return {"ok": False, "reason": "already_decided"}
+
+        entry["decision"] = "approved" if normalized == "APPROVE" else "rejected"
+        entry["decision_note"] = note[:500]
+        entry["decision_at"] = int(time.time())
+        self._record_system_log(
+            f"Proposal {proposal_key} {entry['decision']} by {source}: {entry['description'][:100]}",
+            level="info",
+            tags=["proposal", entry["decision"]],
+            metadata={"proposal_key": proposal_key, "source": source},
+        )
+        return {"ok": True, "decision": entry["decision"], "proposal_key": proposal_key}
+
+    def _pending_proposals(self) -> List[Dict[str, Any]]:
+        """Return all pending proposals sorted by creation time."""
+        return sorted(
+            [p for p in self._proposals.values() if p["decision"] == "pending"],
+            key=lambda p: p["created_at"],
+        )
+
+    async def _evaluate_and_route_operation(
+        self,
+        agent_id: str,
+        capability: Capability,
+        description: str,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Route an operation through graduated approval based on risk tier.
+
+        Returns ``{'executed': True, 'policy': ...}`` for auto/notify,
+        or ``{'executed': False, 'proposal_key': ...}`` for require_approval.
+        """
+        gate.require(agent_id, capability)
+        policy = self._approval_policy.evaluate(agent_id, capability, context)
+
+        if policy == "auto_approve":
+            return {"executed": True, "policy": "auto_approve"}
+
+        if policy == "notify_proceed":
+            await self.telegram.send_as(
+                OBSIDIAN,
+                f"⚡ Proceeding: {description}\nRisk: medium | Agent: {agent_id}",
+            )
+            return {"executed": True, "policy": "notify_proceed"}
+
+        # require_approval — record proposal and await owner decision
+        proposal_key = self._record_proposal(
+            agent_id, capability, description, context
+        )
+        await self.telegram.send_as(
+            OBSIDIAN,
+            (
+                f"🔴 **Approval Required**\n"
+                f"Proposal `{proposal_key}`: {description}\n"
+                f"Risk: HIGH | Agent: {agent_id}\n\n"
+                f"`/approve_proposal {proposal_key}` or `/reject_proposal {proposal_key}`"
+            ),
+        )
+        return {"executed": False, "policy": "require_approval", "proposal_key": proposal_key}
+
+    # ── Health Diagnostics ───────────────────────────────────────────
+
+    async def _run_health_diagnostics(self) -> Dict[str, Any]:
+        """Run health checks and return detected issues."""
+        issues: List[Dict[str, Any]] = []
+        # Check venue health
+        try:
+            state = dispatcher.get_control_state()
+            for venue, info in state.items():
+                if info.get("paused"):
+                    issues.append({
+                        "type": "venue_paused",
+                        "severity": "high",
+                        "venue": venue,
+                        "reason": info.get("pause_reason", "unknown"),
+                        "agent": "OBSIDIAN",
+                    })
+        except Exception:
+            pass
+        # Check failure pressure
+        total_failures = sum(self._failure_counts.values())
+        threshold = self._trading_gate_max_failure_pressure
+        if total_failures > threshold * 0.7:
+            issues.append({
+                "type": "failure_pressure_warning",
+                "severity": "medium" if total_failures <= threshold else "high",
+                "pressure": total_failures,
+                "threshold": threshold,
+                "agent": "OBSIDIAN",
+            })
+        # Check kill switch
+        if self._kill_switch_active:
+            issues.append({
+                "type": "kill_switch_active",
+                "severity": "critical",
+                "agent": "OBSIDIAN",
+            })
+        return {"issues": issues, "checked_at": int(time.time())}
+
     @staticmethod
     def _parse_session_decision_payload(payload_text: str) -> Dict[str, str]:
         text = str(payload_text or "").strip()
@@ -1849,15 +2031,26 @@ class AlphaEngine:
             )
             return {"dispatched": False, "reason": "dry_run", "trigger": trigger}
 
-        if not self.tv_autonomy:
-            return {"dispatched": False, "reason": "tv_integration_disabled", "trigger": trigger}
-        hook_result = await self.tv_autonomy.dispatch_environment_instruction(
-            instruction=instruction,
-            trigger=trigger,
-            context=context,
-            allow_code_changes=self._autonomy_allow_code_changes,
-            allow_gcloud_changes=self._autonomy_allow_gcloud_changes,
-        )
+        # Prefer OpenClaw gateway dispatcher, fall back to tv_autonomy
+        if self.openclaw_dispatcher.enabled:
+            hook_result = await self.openclaw_dispatcher.dispatch_instruction(
+                agent_id=agent_id,
+                instruction=instruction,
+                trigger=trigger,
+                context=context,
+                allow_code_changes=self._autonomy_allow_code_changes,
+                allow_gcloud_changes=self._autonomy_allow_gcloud_changes,
+            )
+        elif self.tv_autonomy:
+            hook_result = await self.tv_autonomy.dispatch_environment_instruction(
+                instruction=instruction,
+                trigger=trigger,
+                context=context,
+                allow_code_changes=self._autonomy_allow_code_changes,
+                allow_gcloud_changes=self._autonomy_allow_gcloud_changes,
+            )
+        else:
+            return {"dispatched": False, "reason": "no_dispatcher_available", "trigger": trigger}
 
         if hook_result.get("dispatched"):
             self._autonomy_last_dispatch_at = now
@@ -1948,8 +2141,12 @@ class AlphaEngine:
             try:
                 await asyncio.sleep(self._autonomy_loop_seconds)
                 context = self._autonomy_context_snapshot()
-                trigger = self._autonomy_trigger_reason(context)
-                await self._dispatch_full_autonomy_cycle(trigger=trigger, force=False)
+                trigger_info = self._autonomy_trigger_info(context)
+                await self._dispatch_full_autonomy_cycle(
+                    trigger=trigger_info["trigger"],
+                    force=False,
+                    agent_id=trigger_info["agent"],
+                )
             except asyncio.CancelledError:
                 break
             except Exception as exc:

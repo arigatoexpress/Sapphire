@@ -1563,11 +1563,215 @@ async def handle_prediction_commands(engine: "AlphaEngine", target: str, action:
     return False
 
 
+# ── Proposal & Operations Commands ─────────────────────────────────────
+
+async def handle_proposal_commands(engine: "AlphaEngine", target: str, action: str, value: float) -> bool:
+    """Handle proposal, health, roadmap, and CI commands.
+
+    Commands:
+      /proposals        — list pending proposals
+      /diff <key>       — show compact diff for a proposal
+      /approve_proposal — approve a pending proposal
+      /reject_proposal  — reject a pending proposal
+      /health           — run health diagnostics
+      /roadmap_sync     — sync roadmap items to tasks
+      /ci_status        — show CI feedback processor status
+      /openclaw_status  — show OpenClaw dispatcher status
+    """
+    normalized = action.upper()
+
+    # ── /proposals ─────────────────────────────────────────────
+    if normalized in {"PROPOSALS", "PENDING_PROPOSALS", "LIST_PROPOSALS"}:
+        pending = engine._pending_proposals()
+        if not pending:
+            await engine.telegram.send_message(
+                "✅ No pending proposals.", priority="medium"
+            )
+            return True
+        lines = [f"📋 **Pending Proposals** ({len(pending)})\n"]
+        for p in pending[:10]:
+            risk_emoji = {"low": "🟢", "medium": "🟡", "high": "🔴"}.get(
+                p.get("risk_tier", "medium"), "🟡"
+            )
+            lines.append(
+                f"{risk_emoji} `{p['proposal_key']}` — {p['description'][:80]}\n"
+                f"  Agent: {p['agent_id']} | Capability: {p['capability']}\n"
+                f"  `/approve_proposal {p['proposal_key']}` | `/reject_proposal {p['proposal_key']}`"
+            )
+        await engine.telegram.send_message("\n".join(lines), priority="high")
+        return True
+
+    # ── /diff <key> ────────────────────────────────────────────
+    if normalized in {"DIFF", "SHOW_DIFF", "PROPOSAL_DIFF"}:
+        key = str(target or "").strip()
+        if not key:
+            await engine.telegram.send_message(
+                "Usage: `/diff <proposal_key>`", priority="high"
+            )
+            return True
+        proposal = engine._proposals.get(key)
+        if not proposal:
+            await engine.telegram.send_message(
+                f"❌ Proposal `{key}` not found.", priority="high"
+            )
+            return True
+        diff_text = proposal.get("diff", "")
+        if not diff_text:
+            await engine.telegram.send_message(
+                f"📄 Proposal `{key}`: {proposal['description']}\n\nNo diff attached.",
+                priority="medium",
+            )
+            return True
+        # Compact diff — truncate for Telegram readability
+        diff_lines = diff_text.splitlines()
+        file_stats: Dict[str, Dict[str, int]] = {}
+        for line in diff_lines:
+            if line.startswith("diff --git") or line.startswith("--- ") or line.startswith("+++ "):
+                continue
+            if line.startswith("@@"):
+                continue
+        # Show first 30 lines of diff
+        preview = "\n".join(diff_lines[:30])
+        if len(diff_lines) > 30:
+            preview += f"\n... ({len(diff_lines) - 30} more lines)"
+        await engine.telegram.send_message(
+            f"📄 Diff for `{key}`:\n```\n{preview}\n```",
+            priority="high",
+        )
+        return True
+
+    # ── /approve_proposal ──────────────────────────────────────
+    if normalized in {"APPROVE_PROPOSAL", "APPROVE_CODE"}:
+        key = str(target or "").strip()
+        if not key:
+            await engine.telegram.send_message(
+                "Usage: `/approve_proposal <proposal_key>`", priority="high"
+            )
+            return True
+        result = engine._apply_proposal_decision(key, "APPROVE", note="Approved via Telegram")
+        if result.get("ok"):
+            await engine.telegram.send_as(
+                OBSIDIAN,
+                f"✅ Proposal `{key}` **approved**.",
+            )
+        else:
+            await engine.telegram.send_message(
+                f"❌ Could not approve: `{result.get('reason', 'unknown')}`",
+                priority="high",
+            )
+        return True
+
+    # ── /reject_proposal ───────────────────────────────────────
+    if normalized in {"REJECT_PROPOSAL", "REJECT_CODE"}:
+        key = str(target or "").strip()
+        if not key:
+            await engine.telegram.send_message(
+                "Usage: `/reject_proposal <proposal_key>`", priority="high"
+            )
+            return True
+        result = engine._apply_proposal_decision(key, "REJECT", note="Rejected via Telegram")
+        if result.get("ok"):
+            await engine.telegram.send_as(
+                OBSIDIAN,
+                f"🚫 Proposal `{key}` **rejected**.",
+            )
+        else:
+            await engine.telegram.send_message(
+                f"❌ Could not reject: `{result.get('reason', 'unknown')}`",
+                priority="high",
+            )
+        return True
+
+    # ── /health ────────────────────────────────────────────────
+    if normalized in {"HEALTH", "HEALTH_CHECK", "DIAGNOSTICS", "SYSTEM_HEALTH"}:
+        diagnostics = await engine._run_health_diagnostics()
+        issues = diagnostics.get("issues", [])
+        if not issues:
+            await engine.telegram.send_message(
+                "✅ All health checks passed. No issues detected.", priority="medium"
+            )
+            return True
+        lines = [f"⚠️ **Health Issues** ({len(issues)})\n"]
+        severity_emoji = {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "🟢"}
+        for issue in issues:
+            emoji = severity_emoji.get(issue.get("severity", "medium"), "🟡")
+            lines.append(
+                f"{emoji} `{issue['type']}` — severity: {issue.get('severity', '?')}\n"
+                f"  Agent: {issue.get('agent', '?')}"
+            )
+            if "venue" in issue:
+                lines[-1] += f" | Venue: {issue['venue']}"
+            if "pressure" in issue:
+                lines[-1] += f" | Pressure: {issue['pressure']}/{issue.get('threshold', '?')}"
+        await engine.telegram.send_message("\n".join(lines), priority="high")
+        return True
+
+    # ── /roadmap_sync ──────────────────────────────────────────
+    if normalized in {"ROADMAP_SYNC", "SYNC_ROADMAP", "ROADMAP"}:
+        try:
+            from src.collaboration.task_manager import RoadmapParser
+            parser = RoadmapParser()
+            result = parser.generate_tasks(engine.task_manager)
+            await engine.telegram.send_message(
+                (
+                    f"📋 Roadmap sync complete.\n"
+                    f"Items found: `{result.get('items_found', 0)}`\n"
+                    f"Tasks created: `{result.get('created', 0)}`\n"
+                    f"Skipped (duplicates): `{result.get('skipped', 0)}`"
+                ),
+                priority="high",
+            )
+        except Exception as exc:
+            await engine.telegram.send_message(
+                f"❌ Roadmap sync failed: `{str(exc)[:200]}`", priority="high"
+            )
+        return True
+
+    # ── /ci_status ─────────────────────────────────────────────
+    if normalized in {"CI_STATUS", "CI", "BUILD_STATUS"}:
+        if hasattr(engine, "ci_feedback") and engine.ci_feedback:
+            await engine.telegram.send_message(
+                "✅ CI Feedback Processor is active.\n"
+                "Test failures → EMERALD tasks\n"
+                "Build failures → OBSIDIAN tasks",
+                priority="medium",
+            )
+        else:
+            await engine.telegram.send_message(
+                "⚠️ CI Feedback Processor not initialized.", priority="medium"
+            )
+        return True
+
+    # ── /openclaw_status ───────────────────────────────────────
+    if normalized in {"OPENCLAW_STATUS", "OPENCLAW", "GATEWAY_STATUS"}:
+        if hasattr(engine, "openclaw_dispatcher"):
+            status = engine.openclaw_dispatcher.status()
+            lines = [
+                "🤖 **OpenClaw Gateway Status**\n",
+                f"Enabled: `{status['enabled']}`",
+                f"URL: `{status['gateway_url']}`",
+                f"Token: `{'configured' if status['token_configured'] else 'MISSING'}`",
+                f"Dispatches: `{status['dispatch_count']}`",
+            ]
+            if status["last_error"]:
+                lines.append(f"Last error: `{status['last_error'][:100]}`")
+            lines.append(f"Repos: `{', '.join(status['allowed_repo_scope'])}`")
+            await engine.telegram.send_message("\n".join(lines), priority="medium")
+        else:
+            await engine.telegram.send_message(
+                "⚠️ OpenClaw dispatcher not initialized.", priority="medium"
+            )
+        return True
+
+    return False
+
+
 # ── Master Dispatch Table ─────────────────────────────────────────────
 
 # Ordered list of handler functions. Each is tried in order;
 # first one returning True wins.
 CONTROL_HANDLER_CHAIN = [
+    handle_proposal_commands,
     handle_media_commands,
     handle_security_commands,
     handle_forum_commands,
