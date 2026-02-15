@@ -1,6 +1,6 @@
 # Sapphire Master Roadmap
 
-> Last Updated: Feb 15, 2026 | Status: Phase 10 Complete 🦅✅ | Tests: 1256 | Deploy: sapphire-alpha-00216-29w | Gateway: openclaw-gateway-00005-5md
+> Last Updated: Feb 15, 2026 | Status: Phase 10 Complete 🦅✅ | Tests: 1256 | Deploy: sapphire-alpha-00224-dc6 | Gateway: openclaw-gateway-00006-twc
 
 ## Vision
 Build a top-tier autonomous crypto trading platform with secure multi-agent collaboration, crowdsourced swarm intelligence, and automated public presence.
@@ -286,7 +286,15 @@ _Full agent autonomy — OBSIDIAN first, then multi-agent_
 - [x] Workspace MEMORY.md seeded for all 3 agents (environment constraints, tools, capabilities)
 - [x] Agents correctly identify their limitations (no git, no gcloud, analysis/research focus)
 - [x] `/agent_status` Telegram command: per-agent dispatch counts, rotation cycle, last dispatch
-- [x] Deploy: sapphire-alpha-00216-29w, openclaw-gateway-00005-5md
+- [x] Deploy: sapphire-alpha-00216-29w → 00224-dc6, openclaw-gateway-00005-5md → 00006-twc
+
+### Operational Reliability (PRs #55-#59)
+- [x] Frontend makeover: AgentsView dashboard, theme unification, dispatch indicator (PR #55)
+- [x] Telegram notification pipeline: secrets mounted, markdown sanitizer hardened, retry fallback (PR #56)
+- [x] Cold-start resilience: deferred bootstrap, dispatch error logging with context (PR #57)
+- [x] Fire-and-forget dispatch: asyncio background tasks, 600s timeout, non-blocking autonomy loop (PR #58)
+- [x] Multi-agent AUTONOMY_DISPATCH: granted to EMERALD and SAPPHIRE for rotation cycles (PR #59)
+- [x] Deploy: sapphire-alpha-00224-dc6, openclaw-gateway-00006-twc
 
 ### Remaining (Optional Polish)
 - [ ] Verify from Telegram: /autonomy, /health, /openclaw_smoke, /agent_status
@@ -336,4 +344,9 @@ Harden        Security       Forum          Swarm          Tracking       Social
 - ✅ PR #52: Multi-Agent Gateway Enablement (3 agents with role-based permissions, smoke test command)
 - ✅ PR #53: Multi-Agent Rotation (OBSIDIAN→EMERALD→SAPPHIRE round-robin, agent-specific instructions, 16 routing tests)
 - ✅ PR #54: Agent Workspace Context + /agent_status (MEMORY.md seeding, environment-aware agents)
-- ✅ 1256 tests passing | All 3 agents live on Claude Opus 4 | Phase 10 COMPLETE
+- ✅ PR #55: Frontend Makeover (AgentsView dashboard, theme unification, dispatch indicator badge)
+- ✅ PR #56: Telegram Notification Fix (secrets mounting, markdown sanitizer, retry fallback)
+- ✅ PR #57: Dispatch Reliability (cold-start deferred bootstrap, error logging with context)
+- ✅ PR #58: Fire-and-Forget Dispatch (asyncio background tasks, non-blocking autonomy loop)
+- ✅ PR #59: Multi-Agent AUTONOMY_DISPATCH (EMERALD + SAPPHIRE capability grant for rotation)
+- ✅ 1256 tests passing | All 3 agents live on Claude Opus 4 | Phase 10 COMPLETE + Operational Reliability
