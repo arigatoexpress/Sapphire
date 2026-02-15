@@ -3,12 +3,14 @@
 Verifies:
   - Dispatcher initializes correctly from env vars
   - Disabled state when credentials missing
-  - dispatch_instruction builds correct payload and handles responses
+  - dispatch_instruction builds correct payload (fire-and-forget pattern)
+  - Background task handles responses and errors
   - dispatch_session_decision forwards decisions
   - status() returns health info
   - Error handling for network failures
 """
 
+import asyncio
 import os
 import sys
 from contextlib import asynccontextmanager
@@ -136,6 +138,8 @@ class TestDispatchInstruction:
                     instruction="Run maintenance cycle",
                     trigger="scheduled_maintenance",
                 )
+                # Fire-and-forget: let the background task complete
+                await asyncio.sleep(0)
         assert result["dispatched"]
         assert "session_key" in result
         assert result["agent"] == "OBSIDIAN"
@@ -151,10 +155,12 @@ class TestDispatchInstruction:
         with patch("openclaw_dispatch.aiohttp.ClientSession", return_value=fake_session):
             with patch("openclaw_dispatch.aiohttp.ClientTimeout"):
                 result = await d.dispatch_instruction("OBSIDIAN", "test")
+                await asyncio.sleep(0)
         assert result["dispatched"]
 
     @pytest.mark.asyncio
     async def test_gateway_error_response(self):
+        """Fire-and-forget: dispatch returns True immediately; error logged in background."""
         d = OpenClawDispatcher(gateway_url="http://localhost:18789", gateway_token="tok")
         fake_resp = _FakeResponse(status=500, body="Internal Server Error")
         fake_session = _FakeSession(fake_resp)
@@ -162,20 +168,27 @@ class TestDispatchInstruction:
         with patch("openclaw_dispatch.aiohttp.ClientSession", return_value=fake_session):
             with patch("openclaw_dispatch.aiohttp.ClientTimeout"):
                 result = await d.dispatch_instruction("OBSIDIAN", "test")
-        assert not result["dispatched"]
-        assert "gateway_error_500" in result["reason"]
+                await asyncio.sleep(0)
+        # Fire-and-forget: always returns dispatched=True
+        assert result["dispatched"]
+        # But the background task records the error
         assert d._last_error != ""
+        assert "500" in d._last_error
 
     @pytest.mark.asyncio
     async def test_network_exception(self):
+        """Fire-and-forget: dispatch returns True; network error recorded in background."""
         d = OpenClawDispatcher(gateway_url="http://localhost:18789", gateway_token="tok")
         err_session = _ErrorSession(ConnectionError("Connection refused"))
 
         with patch("openclaw_dispatch.aiohttp.ClientSession", return_value=err_session):
             with patch("openclaw_dispatch.aiohttp.ClientTimeout"):
                 result = await d.dispatch_instruction("OBSIDIAN", "test")
-        assert not result["dispatched"]
-        assert result["reason"] == "dispatch_exception"
+                await asyncio.sleep(0)
+        # Fire-and-forget: always returns dispatched=True
+        assert result["dispatched"]
+        # Background task records the error
+        assert "ConnectionError" in d._last_error
 
     @pytest.mark.asyncio
     async def test_session_key_generation(self):
@@ -186,6 +199,7 @@ class TestDispatchInstruction:
         with patch("openclaw_dispatch.aiohttp.ClientSession", return_value=fake_session):
             with patch("openclaw_dispatch.aiohttp.ClientTimeout"):
                 result = await d.dispatch_instruction("OBSIDIAN", "test")
+                await asyncio.sleep(0)
         assert len(result["session_key"]) == 16  # sha256 truncated to 16
 
     @pytest.mark.asyncio
@@ -202,6 +216,7 @@ class TestDispatchInstruction:
                     allow_code_changes=True,
                     trigger="manual",
                 )
+                await asyncio.sleep(0)
         _, kwargs = fake_session.post_calls[0]
         payload = kwargs["json"]
         # OpenAI-compatible format
@@ -230,6 +245,7 @@ class TestDispatchInstruction:
         with patch("openclaw_dispatch.aiohttp.ClientSession", return_value=fake_session):
             with patch("openclaw_dispatch.aiohttp.ClientTimeout"):
                 await d.dispatch_instruction("OBSIDIAN", "test")
+                await asyncio.sleep(0)
         url, _ = fake_session.post_calls[0]
         assert url == "http://localhost:18789/v1/chat/completions"
 
@@ -311,6 +327,7 @@ class TestMultiAgentRouting:
         with patch("openclaw_dispatch.aiohttp.ClientSession", return_value=fake_session):
             with patch("openclaw_dispatch.aiohttp.ClientTimeout"):
                 result = await d.dispatch_instruction("OBSIDIAN", "test")
+                await asyncio.sleep(0)
         assert result["dispatched"]
         assert result["agent"] == "OBSIDIAN"
         _, kwargs = fake_session.post_calls[0]
@@ -325,6 +342,7 @@ class TestMultiAgentRouting:
         with patch("openclaw_dispatch.aiohttp.ClientSession", return_value=fake_session):
             with patch("openclaw_dispatch.aiohttp.ClientTimeout"):
                 result = await d.dispatch_instruction("EMERALD", "review code quality")
+                await asyncio.sleep(0)
         assert result["dispatched"]
         assert result["agent"] == "EMERALD"
         _, kwargs = fake_session.post_calls[0]
@@ -340,6 +358,7 @@ class TestMultiAgentRouting:
         with patch("openclaw_dispatch.aiohttp.ClientSession", return_value=fake_session):
             with patch("openclaw_dispatch.aiohttp.ClientTimeout"):
                 result = await d.dispatch_instruction("SAPPHIRE", "security audit")
+                await asyncio.sleep(0)
         assert result["dispatched"]
         assert result["agent"] == "SAPPHIRE"
         _, kwargs = fake_session.post_calls[0]
@@ -360,6 +379,8 @@ class TestMultiAgentRouting:
                 for agent in agents:
                     result = await d.dispatch_instruction(agent, "health ping", trigger="smoke_test")
                     results.append(result)
+                # Let all background tasks complete
+                await asyncio.sleep(0)
 
         assert all(r["dispatched"] for r in results)
         assert d._dispatch_count == 3
