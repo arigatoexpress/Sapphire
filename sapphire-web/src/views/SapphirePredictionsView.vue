@@ -50,16 +50,16 @@ const sentiments = computed(() => {
 const accuracy = computed(() => data.value?.accuracy ?? null)
 
 const sentimentColor = (sentiment: string): string => {
-    if (sentiment.includes('bullish')) return 'text-emerald-400'
-    if (sentiment.includes('bearish')) return 'text-red-400'
-    return 'text-zinc-400'
+    if (sentiment.includes('bullish')) return 'text-bullish'
+    if (sentiment.includes('bearish')) return 'text-bearish'
+    return 'text-neutral'
 }
 
 const riskBadge = (risk: string): { text: string; class: string } => {
     switch (risk) {
-        case 'wash_trading': return { text: 'WASH', class: 'bg-red-500/20 text-red-400' }
-        case 'insider_pattern': return { text: 'INSIDER', class: 'bg-amber-500/20 text-amber-400' }
-        case 'low_liquidity_pump': return { text: 'LOW LIQ', class: 'bg-orange-500/20 text-orange-400' }
+        case 'wash_trading': return { text: 'WASH', class: 'risk-severe' }
+        case 'insider_pattern': return { text: 'INSIDER', class: 'risk-high' }
+        case 'low_liquidity_pump': return { text: 'LOW LIQ', class: 'risk-medium' }
         default: return { text: '', class: '' }
     }
 }
@@ -97,7 +97,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div class="predictions-view" aria-label="Prediction markets dashboard">
+    <div class="predictions-view fade-in" aria-label="Prediction markets dashboard">
         <!-- Status Bar -->
         <div v-if="loading && !lastSyncEpoch" class="status-bar loading-bar" role="status" aria-live="polite">
             <span class="pulse-dot" aria-hidden="true"></span> Connecting to prediction feeds...
@@ -130,29 +130,29 @@ onUnmounted(() => {
         <template v-else>
         <!-- Header Stats -->
         <div class="stats-bar">
-            <div class="stat-card">
-                <div class="stat-value">{{ totalSignals }}</div>
-                <div class="stat-label">Markets</div>
+            <div class="stat-card glass-lift">
+                <div class="stat-value glow">{{ totalSignals }}</div>
+                <div class="stat-label font-mono">Markets</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-value text-amber-400">{{ highConviction }}</div>
-                <div class="stat-label">High Conviction</div>
+            <div class="stat-card glass-lift">
+                <div class="stat-value text-warn">{{ highConviction }}</div>
+                <div class="stat-label font-mono">High Conviction</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-value text-cyan-400">{{ arbCount }}</div>
-                <div class="stat-label">Arbitrage</div>
+            <div class="stat-card glass-lift">
+                <div class="stat-value text-info">{{ arbCount }}</div>
+                <div class="stat-label font-mono">Arbitrage</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-value" :class="whaleCount > 0 ? 'text-red-400' : 'text-zinc-500'">
+            <div class="stat-card glass-lift">
+                <div class="stat-value" :class="whaleCount > 0 ? 'text-error' : ''">
                     {{ whaleCount }}
                 </div>
-                <div class="stat-label">Whale Alerts</div>
+                <div class="stat-label font-mono">Whale Alerts</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-value" :class="isStale ? 'text-red-400' : 'text-emerald-400'">
+            <div class="stat-card glass-lift">
+                <div class="stat-value" :class="isStale ? 'text-error' : 'glow'">
                     {{ data?.status?.enabled ? 'LIVE' : 'OFF' }}
                 </div>
-                <div class="stat-label">Status</div>
+                <div class="stat-label font-mono">Status</div>
             </div>
         </div>
 
@@ -177,7 +177,7 @@ onUnmounted(() => {
             >
                 <span class="font-bold">{{ s.symbol }}</span>
                 <span :class="sentimentColor(s.sentiment)">{{ s.sentiment.replace('_', ' ') }}</span>
-                <span class="text-zinc-500">{{ formatPct(s.weighted_probability) }}</span>
+                <span class="text-dim">{{ formatPct(s.weighted_probability) }}</span>
             </div>
         </div>
 
@@ -212,7 +212,7 @@ onUnmounted(() => {
                     v-for="sig in data.signals"
                     :key="sig.market_id"
                     class="signal-card"
-                    :class="{ 'border-amber-500/30': sig.is_high_conviction, 'border-red-500/30': sig.manipulation_risk !== 'clean' }"
+                    :class="{ 'signal-hc': sig.is_high_conviction, 'signal-risk': sig.manipulation_risk !== 'clean' }"
                 >
                     <div class="signal-header">
                         <span class="source-badge">{{ sig.source }}</span>
@@ -230,7 +230,7 @@ onUnmounted(() => {
                             {{ formatPct(sig.probability) }}
                         </div>
                         <div class="vol">{{ formatUsd(sig.volume_usd) }}</div>
-                        <div v-if="sig.momentum !== null" class="momentum" :class="sig.momentum > 0 ? 'text-emerald-400' : 'text-red-400'">
+                        <div v-if="sig.momentum !== null" class="momentum" :class="sig.momentum > 0 ? 'text-bullish' : 'text-bearish'">
                             {{ sig.momentum > 0 ? '+' : '' }}{{ (sig.momentum * 100).toFixed(1) }}%
                         </div>
                         <div v-if="sig.volume_change !== null" class="vol-change">
@@ -259,7 +259,7 @@ onUnmounted(() => {
                             <span class="venue-name">{{ arb.venue_a }}</span>
                             <span class="venue-price">{{ formatPct(arb.price_a) }}</span>
                         </div>
-                        <div class="arb-spread">{{ arb.spread_pct.toFixed(1) }}%</div>
+                        <div class="arb-spread glow">{{ arb.spread_pct.toFixed(1) }}%</div>
                         <div class="venue">
                             <span class="venue-name">{{ arb.venue_b }}</span>
                             <span class="venue-price">{{ formatPct(arb.price_b) }}</span>
@@ -280,27 +280,27 @@ onUnmounted(() => {
                 <div class="accuracy-stats">
                     <div class="acc-stat">
                         <div class="acc-value">{{ accuracy.total_tracked }}</div>
-                        <div class="acc-label">Tracked</div>
+                        <div class="acc-label font-mono">Tracked</div>
                     </div>
                     <div class="acc-stat">
                         <div class="acc-value">{{ accuracy.total_resolved }}</div>
-                        <div class="acc-label">Resolved</div>
+                        <div class="acc-label font-mono">Resolved</div>
                     </div>
                     <div class="acc-stat">
-                        <div class="acc-value" :class="accuracy.overall_accuracy_pct >= 60 ? 'text-emerald-400' : 'text-amber-400'">
+                        <div class="acc-value" :class="accuracy.overall_accuracy_pct >= 60 ? 'glow' : 'text-warn'">
                             {{ accuracy.overall_accuracy_pct.toFixed(1) }}%
                         </div>
-                        <div class="acc-label">Accuracy</div>
+                        <div class="acc-label font-mono">Accuracy</div>
                     </div>
                     <div class="acc-stat">
-                        <div class="acc-value" :class="accuracy.overall_brier <= 0.25 ? 'text-emerald-400' : 'text-amber-400'">
+                        <div class="acc-value" :class="accuracy.overall_brier <= 0.25 ? 'glow' : 'text-warn'">
                             {{ accuracy.overall_brier.toFixed(3) }}
                         </div>
-                        <div class="acc-label">Brier Score</div>
+                        <div class="acc-label font-mono">Brier Score</div>
                     </div>
                 </div>
                 <div v-if="accuracy.high_conviction_resolved > 0" class="hc-section">
-                    <div class="hc-title">High Conviction</div>
+                    <div class="hc-title font-mono">High Conviction</div>
                     <div class="hc-stats">
                         {{ accuracy.high_conviction_resolved }} resolved &middot;
                         {{ accuracy.high_conviction_accuracy_pct.toFixed(1) }}% accurate &middot;
@@ -308,11 +308,11 @@ onUnmounted(() => {
                     </div>
                 </div>
                 <div v-if="Object.keys(accuracy.by_source).length" class="source-section">
-                    <div class="source-title">By Source</div>
+                    <div class="source-title font-mono">By Source</div>
                     <div v-for="(stats, source) in accuracy.by_source" :key="source" class="source-row">
                         <span class="source-name">{{ source }}</span>
                         <span>{{ stats.correct }}/{{ stats.total }} correct</span>
-                        <span :class="stats.accuracy_pct >= 60 ? 'text-emerald-400' : 'text-amber-400'">
+                        <span :class="stats.accuracy_pct >= 60 ? 'glow' : 'text-warn'">
                             {{ stats.accuracy_pct.toFixed(1) }}%
                         </span>
                     </div>
@@ -339,388 +339,242 @@ onUnmounted(() => {
 
 <style scoped>
 .predictions-view {
-    padding: 1rem;
-    color: #e4e4e7;
-    font-family: 'JetBrains Mono', 'SF Mono', monospace;
+    display: grid;
+    gap: 1rem;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
     font-size: 0.8rem;
 }
 
 .stats-bar {
-    display: flex;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.6rem;
 }
 
 .stat-card {
-    flex: 1;
-    background: rgba(24, 24, 27, 0.8);
-    border: 1px solid rgba(63, 63, 70, 0.5);
-    border-radius: 0.5rem;
-    padding: 0.75rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 0.65rem 0.5rem;
     text-align: center;
+    backdrop-filter: blur(4px);
 }
 
-.stat-value {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: #e4e4e7;
-}
+.stat-value { font-size: 1.3rem; font-weight: 700; color: var(--text-primary); }
+.stat-label { font-size: 0.62rem; color: var(--text-tertiary); margin-top: 0.2rem; }
 
-.stat-label {
-    font-size: 0.65rem;
-    color: #71717a;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-top: 0.25rem;
-}
+.text-warn { color: var(--color-warning); text-shadow: 0 0 4px rgba(255, 176, 0, 0.3); }
+.text-info { color: var(--color-info); text-shadow: 0 0 4px rgba(96, 165, 250, 0.3); }
+.text-error { color: var(--color-error); text-shadow: 0 0 4px rgba(255, 68, 68, 0.3); }
+.text-bullish { color: var(--color-terminal); text-shadow: 0 0 4px rgba(32, 194, 14, 0.3); }
+.text-bearish { color: var(--color-error); text-shadow: 0 0 4px rgba(255, 68, 68, 0.3); }
+.text-neutral { color: var(--text-secondary); }
+.text-dim { color: var(--text-tertiary); }
 
-.feed-row, .sentiment-row {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 0.75rem;
-    flex-wrap: wrap;
-}
+.feed-row, .sentiment-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
 .feed-chip {
-    padding: 0.25rem 0.75rem;
-    border-radius: 9999px;
-    font-size: 0.7rem;
+    padding: 0.2rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.68rem;
     font-weight: 600;
     text-transform: uppercase;
+    letter-spacing: 0.04em;
 }
 
-.feed-ok { background: rgba(16, 185, 129, 0.15); color: #34d399; }
-.feed-warn { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
-.feed-off { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+.feed-ok { background: rgba(32, 194, 14, 0.1); color: var(--color-terminal); border: 1px solid rgba(32, 194, 14, 0.2); }
+.feed-warn { background: rgba(255, 176, 0, 0.1); color: var(--color-warning); border: 1px solid rgba(255, 176, 0, 0.2); }
+.feed-off { background: rgba(255, 68, 68, 0.08); color: var(--color-error); border: 1px solid rgba(255, 68, 68, 0.2); }
 
 .sentiment-chip {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    padding: 0.25rem 0.75rem;
-    background: rgba(24, 24, 27, 0.8);
-    border: 1px solid rgba(63, 63, 70, 0.3);
-    border-radius: 0.375rem;
+    display: flex; gap: 0.5rem; align-items: center;
+    padding: 0.2rem 0.65rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
     font-size: 0.7rem;
 }
 
 .tab-bar {
-    display: flex;
-    gap: 0.25rem;
-    margin-bottom: 1rem;
-    border-bottom: 1px solid rgba(63, 63, 70, 0.5);
+    display: flex; gap: 0.25rem;
+    border-bottom: 1px solid var(--border-subtle);
     padding-bottom: 0.25rem;
 }
 
 .tab-btn {
     padding: 0.4rem 0.75rem;
-    background: transparent;
-    border: none;
-    color: #71717a;
+    background: transparent; border: none;
+    color: var(--text-tertiary);
     cursor: pointer;
     font-size: 0.75rem;
-    font-family: inherit;
+    font-family: var(--font-mono);
+    letter-spacing: 0.04em;
     border-bottom: 2px solid transparent;
     transition: all 0.15s;
 }
 
-.tab-btn:hover { color: #a1a1aa; }
-.tab-btn.active { color: #e4e4e7; border-bottom-color: #6366f1; }
+.tab-btn:hover { color: var(--text-secondary); }
+.tab-btn.active { color: var(--color-terminal); border-bottom-color: var(--color-terminal); text-shadow: 0 0 6px rgba(32, 194, 14, 0.3); }
 
 .tab-content { min-height: 200px; }
-
-.empty-state {
-    text-align: center;
-    color: #52525b;
-    padding: 3rem;
-    font-style: italic;
-}
+.empty-state { text-align: center; color: var(--text-tertiary); padding: 3rem; font-style: italic; }
 
 .signal-grid, .arb-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 0.75rem;
+    gap: 0.7rem;
 }
 
 .signal-card {
-    background: rgba(24, 24, 27, 0.8);
-    border: 1px solid rgba(63, 63, 70, 0.4);
-    border-radius: 0.5rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
     padding: 0.75rem;
-    transition: border-color 0.15s;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    backdrop-filter: blur(4px);
 }
 
-.signal-card:hover { border-color: rgba(99, 102, 241, 0.4); }
+.signal-card:hover { border-color: var(--border-accent); box-shadow: var(--glow-sm); }
+.signal-hc { border-color: rgba(255, 176, 0, 0.3); }
+.signal-risk { border-color: rgba(255, 68, 68, 0.3); }
 
-.signal-header {
-    display: flex;
-    gap: 0.35rem;
-    align-items: center;
-    margin-bottom: 0.4rem;
-}
+.signal-header { display: flex; gap: 0.35rem; align-items: center; margin-bottom: 0.4rem; }
 
 .source-badge {
     padding: 0.1rem 0.4rem;
-    background: rgba(99, 102, 241, 0.15);
-    color: #818cf8;
-    border-radius: 0.25rem;
-    font-size: 0.6rem;
-    font-weight: 700;
-    text-transform: uppercase;
+    background: rgba(32, 194, 14, 0.1);
+    color: var(--color-terminal);
+    border: 1px solid rgba(32, 194, 14, 0.2);
+    border-radius: var(--radius-xs);
+    font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
 }
 
 .whale-badge {
     padding: 0.1rem 0.4rem;
-    background: rgba(6, 182, 212, 0.15);
-    color: #22d3ee;
-    border-radius: 0.25rem;
-    font-size: 0.6rem;
-    font-weight: 700;
+    background: rgba(96, 165, 250, 0.12);
+    color: var(--color-info);
+    border-radius: var(--radius-xs);
+    font-size: 0.6rem; font-weight: 700;
 }
 
 .spike-badge {
     padding: 0.1rem 0.4rem;
-    background: rgba(16, 185, 129, 0.15);
-    color: #34d399;
-    border-radius: 0.25rem;
-    font-size: 0.6rem;
-    font-weight: 700;
+    background: rgba(32, 194, 14, 0.1);
+    color: var(--color-terminal);
+    border-radius: var(--radius-xs);
+    font-size: 0.6rem; font-weight: 700;
 }
 
 .risk-badge {
     padding: 0.1rem 0.4rem;
-    border-radius: 0.25rem;
-    font-size: 0.6rem;
-    font-weight: 700;
+    border-radius: var(--radius-xs);
+    font-size: 0.6rem; font-weight: 700;
 }
+
+.risk-severe { background: rgba(255, 68, 68, 0.15); color: var(--color-error); }
+.risk-high { background: rgba(255, 176, 0, 0.15); color: var(--color-warning); }
+.risk-medium { background: rgba(255, 140, 0, 0.12); color: #ff8c00; }
 
 .signal-question {
-    color: #d4d4d8;
-    font-size: 0.75rem;
-    line-height: 1.3;
-    margin-bottom: 0.4rem;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+    color: var(--text-primary);
+    font-size: 0.75rem; line-height: 1.3; margin-bottom: 0.4rem;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 
-.signal-stats {
-    display: flex;
-    gap: 0.75rem;
-    align-items: center;
-    margin-bottom: 0.35rem;
-}
-
+.signal-stats { display: flex; gap: 0.75rem; align-items: center; margin-bottom: 0.35rem; }
 .prob { font-weight: 700; font-size: 0.85rem; }
-.vol { color: #71717a; }
+.vol { color: var(--text-tertiary); }
 .momentum { font-size: 0.7rem; font-weight: 600; }
-.vol-change { color: #71717a; font-size: 0.65rem; }
+.vol-change { color: var(--text-tertiary); font-size: 0.65rem; }
 
 .signal-symbols { display: flex; gap: 0.25rem; }
 
 .symbol-tag {
     padding: 0.1rem 0.35rem;
-    background: rgba(250, 204, 21, 0.1);
-    color: #fbbf24;
-    border-radius: 0.2rem;
-    font-size: 0.6rem;
-    font-weight: 600;
+    background: rgba(255, 176, 0, 0.08);
+    color: var(--color-warning);
+    border: 1px solid rgba(255, 176, 0, 0.15);
+    border-radius: var(--radius-xs);
+    font-size: 0.6rem; font-weight: 600;
 }
 
 .arb-card {
-    background: rgba(24, 24, 27, 0.8);
-    border: 1px solid rgba(6, 182, 212, 0.3);
-    border-radius: 0.5rem;
+    background: var(--bg-card);
+    border: 1px solid rgba(96, 165, 250, 0.25);
+    border-radius: var(--radius-md);
     padding: 0.75rem;
+    backdrop-filter: blur(4px);
 }
 
 .arb-name {
-    color: #d4d4d8;
-    font-size: 0.75rem;
-    margin-bottom: 0.5rem;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+    color: var(--text-primary); font-size: 0.75rem; margin-bottom: 0.5rem;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 
-.arb-venues {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 0.4rem;
-}
-
+.arb-venues { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem; }
 .venue { text-align: center; }
-.venue-name { display: block; color: #71717a; font-size: 0.6rem; text-transform: uppercase; }
-.venue-price { display: block; font-size: 0.85rem; font-weight: 700; color: #e4e4e7; }
-
-.arb-spread {
-    font-size: 1.1rem;
-    font-weight: 800;
-    color: #22d3ee;
-}
-
-.arb-footer {
-    display: flex;
-    justify-content: space-between;
-    color: #71717a;
-    font-size: 0.65rem;
-}
+.venue-name { display: block; color: var(--text-tertiary); font-size: 0.6rem; text-transform: uppercase; }
+.venue-price { display: block; font-size: 0.85rem; font-weight: 700; color: var(--text-primary); }
+.arb-spread { font-size: 1.1rem; font-weight: 800; color: var(--color-info); }
+.arb-footer { display: flex; justify-content: space-between; color: var(--text-tertiary); font-size: 0.65rem; }
 
 .accuracy-panel { max-width: 600px; }
-
-.accuracy-stats {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 1rem;
-}
-
+.accuracy-stats { display: flex; gap: 1rem; margin-bottom: 1rem; }
 .acc-stat { text-align: center; flex: 1; }
 .acc-value { font-size: 1.3rem; font-weight: 700; }
-.acc-label { font-size: 0.6rem; color: #71717a; text-transform: uppercase; margin-top: 0.15rem; }
+.acc-label { font-size: 0.6rem; color: var(--text-tertiary); text-transform: uppercase; margin-top: 0.15rem; }
 
 .hc-section, .source-section {
-    margin-top: 1rem;
-    padding: 0.75rem;
-    background: rgba(24, 24, 27, 0.6);
-    border: 1px solid rgba(63, 63, 70, 0.3);
-    border-radius: 0.375rem;
+    margin-top: 1rem; padding: 0.75rem;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
 }
 
-.hc-title, .source-title {
-    font-size: 0.7rem;
-    font-weight: 700;
-    color: #a1a1aa;
-    text-transform: uppercase;
-    margin-bottom: 0.4rem;
-}
-
-.hc-stats { color: #d4d4d8; }
+.hc-title, .source-title { font-size: 0.7rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.4rem; }
+.hc-stats { color: var(--text-primary); }
 
 .source-row {
-    display: flex;
-    justify-content: space-between;
+    display: flex; justify-content: space-between;
     padding: 0.25rem 0;
-    border-bottom: 1px solid rgba(63, 63, 70, 0.2);
+    border-bottom: 1px solid var(--border-subtle);
 }
 
 .source-name { font-weight: 600; text-transform: capitalize; }
 
-.whale-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
+.whale-list { display: flex; flex-direction: column; gap: 0.5rem; }
 
 .whale-alert {
     padding: 0.75rem;
-    background: rgba(239, 68, 68, 0.05);
-    border: 1px solid rgba(239, 68, 68, 0.2);
-    border-radius: 0.375rem;
-    color: #fca5a5;
-    font-size: 0.75rem;
-    line-height: 1.4;
+    background: rgba(255, 68, 68, 0.05);
+    border: 1px solid rgba(255, 68, 68, 0.2);
+    border-radius: var(--radius-sm);
+    color: var(--color-error);
+    font-size: 0.75rem; line-height: 1.4;
 }
 
 /* ── Status Bars ── */
-.status-bar {
-    padding: 0.45rem 0.8rem;
-    font-family: 'JetBrains Mono', 'SF Mono', monospace;
-    font-size: 0.72rem;
-    letter-spacing: 0.04em;
-    border-radius: 0.375rem;
-    text-align: center;
-    margin-bottom: 0.75rem;
-}
+.status-bar { padding: 0.45rem 0.8rem; font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.04em; border-radius: var(--radius-sm); text-align: center; }
+.loading-bar { background: rgba(32, 194, 14, 0.08); color: var(--color-terminal); border: 1px solid rgba(32, 194, 14, 0.15); }
+.error-bar { background: rgba(255, 68, 68, 0.08); color: var(--color-error); border: 1px solid rgba(255, 68, 68, 0.2); cursor: pointer; }
+.stale-bar { background: rgba(255, 200, 50, 0.06); color: var(--color-warning); border: 1px solid rgba(255, 200, 50, 0.15); }
 
-.loading-bar {
-    background: rgba(16, 185, 129, 0.08);
-    color: #34d399;
-    border: 1px solid rgba(16, 185, 129, 0.2);
-}
+.pulse-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--color-terminal); margin-right: 0.4rem; animation: pulse 1.2s ease-in-out infinite; }
 
-.error-bar {
-    background: rgba(239, 68, 68, 0.08);
-    color: #f87171;
-    border: 1px solid rgba(239, 68, 68, 0.2);
-    cursor: pointer;
-}
+@keyframes pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
 
-.stale-bar {
-    background: rgba(250, 204, 21, 0.06);
-    color: #fbbf24;
-    border: 1px solid rgba(250, 204, 21, 0.15);
-}
+/* ── Skeleton ── */
+.skeleton-card { position: relative; overflow: hidden; }
+.skeleton-value { width: 40%; height: 1.5rem; margin: 0 auto 0.35rem; background: rgba(32, 194, 14, 0.08); border-radius: var(--radius-xs); animation: skelPulse 1.6s ease-in-out infinite; }
+.skeleton-label { width: 60%; height: 0.6rem; margin: 0 auto; background: rgba(32, 194, 14, 0.05); border-radius: var(--radius-xs); animation: skelPulse 1.6s ease-in-out infinite 0.2s; }
+.skeleton-header { width: 30%; height: 0.7rem; background: rgba(32, 194, 14, 0.06); border-radius: var(--radius-xs); margin-bottom: 0.5rem; animation: skelPulse 1.6s ease-in-out infinite; }
+.skeleton-question { width: 90%; height: 0.75rem; background: rgba(32, 194, 14, 0.05); border-radius: var(--radius-xs); margin-bottom: 0.4rem; animation: skelPulse 1.6s ease-in-out infinite 0.15s; }
+.skeleton-stats { width: 50%; height: 0.65rem; background: rgba(32, 194, 14, 0.04); border-radius: var(--radius-xs); animation: skelPulse 1.6s ease-in-out infinite 0.3s; }
 
-.pulse-dot {
-    display: inline-block;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #34d399;
-    margin-right: 0.4rem;
-    animation: pulse 1.2s ease-in-out infinite;
-}
+@keyframes skelPulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.85; } }
 
-@keyframes pulse {
-    0%, 100% { opacity: 0.3; }
-    50% { opacity: 1; }
-}
-
-/* ── Skeleton Loading ── */
-.skeleton-card {
-    position: relative;
-    overflow: hidden;
-}
-
-.skeleton-value {
-    width: 40%;
-    height: 1.5rem;
-    margin: 0 auto 0.35rem;
-    background: rgba(63, 63, 70, 0.3);
-    border-radius: 0.25rem;
-    animation: skeletonPulse 1.6s ease-in-out infinite;
-}
-
-.skeleton-label {
-    width: 60%;
-    height: 0.6rem;
-    margin: 0 auto;
-    background: rgba(63, 63, 70, 0.2);
-    border-radius: 0.15rem;
-    animation: skeletonPulse 1.6s ease-in-out infinite 0.2s;
-}
-
-.skeleton-header {
-    width: 30%;
-    height: 0.7rem;
-    background: rgba(63, 63, 70, 0.3);
-    border-radius: 0.2rem;
-    margin-bottom: 0.5rem;
-    animation: skeletonPulse 1.6s ease-in-out infinite;
-}
-
-.skeleton-question {
-    width: 90%;
-    height: 0.75rem;
-    background: rgba(63, 63, 70, 0.2);
-    border-radius: 0.15rem;
-    margin-bottom: 0.4rem;
-    animation: skeletonPulse 1.6s ease-in-out infinite 0.15s;
-}
-
-.skeleton-stats {
-    width: 50%;
-    height: 0.65rem;
-    background: rgba(63, 63, 70, 0.15);
-    border-radius: 0.15rem;
-    animation: skeletonPulse 1.6s ease-in-out infinite 0.3s;
-}
-
-@keyframes skeletonPulse {
-    0%, 100% { opacity: 0.4; }
-    50% { opacity: 0.8; }
+@media (max-width: 760px) {
+    .stats-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 </style>
