@@ -1,6 +1,6 @@
 # Sapphire Master Roadmap
 
-> Last Updated: Feb 15, 2026 | Status: Phase 10 Complete 🦅✅ | Tests: 1256 | Deploy: sapphire-alpha-00224-dc6 | Gateway: openclaw-gateway-00006-twc
+> Last Updated: Feb 15, 2026 | Status: Phase 10 Complete 🦅✅ | Tests: 1324 | Deploy: sapphire-alpha-00227-tvg | Gateway: openclaw-gateway-00009-zll
 
 ## Vision
 Build a top-tier autonomous crypto trading platform with secure multi-agent collaboration, crowdsourced swarm intelligence, and automated public presence.
@@ -294,7 +294,24 @@ _Full agent autonomy — OBSIDIAN first, then multi-agent_
 - [x] Cold-start resilience: deferred bootstrap, dispatch error logging with context (PR #57)
 - [x] Fire-and-forget dispatch: asyncio background tasks, 600s timeout, non-blocking autonomy loop (PR #58)
 - [x] Multi-agent AUTONOMY_DISPATCH: granted to EMERALD and SAPPHIRE for rotation cycles (PR #59)
-- [x] Deploy: sapphire-alpha-00224-dc6, openclaw-gateway-00006-twc
+- [x] Deploy: sapphire-alpha-00224-dc6 → 00227-tvg, openclaw-gateway-00006-twc → 00009-zll
+
+### Conversational Assistant (PR #61)
+- [x] Two-tier intent classification: fast local regex (< 1ms) + Gemini Flash LLM fallback
+- [x] IntentType enum: 7 types (status_report, control_trading, media_publish/status, operations, agent_question, general_chat)
+- [x] Fast patterns: status checks, kill/resume, health, proposals, agent status — all zero-LLM-cost
+- [x] Agent question routing: substantive questions dispatch to OpenClaw agents for Claude Opus 4 answers
+- [x] Operations routing: natural language ops ("show proposals", "health check") via dispatch_control_command
+- [x] 68 new tests (1324 total)
+
+### OpenClaw Agent Configuration
+- [x] MEMORY.md seeded for all 3 agents (platform context, deployment history, architecture)
+- [x] HEARTBEAT.md with actual periodic tasks (OBSIDIAN 30m, EMERALD 60m, SAPPHIRE 120m)
+- [x] TOOLS.md with environment-specific context (GCP infra, codebase structure, security tools)
+- [x] Memory flush on compaction enabled (softThresholdTokens: 4000)
+- [x] Removed invalid apply_patch from tool allowlists
+- [x] Gateway entrypoint updated with agent context files
+- [x] Deploy: openclaw-gateway-00009-zll
 
 ### Remaining (Optional Polish)
 - [ ] Verify from Telegram: /autonomy, /health, /openclaw_smoke, /agent_status
@@ -349,4 +366,6 @@ Harden        Security       Forum          Swarm          Tracking       Social
 - ✅ PR #57: Dispatch Reliability (cold-start deferred bootstrap, error logging with context)
 - ✅ PR #58: Fire-and-Forget Dispatch (asyncio background tasks, non-blocking autonomy loop)
 - ✅ PR #59: Multi-Agent AUTONOMY_DISPATCH (EMERALD + SAPPHIRE capability grant for rotation)
-- ✅ 1256 tests passing | All 3 agents live on Claude Opus 4 | Phase 10 COMPLETE + Operational Reliability
+- ✅ PR #60: Telegram HTML Parse Mode (safe HTML formatting across all agent messages)
+- ✅ PR #61: Conversational Assistant (two-tier intent classification, 7 intent types, agent question routing, 68 new tests)
+- ✅ 1324 tests passing | All 3 agents live on Claude Opus 4 | Phase 10 COMPLETE + Conversational Assistant
