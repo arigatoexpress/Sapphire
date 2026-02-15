@@ -204,10 +204,41 @@ class TestDispatchInstruction:
                 )
         _, kwargs = fake_session.post_calls[0]
         payload = kwargs["json"]
-        assert payload["agent"] == "obsidian"
-        assert payload["context"]["allow_code_changes"] is True
-        assert payload["context"]["trigger"] == "manual"
-        assert payload["context"]["extra"] == "data"
+        # OpenAI-compatible format
+        assert payload["model"] == "openclaw"
+        assert payload["stream"] is False
+        assert len(payload["messages"]) == 2
+        assert payload["messages"][0]["role"] == "system"
+        assert payload["messages"][1]["role"] == "user"
+        assert payload["messages"][1]["content"] == "test"
+        # System message contains context metadata
+        system_content = payload["messages"][0]["content"]
+        assert "OBSIDIAN" in system_content
+        assert "allow_code_changes" in system_content
+        assert "manual" in system_content
+        assert "extra" in system_content
+        # Agent ID header
+        headers = kwargs.get("headers", {})
+        assert headers.get("x-openclaw-agent-id") == "obsidian"
+
+    @pytest.mark.asyncio
+    async def test_uses_chat_completions_endpoint(self):
+        d = OpenClawDispatcher(gateway_url="http://localhost:18789", gateway_token="tok")
+        fake_resp = _FakeResponse(status=200)
+        fake_session = _FakeSession(fake_resp)
+
+        with patch("openclaw_dispatch.aiohttp.ClientSession", return_value=fake_session):
+            with patch("openclaw_dispatch.aiohttp.ClientTimeout"):
+                await d.dispatch_instruction("OBSIDIAN", "test")
+        url, _ = fake_session.post_calls[0]
+        assert url == "http://localhost:18789/v1/chat/completions"
+
+    @pytest.mark.asyncio
+    async def test_default_gateway_url_is_cloud_run(self):
+        """Default URL should point to Cloud Run when no env var is set."""
+        with patch.dict(os.environ, {"OPENCLAW_GATEWAY_URL": ""}, clear=False):
+            d = OpenClawDispatcher(gateway_token="tok")
+            assert "us-central1.run.app" in d.gateway_url
 
 
 # ── Session Decision Tests ────────────────────────────────────────────

@@ -1,8 +1,8 @@
 """OpenClaw Gateway Dispatcher — dispatches instructions to OpenClaw agents.
 
-Replaces the tv_autonomy plugin dependency with a direct HTTP call to the
-OpenClaw gateway running locally (or remotely).  The gateway authenticates
-via a bearer token and routes messages to the target agent.
+Sends instructions via the OpenClaw gateway's OpenAI-compatible
+``/v1/chat/completions`` endpoint.  The gateway authenticates via a bearer
+token and routes to the target agent using the ``x-openclaw-agent-id`` header.
 
 Usage::
 
@@ -17,6 +17,7 @@ Usage::
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import os
 import time
@@ -29,9 +30,17 @@ try:
 except ImportError:  # pragma: no cover — aiohttp is always installed in alpha-engine
     aiohttp = None  # type: ignore[assignment]
 
+# Default Cloud Run gateway URL; falls back to localhost for local dev.
+_DEFAULT_GATEWAY_URL = "https://openclaw-gateway-267358751314.us-central1.run.app"
+
 
 class OpenClawDispatcher:
-    """Dispatches instructions to OpenClaw agents via the local gateway."""
+    """Dispatches instructions to OpenClaw agents via the gateway.
+
+    Uses the OpenAI-compatible ``/v1/chat/completions`` endpoint for
+    dispatching instructions and the ``/v1/chat/completions`` endpoint
+    with a session-decision system message for session decisions.
+    """
 
     def __init__(
         self,
@@ -39,7 +48,9 @@ class OpenClawDispatcher:
         gateway_token: str = "",
     ):
         self.gateway_url = (
-            gateway_url or os.getenv("OPENCLAW_GATEWAY_URL", "http://localhost:18789")
+            gateway_url
+            or os.getenv("OPENCLAW_GATEWAY_URL", "")
+            or _DEFAULT_GATEWAY_URL
         ).rstrip("/")
         self.gateway_token = gateway_token or os.getenv("OPENCLAW_GATEWAY_TOKEN", "")
         self.enabled = bool(self.gateway_url and self.gateway_token)
@@ -55,6 +66,32 @@ class OpenClawDispatcher:
             os.getenv("OPENCLAW_ALLOWED_PROJECT", "sapphire-479610")
         }
 
+    # ── helpers ──────────────────────────────────────────────────────────
+
+    def _build_system_context(
+        self,
+        agent_id: str,
+        context: Optional[Dict[str, Any]] = None,
+        allow_code_changes: bool = False,
+        allow_gcloud_changes: bool = False,
+        trigger: str = "",
+    ) -> str:
+        """Return a system-message string encoding dispatch metadata."""
+        ctx = {
+            **(context or {}),
+            "trigger": trigger,
+            "allow_code_changes": allow_code_changes,
+            "allow_gcloud_changes": allow_gcloud_changes,
+            "repo_scope": list(self.allowed_repo_scope),
+            "project_scope": list(self.allowed_project_scope),
+        }
+        return (
+            f"You are {agent_id}, a Sapphire autonomous agent. "
+            f"Dispatch context: {json.dumps(ctx, default=str)}"
+        )
+
+    # ── dispatch instruction ─────────────────────────────────────────────
+
     async def dispatch_instruction(
         self,
         agent_id: str,
@@ -65,6 +102,9 @@ class OpenClawDispatcher:
         trigger: str = "",
     ) -> Dict[str, Any]:
         """Send an instruction to an OpenClaw agent via the gateway.
+
+        Uses ``POST /v1/chat/completions`` with the ``x-openclaw-agent-id``
+        header to route to the correct agent.
 
         Returns a dict with ``dispatched`` (bool) and ``session_key`` (str).
         """
@@ -77,18 +117,16 @@ class OpenClawDispatcher:
             f"{agent_id}:{instruction[:100]}:{time.time()}".encode()
         ).hexdigest()[:16]
 
+        system_ctx = self._build_system_context(
+            agent_id, context, allow_code_changes, allow_gcloud_changes, trigger,
+        )
         payload = {
-            "agent": agent_id.lower(),
-            "message": instruction,
-            "session_key": session_key,
-            "context": {
-                **(context or {}),
-                "trigger": trigger,
-                "allow_code_changes": allow_code_changes,
-                "allow_gcloud_changes": allow_gcloud_changes,
-                "repo_scope": list(self.allowed_repo_scope),
-                "project_scope": list(self.allowed_project_scope),
-            },
+            "model": "openclaw",
+            "messages": [
+                {"role": "system", "content": system_ctx},
+                {"role": "user", "content": instruction},
+            ],
+            "stream": False,
         }
 
         try:
@@ -96,12 +134,13 @@ class OpenClawDispatcher:
                 headers = {
                     "Authorization": f"Bearer {self.gateway_token}",
                     "Content-Type": "application/json",
+                    "x-openclaw-agent-id": agent_id.lower(),
                 }
                 async with session.post(
-                    f"{self.gateway_url}/api/agent/message",
+                    f"{self.gateway_url}/v1/chat/completions",
                     json=payload,
                     headers=headers,
-                    timeout=aiohttp.ClientTimeout(total=30),
+                    timeout=aiohttp.ClientTimeout(total=120),
                 ) as resp:
                     self._last_dispatch_at = time.time()
                     if resp.status in (200, 202):
@@ -132,22 +171,42 @@ class OpenClawDispatcher:
                 "error": self._last_error,
             }
 
+    # ── session decision ─────────────────────────────────────────────────
+
     async def dispatch_session_decision(
         self,
         session_key: str,
         decision: str,
         note: str = "",
     ) -> Dict[str, Any]:
-        """Forward a session approval/rejection to the gateway."""
+        """Forward a session approval/rejection to the gateway.
+
+        Encodes the decision as a chat completion with a system message
+        carrying the session key and decision payload.
+        """
         if not self.enabled:
             return {"dispatched": False, "reason": "gateway_not_configured"}
         if aiohttp is None:
             return {"dispatched": False, "reason": "aiohttp_not_installed"}
 
+        decision_msg = (
+            f"Session decision for key={session_key}: "
+            f"{decision.upper()}"
+            f"{('. Note: ' + note[:500]) if note else ''}"
+        )
         payload = {
-            "session_key": session_key,
-            "decision": decision.upper(),
-            "note": note[:500],
+            "model": "openclaw",
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        f"Process session decision. session_key={session_key} "
+                        f"decision={decision.upper()}"
+                    ),
+                },
+                {"role": "user", "content": decision_msg},
+            ],
+            "stream": False,
         }
 
         try:
@@ -157,10 +216,10 @@ class OpenClawDispatcher:
                     "Content-Type": "application/json",
                 }
                 async with session.post(
-                    f"{self.gateway_url}/api/agent/session/decision",
+                    f"{self.gateway_url}/v1/chat/completions",
                     json=payload,
                     headers=headers,
-                    timeout=aiohttp.ClientTimeout(total=15),
+                    timeout=aiohttp.ClientTimeout(total=30),
                 ) as resp:
                     if resp.status in (200, 202):
                         return {"dispatched": True, "session_key": session_key}
@@ -168,6 +227,8 @@ class OpenClawDispatcher:
         except Exception as exc:
             logger.error(f"[OpenClaw] Session decision dispatch failed: {exc}")
             return {"dispatched": False, "reason": "dispatch_exception"}
+
+    # ── status ───────────────────────────────────────────────────────────
 
     def status(self) -> Dict[str, Any]:
         """Return dispatcher status for health checks and Telegram."""
