@@ -1785,14 +1785,20 @@ class AlphaEngine:
         entry["decision_source"] = source
         self._autonomy_sessions[resolved_key] = entry
 
-        if self.tv_autonomy:
+        if self.openclaw_dispatcher and self.openclaw_dispatcher.enabled:
+            hook_result = await self.openclaw_dispatcher.dispatch_session_decision(
+                session_key=resolved_key,
+                decision=normalized_decision,
+                note=trimmed_note,
+            )
+        elif self.tv_autonomy:
             hook_result = await self.tv_autonomy.dispatch_session_decision(
                 session_key=resolved_key,
                 decision=normalized_decision,
                 note=trimmed_note,
             )
         else:
-            hook_result = {"dispatched": False, "reason": "tv_integration_disabled"}
+            hook_result = {"dispatched": False, "reason": "no_dispatcher_available"}
         dispatched = bool(hook_result.get("dispatched"))
         reason = str(hook_result.get("reason", "")).strip()
         log_level = "info" if dispatched else "warning"
