@@ -2,6 +2,8 @@
 
 Autonomous trading organization and control plane for `arigatoexpress/Sapphire`.
 
+> See `AGENTS.md` for agentic navigation.
+
 ## Mission
 Run a focused, 24/7 trading operation that maximizes risk-adjusted return while preserving hard downside controls.
 
