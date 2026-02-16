@@ -1,1 +1,1 @@
-Enterprise-grade AI-powered algorithmic trading platform with 6 specialized AI agents, sub-2μs latency, and institutional risk management. Live at sapphiretrade.xyz
+Autonomous trading control plane (ASTER/LIGHTER) with Telegram governance, Cloud Run services, and read-only dashboards.

@@ -60,7 +60,7 @@ Risk:
 ### P2 - Product/ops divergence from streamlined architecture goal
 
 Evidence:
-- Large residual legacy surface still exists (`legacy/`, monolith-era modules).
+- Large residual legacy surface still exists (`archive/legacy/`, monolith-era modules).
 - Multiple TODO placeholders remain in execution-critical modules.
 
 Risk:
