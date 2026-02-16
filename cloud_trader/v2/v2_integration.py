@@ -99,8 +99,6 @@ class SapphireV2State:
     # Platform clients
     lighter_client: Optional[LighterClient] = None
     aster_client: Optional[Any] = None
-    aster_client: Optional[Any] = None
-    aster_client: Optional[Any] = None
     
     # Core managers
     dual_router: Optional[DualPlatformRouter] = None
@@ -137,8 +135,6 @@ async def initialize_v2_components(
     aster_private_key: Optional[str] = None,
     # Existing clients (optional)
     aster_client: Optional[Any] = None,
-    aster_client: Optional[Any] = None,
-    aster_client: Optional[Any] = None,
     firestore_client: Optional[Any] = None,
     # Configuration
     lighter_testnet: bool = False,
@@ -150,8 +146,6 @@ async def initialize_v2_components(
         lighter_private_key: Lighter wallet private key
         lighter_wallet: Lighter wallet address
         aster_private_key: Aster/Solana private key
-        aster_client: Existing Aster client
-        aster_client: Existing Aster client
         aster_client: Existing Aster client
         firestore_client: Firestore client for persistence
         lighter_testnet: Use Lighter testnet
@@ -190,8 +184,6 @@ async def initialize_v2_components(
         logger.warning("  ⚠️ Lighter credentials not provided - client disabled")
     
     # 3. Store existing clients
-    state.aster_client = aster_client
-    state.aster_client = aster_client
     state.aster_client = aster_client
     
     # 4. Initialize Dual Platform Router

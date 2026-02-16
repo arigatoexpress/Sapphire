@@ -286,13 +286,15 @@ async def lifespan(app: FastAPI):
             # Pass clients from trading service if available to share connections
             ts = trading_service
 
+            existing_aster_client = None
+            if ts:
+                existing_aster_client = getattr(ts, "_exchange_client", None) or getattr(ts, "aster", None)
+
             await initialize_v2_components(
                 lighter_private_key=creds.hl_private_key,
                 lighter_wallet=creds.hl_account_address,
                 aster_private_key=creds.solana_private_key,
-                aster_client=ts.aster if ts else None,
-                aster_client=ts._exchange_client if ts else None,
-                aster_client=ts.aster if ts else None,
+                aster_client=existing_aster_client,
             )
         except Exception as exc:
             logger.exception("❌ STARTUP: Failed to initialize V2 components: %s", exc)
@@ -858,34 +860,6 @@ async def get_agent_evolution_endpoint(agent_id: str):
     except Exception as e:
         logger.error(f"Error fetching agent evolution: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-            "total_pnl_percent": portfolio_data.get("total_pnl_percent", 0),
-            "open_positions_count": len(portfolio_data.get("positions", [])),
-            "active_agents_count": len([a for a in agents_data if a["status"] == "active"]),
-            "total_signals": len(signals),
-        }
-
-        return {
-            "portfolio": {
-                "balance": portfolio_data.get("portfolio_value", 0),
-                "equity": portfolio_data.get("portfolio_value", 0),
-                "pnl_percent": portfolio_data.get("total_pnl_percent", 0),
-            },
-            "agents": agents_data,
-            "signals": signals,
-            "stats": stats,
-            "history": history,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
-    except Exception as e:
-        logger.error(f"Dashboard batch endpoint error: {e}")
-        return {
-            "portfolio": {"balance": 0, "equity": 0, "pnl_percent": 0},
-            "agents": [],
-            "signals": [],
-            "stats": {},
-            "history": [],
-            "error": str(e),
-        }
 
 
 # ===================================================================
