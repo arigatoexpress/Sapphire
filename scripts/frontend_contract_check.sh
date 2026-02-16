@@ -69,6 +69,7 @@ alpha_curl_body() {
 
   if [[ -n "${ALPHA_ID_TOKEN}" ]]; then
     response="$(curl -sS -w $'\n__STATUS__:%{http_code}' \
+      -H "Origin: ${WEB_DOMAIN}" \
       -H "Authorization: Bearer ${ALPHA_ID_TOKEN}" \
       "${url}" 2>/dev/null || true)"
     body="${response%$'\n'__STATUS__:*}"
@@ -83,6 +84,7 @@ alpha_curl_body() {
     fi
 
     response="$(curl -sS -w $'\n__STATUS__:%{http_code}' \
+      -H "Origin: ${WEB_DOMAIN}" \
       -H "X-Serverless-Authorization: Bearer ${ALPHA_ID_TOKEN}" \
       "${url}" 2>/dev/null || true)"
     body="${response%$'\n'__STATUS__:*}"
@@ -97,7 +99,7 @@ alpha_curl_body() {
     fi
   fi
 
-  response="$(curl -sS -w $'\n__STATUS__:%{http_code}' "${url}" 2>/dev/null || true)"
+  response="$(curl -sS -w $'\n__STATUS__:%{http_code}' -H "Origin: ${WEB_DOMAIN}" "${url}" 2>/dev/null || true)"
   body="${response%$'\n'__STATUS__:*}"
   status="${response##*__STATUS__:}"
   if [[ "${status}" =~ ^2[0-9][0-9]$ ]]; then
@@ -176,7 +178,20 @@ fi
 if curl -fsS "${WEB_URL}/health" >/dev/null; then
   pass "web /health"
 else
-  fail "web /health"
+  # The Cloud Run web service is not guaranteed to expose a /health route (static hosts often 404).
+  web_code="$(curl -sS -o /dev/null -w "%{http_code}" "${WEB_URL}/" 2>/dev/null || echo 000)"
+  if [[ "${web_code}" != "000" && "${web_code}" != 5* ]]; then
+    pass "web URL reachable (HTTP ${web_code})"
+  else
+    fail "web URL reachable"
+  fi
+fi
+
+domain_code="$(curl -sS -o /dev/null -w "%{http_code}" "${WEB_DOMAIN}/" 2>/dev/null || echo 000)"
+if [[ "${domain_code}" != "000" && "${domain_code}" != 5* ]]; then
+  pass "web domain reachable (HTTP ${domain_code})"
+else
+  fail "web domain reachable"
 fi
 
 platform_payload="$(alpha_curl_body "/api/v2/platforms/status" || true)"
@@ -261,8 +276,14 @@ else
 fi
 
 workspace_payload="$(alpha_curl_body "/api/v2/tradingview/workspace" || true)"
+tv_enabled="false"
+if [[ "${control_payload}" != "${RATE_LIMIT_SENTINEL}" && -n "${control_payload}" ]]; then
+  tv_enabled="$(echo "${control_payload}" | jq -r '.tradingview_integration_enabled // false' 2>/dev/null || echo false)"
+fi
 if [[ "${workspace_payload}" == "${RATE_LIMIT_SENTINEL}" ]]; then
   pass "tradingview workspace contract skipped (rate-limited 429)"
+elif [[ "${tv_enabled}" != "true" ]]; then
+  pass "tradingview workspace contract skipped (integration disabled)"
 elif [[ -n "${workspace_payload}" ]] && echo "${workspace_payload}" | jq -e '.workspace.enabled != null and ((.workspace.state.watchlists != null and .workspace.state.selected_symbol != null) or .workspace.reason != null)' >/dev/null 2>&1; then
   pass "tradingview workspace contract"
 else

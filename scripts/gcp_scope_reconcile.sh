@@ -30,9 +30,11 @@ while [[ $# -gt 0 ]]; do
 done
 
 ALLOWED_SERVICES=(
+  "openclaw-gateway"
   "sapphire-alpha"
   "sapphire-aster"
   "sapphire-lighter"
+  "sapphire-control"
   "sapphire-gateway"
   "sapphire-github-webhook-relay"
   "sapphirebook-web"
