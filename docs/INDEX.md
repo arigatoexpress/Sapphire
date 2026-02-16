@@ -20,7 +20,9 @@
 - `LEARNINGS.md`
 - `HANDOFF.md`
 
+## Repo Hygiene
+- `docs/REPO_CONSOLIDATION.md`
+
 ## Archived
 - `docs/archive/README.md`
 - `archive/legacy/README.md`
-
