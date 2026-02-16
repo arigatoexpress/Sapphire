@@ -78,6 +78,16 @@ async def telegram_webhook(request):
     except Exception:
         return web.Response(text="BAD_REQUEST", status=400)
 
+    # Optional: proxy specific commands to the OpenClaw control plane without
+    # changing Telegram's webhook destination. This enables a safe, incremental
+    # migration of command handling.
+    try:
+        if _should_proxy_telegram_update_to_openclaw(update):
+            asyncio.create_task(_proxy_telegram_update_to_openclaw(update))
+    except Exception:
+        # Never allow proxy logic to break the primary webhook handler.
+        pass
+
     handler = request.app.get("telegram_update_handler")
     if handler:
         try:
@@ -105,6 +115,75 @@ async def telegram_webhook(request):
                 pass  # Don't let error reporting crash the webhook
 
     return web.Response(text="OK", status=200)
+
+
+def _extract_telegram_update_text(update: dict[str, Any]) -> str:
+    msg = (
+        update.get("message")
+        or update.get("edited_message")
+        or (update.get("callback_query") or {}).get("message")
+        or {}
+    )
+    if not isinstance(msg, dict):
+        return ""
+    text = msg.get("text") or msg.get("caption") or ""
+    return text.strip() if isinstance(text, str) else ""
+
+
+def _should_proxy_telegram_update_to_openclaw(update: dict[str, Any]) -> bool:
+    proxy_url = os.getenv("OPENCLAW_TELEGRAM_PROXY_URL", "").strip()
+    if not proxy_url:
+        return False
+
+    text = _extract_telegram_update_text(update)
+    if not text.startswith("/"):
+        return False
+
+    lower = text.lower()
+    needle = "/sapphire"
+    if not lower.startswith(needle):
+        return False
+    if len(lower) == len(needle):
+        return True
+    # Allow "/sapphire ..." and "/sapphire@BotUsername ..."
+    return lower[len(needle)] in (" ", "@")
+
+
+async def _proxy_telegram_update_to_openclaw(update: dict[str, Any]) -> None:
+    proxy_url = os.getenv("OPENCLAW_TELEGRAM_PROXY_URL", "").strip().rstrip("/")
+    if not proxy_url:
+        return
+
+    token = (
+        os.getenv("OPENCLAW_TELEGRAM_PROXY_TOKEN", "").strip()
+        or os.getenv("OPENCLAW_GATEWAY_TOKEN", "").strip()
+    )
+    if not token:
+        logger.warning("OpenClaw Telegram proxy enabled but no token configured")
+        return
+
+    target = proxy_url
+    if not target.endswith("/internal/telegram"):
+        target = f"{target}/internal/telegram"
+
+    try:
+        timeout = aiohttp.ClientTimeout(total=3)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(
+                target,
+                json=update,
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json",
+                },
+            ) as resp:
+                if resp.status >= 400:
+                    body = await resp.text()
+                    logger.warning(
+                        f"OpenClaw Telegram proxy error: HTTP {resp.status}: {body[:200]}"
+                    )
+    except Exception as exc:
+        logger.warning(f"OpenClaw Telegram proxy failed: {exc}")
 
 
 def _extract_control_token(request: web.Request) -> str:
