@@ -11,6 +11,7 @@ __pycache__/
 node_modules/
 cloud-trader-dashboard/node_modules/
 cloud-trader-dashboard/dist/
+.firebase/
 build/
 develop-eggs/
 dist/

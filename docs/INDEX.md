@@ -5,6 +5,7 @@
 - `OPERATIONS_RUNBOOK.md` (day-2 ops, deploy, incident response)
 - `MASTERPLAN.md` (system goals + constraints)
 - `docs/SAPPHIRE_STACK_ASCII.md` (architecture map)
+- `docs/CLOUD_ENVIRONMENT.md` (live cloud map + source-of-truth commands)
 
 ## Core System Docs
 - `docs/SAPPHIRE_AUTONOMY_MASTER_PLAN.md`

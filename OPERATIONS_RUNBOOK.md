@@ -2,14 +2,21 @@
 
 This runbook is for operating Sapphire in the current cloud setup with a strict scope on the `arigatoexpress/Sapphire` repository.
 
-## Production Services
+## Production Services (Cloud Run)
 
-- `sapphire-alpha` (control plane): `https://sapphire-alpha-267358751314.us-central1.run.app`
+- `sapphire-alpha` (engine + Telegram/TradingView webhooks + API): `https://sapphire-alpha-267358751314.us-central1.run.app`
+- `sapphire-control` (ops control plane + dashboard + `/sapphire` namespace): `https://sapphire-control-267358751314.us-central1.run.app`
+- `openclaw-gateway` (AI agent gateway): `https://openclaw-gateway-267358751314.us-central1.run.app` (ingress: internal)
 - `sapphire-aster` (venue bot): `https://sapphire-aster-267358751314.us-central1.run.app`
 - `sapphire-lighter` (venue bot): `https://sapphire-lighter-267358751314.europe-west1.run.app`
-- `sapphire-gateway` (OpenClaw gateway): `https://sapphire-gateway-267358751314.us-central1.run.app`
-- `sapphire-github-webhook-relay` (support)
-- `sapphirebook-web` (support frontend)
+- `sapphire-gateway` (GitHub webhook receiver): `https://sapphire-gateway-267358751314.us-central1.run.app`
+- `sapphire-github-webhook-relay` (GitHub webhook relay): `https://sapphire-github-webhook-relay-267358751314.us-central1.run.app`
+- `sapphirebook-web` (support frontend): `https://sapphirebook-web-267358751314.us-central1.run.app` (ingress: internal)
+
+Operator URLs:
+
+- `https://sapphirealpha.xyz` (Firebase Hosting)
+- `https://sapphirealpha.xyz/sapphire` (ops dashboard; rewrites to `sapphire-control`)
 
 ## Active Control Scope
 
@@ -22,11 +29,11 @@ This is enforced by the `ENABLED_VENUES=ASTER;LIGHTER` environment variable in `
 
 Gateway access policy:
 
-- `sapphire-gateway` has Cloud Run invoker IAM check enabled.
-- Unauthenticated requests are denied (`403`), reducing public prompt surface.
-- GitHub workflow `OpenClaw Hook Forwarder` uses WIF + OIDC bearer auth for webhook delivery.
+- `openclaw-gateway` uses Cloud Run invoker IAM and internal ingress; unauthenticated public requests should not reach it.
+- GitHub workflow `OpenClaw Hook Forwarder` uses WIF + OIDC bearer auth for webhook delivery to `OPENCLAW_HOOK_URL`.
   - Required repo secrets: `OPENCLAW_HOOK_URL`, `OPENCLAW_HOOKS_TOKEN`, `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT`
   - Optional override: `OPENCLAW_HOOK_AUDIENCE` (defaults to scheme+host from `OPENCLAW_HOOK_URL`)
+- `sapphire-gateway` also uses Cloud Run invoker IAM (no anonymous access).
 
 ## Telegram Control Channel
 
@@ -171,7 +178,13 @@ Run:
 
 ## Web Frontend Deploy
 
-Deploy the SapphireBook/SapphireTrade/Sapphire Alpha frontend to Cloud Run:
+Primary delivery is via Firebase Hosting (`sapphirealpha.xyz`):
+
+```bash
+./scripts/deploy_sapphirebook_firebase.sh
+```
+
+Optional: also deploy to Cloud Run service `sapphirebook-web` (internal) to keep `*.run.app` preview aligned:
 
 ```bash
 ./scripts/deploy_sapphirebook_web.sh
@@ -179,13 +192,7 @@ Deploy the SapphireBook/SapphireTrade/Sapphire Alpha frontend to Cloud Run:
 
 This builds `sapphire-web` for `linux/amd64`, pushes to Artifact Registry, and deploys `sapphirebook-web`.
 
-If your primary domain is `sapphirealpha.xyz`, also deploy Firebase Hosting to keep domain delivery in lock-step with Cloud Run:
-
-```bash
-./scripts/deploy_sapphirebook_firebase.sh
-```
-
-Preferred one-command deploy:
+Preferred one-command deploy (sync Cloud Run + Firebase to the same build stamp):
 
 ```bash
 ./scripts/deploy_sapphirebook_all.sh

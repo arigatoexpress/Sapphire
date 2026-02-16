@@ -1,5 +1,9 @@
 # Frontend Delivery Audit (2026-02-12)
 
+Note (2026-02-16):
+- `https://sapphirealpha.xyz/sapphire` now rewrites to Cloud Run service `sapphire-control` (ops dashboard).
+- `sapphirebook-web` is internal-ingress and treated as an optional preview surface; Firebase Hosting is the primary operator URL.
+
 ## Objective
 Explain why the frontend appeared unchanged/deprecated and define a deterministic fix.
 

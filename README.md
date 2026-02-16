@@ -12,10 +12,11 @@ Profit model:
 `Net PnL = (edge * trades * capital efficiency) - (fees + slippage + infra cost + tail losses)`
 
 ## Scope Lock
-- Single codebase: `arigatoexpress/Sapphire`
+- Canonical domain repo: `arigatoexpress/Sapphire` (Python services + web UI)
+- Control-plane repo: `arigatoexpress/sapphire-control` (ops dashboard + `/sapphire` command namespace)
 - Active venues: `ASTER`, `LIGHTER`
-- Active control services: `sapphire-alpha`, `sapphire-aster`, `sapphire-lighter`, `sapphire-gateway`
-- Human governance path: Telegram heartbeat + command webhook
+- Active Cloud Run services (prod): `sapphire-alpha`, `sapphire-control`, `openclaw-gateway`, `sapphire-aster`, `sapphire-lighter`, `sapphire-gateway`
+- Human governance path: Telegram heartbeat + command webhook (+ token-gated ops dashboard)
 
 ## Organization (Employees)
 - `SAPPHIRE`: Security and code quality lead
@@ -35,7 +36,9 @@ All three agents operate through OpenClaw with Sapphire-only skills in:
 ## Control Channels
 - Telegram command ingress: `POST /telegram/webhook` on `sapphire-alpha`
 - TradingView signal ingress: `POST /tradingview/webhook` on `sapphire-alpha`
-- OpenClaw gateway control: `sapphire-gateway` (Cloud Run invoker IAM check enabled)
+- Ops dashboard: `https://sapphirealpha.xyz/sapphire` (Firebase Hosting rewrite to `sapphire-control`)
+- `/sapphire …` Telegram namespace: proxied from `sapphire-alpha` -> `sapphire-control` (no webhook move)
+- OpenClaw agent gateway: `openclaw-gateway` (Cloud Run invoker IAM check enabled; ingress is internal)
 - Alpha mutable API routes require `X-Sapphire-Control-Token` (backed by `SAPPHIRE_CONTROL_API_TOKEN` secret)
 
 Owner steering controls in Telegram:

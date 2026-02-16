@@ -1,5 +1,5 @@
 # docker-compose.local.yml
-# Minimal local development infrastructure for Sapphire V2
+# Minimal local development infrastructure (optional)
 # Usage: docker-compose -f docker-compose.local.yml up -d
 
 version: '3.8'
