@@ -103,10 +103,31 @@ Supported TradingView actions:
 - `tv_script_add`, `tv_script_remove`
 - `tv_scan_assets`, `tv_backtest`, `tv_ta`, `tv_status`, `tv_custom`
 
+## Grid Trader (Internal Signals)
+
+Grid trader emits internal BUY/SELL signals around an anchor price and feeds
+the same pipeline as TradingView signals (no direct limit orders; venue bots
+still execute market orders). Disabled by default.
+
+Enable with environment variables on `sapphire-alpha`:
+
+- `SAPPHIRE_GRID_TRADER_ENABLED=true`
+- `SAPPHIRE_GRID_SYMBOLS` (defaults to `SAPPHIRE_PREFERRED_SYMBOLS`)
+- `SAPPHIRE_GRID_LEVELS` (default `4`)
+- `SAPPHIRE_GRID_SPACING_PCT` (default `0.35` percent)
+- `SAPPHIRE_GRID_RECENTER_PCT` (default `2.5` percent)
+- `SAPPHIRE_GRID_REARM_PCT` (default `0.15` percent)
+- `SAPPHIRE_GRID_BASE_QUANTITY` (default `0` uses strategy default quantity)
+- `SAPPHIRE_GRID_LEVERAGE` (default `5`)
+- `SAPPHIRE_GRID_TARGET_MODE` (`best` or `all`)
+- `SAPPHIRE_GRID_TARGET_VENUES` (optional explicit list, e.g. `ASTER,LIGHTER`)
+- `SAPPHIRE_GRID_ALLOW_PAPER` (`true` to allow paper-stage signals)
+
 Safety default:
 
-- `TRADINGVIEW_EXECUTION_ENABLED=false` means alerts are notify-only (dry-run).
-- set `TRADINGVIEW_EXECUTION_ENABLED=true` only after paper validation.
+- `SAPPHIRE_DEX_EXECUTION_STAGE=paper` keeps the signal pipeline in dry-run.
+- `SAPPHIRE_DEX_EXECUTION_STAGE=staged_live|full_live` enables publishing TradeSignals to the bots.
+- Bot execution is additionally gated by `TRADING_ENABLED=true` on each bot service (safe-by-default is `false`).
 
 Risk controls for TradingView ingress (env-configured):
 

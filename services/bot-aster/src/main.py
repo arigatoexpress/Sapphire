@@ -81,6 +81,14 @@ class AsterBot:
         # Paper trading mode (disabled by default for production)
         self.is_paper_trading = os.getenv("PAPER_TRADING", "false").lower() == "true"
 
+        # Telemetry publishing (consumed by api-gateway for realtime dashboard)
+        self._position_publish_interval_seconds = max(
+            3, int(os.getenv("POSITION_PUBLISH_INTERVAL_SECONDS", "10"))
+        )
+
+        # Cache leverage set per-symbol to avoid spamming the exchange API.
+        self._last_leverage_by_symbol: Dict[str, int] = {}
+
     async def initialize(self):
         """Initialize Aster client connection."""
         logger.info(f"🚀 Initializing {SERVICE_NAME}...")
@@ -178,6 +186,8 @@ class AsterBot:
                 self._main_loop(),
                 self._gateway_loop(),  # Hub Listener
                 self._fallback_sync_loop(),
+                self._balance_sync_loop(),
+                self._position_publish_loop(),
                 self._trailing_stop_loop(),
             ]
             await asyncio.gather(*tasks)
@@ -375,6 +385,30 @@ class AsterBot:
                 logger.error(f"Balance sync error: {e}")
             await asyncio.sleep(30)
 
+    async def _position_publish_loop(self):
+        """Periodically publish a snapshot of positions for the realtime dashboard."""
+        from dataclasses import asdict
+
+        while self.running:
+            try:
+                positions_payload = []
+                for position in self.positions.values():
+                    try:
+                        positions_payload.append(asdict(position))
+                    except Exception:
+                        continue
+
+                await publish(
+                    "position-updates",
+                    {
+                        "platform": PLATFORM.value,
+                        "positions": positions_payload,
+                    },
+                )
+            except Exception as e:
+                logger.error(f"Position publish error: {e}")
+            await asyncio.sleep(self._position_publish_interval_seconds)
+
     async def _handle_user_event(self, event: Dict[str, Any]):
         """Handle incoming user data stream event."""
         try:
@@ -447,7 +481,9 @@ class AsterBot:
 
             logger.info(f"📥 Received signal: {signal.side} {signal.symbol}")
             result = await self._execute_trade(signal)
-            await publish("trade-executed", result)
+            # Don't emit trade events for explicit no-op signals (ex: reduce-only without exposure).
+            if not (result.metadata or {}).get("noop"):
+                await publish("trade-executed", result)
 
         except Exception as e:
             logger.error(f"Signal handling error: {e}")
@@ -564,6 +600,8 @@ class AsterBot:
             if not self.client:
                 raise Exception("Aster client not initialized")
 
+            reduce_only = bool((signal.metadata or {}).get("reduce_only", False))
+
             # Calculate quantity
             quantity = signal.quantity or self._calculate_position_size(signal)
             symbol = str(signal.symbol or "").strip().upper() or "SOLUSDT"
@@ -571,6 +609,99 @@ class AsterBot:
 
             # Determine order side
             side = "BUY" if signal.side in (TradeSide.BUY, TradeSide.LONG) else "SELL"
+
+            # Reduce-only safety: avoid opening new exposure and avoid flipping through zero.
+            if reduce_only:
+                current = self.positions.get(symbol)
+                current_qty = float(getattr(current, "quantity", 0.0) or 0.0) if current else 0.0
+                if current_qty <= 0:
+                    logger.info(f"🧯 Reduce-only ignored for {symbol}: no tracked position")
+                    return TradeResult(
+                        trade_id="noop",
+                        signal_id=signal.signal_id,
+                        platform=PLATFORM,
+                        symbol=symbol,
+                        side=signal.side,
+                        success=True,
+                        metadata={
+                            "noop": True,
+                            "reason": "reduce_only_no_position",
+                            "reduce_only": True,
+                        },
+                    )
+
+                current_side = getattr(current, "side", None)
+                if current_side in (TradeSide.BUY, TradeSide.LONG, "BUY", "LONG") and side != "SELL":
+                    logger.info(f"🧯 Reduce-only ignored for {symbol}: expected SELL to reduce long")
+                    return TradeResult(
+                        trade_id="noop",
+                        signal_id=signal.signal_id,
+                        platform=PLATFORM,
+                        symbol=symbol,
+                        side=signal.side,
+                        success=True,
+                        metadata={
+                            "noop": True,
+                            "reason": "reduce_only_direction_mismatch",
+                            "reduce_only": True,
+                        },
+                    )
+
+                if current_side in (TradeSide.SELL, TradeSide.SHORT, "SELL", "SHORT") and side != "BUY":
+                    logger.info(f"🧯 Reduce-only ignored for {symbol}: expected BUY to reduce short")
+                    return TradeResult(
+                        trade_id="noop",
+                        signal_id=signal.signal_id,
+                        platform=PLATFORM,
+                        symbol=symbol,
+                        side=signal.side,
+                        success=True,
+                        metadata={
+                            "noop": True,
+                            "reason": "reduce_only_direction_mismatch",
+                            "reduce_only": True,
+                        },
+                    )
+
+                if quantity > current_qty:
+                    quantity = current_qty
+                if quantity <= 0:
+                    return TradeResult(
+                        trade_id="noop",
+                        signal_id=signal.signal_id,
+                        platform=PLATFORM,
+                        symbol=symbol,
+                        side=signal.side,
+                        success=True,
+                        metadata={
+                            "noop": True,
+                            "reason": "reduce_only_quantity_zero",
+                            "reduce_only": True,
+                        },
+                    )
+
+            desired_leverage: Optional[int] = None
+            if signal.leverage is not None:
+                try:
+                    desired_leverage = int(float(signal.leverage))
+                except (TypeError, ValueError):
+                    desired_leverage = None
+
+            if (
+                desired_leverage is not None
+                and desired_leverage > 0
+                and not self.is_paper_trading
+                and self.client is not None
+            ):
+                desired_leverage = max(1, min(125, desired_leverage))
+                previous = self._last_leverage_by_symbol.get(symbol)
+                if previous != desired_leverage:
+                    try:
+                        await self.client.change_leverage(symbol, desired_leverage)
+                        self._last_leverage_by_symbol[symbol] = desired_leverage
+                        logger.info(f"🧯 Leverage set: {symbol} {desired_leverage}x")
+                    except Exception as e:
+                        logger.warning(f"Failed to set leverage for {symbol} to {desired_leverage}x: {e}")
 
             logger.info(f"⚡ Executing on Aster: {symbol} {side} {quantity}")
 
@@ -591,7 +722,11 @@ class AsterBot:
                 from aster_client import OrderType
 
                 order_result = await self.client.place_order(
-                    symbol=symbol, side=side, order_type=OrderType.MARKET, quantity=quantity
+                    symbol=symbol,
+                    side=side,
+                    order_type=OrderType.MARKET,
+                    quantity=quantity,
+                    reduce_only=reduce_only,
                 )
                 logger.info(f"✅ Aster Order Result: {order_result}")
 
@@ -603,20 +738,21 @@ class AsterBot:
                 filled_qty = float(order_result.get("executedQty", quantity))
                 avg_price = float(order_result.get("avgPrice", 0))
 
-                # Create position record
-                self.positions[symbol] = Position(
-                    position_id=order_result.get("orderId", ""),
-                    platform=PLATFORM,
-                    symbol=symbol,
-                    side=signal.side,
-                    quantity=filled_qty,
-                    entry_price=avg_price,
-                    stop_loss=signal.stop_loss,
-                    take_profit=signal.take_profit,
-                )
+                # Create position record (reduce-only fills are reconciled via WS/REST sync).
+                if not reduce_only:
+                    self.positions[symbol] = Position(
+                        position_id=order_result.get("orderId", ""),
+                        platform=PLATFORM,
+                        symbol=symbol,
+                        side=signal.side,
+                        quantity=filled_qty,
+                        entry_price=avg_price,
+                        stop_loss=signal.stop_loss,
+                        take_profit=signal.take_profit,
+                    )
 
                 # Set up trailing stop if configured
-                if signal.metadata.get("trailing_stop"):
+                if (signal.metadata or {}).get("trailing_stop") and not reduce_only:
                     self.trailing_stops[symbol] = {
                         "trail_percent": signal.metadata.get("trail_percent", 0.02),
                         "stop_price": (
@@ -625,9 +761,9 @@ class AsterBot:
                     }
 
                 # Set TP/SL orders on exchange
-                if signal.stop_loss:
+                if signal.stop_loss and not reduce_only:
                     await self._place_stop_loss(symbol, signal.stop_loss, filled_qty, side)
-                if signal.take_profit:
+                if signal.take_profit and not reduce_only:
                     await self._place_take_profit(symbol, signal.take_profit, filled_qty, side)
 
                 return TradeResult(
@@ -642,6 +778,10 @@ class AsterBot:
                     avg_price=avg_price,
                     fee=float(order_result.get("commission", 0)),
                     execution_time_ms=execution_time,
+                    metadata={
+                        **(signal.metadata or {}),
+                        "reduce_only": reduce_only,
+                    },
                 )
             else:
                 self.trades_failed += 1

@@ -86,7 +86,8 @@ class ServiceConfig:
         self.project_id = os.getenv("GCP_PROJECT_ID", "sapphire-479610")
 
         # Trading Configuration
-        self.trading_enabled = os.getenv("TRADING_ENABLED", "true").lower() == "true"
+        # Safe-by-default: require explicit opt-in to live trade execution.
+        self.trading_enabled = os.getenv("TRADING_ENABLED", "false").lower() == "true"
         self.max_position_size = float(
             os.getenv("MAX_POSITION_SIZE", "20")
         )  # Reduced for low collateral

@@ -118,7 +118,7 @@ class MarketDataAggregator:
     def _parse_extra_symbols() -> List[str]:
         """Parse SAPPHIRE_PREFERRED_SYMBOLS for multi-symbol feeds."""
         import re as _re
-        raw = os.getenv("SAPPHIRE_PREFERRED_SYMBOLS", "BTC,ETH,SOL,BCH,ZEC,XMR,PENGU,MON,LIT,ASTER")
+        raw = os.getenv("SAPPHIRE_PREFERRED_SYMBOLS", "BTC,ETH,SOL,BCH,ZEC,XMR,PENGU,MON,LIT,ASTER,MEGAETH")
         tokens = _re.split(r"[,;|\s]+", str(raw or "").strip())
         seen: set[str] = set()
         result: List[str] = []
