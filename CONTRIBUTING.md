@@ -1,77 +1,42 @@
-# Contributing to Sapphire AI
+# Contributing to Sapphire
 
-Thank you for your interest in contributing to Sapphire! This document provides guidelines and instructions for maintaining our **Pristine Codebase Standards**.
+This repository is an ops-focused monorepo for Sapphire's Cloud Run services, Firebase-hosted web UI, and OpenClaw skills.
 
-## 📋 Table of Contents
-- [Prerequisites](#prerequisites)
-- [Development Setup](#development-setup)
-- [The "Pristine" Standard](#the-pristine-standard)
-- [Branching Strategy](#branching-strategy)
-- [Commit Guidelines](#commit-guidelines)
-- [Pull Request Process](#pull-request-process)
+## Start Here
 
----
+- `AGENTS.md` (fast navigation)
+- `README.md` (scope lock + control channels)
+- `docs/INDEX.md` (doc map)
+- `OPERATIONS_RUNBOOK.md` (deploy/ops)
 
-## 🛠️ Development Setup
+## Active Paths (What We Actually Run)
 
-### Prerequisites
-- Python 3.11+
-- Node.js 18+
-- Docker & GCloud CLI
+- Alpha engine (Telegram + TradingView ingress): `services/alpha-engine/`
+- Venue bots: `services/bot-aster/`, `services/bot-lighter/`
+- Web UI (Vite/Vue; Firebase Hosting): `sapphire-web/`
+- OpenClaw skills (used by `openclaw-gateway`): `skills/`
 
-### Setup
+Note: the `/sapphire` ops dashboard is served by `arigatoexpress/sapphire-control` (separate repo).
+
+## Local Checks
+
+Run the same focused gate that CI runs:
+
 ```bash
-# Clone the repository
-git clone https://github.com/arigatoexpress/AsterAI.git
-cd AsterAI
-
-# Frontend setup
-cd trading-dashboard && npm install && cd ..
-
-# Backend setup
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+./scripts/ci_focused_gate.sh
 ```
 
----
+Frontend dev loop:
 
-## 💎 The "Pristine" Standard
+```bash
+cd sapphire-web
+npm ci
+npm run dev
+```
 
-We maintain a high bar for repository cleanliness. Contributions must adhere to:
+## Pull Requests
 
-1.  **Strict Modularization**: New internal tools or non-runtime code must go to `internal/`.
-2.  **Zero-Stray Policy**: No temporary log files, JSON reports, or stray scripts in the root.
-3.  **No Direct Imports from Root**: Core logic lives in `cloud_trader/`.
-4.  **Standardized Entry**: Use `start.py` for all local and production execution.
+- Keep changes small and scoped to the active paths above.
+- If you change auth/dispatch/control flows, add or extend tests under `tests/unit/`.
+- Do not commit secrets. Production secrets live in GCP Secret Manager.
 
----
-
-## 🌿 Branching & Commits
-
-We use **GitHub Flow** and **Conventional Commits**:
-
-- `feat(agents):` New signal logic
-- `fix(router):` Repair execution flow
-- `docs(pristine):` Documentation updates
-- `refactor(core):` Restructuring modules
-
----
-
-## 🔀 Pull Request Process
-
-1.  **Branch** from `main`.
-2.  **Verify**: Run `python3 start.py --verify-only`.
-3.  **Template**: Fill out the detailed PR template.
-4.  **Review**: At least one maintainer approval required.
-
----
-## 🔐 Security
-- **Never commit secrets**.
-- All production keys are managed via GCP Secret Manager.
-- Use `Settings` in `config.py` for all environment variables.
-
----
-<div align="center">
-<sub>Built with Precision. Trading with Intelligence. 🎉</sub>
-</div>

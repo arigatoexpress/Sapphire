@@ -1,5 +1,10 @@
 # Sapphire First-Principles Audit (2026-02-12)
 
+Note (2026-02-16):
+- The OpenClaw gateway service is now deployed as `openclaw-gateway` (not `sapphire-gateway`).
+- The `/sapphire` ops control plane is served by `sapphire-control` (dashboard + directive state).
+- The legacy `cloud_trader/` codebase referenced below has been archived under `archive/legacy/cloud_trader/`.
+
 ## Objective Function
 
 Primary objective:
@@ -15,8 +20,8 @@ Hard constraints:
 
 - Control plane (`sapphire-alpha`) is live on Cloud Run and dispatching autonomy cycles.
 - Execution venues (`sapphire-aster`, `sapphire-lighter`) are IAM-restricted to service-account invocation.
-- OpenClaw gateway (`sapphire-gateway`) is IAM-restricted and token-protected.
-- Frontend (`sapphirebook-web`) is deployed with cache-busting + build stamps.
+- OpenClaw gateway (`openclaw-gateway`) is IAM-restricted and internal-ingress.
+- Frontend (Firebase Hosting `sapphirealpha.xyz`) is deployed with cache-busting + build stamps.
 - VirusTotal integration is active with free-tier-safe defaults in code and runtime.
 
 ## Findings (Prioritized)
@@ -43,8 +48,8 @@ Risk:
 ### P1 - Secret hygiene debt in legacy/shared code paths
 
 Evidence:
-- `cloud_trader/credentials.py` prints API key prefixes/lengths and has a default Jupiter key.
-- `cloud_trader/jupiter_trader_unified.py` includes example credentials resembling real keys.
+- `archive/legacy/cloud_trader/cloud_trader/credentials.py` prints API key prefixes/lengths and has a default Jupiter key.
+- `archive/legacy/cloud_trader/cloud_trader/jupiter_trader_unified.py` includes example credentials resembling real keys.
 
 Risk:
 - Increased chance of accidental secret disclosure and poor operational hygiene.

@@ -3,25 +3,27 @@
 This repo is a multi-service monorepo (Cloud Run backends + web frontend + infra + OpenClaw skills).
 
 ## Start Here
+- `INDEX.md` (stack map + common changes)
 - `README.md` (scope lock + control channels)
 - `docs/INDEX.md` (doc map)
 - `OPERATIONS_RUNBOOK.md` (deploy/ops)
 
 ## Quick Commands
-- Backend deps: `python -m pip install -r requirements.txt`
-- Python tests: `python -m pytest`
+- Alpha engine deps: `python -m pip install -r services/alpha-engine/requirements.txt`
 - Focused repo gate (CI mirror): `./scripts/ci_focused_gate.sh`
 - Frontend dev: `cd sapphire-web && npm ci && npm run dev`
 
 ## Where Things Live
-- Trading runtime + core domain logic: `cloud_trader/`
-- Cloud Run services (each deployable): `services/*/src/`
+- Engine + Telegram/TradingView ingress: `services/alpha-engine/src/`
+- Venue bots: `services/bot-aster/src/`, `services/bot-lighter/src/`
+- Cloud Run services (each deployable): `services/*/src/` (+ service-local `requirements.txt`)
 - Shared service code: `services/shared/`
 - Web UI (Vite/Vue): `sapphire-web/`
 - Infra: `terraform/`
 - Operator scripts (deploy, wiring, verification): `scripts/`
 - Standalone operator utilities: `tools/`
 - OpenClaw skills (Sapphire-only): `skills/`
+- Ops dashboard + `/sapphire` namespace: `arigatoexpress/sapphire-control` (separate repo)
 - Archived historical assets (not on the active path): `archive/`
 
 ## Guardrails (Keep Agents Honest)
