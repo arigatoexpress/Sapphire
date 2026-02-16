@@ -199,7 +199,7 @@ fi
 
 # ── OpenClaw Gateway Check ──
 openclaw_env=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
-  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="OPENCLAW_GATEWAY_TOKEN") | .value // empty')
+  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="OPENCLAW_GATEWAY_TOKEN") | (.value // .valueFrom.secretKeyRef.name // empty)')
 if [[ -n "$openclaw_env" ]]; then
   pass "OPENCLAW_GATEWAY_TOKEN set in alpha service"
 else
