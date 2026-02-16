@@ -81,12 +81,18 @@ async def telegram_webhook(request):
     # Optional: proxy specific commands to the OpenClaw control plane without
     # changing Telegram's webhook destination. This enables a safe, incremental
     # migration of command handling.
+    proxied = False
     try:
         if _should_proxy_telegram_update_to_openclaw(update):
             asyncio.create_task(_proxy_telegram_update_to_openclaw(update))
+            proxied = True
     except Exception:
         # Never allow proxy logic to break the primary webhook handler.
         pass
+    if proxied:
+        # The proxied command namespace is owned by the control plane.
+        # Avoid double-processing (and duplicate / confusing responses).
+        return web.Response(text="OK", status=200)
 
     handler = request.app.get("telegram_update_handler")
     if handler:
