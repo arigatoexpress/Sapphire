@@ -1026,7 +1026,10 @@ class AlphaEngine:
                 + (" | `MANUAL_REVIEW_HOLD`" if item.get("manual_review_required") else "")
             )
 
-        await self.telegram.send_message("\n".join(lines), priority="medium")
+        # Interactive control commands should respond immediately.
+        # Medium/low notifications are buffered into digest messages, which makes
+        # `/status` feel slow and can collapse detailed output. Use HIGH here.
+        await self.telegram.send_message("\n".join(lines), priority="high")
 
     async def _send_market_prices(self) -> None:
         """Send multi-symbol price snapshot across all venues."""
