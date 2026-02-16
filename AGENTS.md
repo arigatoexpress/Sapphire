@@ -20,6 +20,7 @@ This repo is a multi-service monorepo (Cloud Run backends + web frontend + infra
 - Web UI (Vite/Vue): `sapphire-web/`
 - Infra: `terraform/`
 - Operator scripts (deploy, wiring, verification): `scripts/`
+- Standalone operator utilities: `tools/`
 - OpenClaw skills (Sapphire-only): `skills/`
 - Archived historical assets (not on the active path): `archive/`
 
@@ -28,4 +29,3 @@ This repo is a multi-service monorepo (Cloud Run backends + web frontend + infra
 - Prefer editing code on the active path; avoid `archive/` unless explicitly required.
 - If you change execution, dispatch, or auth paths, add/extend tests in `tests/`.
 - Never print secrets; treat env vars and GCP Secret Manager as the only secret sources.
-
