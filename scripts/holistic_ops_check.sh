@@ -21,40 +21,7 @@ echo
 
 echo
 echo "== Additional Scope Enforcement Checks =="
-
-if ! command -v gcloud >/dev/null 2>&1; then
-  echo "FAIL: gcloud CLI missing"
-  exit 1
-fi
-if ! command -v jq >/dev/null 2>&1; then
-  echo "FAIL: jq missing"
-  exit 1
-fi
-
-alpha_json="$(gcloud run services describe "${ALPHA_SERVICE}" \
-  --project "${PROJECT_ID}" \
-  --region "${ALPHA_REGION}" \
-  --format=json)"
-
-check_env_var() {
-  local key="$1"
-  local expected_pattern="${2:-}"
-  local value
-  value="$(echo "${alpha_json}" | jq -r --arg name "${key}" '.spec.template.spec.containers[0].env[]? | select(.name==$name) | .value // empty')"
-  if [[ -z "${value}" ]]; then
-    echo "FAIL: missing env var ${key}"
-    exit 1
-  fi
-  if [[ -n "${expected_pattern}" ]] && ! [[ "${value}" =~ ${expected_pattern} ]]; then
-    echo "FAIL: ${key} has unexpected value: ${value}"
-    exit 1
-  fi
-  echo "PASS: ${key}=${value}"
-}
-
-check_env_var "SAPPHIRE_ALLOWED_REPOS" "Sapphire"
-check_env_var "SAPPHIRE_ALLOWED_GCP_PROJECTS" "sapphire-479610"
-check_env_var "SAPPHIRE_BLOCKED_SCOPE_TERMS" "sapphireai"
+echo "INFO: scope enforcement is covered by scripts/verify_focused_stack.sh (focus guard + autonomy readiness + GCP scope reconcile)."
 
 elapsed="$(( $(date +%s) - start_epoch ))"
 echo
