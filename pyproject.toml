@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "cloud-trader"
 version = "0.1.0"
-description = "Lean cloud-native cryptocurrency trading service for Aster DEX"
+description = "Sapphire autonomous trading control plane and execution services (ASTER/LIGHTER)"
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
@@ -58,10 +58,10 @@ analytics = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/rari-trade"
-Repository = "https://github.com/yourusername/rari-trade"
-Documentation = "https://rari-trade.readthedocs.io/"
-Issues = "https://github.com/yourusername/rari-trade/issues"
+Homepage = "https://github.com/arigatoexpress/Sapphire"
+Repository = "https://github.com/arigatoexpress/Sapphire"
+Documentation = "https://github.com/arigatoexpress/Sapphire/tree/main/docs"
+Issues = "https://github.com/arigatoexpress/Sapphire/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -95,19 +95,6 @@ multi_line_output = 3
 line_length = 100
 known_first_party = ["cloud_trader"]
 skip = ["__pycache__"]
-
-[tool.flake8]
-max-line-length = 100
-extend-ignore = ["E203", "W503"]
-exclude = [
-    ".git",
-    "__pycache__",
-    "build",
-    "dist",
-    "rari_trade_env",
-    "rari_trade_env_fresh",
-    "*.egg-info",
-]
 
 [tool.mypy]
 python_version = "3.10"
