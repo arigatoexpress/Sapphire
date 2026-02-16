@@ -1,5 +1,13 @@
 # TradingView Quant Workbench Integration (Sapphire)
 
+Status (2026-02-16):
+
+- TradingView webhook ingress is currently disabled in production.
+- `/tradingview/webhook` on `sapphire-alpha` is not deployed (HTTP `404`).
+- Scheduler jobs that target `/tradingview/webhook` are paused by default.
+
+This document is retained as a design spec for re-enabling TradingView as a workbench later.
+
 ## Objective
 Use your TradingView account as a strategy research/backtest workbench, while live execution and analysis stay DEX-native on ASTER/LIGHTER.
 

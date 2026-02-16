@@ -35,7 +35,8 @@ All three agents operate through OpenClaw with Sapphire-only skills in:
 
 ## Control Channels
 - Telegram command ingress: `POST /telegram/webhook` on `sapphire-alpha`
-- TradingView signal ingress: `POST /tradingview/webhook` on `sapphire-alpha`
+- TradingView webhook ingress (optional): design doc in `docs/TRADINGVIEW_QUANT_WORKBENCH.md`
+  - current production status (2026-02-16): `/tradingview/webhook` is not deployed on `sapphire-alpha` (HTTP `404`)
 - Ops dashboard: `https://sapphirealpha.xyz/sapphire` (Firebase Hosting rewrite to `sapphire-control`)
 - `/sapphire …` Telegram namespace: proxied from `sapphire-alpha` -> `sapphire-control` (no webhook move)
 - OpenClaw agent gateway: `openclaw-gateway` (Cloud Run invoker IAM check enabled; ingress is internal)

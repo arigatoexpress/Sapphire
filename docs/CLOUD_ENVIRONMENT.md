@@ -11,7 +11,8 @@ This is the human/agent map of the live deployment for GCP project `sapphire-479
 
 `us-central1`:
 
-- `sapphire-alpha`: public ingress; Telegram/TradingView webhook + API surface (source: `services/alpha-engine/`)
+- `sapphire-alpha`: public ingress; Telegram webhook + API surface (source: `services/alpha-engine/`)
+  - note: TradingView webhook ingress is currently disabled (no `/tradingview/webhook` route deployed)
 - `sapphire-control`: public ingress; ops dashboard + `/sapphire` namespace (source: `arigatoexpress/sapphire-control`)
 - `openclaw-gateway`: internal ingress; AI agent gateway (separate deployment)
 - `sapphire-aster`: public ingress; Cloud Run invoker IAM restricted (source: `services/bot-aster/`)
@@ -32,14 +33,37 @@ This is the human/agent map of the live deployment for GCP project `sapphire-479
 
 Do not store plaintext secrets in Cloud Run env vars or git.
 
-Core secrets used by the active stack include:
+Core secrets used by the active stack (see `./scripts/check_required_secrets.sh`):
+
+CONTROL_PLANE:
 
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_CHAT_ID`
-- `TELEGRAM_WEBHOOK_SECRET`
+- `SAPPHIRE_TELEGRAM_WEBHOOK_SECRET`
 - `SAPPHIRE_CONTROL_API_TOKEN`
 - `OPENCLAW_GATEWAY_TOKEN`
-- `ANTHROPIC_API_KEY`
+
+VENUES:
+
+- `ASTER_API_KEY`
+- `ASTER_SECRET_KEY`
+- `LIGHTER_API_KEY_0`
+- `LIGHTER_API_PUBLIC_KEY_0`
+
+Optional (enables extra integrations, fallback still works when absent):
+
+- `SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL`
+- `SAPPHIRE_SCOUT_EXTERNAL_POST_URL`
+- `SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN`
+- `VIRUSTOTAL_API_KEY`
+
+TradingView (disabled path):
+
+- `TRADINGVIEW_WEBHOOK_SECRET` (only required if re-enabling `/tradingview/webhook`)
+
+Note: Cloud Run environment variable names do not always match Secret Manager secret IDs.
+Example: `sapphire-alpha` reads `TELEGRAM_WEBHOOK_SECRET` from an env var, which is typically bound
+to the Secret Manager entry `SAPPHIRE_TELEGRAM_WEBHOOK_SECRET`.
 
 ## Source-Of-Truth Commands
 

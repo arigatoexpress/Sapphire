@@ -402,6 +402,9 @@ async def _read_json_payload(request: web.Request) -> dict[str, Any]:
 
 async def forum_topics(request: web.Request) -> web.Response:
     if request.method == "GET":
+        denied = _require_dashboard_access(request)
+        if denied is not None:
+            return denied
         handler = request.app.get("forum_topics_handler")
         if handler is None:
             return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)
@@ -434,6 +437,9 @@ async def forum_topics(request: web.Request) -> web.Response:
 
 
 async def forum_topic_detail(request: web.Request) -> web.Response:
+    denied = _require_dashboard_access(request)
+    if denied is not None:
+        return denied
     handler = request.app.get("forum_topic_detail_handler")
     if handler is None:
         return web.json_response({"ok": False, "error": "handler_unavailable"}, status=503)

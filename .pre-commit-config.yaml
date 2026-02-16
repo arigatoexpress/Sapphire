@@ -29,4 +29,5 @@ repos:
     rev: 1.7.8
     hooks:
       - id: bandit
-        args: ["-r", "cloud_trader/"]
+        # Scan active Python code paths (exclude archived legacy).
+        args: ["-r", "services", "internal/proprietary"]

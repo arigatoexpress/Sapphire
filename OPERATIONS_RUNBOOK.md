@@ -80,7 +80,13 @@ Web policy:
 
 ## TradingView Signal Ingress
 
-TradingView alerts can be sent to:
+Status (2026-02-16):
+
+- TradingView webhook ingress is currently disabled in production.
+- `/tradingview/webhook` is not deployed on `sapphire-alpha` (HTTP `404`).
+- Keep TradingView-related scheduler jobs paused unless re-enabling this path.
+
+If/when re-enabled, TradingView alerts can be sent to:
 
 - `POST /tradingview/webhook` on `sapphire-alpha`
 - secret (recommended): `X-Sapphire-Webhook-Secret` header
@@ -134,11 +140,11 @@ Focused jobs in `us-central1`:
 - `sapphire-alpha-heartbeat-30m` -> sends synthetic `/heartbeat` through alpha webhook every 30 minutes
 - `sapphire-alpha-status-daily` -> sends synthetic `/status` update through alpha webhook daily at `14:15 UTC`
 - `sapphire-alpha-strategy-gate-daily` -> sends `/promotion` through alpha webhook daily at `14:45 UTC`
-- `sapphire-heartbeat-30m` -> Sapphire agent heartbeat via alpha `/tradingview/webhook`
-- `obsidian-heartbeat-30m` -> Obsidian agent heartbeat via alpha `/tradingview/webhook`
-- `emerald-heartbeat-30m` -> Emerald agent heartbeat via alpha `/tradingview/webhook`
-- `sapphire-dep-audit-daily` -> daily dependency audit via alpha `/tradingview/webhook`
-- `sapphire-security-scan-weekly` -> weekly security scan via alpha `/tradingview/webhook`
+- `sapphire-heartbeat-30m` -> Sapphire agent heartbeat via alpha `/tradingview/webhook` (currently PAUSED)
+- `obsidian-heartbeat-30m` -> Obsidian agent heartbeat via alpha `/tradingview/webhook` (currently PAUSED)
+- `emerald-heartbeat-30m` -> Emerald agent heartbeat via alpha `/tradingview/webhook` (currently PAUSED)
+- `sapphire-dep-audit-daily` -> daily dependency audit via alpha `/tradingview/webhook` (currently PAUSED)
+- `sapphire-security-scan-weekly` -> weekly security scan via alpha `/tradingview/webhook` (currently PAUSED)
 
 Idempotent job setup script:
 
@@ -150,7 +156,7 @@ Idempotent job setup script:
 Scheduler auth model:
 
 - `sapphire-aster-health-6h`, `sapphire-lighter-health-6h`, and `sapphire-gateway-health-6h` use OIDC tokens from `sapphire-main-sa@sapphire-479610.iam.gserviceaccount.com`.
-- OpenClaw employee jobs (`sapphire-heartbeat-30m`, `obsidian-heartbeat-30m`, `emerald-heartbeat-30m`, `sapphire-dep-audit-daily`, `sapphire-security-scan-weekly`) route through `sapphire-alpha` `/tradingview/webhook` with `X-Sapphire-Webhook-Secret`, then dispatch to gateway.
+- If TradingView ingress is re-enabled later: OpenClaw employee jobs (`sapphire-heartbeat-30m`, `obsidian-heartbeat-30m`, `emerald-heartbeat-30m`, `sapphire-dep-audit-daily`, `sapphire-security-scan-weekly`) route through `sapphire-alpha` `/tradingview/webhook` with `X-Sapphire-Webhook-Secret`, then dispatch to gateway.
 - `sapphire-aster` and `sapphire-lighter` are authenticated-only Cloud Run services (`roles/run.invoker` limited to `sapphire-main-sa`).
 
 Scope reconciliation (dry-run then apply):

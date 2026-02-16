@@ -11,6 +11,7 @@ Features:
 """
 
 import asyncio
+import os
 import sys
 from decimal import Decimal
 from typing import Dict, List, Optional, Any
@@ -429,9 +430,16 @@ class JupiterTraderUnified:
 async def example_unified_trader():
     """Example: Use unified Jupiter trader"""
 
-    # Your credentials
-    JUPITER_API_KEY = "d1302809-3996-4ceb-aad0-7da8a71d6149"
-    SOLANA_PRIVATE_KEY = "5tg6XZMb96ZcGAip6jnpRmxWfQxNASr6tM9C8LmKxhhMC6gKEtsvQPdzhmMogrrbcf8wjTwyWnsfD12NjXJfeZc8"
+    # Example credentials (do not hardcode real keys in source control).
+    # Provide via environment variables when running this example locally:
+    #   export JUPITER_API_KEY="..."
+    #   export SOLANA_PRIVATE_KEY_B58="..."
+    JUPITER_API_KEY = os.environ.get("JUPITER_API_KEY", "").strip()
+    SOLANA_PRIVATE_KEY = os.environ.get("SOLANA_PRIVATE_KEY_B58", "").strip()
+    if not JUPITER_API_KEY or not SOLANA_PRIVATE_KEY:
+        raise RuntimeError(
+            "Missing credentials for example. Set JUPITER_API_KEY and SOLANA_PRIVATE_KEY_B58."
+        )
 
     # Optional Telegram
     TELEGRAM_BOT_TOKEN = None  # "YOUR_BOT_TOKEN"
