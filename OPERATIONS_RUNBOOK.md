@@ -80,7 +80,13 @@ Web policy:
 
 ## TradingView Signal Ingress
 
-TradingView alerts can be sent to:
+Status (2026-02-16):
+
+- TradingView webhook ingress is currently disabled in production.
+- `/tradingview/webhook` is not deployed on `sapphire-alpha` (HTTP `404`).
+- Keep TradingView-related scheduler jobs paused unless re-enabling this path.
+
+If/when re-enabled, TradingView alerts can be sent to:
 
 - `POST /tradingview/webhook` on `sapphire-alpha`
 - secret (recommended): `X-Sapphire-Webhook-Secret` header
@@ -97,10 +103,31 @@ Supported TradingView actions:
 - `tv_script_add`, `tv_script_remove`
 - `tv_scan_assets`, `tv_backtest`, `tv_ta`, `tv_status`, `tv_custom`
 
+## Grid Trader (Internal Signals)
+
+Grid trader emits internal BUY/SELL signals around an anchor price and feeds
+the same pipeline as TradingView signals (no direct limit orders; venue bots
+still execute market orders). Disabled by default.
+
+Enable with environment variables on `sapphire-alpha`:
+
+- `SAPPHIRE_GRID_TRADER_ENABLED=true`
+- `SAPPHIRE_GRID_SYMBOLS` (defaults to `SAPPHIRE_PREFERRED_SYMBOLS`)
+- `SAPPHIRE_GRID_LEVELS` (default `4`)
+- `SAPPHIRE_GRID_SPACING_PCT` (default `0.35` percent)
+- `SAPPHIRE_GRID_RECENTER_PCT` (default `2.5` percent)
+- `SAPPHIRE_GRID_REARM_PCT` (default `0.15` percent)
+- `SAPPHIRE_GRID_BASE_QUANTITY` (default `0` uses strategy default quantity)
+- `SAPPHIRE_GRID_LEVERAGE` (default `5`)
+- `SAPPHIRE_GRID_TARGET_MODE` (`best` or `all`)
+- `SAPPHIRE_GRID_TARGET_VENUES` (optional explicit list, e.g. `ASTER,LIGHTER`)
+- `SAPPHIRE_GRID_ALLOW_PAPER` (`true` to allow paper-stage signals)
+
 Safety default:
 
-- `TRADINGVIEW_EXECUTION_ENABLED=false` means alerts are notify-only (dry-run).
-- set `TRADINGVIEW_EXECUTION_ENABLED=true` only after paper validation.
+- `SAPPHIRE_DEX_EXECUTION_STAGE=paper` keeps the signal pipeline in dry-run.
+- `SAPPHIRE_DEX_EXECUTION_STAGE=staged_live|full_live` enables publishing TradeSignals to the bots.
+- Bot execution is additionally gated by `TRADING_ENABLED=true` on each bot service (safe-by-default is `false`).
 
 Risk controls for TradingView ingress (env-configured):
 
@@ -134,11 +161,11 @@ Focused jobs in `us-central1`:
 - `sapphire-alpha-heartbeat-30m` -> sends synthetic `/heartbeat` through alpha webhook every 30 minutes
 - `sapphire-alpha-status-daily` -> sends synthetic `/status` update through alpha webhook daily at `14:15 UTC`
 - `sapphire-alpha-strategy-gate-daily` -> sends `/promotion` through alpha webhook daily at `14:45 UTC`
-- `sapphire-heartbeat-30m` -> Sapphire agent heartbeat via alpha `/tradingview/webhook`
-- `obsidian-heartbeat-30m` -> Obsidian agent heartbeat via alpha `/tradingview/webhook`
-- `emerald-heartbeat-30m` -> Emerald agent heartbeat via alpha `/tradingview/webhook`
-- `sapphire-dep-audit-daily` -> daily dependency audit via alpha `/tradingview/webhook`
-- `sapphire-security-scan-weekly` -> weekly security scan via alpha `/tradingview/webhook`
+- `sapphire-heartbeat-30m` -> Sapphire agent heartbeat via alpha `/tradingview/webhook` (currently PAUSED)
+- `obsidian-heartbeat-30m` -> Obsidian agent heartbeat via alpha `/tradingview/webhook` (currently PAUSED)
+- `emerald-heartbeat-30m` -> Emerald agent heartbeat via alpha `/tradingview/webhook` (currently PAUSED)
+- `sapphire-dep-audit-daily` -> daily dependency audit via alpha `/tradingview/webhook` (currently PAUSED)
+- `sapphire-security-scan-weekly` -> weekly security scan via alpha `/tradingview/webhook` (currently PAUSED)
 
 Idempotent job setup script:
 
@@ -150,7 +177,7 @@ Idempotent job setup script:
 Scheduler auth model:
 
 - `sapphire-aster-health-6h`, `sapphire-lighter-health-6h`, and `sapphire-gateway-health-6h` use OIDC tokens from `sapphire-main-sa@sapphire-479610.iam.gserviceaccount.com`.
-- OpenClaw employee jobs (`sapphire-heartbeat-30m`, `obsidian-heartbeat-30m`, `emerald-heartbeat-30m`, `sapphire-dep-audit-daily`, `sapphire-security-scan-weekly`) route through `sapphire-alpha` `/tradingview/webhook` with `X-Sapphire-Webhook-Secret`, then dispatch to gateway.
+- If TradingView ingress is re-enabled later: OpenClaw employee jobs (`sapphire-heartbeat-30m`, `obsidian-heartbeat-30m`, `emerald-heartbeat-30m`, `sapphire-dep-audit-daily`, `sapphire-security-scan-weekly`) route through `sapphire-alpha` `/tradingview/webhook` with `X-Sapphire-Webhook-Secret`, then dispatch to gateway.
 - `sapphire-aster` and `sapphire-lighter` are authenticated-only Cloud Run services (`roles/run.invoker` limited to `sapphire-main-sa`).
 
 Scope reconciliation (dry-run then apply):

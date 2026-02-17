@@ -43,7 +43,7 @@ VENUE_PROFILES: Dict[str, Dict[str, Any]] = {
 # Agents may still trade any symbol at their discretion.
 # ---------------------------------------------------------------------------
 
-_DEFAULT_PREFERRED_SYMBOLS = "BTC,ETH,SOL,BCH,ZEC,XMR,PENGU,MON,LIT,ASTER"
+_DEFAULT_PREFERRED_SYMBOLS = "BTC,ETH,SOL,BCH,ZEC,XMR,PENGU,MON,LIT,ASTER,MEGAETH"
 
 
 def _parse_preferred_symbols(raw: str) -> List[str]:

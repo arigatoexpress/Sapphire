@@ -22,6 +22,7 @@ from src.execution.dispatcher import dispatcher
 from src.execution.portfolio import PortfolioTracker
 from src.feeds.market_data import MarketDataAggregator
 from src.signals.alpha_scanner import AlphaSignalScanner
+from src.signals.grid_trader import GridSignalPlanner
 
 
 from src.telegram_handlers import dispatch_control_command
@@ -188,10 +189,13 @@ class AlphaEngine:
             0.0, min(1.0, float(os.getenv("DEFAULT_VENUE_ALLOCATION", "1.0")))
         )
         self._telegram_webhook_url = os.getenv("TELEGRAM_WEBHOOK_URL", "").strip()
-        self._telegram_webhook_secret = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
+        # Prefer the Sapphire-scoped secret name, but keep legacy fallback for now.
+        self._telegram_webhook_secret = (
+            os.getenv("SAPPHIRE_TELEGRAM_WEBHOOK_SECRET", "").strip()
+            or os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
+        )
         self._control_api_token = os.getenv("SAPPHIRE_CONTROL_API_TOKEN", "").strip()
         self._telegram_webhook_mode = bool(self._telegram_webhook_url)
-        self._tradingview_webhook_secret = os.getenv("TRADINGVIEW_WEBHOOK_SECRET", "").strip()
         self._full_autonomy_enabled = self._env_flag("SAPPHIRE_FULL_AUTONOMY_ENABLED", default=True)
         self._autonomy_allow_code_changes = self._env_flag(
             "SAPPHIRE_AUTONOMY_ALLOW_CODE_CHANGES", default=False
@@ -266,6 +270,12 @@ class AlphaEngine:
             prediction_aggregator=self.prediction_aggregator,
         )
         self._alpha_scanner_task: Optional[asyncio.Task[Any]] = None
+        # Grid trader — leveraged grid-style signal generator
+        self.grid_trader = GridSignalPlanner(
+            market_data=self.market_data,
+            strategy=self.strategy,
+        )
+        self._grid_trader_task: Optional[asyncio.Task[Any]] = None
 
         self._trade_metrics: Dict[str, float] = {
             "total_trades": 0.0,
@@ -846,6 +856,199 @@ class AlphaEngine:
                 self._tradingview_signal_seen_at.pop(old_key, None)
         return False
 
+    async def _handle_tradingview_signal(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle an execution signal and publish it to the bot fleet via Pub/Sub.
+
+        TradingView webhook ingress is intentionally disabled. The name is kept for
+        backward-compatibility with internal callers (alpha scanner / grid trader),
+        but the pipeline is now venue-native:
+        - validate + dedupe
+        - apply stage sizing
+        - apply per-venue min-notional guard
+        - publish `TradeSignal` to `trading-signals`
+        """
+        from models import SignalType, TradeSide, TradeSignal
+        from pubsub.client import publish
+
+        if not isinstance(payload, dict):
+            return {"accepted": "rejected", "reason": "payload_not_dict"}
+
+        if self._kill_switch_active:
+            return {"accepted": "blocked", "reason": "kill_switch_active"}
+
+        raw_action = str(payload.get("action") or payload.get("side") or "").strip().upper()
+        if raw_action in {"LONG"}:
+            raw_action = "BUY"
+        if raw_action in {"SHORT"}:
+            raw_action = "SELL"
+
+        if raw_action not in {"BUY", "SELL"}:
+            return {"accepted": "rejected", "reason": "unsupported_action", "action": raw_action}
+
+        symbol = str(payload.get("symbol") or "").strip().upper()
+        if not symbol:
+            return {"accepted": "rejected", "reason": "missing_symbol"}
+
+        # Determine targets:
+        # - explicit target_platforms list wins
+        # - explicit venue hint wins
+        # - otherwise choose the best active venue (avoid duplicating across venues by default)
+        targets_raw = payload.get("target_platforms") or payload.get("targets") or payload.get("target") or []
+        targets: List[str] = []
+        if isinstance(targets_raw, str):
+            import re as _re
+
+            targets = [
+                token.strip().lower()
+                for token in _re.split(r"[,;|\s]+", targets_raw)
+                if token.strip()
+            ]
+        elif isinstance(targets_raw, list):
+            targets = [str(item).strip().lower() for item in targets_raw if str(item).strip()]
+
+        venue_hint = str(payload.get("venue") or "").strip().upper()
+        if venue_hint and venue_hint != "ALL" and not targets:
+            targets = [self._normalize_platform(venue_hint).lower()]
+
+        if not targets:
+            # Pick a single best venue to prevent accidental cross-venue duplication.
+            control = dispatcher.get_control_state()
+            snapshot = self.market_data.get_market_snapshot(symbol=symbol)
+            candidates: List[tuple[float, str]] = []
+            for venue in dispatcher.bot_urls.keys():
+                venue_state = control.get(venue, {})
+                if bool(venue_state.get("paused")):
+                    continue
+                if float(venue_state.get("allocation", 0.0)) <= 0:
+                    continue
+                market = snapshot.get(venue, {})
+                status = str(market.get("status", "offline"))
+                if status not in {"healthy", "degraded"}:
+                    continue
+                score = float(venue_state.get("allocation", 0.0))
+                # Prefer healthy feeds and fresher ticks.
+                if status == "healthy":
+                    score += 0.25
+                age = market.get("age_seconds")
+                if isinstance(age, int):
+                    score += max(0.0, 0.2 - min(0.2, age / 3000.0))
+                candidates.append((score, venue.lower()))
+
+            candidates.sort(reverse=True)
+            if candidates:
+                targets = [candidates[0][1]]
+
+        if not targets:
+            return {"accepted": "blocked", "reason": "no_active_venues"}
+
+        # Quantity: callers provide a baseline quantity (pre-stage sizing).
+        requested_quantity = self._as_float(payload.get("quantity"))
+        if requested_quantity is None or requested_quantity <= 0:
+            requested_quantity = float(self.strategy.default_quantity)
+
+        execution_state = self.strategy.execution_state()
+        multiplier = float(execution_state.get("stage_multiplier", 0.0))
+        stage = str(execution_state.get("dex_execution_stage", "paper"))
+
+        if multiplier <= 0:
+            return {
+                "accepted": "dry_run",
+                "reason": "execution_stage_paper",
+                "stage": stage,
+                "targets": targets,
+                "requested_quantity": float(requested_quantity),
+            }
+
+        # Apply stage sizing once (canonical).
+        dispatch_quantity = float(self.strategy.apply_stage_to_quantity(float(requested_quantity)))
+        if dispatch_quantity <= 0:
+            return {
+                "accepted": "dry_run",
+                "reason": "quantity_zero_after_stage",
+                "stage": stage,
+                "targets": targets,
+                "requested_quantity": float(requested_quantity),
+            }
+
+        # Per-venue notional guard (use the strictest required sizing among targets).
+        guarded_quantity = dispatch_quantity
+        guard_notes: Dict[str, Any] = {}
+        for target in targets:
+            venue = self._normalize_platform(target)
+            guard = self._apply_min_notional_guard(venue, symbol, guarded_quantity)
+            guard_notes[venue.lower()] = guard
+            if guard.get("blocked"):
+                return {
+                    "accepted": "blocked",
+                    "reason": guard.get("reason", "min_notional_blocked"),
+                    "stage": stage,
+                    "targets": targets,
+                    "guard": guard_notes,
+                }
+            guarded_quantity = max(guarded_quantity, float(guard.get("quantity", guarded_quantity)))
+
+        confidence = self._as_float(payload.get("_confidence")) or self._as_float(payload.get("confidence")) or 0.75
+        confidence = max(0.01, min(0.99, float(confidence)))
+        source = str(payload.get("source") or payload.get("strategy") or "alpha-engine").strip() or "alpha-engine"
+        leverage = self._as_float(payload.get("leverage"))
+        if leverage is not None and leverage <= 0:
+            leverage = None
+
+        signal_key = self._build_signal_key(payload, raw_action, targets, symbol, guarded_quantity)
+        if self._is_duplicate_signal(signal_key):
+            return {
+                "accepted": "duplicate",
+                "reason": "idempotent_drop",
+                "signal_key": signal_key,
+                "stage": stage,
+            }
+
+        # Preserve caller metadata, but ensure we never serialize huge blobs.
+        metadata = dict(payload.get("metadata") or {})
+        for key in ("grid", "strategy", "reduce_only", "price", "_reasoning", "_cognition_latency_ms"):
+            if key in payload and key not in metadata:
+                metadata[key] = payload.get(key)
+
+        signal = TradeSignal(
+            signal_id=signal_key,
+            symbol=symbol,
+            side=TradeSide.BUY if raw_action == "BUY" else TradeSide.SELL,
+            signal_type=SignalType.ENTRY,
+            confidence=confidence,
+            source=source,
+            target_platforms=targets,
+            quantity=float(round(guarded_quantity, 8)),
+            leverage=float(leverage) if leverage is not None else None,
+            metadata=metadata,
+        )
+
+        await publish("trading-signals", signal)
+        self._record_system_log(
+            f"Signal published: {raw_action} {symbol} qty={signal.quantity} targets={','.join(targets)}",
+            level="info",
+            tags=["signals", "dispatch"],
+            metadata={
+                "signal_id": signal_key,
+                "symbol": symbol,
+                "action": raw_action,
+                "targets": targets,
+                "quantity": signal.quantity,
+                "stage": stage,
+                "multiplier": multiplier,
+                "guard": guard_notes,
+            },
+        )
+
+        return {
+            "accepted": "executed",
+            "signal_key": signal_key,
+            "stage": stage,
+            "targets": targets,
+            "quantity": signal.quantity,
+            "confidence": confidence,
+            "source": source,
+        }
+
     async def _publish_risk_alert(
         self,
         action: str,
@@ -1252,6 +1455,7 @@ class AlphaEngine:
             "cognition_metrics": self.cognition.get_metrics() if self._cognition_enabled else {},
             "memory_stats": self.memory.get_stats() if self._memory_enabled else {},
             "alpha_scanner": self.alpha_scanner.get_metrics(),
+            "grid_trader": self.grid_trader.metrics(),
             "dispatcher_hardening": dispatcher.get_hardening_status(),
             "timestamp": int(time.time()),
         }
@@ -2253,7 +2457,7 @@ class AlphaEngine:
                 await self.telegram.send_as(
                     EMERALD,
                     f"🔍 Alpha signal (dry-run): `{action.upper()} {symbol}` "
-                    f"(conf={confidence:.0%}) — enable `TRADINGVIEW_EXECUTION_ENABLED=true` to execute",
+                    f"(conf={confidence:.0%}) — set `SAPPHIRE_DEX_EXECUTION_STAGE=staged_live|full_live` to execute",
                 )
             else:
                 logger.info(f"Alpha signal {symbol}: pipeline returned {accepted}")
@@ -2265,6 +2469,43 @@ class AlphaEngine:
         except Exception as exc:
             logger.error(f"Alpha scanner pipeline error: {exc}")
             self.alpha_scanner.resolve_signal("", False)
+
+    async def _handle_grid_trader_signal(self, signal: Dict[str, Any]) -> None:
+        """Callback for grid trader signals — feeds signals into the execution pipeline."""
+        source = signal.get("source", "grid_trader")
+        symbol = signal.get("symbol", "")
+        action = signal.get("action", "")
+        price = signal.get("price", 0)
+        level = signal.get("grid", {}).get("level")
+
+        logger.info(
+            f"🧭 Grid trader signal: {action} {symbol} @ {price} (level={level}, source={source})"
+        )
+
+        # Record activity under EMERALD (strategy/analysis agent)
+        self.telegram.record_activity(
+            EMERALD, "grid_signal",
+            f"{action} {symbol} (lvl {level})",
+        )
+
+        try:
+            result = await self._handle_tradingview_signal(signal)
+            accepted = result.get("accepted", "unknown")
+
+            if accepted == "executed":
+                await self.telegram.send_as(
+                    EMERALD,
+                    f"🧭 Grid executed: `{action} {symbol}` @ `{price}` (lvl {level})",
+                )
+            elif accepted == "dry_run":
+                await self.telegram.send_as(
+                    EMERALD,
+                    f"🧭 Grid signal (dry-run): `{action} {symbol}` @ `{price}`",
+                )
+            else:
+                logger.info(f"Grid signal {symbol}: pipeline returned {accepted}")
+        except Exception as exc:
+            logger.error(f"Grid trader pipeline error: {exc}")
 
 
 
@@ -2811,6 +3052,19 @@ class AlphaEngine:
             )
         else:
             logger.info("Internal alpha scanner disabled (SAPPHIRE_ALPHA_SCANNER_ENABLED=false)")
+
+        # 7. Start Grid Trader (leveraged grid-style signal generation)
+        if self.grid_trader.enabled:
+            self._grid_trader_task = asyncio.create_task(
+                self.grid_trader.run_loop(self._handle_grid_trader_signal)
+            )
+            logger.info("🧭 Grid trader task started")
+            self.telegram.record_activity(
+                EMERALD, "grid",
+                f"Grid trader active — symbols: {','.join(self.grid_trader.metrics().get('symbols', [])[:5])}",
+            )
+        else:
+            logger.info("Grid trader disabled (SAPPHIRE_GRID_TRADER_ENABLED=false)")
 
         # 7. Start Prediction Market Intelligence (Phase 8)
         if self.prediction_aggregator.enabled:

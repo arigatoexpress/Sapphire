@@ -89,6 +89,11 @@ class LighterBot:
         self.trades_failed = 0
         self.avg_latency_ms = 0.0
 
+        # Telemetry publishing (consumed by api-gateway for realtime dashboard)
+        self._position_publish_interval_seconds = max(
+            3, int(os.getenv("POSITION_PUBLISH_INTERVAL_SECONDS", "10"))
+        )
+
     @staticmethod
     async def _call_lighter_api(api_callable, *args, **kwargs):
         """Invoke Lighter SDK methods that may be sync or async across SDK versions."""
@@ -211,6 +216,7 @@ class LighterBot:
                 self._main_loop(),
                 self._gateway_loop(),
                 self._balance_sync_loop(),
+                self._position_publish_loop(),
             ]
             await asyncio.gather(*tasks)
 
@@ -389,6 +395,30 @@ class LighterBot:
                 logger.error(f"Balance sync error: {e}")
             await asyncio.sleep(30)
 
+    async def _position_publish_loop(self):
+        """Periodically publish a snapshot of positions for the realtime dashboard."""
+        from dataclasses import asdict
+
+        while self.running:
+            try:
+                positions_payload = []
+                for position in self.positions.values():
+                    try:
+                        positions_payload.append(asdict(position))
+                    except Exception:
+                        continue
+
+                await publish(
+                    "position-updates",
+                    {
+                        "platform": PLATFORM.value,
+                        "positions": positions_payload,
+                    },
+                )
+            except Exception as e:
+                logger.error(f"Position publish error: {e}")
+            await asyncio.sleep(self._position_publish_interval_seconds)
+
     async def _handle_signal(self, signal_data: Dict[str, Any]):
         """Handle incoming trading signal."""
         try:
@@ -403,7 +433,9 @@ class LighterBot:
 
             logger.info(f"Received signal: {signal.side} {signal.symbol}")
             result = await self._execute_trade(signal)
-            await publish("trade-executed", result)
+            # Don't emit trade events for explicit no-op signals (ex: reduce-only without exposure).
+            if not (result.metadata or {}).get("noop"):
+                await publish("trade-executed", result)
 
         except Exception as e:
             logger.error(f"Signal handling error: {e}")
@@ -439,6 +471,81 @@ class LighterBot:
 
             # Calculate quantity
             quantity = signal.quantity or self._calculate_position_size(signal)
+
+            reduce_only = bool((signal.metadata or {}).get("reduce_only", False))
+            if reduce_only:
+                current = self.positions.get(coin)
+                current_qty = float(getattr(current, "quantity", 0.0) or 0.0) if current else 0.0
+                if current_qty <= 0:
+                    logger.info(f"Reduce-only ignored for {coin}: no tracked position")
+                    return TradeResult(
+                        trade_id="noop",
+                        signal_id=signal.signal_id,
+                        platform=PLATFORM.value,
+                        symbol=coin,
+                        side=signal.side,
+                        success=True,
+                        metadata={
+                            "noop": True,
+                            "reason": "reduce_only_no_position",
+                            "reduce_only": True,
+                        },
+                    )
+
+                current_side = getattr(current, "side", None)
+                if current_side in (TradeSide.BUY, TradeSide.LONG, "BUY", "LONG") and is_buy:
+                    logger.info(f"Reduce-only ignored for {coin}: expected SELL to reduce long")
+                    return TradeResult(
+                        trade_id="noop",
+                        signal_id=signal.signal_id,
+                        platform=PLATFORM.value,
+                        symbol=coin,
+                        side=signal.side,
+                        success=True,
+                        metadata={
+                            "noop": True,
+                            "reason": "reduce_only_direction_mismatch",
+                            "reduce_only": True,
+                        },
+                    )
+
+                if current_side in (TradeSide.SELL, TradeSide.SHORT, "SELL", "SHORT") and not is_buy:
+                    logger.info(f"Reduce-only ignored for {coin}: expected BUY to reduce short")
+                    return TradeResult(
+                        trade_id="noop",
+                        signal_id=signal.signal_id,
+                        platform=PLATFORM.value,
+                        symbol=coin,
+                        side=signal.side,
+                        success=True,
+                        metadata={
+                            "noop": True,
+                            "reason": "reduce_only_direction_mismatch",
+                            "reduce_only": True,
+                        },
+                    )
+
+                if signal.quantity is None:
+                    quantity = current_qty
+                else:
+                    try:
+                        quantity = min(float(quantity), current_qty)
+                    except (TypeError, ValueError):
+                        quantity = current_qty
+                if quantity <= 0:
+                    return TradeResult(
+                        trade_id="noop",
+                        signal_id=signal.signal_id,
+                        platform=PLATFORM.value,
+                        symbol=coin,
+                        side=signal.side,
+                        success=True,
+                        metadata={
+                            "noop": True,
+                            "reason": "reduce_only_quantity_zero",
+                            "reduce_only": True,
+                        },
+                    )
 
             logger.info(
                 f"Placing {signal.side} order | Symbol: {coin} | Qty: {quantity} | OrderBookId: {order_book_id}"
@@ -486,17 +593,18 @@ class LighterBot:
 
                 self.trades_executed += 1
 
-                # Create position record
-                self.positions[coin] = Position(
-                    position_id=getattr(result, "order_id", ""),
-                    platform=PLATFORM.value,
-                    symbol=coin,
-                    side=signal.side,
-                    quantity=filled_qty,
-                    entry_price=fill_price,
-                    stop_loss=signal.stop_loss,
-                    take_profit=signal.take_profit,
-                )
+                # Create position record (reduce-only fills are reconciled via _check_positions).
+                if not reduce_only:
+                    self.positions[coin] = Position(
+                        position_id=getattr(result, "order_id", ""),
+                        platform=PLATFORM.value,
+                        symbol=coin,
+                        side=signal.side,
+                        quantity=filled_qty,
+                        entry_price=fill_price,
+                        stop_loss=signal.stop_loss,
+                        take_profit=signal.take_profit,
+                    )
 
                 logger.info(f"Order FILLED | Symbol: {coin} | Avg Price: ${fill_price}")
 
@@ -511,6 +619,10 @@ class LighterBot:
                     filled_quantity=filled_qty,
                     avg_price=fill_price,
                     execution_time_ms=execution_time,
+                    metadata={
+                        **(signal.metadata or {}),
+                        "reduce_only": reduce_only,
+                    },
                 )
             else:
                 error_msg = getattr(result, "error", "Unknown error")
@@ -639,19 +751,44 @@ class LighterBot:
             )
 
             if account and hasattr(account, "positions"):
-                for pos in account.positions:
-                    if pos.size != 0:
-                        symbol = pos.symbol if hasattr(pos, "symbol") else f"MARKET_{pos.order_book_id}"
+                next_positions: Dict[str, Position] = {}
 
-                        if symbol not in self.positions:
-                            self.positions[symbol] = Position(
-                                position_id=f"{PLATFORM.value}_{pos.order_book_id}",
-                                platform=PLATFORM.value,
-                                symbol=symbol,
-                                side=TradeSide.LONG if float(pos.size) > 0 else TradeSide.SHORT,
-                                quantity=abs(float(pos.size)),
-                                entry_price=float(getattr(pos, "entry_price", 0)),
-                            )
+                for pos in account.positions:
+                    try:
+                        size = float(getattr(pos, "size", 0))
+                    except (TypeError, ValueError):
+                        size = 0.0
+                    if size == 0:
+                        continue
+
+                    symbol = pos.symbol if hasattr(pos, "symbol") else f"MARKET_{pos.order_book_id}"
+                    symbol = str(symbol or "").strip().upper() or f"MARKET_{getattr(pos, 'order_book_id', 0)}"
+
+                    side = TradeSide.LONG if size > 0 else TradeSide.SHORT
+                    qty = abs(size)
+                    entry_price = float(getattr(pos, "entry_price", 0) or 0.0)
+
+                    existing = self.positions.get(symbol)
+                    if existing is None:
+                        existing = Position(
+                            position_id=f"{PLATFORM.value}_{getattr(pos, 'order_book_id', 0)}",
+                            platform=PLATFORM.value,
+                            symbol=symbol,
+                            side=side,
+                            quantity=qty,
+                            entry_price=entry_price,
+                        )
+                    else:
+                        existing.side = side
+                        existing.quantity = qty
+                        if entry_price > 0:
+                            existing.entry_price = entry_price
+                        existing.updated_at = utc_now()
+
+                    next_positions[symbol] = existing
+
+                # Replace with the authoritative snapshot (clears closed positions).
+                self.positions = next_positions
 
         except Exception as e:
             logger.error(f"Position check error: {e}")

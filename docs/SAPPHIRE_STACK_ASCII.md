@@ -15,7 +15,7 @@
 ┌──────────────────────────────────────────────────────────────────────────────────────────────────────┐
 │                           CLOUD RUN: sapphire-alpha (Engine)                                        │
 │                                                                                                      │
-│  Ingress: /telegram/webhook, /tradingview/webhook, /api/v2/*, /health                               │
+│  Ingress: /telegram/webhook, /api/v2/*, /ws, /health                                                 │
 │                                                                                                      │
 │  Core modules:                                                                                        │
 │  - Alpha Engine + Autonomy Loop                                                                       │
