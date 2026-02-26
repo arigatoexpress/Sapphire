@@ -12,8 +12,7 @@ from fastapi import FastAPI, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from google.cloud import firestore
 
-# Add parent directory for imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+# Log viewer dashboard - queries Firestore for system logs
 
 app = FastAPI(title="Sapphire Log Viewer")
 db = firestore.Client(project="sapphire-479610")
