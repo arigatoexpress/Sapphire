@@ -15,9 +15,31 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+# ─── API Auth ────────────────────────────────────────────────────────────────
+
+_CONTROL_TOKEN = os.getenv("SAPPHIRE_CONTROL_API_TOKEN", "")
+
+
+async def require_control_token(
+    x_sapphire_control_token: Optional[str] = Header(None, alias="X-Sapphire-Control-Token"),
+) -> None:
+    """
+    Validate the X-Sapphire-Control-Token header on mutable endpoints.
+    Token is sourced from SAPPHIRE_CONTROL_API_TOKEN env / Secret Manager.
+    Returns 401 if missing, 403 if wrong.
+    """
+    if not _CONTROL_TOKEN:
+        # Token not configured → log warning but allow (dev mode only)
+        logger.warning("⚠️  SAPPHIRE_CONTROL_API_TOKEN not set — mutable endpoint unprotected!")
+        return
+    if not x_sapphire_control_token:
+        raise HTTPException(status_code=401, detail="X-Sapphire-Control-Token header required")
+    if x_sapphire_control_token != _CONTROL_TOKEN:
+        raise HTTPException(status_code=403, detail="Invalid control token")
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -388,7 +410,7 @@ class TradingSignalRequest(BaseModel):
     quantity: Optional[float] = None
 
 
-@app.post("/api/signals/create")
+@app.post("/api/signals/create", dependencies=[Depends(require_control_token)])
 async def create_signal(request: TradingSignalRequest):
     """Create and publish a trading signal to all bots."""
     try:
@@ -414,7 +436,7 @@ async def create_signal(request: TradingSignalRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.post("/api/signals/close-all")
+@app.post("/api/signals/close-all", dependencies=[Depends(require_control_token)])
 async def close_all_positions():
     """Send signal to close all positions across all platforms."""
     from models import RiskAlert
