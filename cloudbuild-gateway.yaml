@@ -26,6 +26,8 @@ steps:
       - 'us-central1'
       - '--project'
       - 'sapphire-479610'
+      - '--update-secrets'
+      - 'SAPPHIRE_CONTROL_API_TOKEN=SAPPHIRE_CONTROL_API_TOKEN:latest'
     id: 'deploy-gateway'
     waitFor: ['push-gateway']
 
