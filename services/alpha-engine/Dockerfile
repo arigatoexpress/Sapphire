@@ -10,8 +10,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY services/alpha-engine/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Alpha control-plane code + Sapphire skills for security scanning.
-COPY services/alpha-engine/shared /app/shared
+# Single root shared library + service code + skills
+COPY services/shared /app/shared
 COPY services/alpha-engine/src /app/src
 COPY skills /app/skills
 

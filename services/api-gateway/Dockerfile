@@ -6,19 +6,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy and install requirements first (for caching)
-COPY requirements.txt .
+COPY services/api-gateway/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy shared library (bundled as package)
-COPY shared /app/shared
+# Single root shared library + service code
+COPY services/shared /app/shared
+COPY services/api-gateway/src /app/src
 
-# Copy service code
-COPY src /app/src
-
-# Set Python path
 ENV PYTHONPATH=/app:/app/src:/app/shared
+ENV PYTHONUNBUFFERED=1
 ENV PORT=8080
 
 EXPOSE 8080
+
 CMD ["python", "-m", "src.main"]
