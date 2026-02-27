@@ -1033,30 +1033,8 @@
                     <button class="log-filter" data-level="error">ERROR</button>
                 </div>
                 <div class="log-container" id="log-container">
-                    <div class="log-entry">
-                        <span class="log-time">22:45:30</span>
-                        <span class="log-level success">OK</span>
-                        <span class="log-message">Signal published <span class="log-meta">ETHBTC | msg_id: abc123</span></span>
-                    </div>
-                    <div class="log-entry">
-                        <span class="log-time">22:44:15</span>
-                        <span class="log-level info">INFO</span>
-                        <span class="log-message">AI enrichment complete <span class="log-meta">verdict: proceed | 95ms</span></span>
-                    </div>
-                    <div class="log-entry">
-                        <span class="log-time">22:43:02</span>
-                        <span class="log-level success">OK</span>
-                        <span class="log-message">Trade executed <span class="log-meta">SOL-PERP | $50.23</span></span>
-                    </div>
-                    <div class="log-entry">
-                        <span class="log-time">22:42:18</span>
-                        <span class="log-level warning">WARN</span>
-                        <span class="log-message">High volatility detected <span class="log-meta">BTC | σ: 2.4</span></span>
-                    </div>
-                    <div class="log-entry">
-                        <span class="log-time">22:40:55</span>
-                        <span class="log-level success">OK</span>
-                        <span class="log-message">Signal validated <span class="log-meta">z-score: -2.1 | confidence: 0.87</span></span>
+                    <div style="padding: 40px; text-align: center; color: var(--terminal-dim);">
+                        Loading logs from Firestore...
                     </div>
                 </div>
             </div>
@@ -1133,32 +1111,165 @@
             });
         }
         
+        // ═════════════════════════════════════════════════════════════════
+        // REAL API INTEGRATION - Fetch live data from backend
+        // ═════════════════════════════════════════════════════════════════
+        
+        const API_BASE = '/api';
+        
+        // Fetch real logs from Firestore
+        async function fetchLogs(service = '', level = '', hours = 24) {
+            try {
+                const params = new URLSearchParams();
+                if (service) params.append('service', service);
+                if (level) params.append('level', level);
+                params.append('hours', hours);
+                params.append('limit', '50');
+                
+                const response = await fetch(`${API_BASE}/logs?${params}`);
+                if (!response.ok) throw new Error('Failed to fetch logs');
+                
+                const data = await response.json();
+                return data.logs || [];
+            } catch (err) {
+                console.error('Error fetching logs:', err);
+                return [];
+            }
+        }
+        
+        // Fetch real metrics
+        async function fetchMetrics() {
+            try {
+                const response = await fetch(`${API_BASE}/metrics`);
+                if (!response.ok) throw new Error('Failed to fetch metrics');
+                return await response.json();
+            } catch (err) {
+                console.error('Error fetching metrics:', err);
+                return null;
+            }
+        }
+        
+        // Render logs to the DOM
+        function renderLogs(logs) {
+            const container = document.getElementById('log-container');
+            
+            if (logs.length === 0) {
+                container.innerHTML = `
+                    <div style="padding: 40px; text-align: center; color: var(--terminal-dim);">
+                        No logs found. Start trading to see activity here.
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = logs.map(log => `
+                <div class="log-entry ${log.level}">
+                    <div class="log-header">
+                        <span class="log-time">${new Date(log.timestamp).toLocaleTimeString()}</span>
+                        <span class="log-service">${log.service || 'system'}</span>
+                        <span class="log-level ${log.level}">${log.level}</span>
+                        ${log.event_type ? `<span style="color: #a855f7;">${log.event_type}</span>` : ''}
+                    </div>
+                    <div class="log-message">${escapeHtml(log.message)}</div>
+                    ${renderLogMeta(log)}
+                </div>
+            `).join('');
+            
+            // Update signal count
+            const signalCount = logs.filter(l => l.event_type && l.event_type.includes('signal')).length;
+            document.getElementById('signal-count').textContent = signalCount;
+        }
+        
+        function renderLogMeta(log) {
+            const meta = Object.entries(log)
+                .filter(([k]) => !['id', 'timestamp', 'service', 'level', 'message', 'severity', 'event_type'].includes(k))
+                .map(([k, v]) => `${k}: ${JSON.stringify(v).substring(0, 100)}`)
+                .join(' | ');
+            return meta ? `<div class="log-meta">${meta}</div>` : '';
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Update metrics display
+        function updateMetrics(data) {
+            if (!data) return;
+            
+            if (data.pnl_24h !== undefined) {
+                const pnl = document.getElementById('pnl-24h');
+                const value = parseFloat(data.pnl_24h);
+                pnl.textContent = (value >= 0 ? '+' : '') + value.toFixed(2) + '%';
+                pnl.style.color = value >= 0 ? 'var(--terminal-bright)' : 'var(--status-error)';
+            }
+            
+            if (data.active_signals !== undefined) {
+                document.getElementById('active-signals').textContent = data.active_signals;
+            }
+            
+            if (data.win_rate !== undefined) {
+                document.getElementById('win-rate').textContent = data.win_rate.toFixed(1) + '%';
+            }
+        }
+        
         // Refresh Functions
-        function refreshTopology() {
+        async function refreshTopology() {
             console.log('Refreshing topology...');
-            // Add temporary loading state
             const svg = document.getElementById('topology-svg');
             svg.style.opacity = '0.5';
+            
+            // Fetch topology status from API
+            try {
+                const response = await fetch(`${API_BASE}/topology-status`);
+                if (response.ok) {
+                    const data = await response.json();
+                    // Update node colors based on status
+                    updateTopologyStatus(data);
+                }
+            } catch (err) {
+                console.log('Topology status fetch failed (optional)');
+            }
+            
             setTimeout(() => {
                 svg.style.opacity = '1';
             }, 500);
         }
         
-        function refreshMetrics() {
-            console.log('Refreshing metrics...');
-            // Simulate data update
-            const pnl = document.getElementById('pnl-24h');
-            const randomPnl = (Math.random() * 5 - 1).toFixed(2);
-            pnl.textContent = (randomPnl > 0 ? '+' : '') + randomPnl + '%';
-            pnl.style.color = randomPnl > 0 ? 'var(--terminal-bright)' : 'var(--status-error)';
+        function updateTopologyStatus(data) {
+            // Update node colors based on real status
+            if (data && data.nodes) {
+                data.nodes.forEach(node => {
+                    // Find node element and update class
+                    const nodeEl = document.querySelector(`[data-node="${node.id}"]`);
+                    if (nodeEl) {
+                        const shape = nodeEl.querySelector('.node-shape');
+                        if (shape) {
+                            shape.classList.remove('online', 'warning', 'offline');
+                            shape.classList.add(node.status);
+                        }
+                    }
+                });
+            }
         }
         
-        function refreshLogs() {
+        async function refreshMetrics() {
+            console.log('Refreshing metrics...');
+            const data = await fetchMetrics();
+            updateMetrics(data);
+        }
+        
+        async function refreshLogs() {
             console.log('Refreshing logs...');
+            const service = document.querySelector('.log-filter.active')?.dataset.level || '';
+            const logs = await fetchLogs(service);
+            renderLogs(logs);
         }
         
         function clearLogs() {
-            document.getElementById('log-container').innerHTML = '';
+            document.getElementById('log-container').innerHTML = 
+                '<div style="padding: 40px; text-align: center; color: var(--terminal-dim);">Logs cleared</div>';
         }
         
         // Log Filters
@@ -1232,47 +1343,21 @@
             terminal.scrollTop = terminal.scrollHeight;
         }
         
-        // Simulate incoming logs
-        const sampleLogs = [
-            { level: 'success', message: 'Signal published', meta: 'SOLBTC | msg_id: xyz789' },
-            { level: 'info', message: 'Price update received', meta: 'BTC: $67,234.50' },
-            { level: 'success', message: 'Trade executed', meta: 'ETH-PERP | $125.00' },
-            { level: 'warning', message: 'Latency spike detected', meta: '145ms > threshold' },
-            { level: 'info', message: 'AI analysis requested', meta: 'gemma3:27b' },
-        ];
+        // ═════════════════════════════════════════════════════════════════
+        // INITIAL LOAD - Fetch real data on page load
+        // ═════════════════════════════════════════════════════════════════
         
-        function addRandomLog() {
-            const log = sampleLogs[Math.floor(Math.random() * sampleLogs.length)];
-            const now = new Date();
-            const time = now.toISOString().slice(11, 19);
-            
-            const logContainer = document.getElementById('log-container');
-            const entry = document.createElement('div');
-            entry.className = 'log-entry';
-            entry.innerHTML = `
-                <span class="log-time">${time}</span>
-                <span class="log-level ${log.level}">${log.level.toUpperCase()}</span>
-                <span class="log-message">${log.message} <span class="log-meta">${log.meta}</span></span>
-            `;
-            
-            logContainer.insertBefore(entry, logContainer.firstChild);
-            
-            // Keep only last 50 entries
-            while (logContainer.children.length > 50) {
-                logContainer.removeChild(logContainer.lastChild);
-            }
-            
-            // Update signal count
-            const count = document.getElementById('signal-count');
-            count.textContent = parseInt(count.textContent) + 1;
-        }
+        // Load real logs on startup
+        refreshLogs();
         
-        // Add new log every 3-8 seconds randomly
+        // Load real metrics on startup
+        refreshMetrics();
+        
+        // Auto-refresh every 30 seconds
         setInterval(() => {
-            if (Math.random() > 0.3) {
-                addRandomLog();
-            }
-        }, 5000);
+            refreshLogs();
+            refreshMetrics();
+        }, 30000);
         
         // Terminal minimize/maximize
         function minimizeTerminal() {
