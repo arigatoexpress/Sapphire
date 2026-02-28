@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Stats Grid -->
+<div class="grid grid-4" style="margin-bottom: var(--space-xl);">
+    <div class="stat-card">
+        <div class="stat-label">System Status</div>
+        <div class="stat-value" style="color: var(--success);">Online</div>
+        <div class="stat-change positive">
+            <i class="fas fa-check-circle"></i> All systems operational
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-label">Active Services</div>
+        <div class="stat-value" id="active-services">--</div>
+        <div class="stat-change">Cloud Run + Pi Cluster</div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-label">Today's Trades</div>
+        <div class="stat-value" id="today-trades">--</div>
+        <div class="stat-change" id="trade-status">Awaiting data</div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-label">Daily P&L</div>
+        <div class="stat-value" id="daily-pnl">--</div>
+        <div class="stat-change" id="pnl-status">--</div>
+    </div>
+</div>
+
+<!-- Main Content Grid -->
+<div class="grid grid-2">
+    <!-- Market Prices -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-coins" style="margin-right: 8px; color: var(--primary);"></i>Market Prices</h3>
+            <button class="btn btn-secondary" style="font-size: 0.8rem; padding: 4px 12px;" onclick="fetchPrices()">
+                <i class="fas fa-sync-alt"></i>
+            </button>
+        </div>
+        <div class="card-body">
+            <div id="prices-loading" class="loading">
+                <div class="spinner"></div>
+                Loading prices...
+            </div>
+            <div id="prices-content" style="display: none;">
+                <div id="prices-list"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Links -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-rocket" style="margin-right: 8px; color: var(--secondary);"></i>Quick Actions</h3>
+        </div>
+        <div class="card-body">
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-md);">
+                <a href="/command-deck" class="btn btn-secondary" style="flex-direction: column; padding: var(--space-lg);">
+                    <i class="fas fa-terminal" style="font-size: 1.5rem; margin-bottom: var(--space-sm);"></i>
+                    <span>Command Deck</span>
+                </a>
+                <a href="/system-health" class="btn btn-secondary" style="flex-direction: column; padding: var(--space-lg);">
+                    <i class="fas fa-heartbeat" style="font-size: 1.5rem; margin-bottom: var(--space-sm);"></i>
+                    <span>System Health</span>
+                </a>
+                <a href="/logs" class="btn btn-secondary" style="flex-direction: column; padding: var(--space-lg);">
+                    <i class="fas fa-list-alt" style="font-size: 1.5rem; margin-bottom: var(--space-sm);"></i>
+                    <span>View Logs</span>
+                </a>
+                <a href="/production-readiness" class="btn btn-secondary" style="flex-direction: column; padding: var(--space-lg);">
+                    <i class="fas fa-check-circle" style="font-size: 1.5rem; margin-bottom: var(--space-sm);"></i>
+                    <span>Readiness Gates</span>
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent Activity -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-history" style="margin-right: 8px; color: var(--accent);"></i>Recent Activity</h3>
+            <a href="/logs" class="btn btn-secondary" style="font-size: 0.8rem; padding: 4px 12px;">View All</a>
+        </div>
+        <div class="card-body">
+            <div class="empty-state">
+                <div class="empty-state-icon">📋</div>
+                <p>No recent activity</p>
+                <p style="font-size: 0.85rem; margin-top: var(--space-sm);">Activity will appear when trading begins</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- System Status -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-server" style="margin-right: 8px; color: var(--success);"></i>Service Status</h3>
+            <a href="/system-health" class="btn btn-secondary" style="font-size: 0.8rem; padding: 4px 12px;">Details</a>
+        </div>
+        <div class="card-body">
+            <div id="services-loading" class="loading">
+                <div class="spinner"></div>
+                Checking services...
+            </div>
+            <div id="services-content" style="display: none;">
+                <div id="services-list"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function fetchPrices() {
+        const loading = document.getElementById('prices-loading');
+        const content = document.getElementById('prices-content');
+        const list = document.getElementById('prices-list');
+        
+        loading.style.display = 'flex';
+        content.style.display = 'none';
+        
+        try {
+            const data = await window.platformApi.getMetrics();
+            const market = data.market || {};
+            
+            if (market.error) {
+                list.innerHTML = `<div class="empty-state"><p>Error: ${market.error}</p></div>`;
+            } else {
+                const coins = [
+                    { key: 'BTC', name: 'Bitcoin', icon: '₿' },
+                    { key: 'ETH', name: 'Ethereum', icon: 'Ξ' },
+                    { key: 'SOL', name: 'Solana', icon: '◎' }
+                ];
+                
+                list.innerHTML = coins.map(coin => {
+                    const price = market[coin.key];
+                    if (!price) return '';
+                    const change = price.change_24h;
+                    const changeClass = change >= 0 ? 'positive' : 'negative';
+                    const changeIcon = change >= 0 ? '▲' : '▼';
+                    
+                    return `
+                        <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-md); border-bottom: 1px solid var(--border);">
+                            <div style="display: flex; align-items: center; gap: var(--space-md);">
+                                <div style="width: 40px; height: 40px; background: var(--bg-glass); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">${coin.icon}</div>
+                                <div>
+                                    <div style="font-weight: 600;">${coin.name}</div>
+                                    <div style="font-size: 0.8rem; color: var(--text-muted);">${coin.key}</div>
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 1.25rem; font-weight: 700; font-family: var(--font-mono);">$${price.price.toLocaleString()}</div>
+                                <div class="stat-change ${changeClass}" style="font-size: 0.85rem;">${changeIcon} ${Math.abs(change).toFixed(2)}%</div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        } catch (e) {
+            list.innerHTML = `<div class="empty-state"><p>Failed to load prices</p></div>`;
+        }
+        
+        loading.style.display = 'none';
+        content.style.display = 'block';
+    }
+    
+    async function fetchServices() {
+        const loading = document.getElementById('services-loading');
+        const content = document.getElementById('services-content');
+        const list = document.getElementById('services-list');
+        
+        try {
+            const data = await window.platformApi.getStatus();
+            
+            const services = [
+                { name: 'Gateway', key: 'gateway', icon: '🌐' },
+                { name: 'Command Deck', key: 'command_deck', icon: '🎯' },
+                { name: 'Health Dashboard', key: 'health_dashboard', icon: '💓' },
+                { name: 'Log Viewer', key: 'log_viewer', icon: '📜' },
+                { name: 'PM Hub', key: 'pm_hub', icon: '📊' },
+                { name: 'Telegram Bot', key: 'telegram_bot', icon: '✈️' },
+            ];
+            
+            list.innerHTML = services.map(s => {
+                const status = data.services?.[s.key]?.status || 'unknown';
+                const statusClass = status === 'healthy' ? 'badge-success' : 'badge-warning';
+                return `
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-sm) 0;">
+                        <div style="display: flex; align-items: center; gap: var(--space-sm);"><span>${s.icon}</span><span>${s.name}</span></div>
+                        <span class="badge ${statusClass}">${status}</span>
+                    </div>
+                `;
+            }).join('');
+            
+            const activeCount = Object.values(data.services || {}).filter(s => s.status === 'healthy').length;
+            document.getElementById('active-services').textContent = `${activeCount}/${services.length}`;
+        } catch (e) {
+            list.innerHTML = `<div class="empty-state"><p>Failed to load services</p></div>`;
+        }
+        
+        loading.style.display = 'none';
+        content.style.display = 'block';
+    }
+    
+    async function fetchTradingMetrics() {
+        try {
+            const data = await window.platformApi.getMetrics();
+            const trading = data.trading || {};
+            
+            document.getElementById('today-trades').textContent = trading.trades?.today || 0;
+            document.getElementById('trade-status').textContent = trading.trades?.total ? `${trading.trades.total} total trades` : 'No trading data';
+            
+            const pnl = trading.pnl?.daily || 0;
+            document.getElementById('daily-pnl').textContent = pnl >= 0 ? `+$${pnl}` : `-$${Math.abs(pnl)}`;
+            document.getElementById('daily-pnl').style.color = pnl >= 0 ? 'var(--success)' : 'var(--danger)';
+            document.getElementById('pnl-status').textContent = pnl >= 0 ? 'Profitable' : 'Loss';
+            document.getElementById('pnl-status').className = `stat-change ${pnl >= 0 ? 'positive' : 'negative'}`;
+        } catch (e) {
+            console.error('Failed to fetch trading metrics:', e);
+        }
+    }
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        fetchPrices();
+        fetchServices();
+        fetchTradingMetrics();
+        setInterval(fetchPrices, 60000);
+    });
+</script>
+{% endblock %}

@@ -17,8 +17,17 @@ from src.security.agent_permissions import gate, Capability
 if TYPE_CHECKING:
     from src.main import AlphaEngine
 
-# Re-export agent identities for message routing
-from telegram_bot import SAPPHIRE, OBSIDIAN, EMERALD
+# Re-export agent identities for message routing.
+# Fallback keeps alpha-engine boot-safe if shared telegram module changes exports.
+try:
+    from telegram_bot import SAPPHIRE, OBSIDIAN, EMERALD
+except Exception:
+    SAPPHIRE = "SAPPHIRE"
+    OBSIDIAN = "OBSIDIAN"
+    EMERALD = "EMERALD"
+    logger.warning(
+        "telegram_bot identity constants unavailable; using built-in agent id fallbacks."
+    )
 
 
 # ── Media Management ──────────────────────────────────────────────────

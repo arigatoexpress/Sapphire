@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Trading Stats -->
+<div class="grid grid-4" style="margin-bottom: var(--space-xl);">
+    <div class="stat-card">
+        <div class="stat-label">Portfolio Value</div>
+        <div class="stat-value" id="portfolio-value">$--</div>
+        <div class="stat-change positive">+0.00% today</div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-label">Open Positions</div>
+        <div class="stat-value" id="open-positions">--</div>
+        <div class="stat-change">Active trades</div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-label">Win Rate</div>
+        <div class="stat-value" id="win-rate">--%</div>
+        <div class="stat-change">All time</div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-label">Total P&L</div>
+        <div class="stat-value" id="total-pnl" style="color: var(--text);">$--</div>
+        <div class="stat-change">Lifetime</div>
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <!-- Positions Table -->
+    <div class="card" style="grid-column: span 2;">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-list" style="margin-right: 8px; color: var(--primary);"></i>Open Positions</h3>
+            <div style="display: flex; gap: var(--space-sm);">
+                <button class="btn btn-secondary" style="font-size: 0.8rem;">
+                    <i class="fas fa-filter"></i> Filter
+                </button>
+                <button class="btn btn-primary" style="font-size: 0.8rem;">
+                    <i class="fas fa-plus"></i> New Trade
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Symbol</th>
+                            <th>Side</th>
+                            <th>Quantity</th>
+                            <th>Entry Price</th>
+                            <th>Current Price</th>
+                            <th>P&L</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="positions-table">
+                        <tr>
+                            <td colspan="7">
+                                <div class="empty-state">
+                                    <div class="empty-state-icon">📊</div>
+                                    <p>No open positions</p>
+                                    <p style="font-size: 0.85rem; margin-top: var(--space-sm);">Positions will appear when trading begins</p>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Market Overview -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-chart-bar" style="margin-right: 8px; color: var(--secondary);"></i>Market Overview</h3>
+        </div>
+        <div class="card-body">
+            <div id="market-overview">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Loading market data...
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent Trades -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-history" style="margin-right: 8px; color: var(--accent);"></i>Recent Trades</h3>
+        </div>
+        <div class="card-body">
+            <div id="recent-trades">
+                <div class="empty-state">
+                    <div class="empty-state-icon">💼</div>
+                    <p>No recent trades</p>
+                    <p style="font-size: 0.85rem; margin-top: var(--space-sm);">Trade history will appear here</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Trading Pairs -->
+    <div class="card" style="grid-column: span 2;">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-exchange-alt" style="margin-right: 8px; color: var(--success);"></i>Active Trading Pairs</h3>
+        </div>
+        <div class="card-body">
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--space-md);">
+                <div class="card" style="background: var(--bg-glass);">
+                    <div class="card-body" style="padding: var(--space-md);">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-sm);">
+                            <span style="font-weight: 600;">BTC/USDT</span>
+                            <span class="badge badge-success">Active</span>
+                        </div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted);">Price: $--</div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted);">24h: --%</div>
+                    </div>
+                </div>
+                <div class="card" style="background: var(--bg-glass);">
+                    <div class="card-body" style="padding: var(--space-md);">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-sm);">
+                            <span style="font-weight: 600;">ETH/USDT</span>
+                            <span class="badge badge-success">Active</span>
+                        </div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted);">Price: $--</div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted);">24h: --%</div>
+                    </div>
+                </div>
+                <div class="card" style="background: var(--bg-glass);">
+                    <div class="card-body" style="padding: var(--space-md);">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-sm);">
+                            <span style="font-weight: 600;">SOL/USDT</span>
+                            <span class="badge badge-success">Active</span>
+                        </div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted);">Price: $--</div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted);">24h: --%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- External Links -->
+<div class="card" style="margin-top: var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-external-link-alt" style="margin-right: 8px; color: var(--info);"></i>External Trading Resources</h3>
+    </div>
+    <div class="card-body">
+        <div style="display: flex; gap: var(--space-md); flex-wrap: wrap;">
+            <a href="/command-deck" class="btn btn-secondary">
+                <i class="fas fa-terminal"></i> Command Deck
+            </a>
+            <a href="https://www.tradingview.com/chart" target="_blank" class="btn btn-secondary">
+                <i class="fas fa-chart-line"></i> TradingView
+            </a>
+            <a href="https://coinmarketcap.com" target="_blank" class="btn btn-secondary">
+                <i class="fas fa-coins"></i> CoinMarketCap
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function fetchTradingData() {
+        try {
+            const data = await window.platformApi.getMetrics();
+            const trading = data.trading || {};
+            
+            document.getElementById('open-positions').textContent = trading.positions?.length || 0;
+            document.getElementById('win-rate').textContent = (trading.trades?.success_rate || 0) + '%';
+            
+            const totalPnl = trading.pnl?.total || 0;
+            document.getElementById('total-pnl').textContent = (totalPnl >= 0 ? '+' : '-') + '$' + Math.abs(totalPnl).toFixed(2);
+            document.getElementById('total-pnl').style.color = totalPnl >= 0 ? 'var(--success)' : 'var(--danger)';
+            
+        } catch (e) {
+            console.error('Failed to fetch trading data:', e);
+        }
+    }
+    
+    async function fetchMarketOverview() {
+        const container = document.getElementById('market-overview');
+        try {
+            const data = await window.platformApi.getMetrics();
+            const market = data.market || {};
+            
+            if (!market.error) {
+                container.innerHTML = `
+                    <div style="display: flex; flex-direction: column; gap: var(--space-md);">
+                        ${['BTC', 'ETH', 'SOL'].map(coin => {
+                            const price = market[coin];
+                            if (!price) return '';
+                            const changeClass = price.change_24h >= 0 ? 'positive' : 'negative';
+                            return `
+                                <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-md); background: var(--bg-glass); border-radius: 8px;">
+                                    <span style="font-weight: 600;">${coin}</span>
+                                    <div style="text-align: right;">
+                                        <div style="font-family: var(--font-mono); font-weight: 600;">$${price.price.toLocaleString()}</div>
+                                        <div class="stat-change ${changeClass}" style="font-size: 0.8rem;">${price.change_24h >= 0 ? '+' : ''}${price.change_24h.toFixed(2)}%</div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+            }
+        } catch (e) {
+            container.innerHTML = '<div class="empty-state"><p>Failed to load market data</p></div>';
+        }
+    }
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        fetchTradingData();
+        fetchMarketOverview();
+    });
+</script>
+{% endblock %}

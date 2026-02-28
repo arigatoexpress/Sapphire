@@ -1595,6 +1595,91 @@ class SapphireForumService:
             "mode": "openclaw_hook",
         }
 
+    @staticmethod
+    def _scout_sandbox_config() -> Dict[str, Any]:
+        sandbox_url = str(os.getenv("SAPPHIRE_SCOUT_SANDBOX_URL", "")).strip()
+        sandbox_token = str(os.getenv("SAPPHIRE_SCOUT_SANDBOX_TOKEN", "")).strip()
+        sandbox_enforce = (
+            str(os.getenv("SAPPHIRE_SCOUT_SANDBOX_ENFORCE", "false")).strip().lower()
+            in {"1", "true", "yes", "on"}
+        )
+        return {
+            "url": sandbox_url,
+            "token": sandbox_token,
+            "enforce": sandbox_enforce,
+            "ready": bool(sandbox_url and sandbox_token),
+        }
+
+    async def _dispatch_scout_sandbox(
+        self,
+        *,
+        action: str,
+        outbound_payload: Dict[str, Any],
+        external_url: str,
+        note: str,
+    ) -> Dict[str, Any]:
+        config = self._scout_sandbox_config()
+        sandbox_url = str(config.get("url", "")).strip()
+        sandbox_token = str(config.get("token", "")).strip()
+        if not sandbox_url:
+            return {"dispatched": False, "reason": "sandbox_url_missing", "mode": "scout_sandbox"}
+        if not sandbox_token:
+            return {"dispatched": False, "reason": "sandbox_token_missing", "mode": "scout_sandbox"}
+
+        endpoint = f"{sandbox_url.rstrip('/')}/v1/scout/dispatch"
+        payload = {
+            "action": action,
+            "outbound_payload": outbound_payload,
+            "external_url_hint": str(external_url or "").strip(),
+            "note": note,
+            "source": "alpha-engine",
+            "request_id": f"scout-{action}-{int(time.time() * 1000)}",
+        }
+        headers = {
+            "Content-Type": "application/json",
+            "X-Scout-Sandbox-Token": sandbox_token,
+        }
+
+        timeout = aiohttp.ClientTimeout(total=25)
+        try:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(endpoint, json=payload, headers=headers) as response:
+                    body = await response.text()
+                    parsed: Dict[str, Any] = {}
+                    try:
+                        maybe = json.loads(body)
+                        if isinstance(maybe, dict):
+                            parsed = maybe
+                    except Exception:
+                        parsed = {}
+
+                    if response.status >= 400:
+                        return {
+                            "dispatched": False,
+                            "reason": f"sandbox_http_{response.status}",
+                            "mode": "scout_sandbox",
+                            "response_excerpt": self._sanitize_text(body, max_len=320)["text"],
+                        }
+
+                    dispatch = parsed.get("dispatch", {}) if isinstance(parsed.get("dispatch"), dict) else {}
+                    result = {
+                        "dispatched": bool(dispatch.get("dispatched", parsed.get("ok", False))),
+                        "reason": str(dispatch.get("reason", "sandbox_dispatch_unknown")).strip()[:120],
+                        "status": dispatch.get("status"),
+                        "mode": "scout_sandbox",
+                    }
+                    if dispatch:
+                        result["metadata"] = dispatch.get("metadata", {})
+                        if dispatch.get("response_excerpt"):
+                            result["response_excerpt"] = str(dispatch.get("response_excerpt", ""))[:320]
+                    return result
+        except Exception as exc:
+            return {
+                "dispatched": False,
+                "reason": f"sandbox_request_failed:{exc}",
+                "mode": "scout_sandbox",
+            }
+
     async def _dispatch_scout_bridge(
         self,
         *,
@@ -1606,6 +1691,33 @@ class SapphireForumService:
     ) -> Dict[str, Any]:
         url = str(external_url or "").strip()
         token = str(external_token or "").strip()
+
+        sandbox = self._scout_sandbox_config()
+        sandbox_url = str(sandbox.get("url", "")).strip()
+        sandbox_enforce = bool(sandbox.get("enforce"))
+        if sandbox_url:
+            sandbox_result = await self._dispatch_scout_sandbox(
+                action=action,
+                outbound_payload=outbound_payload,
+                external_url=url,
+                note=note,
+            )
+            sandbox_result["sandbox_enforce"] = sandbox_enforce
+            if sandbox_result.get("dispatched"):
+                return sandbox_result
+            if sandbox_enforce:
+                return sandbox_result
+            logger.warning(
+                "Scout sandbox dispatch failed (non-enforced mode), falling back to legacy bridge: "
+                f"{sandbox_result.get('reason', 'unknown')}"
+            )
+        elif sandbox_enforce:
+            return {
+                "dispatched": False,
+                "reason": "sandbox_required_not_configured",
+                "mode": "scout_sandbox",
+            }
+
         if url:
             external_result = await self._dispatch_external(url, outbound_payload, token=token)
             external_result["mode"] = "external_http"
@@ -1653,13 +1765,18 @@ class SapphireForumService:
         external_register_url = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL", "")).strip()
         external_post_url = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_POST_URL", "")).strip()
         external_token_set = bool(str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN", "")).strip())
+        sandbox = self._scout_sandbox_config()
+        sandbox_ready = bool(sandbox.get("ready"))
+        sandbox_enforce = bool(sandbox.get("enforce"))
         fallback = self._openclaw_fallback_config()
         fallback_ready = bool(
             fallback.get("hook_url") and fallback.get("hook_token") and fallback.get("chat_id")
         )
         external_ready = bool(external_register_url and external_post_url and external_token_set)
-        dispatch_mode = "external_http" if external_register_url or external_post_url else "openclaw_hook"
-        if dispatch_mode == "openclaw_hook" and not fallback_ready:
+        dispatch_mode = "scout_sandbox" if sandbox.get("url") else ("external_http" if external_register_url or external_post_url else "openclaw_hook")
+        if sandbox_enforce and not sandbox_ready:
+            dispatch_mode = "none"
+        elif dispatch_mode == "openclaw_hook" and not fallback_ready:
             dispatch_mode = "none"
         provider = (
             "moltbook"
@@ -1691,9 +1808,19 @@ class SapphireForumService:
             registration["registered_runtime"] = runtime_registered
             registration["assumed_registered"] = assumed_registered
 
-            if dispatch_mode == "none":
+            if sandbox_enforce and not sandbox_ready:
+                provider_state = "sandbox_enforced_not_ready"
+                operator_hint = "Configure SAPPHIRE_SCOUT_SANDBOX_URL + SAPPHIRE_SCOUT_SANDBOX_TOKEN before scout dispatch."
+            elif dispatch_mode == "none":
                 provider_state = "bridge_unconfigured"
                 operator_hint = "Configure external bridge URLs or OpenClaw fallback hook settings."
+            elif dispatch_mode == "scout_sandbox":
+                provider_state = "sandbox_active" if sandbox_ready else "sandbox_configured_partial"
+                operator_hint = (
+                    "Scout sandbox is active; all external scout dispatch should route through sandbox controls."
+                    if sandbox_ready
+                    else "Complete sandbox token configuration to activate sandbox dispatch."
+                )
             elif dispatch_mode == "openclaw_hook":
                 provider_state = "fallback_only_ready" if fallback_ready else "fallback_not_ready"
                 operator_hint = (
@@ -1717,6 +1844,10 @@ class SapphireForumService:
                 "profile": self._scout_profile(),
                 "registration": registration,
                 "external_bridge": {
+                    "sandbox_url_configured": bool(sandbox.get("url")),
+                    "sandbox_token_configured": bool(sandbox.get("token")),
+                    "sandbox_ready": sandbox_ready,
+                    "sandbox_enforce": sandbox_enforce,
                     "register_url_configured": bool(external_register_url),
                     "post_url_configured": bool(external_post_url),
                     "api_token_configured": external_token_set,

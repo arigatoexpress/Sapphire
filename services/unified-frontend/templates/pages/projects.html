@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Project Stats -->
+<div class="grid grid-4" style="margin-bottom: var(--space-xl);">
+    <div class="stat-card">
+        <div class="stat-label">Total Projects</div>
+        <div class="stat-value" id="total-projects">--</div>
+        <div class="stat-change">Active & archived</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">In Progress</div>
+        <div class="stat-value" id="active-projects" style="color: var(--primary);">--</div>
+        <div class="stat-change">Currently active</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Completed</div>
+        <div class="stat-value" id="completed-projects" style="color: var(--success);">--</div>
+        <div class="stat-change">This month</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Tasks Due</div>
+        <div class="stat-value" id="due-tasks" style="color: var(--warning);">--</div>
+        <div class="stat-change">Next 7 days</div>
+    </div>
+</div>
+
+<!-- Program Control -->
+<div class="card" style="margin-bottom: var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-tasks" style="margin-right: 8px; color: var(--primary);"></i>Program Control</h3>
+        <a href="https://agentic-pm-hub-267358751314.us-central1.run.app/projects" target="_blank" class="btn btn-secondary" style="font-size: 0.8rem;">
+            <i class="fas fa-external-link-alt"></i> Open PM Hub Workspace
+        </a>
+    </div>
+    <div class="card-body">
+        <p style="color: var(--text-muted); margin-bottom: var(--space-md);">
+            Unified Projects now render from canonical platform contracts. Use PM Hub workspace for advanced planning flows.
+        </p>
+        <div id="project-summary" class="grid grid-4"></div>
+    </div>
+</div>
+
+<!-- Projects List -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-folder-open" style="margin-right: 8px; color: var(--secondary);"></i>Active Projects</h3>
+        <button class="btn btn-primary" style="font-size: 0.8rem;">
+            <i class="fas fa-plus"></i> New Project
+        </button>
+    </div>
+    <div class="card-body">
+        <div id="projects-list">
+            <div class="loading">
+                <div class="spinner"></div>
+                Loading projects...
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Links -->
+<div class="card" style="margin-top: var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-link" style="margin-right: 8px; color: var(--accent);"></i>Project Resources</h3>
+    </div>
+    <div class="card-body">
+        <div style="display: flex; gap: var(--space-md); flex-wrap: wrap;">
+            <a href="https://github.com/arigatoexpress/Sapphire" target="_blank" class="btn btn-secondary">
+                <i class="fab fa-github"></i> GitHub Repository
+            </a>
+            <a href="https://linear.app" target="_blank" class="btn btn-secondary">
+                <i class="fas fa-ticket-alt"></i> Linear Issues
+            </a>
+            <a href="https://sapphirealpha.xyz" target="_blank" class="btn btn-secondary">
+                <i class="fas fa-globe"></i> Production Site
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function fetchProjects() {
+        try {
+            const data = await window.platformApi.getProjects();
+            
+            const projects = data.projects || [];
+            document.getElementById('total-projects').textContent = projects.length;
+            document.getElementById('active-projects').textContent = projects.filter(p => p.status === 'active' || p.status === 'in_progress').length;
+            document.getElementById('completed-projects').textContent = projects.filter(p => p.status === 'completed').length;
+            document.getElementById('due-tasks').textContent = projects.filter(p => p.status === 'blocked').length;
+
+            const summary = document.getElementById('project-summary');
+            const blocked = projects.filter(p => p.status === 'blocked').length;
+            const healthy = projects.filter(p => !p.missing_local && !p.missing_github).length;
+            const missingGithub = projects.filter(p => p.missing_github).length;
+            const missingLocal = projects.filter(p => p.missing_local).length;
+            summary.innerHTML = `
+                <div class="stat-card"><div class="stat-label">Healthy Tracked</div><div class="stat-value" style="color: var(--success);">${healthy}</div></div>
+                <div class="stat-card"><div class="stat-label">Blocked</div><div class="stat-value" style="color: var(--warning);">${blocked}</div></div>
+                <div class="stat-card"><div class="stat-label">Missing GitHub</div><div class="stat-value" style="color: var(--danger);">${missingGithub}</div></div>
+                <div class="stat-card"><div class="stat-label">Missing Local</div><div class="stat-value" style="color: var(--danger);">${missingLocal}</div></div>
+            `;
+            
+            const container = document.getElementById('projects-list');
+            if (projects.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📁</div>
+                        <p>No projects found</p>
+                        <p style="font-size: 0.85rem; margin-top: var(--space-sm);">Create your first project to get started</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = `
+                <div style="display: grid; gap: var(--space-md);">
+                    ${projects.map(p => `
+                        <div class="card" style="background: var(--bg-glass);">
+                            <div class="card-body" style="padding: var(--space-md);">
+                                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-sm);">
+                                    <h4 style="font-weight: 600;">${p.name}</h4>
+                                    <span class="badge badge-${p.status === 'active' ? 'success' : p.status === 'in_progress' ? 'info' : 'warning'}">${p.status}</span>
+                                </div>
+                                <div style="margin-bottom: var(--space-md);">
+                                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted); margin-bottom: var(--space-xs);">
+                                        <span>Progress</span>
+                                        <span>${p.progress}%</span>
+                                    </div>
+                                    <div style="height: 6px; background: var(--bg-dark); border-radius: 3px; overflow: hidden;">
+                                        <div style="width: ${p.progress}%; height: 100%; background: linear-gradient(90deg, var(--primary), var(--secondary)); border-radius: 3px;"></div>
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: var(--space-sm);">
+                                    <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 12px;">View</button>
+                                    <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 12px;">Edit</button>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        } catch (e) {
+            console.error('Failed to fetch projects:', e);
+        }
+    }
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        fetchProjects();
+    });
+</script>
+{% endblock %}

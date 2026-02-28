@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Production Readiness</h1>
+        <p class="page-subtitle">Launch gates, blockers, and live environment confidence for final production go-live.</p>
+    </div>
+    <button class="btn btn-primary" onclick="refreshReadiness()">
+        <i class="fas fa-sync-alt"></i> Refresh
+    </button>
+</div>
+
+<div class="grid grid-cols-4" style="margin-bottom: var(--space-xl);">
+    <div class="stat-card">
+        <div class="stat-label">Overall</div>
+        <div class="stat-value" id="overall-status">--</div>
+        <div class="stat-change" id="overall-meta">Waiting for check</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Contract Gate</div>
+        <div class="stat-value" id="gate-a">--</div>
+        <div class="stat-change" id="gate-a-meta">API contracts</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Cloud Gate</div>
+        <div class="stat-value" id="gate-b">--</div>
+        <div class="stat-change" id="gate-b-meta">Cloud services</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Edge Gate</div>
+        <div class="stat-value" id="gate-c">--</div>
+        <div class="stat-change" id="gate-c-meta">Pi/Windows fleet</div>
+    </div>
+</div>
+
+<div class="grid grid-cols-2" style="margin-bottom: var(--space-xl);">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-list-check" style="margin-right: 8px; color: var(--primary);"></i>Gate Status</h3>
+        </div>
+        <div class="card-body">
+            <div id="gates-list" style="display: grid; gap: var(--space-sm);"></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-triangle-exclamation" style="margin-right: 8px; color: var(--warning);"></i>Current Blockers</h3>
+        </div>
+        <div class="card-body">
+            <div id="blockers-list" style="display: grid; gap: var(--space-sm);"></div>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-network-wired" style="margin-right: 8px; color: var(--info);"></i>Cloud Service Matrix</h3>
+    </div>
+    <div class="card-body">
+        <div id="cloud-matrix" style="display: grid; gap: var(--space-sm);"></div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-clipboard-check" style="margin-right: 8px; color: var(--success);"></i>Contract Checks</h3>
+    </div>
+    <div class="card-body">
+        <div id="contract-matrix" style="display: grid; gap: var(--space-sm);"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function statusBadge(ok) {
+        return ok ? '<span class="badge badge-success">PASS</span>' : '<span class="badge badge-danger">FAIL</span>';
+    }
+
+    function setGate(el, metaEl, gate) {
+        const ok = gate && gate.ok;
+        document.getElementById(el).textContent = ok ? 'PASS' : 'FAIL';
+        document.getElementById(el).style.color = ok ? 'var(--success)' : 'var(--danger)';
+        document.getElementById(metaEl).textContent = gate ? `${gate.pass}/${gate.total}` : '--';
+    }
+
+    async function refreshReadiness() {
+        const payload = await window.platformApi.getReadiness();
+
+        const overall = document.getElementById('overall-status');
+        const overallMeta = document.getElementById('overall-meta');
+        overall.textContent = payload.overall_ok ? 'READY' : 'HOLD';
+        overall.style.color = payload.overall_ok ? 'var(--success)' : 'var(--warning)';
+        overallMeta.textContent = payload.timestamp;
+
+        setGate('gate-a', 'gate-a-meta', payload.gates.A_contracts);
+        setGate('gate-b', 'gate-b-meta', payload.gates.B_cloud);
+        setGate('gate-c', 'gate-c-meta', payload.gates.C_edge);
+
+        const gatesList = document.getElementById('gates-list');
+        gatesList.innerHTML = Object.entries(payload.gates).map(([name, gate]) => `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--space-sm) var(--space-md);background:var(--bg-glass);border-radius:8px;">
+                <div>
+                    <div style="font-weight:600;">${name}</div>
+                    <div style="font-size:0.8rem;color:var(--text-muted);">${gate.pass}/${gate.total}</div>
+                </div>
+                ${statusBadge(gate.ok)}
+            </div>
+        `).join('');
+
+        const blockers = document.getElementById('blockers-list');
+        if (!payload.blockers || payload.blockers.length === 0) {
+            blockers.innerHTML = '<div class="empty-state"><p>No blockers. System is ready for launch gates.</p></div>';
+        } else {
+            blockers.innerHTML = payload.blockers.map((b) => `
+                <div style="padding:var(--space-sm) var(--space-md);background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:8px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <strong>${b.name}</strong>
+                        <span class="badge badge-danger">${b.gate}</span>
+                    </div>
+                    <div style="font-size:0.85rem;color:var(--text-secondary);margin-top:4px;">${b.error || 'unhealthy'}</div>
+                </div>
+            `).join('');
+        }
+
+        const cloud = document.getElementById('cloud-matrix');
+        cloud.innerHTML = Object.entries(payload.cloud.services || {}).map(([name, svc]) => `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--space-sm) var(--space-md);background:var(--bg-glass);border-radius:8px;">
+                <div>
+                    <div style="font-weight:600;">${name}</div>
+                    <div style="font-size:0.8rem;color:var(--text-muted);">${svc.status} · ${svc.latency_ms || '--'} ms</div>
+                </div>
+                ${statusBadge(!!svc.healthy)}
+            </div>
+        `).join('');
+
+        const contracts = document.getElementById('contract-matrix');
+        contracts.innerHTML = (payload.contract_checks || []).map((c) => `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--space-sm) var(--space-md);background:var(--bg-glass);border-radius:8px;">
+                <div>
+                    <div style="font-weight:600;">${c.name}</div>
+                    <div style="font-size:0.8rem;color:var(--text-muted);">${c.status || 'ok'} · ${c.latency_ms || '--'} ms</div>
+                </div>
+                ${statusBadge(!!c.healthy)}
+            </div>
+        `).join('');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        refreshReadiness().catch((err) => {
+            document.getElementById('overall-status').textContent = 'ERROR';
+            document.getElementById('overall-status').style.color = 'var(--danger)';
+            document.getElementById('overall-meta').textContent = String(err);
+        });
+    });
+</script>
+{% endblock %}

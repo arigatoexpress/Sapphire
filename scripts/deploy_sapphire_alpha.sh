@@ -67,9 +67,12 @@ SAPPHIRE_SCOUT_AGENT_ID="${SAPPHIRE_SCOUT_AGENT_ID:-SAPPHIRE_SCOUT}"
 SAPPHIRE_SCOUT_DISPATCH_AGENT_ID="${SAPPHIRE_SCOUT_DISPATCH_AGENT_ID:-sapphire}"
 SAPPHIRE_SCOUT_OPENCLAW_CHAT_ID="${SAPPHIRE_SCOUT_OPENCLAW_CHAT_ID:-${TELEGRAM_CHAT_ID:-}}"
 SAPPHIRE_SCOUT_OPENCLAW_HOOK_URL="${SAPPHIRE_SCOUT_OPENCLAW_HOOK_URL:-${TRADINGVIEW_AUTONOMY_HOOK_URL}}"
+SAPPHIRE_SCOUT_SANDBOX_URL="${SAPPHIRE_SCOUT_SANDBOX_URL:-https://sapphire-scout-sandbox-267358751314.us-central1.run.app}"
+SAPPHIRE_SCOUT_SANDBOX_ENFORCE="${SAPPHIRE_SCOUT_SANDBOX_ENFORCE:-true}"
 SCOUT_REGISTER_URL_SECRET="${SCOUT_REGISTER_URL_SECRET:-SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL}"
 SCOUT_POST_URL_SECRET="${SCOUT_POST_URL_SECRET:-SAPPHIRE_SCOUT_EXTERNAL_POST_URL}"
 SCOUT_API_TOKEN_SECRET="${SCOUT_API_TOKEN_SECRET:-SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN}"
+SCOUT_SANDBOX_TOKEN_SECRET="${SCOUT_SANDBOX_TOKEN_SECRET:-SAPPHIRE_SCOUT_SANDBOX_TOKEN}"
 CONTROL_API_TOKEN_SECRET="${CONTROL_API_TOKEN_SECRET:-SAPPHIRE_CONTROL_API_TOKEN}"
 SAPPHIRE_VT_ENABLED="${SAPPHIRE_VT_ENABLED:-true}"
 SAPPHIRE_VT_ENFORCEMENT_MODE="${SAPPHIRE_VT_ENFORCEMENT_MODE:-block_malicious}"
@@ -97,6 +100,9 @@ SUBSTACK_API_TOKEN_SECRET="${SUBSTACK_API_TOKEN_SECRET:-SAPPHIRE_SUBSTACK_API_TO
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ALPHA_DIR="${ROOT_DIR}/services/alpha-engine"
+if [[ -x "${ROOT_DIR}/scripts/check_source_of_truth.sh" ]]; then
+  "${ROOT_DIR}/scripts/check_source_of_truth.sh"
+fi
 IMAGE_URI="${AR_REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${IMAGE_NAME}:${IMAGE_TAG}"
 IMAGE_LATEST="${AR_REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${IMAGE_NAME}:latest"
 
@@ -112,12 +118,22 @@ echo "Image: ${IMAGE_URI}"
 echo
 
 if [[ "${SKIP_BUILD:-false}" != "true" ]]; then
-  docker buildx build \
-    --platform "${PLATFORM}" \
-    -f "${ALPHA_DIR}/Dockerfile" \
-    -t "${IMAGE_URI}" \
-    -t "${IMAGE_LATEST}" \
-    --push "${ROOT_DIR}"
+  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    docker buildx build \
+      --platform "${PLATFORM}" \
+      -f "${ALPHA_DIR}/Dockerfile" \
+      -t "${IMAGE_URI}" \
+      -t "${IMAGE_LATEST}" \
+      --push "${ROOT_DIR}"
+  else
+    echo "Docker daemon unavailable; using Cloud Build fallback."
+    gcloud builds submit \
+      --project "${PROJECT_ID}" \
+      --config "${ROOT_DIR}/cloudbuild-alpha.yaml" \
+      --substitutions "_IMAGE=${IMAGE_URI}" \
+      "${ROOT_DIR}"
+    gcloud artifacts docker tags add "${IMAGE_URI}" "${IMAGE_LATEST}" --project "${PROJECT_ID}" >/dev/null
+  fi
 fi
 
 gcloud run deploy "${SERVICE_NAME}" \
@@ -199,6 +215,8 @@ gcloud run deploy "${SERVICE_NAME}" \
   --update-env-vars "SAPPHIRE_MEDIA_QUEUE_MAX_ITEMS=${SAPPHIRE_MEDIA_QUEUE_MAX_ITEMS}" \
   --update-env-vars "SAPPHIRE_SCOUT_AGENT_ID=${SAPPHIRE_SCOUT_AGENT_ID}" \
   --update-env-vars "SAPPHIRE_SCOUT_DISPATCH_AGENT_ID=${SAPPHIRE_SCOUT_DISPATCH_AGENT_ID}" \
+  --update-env-vars "SAPPHIRE_SCOUT_SANDBOX_URL=${SAPPHIRE_SCOUT_SANDBOX_URL}" \
+  --update-env-vars "SAPPHIRE_SCOUT_SANDBOX_ENFORCE=${SAPPHIRE_SCOUT_SANDBOX_ENFORCE}" \
   --update-env-vars "SAPPHIRE_SCOUT_OPENCLAW_HOOK_URL=${SAPPHIRE_SCOUT_OPENCLAW_HOOK_URL}"
 
 if [[ -n "${SAPPHIRE_SCOUT_OPENCLAW_CHAT_ID}" ]]; then
@@ -218,6 +236,9 @@ if has_secret "${SCOUT_POST_URL_SECRET}"; then
 fi
 if has_secret "${SCOUT_API_TOKEN_SECRET}"; then
   SCOUT_SECRET_MAPPINGS+=("SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN=${SCOUT_API_TOKEN_SECRET}:latest")
+fi
+if has_secret "${SCOUT_SANDBOX_TOKEN_SECRET}"; then
+  SCOUT_SECRET_MAPPINGS+=("SAPPHIRE_SCOUT_SANDBOX_TOKEN=${SCOUT_SANDBOX_TOKEN_SECRET}:latest")
 fi
 
 if [[ "${#SCOUT_SECRET_MAPPINGS[@]}" -gt 0 ]]; then

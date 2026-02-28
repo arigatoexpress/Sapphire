@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import os
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any, Awaitable, Callable, Dict, Optional
 
 from aiohttp import web
 

@@ -70,6 +70,38 @@ def set_cache(key: str, value: Any):
     """Set cached value with timestamp"""
     cache[key] = (value, datetime.utcnow().timestamp())
 
+
+def normalize_node_status(raw: Any, default: str = "unknown") -> str:
+    """Normalize mixed status values from upstream services."""
+    if isinstance(raw, bool):
+        return "online" if raw else "offline"
+    if isinstance(raw, str):
+        lowered = raw.strip().lower()
+        if lowered in {"online", "healthy", "up", "connected", "ok", "ready"}:
+            return "online"
+        if lowered in {"offline", "down", "error", "failed", "disconnected"}:
+            return "offline"
+    return default
+
+
+def zero_metrics_payload(error: Optional[str] = None, source: str = "empty") -> Dict[str, Any]:
+    """Return a non-simulated metrics payload when no live metrics are available."""
+    payload = {
+        "pnl_24h": 0.0,
+        "pnl_7d": 0.0,
+        "pnl_30d": 0.0,
+        "active_signals": 0,
+        "win_rate": 0.0,
+        "latency_ms": 0,
+        "trades_today": 0,
+        "trades_limit": 0,
+        "pending_proposals": 0,
+        "source": source,
+    }
+    if error:
+        payload["error"] = error
+    return payload
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Authentication
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -171,6 +203,12 @@ def health():
         'timestamp': datetime.utcnow().isoformat()
     })
 
+
+@app.route('/api/health')
+def api_health():
+    """Health check alias for monitors expecting /api/health."""
+    return health()
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # API Routes - Topology & Status
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -189,29 +227,33 @@ def api_status():
     
     gateway_status = loop.run_until_complete(fetch_from_gateway('/api/v1/status'))
     
+    pi_cluster = gateway_status.get('pi_cluster', {}) if isinstance(gateway_status, dict) else {}
+    pi1 = pi_cluster.get('pi1', {}) if isinstance(pi_cluster.get('pi1', {}), dict) else {}
+    pi2 = pi_cluster.get('pi2', {}) if isinstance(pi_cluster.get('pi2', {}), dict) else {}
+
     result = {
         'nodes': {
-            'tradingview': {'status': 'online', 'type': 'source'},
-            'windows_pc': {'status': 'online', 'type': 'webhook', 'port': 9090},
-            'pubsub': {'status': 'online', 'type': 'event_bus'},
+            'tradingview': {'status': 'unknown', 'type': 'source'},
+            'windows_pc': {'status': 'unknown', 'type': 'webhook', 'port': 9090},
+            'pubsub': {'status': 'unknown', 'type': 'event_bus'},
             'rari1': {
-                'status': gateway_status.get('pi_cluster', {}).get('pi1', {}).get('status', 'unknown'),
+                'status': normalize_node_status(pi1.get('status')),
                 'type': 'controller',
                 'role': 'workbench'
             },
             'rari2': {
-                'status': gateway_status.get('pi_cluster', {}).get('pi2', {}).get('status', 'unknown'),
+                'status': normalize_node_status(pi2.get('status')),
                 'type': 'execution',
                 'role': 'trading_engine'
             },
-            'cloud_run': {'status': 'online', 'type': 'api_gateway'},
-            'lighter': {'status': 'online', 'type': 'exchange'},
-            'drift': {'status': 'online', 'type': 'exchange'},
-            'ollama': {'status': 'online', 'type': 'ai', 'models': 3}
+            'cloud_run': {'status': normalize_node_status(gateway_status.get('status')), 'type': 'api_gateway'},
+            'lighter': {'status': normalize_node_status(gateway_status.get('lighter_status')), 'type': 'exchange'},
+            'drift': {'status': normalize_node_status(gateway_status.get('drift_status')), 'type': 'exchange'},
+            'ollama': {'status': normalize_node_status(gateway_status.get('ollama_status')), 'type': 'ai', 'models': 3}
         },
         'connections': {
-            'tailscale': {'status': 'connected', 'nodes': 4},
-            'vpn': {'status': 'connected', 'location': 'ProtonVPN'},
+            'tailscale': {'status': normalize_node_status(gateway_status.get('tailscale_status')), 'nodes': gateway_status.get('tailscale_nodes', 0)},
+            'vpn': {'status': normalize_node_status(gateway_status.get('vpn_status')), 'location': gateway_status.get('vpn_location', 'unknown')},
         },
         'timestamp': datetime.utcnow().isoformat()
     }
@@ -267,21 +309,11 @@ def api_metrics():
         
         if recent:
             data = recent[0].to_dict()
+            data['source'] = 'firestore'
         else:
-            # Fallback/mock data
-            data = {
-                'pnl_24h': 2.4,
-                'pnl_7d': 8.7,
-                'pnl_30d': 24.3,
-                'active_signals': 12,
-                'win_rate': 78.5,
-                'latency_ms': 45,
-                'trades_today': 8,
-                'trades_limit': 10,
-                'pending_proposals': 3,
-            }
+            data = zero_metrics_payload(source='empty')
     except Exception as e:
-        data = {'error': str(e)}
+        data = zero_metrics_payload(error=str(e), source='error')
     
     data['timestamp'] = datetime.utcnow().isoformat()
     set_cache('metrics', data)
@@ -312,19 +344,7 @@ def api_metrics_history():
         
         return jsonify({'history': history})
     except Exception as e:
-        # Return mock data
-        import random
-        history = [
-            {
-                'timestamp': (datetime.utcnow() - timedelta(hours=i)).isoformat(),
-                'pnl': random.uniform(-2, 5),
-                'signals': random.randint(8, 15),
-                'win_rate': random.uniform(70, 85),
-                'latency': random.randint(30, 60),
-            }
-            for i in range(24, 0, -1)
-        ]
-        return jsonify({'history': history, 'mock': True})
+        return jsonify({'history': [], 'count': 0, 'error': str(e)})
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # API Routes - Logs
@@ -360,26 +380,7 @@ def api_logs():
         
         return jsonify({'logs': logs, 'count': len(logs)})
     except Exception as e:
-        # Return sample logs if Firestore fails
-        sample_logs = [
-            {
-                'timestamp': datetime.utcnow().isoformat(),
-                'level': 'INFO',
-                'service': 'webhook',
-                'message': 'Signal received from TradingView',
-                'event_type': 'signal_received',
-                'signal_id': 'sig_001'
-            },
-            {
-                'timestamp': (datetime.utcnow() - timedelta(minutes=2)).isoformat(),
-                'level': 'SUCCESS',
-                'service': 'trading',
-                'message': 'Trade executed successfully',
-                'event_type': 'trade_executed',
-                'symbol': 'SOL-PERP'
-            }
-        ]
-        return jsonify({'logs': sample_logs, 'mock': True, 'error': str(e)})
+        return jsonify({'logs': [], 'count': 0, 'error': str(e)})
 
 @app.route('/api/logs/stream')
 @requires_auth

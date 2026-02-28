@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Organization OS</h1>
+        <p class="page-subtitle">Unified view of company structure, operating model, agents, systems, and execution paths.</p>
+    </div>
+    <div style="display: flex; gap: var(--space-sm);">
+        <a id="org-open-link" href="https://agentic-pm-hub-267358751314.us-central1.run.app/organization" target="_blank" class="btn btn-secondary">
+            <i class="fas fa-external-link-alt"></i> Open Source Page
+        </a>
+        <button class="btn btn-primary" onclick="refreshOrganization()">
+            <i class="fas fa-sync-alt"></i> Refresh
+        </button>
+    </div>
+</div>
+
+<div class="grid grid-cols-3" style="margin-bottom: var(--space-xl);">
+    <div class="stat-card">
+        <div class="stat-label">PM Hub Status</div>
+        <div class="stat-value" id="org-pm-status">checking</div>
+        <div class="stat-change" id="org-pm-meta">Probing endpoint</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Organization Endpoint</div>
+        <div class="stat-value" id="org-endpoint-status">pending</div>
+        <div class="stat-change" id="org-endpoint-latency">-- ms</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Last Refresh</div>
+        <div class="stat-value" id="org-last-refresh">--</div>
+        <div class="stat-change">Unified frontend</div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-layer-group" style="margin-right: 8px; color: var(--primary);"></i>Consolidation Blueprint</h3>
+    </div>
+    <div class="card-body">
+        <div class="grid grid-cols-3">
+            <div class="card" style="background: var(--bg-glass);">
+                <div class="card-body">
+                    <h4 style="margin-bottom: var(--space-sm);">1. Core Platform</h4>
+                    <p style="color: var(--text-muted);">One shell, one identity system, one navigation model, shared design tokens.</p>
+                </div>
+            </div>
+            <div class="card" style="background: var(--bg-glass);">
+                <div class="card-body">
+                    <h4 style="margin-bottom: var(--space-sm);">2. Operational Views</h4>
+                    <p style="color: var(--text-muted);">Trading, health, logs, organization, projects, and infrastructure in one website.</p>
+                </div>
+            </div>
+            <div class="card" style="background: var(--bg-glass);">
+                <div class="card-body">
+                    <h4 style="margin-bottom: var(--space-sm);">3. Production Controls</h4>
+                    <p style="color: var(--text-muted);">Release gates, observability, runbooks, and incident workflows integrated.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-diagram-project" style="margin-right: 8px; color: var(--accent);"></i>Canonical Operating Model</h3>
+    </div>
+    <div class="card-body">
+        <div style="margin-bottom: var(--space-lg);">
+            <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">Framework</div>
+            <div id="org-framework" style="font-weight: 600;">loading...</div>
+            <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 12px; margin-bottom: 6px;">Mission</div>
+            <div id="org-mission" style="color: var(--text-secondary);">loading...</div>
+        </div>
+        <div id="org-departments" class="grid grid-cols-2"></div>
+        <div style="margin-top: var(--space-lg);">
+            <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">Knowledge Sources</div>
+            <div id="org-sources" style="display: flex; gap: var(--space-sm); flex-wrap: wrap;"></div>
+            <div id="org-safety" style="margin-top: var(--space-sm); color: var(--warning);"></div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-building" style="margin-right: 8px; color: var(--info);"></i>Organization Execution Surface</h3>
+    </div>
+    <div class="card-body">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:var(--space-md);">
+            <div class="card" style="background:var(--bg-glass);">
+                <div class="card-body">
+                    <h4 style="margin-bottom:var(--space-sm);">Governance Loop</h4>
+                    <p style="color:var(--text-muted);">Agentic PM framework drives prioritization and policy locks.</p>
+                </div>
+            </div>
+            <div class="card" style="background:var(--bg-glass);">
+                <div class="card-body">
+                    <h4 style="margin-bottom:var(--space-sm);">Execution Loop</h4>
+                    <p style="color:var(--text-muted);">Trading, research, and development run on shared telemetry and readiness gates.</p>
+                </div>
+            </div>
+            <div class="card" style="background:var(--bg-glass);">
+                <div class="card-body">
+                    <h4 style="margin-bottom:var(--space-sm);">Learning Loop</h4>
+                    <p style="color:var(--text-muted);">Safe improvements from GitHub, MoltHub, and MoltBook flow through sandbox validation.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function refreshOrganization() {
+        const statusEl = document.getElementById('org-pm-status');
+        const endpointStatus = document.getElementById('org-endpoint-status');
+        const endpointMeta = document.getElementById('org-endpoint-latency');
+        const lastRefresh = document.getElementById('org-last-refresh');
+        const openLink = document.getElementById('org-open-link');
+        const framework = document.getElementById('org-framework');
+        const mission = document.getElementById('org-mission');
+        const departments = document.getElementById('org-departments');
+        const sources = document.getElementById('org-sources');
+        const safety = document.getElementById('org-safety');
+
+        statusEl.textContent = 'checking';
+        endpointStatus.textContent = 'pending';
+        endpointMeta.textContent = '-- ms';
+
+        const started = performance.now();
+        try {
+            const payload = await window.platformApi.getOrganization();
+            const elapsed = Math.round(performance.now() - started);
+
+            if (payload.health && payload.health.healthy) {
+                statusEl.textContent = 'healthy';
+                statusEl.style.color = 'var(--success)';
+                endpointStatus.textContent = (payload.health.status || 'healthy');
+                endpointStatus.style.color = 'var(--success)';
+            } else {
+                statusEl.textContent = 'degraded';
+                statusEl.style.color = 'var(--warning)';
+                endpointStatus.textContent = (payload.health && payload.health.status) || 'degraded';
+                endpointStatus.style.color = 'var(--warning)';
+            }
+
+            endpointMeta.textContent = `${elapsed} ms`;
+            lastRefresh.textContent = new Date().toLocaleTimeString();
+
+            if (payload.organization_url) {
+                openLink.href = payload.organization_url;
+            }
+
+            if (payload.model) {
+                framework.textContent = payload.model.framework || 'N/A';
+                mission.textContent = payload.model.mission || 'N/A';
+
+                const deptCards = (payload.model.departments || []).map((dept) => `
+                    <div class="card" style="background: var(--bg-glass);">
+                        <div class="card-body">
+                            <h4 style="margin-bottom: var(--space-sm);">${dept.name}</h4>
+                            <p style="color: var(--text-muted); margin-bottom: var(--space-sm);">${dept.focus || ''}</p>
+                            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                                ${(dept.systems || []).map((s) => `<span class="badge badge-secondary">${s}</span>`).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+
+                departments.innerHTML = deptCards;
+                sources.innerHTML = (payload.model.knowledge_sources || []).map((s) => `<span class="badge badge-info">${s}</span>`).join('');
+                safety.textContent = payload.model.safety_policy || '';
+            }
+        } catch (err) {
+            statusEl.textContent = 'offline';
+            statusEl.style.color = 'var(--danger)';
+            endpointStatus.textContent = 'failed';
+            endpointStatus.style.color = 'var(--danger)';
+            endpointMeta.textContent = 'request failed';
+            lastRefresh.textContent = new Date().toLocaleTimeString();
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        refreshOrganization();
+    });
+</script>
+{% endblock %}

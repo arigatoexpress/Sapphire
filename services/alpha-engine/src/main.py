@@ -57,7 +57,12 @@ from shared.enhanced_episodic_memory import EnhancedMemoryBank, MarketSnapshot
 from shared.dual_speed_cognition import DualSpeedCognition, CognitionRequest, CognitionSpeed
 from health import start_health_server
 from smart_notifications import notification_manager
-from telegram_bot import SAPPHIRE, OBSIDIAN, EMERALD
+try:
+    from telegram_bot import SAPPHIRE, OBSIDIAN, EMERALD
+except Exception:
+    SAPPHIRE = "SAPPHIRE"
+    OBSIDIAN = "OBSIDIAN"
+    EMERALD = "EMERALD"
 
 # Install uvloop as the default event loop policy
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
@@ -168,8 +173,7 @@ class AlphaEngine:
         self.telegram = TelegramPlatformBot(
             bot_token=token, 
             chat_id=chat_id, 
-            command_callback=self._handle_telegram_command,
-            message_callback=self._handle_telegram_message
+            command_callback=self._handle_telegram_command
         )
         # Initialize Gemini Guard
         self.ai = GeminiGuard(telegram_bot=self.telegram)

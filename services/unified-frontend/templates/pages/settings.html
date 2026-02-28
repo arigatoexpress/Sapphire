@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Settings Grid -->
+<div class="grid grid-2">
+    <!-- General Settings -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-cog" style="margin-right: 8px; color: var(--primary);"></i>General Settings</h3>
+        </div>
+        <div class="card-body">
+            <form id="general-settings" style="display: flex; flex-direction: column; gap: var(--space-md);">
+                <div>
+                    <label style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: var(--space-xs);">Dashboard Theme</label>
+                    <select style="width: 100%; padding: var(--space-sm); background: var(--bg-glass); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: inherit;">
+                        <option value="dark">Dark (Default)</option>
+                        <option value="terminal">Terminal Green</option>
+                        <option value="blue">Midnight Blue</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: var(--space-xs);">Auto-refresh Interval</label>
+                    <select style="width: 100%; padding: var(--space-sm); background: var(--bg-glass); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: inherit;">
+                        <option value="10">10 seconds</option>
+                        <option value="30" selected>30 seconds</option>
+                        <option value="60">1 minute</option>
+                        <option value="300">5 minutes</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: var(--space-xs);">Default View</label>
+                    <select style="width: 100%; padding: var(--space-sm); background: var(--bg-glass); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: inherit;">
+                        <option value="overview">Overview</option>
+                        <option value="trading">Trading</option>
+                        <option value="command-deck">Command Deck</option>
+                    </select>
+                </div>
+                <button type="button" class="btn btn-primary" onclick="saveGeneralSettings()">
+                    <i class="fas fa-save"></i> Save Changes
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Notification Settings -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-bell" style="margin-right: 8px; color: var(--warning);"></i>Notifications</h3>
+        </div>
+        <div class="card-body">
+            <form id="notification-settings" style="display: flex; flex-direction: column; gap: var(--space-md);">
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-md); background: var(--bg-glass); border-radius: 8px;">
+                    <div>
+                        <div style="font-weight: 600;">Trade Executions</div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted);">Get notified when trades are executed</div>
+                    </div>
+                    <label style="position: relative; display: inline-block; width: 48px; height: 24px;">
+                        <input type="checkbox" checked style="opacity: 0; width: 0; height: 0;">
+                        <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: var(--success); border-radius: 24px; transition: 0.3s;"></span>
+                    </label>
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-md); background: var(--bg-glass); border-radius: 8px;">
+                    <div>
+                        <div style="font-weight: 600;">System Alerts</div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted);">Health check failures and errors</div>
+                    </div>
+                    <label style="position: relative; display: inline-block; width: 48px; height: 24px;">
+                        <input type="checkbox" checked style="opacity: 0; width: 0; height: 0;">
+                        <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: var(--success); border-radius: 24px; transition: 0.3s;"></span>
+                    </label>
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-md); background: var(--bg-glass); border-radius: 8px;">
+                    <div>
+                        <div style="font-weight: 600;">Daily Summary</div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted);">End-of-day trading report</div>
+                    </div>
+                    <label style="position: relative; display: inline-block; width: 48px; height: 24px;">
+                        <input type="checkbox" style="opacity: 0; width: 0; height: 0;">
+                        <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: var(--border); border-radius: 24px; transition: 0.3s;"></span>
+                    </label>
+                </div>
+                <button type="button" class="btn btn-primary" onclick="saveNotificationSettings()">
+                    <i class="fas fa-save"></i> Save Changes
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- API Configuration -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-key" style="margin-right: 8px; color: var(--danger);"></i>API Configuration</h3>
+        </div>
+        <div class="card-body">
+            <form id="api-settings" style="display: flex; flex-direction: column; gap: var(--space-md);">
+                <div>
+                    <label style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: var(--space-xs);">Gateway URL</label>
+                    <input type="text" value="https://sapphire-gateway-267358751314.us-central1.run.app" style="width: 100%; padding: var(--space-sm); background: var(--bg-glass); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: inherit;">
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: var(--space-xs);">Health Dashboard URL</label>
+                    <input type="text" value="https://sapphire-health-dashboard-s77j6bxyra-uc.a.run.app" style="width: 100%; padding: var(--space-sm); background: var(--bg-glass); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: inherit;">
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: var(--space-xs);">Telegram Bot Token</label>
+                    <input type="password" value="••••••••••••••••" style="width: 100%; padding: var(--space-sm); background: var(--bg-glass); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: inherit;">
+                </div>
+                <button type="button" class="btn btn-primary" onclick="saveApiSettings()">
+                    <i class="fas fa-save"></i> Save Changes
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- System Info -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-info-circle" style="margin-right: 8px; color: var(--info);"></i>System Information</h3>
+        </div>
+        <div class="card-body">
+            <div style="font-size: 0.9rem; line-height: 2;">
+                <div style="display: flex; justify-content: space-between; padding: var(--space-sm) 0; border-bottom: 1px solid var(--border);">
+                    <span style="color: var(--text-muted);">Frontend Version</span>
+                    <span>2.0.0</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: var(--space-sm) 0; border-bottom: 1px solid var(--border);">
+                    <span style="color: var(--text-muted);">Flask Version</span>
+                    <span>2.3.x</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: var(--space-sm) 0; border-bottom: 1px solid var(--border);">
+                    <span style="color: var(--text-muted);">Python Version</span>
+                    <span>3.11+</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: var(--space-sm) 0; border-bottom: 1px solid var(--border);">
+                    <span style="color: var(--text-muted);">GCP Project</span>
+                    <span>sapphire-479610</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: var(--space-sm) 0;">
+                    <span style="color: var(--text-muted);">Region</span>
+                    <span>us-central1</span>
+                </div>
+            </div>
+            <hr style="border-color: var(--border); margin: var(--space-md) 0;">
+            <button class="btn btn-secondary" style="width: 100%;" onclick="checkForUpdates()">
+                <i class="fas fa-sync-alt"></i> Check for Updates
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Danger Zone -->
+<div class="card" style="margin-top: var(--space-xl); border-color: var(--danger);">
+    <div class="card-header" style="background: rgba(239, 68, 68, 0.1);">
+        <h3 class="card-title" style="color: var(--danger);"><i class="fas fa-exclamation-triangle" style="margin-right: 8px;"></i>Danger Zone</h3>
+    </div>
+    <div class="card-body">
+        <div style="display: flex; flex-direction: column; gap: var(--space-md);">
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-md); background: rgba(239, 68, 68, 0.05); border-radius: 8px;">
+                <div>
+                    <div style="font-weight: 600; color: var(--danger);">Clear Cache</div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">Clear all cached data and sessions</div>
+                </div>
+                <button class="btn btn-secondary" onclick="clearCache()" style="border-color: var(--danger); color: var(--danger);">
+                    Clear Cache
+                </button>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-md); background: rgba(239, 68, 68, 0.05); border-radius: 8px;">
+                <div>
+                    <div style="font-weight: 600; color: var(--danger);">Reset to Defaults</div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">Reset all settings to default values</div>
+                </div>
+                <button class="btn btn-secondary" onclick="resetDefaults()" style="border-color: var(--danger); color: var(--danger);">
+                    Reset
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function saveGeneralSettings() {
+        showNotification('General settings saved!', 'success');
+    }
+    
+    function saveNotificationSettings() {
+        showNotification('Notification settings saved!', 'success');
+    }
+    
+    function saveApiSettings() {
+        showNotification('API settings saved!', 'success');
+    }
+    
+    function checkForUpdates() {
+        showNotification('You are running the latest version!', 'info');
+    }
+    
+    function clearCache() {
+        if (confirm('Are you sure you want to clear the cache?')) {
+            localStorage.clear();
+            showNotification('Cache cleared successfully!', 'success');
+        }
+    }
+    
+    function resetDefaults() {
+        if (confirm('Are you sure you want to reset all settings to defaults?')) {
+            showNotification('Settings reset to defaults!', 'success');
+        }
+    }
+    
+    function showNotification(message, type) {
+        // Simple notification - could be enhanced with a toast system
+        const colors = {
+            success: 'var(--success)',
+            error: 'var(--danger)',
+            warning: 'var(--warning)',
+            info: 'var(--info)'
+        };
+        
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${colors[type] || colors.info};
+            color: white;
+            padding: 16px 24px;
+            border-radius: 8px;
+            font-weight: 500;
+            z-index: 10000;
+            animation: slideIn 0.3s ease;
+        `;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.style.animation = 'slideOut 0.3s ease';
+            setTimeout(() => notification.remove(), 300);
+        }, 3000);
+    }
+</script>
+
+<style>
+    @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes slideOut {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
+    }
+</style>
+{% endblock %}

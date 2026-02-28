@@ -43,6 +43,41 @@ class TelegramPlatformBot:
         self.running = False
         self.message_buffer: List[str] = []
         self._flush_task = None
+        self._session: Optional[aiohttp.ClientSession] = None
+        self.activity_log: List[Dict[str, Any]] = []
+
+    @staticmethod
+    def _agent_badge(agent_id: str) -> str:
+        return {
+            "SAPPHIRE": "💎",
+            "OBSIDIAN": "🖤",
+            "EMERALD": "💚",
+            "SCOUT": "🔭",
+        }.get(str(agent_id or "").strip().upper(), "🤖")
+
+    async def send_as(
+        self,
+        agent_id: str,
+        text: str,
+        priority: NotificationPriority = NotificationPriority.MEDIUM,
+        **kwargs,
+    ):
+        """Compatibility shim used by alpha-engine role-routed notifications."""
+        agent = str(agent_id or "AGENT").strip().upper()
+        badge = self._agent_badge(agent)
+        await self.send_message(f"{badge} *{agent}*: {text}", priority=priority, **kwargs)
+
+    def record_activity(self, agent_id: str, action: str, detail: str):
+        """Compatibility shim for activity timeline logging."""
+        item = {
+            "ts": int(time.time()),
+            "agent": str(agent_id or "AGENT").strip().upper(),
+            "action": str(action or "").strip().lower() or "event",
+            "detail": str(detail or "").strip(),
+        }
+        self.activity_log.append(item)
+        if len(self.activity_log) > 400:
+            self.activity_log = self.activity_log[-400:]
 
     async def _get_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
