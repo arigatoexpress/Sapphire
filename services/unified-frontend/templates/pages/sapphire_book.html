@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block page_subtitle %}Sapphire Book restoration status, operator app direction, and Kimi-Claw integration track.{% endblock %}
+
+{% block content %}
+<div class="grid grid-4" style="margin-bottom: var(--space-xl);">
+    <div class="stat-card">
+        <div class="stat-label">Mode</div>
+        <div class="stat-value" style="color: var(--warning);">Read-Only</div>
+        <div class="stat-change">Public web policy</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Operator Surface</div>
+        <div class="stat-value">macOS App</div>
+        <div class="stat-change">Controls restricted</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Kimi-Claw</div>
+        <div class="stat-value" id="kimi-status">Syncing</div>
+        <div class="stat-change">Runtime restoration</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Frontend Contracts</div>
+        <div class="stat-value">6/6</div>
+        <div class="stat-change">Platform APIs</div>
+    </div>
+</div>
+
+<div class="grid grid-2" style="margin-bottom: var(--space-xl);">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-compass" style="margin-right: 8px; color: var(--primary);"></i>Sapphire Book Direction</h3>
+        </div>
+        <div class="card-body">
+            <ul style="margin-left: 18px; color: var(--text-secondary); line-height: 1.9;">
+                <li>Public site remains business-facing, observable, and non-operational.</li>
+                <li>All privileged controls move to the macOS Operator App.</li>
+                <li>Web and macOS clients share the same platform contracts for consistency.</li>
+                <li>Kimi-Claw integrations are restored in secure operator contexts only.</li>
+            </ul>
+            {% if mac_operator_app_url %}
+            <div style="margin-top: var(--space-md);">
+                <a class="btn btn-primary" href="{{ mac_operator_app_url }}">
+                    <i class="fab fa-apple"></i> {{ mac_operator_app_label }}
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-timeline" style="margin-right: 8px; color: var(--accent);"></i>Restoration Milestones</h3>
+        </div>
+        <div class="card-body">
+            <div style="display: grid; gap: var(--space-sm);">
+                <div class="badge badge-success" style="justify-content: flex-start; width: fit-content;">Platform contracts normalized</div>
+                <div class="badge badge-success" style="justify-content: flex-start; width: fit-content;">Windows/Pi/Cloud health synchronized</div>
+                <div class="badge badge-info" style="justify-content: flex-start; width: fit-content;">Sapphire Book module migration in progress</div>
+                <div class="badge badge-warning" style="justify-content: flex-start; width: fit-content;">Kimi-Claw operator workflow hardening</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-link" style="margin-right: 8px; color: var(--info);"></i>Related Pages</h3>
+    </div>
+    <div class="card-body">
+        <div style="display: flex; gap: var(--space-md); flex-wrap: wrap;">
+            <a href="/organization" class="btn btn-secondary"><i class="fas fa-sitemap"></i> Organization OS</a>
+            <a href="/production-readiness" class="btn btn-secondary"><i class="fas fa-rocket"></i> Readiness</a>
+            <a href="/system-health" class="btn btn-secondary"><i class="fas fa-heartbeat"></i> System Health</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function refreshBookStatus() {
+        try {
+            const status = await window.platformApi.getStatus();
+            const windows = (status.by_category && status.by_category.windows) || [];
+            const healthy = windows.every((row) => !!row.healthy);
+            const el = document.getElementById('kimi-status');
+            el.textContent = healthy ? 'Online' : 'Degraded';
+            el.style.color = healthy ? 'var(--success)' : 'var(--warning)';
+        } catch (err) {
+            const el = document.getElementById('kimi-status');
+            el.textContent = 'Unknown';
+            el.style.color = 'var(--text-muted)';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', refreshBookStatus);
+</script>
+{% endblock %}

@@ -33,14 +33,7 @@
     <div class="card" style="grid-column: span 2;">
         <div class="card-header">
             <h3 class="card-title"><i class="fas fa-list" style="margin-right: 8px; color: var(--primary);"></i>Open Positions</h3>
-            <div style="display: flex; gap: var(--space-sm);">
-                <button class="btn btn-secondary" style="font-size: 0.8rem;">
-                    <i class="fas fa-filter"></i> Filter
-                </button>
-                <button class="btn btn-primary" style="font-size: 0.8rem;">
-                    <i class="fas fa-plus"></i> New Trade
-                </button>
-            </div>
+            <span class="badge badge-warning">Read-Only View</span>
         </div>
         <div class="card-body">
             <div class="table-container">
@@ -53,7 +46,7 @@
                             <th>Entry Price</th>
                             <th>Current Price</th>
                             <th>P&L</th>
-                            <th>Actions</th>
+                            <th>Notes</th>
                         </tr>
                     </thead>
                     <tbody id="positions-table">
@@ -155,6 +148,11 @@
             <a href="/command-deck" class="btn btn-secondary">
                 <i class="fas fa-terminal"></i> Command Deck
             </a>
+            {% if mac_operator_app_url %}
+            <a href="{{ mac_operator_app_url }}" class="btn btn-primary">
+                <i class="fab fa-apple"></i> {{ mac_operator_app_label }}
+            </a>
+            {% endif %}
             <a href="https://www.tradingview.com/chart" target="_blank" class="btn btn-secondary">
                 <i class="fas fa-chart-line"></i> TradingView
             </a>

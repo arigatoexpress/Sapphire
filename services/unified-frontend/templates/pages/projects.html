@@ -25,13 +25,11 @@
     </div>
 </div>
 
-<!-- Program Control -->
+<!-- Program Overview -->
 <div class="card" style="margin-bottom: var(--space-xl);">
     <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-tasks" style="margin-right: 8px; color: var(--primary);"></i>Program Control</h3>
-        <a href="https://agentic-pm-hub-267358751314.us-central1.run.app/projects" target="_blank" class="btn btn-secondary" style="font-size: 0.8rem;">
-            <i class="fas fa-external-link-alt"></i> Open PM Hub Workspace
-        </a>
+        <h3 class="card-title"><i class="fas fa-tasks" style="margin-right: 8px; color: var(--primary);"></i>Program Overview</h3>
+        <span class="badge badge-warning">Read-Only View</span>
     </div>
     <div class="card-body">
         <p style="color: var(--text-muted); margin-bottom: var(--space-md);">
@@ -45,9 +43,11 @@
 <div class="card">
     <div class="card-header">
         <h3 class="card-title"><i class="fas fa-folder-open" style="margin-right: 8px; color: var(--secondary);"></i>Active Projects</h3>
-        <button class="btn btn-primary" style="font-size: 0.8rem;">
-            <i class="fas fa-plus"></i> New Project
-        </button>
+        {% if mac_operator_app_url %}
+        <a class="btn btn-primary" style="font-size: 0.8rem;" href="{{ mac_operator_app_url }}">
+            <i class="fab fa-apple"></i> Manage in macOS App
+        </a>
+        {% endif %}
     </div>
     <div class="card-body">
         <div id="projects-list">
@@ -134,10 +134,7 @@
                                         <div style="width: ${p.progress}%; height: 100%; background: linear-gradient(90deg, var(--primary), var(--secondary)); border-radius: 3px;"></div>
                                     </div>
                                 </div>
-                                <div style="display: flex; gap: var(--space-sm);">
-                                    <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 12px;">View</button>
-                                    <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 12px;">Edit</button>
-                                </div>
+                                <div><span class="badge">Public Snapshot</span></div>
                             </div>
                         </div>
                     `).join('')}

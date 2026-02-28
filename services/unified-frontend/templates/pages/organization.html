@@ -221,9 +221,7 @@
             </div>
         </div>
         <div style="display:flex; gap: var(--space-sm); justify-content:flex-end; flex-wrap:wrap;">
-            <a id="org-open-link" href="https://agentic-pm-hub-267358751314.us-central1.run.app/organization" target="_blank" class="btn btn-secondary">
-                <i class="fas fa-external-link-alt"></i> Open PM Hub
-            </a>
+            <span class="badge badge-warning" style="align-self:center;">Public Read-Only</span>
             <button class="btn btn-primary" onclick="refreshOrganization(true)">
                 <i class="fas fa-sync-alt"></i> Refresh
             </button>
@@ -485,7 +483,6 @@ async function refreshOrganization(force = false) {
     const blockersList = document.getElementById('org-blockers-list');
     const policyList = document.getElementById('org-policy-list');
     const recommendationsList = document.getElementById('org-recommendations-list');
-    const openLink = document.getElementById('org-open-link');
 
     try {
         const payload = await window.platformApi.getOrganization(force);
@@ -543,9 +540,6 @@ async function refreshOrganization(force = false) {
         ];
         renderList(recommendationsList, recommendations, 'No recommendations currently reported.');
 
-        if (payload.organization_url) {
-            openLink.href = payload.organization_url;
-        }
     } catch (err) {
         console.error('Organization refresh failed:', err);
         renderList(document.getElementById('org-blockers-list'), [

@@ -55,26 +55,25 @@
     </div>
 </div>
 
-<!-- Signal Controls -->
+<!-- Read-only Operator Notice -->
 <div class="grid grid-2">
     <div class="card">
         <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-broadcast-tower" style="margin-right: 8px; color: var(--warning);"></i>Signal Controls</h3>
+            <h3 class="card-title"><i class="fas fa-lock" style="margin-right: 8px; color: var(--warning);"></i>Operator Controls</h3>
         </div>
         <div class="card-body">
             <div style="display: flex; flex-direction: column; gap: var(--space-md);">
-                <button class="btn btn-primary" onclick="testSignal()">
-                    <i class="fas fa-paper-plane"></i> Send Test Signal
-                </button>
-                <button class="btn btn-secondary" onclick="pauseWorkbench()">
-                    <i class="fas fa-pause"></i> Pause Workbench
-                </button>
-                <button class="btn btn-secondary" onclick="resumeWorkbench()">
-                    <i class="fas fa-play"></i> Resume Workbench
-                </button>
-                <button class="btn btn-secondary" onclick="flushQueue()">
-                    <i class="fas fa-broom"></i> Flush Signal Queue
-                </button>
+                <p style="color: var(--text-secondary);">
+                    This public website is read-only by policy. Signal dispatch, queue operations, and all execution controls are disabled on web.
+                </p>
+                <p style="color: var(--text-muted); font-size: 0.9rem;">
+                    Use the macOS Operator App for authenticated control workflows.
+                </p>
+                {% if mac_operator_app_url %}
+                <a class="btn btn-primary" href="{{ mac_operator_app_url }}">
+                    <i class="fab fa-apple"></i> {{ mac_operator_app_label }}
+                </a>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -161,24 +160,6 @@
         } catch (error) {
             pipeline.innerHTML = '<div class="empty-state"><p>Failed to load pipeline status</p></div>';
             events.innerHTML = '<div class="empty-state"><p>Failed to load signal events</p></div>';
-        }
-    }
-    
-    function testSignal() {
-        alert('Test signal feature coming soon!\n\nThis will send a test trading signal through the pipeline.');
-    }
-    
-    function pauseWorkbench() {
-        alert('Workbench paused!');
-    }
-    
-    function resumeWorkbench() {
-        alert('Workbench resumed!');
-    }
-    
-    function flushQueue() {
-        if (confirm('Are you sure you want to flush the signal queue?')) {
-            alert('Signal queue flushed!');
         }
     }
     

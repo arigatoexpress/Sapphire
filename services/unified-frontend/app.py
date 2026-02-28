@@ -67,6 +67,9 @@ OPTIONAL_HEALTH_NAMES = {
 AUTH_USERNAME = os.environ.get('AUTH_USERNAME', 'sapphire')
 AUTH_PASSWORD = os.environ.get('AUTH_PASSWORD', 'alpha2024')
 ENABLE_AUTH = os.environ.get('ENABLE_AUTH', 'true').lower() == 'true'
+PUBLIC_READ_ONLY = os.environ.get('PUBLIC_READ_ONLY', 'true').lower() == 'true'
+MAC_OPERATOR_APP_URL = os.environ.get('MAC_OPERATOR_APP_URL', 'sapphirebook://operator')
+MAC_OPERATOR_APP_LABEL = os.environ.get('MAC_OPERATOR_APP_LABEL', 'Open macOS Operator App')
 
 # Simple in-memory cache
 cache = {}
@@ -161,6 +164,15 @@ def requires_auth(f):
             return authenticate()
         return f(*args, **kwargs)
     return decorated
+
+
+@app.context_processor
+def inject_platform_context():
+    return {
+        'public_read_only': PUBLIC_READ_ONLY,
+        'mac_operator_app_url': MAC_OPERATOR_APP_URL,
+        'mac_operator_app_label': MAC_OPERATOR_APP_LABEL,
+    }
 
 
 def get_cached(key, duration=CACHE_DURATION):
@@ -1087,7 +1099,13 @@ def infrastructure():
 @app.route('/settings')
 @requires_auth
 def settings():
-    return render_template('pages/settings.html', current_page='settings', page_title='Settings')
+    return render_template('pages/settings.html', current_page='settings', page_title='Public Configuration')
+
+
+@app.route('/sapphire-book')
+@requires_auth
+def sapphire_book():
+    return render_template('pages/sapphire_book.html', current_page='sapphire-book', page_title='Sapphire Book')
 
 
 @app.route('/ping')

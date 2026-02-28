@@ -707,6 +707,10 @@
                         <i class="fas fa-sitemap nav-icon"></i>
                         <span class="nav-label">Organization</span>
                     </a>
+                    <a href="/sapphire-book" class="nav-item {% if current_page == 'sapphire-book' %}active{% endif %}">
+                        <i class="fas fa-book-open nav-icon"></i>
+                        <span class="nav-label">Sapphire Book</span>
+                    </a>
                     <a href="/projects" class="nav-item {% if current_page == 'projects' %}active{% endif %}">
                         <i class="fas fa-tasks nav-icon"></i>
                         <span class="nav-label">Project Management</span>
@@ -779,9 +783,19 @@
                     <p class="page-subtitle" id="page-subtitle">{% block page_subtitle %}Real-time system monitoring{% endblock %}</p>
                 </div>
                 <div class="header-actions">
+                    {% if public_read_only %}
+                    <span class="status-indicator" style="background: rgba(255, 204, 102, 0.14); color: var(--warning); border-color: rgba(255, 204, 102, 0.35);">
+                        Public Read-Only
+                    </span>
+                    {% endif %}
                     <span class="status-indicator status-online">
                         System Online
                     </span>
+                    {% if mac_operator_app_url %}
+                    <a class="btn btn-secondary" href="{{ mac_operator_app_url }}">
+                        <i class="fab fa-apple"></i> {{ mac_operator_app_label }}
+                    </a>
+                    {% endif %}
                     <button class="btn btn-icon btn-secondary" title="Refresh">
                         <i class="fas fa-sync-alt"></i>
                     </button>
