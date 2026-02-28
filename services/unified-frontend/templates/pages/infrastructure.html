@@ -20,6 +20,53 @@
     </div>
 </div>
 
+<!-- Windows AI Lab Live Snapshot -->
+<div class="card" style="margin-bottom: var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-microchip" style="margin-right: 8px; color: var(--accent);"></i>Windows AI Lab (Live)</h3>
+    </div>
+    <div class="card-body">
+        <div class="grid grid-4" style="margin-bottom: var(--space-lg);">
+            <div class="stat-card">
+                <div class="stat-label">Snapshot Status</div>
+                <div class="stat-value" id="lab-status" style="color: var(--text);">Loading</div>
+                <div class="stat-change" id="lab-age">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">GPU Count</div>
+                <div class="stat-value" id="lab-gpu-count" style="color: var(--primary);">--</div>
+                <div class="stat-change" id="lab-gpu-name">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Ollama Models</div>
+                <div class="stat-value" id="lab-model-count" style="color: var(--secondary);">--</div>
+                <div class="stat-change">Local model bench</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Service Health</div>
+                <div class="stat-value" id="lab-service-health" style="color: var(--success);">--</div>
+                <div class="stat-change">webhook / tv / ollama</div>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Service</th>
+                        <th>Healthy</th>
+                        <th>Latency</th>
+                        <th>Status Code</th>
+                    </tr>
+                </thead>
+                <tbody id="lab-services-table">
+                    <tr><td colspan="4" style="color: var(--text-muted);">Loading Windows Lab service probes...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 <!-- Architecture Diagram -->
 <div class="card" style="margin-bottom: var(--space-xl);">
     <div class="card-header">
@@ -191,4 +238,66 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function refreshWindowsLab() {
+    const statusEl = document.getElementById('lab-status');
+    const ageEl = document.getElementById('lab-age');
+    const gpuCountEl = document.getElementById('lab-gpu-count');
+    const gpuNameEl = document.getElementById('lab-gpu-name');
+    const modelCountEl = document.getElementById('lab-model-count');
+    const serviceHealthEl = document.getElementById('lab-service-health');
+    const tableEl = document.getElementById('lab-services-table');
+
+    try {
+        const payload = await window.platformApi.getWindowsLab();
+        const available = !!payload.available;
+        const stale = !!payload.stale;
+        statusEl.textContent = available ? (stale ? 'Stale' : 'Online') : 'Unavailable';
+        statusEl.style.color = available ? (stale ? 'var(--warning)' : 'var(--success)') : 'var(--danger)';
+
+        const ageSeconds = payload.age_seconds;
+        ageEl.textContent = (ageSeconds === null || ageSeconds === undefined) ? 'No recent sync' : `Age: ${ageSeconds}s`;
+
+        const gpu = (payload.hardware && payload.hardware.gpu) || [];
+        gpuCountEl.textContent = String(payload.hardware?.gpu_count ?? gpu.length ?? 0);
+        gpuNameEl.textContent = gpu.length ? String(gpu[0].name || 'GPU detected') : 'No GPU data';
+
+        const models = payload.models || {};
+        modelCountEl.textContent = String(models.ollama_model_count ?? 0);
+
+        const services = payload.services || {};
+        const serviceRows = Object.entries(services);
+        const healthyCount = serviceRows.filter(([_, v]) => !!v.healthy).length;
+        serviceHealthEl.textContent = `${healthyCount}/${serviceRows.length || 0}`;
+        serviceHealthEl.style.color = healthyCount === serviceRows.length ? 'var(--success)' : 'var(--warning)';
+
+        if (!serviceRows.length) {
+            tableEl.innerHTML = '<tr><td colspan="4" style="color: var(--text-muted);">No service probe data available.</td></tr>';
+            return;
+        }
+
+        tableEl.innerHTML = serviceRows.map(([name, svc]) => `
+            <tr>
+                <td>${name}</td>
+                <td><span class="badge ${svc.healthy ? 'badge-success' : 'badge-warning'}">${svc.healthy ? 'yes' : 'no'}</span></td>
+                <td>${svc.latency_ms ?? '--'} ms</td>
+                <td>${svc.status_code ?? '--'}</td>
+            </tr>
+        `).join('');
+    } catch (error) {
+        statusEl.textContent = 'Error';
+        statusEl.style.color = 'var(--danger)';
+        ageEl.textContent = error.message || 'Failed to load Windows lab state';
+        tableEl.innerHTML = '<tr><td colspan="4" style="color: var(--danger);">Failed to load Windows lab capabilities.</td></tr>';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    refreshWindowsLab();
+    setInterval(refreshWindowsLab, 30000);
+});
+</script>
 {% endblock %}

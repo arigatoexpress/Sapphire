@@ -38,6 +38,7 @@ PRICE_CACHE_DURATION = int(os.environ.get('PRICE_CACHE_DURATION', '30'))
 GCP_PROJECT = os.environ.get('GCP_PROJECT', 'sapphire-479610')
 TRADING_METRICS_COLLECTION = os.environ.get('TRADING_METRICS_COLLECTION', 'trading_metrics')
 SYSTEM_LOGS_COLLECTION = os.environ.get('SYSTEM_LOGS_COLLECTION', 'system_logs')
+EDGE_CAPABILITIES_COLLECTION = os.environ.get('EDGE_CAPABILITIES_COLLECTION', 'edge_capabilities')
 
 CRITICAL_EDGE_SERVICES = {
     item.strip() for item in os.environ.get(
@@ -221,6 +222,38 @@ def _probe_http(url: str, timeout: float = 6, auth_required: bool = False):
         return {'status': status, 'healthy': False, 'status_code': None, 'latency_ms': round((time.time() - start) * 1000, 2)}
     except requests.RequestException as exc:
         return {'status': 'unreachable', 'healthy': False, 'status_code': None, 'latency_ms': round((time.time() - start) * 1000, 2), 'error': str(exc)}
+
+
+def _get_json(url: str, *, timeout: float = 4.0, params: dict | None = None):
+    """Fetch JSON payload from an endpoint with standardized error shape."""
+    started = time.time()
+    try:
+        response = requests.get(url, timeout=timeout, params=params)
+        latency_ms = round((time.time() - started) * 1000, 2)
+        if response.status_code != 200:
+            return {
+                'ok': False,
+                'status_code': response.status_code,
+                'latency_ms': latency_ms,
+                'error': f'http_{response.status_code}',
+                'data': {},
+            }
+        payload = response.json() if response.content else {}
+        return {
+            'ok': True,
+            'status_code': 200,
+            'latency_ms': latency_ms,
+            'error': None,
+            'data': payload if isinstance(payload, dict) else {},
+        }
+    except requests.RequestException as exc:
+        return {
+            'ok': False,
+            'status_code': None,
+            'latency_ms': round((time.time() - started) * 1000, 2),
+            'error': str(exc),
+            'data': {},
+        }
 
 
 def _collect_system_status():
@@ -760,9 +793,66 @@ def _platform_metrics_payload():
         'market': _fetch_market_prices(),
         'health': _platform_health_summary(status_data),
         'status': status_data,
+        'windows_lab': _fetch_windows_lab_payload(),
     }
     set_cache('platform_metrics', payload)
     return payload
+
+
+def _fetch_windows_lab_payload():
+    cached = get_cached('windows_lab', duration=20)
+    if cached:
+        return cached
+
+    if db is None:
+        payload = {
+            'available': False,
+            'error': 'firestore_unavailable',
+            'source': 'edge_capabilities/windows_lab',
+            'timestamp': datetime.utcnow().isoformat(),
+        }
+        set_cache('windows_lab', payload)
+        return payload
+
+    try:
+        doc = db.collection(EDGE_CAPABILITIES_COLLECTION).document('windows_lab').get()
+        if not doc.exists:
+            payload = {
+                'available': False,
+                'error': 'windows_lab_not_reported',
+                'source': f'{EDGE_CAPABILITIES_COLLECTION}/windows_lab',
+                'timestamp': datetime.utcnow().isoformat(),
+            }
+            set_cache('windows_lab', payload)
+            return payload
+
+        raw = doc.to_dict() or {}
+        updated_at = _coerce_datetime(raw.get('updated_at') or raw.get('timestamp'))
+        age_seconds = None
+        stale = True
+        if updated_at is not None:
+            age_seconds = max(0, int((datetime.now(timezone.utc) - updated_at).total_seconds()))
+            stale = age_seconds > 900
+
+        payload = {
+            **raw,
+            'available': bool(raw.get('available', True)),
+            'stale': stale,
+            'age_seconds': age_seconds,
+            'source': f'{EDGE_CAPABILITIES_COLLECTION}/windows_lab',
+            'timestamp': datetime.utcnow().isoformat(),
+        }
+        set_cache('windows_lab', payload)
+        return payload
+    except Exception as exc:
+        payload = {
+            'available': False,
+            'error': str(exc),
+            'source': f'{EDGE_CAPABILITIES_COLLECTION}/windows_lab',
+            'timestamp': datetime.utcnow().isoformat(),
+        }
+        set_cache('windows_lab', payload)
+        return payload
 
 
 def _fetch_projects_payload():
@@ -815,17 +905,81 @@ def _fetch_projects_payload():
     return payload
 
 
-def _platform_organization_payload():
+def _platform_organization_payload(refresh: bool = False):
+    cache_key = 'platform_organization_refresh' if refresh else 'platform_organization'
+    if not refresh:
+        cached = get_cached(cache_key, duration=20)
+        if cached:
+            return cached
+
+    params = {'refresh': 'true'} if refresh else None
     org_url = _join_url(PM_HUB_URL, '/organization')
     status_url = _join_url(PM_HUB_URL, '/health')
+    overview_url = _join_url(PM_HUB_URL, '/api/org/overview')
+    ops_status_url = _join_url(PM_HUB_URL, '/api/frontend/ops-status')
+    logbook_url = _join_url(PM_HUB_URL, '/api/frontend/logbook')
+
     status_probe = _probe_http(status_url, timeout=2)
-    return {
+
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        overview_future = pool.submit(_get_json, overview_url, timeout=5.0, params=params)
+        ops_future = pool.submit(_get_json, ops_status_url, timeout=5.0, params={'event_limit': '20', **(params or {})})
+        logbook_future = pool.submit(_get_json, logbook_url, timeout=5.0, params={'event_limit': '24', **(params or {})})
+        overview_resp = overview_future.result()
+        ops_resp = ops_future.result()
+        logbook_resp = logbook_future.result()
+
+    overview = overview_resp.get('data', {})
+    ops_status = ops_resp.get('data', {})
+    logbook = logbook_resp.get('data', {})
+
+    projects_summary = overview.get('projects_summary', {}) if isinstance(overview.get('projects_summary'), dict) else {}
+    control_overview = overview.get('control_plane', {}).get('overview', {}) if isinstance(overview.get('control_plane'), dict) else {}
+    trading = overview.get('trading_operations', {}) if isinstance(overview.get('trading_operations'), dict) else {}
+    rails = trading.get('rails', []) if isinstance(trading.get('rails'), list) else []
+    rails_ready = sum(1 for rail in rails if isinstance(rail, dict) and rail.get('readiness') == 'ready')
+
+    payload = {
         'organization_url': org_url,
         'pm_hub_url': PM_HUB_URL,
         'health': status_probe,
         'model': ORG_MODEL,
+        'overview': overview,
+        'ops_status': ops_status,
+        'logbook': logbook,
+        'sources': {
+            'overview': {
+                'ok': overview_resp.get('ok', False),
+                'status_code': overview_resp.get('status_code'),
+                'latency_ms': overview_resp.get('latency_ms'),
+                'error': overview_resp.get('error'),
+            },
+            'ops_status': {
+                'ok': ops_resp.get('ok', False),
+                'status_code': ops_resp.get('status_code'),
+                'latency_ms': ops_resp.get('latency_ms'),
+                'error': ops_resp.get('error'),
+            },
+            'logbook': {
+                'ok': logbook_resp.get('ok', False),
+                'status_code': logbook_resp.get('status_code'),
+                'latency_ms': logbook_resp.get('latency_ms'),
+                'error': logbook_resp.get('error'),
+            },
+        },
+        'summary': {
+            'workspaces': len(overview.get('workspaces', [])) if isinstance(overview.get('workspaces'), list) else 0,
+            'tracked_projects': int(projects_summary.get('tracked_project_count', 0) or 0),
+            'agents_online': int(control_overview.get('agents_executor_online', control_overview.get('agents_online', 0)) or 0),
+            'agents_total': int(control_overview.get('agents_executor_total', control_overview.get('agents_total', 0)) or 0),
+            'rails_ready': rails_ready,
+            'rails_total': len(rails),
+        },
+        'generated_at': overview.get('generated_at') or datetime.utcnow().isoformat(),
         'timestamp': datetime.utcnow().isoformat(),
     }
+    set_cache(cache_key, payload)
+    return payload
 
 
 # ---------------------------------------------------------------------------
@@ -947,7 +1101,8 @@ def api_platform_logs():
 @app.route('/api/platform/organization')
 @requires_auth
 def api_platform_organization():
-    return jsonify(_platform_organization_payload())
+    refresh = request.args.get('refresh', 'false').lower() == 'true'
+    return jsonify(_platform_organization_payload(refresh=refresh))
 
 
 @app.route('/api/platform/readiness')
@@ -960,6 +1115,12 @@ def api_platform_readiness():
 @requires_auth
 def api_platform_projects():
     return jsonify(_fetch_projects_payload())
+
+
+@app.route('/api/platform/windows-lab')
+@requires_auth
+def api_platform_windows_lab():
+    return jsonify(_fetch_windows_lab_payload())
 
 
 @app.route('/api/logs')
@@ -1003,6 +1164,12 @@ def api_production_readiness():
 @requires_auth
 def api_trading_metrics():
     return jsonify(_platform_metrics_payload().get('trading', {}))
+
+
+@app.route('/api/windows-lab')
+@requires_auth
+def api_windows_lab():
+    return api_platform_windows_lab()
 
 
 if __name__ == '__main__':

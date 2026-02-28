@@ -1,111 +1,349 @@
 {% extends 'base.html' %}
 
+{% block page_subtitle %}Autonomous organization model, execution lanes, and live readiness across cloud + edge.{% endblock %}
+
+{% block extra_css %}
+.org-hero {
+    position: relative;
+    overflow: hidden;
+    margin-bottom: var(--space-xl);
+}
+
+.org-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 15% 20%, rgba(105, 212, 255, 0.2), transparent 45%),
+        radial-gradient(circle at 85% 15%, rgba(143, 125, 255, 0.2), transparent 40%);
+    pointer-events: none;
+}
+
+.org-hero-body {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1.7fr 1fr;
+    gap: var(--space-lg);
+    align-items: center;
+}
+
+.org-hero-title {
+    font-size: 2rem;
+    line-height: 1.1;
+    margin-bottom: var(--space-sm);
+}
+
+.org-hero-copy {
+    color: var(--text-secondary);
+    max-width: 65ch;
+}
+
+.org-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    margin-top: var(--space-md);
+}
+
+.org-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 999px;
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.08);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.org-kpi-note {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.org-surface-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--space-md);
+}
+
+.org-surface-card {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: var(--space-md);
+}
+
+.org-surface-card h4 {
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+}
+
+.org-surface-card p {
+    color: var(--text-muted);
+    font-size: 0.86rem;
+}
+
+.org-list {
+    list-style: none;
+    display: grid;
+    gap: 8px;
+}
+
+.org-list li {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-secondary);
+}
+
+.org-workspace-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--space-md);
+}
+
+.org-workspace {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.04);
+    padding: var(--space-md);
+}
+
+.org-workspace h4 {
+    margin-bottom: 6px;
+}
+
+.org-workspace .meta {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    margin-bottom: 8px;
+}
+
+.org-chart {
+    display: grid;
+    gap: var(--space-md);
+}
+
+.org-chart-root {
+    padding: var(--space-md);
+    border-radius: 14px;
+    border: 1px solid var(--border-accent);
+    background: rgba(105, 212, 255, 0.09);
+}
+
+.org-chart-lanes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--space-md);
+}
+
+.org-lane {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: var(--space-md);
+}
+
+.org-lane h4 {
+    margin-bottom: 6px;
+    font-size: 0.95rem;
+}
+
+.org-lane p {
+    color: var(--text-muted);
+    font-size: 0.84rem;
+    margin-bottom: 8px;
+}
+
+.org-lane .systems {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.org-lane .systems span {
+    border-radius: 999px;
+    background: rgba(110, 168, 255, 0.16);
+    color: var(--info);
+    border: 1px solid rgba(110, 168, 255, 0.35);
+    padding: 4px 8px;
+    font-size: 0.75rem;
+}
+
+.org-source-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--space-sm);
+}
+
+.org-source {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 10px 12px;
+}
+
+.org-source .name {
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.org-source .meta {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+@media (max-width: 980px) {
+    .org-hero-body {
+        grid-template-columns: 1fr;
+    }
+
+    .org-hero-title {
+        font-size: 1.55rem;
+    }
+}
+{% endblock %}
+
 {% block content %}
-<div class="page-header">
-    <div>
-        <h1 class="page-title">Organization OS</h1>
-        <p class="page-subtitle">Unified view of company structure, operating model, agents, systems, and execution paths.</p>
-    </div>
-    <div style="display: flex; gap: var(--space-sm);">
-        <a id="org-open-link" href="https://agentic-pm-hub-267358751314.us-central1.run.app/organization" target="_blank" class="btn btn-secondary">
-            <i class="fas fa-external-link-alt"></i> Open Source Page
-        </a>
-        <button class="btn btn-primary" onclick="refreshOrganization()">
-            <i class="fas fa-sync-alt"></i> Refresh
-        </button>
+<div class="card org-hero">
+    <div class="card-body org-hero-body">
+        <div>
+            <div class="org-chip">Sapphire Inc · Organization OS</div>
+            <h2 class="org-hero-title">Autonomous Organization Command Center</h2>
+            <p class="org-hero-copy">
+                One operating model across agentic project management, trading execution, development delivery, and infrastructure research.
+                This surface is now synced to PM Hub organization data and normalized for production operations.
+            </p>
+            <div class="org-chip-row" id="org-chip-row">
+                <span class="org-chip">Loading sources…</span>
+            </div>
+        </div>
+        <div style="display:flex; gap: var(--space-sm); justify-content:flex-end; flex-wrap:wrap;">
+            <a id="org-open-link" href="https://agentic-pm-hub-267358751314.us-central1.run.app/organization" target="_blank" class="btn btn-secondary">
+                <i class="fas fa-external-link-alt"></i> Open PM Hub
+            </a>
+            <button class="btn btn-primary" onclick="refreshOrganization(true)">
+                <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+        </div>
     </div>
 </div>
 
-<div class="grid grid-cols-3" style="margin-bottom: var(--space-xl);">
+<div class="grid grid-4" style="margin-bottom: var(--space-xl);">
     <div class="stat-card">
-        <div class="stat-label">PM Hub Status</div>
-        <div class="stat-value" id="org-pm-status">checking</div>
-        <div class="stat-change" id="org-pm-meta">Probing endpoint</div>
+        <div class="stat-label">Generated</div>
+        <div class="stat-value" id="org-generated">--</div>
+        <div class="org-kpi-note">PM Hub snapshot</div>
     </div>
     <div class="stat-card">
-        <div class="stat-label">Organization Endpoint</div>
-        <div class="stat-value" id="org-endpoint-status">pending</div>
-        <div class="stat-change" id="org-endpoint-latency">-- ms</div>
+        <div class="stat-label">Workspaces</div>
+        <div class="stat-value" id="org-workspaces">--</div>
+        <div class="org-kpi-note">Autonomous lanes</div>
     </div>
     <div class="stat-card">
-        <div class="stat-label">Last Refresh</div>
-        <div class="stat-value" id="org-last-refresh">--</div>
-        <div class="stat-change">Unified frontend</div>
+        <div class="stat-label">Agents Online</div>
+        <div class="stat-value" id="org-agents">--</div>
+        <div class="org-kpi-note">Executor coverage</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Trading Rails</div>
+        <div class="stat-value" id="org-rails">--</div>
+        <div class="org-kpi-note" id="org-rails-note">Readiness status</div>
     </div>
 </div>
 
-<div class="card" style="margin-bottom: var(--space-xl);">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-layer-group" style="margin-right: 8px; color: var(--primary);"></i>Consolidation Blueprint</h3>
+<div class="grid grid-2" style="margin-bottom: var(--space-xl);">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-compass" style="margin-right: 8px; color: var(--primary);"></i>Operating Model</h3>
+        </div>
+        <div class="card-body">
+            <ul class="org-list" id="org-model-list">
+                <li>Loading organization model…</li>
+            </ul>
+        </div>
     </div>
-    <div class="card-body">
-        <div class="grid grid-cols-3">
-            <div class="card" style="background: var(--bg-glass);">
-                <div class="card-body">
-                    <h4 style="margin-bottom: var(--space-sm);">1. Core Platform</h4>
-                    <p style="color: var(--text-muted);">One shell, one identity system, one navigation model, shared design tokens.</p>
-                </div>
-            </div>
-            <div class="card" style="background: var(--bg-glass);">
-                <div class="card-body">
-                    <h4 style="margin-bottom: var(--space-sm);">2. Operational Views</h4>
-                    <p style="color: var(--text-muted);">Trading, health, logs, organization, projects, and infrastructure in one website.</p>
-                </div>
-            </div>
-            <div class="card" style="background: var(--bg-glass);">
-                <div class="card-body">
-                    <h4 style="margin-bottom: var(--space-sm);">3. Production Controls</h4>
-                    <p style="color: var(--text-muted);">Release gates, observability, runbooks, and incident workflows integrated.</p>
-                </div>
-            </div>
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-triangle-exclamation" style="margin-right: 8px; color: var(--warning);"></i>Blockers</h3>
+        </div>
+        <div class="card-body">
+            <ul class="org-list" id="org-blockers-list">
+                <li>Loading blockers…</li>
+            </ul>
         </div>
     </div>
 </div>
 
 <div class="card" style="margin-bottom: var(--space-xl);">
     <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-diagram-project" style="margin-right: 8px; color: var(--accent);"></i>Canonical Operating Model</h3>
+        <h3 class="card-title"><i class="fas fa-layer-group" style="margin-right: 8px; color: var(--accent);"></i>Workspace Alignment</h3>
     </div>
     <div class="card-body">
-        <div style="margin-bottom: var(--space-lg);">
-            <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">Framework</div>
-            <div id="org-framework" style="font-weight: 600;">loading...</div>
-            <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 12px; margin-bottom: 6px;">Mission</div>
-            <div id="org-mission" style="color: var(--text-secondary);">loading...</div>
+        <div class="org-workspace-grid" id="org-workspace-grid">
+            <div class="org-workspace"><div class="meta">Loading workspaces…</div></div>
         </div>
-        <div id="org-departments" class="grid grid-cols-2"></div>
-        <div style="margin-top: var(--space-lg);">
-            <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">Knowledge Sources</div>
-            <div id="org-sources" style="display: flex; gap: var(--space-sm); flex-wrap: wrap;"></div>
-            <div id="org-safety" style="margin-top: var(--space-sm); color: var(--warning);"></div>
+    </div>
+</div>
+
+<div class="grid grid-2" style="margin-bottom: var(--space-xl);">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-route" style="margin-right: 8px; color: var(--secondary);"></i>Trading Rail Readiness</h3>
         </div>
+        <div class="card-body table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Rail</th>
+                        <th>Node</th>
+                        <th>Agent</th>
+                        <th>Readiness</th>
+                    </tr>
+                </thead>
+                <tbody id="org-rails-table">
+                    <tr><td colspan="4">Loading rails…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-shield-halved" style="margin-right: 8px; color: var(--info);"></i>Policy + Recommendations</h3>
+        </div>
+        <div class="card-body">
+            <ul class="org-list" id="org-policy-list">
+                <li>Loading policy…</li>
+            </ul>
+            <ul class="org-list" id="org-recommendations-list" style="margin-top: var(--space-md);">
+                <li>Loading recommendations…</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-sitemap" style="margin-right: 8px; color: var(--success);"></i>Canonical Organization Architecture</h3>
+    </div>
+    <div class="card-body org-chart" id="org-chart">
+        <div class="org-chart-root">
+            <strong id="org-root-name">Sapphire Autonomous Organization</strong>
+            <div style="color: var(--text-muted); margin-top: 4px;" id="org-root-framework">Loading framework…</div>
+        </div>
+        <div class="org-chart-lanes" id="org-chart-lanes"></div>
     </div>
 </div>
 
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-building" style="margin-right: 8px; color: var(--info);"></i>Organization Execution Surface</h3>
+        <h3 class="card-title"><i class="fas fa-plug" style="margin-right: 8px; color: var(--primary);"></i>Integration Sources</h3>
     </div>
     <div class="card-body">
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:var(--space-md);">
-            <div class="card" style="background:var(--bg-glass);">
-                <div class="card-body">
-                    <h4 style="margin-bottom:var(--space-sm);">Governance Loop</h4>
-                    <p style="color:var(--text-muted);">Agentic PM framework drives prioritization and policy locks.</p>
-                </div>
-            </div>
-            <div class="card" style="background:var(--bg-glass);">
-                <div class="card-body">
-                    <h4 style="margin-bottom:var(--space-sm);">Execution Loop</h4>
-                    <p style="color:var(--text-muted);">Trading, research, and development run on shared telemetry and readiness gates.</p>
-                </div>
-            </div>
-            <div class="card" style="background:var(--bg-glass);">
-                <div class="card-body">
-                    <h4 style="margin-bottom:var(--space-sm);">Learning Loop</h4>
-                    <p style="color:var(--text-muted);">Safe improvements from GitHub, MoltHub, and MoltBook flow through sandbox validation.</p>
-                </div>
-            </div>
+        <div class="org-source-grid" id="org-source-grid">
+            <div class="org-source"><div class="name">overview</div><div class="meta">Loading…</div></div>
         </div>
     </div>
 </div>
@@ -113,78 +351,212 @@
 
 {% block extra_js %}
 <script>
-    async function refreshOrganization() {
-        const statusEl = document.getElementById('org-pm-status');
-        const endpointStatus = document.getElementById('org-endpoint-status');
-        const endpointMeta = document.getElementById('org-endpoint-latency');
-        const lastRefresh = document.getElementById('org-last-refresh');
-        const openLink = document.getElementById('org-open-link');
-        const framework = document.getElementById('org-framework');
-        const mission = document.getElementById('org-mission');
-        const departments = document.getElementById('org-departments');
-        const sources = document.getElementById('org-sources');
-        const safety = document.getElementById('org-safety');
+function fmtIso(value) {
+    if (!value) return '--';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return String(value);
+    return d.toLocaleString();
+}
 
-        statusEl.textContent = 'checking';
-        endpointStatus.textContent = 'pending';
-        endpointMeta.textContent = '-- ms';
+function safeArray(value) {
+    return Array.isArray(value) ? value : [];
+}
 
-        const started = performance.now();
-        try {
-            const payload = await window.platformApi.getOrganization();
-            const elapsed = Math.round(performance.now() - started);
+function badgeClass(status) {
+    const s = String(status || '').toLowerCase();
+    if (s === 'ready' || s === 'healthy') return 'badge-success';
+    if (s === 'degraded' || s === 'warning') return 'badge-warning';
+    return 'badge';
+}
 
-            if (payload.health && payload.health.healthy) {
-                statusEl.textContent = 'healthy';
-                statusEl.style.color = 'var(--success)';
-                endpointStatus.textContent = (payload.health.status || 'healthy');
-                endpointStatus.style.color = 'var(--success)';
-            } else {
-                statusEl.textContent = 'degraded';
-                statusEl.style.color = 'var(--warning)';
-                endpointStatus.textContent = (payload.health && payload.health.status) || 'degraded';
-                endpointStatus.style.color = 'var(--warning)';
-            }
+function renderList(el, items, emptyText) {
+    if (!el) return;
+    if (!Array.isArray(items) || !items.length) {
+        el.innerHTML = `<li>${emptyText}</li>`;
+        return;
+    }
+    el.innerHTML = items.map((item) => `<li>${String(item)}</li>`).join('');
+}
 
-            endpointMeta.textContent = `${elapsed} ms`;
-            lastRefresh.textContent = new Date().toLocaleTimeString();
-
-            if (payload.organization_url) {
-                openLink.href = payload.organization_url;
-            }
-
-            if (payload.model) {
-                framework.textContent = payload.model.framework || 'N/A';
-                mission.textContent = payload.model.mission || 'N/A';
-
-                const deptCards = (payload.model.departments || []).map((dept) => `
-                    <div class="card" style="background: var(--bg-glass);">
-                        <div class="card-body">
-                            <h4 style="margin-bottom: var(--space-sm);">${dept.name}</h4>
-                            <p style="color: var(--text-muted); margin-bottom: var(--space-sm);">${dept.focus || ''}</p>
-                            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-                                ${(dept.systems || []).map((s) => `<span class="badge badge-secondary">${s}</span>`).join('')}
-                            </div>
-                        </div>
-                    </div>
-                `).join('');
-
-                departments.innerHTML = deptCards;
-                sources.innerHTML = (payload.model.knowledge_sources || []).map((s) => `<span class="badge badge-info">${s}</span>`).join('');
-                safety.textContent = payload.model.safety_policy || '';
-            }
-        } catch (err) {
-            statusEl.textContent = 'offline';
-            statusEl.style.color = 'var(--danger)';
-            endpointStatus.textContent = 'failed';
-            endpointStatus.style.color = 'var(--danger)';
-            endpointMeta.textContent = 'request failed';
-            lastRefresh.textContent = new Date().toLocaleTimeString();
-        }
+function renderWorkspaces(workspaces) {
+    const grid = document.getElementById('org-workspace-grid');
+    if (!grid) return;
+    if (!workspaces.length) {
+        grid.innerHTML = '<div class="org-workspace"><div class="meta">No workspace data available.</div></div>';
+        return;
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
-        refreshOrganization();
-    });
+    grid.innerHTML = workspaces.map((ws) => {
+        const metrics = ws.metrics || {};
+        const projects = safeArray(ws.projects);
+        const chips = projects.length
+            ? projects.map((p) => `<span class="badge badge-info">${String(p.name || p.id || 'project')}</span>`).join(' ')
+            : '<span class="badge">No projects</span>';
+        return `
+            <article class="org-workspace">
+                <h4>${String(ws.name || 'Workspace')}</h4>
+                <div class="meta">${String(ws.purpose || '')}</div>
+                <div class="meta">status=${String(ws.status || 'unknown')} · projects=${Number(metrics.project_count || 0)} · healthy=${Number(metrics.healthy_count || 0)}</div>
+                <div>${chips}</div>
+            </article>
+        `;
+    }).join('');
+}
+
+function renderRails(rails) {
+    const table = document.getElementById('org-rails-table');
+    if (!table) return;
+    if (!rails.length) {
+        table.innerHTML = '<tr><td colspan="4">No rail data available.</td></tr>';
+        return;
+    }
+
+    table.innerHTML = rails.map((rail) => `
+        <tr>
+            <td>${String(rail.name || rail.id || 'rail')}</td>
+            <td>${String(rail.preferred_node || '--')}</td>
+            <td>${String(rail.preferred_agent_id || '--')}</td>
+            <td><span class="badge ${badgeClass(rail.readiness)}">${String(rail.readiness || 'unknown')}</span></td>
+        </tr>
+    `).join('');
+}
+
+function renderOrgChart(model) {
+    const rootName = document.getElementById('org-root-name');
+    const rootFramework = document.getElementById('org-root-framework');
+    const lanes = document.getElementById('org-chart-lanes');
+    if (!lanes) return;
+
+    rootName.textContent = model.name || 'Sapphire Autonomous Organization';
+    rootFramework.textContent = model.framework || 'Agentic framework';
+
+    const departments = safeArray(model.departments);
+    if (!departments.length) {
+        lanes.innerHTML = '<article class="org-lane"><h4>No departments loaded</h4></article>';
+        return;
+    }
+
+    lanes.innerHTML = departments.map((dept) => {
+        const systems = safeArray(dept.systems);
+        return `
+            <article class="org-lane">
+                <h4>${String(dept.name || 'Department')}</h4>
+                <p>${String(dept.focus || '')}</p>
+                <div class="systems">${systems.map((s) => `<span>${String(s)}</span>`).join('')}</div>
+            </article>
+        `;
+    }).join('');
+}
+
+function renderSourceStatus(sources) {
+    const grid = document.getElementById('org-source-grid');
+    const chipRow = document.getElementById('org-chip-row');
+    if (!grid) return;
+    const entries = Object.entries(sources || {});
+    if (!entries.length) {
+        grid.innerHTML = '<div class="org-source"><div class="name">No source data</div><div class="meta">unavailable</div></div>';
+        return;
+    }
+
+    grid.innerHTML = entries.map(([name, meta]) => {
+        const ok = !!meta.ok;
+        const cls = ok ? 'badge-success' : 'badge-warning';
+        return `
+            <div class="org-source">
+                <div class="name">${name}</div>
+                <div class="meta"><span class="badge ${cls}">${ok ? 'ok' : 'degraded'}</span> · ${meta.latency_ms ?? '--'}ms · code=${meta.status_code ?? '--'}</div>
+            </div>
+        `;
+    }).join('');
+
+    chipRow.innerHTML = entries.map(([name, meta]) => {
+        const dot = meta.ok ? '🟢' : '🟠';
+        return `<span class="org-chip">${dot} ${name}</span>`;
+    }).join('');
+}
+
+async function refreshOrganization(force = false) {
+    const generated = document.getElementById('org-generated');
+    const workspacesMetric = document.getElementById('org-workspaces');
+    const agentsMetric = document.getElementById('org-agents');
+    const railsMetric = document.getElementById('org-rails');
+    const railsNote = document.getElementById('org-rails-note');
+    const modelList = document.getElementById('org-model-list');
+    const blockersList = document.getElementById('org-blockers-list');
+    const policyList = document.getElementById('org-policy-list');
+    const recommendationsList = document.getElementById('org-recommendations-list');
+    const openLink = document.getElementById('org-open-link');
+
+    try {
+        const payload = await window.platformApi.getOrganization(force);
+        const overview = payload.overview || {};
+        const ops = payload.ops_status || {};
+        const model = payload.model || {};
+        const summary = payload.summary || {};
+        const workspaces = safeArray(overview.workspaces);
+        const rails = safeArray((overview.trading_operations || {}).rails);
+        const control = (overview.control_plane && overview.control_plane.overview) || {};
+        const tasks = control.tasks || {};
+
+        generated.textContent = fmtIso(payload.generated_at || payload.timestamp);
+        workspacesMetric.textContent = String(summary.workspaces ?? workspaces.length ?? 0);
+        agentsMetric.textContent = `${summary.agents_online ?? 0}/${summary.agents_total ?? 0}`;
+        railsMetric.textContent = `${summary.rails_ready ?? 0}/${summary.rails_total ?? rails.length}`;
+        railsNote.textContent = `${summary.tracked_projects ?? 0} tracked projects`;
+
+        renderWorkspaces(workspaces);
+        renderRails(rails);
+        renderOrgChart(model);
+        renderSourceStatus(payload.sources || {});
+
+        const modelItems = [
+            `Organization: ${String((overview.organization || {}).name || model.name || 'Sapphire Inc')}`,
+            `Runtime: ${String((overview.shell_app || {}).runtime_mode || '--')} · Service: ${String((overview.shell_app || {}).service_name || '--')}`,
+            `Queue: queued=${Number(tasks.queued || 0)} leased=${Number(tasks.leased || 0)} failed=${Number(tasks.failed || 0)}`,
+            `Policy lock: ${String((overview.executor_policy || {}).policy_lock_mode || 'unset')}`,
+        ];
+        renderList(modelList, modelItems, 'No model data available.');
+
+        const blockers = safeArray(overview.blockers).map((b) => String(b));
+        const drift = ops.policy_drift || {};
+        if (drift.enabled && drift.drift_detected) {
+            const mismatches = safeArray(drift.mismatches).map((m) => String(m.field || 'unknown')).join(', ') || 'policy mismatch';
+            blockers.unshift(`Executor policy drift detected: ${mismatches}`);
+        }
+        renderList(blockersList, blockers, 'No blockers currently reported.');
+
+        const policyItems = [
+            `mode=${String((overview.executor_policy || {}).policy_mode || 'unspecified')}`,
+            `locked=${String((overview.executor_policy || {}).policy_lock_mode || 'off')}`,
+            `description=${String((overview.executor_policy || {}).description || 'n/a')}`,
+        ];
+        renderList(policyList, policyItems, 'No policy data available.');
+
+        const queueRecommendations = safeArray(((ops.queue_routability || {}).recommendations || [])).map((r) => {
+            const pri = String(r.priority || 'info');
+            const action = String(r.action || r.id || 'recommendation');
+            return `[${pri}] ${action}`;
+        });
+        const recommendations = [
+            ...safeArray(overview.recommendations).map((r) => String(r)),
+            ...queueRecommendations,
+        ];
+        renderList(recommendationsList, recommendations, 'No recommendations currently reported.');
+
+        if (payload.organization_url) {
+            openLink.href = payload.organization_url;
+        }
+    } catch (err) {
+        console.error('Organization refresh failed:', err);
+        renderList(document.getElementById('org-blockers-list'), [
+            `Could not load organization data: ${err.message || 'request failed'}`,
+        ], 'Could not load organization data.');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    refreshOrganization(false);
+    setInterval(() => refreshOrganization(false), 60000);
+});
 </script>
 {% endblock %}

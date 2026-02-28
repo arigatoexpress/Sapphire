@@ -90,6 +90,9 @@ gcloud run services list \
   --region "$REGION" \
   --format='table(metadata.name,status.latestReadyRevisionName,status.traffic[0].percent)'
 
+printf "\n[extra] Windows lab capabilities snapshot\n"
+check_endpoint /api/platform/windows-lab
+
 printf "\n[6/7] Scheduler inventory\n"
 gcloud scheduler jobs list \
   --project "$PROJECT_ID" \

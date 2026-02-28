@@ -47,14 +47,17 @@
     getLogs(params) {
       return request(withParams('/api/platform/logs', params));
     },
-    getOrganization() {
-      return request('/api/platform/organization');
+    getOrganization(refresh = false) {
+      return request(withParams('/api/platform/organization', refresh ? { refresh: true } : {}));
     },
     getReadiness() {
       return request('/api/platform/readiness');
     },
     getProjects() {
       return request('/api/platform/projects');
+    },
+    getWindowsLab() {
+      return request('/api/platform/windows-lab');
     },
   };
 })();

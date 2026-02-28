@@ -10,7 +10,10 @@ fi
 echo "Deploying Sapphire Unified Frontend..."
 
 cd "${SERVICE_DIR}"
-gcloud builds submit --config cloudbuild.yaml .
+gcloud builds submit \
+  --config cloudbuild.yaml \
+  --service-account="projects/${PROJECT_ID}/serviceAccounts/sapphirev3@sapphire-479610.iam.gserviceaccount.com" \
+  .
 
 echo
 echo "Deployment complete."

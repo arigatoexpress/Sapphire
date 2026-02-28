@@ -17,15 +17,18 @@ Signal flow:
 
 import json
 import logging
-import hmac
-import hashlib
 import httpx
 import asyncio
 import uuid
+import os
+import platform
+import socket
+import subprocess
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 from dataclasses import dataclass, asdict
 from contextlib import asynccontextmanager
+import contextlib
 
 from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse, HTMLResponse
@@ -53,9 +56,13 @@ PUBSUB_TOPIC    = f"projects/{GCP_PROJECT_ID}/topics/trading-signals"
 GATEWAY_URL     = "https://sapphire-gateway-s77j6bxyra-uc.a.run.app"  # HTTPS fallback
 OLLAMA_URL      = "http://localhost:11434"   # Local Ollama (RTX 5070 Ti)
 WEBHOOK_PORT    = 9090
-LOG_FILE        = "D:/CodingFiles/sapphire-webhook/webhook.log"
+LOG_FILE        = os.getenv("WEBHOOK_LOG_FILE", "C:/sapphire/webhook.log")
 MAX_HISTORY     = 200
 SYSTEM_LOGS_COLLECTION = "system_logs"
+EDGE_CAPABILITIES_COLLECTION = "edge_capabilities"
+CAPABILITY_SYNC_INTERVAL_SECONDS = int(
+    os.getenv("CAPABILITY_SYNC_INTERVAL_SECONDS", "180")
+)
 
 # Supported symbols → canonical Sapphire format
 SYMBOL_MAP = {
@@ -70,6 +77,10 @@ VALID_ACTIONS = [
 ]
 
 # ─── Logging ──────────────────────────────────────────────────────────────────
+
+_log_dir = os.path.dirname(LOG_FILE)
+if _log_dir:
+    os.makedirs(_log_dir, exist_ok=True)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -130,6 +141,12 @@ stats = {"total": 0, "published": 0, "errors": 0, "ai_enriched": 0,
 
 _publisher: Optional["pubsub_v1.PublisherClient"] = None  # type: ignore
 _firestore_client = None
+_capability_sync_task: Optional[asyncio.Task[Any]] = None
+_capability_snapshot: dict[str, Any] = {
+    "available": False,
+    "last_sync": None,
+    "error": "not_initialized",
+}
 
 
 def _get_publisher():
@@ -155,6 +172,158 @@ def _get_firestore_client():
             log.warning("Firestore client init failed: %s", exc)
             _firestore_client = None
     return _firestore_client
+
+
+async def _fetch_ollama_models() -> list[dict]:
+    """Best-effort local Ollama model inventory."""
+    try:
+        async with httpx.AsyncClient(timeout=2.5) as client:
+            response = await client.get(f"{OLLAMA_URL}/api/tags")
+            if response.status_code != 200:
+                return []
+            payload = response.json() if response.headers.get("content-type", "").startswith("application/json") else {}
+            models = payload.get("models", []) if isinstance(payload, dict) else []
+            rows: list[dict] = []
+            for item in models:
+                if not isinstance(item, dict):
+                    continue
+                rows.append(
+                    {
+                        "name": item.get("name"),
+                        "size": item.get("size"),
+                        "modified_at": item.get("modified_at"),
+                    }
+                )
+            return rows
+    except Exception:
+        return []
+
+
+def _detect_gpu_inventory() -> list[dict]:
+    """Best-effort GPU inventory via nvidia-smi (Windows host)."""
+    command = [
+        "nvidia-smi",
+        "--query-gpu=name,memory.total,driver_version",
+        "--format=csv,noheader,nounits",
+    ]
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, check=True, timeout=4)
+    except Exception:
+        return []
+    rows: list[dict] = []
+    for line in result.stdout.splitlines():
+        text = line.strip()
+        if not text:
+            continue
+        parts = [p.strip() for p in text.split(",")]
+        if len(parts) < 3:
+            continue
+        rows.append(
+            {
+                "name": parts[0],
+                "memory_total_mb": float(parts[1]) if parts[1].replace(".", "", 1).isdigit() else parts[1],
+                "driver_version": parts[2],
+            }
+        )
+    return rows
+
+
+async def _probe_local_service(url: str) -> dict:
+    started = datetime.now(timezone.utc)
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            response = await client.get(url)
+            latency_ms = int((datetime.now(timezone.utc) - started).total_seconds() * 1000)
+            return {
+                "healthy": response.status_code == 200,
+                "status_code": response.status_code,
+                "latency_ms": latency_ms,
+            }
+    except Exception as exc:
+        latency_ms = int((datetime.now(timezone.utc) - started).total_seconds() * 1000)
+        return {
+            "healthy": False,
+            "status_code": None,
+            "latency_ms": latency_ms,
+            "error": str(exc)[:180],
+        }
+
+
+async def _collect_windows_lab_snapshot() -> dict:
+    """Collect local workstation capabilities and service health."""
+    started = datetime.now(timezone.utc)
+    ollama_models = await _fetch_ollama_models()
+    gpu_rows = await asyncio.to_thread(_detect_gpu_inventory)
+    webhook_probe, tv_probe, ollama_probe = await asyncio.gather(
+        _probe_local_service(f"http://127.0.0.1:{WEBHOOK_PORT}/status"),
+        _probe_local_service("http://127.0.0.1:8081/health"),
+        _probe_local_service(f"{OLLAMA_URL}/api/tags"),
+    )
+    snapshot = {
+        "available": True,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "host": {
+            "hostname": socket.gethostname(),
+            "os": platform.platform(),
+            "python_version": platform.python_version(),
+            "cpu_count": os.cpu_count(),
+            "cpu_name": platform.processor(),
+        },
+        "hardware": {
+            "gpu": gpu_rows,
+            "gpu_count": len(gpu_rows),
+        },
+        "models": {
+            "ollama_model_count": len(ollama_models),
+            "ollama_models": ollama_models[:40],
+        },
+        "services": {
+            "windows_webhook": webhook_probe,
+            "windows_tv_agent": tv_probe,
+            "windows_ollama": ollama_probe,
+        },
+        "stats": {
+            "signals_total": stats["total"],
+            "signals_published": stats["published"],
+            "pubsub_success": stats["pubsub_success"],
+            "gateway_fallback": stats["gateway_fallback"],
+        },
+        "source": "windows_webhook_receiver",
+    }
+    snapshot["collection_latency_ms"] = int(
+        (datetime.now(timezone.utc) - started).total_seconds() * 1000
+    )
+    return snapshot
+
+
+def _write_windows_capabilities(snapshot: dict):
+    """Persist latest workstation capabilities into Firestore."""
+    client = _get_firestore_client()
+    if client is None:
+        return
+    try:
+        client.collection(EDGE_CAPABILITIES_COLLECTION).document("windows_lab").set(snapshot, merge=True)
+    except Exception as exc:
+        log.warning("Windows capabilities Firestore write failed: %s", exc)
+
+
+async def _capability_sync_loop():
+    """Background sync loop for Windows AI lab capabilities."""
+    global _capability_snapshot
+    while True:
+        try:
+            snapshot = await _collect_windows_lab_snapshot()
+            _capability_snapshot = snapshot
+            _write_windows_capabilities(snapshot)
+        except Exception as exc:
+            _capability_snapshot = {
+                "available": False,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "error": str(exc)[:240],
+                "source": "windows_webhook_receiver",
+            }
+            log.warning("Capability sync error: %s", exc)
+        await asyncio.sleep(max(60, CAPABILITY_SYNC_INTERVAL_SECONDS))
 
 
 def write_system_log(
@@ -327,6 +496,7 @@ async def ollama_enrich(alert: TradingViewAlert) -> Optional[str]:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global _capability_sync_task
     log.info("🚀 Sapphire Webhook Receiver starting on port %d", WEBHOOK_PORT)
     log.info("Pub/Sub topic:   %s", PUBSUB_TOPIC)
     log.info("Gateway fallback: %s", GATEWAY_URL)
@@ -334,7 +504,14 @@ async def lifespan(app: FastAPI):
     log.info("Pub/Sub available: %s", _PUBSUB_AVAILABLE)
     # Warm up publisher on startup
     _get_publisher()
+    _get_firestore_client()
+    _capability_sync_task = asyncio.create_task(_capability_sync_loop())
     yield
+    if _capability_sync_task is not None:
+        _capability_sync_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await _capability_sync_task
+        _capability_sync_task = None
     log.info("Webhook receiver shutting down")
 
 
@@ -412,6 +589,8 @@ async def dashboard():
 
 @app.get("/status")
 async def status():
+    services = (_capability_snapshot or {}).get("services", {})
+    capabilities = (_capability_snapshot or {}).get("models", {})
     return {
         "status": "active",
         "version": "2.0.0",
@@ -420,9 +599,54 @@ async def status():
         "pubsub_available": _PUBSUB_AVAILABLE,
         "gateway_url": GATEWAY_URL,
         "ollama_url": OLLAMA_URL,
+        "services": services,
+        "capabilities": {
+            "ollama_model_count": capabilities.get("ollama_model_count", 0),
+            "gpu_count": ((_capability_snapshot or {}).get("hardware", {}) or {}).get("gpu_count", 0),
+            "last_sync": (_capability_snapshot or {}).get("updated_at"),
+        },
         "supported_actions": VALID_ACTIONS,
         "symbol_map": SYMBOL_MAP,
     }
+
+
+@app.get("/health")
+async def health():
+    services = (_capability_snapshot or {}).get("services", {})
+    webhook_ok = services.get("windows_webhook", {}).get("healthy", True)
+    return {
+        "status": "healthy" if webhook_ok else "degraded",
+        "service": "windows_webhook",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@app.get("/webhook/health")
+async def webhook_health():
+    services = (_capability_snapshot or {}).get("services", {})
+    return {
+        "status": "healthy",
+        "service": "windows_webhook",
+        "version": "2.0.0",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "services": services,
+        "stats": stats,
+        "capabilities": {
+            "last_sync": (_capability_snapshot or {}).get("updated_at"),
+            "available": bool((_capability_snapshot or {}).get("available")),
+            "ollama_model_count": ((_capability_snapshot or {}).get("models", {}) or {}).get("ollama_model_count", 0),
+            "gpu_count": ((_capability_snapshot or {}).get("hardware", {}) or {}).get("gpu_count", 0),
+        },
+    }
+
+
+@app.get("/windows/capabilities")
+async def windows_capabilities():
+    snapshot = dict(_capability_snapshot or {})
+    if not snapshot:
+        snapshot = {"available": False, "error": "capabilities_not_ready"}
+    snapshot["timestamp"] = datetime.now(timezone.utc).isoformat()
+    return snapshot
 
 
 @app.get("/alerts")
@@ -538,7 +762,7 @@ async def receive_tradingview(request: Request, background_tasks: BackgroundTask
 
 if __name__ == "__main__":
     uvicorn.run(
-        "main:app",
+        app,
         host="0.0.0.0",
         port=WEBHOOK_PORT,
         log_level="info",
