@@ -6,18 +6,27 @@ It aggregates data from all platform bots via Pub/Sub and Firestore.
 """
 
 import asyncio
+import hashlib
+import json
 import logging
 import os
+import time
+import uuid
 
 # Add shared library to path
 import sys
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+try:
+    from google.cloud import firestore as g_firestore
+except ImportError:  # pragma: no cover
+    g_firestore = None
 
 # ─── API Auth ────────────────────────────────────────────────────────────────
 
@@ -51,6 +60,28 @@ from models import BalanceUpdate, Position, SignalType, TradeResult, TradeSide, 
 logger = logging.getLogger(__name__)
 
 SERVICE_NAME = "api-gateway"
+GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID", "sapphire-479610")
+TRADINGVIEW_WEBHOOK_SECRET = os.getenv("SAPPHIRE_TRADINGVIEW_WEBHOOK_SECRET", "").strip()
+TRADINGVIEW_IDEMPOTENCY_WINDOW_SECONDS = max(
+    30, int(os.getenv("SAPPHIRE_TRADINGVIEW_IDEMPOTENCY_WINDOW_SECONDS", "300"))
+)
+TRADINGVIEW_IDEMPOTENCY_MAX_KEYS = max(
+    50, int(os.getenv("SAPPHIRE_TRADINGVIEW_IDEMPOTENCY_MAX_KEYS", "1000"))
+)
+SYSTEM_LOGS_COLLECTION = os.getenv("SYSTEM_LOGS_COLLECTION", "system_logs")
+
+VALID_TV_ACTIONS = {
+    "buy",
+    "sell",
+    "long",
+    "short",
+    "entry_long",
+    "entry_short",
+    "exit",
+    "close",
+    "exit_long",
+    "exit_short",
+}
 
 
 class ServiceState:
@@ -68,6 +99,16 @@ class ServiceState:
 
         # WebSocket clients
         self.ws_clients: List[WebSocket] = []
+        self.tradingview_ingress_stats: Dict[str, int] = {
+            "total": 0,
+            "published": 0,
+            "duplicates": 0,
+            "failed": 0,
+            "rejected": 0,
+        }
+        self.tradingview_recent: List[Dict[str, Any]] = []
+        self.tradingview_signal_seen_at: Dict[str, float] = {}
+        self.tradingview_last_signal_at: Optional[str] = None
 
     def get_total_balance(self) -> float:
         """Get aggregated balance across all platforms."""
@@ -88,6 +129,174 @@ class ServiceState:
 
 
 state = ServiceState()
+_firestore_client = None
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _coerce_float(value: Any, default: Optional[float] = None) -> Optional[float]:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _extract_text(payload: Dict[str, Any], keys: List[str], default: str = "") -> str:
+    for key in keys:
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return default
+
+
+def _parse_message_payload(message: Any) -> Dict[str, Any]:
+    if isinstance(message, dict):
+        return message
+    if message is None:
+        return {}
+
+    text = str(message).strip()
+    if not text:
+        return {}
+
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, dict):
+            return parsed
+    except Exception:
+        pass
+
+    parsed: Dict[str, Any] = {}
+    chunks = [chunk.strip() for chunk in text.replace("\n", ",").split(",") if chunk.strip()]
+    for chunk in chunks:
+        if "=" in chunk:
+            key, value = chunk.split("=", 1)
+        elif ":" in chunk:
+            key, value = chunk.split(":", 1)
+        else:
+            continue
+        parsed[key.strip()] = value.strip()
+    return parsed
+
+
+def _normalize_tv_symbol(raw_symbol: str) -> str:
+    symbol = str(raw_symbol or "").strip().upper()
+    if ":" in symbol:
+        symbol = symbol.split(":")[-1]
+    return symbol.replace("/", "").replace("-", "").replace("_", "")
+
+
+def _normalize_tv_action(raw_action: str) -> str:
+    action = str(raw_action or "").strip().lower()
+    aliases = {
+        "entry": "buy",
+        "exit_all": "exit",
+    }
+    return aliases.get(action, action)
+
+
+def _map_tv_action(action: str) -> tuple[TradeSide, SignalType]:
+    if action in {"buy", "long", "entry_long"}:
+        return TradeSide.BUY, SignalType.ENTRY
+    if action in {"sell", "short", "entry_short"}:
+        return TradeSide.SELL, SignalType.ENTRY
+    if action in {"exit_long", "close", "exit"}:
+        return TradeSide.SELL, SignalType.EXIT
+    if action == "exit_short":
+        return TradeSide.BUY, SignalType.EXIT
+    raise ValueError(f"Unsupported action: {action}")
+
+
+def _build_signal_key(
+    payload: Dict[str, Any],
+    symbol: str,
+    action: str,
+    timestamp: str,
+    price: Optional[float],
+) -> str:
+    explicit_id = _extract_text(payload, ["signal_id", "alert_id", "id", "message_id", "tv_id"])
+    if explicit_id:
+        return explicit_id
+    seed = json.dumps(
+        {
+            "symbol": symbol,
+            "action": action,
+            "timestamp": timestamp,
+            "price": price,
+        },
+        sort_keys=True,
+        default=str,
+    )
+    return hashlib.sha256(seed.encode("utf-8")).hexdigest()
+
+
+def _is_duplicate_signal(signal_key: str) -> bool:
+    now = time.time()
+    cutoff = now - float(TRADINGVIEW_IDEMPOTENCY_WINDOW_SECONDS)
+    stale_keys = [key for key, seen_at in state.tradingview_signal_seen_at.items() if seen_at < cutoff]
+    for key in stale_keys:
+        state.tradingview_signal_seen_at.pop(key, None)
+
+    if signal_key in state.tradingview_signal_seen_at:
+        return True
+
+    state.tradingview_signal_seen_at[signal_key] = now
+    if len(state.tradingview_signal_seen_at) > TRADINGVIEW_IDEMPOTENCY_MAX_KEYS:
+        overflow = sorted(
+            state.tradingview_signal_seen_at.items(), key=lambda item: item[1]
+        )[: len(state.tradingview_signal_seen_at) - TRADINGVIEW_IDEMPOTENCY_MAX_KEYS]
+        for old_key, _ in overflow:
+            state.tradingview_signal_seen_at.pop(old_key, None)
+    return False
+
+
+def _append_tradingview_event(event: Dict[str, Any]) -> None:
+    state.tradingview_recent.append(event)
+    if len(state.tradingview_recent) > 200:
+        state.tradingview_recent = state.tradingview_recent[-200:]
+
+
+def _get_firestore_client():
+    global _firestore_client
+    if _firestore_client is None and g_firestore is not None:
+        try:
+            _firestore_client = g_firestore.Client(project=GCP_PROJECT_ID)
+        except Exception as exc:
+            logger.warning("Firestore client init failed: %s", exc)
+            _firestore_client = None
+    return _firestore_client
+
+
+def _write_system_log(
+    *,
+    level: str,
+    message: str,
+    event_type: str,
+    signal_id: Optional[str] = None,
+    symbol: Optional[str] = None,
+    action: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> None:
+    client = _get_firestore_client()
+    if client is None:
+        return
+    payload = {
+        "timestamp": _utc_now_iso(),
+        "level": str(level or "INFO").upper(),
+        "service": "gateway_webhook",
+        "message": str(message or "")[:500],
+        "event_type": str(event_type or "event"),
+        "signal_id": signal_id,
+        "symbol": symbol,
+        "action": action,
+        "metadata": metadata or {},
+    }
+    try:
+        client.collection(SYSTEM_LOGS_COLLECTION).add(payload)
+    except Exception as exc:
+        logger.warning("Firestore log write failed: %s", exc)
 
 
 @asynccontextmanager
@@ -393,6 +602,226 @@ async def get_platform_positions(platform: str):
 async def get_trades(limit: int = 50):
     """Get recent trade history."""
     return {"trades": state.trade_history[-limit:]}
+
+
+def _validate_tradingview_secret(payload: Dict[str, Any], header_secret: Optional[str]) -> None:
+    if not TRADINGVIEW_WEBHOOK_SECRET:
+        raise HTTPException(
+            status_code=503,
+            detail="TradingView webhook secret is not configured",
+        )
+
+    body_secret = _extract_text(payload, ["passphrase", "secret", "token"])
+    if (
+        (header_secret and header_secret == TRADINGVIEW_WEBHOOK_SECRET)
+        or (body_secret and body_secret == TRADINGVIEW_WEBHOOK_SECRET)
+    ):
+        return
+    state.tradingview_ingress_stats["rejected"] += 1
+    raise HTTPException(status_code=401, detail="Invalid webhook secret")
+
+
+def _build_trade_signal_from_tv_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+    message_payload = _parse_message_payload(payload.get("message"))
+    merged: Dict[str, Any] = {**message_payload, **payload}
+
+    symbol = _normalize_tv_symbol(_extract_text(merged, ["symbol", "ticker", "pair", "instrument"]))
+    action = _normalize_tv_action(_extract_text(merged, ["action", "side", "signal"]))
+    if not symbol:
+        raise HTTPException(status_code=400, detail="Missing symbol")
+    if action not in VALID_TV_ACTIONS:
+        raise HTTPException(status_code=400, detail=f"Unsupported action: {action}")
+
+    side, signal_type = _map_tv_action(action)
+    timestamp = _extract_text(merged, ["time", "timestamp", "ts"], default=_utc_now_iso())
+    price = _coerce_float(
+        merged.get("price")
+        or merged.get("entry_price")
+        or merged.get("close")
+        or merged.get("last"),
+        default=None,
+    )
+    confidence = _coerce_float(merged.get("confidence"), default=0.5) or 0.5
+    confidence = max(0.0, min(1.0, confidence))
+    quantity = _coerce_float(merged.get("quantity"), default=None)
+    z_score = _coerce_float(merged.get("z_score"), default=None)
+    regime_score = _coerce_float(merged.get("regime_score"), default=None)
+
+    signal_key = _build_signal_key(
+        merged,
+        symbol=symbol,
+        action=action,
+        timestamp=timestamp,
+        price=price,
+    )
+    if _is_duplicate_signal(signal_key):
+        state.tradingview_ingress_stats["duplicates"] += 1
+        _write_system_log(
+            level="WARN",
+            message=f"Duplicate TradingView signal ignored {action.upper()} {symbol}",
+            event_type="signal_duplicate",
+            symbol=symbol,
+            action=action,
+            metadata={"signal_key": signal_key},
+        )
+        return {
+            "duplicate": True,
+            "signal_key": signal_key,
+            "symbol": symbol,
+            "action": action,
+        }
+
+    signal_id = f"tv-{uuid.uuid4()}"
+    trade_signal = TradeSignal(
+        signal_id=signal_id,
+        symbol=symbol,
+        side=side,
+        signal_type=signal_type,
+        confidence=confidence,
+        source="tradingview-gateway",
+        target_platforms=[],
+        entry_price=price,
+        quantity=quantity,
+    )
+    trade_signal.metadata = {
+        "origin": "cloud_gateway_webhook",
+        "signal_key": signal_key,
+        "raw_action": action,
+        "exchange": _extract_text(merged, ["exchange"]),
+        "interval": _extract_text(merged, ["interval", "timeframe"]),
+        "z_score": z_score,
+        "regime_score": regime_score,
+        "message": _extract_text(merged, ["message"]),
+        "dry_run": confidence < 0.7,
+    }
+    trade_signal.timestamp = datetime.now(timezone.utc)
+
+    return {
+        "duplicate": False,
+        "signal_key": signal_key,
+        "signal": trade_signal,
+        "symbol": symbol,
+        "action": action,
+    }
+
+
+@app.get("/webhook/health")
+async def tradingview_webhook_health():
+    """Health endpoint for cloud failover TradingView ingress."""
+    return {
+        "status": "healthy",
+        "service": SERVICE_NAME,
+        "tradingview_ingress": {
+            "enabled": bool(TRADINGVIEW_WEBHOOK_SECRET),
+            "idempotency_window_seconds": TRADINGVIEW_IDEMPOTENCY_WINDOW_SECONDS,
+            "stats": state.tradingview_ingress_stats,
+            "last_signal_at": state.tradingview_last_signal_at,
+            "recent_count": len(state.tradingview_recent),
+        },
+        "timestamp": _utc_now_iso(),
+    }
+
+
+@app.get("/webhook/tradingview/status")
+async def tradingview_webhook_status(limit: int = 20):
+    """Operational status for failover ingress without exposing secrets."""
+    safe_limit = max(1, min(limit, 100))
+    return {
+        "status": "active",
+        "service": SERVICE_NAME,
+        "stats": state.tradingview_ingress_stats,
+        "last_signal_at": state.tradingview_last_signal_at,
+        "recent": state.tradingview_recent[-safe_limit:],
+        "timestamp": _utc_now_iso(),
+    }
+
+
+@app.post("/webhook/tradingview")
+async def tradingview_webhook_ingress(
+    payload: Dict[str, Any],
+    request: Request,
+    x_sapphire_webhook_secret: Optional[str] = Header(None, alias="X-Sapphire-Webhook-Secret"),
+):
+    """
+    Failover TradingView ingress endpoint hosted in Cloud Run.
+    Publishes standardized TradeSignal events to Pub/Sub.
+    """
+    _validate_tradingview_secret(payload, x_sapphire_webhook_secret)
+
+    state.tradingview_ingress_stats["total"] += 1
+    parsed = _build_trade_signal_from_tv_payload(payload)
+    if parsed.get("duplicate"):
+        event = {
+            "timestamp": _utc_now_iso(),
+            "duplicate": True,
+            "symbol": parsed.get("symbol"),
+            "action": parsed.get("action"),
+            "source_ip": request.client.host if request.client else None,
+        }
+        _append_tradingview_event(event)
+        return {
+            "status": "duplicate_ignored",
+            "signal_key": parsed.get("signal_key"),
+            "symbol": parsed.get("symbol"),
+            "action": parsed.get("action"),
+        }
+
+    signal: TradeSignal = parsed["signal"]
+    message_id = await publish("trading-signals", signal)
+    if not message_id:
+        state.tradingview_ingress_stats["failed"] += 1
+        _write_system_log(
+            level="ERROR",
+            message=f"TradingView signal publish failed {signal.symbol}",
+            event_type="signal_publish_failed",
+            signal_id=signal.signal_id,
+            symbol=signal.symbol,
+            action=parsed.get("action"),
+            metadata={"signal_key": parsed.get("signal_key")},
+        )
+        raise HTTPException(status_code=502, detail="Failed to publish TradingView signal")
+
+    state.tradingview_ingress_stats["published"] += 1
+    state.tradingview_last_signal_at = _utc_now_iso()
+
+    _write_system_log(
+        level="INFO",
+        message=f"Signal published {signal.symbol}",
+        event_type="signal_published",
+        signal_id=signal.signal_id,
+        symbol=signal.symbol,
+        action=parsed.get("action"),
+        metadata={
+            "channel": "pubsub",
+            "message_id": message_id,
+            "confidence": signal.confidence,
+            "dry_run": signal.metadata.get("dry_run", False),
+        },
+    )
+
+    event = {
+        "timestamp": _utc_now_iso(),
+        "duplicate": False,
+        "signal_id": signal.signal_id,
+        "symbol": signal.symbol,
+        "action": parsed.get("action"),
+        "signal_type": signal.signal_type.value,
+        "confidence": signal.confidence,
+        "message_id": message_id,
+        "source_ip": request.client.host if request.client else None,
+        "dry_run": signal.metadata.get("dry_run", False),
+    }
+    _append_tradingview_event(event)
+
+    return {
+        "status": "published",
+        "signal_id": signal.signal_id,
+        "symbol": signal.symbol,
+        "action": parsed.get("action"),
+        "signal_type": signal.signal_type.value,
+        "message_id": message_id,
+        "dry_run": signal.metadata.get("dry_run", False),
+    }
 
 
 # ============ Trading Signal Endpoints ============

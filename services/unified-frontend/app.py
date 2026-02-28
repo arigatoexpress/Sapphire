@@ -4,7 +4,7 @@ Sapphire Unified Frontend
 Multi-page dashboard with shared navigation and live status APIs.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 from concurrent.futures import ThreadPoolExecutor
 import os
@@ -42,7 +42,7 @@ SYSTEM_LOGS_COLLECTION = os.environ.get('SYSTEM_LOGS_COLLECTION', 'system_logs')
 CRITICAL_EDGE_SERVICES = {
     item.strip() for item in os.environ.get(
         'CRITICAL_EDGE_SERVICES',
-        'rari1_trading_api,rari2_trading_api,rari2_lighter_api,windows_webhook',
+        'rari1_trading_api,rari2_trading_api,rari2_lighter_api',
     ).split(',')
     if item.strip()
 }
@@ -68,6 +68,7 @@ except ValueError:
 
 SERVICE_CHECKS = {
     'gateway': {'base': GATEWAY_URL, 'path': '/health', 'auth': False},
+    'gateway_signal_ingress': {'base': GATEWAY_URL, 'path': '/webhook/health', 'auth': False},
     'alpha_engine': {'base': ALPHA_ENGINE_URL, 'path': '/health', 'auth': False},
     'pm_hub': {'base': PM_HUB_URL, 'path': '/health', 'auth': False},
     'telegram_bot': {'base': TELEGRAM_BOT_URL, 'path': '/health', 'auth': False},
@@ -167,16 +168,21 @@ def _join_url(base: str, path: str) -> str:
 
 def _coerce_datetime(value):
     if isinstance(value, datetime):
-        return value
-    if isinstance(value, str):
+        parsed = value
+    elif isinstance(value, str):
         text = value.strip()
         if not text:
             return None
         try:
-            return datetime.fromisoformat(text.replace('Z', '+00:00'))
+            parsed = datetime.fromisoformat(text.replace('Z', '+00:00'))
         except ValueError:
             return None
-    return None
+    else:
+        return None
+
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 def _iso_or_default(value, default=None):
@@ -234,7 +240,7 @@ def _collect_system_status():
     }
     with ThreadPoolExecutor(max_workers=max(4, len(service_targets))) as pool:
         futures = {
-            pool.submit(_probe_http, target['url'], 2.0, target['auth']): name
+            pool.submit(_probe_http, target['url'], 5.0, target['auth']): name
             for name, target in service_targets.items()
         }
         for future, name in ((f, futures[f]) for f in futures):
@@ -539,6 +545,21 @@ def _build_readiness_payload(host_root: str):
 
     monitor_ok = monitor.get('available', False) and len(edge_blockers) == 0
 
+    gateway_ingress = bool(
+        status_data.get('services', {})
+        .get('gateway_signal_ingress', {})
+        .get('healthy', False)
+    )
+    windows_ingress = False
+    if monitor.get('available'):
+        for row in (monitor.get('by_category', {}) or {}).get('windows', []):
+            if not isinstance(row, dict):
+                continue
+            if row.get('name') == 'windows_webhook':
+                windows_ingress = bool(row.get('healthy', False))
+                break
+    signal_ingress_ok = gateway_ingress or windows_ingress
+
     blockers = []
     for check in contract_checks:
         if not check.get('healthy'):
@@ -549,6 +570,14 @@ def _build_readiness_payload(host_root: str):
                 blockers.append({'gate': 'B_cloud', 'name': service_name, 'error': service.get('status', 'unhealthy')})
     for item in edge_blockers:
         blockers.append({'gate': 'C_edge', **item})
+    if not signal_ingress_ok:
+        blockers.append(
+            {
+                'gate': 'D_signal_ingress',
+                'name': 'tradingview_ingress',
+                'error': 'both_gateway_and_windows_ingress_unhealthy',
+            }
+        )
 
     gates = {
         'A_contracts': {
@@ -567,6 +596,15 @@ def _build_readiness_payload(host_root: str):
             'total': 0 if not monitor.get('available') else len(critical_rows),
             'source': 'system_status/current',
             'critical_services': sorted(CRITICAL_EDGE_SERVICES),
+        },
+        'D_signal_ingress': {
+            'ok': signal_ingress_ok,
+            'pass': int(gateway_ingress) + int(windows_ingress),
+            'total': 2,
+            'sources': {
+                'gateway_signal_ingress': gateway_ingress,
+                'windows_webhook': windows_ingress,
+            },
         },
     }
 
@@ -650,7 +688,7 @@ def _fetch_logs(hours: int = 24, limit: int = 100, service: str = '', level: str
     if db is None:
         return {'logs': [], 'count': 0, 'error': 'firestore_unavailable', 'source': 'firestore'}
 
-    since = datetime.utcnow() - timedelta(hours=max(1, hours))
+    since = datetime.now(timezone.utc) - timedelta(hours=max(1, hours))
 
     def _normalize_log(doc_id, raw):
         entry = dict(raw or {})

@@ -58,20 +58,46 @@ for b in blockers[:5]:
     print(" -", b.get("gate"), b.get("name"), b.get("error"))
 '
 
-printf "\n[4/6] Cloud Run inventory\n"
+printf "\n[4/7] Gateway failover ingress\n"
+GATEWAY_URL=$(gcloud run services describe sapphire-gateway \
+  --project "$PROJECT_ID" \
+  --region "$REGION" \
+  --format='value(status.url)')
+if [[ -n "${GATEWAY_URL:-}" ]]; then
+  code=$(curl -s -o /tmp/sapphire_gateway_webhook_health.json -w '%{http_code}' "$GATEWAY_URL/webhook/health")
+  printf "%-40s %s\n" "$GATEWAY_URL/webhook/health" "$code"
+  if [[ -f /tmp/sapphire_gateway_webhook_health.json ]]; then
+    python3 - <<'PY'
+import json
+from pathlib import Path
+p = Path("/tmp/sapphire_gateway_webhook_health.json")
+try:
+    d = json.loads(p.read_text())
+    ingress = d.get("tradingview_ingress", {})
+    print("ingress_enabled=", ingress.get("enabled"))
+    print("ingress_published=", (ingress.get("stats") or {}).get("published"))
+except Exception as e:
+    print("ingress_parse_error=", e)
+PY
+  fi
+else
+  echo "gateway_url_unavailable"
+fi
+
+printf "\n[5/7] Cloud Run inventory\n"
 gcloud run services list \
   --project "$PROJECT_ID" \
   --region "$REGION" \
   --format='table(metadata.name,status.latestReadyRevisionName,status.traffic[0].percent)'
 
-printf "\n[5/6] Scheduler inventory\n"
+printf "\n[6/7] Scheduler inventory\n"
 gcloud scheduler jobs list \
   --project "$PROJECT_ID" \
   --location "$REGION" \
   --format='table(name,state,schedule,httpTarget.uri)'
 
 if [[ -x "./scripts/cleanup_scheduler_drift.sh" ]]; then
-  printf "\n[6/6] Scheduler drift audit (allowlist)\n"
+  printf "\n[7/7] Scheduler drift audit (allowlist)\n"
   ./scripts/cleanup_scheduler_drift.sh --dry-run
 fi
 

@@ -26,8 +26,10 @@ steps:
       - 'us-central1'
       - '--project'
       - 'sapphire-479610'
+      - '--service-account'
+      - 'sapphirev3@sapphire-479610.iam.gserviceaccount.com'
       - '--update-secrets'
-      - 'SAPPHIRE_CONTROL_API_TOKEN=SAPPHIRE_CONTROL_API_TOKEN:latest'
+      - 'SAPPHIRE_CONTROL_API_TOKEN=SAPPHIRE_CONTROL_API_TOKEN:latest,SAPPHIRE_TRADINGVIEW_WEBHOOK_SECRET=SAPPHIRE_TRADINGVIEW_WEBHOOK_SECRET:latest'
     id: 'deploy-gateway'
     waitFor: ['push-gateway']
 
