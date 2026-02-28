@@ -41,6 +41,14 @@ Project: Sapphire Autonomous Organization Platform
 - **Scenario E2E-04**: SCOUT outbound dispatch routes through sandbox and is audited.
 - **Scenario E2E-05**: Unified frontend renders status/metrics/logs/readiness from canonical contracts.
 
+### Single-command validator
+- Canonical runner: `./scripts/run_e2e_signal_validation.sh`
+- What it validates in sequence:
+  - platform readiness gate (`/api/platform/readiness`)
+  - Windows webhook + TV agent health (`:9090`, `:8081`)
+  - live signal publish to Pub/Sub via Windows webhook
+  - signal trace in unified frontend log contract (`/api/platform/logs`)
+
 ## 4) Release Procedure
 1. Deploy sandbox updates.
 2. Deploy backend (`alpha-engine`, gateway) with compatibility tests.
