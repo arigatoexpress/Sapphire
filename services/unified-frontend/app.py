@@ -1045,13 +1045,13 @@ def _platform_organization_payload(refresh: bool = False):
 @app.route('/')
 @requires_auth
 def index():
-    return render_template('pages/overview.html', current_page='overview', page_title='Overview')
+    return render_template('pages/overview.html', current_page='overview', page_title='Sapphire Operations')
 
 
 @app.route('/trading')
 @requires_auth
 def trading():
-    return render_template('pages/trading.html', current_page='trading', page_title='Trading')
+    return render_template('pages/trading.html', current_page='trading', page_title='Market Intelligence')
 
 
 @app.route('/command-deck')
@@ -1063,43 +1063,43 @@ def command_deck():
 @app.route('/system-health')
 @requires_auth
 def system_health():
-    return render_template('pages/health.html', current_page='health', page_title='System Health')
+    return render_template('pages/health.html', current_page='health', page_title='Platform Status')
 
 
 @app.route('/logs')
 @requires_auth
 def logs():
-    return render_template('pages/logs.html', current_page='logs', page_title='System Logs')
+    return render_template('pages/logs.html', current_page='logs', page_title='Activity Highlights')
 
 
 @app.route('/projects')
 @requires_auth
 def projects():
-    return render_template('pages/projects.html', current_page='projects', page_title='Project Management')
+    return render_template('pages/projects.html', current_page='projects', page_title='Client Programs')
 
 
 @app.route('/organization')
 @requires_auth
 def organization():
-    return render_template('pages/organization.html', current_page='organization', page_title='Organization OS')
+    return render_template('pages/organization.html', current_page='organization', page_title='Organization')
 
 
 @app.route('/production-readiness')
 @requires_auth
 def production_readiness():
-    return render_template('pages/production_readiness.html', current_page='production', page_title='Production Readiness')
+    return render_template('pages/production_readiness.html', current_page='production', page_title='Operational Readiness')
 
 
 @app.route('/infrastructure')
 @requires_auth
 def infrastructure():
-    return render_template('pages/infrastructure.html', current_page='infrastructure', page_title='Infrastructure')
+    return render_template('pages/infrastructure.html', current_page='infrastructure', page_title='Technology Infrastructure')
 
 
 @app.route('/settings')
 @requires_auth
 def settings():
-    return render_template('pages/settings.html', current_page='settings', page_title='Public Configuration')
+    return render_template('pages/settings.html', current_page='settings', page_title='Security Policy')
 
 
 @app.route('/sapphire-book')

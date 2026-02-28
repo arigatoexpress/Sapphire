@@ -1,112 +1,249 @@
 {% extends "base.html" %}
 
+{% block page_subtitle %}A public, read-only view of Sapphire's autonomous organization, client delivery, and live platform reliability.{% endblock %}
+
+{% block extra_css %}
+.overview-hero {
+    position: relative;
+    overflow: hidden;
+    margin-bottom: var(--space-xl);
+}
+
+.overview-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 15% 18%, rgba(105, 212, 255, 0.22), transparent 42%),
+        radial-gradient(circle at 88% 15%, rgba(143, 125, 255, 0.18), transparent 38%);
+    pointer-events: none;
+}
+
+.overview-hero-body {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: var(--space-lg);
+    align-items: center;
+}
+
+.overview-hero h2 {
+    font-size: 2rem;
+    line-height: 1.1;
+    margin-bottom: var(--space-sm);
+}
+
+.overview-hero p {
+    color: var(--text-secondary);
+    max-width: 65ch;
+}
+
+.overview-chip-row {
+    margin-top: var(--space-md);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+}
+
+.overview-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    padding: 6px 12px;
+}
+
+.overview-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    justify-content: center;
+}
+
+.capability-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--space-md);
+}
+
+.capability-card {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: var(--space-md);
+}
+
+.capability-card h4 {
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+}
+
+.capability-card p {
+    color: var(--text-muted);
+    font-size: 0.86rem;
+    line-height: 1.6;
+}
+
+.activity-list {
+    display: grid;
+    gap: var(--space-sm);
+}
+
+.activity-item {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 10px 12px;
+}
+
+.activity-item .meta {
+    display: flex;
+    gap: var(--space-sm);
+    align-items: center;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.activity-item .msg {
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+    line-height: 1.5;
+}
+
+@media (max-width: 980px) {
+    .overview-hero-body {
+        grid-template-columns: 1fr;
+    }
+
+    .overview-hero h2 {
+        font-size: 1.6rem;
+    }
+}
+{% endblock %}
+
 {% block content %}
-<!-- Stats Grid -->
-<div class="grid grid-4" style="margin-bottom: var(--space-xl);">
-    <div class="stat-card">
-        <div class="stat-label">System Status</div>
-        <div class="stat-value" style="color: var(--success);">Online</div>
-        <div class="stat-change positive">
-            <i class="fas fa-check-circle"></i> All systems operational
+<div class="card overview-hero">
+    <div class="card-body overview-hero-body">
+        <div>
+            <span class="overview-chip">Sapphire Inc. · Autonomous Operations</span>
+            <h2>Professional AI Operations Across Projects, Markets, and Infrastructure</h2>
+            <p>
+                Sapphire runs a unified autonomous operating system for project management, client delivery, market intelligence,
+                and resilient multi-environment infrastructure. This public surface is intentionally read-only and reflects live
+                production telemetry.
+            </p>
+            <div class="overview-chip-row">
+                <span class="overview-chip"><i class="fas fa-lock"></i> No web-side controls</span>
+                <span class="overview-chip"><i class="fas fa-shield-check"></i> Production readiness tracked</span>
+                <span class="overview-chip"><i class="fas fa-globe"></i> Public transparency portal</span>
+            </div>
         </div>
-    </div>
-    
-    <div class="stat-card">
-        <div class="stat-label">Active Services</div>
-        <div class="stat-value" id="active-services">--</div>
-        <div class="stat-change">Cloud Run + Pi Cluster</div>
-    </div>
-    
-    <div class="stat-card">
-        <div class="stat-label">Today's Trades</div>
-        <div class="stat-value" id="today-trades">--</div>
-        <div class="stat-change" id="trade-status">Awaiting data</div>
-    </div>
-    
-    <div class="stat-card">
-        <div class="stat-label">Daily P&L</div>
-        <div class="stat-value" id="daily-pnl">--</div>
-        <div class="stat-change" id="pnl-status">--</div>
+        <div class="overview-actions">
+            <a href="/organization" class="btn btn-primary"><i class="fas fa-sitemap"></i> View Organization</a>
+            <a href="/projects" class="btn btn-secondary"><i class="fas fa-briefcase"></i> Explore Client Programs</a>
+            <a href="/sapphire-book" class="btn btn-secondary"><i class="fas fa-book-open"></i> Sapphire Book</a>
+        </div>
     </div>
 </div>
 
-<!-- Main Content Grid -->
+<div class="grid grid-4" style="margin-bottom: var(--space-xl);">
+    <div class="stat-card">
+        <div class="stat-label">Live Services</div>
+        <div class="stat-value" id="metric-services">--</div>
+        <div class="stat-change" id="metric-services-note">Checking cloud + edge</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Tracked Programs</div>
+        <div class="stat-value" id="metric-projects">--</div>
+        <div class="stat-change" id="metric-projects-note">Loading project portfolio</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Organization Lanes</div>
+        <div class="stat-value" id="metric-workspaces">--</div>
+        <div class="stat-change" id="metric-workspaces-note">PM Hub alignment</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Readiness</div>
+        <div class="stat-value" id="metric-readiness">--</div>
+        <div class="stat-change" id="metric-readiness-note">Production gates</div>
+    </div>
+</div>
+
+<div class="grid grid-2" style="margin-bottom: var(--space-xl);">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-layer-group" style="margin-right: 8px; color: var(--primary);"></i>What Sapphire Operates</h3>
+        </div>
+        <div class="card-body">
+            <div class="capability-grid">
+                <div class="capability-card">
+                    <h4><i class="fas fa-diagram-project" style="margin-right: 6px; color: var(--primary);"></i>Agentic PM</h4>
+                    <p>Autonomous planning loops, execution governance, and structured project visibility across departments.</p>
+                </div>
+                <div class="capability-card">
+                    <h4><i class="fas fa-chart-line" style="margin-right: 6px; color: var(--secondary);"></i>Market Intelligence</h4>
+                    <p>Signal processing, research telemetry, and read-only performance insights from production contracts.</p>
+                </div>
+                <div class="capability-card">
+                    <h4><i class="fas fa-rocket" style="margin-right: 6px; color: var(--accent);"></i>Client Delivery</h4>
+                    <p>Execution lanes for THO and BIS programs with centralized reporting and operational checkpoints.</p>
+                </div>
+                <div class="capability-card">
+                    <h4><i class="fas fa-server" style="margin-right: 6px; color: var(--success);"></i>Resilient Infrastructure</h4>
+                    <p>Tailscale-connected cloud, Pi, macOS, and Windows environments with monitored failover pathways.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-wave-square" style="margin-right: 8px; color: var(--info);"></i>Live Platform Snapshot</h3>
+        </div>
+        <div class="card-body">
+            <div id="service-snapshot" class="loading">
+                <div class="spinner"></div>
+                Loading platform snapshot...
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="grid grid-2">
-    <!-- Market Prices -->
     <div class="card">
         <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-coins" style="margin-right: 8px; color: var(--primary);"></i>Market Prices</h3>
-            <button class="btn btn-secondary" style="font-size: 0.8rem; padding: 4px 12px;" onclick="fetchPrices()">
-                <i class="fas fa-sync-alt"></i>
-            </button>
+            <h3 class="card-title"><i class="fas fa-list-check" style="margin-right: 8px; color: var(--accent);"></i>Recent Activity Highlights</h3>
+            <a href="/logs" class="btn btn-secondary" style="font-size: 0.8rem;">View Full Feed</a>
         </div>
         <div class="card-body">
-            <div id="prices-loading" class="loading">
+            <div id="activity-highlights" class="loading">
                 <div class="spinner"></div>
-                Loading prices...
-            </div>
-            <div id="prices-content" style="display: none;">
-                <div id="prices-list"></div>
+                Loading activity...
             </div>
         </div>
     </div>
-    
-    <!-- Quick Links -->
+
     <div class="card">
         <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-rocket" style="margin-right: 8px; color: var(--secondary);"></i>Quick Actions</h3>
+            <h3 class="card-title"><i class="fas fa-shield-halved" style="margin-right: 8px; color: var(--warning);"></i>Public Site Policy</h3>
         </div>
-        <div class="card-body">
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-md);">
-                <a href="/command-deck" class="btn btn-secondary" style="flex-direction: column; padding: var(--space-lg);">
-                    <i class="fas fa-terminal" style="font-size: 1.5rem; margin-bottom: var(--space-sm);"></i>
-                    <span>Command Deck</span>
-                </a>
-                <a href="/system-health" class="btn btn-secondary" style="flex-direction: column; padding: var(--space-lg);">
-                    <i class="fas fa-heartbeat" style="font-size: 1.5rem; margin-bottom: var(--space-sm);"></i>
-                    <span>System Health</span>
-                </a>
-                <a href="/logs" class="btn btn-secondary" style="flex-direction: column; padding: var(--space-lg);">
-                    <i class="fas fa-list-alt" style="font-size: 1.5rem; margin-bottom: var(--space-sm);"></i>
-                    <span>View Logs</span>
-                </a>
-                <a href="/production-readiness" class="btn btn-secondary" style="flex-direction: column; padding: var(--space-lg);">
-                    <i class="fas fa-check-circle" style="font-size: 1.5rem; margin-bottom: var(--space-sm);"></i>
-                    <span>Readiness Gates</span>
-                </a>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Recent Activity -->
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-history" style="margin-right: 8px; color: var(--accent);"></i>Recent Activity</h3>
-            <a href="/logs" class="btn btn-secondary" style="font-size: 0.8rem; padding: 4px 12px;">View All</a>
-        </div>
-        <div class="card-body">
-            <div class="empty-state">
-                <div class="empty-state-icon">📋</div>
-                <p>No recent activity</p>
-                <p style="font-size: 0.85rem; margin-top: var(--space-sm);">Activity will appear when trading begins</p>
-            </div>
-        </div>
-    </div>
-    
-    <!-- System Status -->
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-server" style="margin-right: 8px; color: var(--success);"></i>Service Status</h3>
-            <a href="/system-health" class="btn btn-secondary" style="font-size: 0.8rem; padding: 4px 12px;">Details</a>
-        </div>
-        <div class="card-body">
-            <div id="services-loading" class="loading">
-                <div class="spinner"></div>
-                Checking services...
-            </div>
-            <div id="services-content" style="display: none;">
-                <div id="services-list"></div>
-            </div>
+        <div class="card-body" style="color: var(--text-secondary); line-height: 1.8;">
+            <p>
+                This website is built for business visibility only. Operational controls are intentionally excluded from the public surface.
+            </p>
+            <p>
+                Execution controls, dispatch actions, and privileged workflows run in the dedicated macOS operator client.
+            </p>
+            {% if mac_operator_app_url %}
+            <a class="btn btn-secondary" href="{{ mac_operator_app_url }}">
+                <i class="fab fa-apple"></i> {{ mac_operator_app_label }}
+            </a>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -114,120 +251,142 @@
 
 {% block extra_js %}
 <script>
-    async function fetchPrices() {
-        const loading = document.getElementById('prices-loading');
-        const content = document.getElementById('prices-content');
-        const list = document.getElementById('prices-list');
-        
-        loading.style.display = 'flex';
-        content.style.display = 'none';
-        
+    function fmtTime(iso) {
+        if (!iso) return '--';
         try {
-            const data = await window.platformApi.getMetrics();
-            const market = data.market || {};
-            
-            if (market.error) {
-                list.innerHTML = `<div class="empty-state"><p>Error: ${market.error}</p></div>`;
-            } else {
-                const coins = [
-                    { key: 'BTC', name: 'Bitcoin', icon: '₿' },
-                    { key: 'ETH', name: 'Ethereum', icon: 'Ξ' },
-                    { key: 'SOL', name: 'Solana', icon: '◎' }
-                ];
-                
-                list.innerHTML = coins.map(coin => {
-                    const price = market[coin.key];
-                    if (!price) return '';
-                    const change = price.change_24h;
-                    const changeClass = change >= 0 ? 'positive' : 'negative';
-                    const changeIcon = change >= 0 ? '▲' : '▼';
-                    
-                    return `
-                        <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-md); border-bottom: 1px solid var(--border);">
-                            <div style="display: flex; align-items: center; gap: var(--space-md);">
-                                <div style="width: 40px; height: 40px; background: var(--bg-glass); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">${coin.icon}</div>
+            return new Date(iso).toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+            });
+        } catch (_) {
+            return '--';
+        }
+    }
+
+    function statusPill(status) {
+        if (status === 'healthy') return '<span class="badge badge-success">healthy</span>';
+        if (status === 'degraded') return '<span class="badge badge-warning">degraded</span>';
+        return '<span class="badge badge-danger">down</span>';
+    }
+
+    async function loadOverview() {
+        try {
+            const [status, metrics, projectsData, orgData, readiness, logsData] = await Promise.all([
+                window.platformApi.getStatus(),
+                window.platformApi.getMetrics(),
+                window.platformApi.getProjects(),
+                window.platformApi.getOrganization(),
+                window.platformApi.getReadiness(),
+                window.platformApi.getLogs({ limit: 8, hours: 24 }),
+            ]);
+
+            const services = status.services || {};
+            const serviceValues = Object.values(services);
+            const healthyCount = serviceValues.filter((row) => row && row.status === 'healthy').length;
+            const totalCount = serviceValues.length;
+
+            document.getElementById('metric-services').textContent = `${healthyCount}/${totalCount || 0}`;
+            document.getElementById('metric-services-note').textContent = totalCount
+                ? `${totalCount - healthyCount} degraded or offline`
+                : 'No service telemetry';
+            document.getElementById('metric-services-note').className = `stat-change ${healthyCount === totalCount ? 'positive' : ''}`;
+
+            const projects = projectsData.projects || [];
+            const activeProjects = projects.filter((p) => ['active', 'in_progress'].includes((p.status || '').toLowerCase())).length;
+            document.getElementById('metric-projects').textContent = projects.length;
+            document.getElementById('metric-projects-note').textContent = `${activeProjects} currently active`;
+
+            const summary = orgData.summary || {};
+            const workspaces = Number(summary.workspaces || 0);
+            document.getElementById('metric-workspaces').textContent = workspaces;
+            document.getElementById('metric-workspaces-note').textContent = `${summary.agents_online || 0}/${summary.agents_total || 0} agents online`;
+
+            document.getElementById('metric-readiness').textContent = readiness.overall_ok ? 'Ready' : 'Watch';
+            document.getElementById('metric-readiness').style.color = readiness.overall_ok ? 'var(--success)' : 'var(--warning)';
+            const gateA = readiness.gates?.A_contracts || { pass: 0, total: 0 };
+            const gateB = readiness.gates?.B_cloud || { pass: 0, total: 0 };
+            const gateC = readiness.gates?.C_edge || { pass: 0, total: 0 };
+            document.getElementById('metric-readiness-note').textContent = `A:${gateA.pass}/${gateA.total} B:${gateB.pass}/${gateB.total} C:${gateC.pass}/${gateC.total}`;
+
+            const snapshotRows = [
+                { label: 'Signal Gateway', key: 'gateway' },
+                { label: 'PM Hub', key: 'pm_hub' },
+                { label: 'Unified Frontend', key: 'unified_frontend' },
+                { label: 'SCOUT Sandbox', key: 'scout_sandbox' },
+                { label: 'Windows Webhook', key: 'windows_webhook' },
+                { label: 'Rari2 Trading', key: 'rari2_lighter_api' },
+            ];
+
+            const snapshot = document.getElementById('service-snapshot');
+            snapshot.className = '';
+            snapshot.innerHTML = `
+                <div style="display: grid; gap: var(--space-sm);">
+                    ${snapshotRows.map((row) => {
+                        const svc = services[row.key] || {};
+                        const state = svc.status || 'down';
+                        const latency = svc.latency_ms ? `${svc.latency_ms}ms` : '--';
+                        return `
+                            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,0.04);">
                                 <div>
-                                    <div style="font-weight: 600;">${coin.name}</div>
-                                    <div style="font-size: 0.8rem; color: var(--text-muted);">${coin.key}</div>
+                                    <div style="font-weight:600;">${row.label}</div>
+                                    <div style="font-size:0.75rem;color:var(--text-muted);">Latency ${latency}</div>
                                 </div>
+                                ${statusPill(state)}
                             </div>
-                            <div style="text-align: right;">
-                                <div style="font-size: 1.25rem; font-weight: 700; font-family: var(--font-mono);">$${price.price.toLocaleString()}</div>
-                                <div class="stat-change ${changeClass}" style="font-size: 0.85rem;">${changeIcon} ${Math.abs(change).toFixed(2)}%</div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+
+            const activities = logsData.logs || [];
+            const activityEl = document.getElementById('activity-highlights');
+            if (!activities.length) {
+                activityEl.className = 'empty-state';
+                activityEl.innerHTML = '<p>No recent platform events.</p>';
+            } else {
+                activityEl.className = 'activity-list';
+                activityEl.innerHTML = activities.slice(0, 8).map((entry) => {
+                    const level = String(entry.level || 'info').toUpperCase();
+                    const service = entry.service || 'platform';
+                    const message = entry.message || 'No message';
+                    return `
+                        <div class="activity-item">
+                            <div class="meta">
+                                <span>${fmtTime(entry.timestamp)}</span>
+                                <span>•</span>
+                                <span>${service}</span>
+                                <span>•</span>
+                                <span>${level}</span>
                             </div>
+                            <div class="msg">${message}</div>
                         </div>
                     `;
                 }).join('');
             }
-        } catch (e) {
-            list.innerHTML = `<div class="empty-state"><p>Failed to load prices</p></div>`;
-        }
-        
-        loading.style.display = 'none';
-        content.style.display = 'block';
-    }
-    
-    async function fetchServices() {
-        const loading = document.getElementById('services-loading');
-        const content = document.getElementById('services-content');
-        const list = document.getElementById('services-list');
-        
-        try {
-            const data = await window.platformApi.getStatus();
-            
-            const services = [
-                { name: 'Gateway', key: 'gateway', icon: '🌐' },
-                { name: 'Signal Ingress', key: 'gateway_signal_ingress', icon: '📡' },
-                { name: 'Alpha Engine', key: 'alpha_engine', icon: '🧠' },
-                { name: 'PM Hub', key: 'pm_hub', icon: '📊' },
-                { name: 'THO Agent', key: 'tho_agent', icon: '🏠' },
-                { name: 'SCOUT Sandbox', key: 'scout_sandbox', icon: '🛡️' },
-            ];
-            
-            list.innerHTML = services.map(s => {
-                const status = data.services?.[s.key]?.status || 'unknown';
-                const statusClass = status === 'healthy' ? 'badge-success' : 'badge-warning';
-                return `
-                    <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-sm) 0;">
-                        <div style="display: flex; align-items: center; gap: var(--space-sm);"><span>${s.icon}</span><span>${s.name}</span></div>
-                        <span class="badge ${statusClass}">${status}</span>
-                    </div>
-                `;
-            }).join('');
-            
-            const activeCount = Object.values(data.services || {}).filter(s => s.status === 'healthy').length;
-            document.getElementById('active-services').textContent = `${activeCount}/${services.length}`;
-        } catch (e) {
-            list.innerHTML = `<div class="empty-state"><p>Failed to load services</p></div>`;
-        }
-        
-        loading.style.display = 'none';
-        content.style.display = 'block';
-    }
-    
-    async function fetchTradingMetrics() {
-        try {
-            const data = await window.platformApi.getMetrics();
-            const trading = data.trading || {};
-            
-            document.getElementById('today-trades').textContent = trading.trades?.today || 0;
-            document.getElementById('trade-status').textContent = trading.trades?.total ? `${trading.trades.total} total trades` : 'No trading data';
-            
-            const pnl = trading.pnl?.daily || 0;
-            document.getElementById('daily-pnl').textContent = pnl >= 0 ? `+$${pnl}` : `-$${Math.abs(pnl)}`;
-            document.getElementById('daily-pnl').style.color = pnl >= 0 ? 'var(--success)' : 'var(--danger)';
-            document.getElementById('pnl-status').textContent = pnl >= 0 ? 'Profitable' : 'Loss';
-            document.getElementById('pnl-status').className = `stat-change ${pnl >= 0 ? 'positive' : 'negative'}`;
-        } catch (e) {
-            console.error('Failed to fetch trading metrics:', e);
+
+            const health = metrics.health || {};
+            const chips = document.querySelector('.overview-chip-row');
+            chips.innerHTML = `
+                <span class="overview-chip"><i class="fas fa-heartbeat"></i> ${health.healthy_count || 0} healthy services</span>
+                <span class="overview-chip"><i class="fas fa-triangle-exclamation"></i> ${health.unhealthy_count || 0} core issues</span>
+                <span class="overview-chip"><i class="fas fa-clock"></i> Snapshot ${fmtTime(health.timestamp || readiness.timestamp)}</span>
+            `;
+        } catch (error) {
+            console.error('Failed to load overview:', error);
+            const activityEl = document.getElementById('activity-highlights');
+            activityEl.className = 'empty-state';
+            activityEl.innerHTML = '<p>Unable to load live platform data right now.</p>';
+            const snapshot = document.getElementById('service-snapshot');
+            snapshot.className = 'empty-state';
+            snapshot.innerHTML = '<p>Snapshot unavailable.</p>';
         }
     }
-    
+
     document.addEventListener('DOMContentLoaded', () => {
-        fetchPrices();
-        fetchServices();
-        fetchTradingMetrics();
-        setInterval(fetchPrices, 60000);
+        loadOverview();
+        setInterval(loadOverview, 60000);
     });
 </script>
 {% endblock %}

@@ -1,109 +1,70 @@
 {% extends "base.html" %}
 
+{% block page_subtitle %}Business-facing activity feed across signals, automation, and platform operations.{% endblock %}
+
 {% block content %}
-<!-- Log Filters -->
 <div class="card" style="margin-bottom: var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-stream" style="margin-right: 8px; color: var(--primary);"></i>Activity Feed Controls</h3>
+        <button class="btn btn-secondary" style="font-size: 0.8rem;" onclick="loadActivity()">
+            <i class="fas fa-sync-alt"></i> Refresh
+        </button>
+    </div>
     <div class="card-body">
-        <div style="display: flex; gap: var(--space-md); flex-wrap: wrap; align-items: center;">
-            <div style="flex: 1; min-width: 200px;">
-                <label style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: var(--space-xs);">Search</label>
-                <input type="text" id="log-search" placeholder="Search logs..." style="width: 100%; padding: var(--space-sm); background: var(--bg-glass); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: inherit;">
-            </div>
+        <div style="display:flex;gap:var(--space-md);flex-wrap:wrap;align-items:flex-end;">
             <div>
-                <label style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: var(--space-xs);">Service</label>
-                <select id="service-filter" style="padding: var(--space-sm); background: var(--bg-glass); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: inherit;">
-                    <option value="">All Services</option>
-                    <option value="trading">Trading</option>
-                    <option value="gateway">Gateway</option>
-                    <option value="webhook">Webhook</option>
-                    <option value="telegram">Telegram</option>
-                </select>
-            </div>
-            <div>
-                <label style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: var(--space-xs);">Level</label>
-                <select id="level-filter" style="padding: var(--space-sm); background: var(--bg-glass); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: inherit;">
-                    <option value="">All Levels</option>
-                    <option value="error">Error</option>
-                    <option value="warning">Warning</option>
-                    <option value="info">Info</option>
-                    <option value="debug">Debug</option>
-                </select>
-            </div>
-            <div>
-                <label style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: var(--space-xs);">Time Range</label>
-                <select id="time-filter" style="padding: var(--space-sm); background: var(--bg-glass); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: inherit;">
+                <label style="display:block;font-size:0.8rem;color:var(--text-muted);margin-bottom:4px;">Time Range</label>
+                <select id="time-filter" style="padding: var(--space-sm); background: var(--bg-glass); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-family: inherit;">
                     <option value="1">Last 1 hour</option>
                     <option value="24" selected>Last 24 hours</option>
                     <option value="168">Last 7 days</option>
                 </select>
             </div>
-            <div style="display: flex; gap: var(--space-sm); margin-top: 18px;">
-                <button class="btn btn-primary" onclick="applyFilters()">
-                    <i class="fas fa-filter"></i> Apply
-                </button>
-                <button class="btn btn-secondary" onclick="resetFilters()">
-                    <i class="fas fa-undo"></i> Reset
-                </button>
+            <div style="flex:1;min-width:220px;">
+                <label style="display:block;font-size:0.8rem;color:var(--text-muted);margin-bottom:4px;">Search</label>
+                <input id="log-search" type="text" placeholder="Search activities..." style="width:100%;padding: var(--space-sm); background: var(--bg-glass); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-family: inherit;">
             </div>
-        </div>
-    </div>
-</div>
-
-<!-- Stream Controls -->
-<div class="card" style="margin-bottom: var(--space-xl);">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-list-alt" style="margin-right: 8px; color: var(--primary);"></i>Unified Log Stream</h3>
-        <div style="display: flex; gap: var(--space-sm);">
-            <button class="btn btn-secondary" style="font-size: 0.8rem;" onclick="refreshLogs()">
-                <i class="fas fa-sync-alt"></i> Refresh
+            <button class="btn btn-primary" onclick="loadActivity()">
+                <i class="fas fa-filter"></i> Apply
             </button>
-            <a href="/system-health" class="btn btn-secondary" style="font-size: 0.8rem;">
-                <i class="fas fa-heartbeat"></i> Health Correlation
+            <a class="btn btn-secondary" href="/system-health">
+                <i class="fas fa-heartbeat"></i> Platform Status
             </a>
         </div>
     </div>
-    <div class="card-body">
-        <p style="color: var(--text-muted);">
-            This view is sourced directly from canonical platform contracts. Legacy standalone log dashboard embeds are retired from the operator UI.
-        </p>
-    </div>
 </div>
 
-<!-- Log Statistics -->
-<div class="grid grid-4">
+<div class="grid grid-4" style="margin-bottom: var(--space-xl);">
     <div class="stat-card">
-        <div class="stat-label">Total Logs (24h)</div>
+        <div class="stat-label">Total Events</div>
         <div class="stat-value" id="total-logs">--</div>
-        <div class="stat-change">All services</div>
+        <div class="stat-change">Within selected range</div>
     </div>
     <div class="stat-card">
         <div class="stat-label">Errors</div>
         <div class="stat-value" id="error-count" style="color: var(--danger);">--</div>
-        <div class="stat-change">Require attention</div>
+        <div class="stat-change">Priority attention</div>
     </div>
     <div class="stat-card">
         <div class="stat-label">Warnings</div>
         <div class="stat-value" id="warning-count" style="color: var(--warning);">--</div>
-        <div class="stat-change">Review suggested</div>
+        <div class="stat-change">Needs review</div>
     </div>
     <div class="stat-card">
-        <div class="stat-label">Info</div>
+        <div class="stat-label">Informational</div>
         <div class="stat-value" id="info-count" style="color: var(--info);">--</div>
-        <div class="stat-change">Normal operations</div>
+        <div class="stat-change">Normal platform events</div>
     </div>
 </div>
 
-<!-- Recent Log Entries -->
-<div class="card" style="margin-top: var(--space-xl);">
+<div class="card">
     <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-stream" style="margin-right: 8px; color: var(--secondary);"></i>Recent Log Entries</h3>
+        <h3 class="card-title"><i class="fas fa-clock-rotate-left" style="margin-right: 8px; color: var(--secondary);"></i>Recent Activity</h3>
     </div>
-    <div class="card-body">
-        <div id="log-entries">
-            <div class="loading">
-                <div class="spinner"></div>
-                Loading logs...
-            </div>
+    <div class="card-body" id="log-entries">
+        <div class="loading">
+            <div class="spinner"></div>
+            Loading activity...
         </div>
     </div>
 </div>
@@ -111,106 +72,92 @@
 
 {% block extra_js %}
 <script>
-    async function fetchLogs() {
-        const hours = document.getElementById('time-filter').value;
-        const service = document.getElementById('service-filter').value;
-        const level = document.getElementById('level-filter').value;
-        const search = document.getElementById('log-search').value.trim().toLowerCase();
-        
+    function badgeForLevel(levelRaw) {
+        const level = String(levelRaw || 'info').toLowerCase();
+        if (level === 'error') return '<span class="badge badge-danger">ERROR</span>';
+        if (level === 'warning' || level === 'warn') return '<span class="badge badge-warning">WARN</span>';
+        return '<span class="badge badge-info">INFO</span>';
+    }
+
+    function formatTs(iso) {
+        if (!iso) return '--';
         try {
-            const data = await window.platformApi.getLogs({
-                hours,
-                service,
-                level
+            return new Date(iso).toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
             });
-            
-            let logs = data.logs || [];
+        } catch (_) {
+            return '--';
+        }
+    }
+
+    async function loadActivity() {
+        const hours = document.getElementById('time-filter').value;
+        const search = (document.getElementById('log-search').value || '').trim().toLowerCase();
+
+        try {
+            const payload = await window.platformApi.getLogs({ hours, limit: 120 });
+            let logs = payload.logs || [];
+
             if (search) {
-                logs = logs.filter((log) => {
-                    const message = String(log.message || '').toLowerCase();
-                    const svc = String(log.service || '').toLowerCase();
-                    const lvl = String(log.level || '').toLowerCase();
-                    return message.includes(search) || svc.includes(search) || lvl.includes(search);
+                logs = logs.filter((row) => {
+                    const message = String(row.message || '').toLowerCase();
+                    const service = String(row.service || '').toLowerCase();
+                    const level = String(row.level || '').toLowerCase();
+                    return message.includes(search) || service.includes(search) || level.includes(search);
                 });
             }
 
-            document.getElementById('total-logs').textContent = logs.length;
-            
-            const container = document.getElementById('log-entries');
-            if (logs.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">📋</div>
-                        <p>No logs found</p>
-                        <p style="font-size: 0.85rem; margin-top: var(--space-sm);">Try adjusting your filters</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            // Count by level
             const counts = { error: 0, warning: 0, info: 0 };
-            logs.forEach(log => {
-                const l = (log.level || 'info').toLowerCase();
-                if (counts[l] !== undefined) counts[l]++;
+            logs.forEach((row) => {
+                const level = String(row.level || 'info').toLowerCase();
+                if (level === 'error') counts.error += 1;
+                else if (level === 'warning' || level === 'warn') counts.warning += 1;
+                else counts.info += 1;
             });
-            
+
+            document.getElementById('total-logs').textContent = logs.length;
             document.getElementById('error-count').textContent = counts.error;
             document.getElementById('warning-count').textContent = counts.warning;
             document.getElementById('info-count').textContent = counts.info;
-            
-            // Render logs
+
+            const container = document.getElementById('log-entries');
+            if (!logs.length) {
+                container.innerHTML = '<div class="empty-state"><p>No activity found for current filters.</p></div>';
+                return;
+            }
+
             container.innerHTML = `
-                <div style="font-family: var(--font-mono); font-size: 0.85rem;">
-                    ${logs.slice(0, 50).map(log => {
-                        const level = (log.level || 'info').toLowerCase();
-                        const levelColor = {
-                            error: 'var(--danger)',
-                            warning: 'var(--warning)',
-                            info: 'var(--info)',
-                            debug: 'var(--text-muted)'
-                        }[level] || 'var(--text)';
-                        
-                        const time = new Date(log.timestamp).toLocaleTimeString();
-                        return `
-                            <div style="padding: var(--space-sm); border-bottom: 1px solid var(--border); display: flex; gap: var(--space-md);">
-                                <span style="color: var(--text-muted); min-width: 80px;">${time}</span>
-                                <span style="color: ${levelColor}; min-width: 60px; font-weight: 600;">${log.level || 'INFO'}</span>
-                                <span style="color: var(--text-muted); min-width: 100px;">${log.service || 'system'}</span>
-                                <span style="flex: 1; color: var(--text);">${log.message}</span>
+                <div style="display:grid;gap:var(--space-sm);">
+                    ${logs.slice(0, 80).map((row) => `
+                        <div style="padding:12px;border:1px solid var(--border);border-radius:12px;background:rgba(255,255,255,0.04);">
+                            <div style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-sm);margin-bottom:6px;flex-wrap:wrap;">
+                                <div style="display:flex;align-items:center;gap:var(--space-sm);font-size:0.78rem;color:var(--text-muted);">
+                                    <span>${formatTs(row.timestamp)}</span>
+                                    <span>•</span>
+                                    <span>${row.service || 'platform'}</span>
+                                </div>
+                                ${badgeForLevel(row.level)}
                             </div>
-                        `;
-                    }).join('')}
+                            <div style="color:var(--text-secondary);font-size:0.9rem;line-height:1.55;">${row.message || 'No message provided.'}</div>
+                        </div>
+                    `).join('')}
                 </div>
             `;
-        } catch (e) {
-            console.error('Failed to fetch logs:', e);
+        } catch (error) {
+            console.error('Failed to load activity logs:', error);
+            document.getElementById('log-entries').innerHTML = '<div class="empty-state"><p>Unable to load activity feed.</p></div>';
         }
     }
-    
-    function applyFilters() {
-        fetchLogs();
-    }
-    
-    function resetFilters() {
-        document.getElementById('log-search').value = '';
-        document.getElementById('service-filter').value = '';
-        document.getElementById('level-filter').value = '';
-        document.getElementById('time-filter').value = '24';
-        fetchLogs();
-    }
-    
-    function refreshLogs() {
-        fetchLogs();
-    }
-    
+
     document.addEventListener('DOMContentLoaded', () => {
-        fetchLogs();
+        loadActivity();
         document.getElementById('log-search').addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') {
-                fetchLogs();
-            }
+            if (event.key === 'Enter') loadActivity();
         });
+        setInterval(loadActivity, 60000);
     });
 </script>
 {% endblock %}

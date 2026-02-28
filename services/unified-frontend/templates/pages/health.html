@@ -1,274 +1,203 @@
 {% extends "base.html" %}
 
+{% block page_subtitle %}Live reliability view across cloud, edge, and data systems. Read-only and externally shareable.{% endblock %}
+
 {% block content %}
-<!-- Health Summary -->
 <div class="grid grid-4" style="margin-bottom: var(--space-xl);">
     <div class="stat-card">
         <div class="stat-label">Overall Status</div>
         <div class="stat-value" id="overall-status" style="color: var(--text);">Checking...</div>
         <div class="stat-change" id="status-detail">--</div>
     </div>
-    
+
     <div class="stat-card">
-        <div class="stat-label">Core Healthy</div>
+        <div class="stat-label">Healthy Services</div>
         <div class="stat-value" id="healthy-count" style="color: var(--success);">--</div>
-        <div class="stat-change">Operational</div>
+        <div class="stat-change">Core and optional endpoints</div>
     </div>
-    
+
     <div class="stat-card">
         <div class="stat-label">Core Issues</div>
         <div class="stat-value" id="unhealthy-count" style="color: var(--danger);">--</div>
-        <div class="stat-change">Need attention</div>
+        <div class="stat-change">Require operator review</div>
     </div>
-    
+
     <div class="stat-card">
-        <div class="stat-label">Last Check</div>
+        <div class="stat-label">Last Health Snapshot</div>
         <div class="stat-value" id="last-check" style="font-size: 1.5rem;">--</div>
-        <div class="stat-change">Minutes ago</div>
+        <div class="stat-change">From platform monitor</div>
     </div>
 </div>
 
-<!-- Readiness Snapshot -->
 <div class="card" style="margin-bottom: var(--space-xl);">
     <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-shield-check" style="margin-right: 8px; color: var(--success);"></i>Readiness Snapshot</h3>
+        <h3 class="card-title"><i class="fas fa-shield-check" style="margin-right: 8px; color: var(--success);"></i>Production Readiness Summary</h3>
         <a href="/production-readiness" class="btn btn-secondary" style="font-size: 0.8rem;">
-            <i class="fas fa-arrow-right"></i> Open Readiness Gates
+            <i class="fas fa-arrow-right"></i> Full Readiness View
         </a>
     </div>
-    <div class="card-body">
-        <div id="health-readiness" class="empty-state">
-            <p>Loading readiness status...</p>
+    <div class="card-body" id="health-readiness">
+        <div class="loading">
+            <div class="spinner"></div>
+            Loading readiness summary...
         </div>
     </div>
 </div>
 
-<!-- Service Categories -->
 <div class="grid grid-2">
-    <!-- Cloud Services -->
     <div class="card">
         <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-cloud" style="margin-right: 8px; color: var(--primary);"></i>Cloud Services</h3>
-            <span class="badge badge-info">GCP us-central1</span>
+            <h3 class="card-title"><i class="fas fa-cloud" style="margin-right: 8px; color: var(--primary);"></i>Cloud Platform</h3>
+            <span class="badge badge-info">Google Cloud</span>
         </div>
-        <div class="card-body">
-            <div id="cloud-services">
-                <div class="loading">
-                    <div class="spinner"></div>
-                    Loading...
-                </div>
-            </div>
+        <div class="card-body" id="cloud-services">
+            <div class="loading"><div class="spinner"></div>Loading cloud services...</div>
         </div>
     </div>
-    
-    <!-- Pi Cluster -->
+
     <div class="card">
         <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-server" style="margin-right: 8px; color: var(--secondary);"></i>Pi Cluster</h3>
-            <span class="badge badge-info">Local Network</span>
-        </div>
-        <div class="card-body">
-            <div id="pi-services">
-                <div class="loading">
-                    <div class="spinner"></div>
-                    Loading...
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Windows Workstation -->
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-desktop" style="margin-right: 8px; color: var(--accent);"></i>Windows Workstation</h3>
+            <h3 class="card-title"><i class="fas fa-server" style="margin-right: 8px; color: var(--secondary);"></i>Edge Fleet (Pi)</h3>
             <span class="badge badge-info">Tailscale</span>
         </div>
-        <div class="card-body">
-            <div id="windows-services">
-                <div class="loading">
-                    <div class="spinner"></div>
-                    Loading...
-                </div>
-            </div>
+        <div class="card-body" id="pi-services">
+            <div class="loading"><div class="spinner"></div>Loading Pi services...</div>
         </div>
     </div>
-    
-    <!-- Firestore -->
+
     <div class="card">
         <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-database" style="margin-right: 8px; color: var(--warning);"></i>Firestore Database</h3>
-            <span class="badge badge-info">GCP</span>
+            <h3 class="card-title"><i class="fas fa-desktop" style="margin-right: 8px; color: var(--accent);"></i>Windows Lab</h3>
+            <span class="badge badge-info">Signals + AI Bench</span>
         </div>
-        <div class="card-body">
-            <div id="firestore-status">
-                <div class="loading">
-                    <div class="spinner"></div>
-                    Loading...
-                </div>
-            </div>
+        <div class="card-body" id="windows-services">
+            <div class="loading"><div class="spinner"></div>Loading Windows services...</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-database" style="margin-right: 8px; color: var(--warning);"></i>Data Layer</h3>
+            <span class="badge badge-info">Firestore</span>
+        </div>
+        <div class="card-body" id="firestore-services">
+            <div class="loading"><div class="spinner"></div>Loading data services...</div>
         </div>
     </div>
 </div>
 
-<!-- Quick Actions -->
-<div class="card" style="margin-top: var(--space-xl);">
+<div class="card" style="margin-top: var(--space-xl); border-color: rgba(255, 204, 102, 0.4); background: rgba(255, 204, 102, 0.07);">
     <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-tools" style="margin-right: 8px; color: var(--info);"></i>Health Check Actions</h3>
+        <h3 class="card-title"><i class="fas fa-lock" style="margin-right: 8px; color: var(--warning);"></i>Public Transparency Policy</h3>
     </div>
-    <div class="card-body">
-        <div style="display: flex; gap: var(--space-md); flex-wrap: wrap;">
-            <button class="btn btn-primary" onclick="runHealthCheck()">
-                <i class="fas fa-sync-alt"></i> Run Health Check
-            </button>
-            <a href="/logs" class="btn btn-secondary">
-                <i class="fas fa-list-alt"></i> View Logs
-            </a>
-            <button class="btn btn-secondary" onclick="exportHealthReport()">
-                <i class="fas fa-download"></i> Export Report
-            </button>
-        </div>
+    <div class="card-body" style="color: var(--text-secondary); line-height: 1.8;">
+        This page exposes live reliability telemetry only. No restart, dispatch, or administrative controls are available on the public web surface.
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    async function fetchHealthStatus() {
+    function renderServiceRows(container, services) {
+        if (!services.length) {
+            container.innerHTML = '<div class="empty-state"><p>No service data available.</p></div>';
+            return;
+        }
+
+        container.innerHTML = services.map((svc) => {
+            const healthy = !!svc.healthy;
+            const latency = svc.response_time_ms ? `${svc.response_time_ms}ms` : '--';
+            return `
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border);">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span style="color:${healthy ? 'var(--success)' : 'var(--danger)'};">
+                            <i class="fas fa-${healthy ? 'check-circle' : 'times-circle'}"></i>
+                        </span>
+                        <span style="font-weight:500;">${svc.name || 'service'}</span>
+                    </div>
+                    <div style="text-align:right;">
+                        <span class="badge badge-${healthy ? 'success' : 'danger'}">${healthy ? 'healthy' : 'issue'}</span>
+                        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">${latency}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    async function refreshHealthPage() {
         try {
-            const data = await window.platformApi.getMetrics();
-            const health = data.health || {};
-            
-            // Update summary
+            const metrics = await window.platformApi.getMetrics();
+            const health = metrics.health || {};
+            const byCategory = metrics.status?.by_category || {};
+
             const overallStatus = document.getElementById('overall-status');
             const statusDetail = document.getElementById('status-detail');
-            
+
             if (health.healthy) {
                 overallStatus.textContent = 'Healthy';
                 overallStatus.style.color = 'var(--success)';
-                const optionalDown = health.optional_degraded_count || 0;
-                statusDetail.textContent = optionalDown > 0
-                    ? `Core systems operational • ${optionalDown} optional edge endpoint${optionalDown === 1 ? '' : 's'} degraded`
-                    : 'Core systems operational';
+                statusDetail.textContent = 'Core systems are operational';
             } else {
-                overallStatus.textContent = 'Core Issues';
-                overallStatus.style.color = 'var(--danger)';
-                statusDetail.textContent = `${health.unhealthy_count || 0} core service${(health.unhealthy_count || 0) === 1 ? '' : 's'} need attention`;
+                overallStatus.textContent = 'Degraded';
+                overallStatus.style.color = 'var(--warning)';
+                statusDetail.textContent = `${health.unhealthy_count || 0} core issue(s) detected`;
             }
-            
+
             document.getElementById('healthy-count').textContent = health.healthy_count || 0;
             document.getElementById('unhealthy-count').textContent = health.unhealthy_count || 0;
-            
+
             if (health.timestamp) {
-                const checkTime = new Date(health.timestamp);
-                const minutesAgo = Math.floor((new Date() - checkTime) / 60000);
-                document.getElementById('last-check').textContent = minutesAgo < 1 ? 'Just now' : `${minutesAgo}m`;
+                const d = new Date(health.timestamp);
+                document.getElementById('last-check').textContent = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
             }
-        } catch (e) {
-            console.error('Failed to fetch health status:', e);
-        }
-    }
-    
-    async function fetchDetailedHealth() {
-        const categories = {
-            cloud: document.getElementById('cloud-services'),
-            pi: document.getElementById('pi-services'),
-            windows: document.getElementById('windows-services'),
-            firestore: document.getElementById('firestore-status')
-        };
 
-        try {
-            const data = await window.platformApi.getMetrics();
-            const byCategory = data.status?.by_category || {};
-            
-            Object.keys(categories).forEach(cat => {
-                const services = byCategory[cat] || [];
-                const container = categories[cat];
-                
-                if (services.length === 0) {
-                    container.innerHTML = '<div class="empty-state"><p>No services found</p></div>';
-                    return;
-                }
-                
-                container.innerHTML = services.map(s => `
-                    <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-md); border-bottom: 1px solid var(--border);">
-                        <div style="display: flex; align-items: center; gap: var(--space-sm);">
-                            <span style="color: ${s.healthy ? 'var(--success)' : 'var(--danger)'};">
-                                <i class="fas fa-${s.healthy ? 'check-circle' : 'times-circle'}"></i>
-                            </span>
-                            <span style="font-weight: 500;">${s.name}</span>
-                        </div>
-                        <div style="text-align: right;">
-                            <span class="badge badge-${s.healthy ? 'success' : 'danger'}">${s.healthy ? 'Healthy' : 'Error'}</span>
-                            ${s.response_time_ms ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">${s.response_time_ms}ms</div>` : ''}
-                        </div>
-                    </div>
-                `).join('');
-            });
-        } catch (e) {
-            console.error('Failed to fetch detailed health:', e);
-            Object.values(categories).forEach(el => {
-                el.innerHTML = '<div class="empty-state"><p>Failed to load health data</p></div>';
+            renderServiceRows(document.getElementById('cloud-services'), byCategory.cloud || []);
+            renderServiceRows(document.getElementById('pi-services'), byCategory.pi || []);
+            renderServiceRows(document.getElementById('windows-services'), byCategory.windows || []);
+            renderServiceRows(document.getElementById('firestore-services'), byCategory.firestore || []);
+        } catch (error) {
+            console.error('Failed to refresh health page:', error);
+            ['cloud-services', 'pi-services', 'windows-services', 'firestore-services'].forEach((id) => {
+                const el = document.getElementById(id);
+                el.innerHTML = '<div class="empty-state"><p>Unable to load service data.</p></div>';
             });
         }
     }
 
-    async function fetchReadiness() {
+    async function refreshReadiness() {
         const el = document.getElementById('health-readiness');
         try {
             const readiness = await window.platformApi.getReadiness();
             const gates = readiness.gates || {};
             const rows = Object.entries(gates).map(([name, gate]) => `
                 <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--space-sm) 0;border-bottom:1px solid var(--border);">
-                    <span style="font-weight:600;">${name}</span>
-                    <span class="badge badge-${gate.ok ? 'success' : 'warning'}">${gate.pass || 0}/${gate.total || 0}</span>
+                    <div>
+                        <div style="font-weight:600;">${name}</div>
+                        <div style="font-size:0.8rem;color:var(--text-muted);">${gate.pass || 0}/${gate.total || 0}</div>
+                    </div>
+                    <span class="badge badge-${gate.ok ? 'success' : 'warning'}">${gate.ok ? 'PASS' : 'WATCH'}</span>
                 </div>
             `).join('');
-            el.className = '';
+
             el.innerHTML = `
                 <div>
-                    <div style="margin-bottom: var(--space-sm); font-weight: 600; color: ${readiness.overall_ok ? 'var(--success)' : 'var(--warning)'};">
-                        ${readiness.overall_ok ? 'System ready for production gates' : 'System has active blockers'}
+                    <div style="margin-bottom:var(--space-sm);font-weight:600;color:${readiness.overall_ok ? 'var(--success)' : 'var(--warning)'};">
+                        ${readiness.overall_ok ? 'Production gates are currently green.' : 'One or more gates require attention.'}
                     </div>
                     ${rows}
                 </div>
             `;
-        } catch (e) {
-            el.className = 'empty-state';
-            el.innerHTML = '<p>Failed to load readiness snapshot</p>';
+        } catch (error) {
+            el.innerHTML = '<div class="empty-state"><p>Unable to load readiness summary.</p></div>';
         }
     }
-    
-    function runHealthCheck() {
-        // Refresh all health data
-        fetchHealthStatus();
-        fetchDetailedHealth();
-        fetchReadiness();
-        
-        // Show notification
-        const btn = document.querySelector('button[onclick="runHealthCheck()"]');
-        const originalText = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-check"></i> Check Complete';
-        btn.disabled = true;
-        setTimeout(() => {
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-        }, 2000);
-    }
-    
-    function exportHealthReport() {
-        alert('Export feature coming soon!');
-    }
-    
-    document.addEventListener('DOMContentLoaded', () => {
-        fetchHealthStatus();
-        fetchDetailedHealth();
-        fetchReadiness();
 
-        // Refresh every 30 seconds
+    document.addEventListener('DOMContentLoaded', () => {
+        refreshHealthPage();
+        refreshReadiness();
         setInterval(() => {
-            fetchHealthStatus();
-            fetchDetailedHealth();
-            fetchReadiness();
+            refreshHealthPage();
+            refreshReadiness();
         }, 30000);
     });
 </script>
