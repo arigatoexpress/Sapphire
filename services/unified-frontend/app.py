@@ -21,7 +21,6 @@ app = Flask(__name__)
 GATEWAY_URL = os.environ.get('GATEWAY_URL', 'https://sapphire-gateway-267358751314.us-central1.run.app')
 ALPHA_ENGINE_URL = os.environ.get('ALPHA_ENGINE_URL', 'https://sapphire-alpha-267358751314.us-central1.run.app')
 PM_HUB_URL = os.environ.get('PM_HUB_URL', 'https://agentic-pm-hub-267358751314.us-central1.run.app')
-TELEGRAM_BOT_URL = os.environ.get('TELEGRAM_BOT_URL', 'https://sapphire-telegram-bot-267358751314.us-central1.run.app')
 THO_AGENT_URL = os.environ.get('THO_AGENT_URL', 'https://tho-agent-267358751314.us-central1.run.app')
 SCOUT_SANDBOX_URL = os.environ.get('SCOUT_SANDBOX_URL', 'https://sapphire-scout-sandbox-267358751314.us-central1.run.app')
 
@@ -29,8 +28,8 @@ RARI1_IP = os.environ.get('RARI1_IP', '100.120.191.1')
 RARI2_IP = os.environ.get('RARI2_IP', '100.87.225.89')
 WINDOWS_IP = os.environ.get('WINDOWS_IP', '100.71.10.48')
 
-RARI1_HEALTH_URL = os.environ.get('RARI1_HEALTH_URL', f'http://{RARI1_IP}:8080/health')
-RARI2_HEALTH_URL = os.environ.get('RARI2_HEALTH_URL', f'http://{RARI2_IP}:18888/health')
+RARI1_HEALTH_URL = os.environ.get('RARI1_HEALTH_URL', f'http://{RARI1_IP}:8000/output/latest_hourly.json')
+RARI2_HEALTH_URL = os.environ.get('RARI2_HEALTH_URL', f'http://{RARI2_IP}:18888/status')
 WINDOWS_HEALTH_URL = os.environ.get('WINDOWS_HEALTH_URL', f'http://{WINDOWS_IP}:9090/webhook/health')
 
 CACHE_DURATION = int(os.environ.get('CACHE_DURATION', '10'))
@@ -43,7 +42,7 @@ EDGE_CAPABILITIES_COLLECTION = os.environ.get('EDGE_CAPABILITIES_COLLECTION', 'e
 CRITICAL_EDGE_SERVICES = {
     item.strip() for item in os.environ.get(
         'CRITICAL_EDGE_SERVICES',
-        'rari1_trading_api,rari2_trading_api,rari2_lighter_api',
+        'rari2_trading_api,rari2_lighter_api',
     ).split(',')
     if item.strip()
 }
@@ -72,7 +71,6 @@ SERVICE_CHECKS = {
     'gateway_signal_ingress': {'base': GATEWAY_URL, 'path': '/webhook/health', 'auth': False},
     'alpha_engine': {'base': ALPHA_ENGINE_URL, 'path': '/health', 'auth': False},
     'pm_hub': {'base': PM_HUB_URL, 'path': '/health', 'auth': False},
-    'telegram_bot': {'base': TELEGRAM_BOT_URL, 'path': '/health', 'auth': False},
     'tho_agent': {'base': THO_AGENT_URL, 'path': '/health', 'auth': False},
     'scout_sandbox': {'base': SCOUT_SANDBOX_URL, 'path': '/health', 'auth': False},
 }

@@ -1,0 +1,13 @@
+[Unit]
+Description=Sapphire Research Batch Runner (Daily)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=rari
+Group=rari
+WorkingDirectory=/home/rari/research-node
+ExecStart=/usr/bin/python3 /home/rari/research-node/research_batch_runner.py --profile daily --output-dir /home/rari/research-node/output
+StandardOutput=journal
+StandardError=journal

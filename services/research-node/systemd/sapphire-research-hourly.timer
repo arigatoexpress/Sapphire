@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Sapphire Research Batch Runner Hourly
+
+[Timer]
+OnCalendar=hourly
+RandomizedDelaySec=120
+Persistent=true
+Unit=sapphire-research-hourly.service
+
+[Install]
+WantedBy=timers.target

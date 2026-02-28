@@ -45,17 +45,17 @@ class SystemMonitor:
         },
         
         # Pi Cluster
-        "rari1": {
-            "name": "RARI1 (Controller)",
+        "rari1_research": {
+            "name": "RARI1 Research Node",
             "host": "100.120.191.1",
-            "port": 22,  # SSH
-            "endpoint": None
+            "port": 8000,
+            "endpoint": "/output/latest_hourly.json"
         },
         "rari2_trading": {
             "name": "RARI2 Trading",
             "host": "100.87.225.89",
-            "port": 8080,
-            "endpoint": "/health"
+            "port": 18888,
+            "endpoint": "/status"
         },
         
         # Cloud
@@ -77,9 +77,9 @@ class SystemMonitor:
             "name": "Log Viewer",
             "host": "sapphire-log-viewer-267358751314.us-central1.run.app",
             "port": 443,
-            "endpoint": "/api/stats",
+            "endpoint": "/",
             "https": True
-        }
+        },
     }
     
     def __init__(self):
@@ -218,7 +218,7 @@ class SystemMonitor:
         
         # Pi Cluster
         print("  🥧 PI CLUSTER")
-        for key in ["rari1", "rari2_trading"]:
+        for key in ["rari1_research", "rari2_trading"]:
             if key in self.statuses:
                 s = self.statuses[key]
                 icon = "🟢" if s.status == "online" else "🔴"

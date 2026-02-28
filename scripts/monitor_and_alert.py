@@ -40,9 +40,9 @@ class ServiceMonitor:
             "url": "http://100.71.10.48:8081/health",
             "critical": True
         },
-        "rari1_controller": {
-            "name": "RARI1 Controller",
-            "url": "http://100.120.191.1:8080/health",
+        "rari1_research": {
+            "name": "RARI1 Research Node",
+            "url": "http://100.120.191.1:8000/output/latest_hourly.json",
             "critical": False
         },
         "rari2_trading": {
@@ -50,14 +50,19 @@ class ServiceMonitor:
             "url": "http://100.87.225.89:18888/status",
             "critical": True
         },
-        "command_deck": {
-            "name": "Command Deck",
+        "sapphire_frontend": {
+            "name": "Sapphire Frontend",
             "url": "https://sapphirealpha.xyz/health",
             "critical": False
         },
         "gateway": {
             "name": "API Gateway",
             "url": "https://gateway.sapphirealpha.xyz/health",
+            "critical": False
+        },
+        "pm_hub": {
+            "name": "PM Hub",
+            "url": "https://agentic-pm-hub-267358751314.us-central1.run.app/health",
             "critical": False
         }
     }
@@ -88,7 +93,7 @@ class ServiceMonitor:
             async with self.session.get(url) as resp:
                 latency = (time.time() - start) * 1000
                 
-                if resp.status == 200:
+                if resp.status in (200, 401, 403):
                     status = "online"
                     self.consecutive_failures[key] = 0
                 else:
@@ -178,8 +183,8 @@ class ServiceMonitor:
         # Group by category
         categories = [
             ("🖥️  Windows PC", ["windows_webhook", "windows_tv_agent"]),
-            ("🥧 Pi Cluster", ["rari1_controller", "rari2_trading"]),
-            ("☁️  Cloud", ["command_deck", "gateway"])
+            ("🥧 Pi Cluster", ["rari1_research", "rari2_trading"]),
+            ("☁️  Cloud", ["sapphire_frontend", "gateway", "pm_hub"])
         ]
         
         for cat_name, keys in categories:

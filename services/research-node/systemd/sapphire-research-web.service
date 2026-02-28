@@ -1,0 +1,15 @@
+[Unit]
+Description=Sapphire Research Node Artifact Server
+After=network.target
+
+[Service]
+Type=simple
+User=rari
+Group=rari
+WorkingDirectory=/home/rari/research-node
+ExecStart=/usr/bin/python3 -m http.server 8000 --directory /home/rari/research-node
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
