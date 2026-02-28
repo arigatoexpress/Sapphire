@@ -22,6 +22,11 @@
 - `sapphire-unified-frontend` (latest ready: `00012-zjm`, 100% traffic, runtime SA: `sapphirev3@sapphire-479610.iam.gserviceaccount.com`)
 - `tho-agent`
 
+Latest production revisions (post-cutover):
+- `sapphire-alpha`: `sapphire-alpha-00011-pc2` (100%)
+- `sapphire-scout-sandbox`: `sapphire-scout-sandbox-00004-cln` (100%)
+- `sapphire-unified-frontend`: `sapphire-unified-frontend-00012-zjm` (100%)
+
 Legacy dashboard exposure:
 - `sapphire-command-deck`: internal/auth required
 - `sapphire-log-viewer`: internal/auth required
