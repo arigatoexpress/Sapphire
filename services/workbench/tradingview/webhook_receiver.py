@@ -38,6 +38,13 @@ except ImportError:
     pubsub_v1 = None
     _PUBSUB_AVAILABLE = False
 
+try:
+    from google.cloud import firestore as g_firestore
+    _FIRESTORE_AVAILABLE = True
+except ImportError:
+    g_firestore = None
+    _FIRESTORE_AVAILABLE = False
+
 # ─── Config ───────────────────────────────────────────────────────────────────
 
 WEBHOOK_SECRET  = "sapphire_trading_2024"   # Must match Pine Script alert body
@@ -48,6 +55,7 @@ OLLAMA_URL      = "http://localhost:11434"   # Local Ollama (RTX 5070 Ti)
 WEBHOOK_PORT    = 9090
 LOG_FILE        = "D:/CodingFiles/sapphire-webhook/webhook.log"
 MAX_HISTORY     = 200
+SYSTEM_LOGS_COLLECTION = "system_logs"
 
 # Supported symbols → canonical Sapphire format
 SYMBOL_MAP = {
@@ -121,6 +129,7 @@ stats = {"total": 0, "published": 0, "errors": 0, "ai_enriched": 0,
 # ─── Pub/Sub singleton ────────────────────────────────────────────────────────
 
 _publisher: Optional["pubsub_v1.PublisherClient"] = None  # type: ignore
+_firestore_client = None
 
 
 def _get_publisher():
@@ -133,6 +142,51 @@ def _get_publisher():
         except Exception as e:
             log.error("❌ Failed to create PublisherClient: %s", e)
     return _publisher
+
+
+def _get_firestore_client():
+    """Lazy-init Firestore client for cross-surface operational logs."""
+    global _firestore_client
+    if _firestore_client is None and _FIRESTORE_AVAILABLE:
+        try:
+            _firestore_client = g_firestore.Client(project=GCP_PROJECT_ID)
+            log.info("✅ Firestore client initialized")
+        except Exception as exc:
+            log.warning("Firestore client init failed: %s", exc)
+            _firestore_client = None
+    return _firestore_client
+
+
+def write_system_log(
+    *,
+    level: str,
+    message: str,
+    event_type: str,
+    signal_id: Optional[str] = None,
+    symbol: Optional[str] = None,
+    action: Optional[str] = None,
+    metadata: Optional[dict] = None,
+):
+    """Best-effort Firestore log emit used by unified operator frontend."""
+    client = _get_firestore_client()
+    if client is None:
+        return
+
+    payload = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "level": str(level or "INFO").upper(),
+        "service": "windows_webhook",
+        "message": str(message or "")[:500],
+        "event_type": str(event_type or "event"),
+        "signal_id": signal_id,
+        "symbol": symbol,
+        "action": action,
+        "metadata": metadata or {},
+    }
+    try:
+        client.collection(SYSTEM_LOGS_COLLECTION).add(payload)
+    except Exception as exc:
+        log.warning("Firestore log write failed: %s", exc)
 
 
 # ─── Signal mapping ───────────────────────────────────────────────────────────
@@ -407,6 +461,52 @@ async def receive_tradingview(request: Request, background_tasks: BackgroundTask
 
     # Step 3 — Publish to Pub/Sub (with gateway fallback)
     pub_result = await publish_to_pubsub(signal)
+
+    write_system_log(
+        level="INFO",
+        message=f"Signal received {alert.action.upper()} {alert.symbol}",
+        event_type="signal_received",
+        signal_id=signal["signal_id"],
+        symbol=alert.symbol,
+        action=alert.action,
+        metadata={
+            "channel": pub_result.get("channel"),
+            "published": bool(pub_result.get("published")),
+            "confidence": alert.confidence,
+            "z_score": alert.z_score,
+            "regime_score": alert.regime_score,
+            "dry_run": signal.get("metadata", {}).get("dry_run", False),
+        },
+    )
+
+    if pub_result.get("published"):
+        write_system_log(
+            level="OK",
+            message=f"Signal published {alert.symbol}",
+            event_type="signal_published",
+            signal_id=signal["signal_id"],
+            symbol=alert.symbol,
+            action=alert.action,
+            metadata={
+                "channel": pub_result.get("channel"),
+                "message_id": pub_result.get("message_id"),
+                "dry_run": signal.get("metadata", {}).get("dry_run", False),
+            },
+        )
+    else:
+        write_system_log(
+            level="ERROR",
+            message=f"Signal publish failed {alert.symbol}",
+            event_type="signal_publish_failed",
+            signal_id=signal["signal_id"],
+            symbol=alert.symbol,
+            action=alert.action,
+            metadata={
+                "channel": pub_result.get("channel"),
+                "error": pub_result.get("error"),
+                "dry_run": signal.get("metadata", {}).get("dry_run", False),
+            },
+        )
 
     # Step 4 — Store in local history
     entry = {
