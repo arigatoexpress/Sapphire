@@ -10,13 +10,13 @@
     </div>
     
     <div class="stat-card">
-        <div class="stat-label">Healthy Services</div>
+        <div class="stat-label">Core Healthy</div>
         <div class="stat-value" id="healthy-count" style="color: var(--success);">--</div>
         <div class="stat-change">Operational</div>
     </div>
     
     <div class="stat-card">
-        <div class="stat-label">Unhealthy Services</div>
+        <div class="stat-label">Core Issues</div>
         <div class="stat-value" id="unhealthy-count" style="color: var(--danger);">--</div>
         <div class="stat-change">Need attention</div>
     </div>
@@ -145,11 +145,14 @@
             if (health.healthy) {
                 overallStatus.textContent = 'Healthy';
                 overallStatus.style.color = 'var(--success)';
-                statusDetail.textContent = 'All systems operational';
+                const optionalDown = health.optional_degraded_count || 0;
+                statusDetail.textContent = optionalDown > 0
+                    ? `Core systems operational • ${optionalDown} optional edge endpoint${optionalDown === 1 ? '' : 's'} degraded`
+                    : 'Core systems operational';
             } else {
-                overallStatus.textContent = 'Issues Detected';
+                overallStatus.textContent = 'Core Issues';
                 overallStatus.style.color = 'var(--danger)';
-                statusDetail.textContent = `${health.unhealthy_count || 0} services need attention`;
+                statusDetail.textContent = `${health.unhealthy_count || 0} core service${(health.unhealthy_count || 0) === 1 ? '' : 's'} need attention`;
             }
             
             document.getElementById('healthy-count').textContent = health.healthy_count || 0;

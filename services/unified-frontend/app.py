@@ -47,6 +47,22 @@ CRITICAL_EDGE_SERVICES = {
     if item.strip()
 }
 
+OPTIONAL_HEALTH_CATEGORIES = {
+    item.strip() for item in os.environ.get(
+        'OPTIONAL_HEALTH_CATEGORIES',
+        'windows',
+    ).split(',')
+    if item.strip()
+}
+
+OPTIONAL_HEALTH_NAMES = {
+    item.strip() for item in os.environ.get(
+        'OPTIONAL_HEALTH_NAMES',
+        'windows,windows_webhook,windows_tv_agent',
+    ).split(',')
+    if item.strip()
+}
+
 # Auth Configuration
 AUTH_USERNAME = os.environ.get('AUTH_USERNAME', 'sapphire')
 AUTH_PASSWORD = os.environ.get('AUTH_PASSWORD', 'alpha2024')
@@ -768,14 +784,44 @@ def _fetch_logs(hours: int = 24, limit: int = 100, service: str = '', level: str
 def _platform_health_summary(status_data=None):
     status_data = status_data or _collect_system_status()
     summary = status_data.get('summary', {})
+    by_category = status_data.get('by_category', {})
+
+    rows = []
+    for category, items in by_category.items():
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            rows.append({
+                'category': str(category),
+                'name': str(item.get('name', 'unknown')),
+                'healthy': bool(item.get('healthy', False)),
+            })
+
+    def _is_optional(row):
+        if row['category'] in OPTIONAL_HEALTH_CATEGORIES:
+            return True
+        return row['name'] in OPTIONAL_HEALTH_NAMES
+
+    core_rows = [r for r in rows if not _is_optional(r)]
+    optional_rows = [r for r in rows if _is_optional(r)]
+    core_healthy_count = sum(1 for r in core_rows if r['healthy'])
+    core_unhealthy_count = len(core_rows) - core_healthy_count
+    optional_degraded_count = sum(1 for r in optional_rows if not r['healthy'])
+
     return {
-        'healthy': summary.get('service_unhealthy', 0) == 0,
-        'healthy_count': summary.get('service_healthy', 0),
-        'unhealthy_count': summary.get('service_unhealthy', 0),
+        # `healthy` intentionally tracks core production health, not optional edge devices.
+        'healthy': core_unhealthy_count == 0,
+        'overall_healthy': (summary.get('service_unhealthy', 0) == 0 and summary.get('node_unhealthy', 0) == 0),
+        'healthy_count': core_healthy_count,
+        'unhealthy_count': core_unhealthy_count,
+        'optional_total': len(optional_rows),
+        'optional_degraded_count': optional_degraded_count,
         'node_healthy_count': summary.get('node_healthy', 0),
         'node_unhealthy_count': summary.get('node_unhealthy', 0),
         'timestamp': status_data.get('timestamp'),
-        'by_category': status_data.get('by_category', {}),
+        'by_category': by_category,
     }
 
 
