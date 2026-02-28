@@ -66,7 +66,7 @@ OPTIONAL_HEALTH_NAMES = {
 # Auth Configuration
 AUTH_USERNAME = os.environ.get('AUTH_USERNAME', 'sapphire')
 AUTH_PASSWORD = os.environ.get('AUTH_PASSWORD', 'alpha2024')
-ENABLE_AUTH = os.environ.get('ENABLE_AUTH', 'true').lower() == 'true'
+ENABLE_AUTH = os.environ.get('ENABLE_AUTH', 'false').lower() == 'true'
 PUBLIC_READ_ONLY = os.environ.get('PUBLIC_READ_ONLY', 'true').lower() == 'true'
 MAC_OPERATOR_APP_URL = os.environ.get('MAC_OPERATOR_APP_URL', 'sapphirebook://operator')
 MAC_OPERATOR_APP_LABEL = os.environ.get('MAC_OPERATOR_APP_LABEL', 'Open macOS Operator App')
