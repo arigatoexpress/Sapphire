@@ -1,4 +1,5 @@
 @echo off
+setlocal EnableDelayedExpansion
 echo ===============================================================
 echo  SAPPHIRE SERVICES - AUTO-START INSTALLER
 echo ===============================================================
@@ -33,6 +34,8 @@ if exist "C:\TradingViewAutonomousManager\backend\main.py" (
     set "TV_PATH=C:\TradingViewAutonomousManager\backend"
 ) else if exist "C:\sapphire\tv-agent\backend\main.py" (
     set "TV_PATH=C:\sapphire\tv-agent\backend"
+) else if exist "%USERPROFILE%\TradingViewAutonomousManager\backend\main.py" (
+    set "TV_PATH=%USERPROFILE%\TradingViewAutonomousManager\backend"
 )
 
 if defined TV_PATH (
@@ -111,7 +114,7 @@ if %errorlevel% == 0 (
     echo [INFO] TV Agent not running - will start on next boot
     echo.
     set /p start_now="Start TV Agent now? (y/n): "
-    if /I "!start_now!"=="y" (
+    if /I "%start_now%"=="y" (
         call "C:\sapphire\start_tv_agent.bat"
     )
 )

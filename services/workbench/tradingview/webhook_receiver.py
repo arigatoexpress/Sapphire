@@ -63,6 +63,9 @@ EDGE_CAPABILITIES_COLLECTION = "edge_capabilities"
 CAPABILITY_SYNC_INTERVAL_SECONDS = int(
     os.getenv("CAPABILITY_SYNC_INTERVAL_SECONDS", "180")
 )
+LOCAL_SERVICE_PROBE_TIMEOUT_SECONDS = float(
+    os.getenv("LOCAL_SERVICE_PROBE_TIMEOUT_SECONDS", "5.0")
+)
 
 # Supported symbols → canonical Sapphire format
 SYMBOL_MAP = {
@@ -231,7 +234,7 @@ def _detect_gpu_inventory() -> list[dict]:
 async def _probe_local_service(url: str) -> dict:
     started = datetime.now(timezone.utc)
     try:
-        async with httpx.AsyncClient(timeout=2.0) as client:
+        async with httpx.AsyncClient(timeout=LOCAL_SERVICE_PROBE_TIMEOUT_SECONDS) as client:
             response = await client.get(url)
             latency_ms = int((datetime.now(timezone.utc) - started).total_seconds() * 1000)
             return {
