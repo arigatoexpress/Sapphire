@@ -1,99 +1,321 @@
 {% extends "base.html" %}
 
-{% block page_subtitle %}Sapphire Book restoration status, operator app direction, and Kimi-Claw integration track.{% endblock %}
+{% block page_subtitle %}Sapphire Book roadmap for operator workflows, Kimi integration, and unified public/private surface separation.{% endblock %}
+
+{% block extra_css %}
+.book-hero {
+    position: relative;
+    overflow: hidden;
+    margin-bottom: var(--space-xl);
+}
+
+.book-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 12% 18%, rgba(105, 212, 255, 0.2), transparent 42%),
+        radial-gradient(circle at 86% 14%, rgba(143, 125, 255, 0.2), transparent 36%);
+    pointer-events: none;
+}
+
+.book-hero-body {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: var(--space-lg);
+    align-items: center;
+}
+
+.book-hero h2 {
+    font-size: 1.9rem;
+    line-height: 1.1;
+    margin-bottom: var(--space-sm);
+}
+
+.book-hero p {
+    color: var(--text-secondary);
+    max-width: 66ch;
+}
+
+.book-chip-row {
+    margin-top: var(--space-md);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+}
+
+.book-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    padding: 6px 12px;
+}
+
+.book-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--space-md);
+}
+
+.book-card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 10px 12px;
+}
+
+.book-card h4 {
+    margin-bottom: 6px;
+    font-size: 0.93rem;
+}
+
+.book-card p {
+    font-size: 0.84rem;
+    color: var(--text-muted);
+    line-height: 1.55;
+}
+
+.book-list {
+    display: grid;
+    gap: var(--space-sm);
+}
+
+.book-item {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 10px 12px;
+    color: var(--text-secondary);
+}
+
+@media (max-width: 980px) {
+    .book-hero-body {
+        grid-template-columns: 1fr;
+    }
+
+    .book-hero h2 {
+        font-size: 1.6rem;
+    }
+}
+{% endblock %}
 
 {% block content %}
+<div class="card book-hero">
+    <div class="card-body book-hero-body">
+        <div>
+            <span class="book-chip">Sapphire Book · Operator Client Strategy</span>
+            <h2>Unified Public Website + Private Operator Experience</h2>
+            <p>
+                Sapphire Book defines how privileged operator workflows move out of the public web and into the macOS client,
+                while preserving transparent business reporting on sapphirealpha.xyz.
+            </p>
+            <div class="book-chip-row" id="book-chip-row">
+                <span class="book-chip"><i class="fas fa-clock"></i> Loading live status...</span>
+            </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:var(--space-sm);">
+            {% if mac_operator_app_url %}
+            <a class="btn btn-primary" href="{{ mac_operator_app_url }}">
+                <i class="fab fa-apple"></i> {{ mac_operator_app_label }}
+            </a>
+            {% endif %}
+            <a class="btn btn-secondary" href="/organization"><i class="fas fa-sitemap"></i> Organization</a>
+            <a class="btn btn-secondary" href="/production-readiness"><i class="fas fa-shield-check"></i> Readiness</a>
+        </div>
+    </div>
+</div>
+
 <div class="grid grid-4" style="margin-bottom: var(--space-xl);">
     <div class="stat-card">
-        <div class="stat-label">Mode</div>
+        <div class="stat-label">Public Mode</div>
         <div class="stat-value" style="color: var(--warning);">Read-Only</div>
-        <div class="stat-change">Public web policy</div>
+        <div class="stat-change">No privileged controls</div>
     </div>
     <div class="stat-card">
         <div class="stat-label">Operator Surface</div>
         <div class="stat-value">macOS App</div>
-        <div class="stat-change">Controls restricted</div>
+        <div class="stat-change">Execution workflows</div>
     </div>
     <div class="stat-card">
-        <div class="stat-label">Kimi-Claw</div>
-        <div class="stat-value" id="kimi-status">Syncing</div>
-        <div class="stat-change">Runtime restoration</div>
+        <div class="stat-label">Kimi Runtime</div>
+        <div class="stat-value" id="book-kimi">--</div>
+        <div class="stat-change" id="book-kimi-note">Checking Windows + edge</div>
     </div>
     <div class="stat-card">
-        <div class="stat-label">Frontend Contracts</div>
-        <div class="stat-value">6/6</div>
-        <div class="stat-change">Platform APIs</div>
+        <div class="stat-label">Contracts</div>
+        <div class="stat-value" id="book-contracts">--</div>
+        <div class="stat-change" id="book-contracts-note">Platform API health</div>
     </div>
 </div>
 
 <div class="grid grid-2" style="margin-bottom: var(--space-xl);">
     <div class="card">
         <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-compass" style="margin-right: 8px; color: var(--primary);"></i>Sapphire Book Direction</h3>
+            <h3 class="card-title"><i class="fas fa-compass" style="margin-right: 8px; color: var(--primary);"></i>Product Direction</h3>
         </div>
         <div class="card-body">
-            <ul style="margin-left: 18px; color: var(--text-secondary); line-height: 1.9;">
-                <li>Public site remains business-facing, observable, and non-operational.</li>
-                <li>All privileged controls move to the macOS Operator App.</li>
-                <li>Web and macOS clients share the same platform contracts for consistency.</li>
-                <li>Kimi-Claw integrations are restored in secure operator contexts only.</li>
-            </ul>
-            {% if mac_operator_app_url %}
-            <div style="margin-top: var(--space-md);">
-                <a class="btn btn-primary" href="{{ mac_operator_app_url }}">
-                    <i class="fab fa-apple"></i> {{ mac_operator_app_label }}
-                </a>
+            <div class="book-grid">
+                <article class="book-card">
+                    <h4>Public Surface</h4>
+                    <p>Business-facing, shareable, and read-only. Focused on transparency, credibility, and operational visibility.</p>
+                </article>
+                <article class="book-card">
+                    <h4>Operator Surface</h4>
+                    <p>Privileged controls run in the authenticated macOS app with policy checks and secure runtime boundaries.</p>
+                </article>
+                <article class="book-card">
+                    <h4>Unified Contracts</h4>
+                    <p>Web and app clients consume the same `/api/platform/*` contracts for consistency and reduced drift.</p>
+                </article>
+                <article class="book-card">
+                    <h4>SCOUT Safety</h4>
+                    <p>External dispatch remains sandboxed and policy-controlled before any operational integration.</p>
+                </article>
             </div>
-            {% endif %}
         </div>
     </div>
 
     <div class="card">
         <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-timeline" style="margin-right: 8px; color: var(--accent);"></i>Restoration Milestones</h3>
+            <h3 class="card-title"><i class="fas fa-road" style="margin-right: 8px; color: var(--accent);"></i>Restoration Milestones</h3>
         </div>
-        <div class="card-body">
-            <div style="display: grid; gap: var(--space-sm);">
-                <div class="badge badge-success" style="justify-content: flex-start; width: fit-content;">Platform contracts normalized</div>
-                <div class="badge badge-success" style="justify-content: flex-start; width: fit-content;">Windows/Pi/Cloud health synchronized</div>
-                <div class="badge badge-info" style="justify-content: flex-start; width: fit-content;">Sapphire Book module migration in progress</div>
-                <div class="badge badge-warning" style="justify-content: flex-start; width: fit-content;">Kimi-Claw operator workflow hardening</div>
-            </div>
+        <div class="card-body" id="book-milestones">
+            <div class="loading"><div class="spinner"></div>Loading milestones...</div>
         </div>
     </div>
 </div>
 
-<div class="card">
+<div class="card" style="margin-bottom: var(--space-xl);">
     <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-link" style="margin-right: 8px; color: var(--info);"></i>Related Pages</h3>
+        <h3 class="card-title"><i class="fas fa-link" style="margin-right: 8px; color: var(--secondary);"></i>Connected System Surfaces</h3>
     </div>
     <div class="card-body">
-        <div style="display: flex; gap: var(--space-md); flex-wrap: wrap;">
-            <a href="/organization" class="btn btn-secondary"><i class="fas fa-sitemap"></i> Organization OS</a>
-            <a href="/production-readiness" class="btn btn-secondary"><i class="fas fa-rocket"></i> Readiness</a>
-            <a href="/system-health" class="btn btn-secondary"><i class="fas fa-heartbeat"></i> System Health</a>
+        <div class="book-list" id="book-surfaces">
+            <div class="book-item">Loading connected surfaces...</div>
         </div>
+    </div>
+</div>
+
+<div class="card" style="border-color: rgba(255, 204, 102, 0.4); background: rgba(255, 204, 102, 0.07);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-lock" style="margin-right: 8px; color: var(--warning);"></i>Access Boundary Policy</h3>
+    </div>
+    <div class="card-body" style="color: var(--text-secondary); line-height: 1.8;">
+        Public web pages remain strictly non-operational. Any control surface (dispatch, execution, configuration, credentials) is app-only.
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    async function refreshBookStatus() {
+    function boolBadge(ok, textOk, textNo) {
+        return ok
+            ? `<span class="badge badge-success">${textOk}</span>`
+            : `<span class="badge badge-warning">${textNo}</span>`;
+    }
+
+    function fmtTime(iso) {
+        if (!iso) return '--';
         try {
-            const status = await window.platformApi.getStatus();
-            const windows = (status.by_category && status.by_category.windows) || [];
-            const healthy = windows.every((row) => !!row.healthy);
-            const el = document.getElementById('kimi-status');
-            el.textContent = healthy ? 'Online' : 'Degraded';
-            el.style.color = healthy ? 'var(--success)' : 'var(--warning)';
-        } catch (err) {
-            const el = document.getElementById('kimi-status');
-            el.textContent = 'Unknown';
-            el.style.color = 'var(--text-muted)';
+            return new Date(iso).toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+            });
+        } catch (_) {
+            return '--';
         }
     }
 
-    document.addEventListener('DOMContentLoaded', refreshBookStatus);
+    async function refreshSapphireBook() {
+        try {
+            const [status, readiness, org, logs] = await Promise.all([
+                window.platformApi.getStatus(),
+                window.platformApi.getReadiness(),
+                window.platformApi.getOrganization(),
+                window.platformApi.getLogs({ hours: 24, limit: 40 }),
+            ]);
+
+            const windows = (status.by_category && status.by_category.windows) || [];
+            const windowsHealthy = windows.length ? windows.every((row) => !!row.healthy) : false;
+            const kimiEl = document.getElementById('book-kimi');
+            kimiEl.textContent = windowsHealthy ? 'Online' : 'Watch';
+            kimiEl.style.color = windowsHealthy ? 'var(--success)' : 'var(--warning)';
+            document.getElementById('book-kimi-note').textContent = `${windows.filter((row) => row.healthy).length}/${windows.length || 0} Windows endpoints healthy`;
+
+            const contractsGate = readiness.gates?.A_contracts;
+            const contractsOk = !!(contractsGate && contractsGate.ok);
+            document.getElementById('book-contracts').textContent = contractsGate ? `${contractsGate.pass}/${contractsGate.total}` : '--';
+            document.getElementById('book-contracts').style.color = contractsOk ? 'var(--success)' : 'var(--warning)';
+            document.getElementById('book-contracts-note').textContent = contractsOk ? 'Canonical contracts green' : 'Contract gate requires attention';
+
+            const chipRow = document.getElementById('book-chip-row');
+            chipRow.innerHTML = `
+                <span class="book-chip"><i class="fas fa-shield-check"></i> readiness ${readiness.overall_ok ? 'green' : 'watch'}</span>
+                <span class="book-chip"><i class="fas fa-sitemap"></i> ${org.summary?.workspaces || 0} workspaces mapped</span>
+                <span class="book-chip"><i class="fas fa-clock"></i> ${fmtTime(readiness.timestamp)}</span>
+            `;
+
+            const milestones = [
+                { ok: contractsOk, text: 'Platform contracts normalized across web + app' },
+                { ok: readiness.overall_ok, text: 'Production readiness gates currently passing' },
+                { ok: windowsHealthy, text: 'Windows edge services healthy for operator runtime' },
+                { ok: !!(status.services?.scout_sandbox && status.services.scout_sandbox.status === 'healthy'), text: 'SCOUT sandbox ingress healthy' },
+            ];
+
+            document.getElementById('book-milestones').innerHTML = `
+                <div class="book-list">
+                    ${milestones.map((m) => `
+                        <div class="book-item" style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-sm);">
+                            <span>${m.text}</span>
+                            ${boolBadge(m.ok, 'done', 'in progress')}
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+
+            const eventRows = (logs.logs || []).filter((row) => {
+                const msg = String(row.message || '').toLowerCase();
+                const svc = String(row.service || '').toLowerCase();
+                return msg.includes('kimi') || msg.includes('signal') || svc.includes('gateway') || svc.includes('webhook');
+            }).slice(0, 5);
+
+            const surfaces = [
+                { name: 'Public Website', value: 'sapphirealpha.xyz', ok: true },
+                { name: 'Organization Model', value: `${org.summary?.workspaces || 0} workspaces`, ok: true },
+                { name: 'Operator App', value: 'macOS-only control surface', ok: true },
+                { name: 'Recent Runtime Events', value: `${eventRows.length} relevant events (24h)`, ok: true },
+            ];
+
+            document.getElementById('book-surfaces').innerHTML = surfaces.map((s) => `
+                <div class="book-item" style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-sm);">
+                    <div>
+                        <div style="font-weight:600;">${s.name}</div>
+                        <div style="font-size:0.78rem;color:var(--text-muted);">${s.value}</div>
+                    </div>
+                    ${boolBadge(s.ok, 'connected', 'pending')}
+                </div>
+            `).join('');
+        } catch (error) {
+            console.error('Failed to refresh Sapphire Book status:', error);
+            const kimiEl = document.getElementById('book-kimi');
+            kimiEl.textContent = 'Unknown';
+            kimiEl.style.color = 'var(--text-muted)';
+            document.getElementById('book-milestones').innerHTML = '<div class="empty-state"><p>Unable to load milestone telemetry.</p></div>';
+            document.getElementById('book-surfaces').innerHTML = '<div class="book-item">Unable to load connected surfaces.</div>';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        refreshSapphireBook();
+        setInterval(refreshSapphireBook, 60000);
+    });
 </script>
 {% endblock %}
