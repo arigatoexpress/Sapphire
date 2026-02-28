@@ -696,13 +696,26 @@
             </button>
             
             <nav class="nav-content">
-                <!-- Main Section -->
+                <!-- Organization Section -->
                 <div class="nav-section">
-                    <div class="nav-title">Operations</div>
+                    <div class="nav-title">Organization OS</div>
                     <a href="/" class="nav-item {% if current_page == 'overview' %}active{% endif %}">
                         <i class="fas fa-home nav-icon"></i>
                         <span class="nav-label">Overview</span>
                     </a>
+                    <a href="/organization" class="nav-item {% if current_page == 'organization' %}active{% endif %}">
+                        <i class="fas fa-sitemap nav-icon"></i>
+                        <span class="nav-label">Organization</span>
+                    </a>
+                    <a href="/projects" class="nav-item {% if current_page == 'projects' %}active{% endif %}">
+                        <i class="fas fa-tasks nav-icon"></i>
+                        <span class="nav-label">Project Management</span>
+                    </a>
+                </div>
+
+                <!-- Trading Section -->
+                <div class="nav-section">
+                    <div class="nav-title">Trading Department</div>
                     <a href="/trading" class="nav-item {% if current_page == 'trading' %}active{% endif %}">
                         <i class="fas fa-chart-line nav-icon"></i>
                         <span class="nav-label">Trading</span>
@@ -711,40 +724,27 @@
                         <i class="fas fa-terminal nav-icon"></i>
                         <span class="nav-label">Command Deck</span>
                     </a>
-                </div>
-                
-                <!-- System Section -->
-                <div class="nav-section">
-                    <div class="nav-title">System</div>
-                    <a href="/system-health" class="nav-item {% if current_page == 'health' %}active{% endif %}">
-                        <i class="fas fa-heartbeat nav-icon"></i>
-                        <span class="nav-label">Health</span>
-                        <span class="nav-badge" id="health-badge" style="display: none;">!</span>
-                    </a>
-                    <a href="/logs" class="nav-item {% if current_page == 'logs' %}active{% endif %}">
-                        <i class="fas fa-list-alt nav-icon"></i>
-                        <span class="nav-label">Logs</span>
-                    </a>
-                    <a href="/organization" class="nav-item {% if current_page == 'organization' %}active{% endif %}">
-                        <i class="fas fa-sitemap nav-icon"></i>
-                        <span class="nav-label">Organization</span>
-                    </a>
                     <a href="/production-readiness" class="nav-item {% if current_page == 'production' %}active{% endif %}">
                         <i class="fas fa-rocket nav-icon"></i>
                         <span class="nav-label">Production</span>
                     </a>
+                </div>
+
+                <!-- Research + Infrastructure Section -->
+                <div class="nav-section">
+                    <div class="nav-title">Research + Infrastructure</div>
+                    <a href="/system-health" class="nav-item {% if current_page == 'health' %}active{% endif %}">
+                        <i class="fas fa-heartbeat nav-icon"></i>
+                        <span class="nav-label">System Health</span>
+                        <span class="nav-badge" id="health-badge" style="display: none;">!</span>
+                    </a>
+                    <a href="/logs" class="nav-item {% if current_page == 'logs' %}active{% endif %}">
+                        <i class="fas fa-list-alt nav-icon"></i>
+                        <span class="nav-label">Operations Log</span>
+                    </a>
                     <a href="/infrastructure" class="nav-item {% if current_page == 'infrastructure' %}active{% endif %}">
                         <i class="fas fa-network-wired nav-icon"></i>
                         <span class="nav-label">Infrastructure</span>
-                    </a>
-                </div>
-                
-                <!-- Projects Section -->
-                <div class="nav-section">
-                    <div class="nav-title">Projects</div>
-                    <a href="/projects" class="nav-item {% if current_page == 'projects' %}active{% endif %}">
-                        <i class="fas fa-tasks nav-icon"></i>
-                        <span class="nav-label">Project Management</span>
                     </a>
                 </div>
                 
