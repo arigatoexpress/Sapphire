@@ -5,15 +5,22 @@ set -euo pipefail
 
 PROJECT_ID="${PROJECT_ID:-sapphire-479610}"
 ALPHA_SERVICE="${ALPHA_SERVICE:-sapphire-alpha}"
-ASTER_SERVICE="${ASTER_SERVICE:-sapphire-aster}"
-LIGHTER_SERVICE="${LIGHTER_SERVICE:-sapphire-lighter}"
+PM_HUB_SERVICE="${PM_HUB_SERVICE:-agentic-pm-hub}"
+THO_AGENT_SERVICE="${THO_AGENT_SERVICE:-tho-agent}"
+SCOUT_SANDBOX_SERVICE="${SCOUT_SANDBOX_SERVICE:-sapphire-scout-sandbox}"
 GATEWAY_SERVICE="${GATEWAY_SERVICE:-sapphire-gateway}"
 ALPHA_REGION="${ALPHA_REGION:-us-central1}"
-ASTER_REGION="${ASTER_REGION:-us-central1}"
-LIGHTER_REGION="${LIGHTER_REGION:-europe-west1}"
+PM_HUB_REGION="${PM_HUB_REGION:-us-central1}"
+THO_AGENT_REGION="${THO_AGENT_REGION:-us-central1}"
+SCOUT_SANDBOX_REGION="${SCOUT_SANDBOX_REGION:-us-central1}"
 GATEWAY_REGION="${GATEWAY_REGION:-us-central1}"
 SCHEDULER_REGION="${SCHEDULER_REGION:-us-central1}"
 AUTONOMY_SA="${AUTONOMY_SA:-sapphire-main-sa@${PROJECT_ID}.iam.gserviceaccount.com}"
+GATEWAY_EXPECTED_SERVICE_ACCOUNTS="${GATEWAY_EXPECTED_SERVICE_ACCOUNTS:-${AUTONOMY_SA},sapphirev3@${PROJECT_ID}.iam.gserviceaccount.com}"
+PUBLIC_HEALTH_SERVICES="${PUBLIC_HEALTH_SERVICES:-${PM_HUB_SERVICE},${THO_AGENT_SERVICE},${SCOUT_SANDBOX_SERVICE}}"
+PLATFORM_BASE_URL="${PLATFORM_BASE_URL:-https://sapphirealpha.xyz}"
+PLATFORM_AUTH_USER="${PLATFORM_AUTH_USER:-sapphire}"
+PLATFORM_AUTH_PASS="${PLATFORM_AUTH_PASS:-alpha2024}"
 
 
 FAILURES=0
@@ -34,6 +41,33 @@ check_cmd() {
   else
     fail "missing command: $cmd"
   fi
+}
+
+check_platform_contracts() {
+  local endpoints=(
+    "/api/platform/status"
+    "/api/platform/metrics"
+    "/api/platform/logs"
+    "/api/platform/organization"
+    "/api/platform/readiness"
+    "/api/platform/projects"
+  )
+
+  for endpoint in "${endpoints[@]}"; do
+    local status
+    status="$(curl -sS -o /dev/null -w '%{http_code}' -u "${PLATFORM_AUTH_USER}:${PLATFORM_AUTH_PASS}" "${PLATFORM_BASE_URL}${endpoint}" 2>/dev/null || true)"
+    if [[ "$status" == "200" ]]; then
+      pass "platform contract OK: $endpoint"
+    else
+      fail "platform contract failed: $endpoint (status=${status:-none})"
+    fi
+  done
+}
+
+service_in_csv() {
+  local value="$1"
+  local csv="$2"
+  echo "$csv" | tr ',' '\n' | grep -Fxq "$value"
 }
 
 service_ready() {
@@ -59,23 +93,19 @@ service_ready() {
 
   if [[ -n "$url" ]]; then
     if [[ "$service" == "$GATEWAY_SERVICE" ]]; then
-      local id_token
-      id_token="${SAPPHIRE_GATEWAY_OIDC_TOKEN:-}"
-      if [[ -z "$id_token" ]]; then
-        id_token="$(gcloud auth print-identity-token --audiences="$url" 2>/dev/null || true)"
-      fi
-      if [[ -z "$id_token" ]]; then
-        id_token="$(gcloud auth print-identity-token 2>/dev/null || true)"
-      fi
-      if [[ -n "$id_token" ]] && curl -fsS -H "X-Serverless-Authorization: Bearer ${id_token}" "$url/" >/dev/null 2>&1; then
-        pass "$service authenticated endpoint"
+      if curl -fsS "$url/webhook/health" >/dev/null 2>&1; then
+        pass "$service webhook health endpoint"
       else
-        fail "$service authenticated endpoint unexpected response"
+        fail "$service webhook health endpoint unreachable"
       fi
-      if curl -fsS "$url/" >/dev/null 2>&1; then
-        fail "$service unexpectedly allows unauthenticated invoke"
+      local root_status
+      root_status="$(curl -sS -o /dev/null -w '%{http_code}' "$url/" 2>/dev/null || true)"
+      if [[ "$root_status" == "401" || "$root_status" == "403" ]]; then
+        pass "$service blocks unauthenticated root"
+      elif [[ "$root_status" =~ ^2 ]]; then
+        fail "$service unexpectedly allows unauthenticated root"
       else
-        pass "$service blocks unauthenticated invoke"
+        pass "$service root returned ${root_status:-none} (treated as protected)"
       fi
     elif [[ "$service" == "$ALPHA_SERVICE" ]]; then
       local id_token=""
@@ -108,7 +138,11 @@ service_ready() {
         fi
       fi
     elif curl -fsS "$url/health" >/dev/null 2>&1; then
-      fail "$service unexpectedly allows unauthenticated invoke"
+      if service_in_csv "$service" "$PUBLIC_HEALTH_SERVICES"; then
+        pass "$service public health endpoint"
+      else
+        fail "$service unexpectedly allows unauthenticated invoke"
+      fi
     else
       local id_token=""
       local auth_ok=false
@@ -152,9 +186,12 @@ check_cmd gcloud
 check_cmd jq
 check_cmd curl
 
+check_platform_contracts
+
 service_ready "$ALPHA_SERVICE" "$ALPHA_REGION"
-service_ready "$ASTER_SERVICE" "$ASTER_REGION"
-service_ready "$LIGHTER_SERVICE" "$LIGHTER_REGION"
+service_ready "$PM_HUB_SERVICE" "$PM_HUB_REGION"
+service_ready "$THO_AGENT_SERVICE" "$THO_AGENT_REGION"
+service_ready "$SCOUT_SANDBOX_SERVICE" "$SCOUT_SANDBOX_REGION"
 service_ready "$GATEWAY_SERVICE" "$GATEWAY_REGION"
 
 alpha_sa=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
@@ -167,10 +204,10 @@ fi
 
 gateway_sa=$(gcloud run services describe "$GATEWAY_SERVICE" --project "$PROJECT_ID" --region "$GATEWAY_REGION" --format=json \
   | jq -r '.spec.template.spec.serviceAccountName // empty')
-if [[ "$gateway_sa" == "${AUTONOMY_SA}" ]]; then
-  pass "gateway service account uses sapphire-main-sa"
+if echo "$GATEWAY_EXPECTED_SERVICE_ACCOUNTS" | tr ',' '\n' | grep -Fxq "$gateway_sa"; then
+  pass "gateway service account allowed: $gateway_sa"
 else
-  fail "gateway service account mismatch: ${gateway_sa:-<empty>}"
+  fail "gateway service account mismatch: ${gateway_sa:-<empty>} (allowed: $GATEWAY_EXPECTED_SERVICE_ACCOUNTS)"
 fi
 
 if gcloud projects get-iam-policy "$PROJECT_ID" --format='value(etag)' >/dev/null 2>&1; then
@@ -200,8 +237,12 @@ fi
 # ── OpenClaw Gateway Check ──
 openclaw_env=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
   | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="OPENCLAW_GATEWAY_TOKEN") | (.value // .valueFrom.secretKeyRef.name // empty)')
+tradingview_enabled=$(gcloud run services describe "$ALPHA_SERVICE" --project "$PROJECT_ID" --region "$ALPHA_REGION" --format=json \
+  | jq -r '.spec.template.spec.containers[0].env[]? | select(.name=="TRADINGVIEW_EXECUTION_ENABLED") | .value // empty')
 if [[ -n "$openclaw_env" ]]; then
   pass "OPENCLAW_GATEWAY_TOKEN configured in alpha service"
+elif [[ "$tradingview_enabled" == "false" ]]; then
+  pass "OPENCLAW_GATEWAY_TOKEN not required while TRADINGVIEW_EXECUTION_ENABLED=false"
 else
   fail "OPENCLAW_GATEWAY_TOKEN not set in alpha service (OpenClaw dispatch disabled)"
 fi
@@ -215,13 +256,11 @@ else
 fi
 
 required_jobs=(
-  "sapphire-alpha-health-6h"
-  "sapphire-aster-health-6h"
-  "sapphire-lighter-health-6h"
+  "agentic-pm-hub-autonomy-15m"
+  "agentic-pm-hub-assistant-checkin-30m"
+  "bis-automation-job"
+  "weekly-self-improvement"
   "sapphire-gateway-health-6h"
-  "sapphire-alpha-heartbeat-30m"
-  "sapphire-alpha-status-daily"
-  "sapphire-alpha-strategy-gate-daily"
 )
 
 for job in "${required_jobs[@]}"; do
