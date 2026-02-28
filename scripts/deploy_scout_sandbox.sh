@@ -13,6 +13,7 @@ SERVICE_NAME="${SERVICE_NAME:-sapphire-scout-sandbox}"
 IMAGE_NAME="${IMAGE_NAME:-sapphire-scout-sandbox}"
 IMAGE_TAG="${IMAGE_TAG:-$(date -u +%Y%m%d%H%M)-sandbox}"
 SERVICE_ACCOUNT="${SERVICE_ACCOUNT:-sapphire-main-sa@${PROJECT_ID}.iam.gserviceaccount.com}"
+BUILD_SERVICE_ACCOUNT="${BUILD_SERVICE_ACCOUNT:-sapphirev3@${PROJECT_ID}.iam.gserviceaccount.com}"
 
 SCOUT_SANDBOX_TOKEN_SECRET="${SCOUT_SANDBOX_TOKEN_SECRET:-SAPPHIRE_SCOUT_SANDBOX_TOKEN}"
 SCOUT_SANDBOX_REGISTER_URL_SECRET="${SCOUT_SANDBOX_REGISTER_URL_SECRET:-SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL}"
@@ -38,6 +39,7 @@ echo "Image: ${IMAGE_URI}"
 
 gcloud builds submit \
   --project "${PROJECT_ID}" \
+  --service-account "projects/${PROJECT_ID}/serviceAccounts/${BUILD_SERVICE_ACCOUNT}" \
   --config "${ROOT_DIR}/cloudbuild-scout-sandbox.yaml" \
   --substitutions "_IMAGE=${IMAGE_URI}" \
   "${ROOT_DIR}"

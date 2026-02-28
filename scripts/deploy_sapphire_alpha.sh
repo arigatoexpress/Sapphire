@@ -17,6 +17,7 @@ CONCURRENCY="${CONCURRENCY:-80}"
 TIMEOUT="${TIMEOUT:-300}"
 PORT="${PORT:-8080}"
 SERVICE_ACCOUNT="${SERVICE_ACCOUNT:-sapphire-main-sa@${PROJECT_ID}.iam.gserviceaccount.com}"
+BUILD_SERVICE_ACCOUNT="${BUILD_SERVICE_ACCOUNT:-sapphirev3@${PROJECT_ID}.iam.gserviceaccount.com}"
 FULL_AUTONOMY_ENABLED="${FULL_AUTONOMY_ENABLED:-true}"
 AUTONOMY_ALLOW_CODE_CHANGES="${AUTONOMY_ALLOW_CODE_CHANGES:-true}"
 AUTONOMY_ALLOW_GCLOUD_CHANGES="${AUTONOMY_ALLOW_GCLOUD_CHANGES:-true}"
@@ -129,6 +130,7 @@ if [[ "${SKIP_BUILD:-false}" != "true" ]]; then
     echo "Docker daemon unavailable; using Cloud Build fallback."
     gcloud builds submit \
       --project "${PROJECT_ID}" \
+      --service-account "projects/${PROJECT_ID}/serviceAccounts/${BUILD_SERVICE_ACCOUNT}" \
       --config "${ROOT_DIR}/cloudbuild-alpha.yaml" \
       --substitutions "_IMAGE=${IMAGE_URI}" \
       "${ROOT_DIR}"
