@@ -1,152 +1,290 @@
 {% extends "base.html" %}
 
+{% block page_subtitle %}Portfolio-level visibility into client programs and delivery status from canonical platform contracts.{% endblock %}
+
+{% block extra_css %}
+.projects-hero {
+    position: relative;
+    overflow: hidden;
+    margin-bottom: var(--space-xl);
+}
+
+.projects-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 16% 18%, rgba(105, 212, 255, 0.2), transparent 42%),
+        radial-gradient(circle at 84% 16%, rgba(143, 125, 255, 0.18), transparent 36%);
+    pointer-events: none;
+}
+
+.projects-hero-body {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: var(--space-lg);
+    align-items: center;
+}
+
+.projects-hero h2 {
+    font-size: 1.9rem;
+    line-height: 1.1;
+    margin-bottom: var(--space-sm);
+}
+
+.projects-hero p {
+    color: var(--text-secondary);
+    max-width: 62ch;
+}
+
+.projects-chip-row {
+    margin-top: var(--space-md);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+}
+
+.projects-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    padding: 6px 12px;
+}
+
+.project-list {
+    display: grid;
+    gap: var(--space-md);
+}
+
+.project-item {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.04);
+    padding: var(--space-md);
+}
+
+.project-top {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-md);
+    align-items: center;
+    margin-bottom: var(--space-sm);
+}
+
+.project-title {
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.project-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.project-progress-track {
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+    margin-top: 8px;
+}
+
+.project-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), var(--secondary));
+}
+
+@media (max-width: 980px) {
+    .projects-hero-body {
+        grid-template-columns: 1fr;
+    }
+
+    .projects-hero h2 {
+        font-size: 1.6rem;
+    }
+}
+{% endblock %}
+
 {% block content %}
-<!-- Project Stats -->
-<div class="grid grid-4" style="margin-bottom: var(--space-xl);">
-    <div class="stat-card">
-        <div class="stat-label">Total Projects</div>
-        <div class="stat-value" id="total-projects">--</div>
-        <div class="stat-change">Active & archived</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">In Progress</div>
-        <div class="stat-value" id="active-projects" style="color: var(--primary);">--</div>
-        <div class="stat-change">Currently active</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Completed</div>
-        <div class="stat-value" id="completed-projects" style="color: var(--success);">--</div>
-        <div class="stat-change">This month</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Tasks Due</div>
-        <div class="stat-value" id="due-tasks" style="color: var(--warning);">--</div>
-        <div class="stat-change">Next 7 days</div>
-    </div>
-</div>
-
-<!-- Program Overview -->
-<div class="card" style="margin-bottom: var(--space-xl);">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-tasks" style="margin-right: 8px; color: var(--primary);"></i>Program Overview</h3>
-        <span class="badge badge-warning">Read-Only View</span>
-    </div>
-    <div class="card-body">
-        <p style="color: var(--text-muted); margin-bottom: var(--space-md);">
-            Unified Projects now render from canonical platform contracts. Use PM Hub workspace for advanced planning flows.
-        </p>
-        <div id="project-summary" class="grid grid-4"></div>
-    </div>
-</div>
-
-<!-- Projects List -->
-<div class="card">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-folder-open" style="margin-right: 8px; color: var(--secondary);"></i>Active Projects</h3>
-        {% if mac_operator_app_url %}
-        <a class="btn btn-primary" style="font-size: 0.8rem;" href="{{ mac_operator_app_url }}">
-            <i class="fab fa-apple"></i> Manage in macOS App
-        </a>
-        {% endif %}
-    </div>
-    <div class="card-body">
-        <div id="projects-list">
-            <div class="loading">
-                <div class="spinner"></div>
-                Loading projects...
+<div class="card projects-hero">
+    <div class="card-body projects-hero-body">
+        <div>
+            <span class="projects-chip">Client Delivery · Portfolio View</span>
+            <h2>Program Visibility Across Autonomous Delivery Lanes</h2>
+            <p>
+                This page provides a read-only snapshot of active and planned programs, sourced directly from Sapphire's
+                canonical platform contracts. It is designed for business review, not execution control.
+            </p>
+            <div class="projects-chip-row">
+                <span class="projects-chip"><i class="fas fa-lock"></i> Public read-only</span>
+                <span class="projects-chip"><i class="fas fa-diagram-project"></i> Cross-project governance</span>
+                <span class="projects-chip"><i class="fas fa-shield-check"></i> Contract-backed data</span>
             </div>
         </div>
+        <div style="display:flex;flex-direction:column;gap:var(--space-sm);">
+            <a href="/organization" class="btn btn-primary"><i class="fas fa-sitemap"></i> Organization Model</a>
+            <a href="https://agentic-pm-hub-267358751314.us-central1.run.app/organization" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">
+                <i class="fas fa-up-right-from-square"></i> PM Hub Organization
+            </a>
+            {% if mac_operator_app_url %}
+            <a class="btn btn-secondary" href="{{ mac_operator_app_url }}">
+                <i class="fab fa-apple"></i> {{ mac_operator_app_label }}
+            </a>
+            {% endif %}
+        </div>
     </div>
 </div>
 
-<!-- Quick Links -->
-<div class="card" style="margin-top: var(--space-xl);">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-link" style="margin-right: 8px; color: var(--accent);"></i>Project Resources</h3>
+<div class="grid grid-4" style="margin-bottom: var(--space-xl);">
+    <div class="stat-card">
+        <div class="stat-label">Tracked Programs</div>
+        <div class="stat-value" id="total-projects">--</div>
+        <div class="stat-change">Across all departments</div>
     </div>
-    <div class="card-body">
-        <div style="display: flex; gap: var(--space-md); flex-wrap: wrap;">
-            <a href="https://github.com/arigatoexpress/Sapphire" target="_blank" class="btn btn-secondary">
-                <i class="fab fa-github"></i> GitHub Repository
-            </a>
-            <a href="https://linear.app" target="_blank" class="btn btn-secondary">
-                <i class="fas fa-ticket-alt"></i> Linear Issues
-            </a>
-            <a href="https://sapphirealpha.xyz" target="_blank" class="btn btn-secondary">
-                <i class="fas fa-globe"></i> Production Site
-            </a>
+    <div class="stat-card">
+        <div class="stat-label">Active Delivery</div>
+        <div class="stat-value" id="active-projects" style="color: var(--primary);">--</div>
+        <div class="stat-change">Active or in-progress</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Blocked</div>
+        <div class="stat-value" id="blocked-projects" style="color: var(--warning);">--</div>
+        <div class="stat-change">Needs intervention</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Avg Progress</div>
+        <div class="stat-value" id="avg-progress">--%</div>
+        <div class="stat-change">Portfolio maturity</div>
+    </div>
+</div>
+
+<div class="grid grid-2" style="margin-bottom: var(--space-xl);">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-chart-column" style="margin-right: 8px; color: var(--primary);"></i>Portfolio Summary</h3>
         </div>
+        <div class="card-body" id="project-summary">
+            <div class="loading"><div class="spinner"></div>Loading summary...</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-book-open" style="margin-right: 8px; color: var(--accent);"></i>Business Notes</h3>
+        </div>
+        <div class="card-body" style="color: var(--text-secondary); line-height: 1.8;">
+            <p>Program data is sourced from canonical platform contracts and intended for investor/client review.</p>
+            <p>Operational controls, edits, and deployment actions are restricted to internal operator workflows.</p>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-briefcase" style="margin-right: 8px; color: var(--secondary);"></i>Program Portfolio</h3>
+    </div>
+    <div class="card-body" id="projects-list">
+        <div class="loading"><div class="spinner"></div>Loading programs...</div>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+    function statusBadge(statusRaw) {
+        const status = String(statusRaw || 'unknown').toLowerCase();
+        if (status === 'active' || status === 'healthy') return '<span class="badge badge-success">active</span>';
+        if (status === 'in_progress') return '<span class="badge badge-info">in progress</span>';
+        if (status === 'blocked') return '<span class="badge badge-warning">blocked</span>';
+        if (status === 'completed') return '<span class="badge badge-success">completed</span>';
+        return `<span class="badge">${status}</span>`;
+    }
+
+    function clampProgress(value) {
+        const num = Number(value || 0);
+        if (!Number.isFinite(num)) return 0;
+        return Math.max(0, Math.min(100, Math.round(num)));
+    }
+
     async function fetchProjects() {
         try {
-            const data = await window.platformApi.getProjects();
-            
-            const projects = data.projects || [];
-            document.getElementById('total-projects').textContent = projects.length;
-            document.getElementById('active-projects').textContent = projects.filter(p => p.status === 'active' || p.status === 'in_progress').length;
-            document.getElementById('completed-projects').textContent = projects.filter(p => p.status === 'completed').length;
-            document.getElementById('due-tasks').textContent = projects.filter(p => p.status === 'blocked').length;
+            const payload = await window.platformApi.getProjects();
+            const projects = payload.projects || [];
 
-            const summary = document.getElementById('project-summary');
-            const blocked = projects.filter(p => p.status === 'blocked').length;
-            const healthy = projects.filter(p => !p.missing_local && !p.missing_github).length;
-            const missingGithub = projects.filter(p => p.missing_github).length;
-            const missingLocal = projects.filter(p => p.missing_local).length;
-            summary.innerHTML = `
-                <div class="stat-card"><div class="stat-label">Healthy Tracked</div><div class="stat-value" style="color: var(--success);">${healthy}</div></div>
-                <div class="stat-card"><div class="stat-label">Blocked</div><div class="stat-value" style="color: var(--warning);">${blocked}</div></div>
-                <div class="stat-card"><div class="stat-label">Missing GitHub</div><div class="stat-value" style="color: var(--danger);">${missingGithub}</div></div>
-                <div class="stat-card"><div class="stat-label">Missing Local</div><div class="stat-value" style="color: var(--danger);">${missingLocal}</div></div>
-            `;
-            
-            const container = document.getElementById('projects-list');
-            if (projects.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">📁</div>
-                        <p>No projects found</p>
-                        <p style="font-size: 0.85rem; margin-top: var(--space-sm);">Create your first project to get started</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            container.innerHTML = `
-                <div style="display: grid; gap: var(--space-md);">
-                    ${projects.map(p => `
-                        <div class="card" style="background: var(--bg-glass);">
-                            <div class="card-body" style="padding: var(--space-md);">
-                                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-sm);">
-                                    <h4 style="font-weight: 600;">${p.name}</h4>
-                                    <span class="badge badge-${p.status === 'active' ? 'success' : p.status === 'in_progress' ? 'info' : 'warning'}">${p.status}</span>
-                                </div>
-                                <div style="margin-bottom: var(--space-md);">
-                                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted); margin-bottom: var(--space-xs);">
-                                        <span>Progress</span>
-                                        <span>${p.progress}%</span>
-                                    </div>
-                                    <div style="height: 6px; background: var(--bg-dark); border-radius: 3px; overflow: hidden;">
-                                        <div style="width: ${p.progress}%; height: 100%; background: linear-gradient(90deg, var(--primary), var(--secondary)); border-radius: 3px;"></div>
-                                    </div>
-                                </div>
-                                <div><span class="badge">Public Snapshot</span></div>
-                            </div>
-                        </div>
-                    `).join('')}
+            const total = projects.length;
+            const active = projects.filter((p) => ['active', 'in_progress'].includes(String(p.status || '').toLowerCase())).length;
+            const blocked = projects.filter((p) => String(p.status || '').toLowerCase() === 'blocked').length;
+            const avg = total ? Math.round(projects.reduce((acc, p) => acc + clampProgress(p.progress), 0) / total) : 0;
+
+            document.getElementById('total-projects').textContent = total;
+            document.getElementById('active-projects').textContent = active;
+            document.getElementById('blocked-projects').textContent = blocked;
+            document.getElementById('avg-progress').textContent = `${avg}%`;
+
+            const missingGithub = projects.filter((p) => !!p.missing_github).length;
+            const missingLocal = projects.filter((p) => !!p.missing_local).length;
+            const healthyTracked = projects.filter((p) => !p.missing_github && !p.missing_local).length;
+
+            document.getElementById('project-summary').innerHTML = `
+                <div class="grid grid-2">
+                    <div class="stat-card"><div class="stat-label">Healthy Tracked</div><div class="stat-value" style="color: var(--success);">${healthyTracked}</div></div>
+                    <div class="stat-card"><div class="stat-label">Blocked</div><div class="stat-value" style="color: var(--warning);">${blocked}</div></div>
+                    <div class="stat-card"><div class="stat-label">Missing GitHub</div><div class="stat-value" style="color: var(--danger);">${missingGithub}</div></div>
+                    <div class="stat-card"><div class="stat-label">Missing Local</div><div class="stat-value" style="color: var(--danger);">${missingLocal}</div></div>
                 </div>
             `;
-        } catch (e) {
-            console.error('Failed to fetch projects:', e);
+
+            const container = document.getElementById('projects-list');
+            if (!projects.length) {
+                container.innerHTML = '<div class="empty-state"><p>No programs found.</p></div>';
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="project-list">
+                    ${projects.map((p) => {
+                        const progress = clampProgress(p.progress);
+                        const missingTags = [
+                            p.missing_github ? '<span class="badge badge-warning">missing github</span>' : '',
+                            p.missing_local ? '<span class="badge badge-warning">missing local</span>' : '',
+                        ].filter(Boolean).join(' ');
+                        return `
+                            <article class="project-item">
+                                <div class="project-top">
+                                    <div>
+                                        <div class="project-title">${p.name || p.id || 'Unnamed Program'}</div>
+                                        <div style="font-size:0.8rem;color:var(--text-muted);">Program ID: ${p.id || '--'}</div>
+                                    </div>
+                                    ${statusBadge(p.status)}
+                                </div>
+                                <div style="font-size:0.86rem;color:var(--text-secondary);">Progress: ${progress}%</div>
+                                <div class="project-progress-track"><div class="project-progress-fill" style="width:${progress}%;"></div></div>
+                                <div class="project-meta" style="margin-top: var(--space-sm);">
+                                    <span class="badge badge-info">public snapshot</span>
+                                    ${missingTags || '<span class="badge badge-success">tracked</span>'}
+                                </div>
+                            </article>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        } catch (error) {
+            console.error('Failed to fetch programs:', error);
+            document.getElementById('projects-list').innerHTML = '<div class="empty-state"><p>Unable to load program portfolio.</p></div>';
         }
     }
-    
+
     document.addEventListener('DOMContentLoaded', () => {
         fetchProjects();
+        setInterval(fetchProjects, 60000);
     });
 </script>
 {% endblock %}
