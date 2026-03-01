@@ -220,6 +220,22 @@ class LighterBot:
 
     async def _load_account_info(self):
         """Load account information and get account index."""
+        configured_index_raw = os.getenv("LIGHTER_ACCOUNT_INDEX", "").strip()
+        if configured_index_raw:
+            try:
+                configured_index = int(configured_index_raw)
+                if await self._validate_account_index(configured_index):
+                    self.account_index = configured_index
+                    logger.info(f"Account index from env LIGHTER_ACCOUNT_INDEX: {self.account_index}")
+                    return
+                logger.warning(
+                    f"Configured LIGHTER_ACCOUNT_INDEX={configured_index} failed validation, continuing discovery"
+                )
+            except ValueError:
+                logger.warning(
+                    f"Invalid LIGHTER_ACCOUNT_INDEX value '{configured_index_raw}', continuing discovery"
+                )
+
         try:
             # Query accounts by the public key (L1 address)
             accounts = await self._call_lighter_api(
@@ -231,12 +247,60 @@ class LighterBot:
                 self.account_index = accounts.accounts[0].index
                 logger.info(f"Account index: {self.account_index}")
             else:
-                self.account_index = 0
-                logger.warning("Could not find account, using index 0")
+                discovered = await self._discover_account_index_by_api_key()
+                if discovered is not None:
+                    self.account_index = discovered
+                    logger.info(f"Account index discovered from API key: {self.account_index}")
+                else:
+                    self.account_index = 0
+                    logger.warning("Could not find account, using index 0")
 
         except Exception as e:
             logger.warning(f"Failed to load account info: {e}")
-            self.account_index = 0
+            discovered = await self._discover_account_index_by_api_key()
+            if discovered is not None:
+                self.account_index = discovered
+                logger.info(f"Recovered account index from API key: {self.account_index}")
+            else:
+                self.account_index = 0
+
+    async def _validate_account_index(self, account_index: int) -> bool:
+        """Validate account index by probing api key listing endpoint."""
+        if account_index < 0:
+            return False
+        try:
+            result = await self._call_lighter_api(
+                self.account_api.apikeys,
+                account_index=int(account_index),
+                api_key_index=0,
+            )
+            if result is None:
+                return False
+            api_keys = getattr(result, "api_keys", None) or getattr(result, "apikeys", None) or []
+            if not api_keys:
+                return False
+            if not self._pub_key:
+                return True
+            target = str(self._pub_key).lower().replace("0x", "")
+            for row in api_keys:
+                candidate = str(
+                    getattr(row, "public_key", None)
+                    or getattr(row, "pub_key", None)
+                    or ""
+                ).lower().replace("0x", "")
+                if candidate and (candidate == target or target.endswith(candidate) or candidate.endswith(target)):
+                    return True
+            return False
+        except Exception:
+            return False
+
+    async def _discover_account_index_by_api_key(self) -> Optional[int]:
+        """Brute-force a small account-index window and match configured API public key."""
+        for idx in range(0, 16):
+            ok = await self._validate_account_index(idx)
+            if ok:
+                return idx
+        return None
 
     async def start(self):
         """Start the bot's main trading loop."""
