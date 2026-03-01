@@ -53,6 +53,9 @@
     getLogs(params) {
       return request(withParams('/api/platform/logs', params));
     },
+    getTrades(params) {
+      return request(withParams('/api/platform/trades', params));
+    },
     getOrganization(refresh = false) {
       return request(withParams('/api/platform/organization', refresh ? { refresh: true } : {}));
     },

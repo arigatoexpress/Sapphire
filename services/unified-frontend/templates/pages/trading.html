@@ -144,9 +144,9 @@
         <div class="stat-change">Published + received</div>
     </div>
     <div class="stat-card">
-        <div class="stat-label">Execution Events (24h)</div>
+        <div class="stat-label">Verified Executions (24h)</div>
         <div class="stat-value" id="mi-executions">--</div>
-        <div class="stat-change">Trade-related logs</div>
+        <div class="stat-change">Real executed fills only</div>
     </div>
     <div class="stat-card">
         <div class="stat-label">Ingress Resilience</div>
@@ -180,12 +180,22 @@
     </div>
 </div>
 
-<div class="card" style="margin-bottom: var(--space-xl);">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-clock-rotate-left" style="margin-right: 8px; color: var(--accent);"></i>Recent Market & Signal Activity</h3>
+<div class="grid grid-2" style="margin-bottom: var(--space-xl);">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-signal" style="margin-right: 8px; color: var(--accent);"></i>Recent Signal Activity</h3>
+        </div>
+        <div class="card-body" id="mi-events">
+            <div class="loading"><div class="spinner"></div>Loading signal activity...</div>
+        </div>
     </div>
-    <div class="card-body" id="mi-events">
-        <div class="loading"><div class="spinner"></div>Loading recent activity...</div>
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-check-circle" style="margin-right: 8px; color: var(--success);"></i>Verified Trade Log</h3>
+        </div>
+        <div class="card-body" id="mi-executions-log">
+            <div class="loading"><div class="spinner"></div>Loading verified executions...</div>
+        </div>
     </div>
 </div>
 
@@ -211,6 +221,12 @@
         const n = Number(value || 0);
         if (!Number.isFinite(n)) return '--';
         return `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`;
+    }
+
+    function fmtUsd(value) {
+        const n = Number(value || 0);
+        if (!Number.isFinite(n)) return '$0.00';
+        return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
 
     function fmtTime(iso) {
@@ -239,23 +255,20 @@
         return m.includes('signal');
     }
 
-    function isExecutionEvent(message) {
-        const m = String(message || '').toLowerCase();
-        return m.includes('trade') || m.includes('execut');
-    }
-
     async function refreshMarketIntelligence() {
         try {
-            const [status, metrics, logsPayload, readiness] = await Promise.all([
+            const [status, metrics, logsPayload, readiness, tradesPayload] = await Promise.all([
                 window.platformApi.getStatus(),
                 window.platformApi.getMetrics(),
                 window.platformApi.getLogs({ hours: 24, limit: 80 }),
                 window.platformApi.getReadiness(),
+                window.platformApi.getTrades({ hours: 24, limit: 60 }),
             ]);
 
             const logs = logsPayload.logs || [];
             const signalEvents = logs.filter((row) => isSignalEvent(row.message)).length;
-            const executionEvents = logs.filter((row) => isExecutionEvent(row.message)).length;
+            const executions = tradesPayload.trades || [];
+            const executionEvents = executions.length;
             document.getElementById('mi-signals').textContent = fmtNumber(signalEvents);
             document.getElementById('mi-executions').textContent = fmtNumber(executionEvents);
 
@@ -336,12 +349,12 @@
 
             const eventRows = logs.filter((row) => {
                 const service = String(row.service || '').toLowerCase();
-                return ['gateway', 'webhook', 'trading', 'alpha', 'lighter'].some((token) => service.includes(token)) || isSignalEvent(row.message) || isExecutionEvent(row.message);
+                return ['gateway', 'webhook', 'trading', 'alpha', 'lighter'].some((token) => service.includes(token)) || isSignalEvent(row.message);
             }).slice(0, 12);
 
             const eventEl = document.getElementById('mi-events');
             if (!eventRows.length) {
-                eventEl.innerHTML = '<div class="empty-state"><p>No recent market events in the current window.</p></div>';
+                eventEl.innerHTML = '<div class="empty-state"><p>No recent signal events in the current window.</p></div>';
             } else {
                 eventEl.innerHTML = `
                     <div class="mi-events">
@@ -361,6 +374,31 @@
                 `;
             }
 
+            const executionEl = document.getElementById('mi-executions-log');
+            if (!executions.length) {
+                executionEl.innerHTML = '<div class="empty-state"><p>No verified executions in the current window.</p></div>';
+            } else {
+                executionEl.innerHTML = `
+                    <div class="mi-events">
+                        ${executions.slice(0, 12).map((row) => `
+                            <article class="mi-event">
+                                <div class="meta">
+                                    <span>${fmtTime(row.timestamp)}</span>
+                                    <span>•</span>
+                                    <span>${String(row.platform || 'unknown').toUpperCase()}</span>
+                                    <span>•</span>
+                                    <span class="badge badge-success">EXECUTED</span>
+                                </div>
+                                <div class="msg" style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                                    <span><strong>${row.side || '--'}</strong> ${row.symbol || '--'} · qty ${fmtNumber(row.filled_quantity || 0)}</span>
+                                    <span style="font-family:var(--font-mono);">${fmtUsd(row.realized_pnl || 0)}</span>
+                                </div>
+                            </article>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
             const chipRow = document.getElementById('mi-chip-row');
             chipRow.innerHTML = `
                 <span class="mi-chip"><i class="fas fa-signal"></i> ${signalEvents} signal events (24h)</span>
@@ -371,7 +409,8 @@
             console.error('Failed to refresh market intelligence:', error);
             document.getElementById('mi-market').innerHTML = '<div class="empty-state"><p>Unable to load market data.</p></div>';
             document.getElementById('mi-pipeline').innerHTML = '<div class="empty-state"><p>Unable to load pipeline status.</p></div>';
-            document.getElementById('mi-events').innerHTML = '<div class="empty-state"><p>Unable to load event feed.</p></div>';
+            document.getElementById('mi-events').innerHTML = '<div class="empty-state"><p>Unable to load signal feed.</p></div>';
+            document.getElementById('mi-executions-log').innerHTML = '<div class="empty-state"><p>Unable to load verified trade log.</p></div>';
         }
     }
 

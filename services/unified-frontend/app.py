@@ -36,6 +36,7 @@ CACHE_DURATION = int(os.environ.get('CACHE_DURATION', '10'))
 PRICE_CACHE_DURATION = int(os.environ.get('PRICE_CACHE_DURATION', '30'))
 GCP_PROJECT = os.environ.get('GCP_PROJECT', 'sapphire-479610')
 TRADING_METRICS_COLLECTION = os.environ.get('TRADING_METRICS_COLLECTION', 'trading_metrics')
+TRADE_EXECUTIONS_COLLECTION = os.environ.get('TRADE_EXECUTIONS_COLLECTION', 'trade_executions')
 SYSTEM_LOGS_COLLECTION = os.environ.get('SYSTEM_LOGS_COLLECTION', 'system_logs')
 EDGE_CAPABILITIES_COLLECTION = os.environ.get('EDGE_CAPABILITIES_COLLECTION', 'edge_capabilities')
 
@@ -217,6 +218,43 @@ def _iso_or_default(value, default=None):
     if parsed:
         return parsed.isoformat()
     return default or datetime.utcnow().isoformat()
+
+
+def _is_truthy(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        return value.strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
+    return False
+
+
+def _is_simulated_trade_payload(payload: dict | None) -> bool:
+    row = payload if isinstance(payload, dict) else {}
+    metadata = row.get('metadata') if isinstance(row.get('metadata'), dict) else {}
+
+    marker_keys = (
+        'dry_run',
+        'paper_trade',
+        'paper',
+        'test_event',
+        'is_test',
+        'simulated',
+        'sandbox',
+        'backtest',
+    )
+    for key in marker_keys:
+        if _is_truthy(row.get(key)) or _is_truthy(metadata.get(key)):
+            return True
+
+    trade_id = str(row.get('trade_id', '')).lower()
+    signal_id = str(row.get('signal_id', '')).lower()
+    message = str(row.get('message', '')).lower()
+    source = str(metadata.get('source', '')).lower()
+    haystack = ' '.join([trade_id, signal_id, message, source])
+    simulation_tokens = ('perf-check', 'perf-', 'test', 'mock', 'sandbox', 'paper', 'dry-run', 'dry_run')
+    return any(token in haystack for token in simulation_tokens)
 
 
 def _probe_http(url: str, timeout: float = 6, auth_required: bool = False):
@@ -746,35 +784,95 @@ def _normalize_trading_metrics_payload(raw=None, source='fallback', error=None):
     return payload
 
 
+def _fetch_verified_trading_metrics():
+    if db is None:
+        return None
+
+    now_utc = datetime.now(timezone.utc)
+    day_start = now_utc - timedelta(hours=24)
+    week_start = now_utc - timedelta(days=7)
+    month_start = now_utc - timedelta(days=30)
+
+    try:
+        docs = list(
+            db.collection(TRADE_EXECUTIONS_COLLECTION)
+            .where('timestamp', '>=', month_start.isoformat())
+            .order_by('timestamp', direction=firestore.Query.DESCENDING)
+            .limit(500)
+            .stream()
+        )
+    except Exception:
+        docs = list(
+            db.collection(TRADE_EXECUTIONS_COLLECTION)
+            .order_by('timestamp', direction=firestore.Query.DESCENDING)
+            .limit(800)
+            .stream()
+        )
+
+    daily_count = weekly_count = monthly_count = 0
+    daily_pnl = weekly_pnl = monthly_pnl = 0.0
+    wins = losses = 0
+
+    for doc in docs:
+        row = doc.to_dict() or {}
+        if _is_simulated_trade_payload(row):
+            continue
+
+        ts = _coerce_datetime(row.get('timestamp')) or now_utc
+        if ts < month_start:
+            continue
+
+        pnl = float(row.get('realized_pnl', 0.0) or 0.0)
+        success = _is_truthy(row.get('success'))
+
+        monthly_count += 1
+        monthly_pnl += pnl
+        if ts >= week_start:
+            weekly_count += 1
+            weekly_pnl += pnl
+        if ts >= day_start:
+            daily_count += 1
+            daily_pnl += pnl
+
+        if success and pnl >= 0:
+            wins += 1
+        else:
+            losses += 1
+
+    if monthly_count == 0:
+        return None
+
+    success_rate = round((wins / monthly_count) * 100.0, 2) if monthly_count > 0 else 0.0
+    raw = {
+        'timestamp': now_utc.isoformat(),
+        'pnl': {
+            'daily': round(daily_pnl, 6),
+            'weekly': round(weekly_pnl, 6),
+            'monthly': round(monthly_pnl, 6),
+            'total': round(monthly_pnl, 6),
+        },
+        'trades': {
+            'today': daily_count,
+            'total': monthly_count,
+            'success_rate': success_rate,
+            'wins': wins,
+            'losses': losses,
+        },
+        'positions': [],
+        'verified_execution_source': 'trade_executions',
+    }
+    return _normalize_trading_metrics_payload(raw, source='firestore_verified_executions')
+
+
 def _fetch_trading_metrics():
     if db is None:
         return _normalize_trading_metrics_payload(source='firestore_unavailable', error='firestore_unavailable')
 
-    try:
-        docs = list(
-            db.collection(TRADING_METRICS_COLLECTION)
-            .order_by('timestamp', direction=firestore.Query.DESCENDING)
-            .limit(1)
-            .stream()
-        )
-    except Exception:
-        # Fallback query when sort/index is not available.
-        docs = list(db.collection(TRADING_METRICS_COLLECTION).limit(25).stream())
-        docs.sort(
-            key=lambda doc: _coerce_datetime((doc.to_dict() or {}).get('timestamp')) or datetime.min,
-            reverse=True,
-        )
+    verified = _fetch_verified_trading_metrics()
+    if verified is not None:
+        return verified
 
-    if not docs:
-        derived = _derive_trading_metrics_from_logs(hours=72, limit=600)
-        if derived:
-            return derived
-        return _normalize_trading_metrics_payload(source='firestore_empty')
-
-    latest = docs[0]
-    raw = latest.to_dict() or {}
-    raw['timestamp'] = _iso_or_default(raw.get('timestamp'), default=latest.update_time.isoformat())
-    return _normalize_trading_metrics_payload(raw, source='firestore')
+    return _normalize_trading_metrics_payload(source='firestore_verified_empty', error='no_verified_executions')
 
 
 def _derive_trading_metrics_from_logs(hours: int = 72, limit: int = 600):
@@ -884,7 +982,13 @@ def _derive_trading_metrics_from_logs(hours: int = 72, limit: int = 600):
     return _normalize_trading_metrics_payload(raw, source='firestore_logs_derived')
 
 
-def _fetch_logs(hours: int = 24, limit: int = 100, service: str = '', level: str = ''):
+def _fetch_logs(
+    hours: int = 24,
+    limit: int = 100,
+    service: str = '',
+    level: str = '',
+    include_simulated: bool = False,
+):
     if db is None:
         return {'logs': [], 'count': 0, 'error': 'firestore_unavailable', 'source': 'firestore'}
 
@@ -897,6 +1001,10 @@ def _fetch_logs(hours: int = 24, limit: int = 100, service: str = '', level: str
         entry['service'] = str(entry.get('service', 'system'))
         entry['level'] = str(entry.get('level', 'INFO')).upper()
         entry['message'] = str(entry.get('message', ''))
+        entry['event_type'] = str(entry.get('event_type', '')).lower()
+        metadata = entry.get('metadata')
+        entry['metadata'] = metadata if isinstance(metadata, dict) else {}
+        entry['simulated'] = _is_simulated_trade_payload(entry)
         return entry
 
     try:
@@ -908,6 +1016,8 @@ def _fetch_logs(hours: int = 24, limit: int = 100, service: str = '', level: str
         query = query.order_by('timestamp', direction=firestore.Query.DESCENDING).limit(max(1, min(limit, 500)))
         docs = list(query.stream())
         logs = [_normalize_log(doc.id, doc.to_dict()) for doc in docs]
+        if not include_simulated:
+            logs = [row for row in logs if not row.get('simulated', False)]
         return {'logs': logs, 'count': len(logs), 'source': 'firestore'}
     except Exception as exc:
         # Fallback for index/where constraints: pull recent rows and filter in-memory.
@@ -928,10 +1038,83 @@ def _fetch_logs(hours: int = 24, limit: int = 100, service: str = '', level: str
                     continue
                 if level and str(log.get('level', '')).upper() != level.upper():
                     continue
+                if not include_simulated and log.get('simulated', False):
+                    continue
                 filtered.append(log)
             return {'logs': filtered[:limit], 'count': len(filtered), 'source': 'firestore_fallback', 'warning': str(exc)}
         except Exception as fallback_exc:
             return {'logs': [], 'count': 0, 'error': str(fallback_exc), 'source': 'firestore_error'}
+
+
+def _normalize_trade_record(doc_id, raw):
+    entry = dict(raw or {})
+    metadata = entry.get('metadata')
+    entry['metadata'] = metadata if isinstance(metadata, dict) else {}
+    entry['id'] = doc_id
+    entry['trade_id'] = str(entry.get('trade_id', doc_id))
+    entry['signal_id'] = str(entry.get('signal_id', ''))
+    entry['timestamp'] = _iso_or_default(entry.get('timestamp'))
+    entry['platform'] = str(entry.get('platform', 'unknown')).lower()
+    entry['symbol'] = str(entry.get('symbol', 'UNKNOWN')).upper()
+    entry['side'] = str(entry.get('side', 'UNKNOWN')).upper()
+    entry['success'] = bool(entry.get('success', False))
+    entry['realized_pnl'] = float(entry.get('realized_pnl', 0.0) or 0.0)
+    entry['filled_quantity'] = float(entry.get('filled_quantity', 0.0) or 0.0)
+    entry['avg_price'] = float(entry.get('avg_price', 0.0) or 0.0)
+    entry['simulated'] = _is_simulated_trade_payload(entry)
+    return entry
+
+
+def _fetch_trade_executions(
+    hours: int = 24,
+    limit: int = 100,
+    include_simulated: bool = False,
+    include_failed: bool = False,
+):
+    if db is None:
+        return {'trades': [], 'count': 0, 'error': 'firestore_unavailable', 'source': 'firestore'}
+
+    since = datetime.now(timezone.utc) - timedelta(hours=max(1, hours))
+    safe_limit = max(1, min(limit, 500))
+
+    try:
+        query = (
+            db.collection(TRADE_EXECUTIONS_COLLECTION)
+            .where('timestamp', '>=', since.isoformat())
+            .order_by('timestamp', direction=firestore.Query.DESCENDING)
+            .limit(safe_limit)
+        )
+        docs = list(query.stream())
+    except Exception:
+        docs = list(
+            db.collection(TRADE_EXECUTIONS_COLLECTION)
+            .order_by('timestamp', direction=firestore.Query.DESCENDING)
+            .limit(max(200, min(safe_limit * 4, 800)))
+            .stream()
+        )
+
+    rows = []
+    for doc in docs:
+        row = _normalize_trade_record(doc.id, doc.to_dict())
+        ts = _coerce_datetime(row.get('timestamp'))
+        if ts and ts < since:
+            continue
+        if not include_simulated and row.get('simulated', False):
+            continue
+        if not include_failed and not row.get('success', False):
+            continue
+        rows.append(row)
+
+    return {
+        'trades': rows[:safe_limit],
+        'count': len(rows[:safe_limit]),
+        'source': 'firestore',
+        'filters': {
+            'hours': max(1, hours),
+            'include_simulated': bool(include_simulated),
+            'include_failed': bool(include_failed),
+        },
+    }
 
 
 def _normalize_intel_item(raw: dict, fallback_source: str = 'alpha_engine') -> dict:
@@ -1819,7 +2002,33 @@ def api_platform_logs():
     limit = request.args.get('limit', 100, type=int)
     service = request.args.get('service', '')
     level = request.args.get('level', '')
-    return jsonify(_fetch_logs(hours=hours, limit=limit, service=service, level=level))
+    include_simulated = request.args.get('include_simulated', 'false').lower() == 'true'
+    return jsonify(
+        _fetch_logs(
+            hours=hours,
+            limit=limit,
+            service=service,
+            level=level,
+            include_simulated=include_simulated,
+        )
+    )
+
+
+@app.route('/api/platform/trades')
+@requires_auth
+def api_platform_trades():
+    hours = request.args.get('hours', 24, type=int)
+    limit = request.args.get('limit', 100, type=int)
+    include_simulated = request.args.get('include_simulated', 'false').lower() == 'true'
+    include_failed = request.args.get('include_failed', 'false').lower() == 'true'
+    return jsonify(
+        _fetch_trade_executions(
+            hours=hours,
+            limit=limit,
+            include_simulated=include_simulated,
+            include_failed=include_failed,
+        )
+    )
 
 
 @app.route('/api/platform/organization')
@@ -1864,7 +2073,16 @@ def api_logs():
     limit = request.args.get('limit', 100, type=int)
     service = request.args.get('service', '')
     level = request.args.get('level', '')
-    return jsonify(_fetch_logs(hours=hours, limit=limit, service=service, level=level))
+    include_simulated = request.args.get('include_simulated', 'false').lower() == 'true'
+    return jsonify(
+        _fetch_logs(
+            hours=hours,
+            limit=limit,
+            service=service,
+            level=level,
+            include_simulated=include_simulated,
+        )
+    )
 
 
 @app.route('/api/market/prices')
@@ -1898,6 +2116,12 @@ def api_production_readiness():
 @requires_auth
 def api_trading_metrics():
     return jsonify(_platform_metrics_payload().get('trading', {}))
+
+
+@app.route('/api/trades')
+@requires_auth
+def api_trades():
+    return api_platform_trades()
 
 
 @app.route('/api/windows-lab')
