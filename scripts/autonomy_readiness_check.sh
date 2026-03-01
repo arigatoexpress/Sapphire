@@ -50,9 +50,14 @@ check_platform_contracts() {
     "/api/platform/autonomy"
     "/api/platform/home-snapshot"
     "/api/platform/logs"
+    "/api/platform/trades"
     "/api/platform/organization"
     "/api/platform/readiness"
     "/api/platform/projects"
+    "/api/platform/intel-feed"
+    "/api/platform/superswarm"
+    "/api/platform/windows-lab"
+    "/api/platform/contracts"
   )
 
   for endpoint in "${endpoints[@]}"; do

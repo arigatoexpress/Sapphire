@@ -143,6 +143,113 @@ ORG_MODEL = {
     'safety_policy': 'Only adopt safe, validated improvements into autonomous production operations.',
 }
 
+PLATFORM_CONTRACTS = [
+    {
+        'name': 'status',
+        'path': '/api/platform/status',
+        'method': 'GET',
+        'auth': 'basic_or_public',
+        'category': 'core',
+        'description': 'Cross-environment service and node status snapshot.',
+    },
+    {
+        'name': 'metrics',
+        'path': '/api/platform/metrics',
+        'method': 'GET',
+        'auth': 'basic_or_public',
+        'category': 'core',
+        'description': 'Aggregated market, trading, and operations metrics.',
+    },
+    {
+        'name': 'autonomy',
+        'path': '/api/platform/autonomy',
+        'method': 'GET',
+        'auth': 'basic_or_public',
+        'category': 'autonomy',
+        'description': 'Autonomy loop controls, guardrails, and backlog telemetry.',
+    },
+    {
+        'name': 'home_snapshot',
+        'path': '/api/platform/home-snapshot',
+        'method': 'GET',
+        'auth': 'basic_or_public',
+        'category': 'core',
+        'description': 'Single-call payload for homepage hydration.',
+    },
+    {
+        'name': 'logs',
+        'path': '/api/platform/logs',
+        'method': 'GET',
+        'auth': 'basic_or_public',
+        'category': 'telemetry',
+        'description': 'Operational logs feed with filter support.',
+    },
+    {
+        'name': 'trades',
+        'path': '/api/platform/trades',
+        'method': 'GET',
+        'auth': 'basic_or_public',
+        'category': 'telemetry',
+        'description': 'Verified trade execution feed (simulation excluded by default).',
+    },
+    {
+        'name': 'organization',
+        'path': '/api/platform/organization',
+        'method': 'GET',
+        'auth': 'basic_or_public',
+        'category': 'organization',
+        'description': 'Organization model, PM hub integration, and structure analytics.',
+    },
+    {
+        'name': 'readiness',
+        'path': '/api/platform/readiness',
+        'method': 'GET',
+        'auth': 'basic_or_public',
+        'category': 'core',
+        'description': 'Readiness gates and blocker list.',
+    },
+    {
+        'name': 'projects',
+        'path': '/api/platform/projects',
+        'method': 'GET',
+        'auth': 'basic_or_public',
+        'category': 'organization',
+        'description': 'Project portfolio and delivery telemetry.',
+    },
+    {
+        'name': 'intel_feed',
+        'path': '/api/platform/intel-feed',
+        'method': 'GET',
+        'auth': 'basic_or_public',
+        'category': 'research',
+        'description': 'Market/research intelligence feed (alpha engine + safe fallback).',
+    },
+    {
+        'name': 'superswarm',
+        'path': '/api/platform/superswarm',
+        'method': 'GET',
+        'auth': 'basic_or_public',
+        'category': 'autonomy',
+        'description': 'Self-improvement analytics, loop state, and efficacy rollups.',
+    },
+    {
+        'name': 'windows_lab',
+        'path': '/api/platform/windows-lab',
+        'method': 'GET',
+        'auth': 'basic_or_public',
+        'category': 'infrastructure',
+        'description': 'Windows edge AI/model bench capability snapshot.',
+    },
+    {
+        'name': 'contracts',
+        'path': '/api/platform/contracts',
+        'method': 'GET',
+        'auth': 'basic_or_public',
+        'category': 'core',
+        'description': 'Machine-readable endpoint manifest for clients and checks.',
+    },
+]
+
 
 def check_auth(username, password):
     """Verify credentials"""
@@ -191,6 +298,15 @@ def requires_control_token(f):
             return jsonify({'error': 'unauthorized'}), 403
         return f(*args, **kwargs)
     return decorated
+
+
+@app.after_request
+def add_api_response_headers(response):
+    path = request.path or ''
+    if path.startswith('/api/'):
+        response.headers['Cache-Control'] = 'no-store, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+    return response
 
 
 @app.context_processor
@@ -649,11 +765,17 @@ def _build_readiness_payload(host_root: str):
     contract_checks = [
         run_contract_check('/api/platform/status', _collect_system_status),
         run_contract_check('/api/platform/metrics', _platform_metrics_payload),
+        run_contract_check('/api/platform/autonomy', _platform_autonomy_payload),
+        run_contract_check('/api/platform/home-snapshot', _platform_home_snapshot_payload),
         run_contract_check('/api/platform/logs', lambda: _fetch_logs(limit=1)),
+        run_contract_check('/api/platform/trades', lambda: _fetch_trade_executions(limit=1)),
         run_contract_check('/api/platform/superswarm', lambda: _platform_superswarm_payload(hours=24)),
         run_contract_check('/api/platform/organization', _platform_organization_payload),
         run_contract_check('/api/platform/readiness', lambda: True),
         run_contract_check('/api/platform/projects', _fetch_projects_payload),
+        run_contract_check('/api/platform/intel-feed', lambda: _fetch_intel_feed_payload(limit=3)),
+        run_contract_check('/api/platform/windows-lab', _fetch_windows_lab_payload),
+        run_contract_check('/api/platform/contracts', _platform_contracts_payload),
     ]
 
     contract_ok = all(check.get('healthy', False) for check in contract_checks)
@@ -2317,6 +2439,58 @@ def _platform_organization_payload(refresh: bool = False):
     return payload
 
 
+def _platform_contracts_payload():
+    host_root = (request.url_root or '').rstrip('/')
+    revision = os.environ.get('K_REVISION', '')
+
+    endpoints = []
+    for row in PLATFORM_CONTRACTS:
+        path = row.get('path', '')
+        endpoints.append(
+            {
+                **row,
+                'url': f"{host_root}{path}" if host_root and path.startswith('/') else path,
+                'auth_required': bool(ENABLE_AUTH),
+                'public_available': not ENABLE_AUTH,
+            }
+        )
+
+    return {
+        'name': 'Sapphire Platform Contract Manifest',
+        'version': 'v1',
+        'generated_at': datetime.utcnow().isoformat(),
+        'revision': revision,
+        'auth': {
+            'enabled': bool(ENABLE_AUTH),
+            'mode': 'basic' if ENABLE_AUTH else 'public',
+            'public_read_only': bool(PUBLIC_READ_ONLY),
+        },
+        'endpoints': endpoints,
+        'counts': {
+            'total': len(endpoints),
+            'categories': sorted({item.get('category', 'core') for item in endpoints}),
+        },
+        'aliases': {
+            '/api/status': '/api/platform/status',
+            '/api/trading/metrics': '/api/platform/metrics',
+            '/api/logs': '/api/platform/logs',
+            '/api/trades': '/api/platform/trades',
+            '/api/organization': '/api/platform/organization',
+            '/api/production/readiness': '/api/platform/readiness',
+            '/api/projects': '/api/platform/projects',
+            '/api/intel/feed': '/api/platform/intel-feed',
+            '/api/superswarm': '/api/platform/superswarm',
+            '/api/windows-lab': '/api/platform/windows-lab',
+            '/api/contracts': '/api/platform/contracts',
+        },
+        'notes': [
+            'Use /api/platform/* contracts for all new clients.',
+            'Legacy aliases are maintained for compatibility and will be retired after migration.',
+            'Control/mutation routes are not public and require explicit control token.',
+        ],
+    }
+
+
 # ---------------------------------------------------------------------------
 # PAGE ROUTES
 # ---------------------------------------------------------------------------
@@ -2532,6 +2706,12 @@ def api_platform_windows_lab():
     return jsonify(_fetch_windows_lab_payload())
 
 
+@app.route('/api/platform/contracts')
+@requires_auth
+def api_platform_contracts():
+    return jsonify(_platform_contracts_payload())
+
+
 @app.route('/api/logs')
 @requires_auth
 def api_logs():
@@ -2606,6 +2786,12 @@ def api_intel_feed():
 @requires_auth
 def api_superswarm():
     return api_platform_superswarm()
+
+
+@app.route('/api/contracts')
+@requires_auth
+def api_contracts():
+    return api_platform_contracts()
 
 
 @app.route('/jobs/superswarm/hourly-rollup', methods=['POST', 'GET'])

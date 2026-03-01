@@ -74,5 +74,8 @@
     getSuperswarm(params) {
       return request(withParams('/api/platform/superswarm', params));
     },
+    getContracts() {
+      return request('/api/platform/contracts');
+    },
   };
 })();

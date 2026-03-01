@@ -25,11 +25,14 @@ for path in \
   /api/platform/autonomy \
   /api/platform/home-snapshot \
   /api/platform/logs \
+  /api/platform/trades \
   /api/platform/organization \
   /api/platform/readiness \
   /api/platform/projects \
   /api/platform/intel-feed \
-  /api/platform/superswarm
+  /api/platform/superswarm \
+  /api/platform/windows-lab \
+  /api/platform/contracts
   do
   check_endpoint "$path"
 done
@@ -107,8 +110,14 @@ gcloud run services list \
   --region "$REGION" \
   --format='table(metadata.name,status.latestReadyRevisionName,status.traffic[0].percent)'
 
-printf "\n[extra] Windows lab capabilities snapshot\n"
-check_endpoint /api/platform/windows-lab
+printf "\n[extra] Contract manifest snapshot\n"
+curl -s -u "$AUTH" "$DOMAIN/api/platform/contracts" | python3 -c '
+import json,sys
+p=json.load(sys.stdin)
+print("contract_version=", p.get("version"))
+print("endpoint_count=", (p.get("counts") or {}).get("total"))
+print("auth_enabled=", (p.get("auth") or {}).get("enabled"))
+'
 
 printf "\n[6/7] Scheduler inventory\n"
 gcloud scheduler jobs list \
