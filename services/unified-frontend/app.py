@@ -766,12 +766,122 @@ def _fetch_trading_metrics():
         )
 
     if not docs:
+        derived = _derive_trading_metrics_from_logs(hours=72, limit=600)
+        if derived:
+            return derived
         return _normalize_trading_metrics_payload(source='firestore_empty')
 
     latest = docs[0]
     raw = latest.to_dict() or {}
     raw['timestamp'] = _iso_or_default(raw.get('timestamp'), default=latest.update_time.isoformat())
     return _normalize_trading_metrics_payload(raw, source='firestore')
+
+
+def _derive_trading_metrics_from_logs(hours: int = 72, limit: int = 600):
+    logs_payload = _fetch_logs(hours=max(24, hours), limit=max(120, limit))
+    logs = logs_payload.get('logs', [])
+    if not logs:
+        return None
+
+    now_utc = datetime.now(timezone.utc)
+    day_start = now_utc - timedelta(hours=24)
+    week_start = now_utc - timedelta(days=7)
+    month_start = now_utc - timedelta(days=30)
+
+    signal_received = 0
+    signal_published = 0
+    signal_failed = 0
+
+    daily_count = 0
+    weekly_count = 0
+    monthly_count = 0
+    daily_pnl = 0.0
+    weekly_pnl = 0.0
+    monthly_pnl = 0.0
+    wins = 0
+    losses = 0
+
+    def _extract_pnl(row: dict) -> float:
+        metadata = row.get('metadata', {}) if isinstance(row.get('metadata'), dict) else {}
+        for key in ('realized_pnl', 'pnl', 'net_pnl', 'profit'):
+            value = row.get(key)
+            if value is None:
+                value = metadata.get(key)
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                continue
+        return 0.0
+
+    for row in logs:
+        event_type = str(row.get('event_type', '')).strip().lower()
+        message = str(row.get('message', '')).strip().lower()
+        ts = _coerce_datetime(row.get('timestamp'))
+        if ts is None:
+            ts = now_utc
+
+        if event_type == 'signal_received' or 'signal received' in message:
+            signal_received += 1
+        elif event_type == 'signal_published' or ('signal published' in message and 'trade' not in message):
+            signal_published += 1
+        elif event_type == 'signal_publish_failed' or 'signal publish failed' in message:
+            signal_failed += 1
+
+        trade_event = event_type in {'trade_executed', 'trade_execution_failed'} or 'trade executed' in message or 'trade failed' in message
+        if not trade_event:
+            continue
+
+        pnl = _extract_pnl(row)
+        if ts >= month_start:
+            monthly_count += 1
+            monthly_pnl += pnl
+        if ts >= week_start:
+            weekly_count += 1
+            weekly_pnl += pnl
+        if ts >= day_start:
+            daily_count += 1
+            daily_pnl += pnl
+
+        if event_type == 'trade_execution_failed' or 'trade failed' in message:
+            losses += 1
+        elif pnl >= 0:
+            wins += 1
+        else:
+            losses += 1
+
+    has_trading_or_signals = any(
+        [signal_received, signal_published, signal_failed, daily_count, weekly_count, monthly_count]
+    )
+    if not has_trading_or_signals:
+        return None
+
+    total_trades = monthly_count
+    success_rate = round((wins / total_trades) * 100.0, 2) if total_trades > 0 else 0.0
+
+    raw = {
+        'timestamp': now_utc.isoformat(),
+        'pnl': {
+            'daily': round(daily_pnl, 6),
+            'weekly': round(weekly_pnl, 6),
+            'monthly': round(monthly_pnl, 6),
+            'total': round(monthly_pnl, 6),
+        },
+        'trades': {
+            'today': daily_count,
+            'total': total_trades,
+            'success_rate': success_rate,
+            'wins': wins,
+            'losses': losses,
+        },
+        'signals': {
+            'received': signal_received,
+            'published': signal_published,
+            'publish_failed': signal_failed,
+            'window_hours': max(24, hours),
+        },
+        'positions': [],
+    }
+    return _normalize_trading_metrics_payload(raw, source='firestore_logs_derived')
 
 
 def _fetch_logs(hours: int = 24, limit: int = 100, service: str = '', level: str = ''):

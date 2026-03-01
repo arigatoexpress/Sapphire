@@ -15,6 +15,7 @@ CPU="${CPU:-1}"
 MEMORY="${MEMORY:-1Gi}"
 CONCURRENCY="${CONCURRENCY:-80}"
 TIMEOUT="${TIMEOUT:-300}"
+MIN_INSTANCES="${MIN_INSTANCES:-1}"
 PORT="${PORT:-8080}"
 SERVICE_ACCOUNT="${SERVICE_ACCOUNT:-sapphire-main-sa@${PROJECT_ID}.iam.gserviceaccount.com}"
 BUILD_SERVICE_ACCOUNT="${BUILD_SERVICE_ACCOUNT:-sapphirev3@${PROJECT_ID}.iam.gserviceaccount.com}"
@@ -158,6 +159,7 @@ gcloud run deploy "${SERVICE_NAME}" \
   --cpu "${CPU}" \
   --concurrency "${CONCURRENCY}" \
   --timeout "${TIMEOUT}" \
+  --min-instances "${MIN_INSTANCES}" \
   --port "${PORT}" \
   --update-env-vars "GCP_PROJECT_ID=${GCP_PROJECT_ID_ENV}" \
   --update-env-vars "SERVICE_NAME=${SERVICE_NAME_ENV}" \

@@ -59,11 +59,12 @@ from shared.dual_speed_cognition import DualSpeedCognition, CognitionRequest, Co
 from health import start_health_server
 from smart_notifications import notification_manager
 try:
-    from telegram_bot import SAPPHIRE, OBSIDIAN, EMERALD
+    from telegram_bot import SAPPHIRE, OBSIDIAN, EMERALD, SCOUT
 except Exception:
     SAPPHIRE = "SAPPHIRE"
     OBSIDIAN = "OBSIDIAN"
     EMERALD = "EMERALD"
+    SCOUT = "SCOUT"
 
 # Install uvloop as the default event loop policy
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())

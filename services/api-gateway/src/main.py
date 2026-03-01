@@ -16,7 +16,7 @@ import uuid
 # Add shared library to path
 import sys
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
@@ -27,6 +27,11 @@ try:
     from google.cloud import firestore as g_firestore
 except ImportError:  # pragma: no cover
     g_firestore = None
+
+try:
+    from google.api_core.exceptions import AlreadyExists
+except ImportError:  # pragma: no cover
+    AlreadyExists = Exception
 
 # ─── API Auth ────────────────────────────────────────────────────────────────
 
@@ -69,6 +74,9 @@ TRADINGVIEW_IDEMPOTENCY_MAX_KEYS = max(
     50, int(os.getenv("SAPPHIRE_TRADINGVIEW_IDEMPOTENCY_MAX_KEYS", "1000"))
 )
 SYSTEM_LOGS_COLLECTION = os.getenv("SYSTEM_LOGS_COLLECTION", "system_logs")
+TRADE_EXECUTIONS_COLLECTION = os.getenv("TRADE_EXECUTIONS_COLLECTION", "trade_executions")
+TRADING_METRICS_COLLECTION = os.getenv("TRADING_METRICS_COLLECTION", "trading_metrics")
+TRADING_METRICS_DOC_ID = os.getenv("TRADING_METRICS_DOC_ID", "current")
 
 VALID_TV_ACTIONS = {
     "buy",
@@ -299,6 +307,265 @@ def _write_system_log(
         logger.warning("Firestore log write failed: %s", exc)
 
 
+def _parse_timestamp(value: Any) -> datetime:
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return datetime.now(timezone.utc)
+        try:
+            parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        except ValueError:
+            return datetime.now(timezone.utc)
+    else:
+        return datetime.now(timezone.utc)
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _extract_trade_pnl(payload: Dict[str, Any]) -> float:
+    for key in ("realized_pnl", "pnl", "net_pnl", "profit", "realizedPnl", "netPnl"):
+        value = _coerce_float(payload.get(key), default=None)
+        if value is not None:
+            return float(value)
+    metadata = payload.get("metadata", {})
+    if isinstance(metadata, dict):
+        for key in ("realized_pnl", "pnl", "net_pnl", "profit"):
+            value = _coerce_float(metadata.get(key), default=None)
+            if value is not None:
+                return float(value)
+    return 0.0
+
+
+def _extract_trade_success(payload: Dict[str, Any], pnl: float) -> bool:
+    raw_success = payload.get("success")
+    if isinstance(raw_success, bool):
+        return raw_success
+    if raw_success is not None:
+        text = str(raw_success).strip().lower()
+        if text in {"1", "true", "yes", "ok", "success", "filled"}:
+            return True
+        if text in {"0", "false", "no", "failed", "error", "rejected"}:
+            return False
+
+    status = str(payload.get("status", "")).strip().lower()
+    if status in {"filled", "executed", "success", "ok"}:
+        return True
+    if status in {"failed", "rejected", "error"}:
+        return False
+
+    # Conservative fallback when no explicit status is present.
+    return pnl >= 0.0
+
+
+def _build_trade_execution_event(data: Dict[str, Any]) -> Dict[str, Any]:
+    event = dict(data or {})
+    timestamp_dt = _parse_timestamp(event.get("timestamp"))
+    symbol = _normalize_tv_symbol(_extract_text(event, ["symbol", "ticker", "pair", "instrument"]))
+    platform = str(event.get("platform", "unknown")).strip().lower() or "unknown"
+    side = str(event.get("side", "")).strip().upper()
+    signal_id = _extract_text(event, ["signal_id", "signalId"], default="")
+    pnl = _extract_trade_pnl(event)
+    success = _extract_trade_success(event, pnl)
+    quantity = _coerce_float(event.get("filled_quantity"), default=0.0) or 0.0
+    avg_price = _coerce_float(event.get("avg_price"), default=0.0) or 0.0
+    fee = _coerce_float(event.get("fee"), default=0.0) or 0.0
+    execution_time_ms = _coerce_float(event.get("execution_time_ms"), default=0.0) or 0.0
+    error_message = str(event.get("error_message", "")).strip()
+    metadata = event.get("metadata", {})
+    if not isinstance(metadata, dict):
+        metadata = {}
+
+    trade_id = _extract_text(event, ["trade_id", "tradeId"], default="")
+    if not trade_id:
+        seed = json.dumps(
+            {
+                "signal_id": signal_id,
+                "platform": platform,
+                "symbol": symbol,
+                "side": side,
+                "timestamp": timestamp_dt.isoformat(),
+                "qty": quantity,
+                "price": avg_price,
+            },
+            sort_keys=True,
+            default=str,
+        )
+        trade_id = f"trade-{hashlib.sha256(seed.encode('utf-8')).hexdigest()[:20]}"
+
+    return {
+        "trade_id": trade_id,
+        "signal_id": signal_id or None,
+        "platform": platform,
+        "symbol": symbol or "UNKNOWN",
+        "side": side or "UNKNOWN",
+        "success": bool(success),
+        "realized_pnl": float(pnl),
+        "filled_quantity": float(quantity),
+        "avg_price": float(avg_price),
+        "fee": float(fee),
+        "execution_time_ms": float(execution_time_ms),
+        "error_message": error_message or None,
+        "timestamp": timestamp_dt.isoformat(),
+        "received_at": _utc_now_iso(),
+        "metadata": metadata,
+    }
+
+
+def _compute_window_metrics(client: Any) -> Dict[str, Any]:
+    now = datetime.now(timezone.utc)
+    day_start = now - timedelta(hours=24)
+    week_start = now - timedelta(days=7)
+    month_start = now - timedelta(days=30)
+
+    month_docs = list(
+        client.collection(TRADE_EXECUTIONS_COLLECTION)
+        .where("timestamp", ">=", month_start.isoformat())
+        .stream()
+    )
+
+    daily = {"count": 0, "pnl": 0.0}
+    weekly = {"count": 0, "pnl": 0.0}
+    monthly = {"count": 0, "pnl": 0.0}
+
+    for doc in month_docs:
+        row = doc.to_dict() or {}
+        ts = _parse_timestamp(row.get("timestamp"))
+        pnl = _coerce_float(row.get("realized_pnl"), default=0.0) or 0.0
+        monthly["count"] += 1
+        monthly["pnl"] += pnl
+        if ts >= week_start:
+            weekly["count"] += 1
+            weekly["pnl"] += pnl
+        if ts >= day_start:
+            daily["count"] += 1
+            daily["pnl"] += pnl
+
+    return {
+        "daily": {"count": int(daily["count"]), "pnl": float(round(daily["pnl"], 6))},
+        "weekly": {"count": int(weekly["count"]), "pnl": float(round(weekly["pnl"], 6))},
+        "monthly": {"count": int(monthly["count"]), "pnl": float(round(monthly["pnl"], 6))},
+        "window_days": 30,
+    }
+
+
+def _update_trading_metrics_snapshot(event: Dict[str, Any]) -> Dict[str, Any]:
+    client = _get_firestore_client()
+    if client is None or g_firestore is None:
+        return {"ok": False, "reason": "firestore_unavailable"}
+
+    metrics_ref = client.collection(TRADING_METRICS_COLLECTION).document(TRADING_METRICS_DOC_ID)
+    pnl = float(event.get("realized_pnl", 0.0) or 0.0)
+    success = bool(event.get("success", False))
+    wins_delta = 1 if success and pnl >= 0 else 0
+    losses_delta = 1 if (not success) or pnl < 0 else 0
+
+    metrics_ref.set(
+        {
+            "updated_at": _utc_now_iso(),
+            "last_trade_id": event.get("trade_id"),
+            "last_trade_symbol": event.get("symbol"),
+            "last_trade_platform": event.get("platform"),
+            "last_trade_success": success,
+            "last_trade_pnl": pnl,
+            "trades_total": g_firestore.Increment(1),
+            "wins_total": g_firestore.Increment(wins_delta),
+            "losses_total": g_firestore.Increment(losses_delta),
+            "realized_pnl_total": g_firestore.Increment(pnl),
+        },
+        merge=True,
+    )
+
+    metrics_doc = metrics_ref.get()
+    metrics_data = metrics_doc.to_dict() or {}
+    total_trades = int(metrics_data.get("trades_total", 0) or 0)
+    wins_total = int(metrics_data.get("wins_total", 0) or 0)
+    losses_total = int(metrics_data.get("losses_total", 0) or 0)
+    total_pnl = float(metrics_data.get("realized_pnl_total", 0.0) or 0.0)
+    success_rate = round((wins_total / total_trades) * 100.0, 2) if total_trades > 0 else 0.0
+    windows = _compute_window_metrics(client)
+
+    payload = {
+        "timestamp": _utc_now_iso(),
+        "source": "api_gateway_trade_executions",
+        "pnl": {
+            "daily": windows["daily"]["pnl"],
+            "weekly": windows["weekly"]["pnl"],
+            "monthly": windows["monthly"]["pnl"],
+            "total": float(round(total_pnl, 6)),
+        },
+        "trades": {
+            "today": windows["daily"]["count"],
+            "total": total_trades,
+            "success_rate": success_rate,
+            "wins": wins_total,
+            "losses": losses_total,
+            "failed": losses_total,
+        },
+        "positions": state.get_all_positions(),
+        "windows": windows,
+        # Legacy compatibility fields.
+        "pnl_24h": windows["daily"]["pnl"],
+        "pnl_7d": windows["weekly"]["pnl"],
+        "pnl_30d": windows["monthly"]["pnl"],
+        "win_rate": success_rate,
+        "trades_today": windows["daily"]["count"],
+        "trades_limit": total_trades,
+    }
+    metrics_ref.set(payload, merge=True)
+    return {"ok": True, "snapshot": payload}
+
+
+def _record_trade_execution(data: Dict[str, Any]) -> Dict[str, Any]:
+    client = _get_firestore_client()
+    if client is None:
+        return {"stored": False, "reason": "firestore_unavailable"}
+
+    event = _build_trade_execution_event(data)
+    trade_id = str(event.get("trade_id", "")).strip()
+    if not trade_id:
+        return {"stored": False, "reason": "invalid_trade_id", "event": event}
+
+    try:
+        client.collection(TRADE_EXECUTIONS_COLLECTION).document(trade_id).create(event)
+    except AlreadyExists:
+        return {"stored": False, "duplicate": True, "event": event}
+    except Exception as exc:
+        return {"stored": False, "error": str(exc), "event": event}
+
+    snapshot = _update_trading_metrics_snapshot(event)
+    return {"stored": True, "event": event, "snapshot": snapshot}
+
+
+def _fetch_trade_history_from_firestore(limit: int = 50) -> List[Dict[str, Any]]:
+    client = _get_firestore_client()
+    if client is None:
+        return []
+    safe_limit = max(1, min(int(limit or 50), 500))
+    try:
+        docs = list(
+            client.collection(TRADE_EXECUTIONS_COLLECTION)
+            .order_by("timestamp", direction=g_firestore.Query.DESCENDING)
+            .limit(safe_limit)
+            .stream()
+        )
+    except Exception:
+        docs = list(client.collection(TRADE_EXECUTIONS_COLLECTION).limit(safe_limit).stream())
+        docs.sort(
+            key=lambda doc: _parse_timestamp((doc.to_dict() or {}).get("timestamp")),
+            reverse=True,
+        )
+
+    rows: List[Dict[str, Any]] = []
+    for doc in docs:
+        payload = doc.to_dict() or {}
+        payload.setdefault("trade_id", doc.id)
+        rows.append(payload)
+    return rows[:safe_limit]
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize and cleanup on startup/shutdown."""
@@ -420,6 +687,42 @@ async def handle_trade_executed(data: Dict[str, Any]):
     # Keep last 1000 trades
     if len(state.trade_history) > 1000:
         state.trade_history = state.trade_history[-1000:]
+
+    persist_result = _record_trade_execution(data)
+    event = persist_result.get("event", {})
+    if persist_result.get("stored"):
+        success = bool(event.get("success", False))
+        event_type = "trade_executed" if success else "trade_execution_failed"
+        level = "OK" if success else "WARN"
+        pnl = float(event.get("realized_pnl", 0.0) or 0.0)
+        symbol = str(event.get("symbol", "UNKNOWN"))
+        side = str(event.get("side", "UNKNOWN"))
+        platform = str(event.get("platform", "unknown"))
+        message = (
+            f"Trade executed {symbol} {side} on {platform} | pnl={pnl:+.4f}"
+            if success
+            else f"Trade failed {symbol} {side} on {platform}"
+        )
+        _write_system_log(
+            level=level,
+            message=message,
+            event_type=event_type,
+            signal_id=event.get("signal_id"),
+            symbol=symbol,
+            action=side.lower(),
+            metadata={
+                "platform": platform,
+                "trade_id": event.get("trade_id"),
+                "realized_pnl": pnl,
+                "filled_quantity": event.get("filled_quantity"),
+                "avg_price": event.get("avg_price"),
+                "success": success,
+            },
+        )
+    elif persist_result.get("duplicate"):
+        logger.info("Duplicate trade execution ignored: %s", event.get("trade_id"))
+    elif persist_result.get("error"):
+        logger.warning("Trade execution persistence failed: %s", persist_result.get("error"))
 
     await broadcast_ws(
         {
@@ -601,7 +904,11 @@ async def get_platform_positions(platform: str):
 @app.get("/api/trades")
 async def get_trades(limit: int = 50):
     """Get recent trade history."""
-    return {"trades": state.trade_history[-limit:]}
+    safe_limit = max(1, min(int(limit or 50), 500))
+    in_memory = state.trade_history[-safe_limit:]
+    if in_memory:
+        return {"trades": in_memory}
+    return {"trades": _fetch_trade_history_from_firestore(limit=safe_limit)}
 
 
 def _validate_tradingview_secret(payload: Dict[str, Any], header_secret: Optional[str]) -> None:

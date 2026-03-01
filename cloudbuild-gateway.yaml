@@ -28,6 +28,8 @@ steps:
       - 'sapphire-479610'
       - '--service-account'
       - 'sapphirev3@sapphire-479610.iam.gserviceaccount.com'
+      - '--set-env-vars'
+      - 'GCP_PROJECT_ID=sapphire-479610,SERVICE_NAME=sapphire-gateway,SYSTEM_LOGS_COLLECTION=system_logs,TRADING_METRICS_COLLECTION=trading_metrics,TRADE_EXECUTIONS_COLLECTION=trade_executions'
       - '--update-secrets'
       - 'SAPPHIRE_CONTROL_API_TOKEN=SAPPHIRE_CONTROL_API_TOKEN:latest,SAPPHIRE_TRADINGVIEW_WEBHOOK_SECRET=SAPPHIRE_TRADINGVIEW_WEBHOOK_SECRET:latest'
     id: 'deploy-gateway'

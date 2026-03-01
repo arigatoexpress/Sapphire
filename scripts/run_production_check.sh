@@ -62,6 +62,18 @@ for b in blockers[:5]:
     print(" -", b.get("gate"), b.get("name"), b.get("error"))
 '
 
+printf "\n[extra] Trading telemetry snapshot\n"
+curl -s -u "$AUTH" "$DOMAIN/api/platform/metrics" | python3 -c '
+import json,sys
+p=json.load(sys.stdin)
+t=(p.get("trading") or {})
+print("source=", t.get("source"))
+tr=(t.get("trades") or {})
+pnl=(t.get("pnl") or {})
+print("trades_today=", tr.get("today"), "trades_total=", tr.get("total"), "success_rate=", tr.get("success_rate"))
+print("pnl_daily=", pnl.get("daily"), "pnl_weekly=", pnl.get("weekly"), "pnl_monthly=", pnl.get("monthly"), "pnl_total=", pnl.get("total"))
+'
+
 printf "\n[4/7] Gateway failover ingress\n"
 GATEWAY_URL=$(gcloud run services describe sapphire-gateway \
   --project "$PROJECT_ID" \
