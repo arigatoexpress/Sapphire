@@ -35,3 +35,23 @@ Behavior:
 - Mobile-first shell improvements in `base.html`
 - New tactical but business-facing feed surface (`/feed`)
 - Security/privacy messaging updated (including zk attestation roadmap)
+
+## 2026-03-01 hardening update
+- SCOUT sandbox now exposes a dedicated collector endpoint:
+  - `POST /v1/intel/glint_collect`
+  - file: `services/scout-sandbox/app.py`
+- Collector policy remains allowlisted + token-gated:
+  - host/path checks for `glint.trade/feed`
+  - optional authenticated Glint API mode via:
+    - `SCOUT_SANDBOX_INTEL_GLINT_API_URL`
+    - `SCOUT_SANDBOX_INTEL_GLINT_BEARER_TOKEN` (secret-backed)
+- Alpha-engine now consumes Glint intel through SCOUT sandbox by default:
+  - file: `services/alpha-engine/src/feeds/intel_feed.py`
+  - env toggles wired in deploy script:
+    - `SAPPHIRE_GLINT_USE_SCOUT_SANDBOX`
+    - `SAPPHIRE_GLINT_SOURCE_URL`
+    - `SAPPHIRE_GLINT_SANDBOX_LIMIT`
+- Unified frontend intel contract hardened against transient upstream failures:
+  - `_get_json()` retries transient HTTP/network errors before fallback.
+  - `/api/platform/intel-feed` performs a forced refresh retry before degrading to Firestore logs.
+  - file: `services/unified-frontend/app.py`

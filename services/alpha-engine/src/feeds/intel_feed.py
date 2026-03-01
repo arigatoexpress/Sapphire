@@ -6,7 +6,7 @@ Provides a Glint-style intelligence feed from stable, public sources:
   - Hacker News (crypto + AI)
   - GitHub repository momentum (AI-focused)
 
-Optional Glint page scraping is sandbox-gated and disabled by default.
+Optional Glint collection is routed through the SCOUT sandbox by default.
 """
 
 from __future__ import annotations
@@ -91,6 +91,21 @@ class IntelFeedAggregator:
         self._glint_scrape_enabled = _env_flag("SAPPHIRE_GLINT_SCRAPE_ENABLED", default=False)
         self._glint_sandbox_only = _env_flag(
             "SAPPHIRE_GLINT_SCRAPE_SANDBOX_ONLY", default=True
+        )
+        self._glint_use_scout_sandbox = _env_flag(
+            "SAPPHIRE_GLINT_USE_SCOUT_SANDBOX", default=True
+        )
+        self._scout_sandbox_url = str(os.getenv("SAPPHIRE_SCOUT_SANDBOX_URL", "")).strip().rstrip("/")
+        self._scout_sandbox_token = str(os.getenv("SAPPHIRE_SCOUT_SANDBOX_TOKEN", "")).strip()
+        self._glint_source_url = str(
+            os.getenv("SAPPHIRE_GLINT_SOURCE_URL", "https://glint.trade/feed")
+        ).strip()
+        self._glint_sandbox_limit = max(
+            1, min(int(os.getenv("SAPPHIRE_GLINT_SANDBOX_LIMIT", "24")), 100)
+        )
+        self._glint_sandbox_query = str(os.getenv("SAPPHIRE_GLINT_SANDBOX_QUERY", "")).strip()
+        self._glint_sandbox_timeout_seconds = max(
+            5, min(int(os.getenv("SAPPHIRE_GLINT_SANDBOX_TIMEOUT_SECONDS", "14")), 30)
         )
         self._runtime_env = str(
             os.getenv("SAPPHIRE_ENV", os.getenv("ENVIRONMENT", "production"))
@@ -396,7 +411,15 @@ class IntelFeedAggregator:
             status["consecutive_errors"] = 0
             return []
 
-        if self._glint_sandbox_only and self._runtime_env not in {"sandbox", "dev", "development", "staging"}:
+        if self._glint_use_scout_sandbox:
+            return await self._pull_glint_feed_from_scout_sandbox()
+
+        if self._glint_sandbox_only and self._runtime_env not in {
+            "sandbox",
+            "dev",
+            "development",
+            "staging",
+        }:
             status["healthy"] = True
             status["status"] = "blocked_outside_sandbox"
             status["items"] = 0
@@ -405,7 +428,81 @@ class IntelFeedAggregator:
             status["consecutive_errors"] = 0
             return []
 
-        html = await self._fetch_text("https://glint.trade/feed", timeout=10.0)
+        return await self._pull_glint_feed_direct()
+
+    async def _pull_glint_feed_from_scout_sandbox(self) -> List[Dict[str, Any]]:
+        if not self._session:
+            raise RuntimeError("session_unavailable")
+        if not self._scout_sandbox_url:
+            raise RuntimeError("sandbox_url_missing")
+        if not self._scout_sandbox_token:
+            raise RuntimeError("sandbox_token_missing")
+
+        endpoint = f"{self._scout_sandbox_url}/v1/intel/glint_collect"
+        payload = {
+            "limit": self._glint_sandbox_limit,
+            "query": self._glint_sandbox_query,
+            "source_url": self._glint_source_url,
+        }
+        headers = {
+            "Content-Type": "application/json",
+            "X-Scout-Sandbox-Token": self._scout_sandbox_token,
+        }
+        timeout = aiohttp.ClientTimeout(total=self._glint_sandbox_timeout_seconds)
+        async with self._session.post(
+            endpoint,
+            json=payload,
+            headers=headers,
+            timeout=timeout,
+        ) as resp:
+            if resp.status >= 400:
+                raise RuntimeError(f"sandbox_http_{resp.status}")
+            data = await resp.json(content_type=None)
+
+        if not isinstance(data, dict):
+            raise RuntimeError("sandbox_response_invalid")
+        if not bool(data.get("ok", False)):
+            reason = str(data.get("reason", "collect_failed")).strip()[:120]
+            raise RuntimeError(f"sandbox_collect_failed:{reason}")
+
+        rows = data.get("items", [])
+        if not isinstance(rows, list):
+            return []
+
+        items: List[Dict[str, Any]] = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            title = _clean_text(row.get("title", ""), limit=220)
+            if not title:
+                continue
+            summary = row.get("summary") or "Collected by SCOUT sandbox collector."
+            try:
+                score = float(row.get("score", 0.58))
+            except (TypeError, ValueError):
+                score = 0.58
+            tags = row.get("tags", [])
+            if not isinstance(tags, list):
+                tags = []
+            items.append(
+                self._build_item(
+                    source=str(row.get("source") or "glint_feed_scrape"),
+                    category=str(row.get("category") or "market"),
+                    title=title,
+                    summary=summary,
+                    url=str(row.get("url") or self._glint_source_url),
+                    published_at=_parse_ts(row.get("published_at")) or _now_utc(),
+                    tags=[*tags, "scout_sandbox"],
+                    confidence=str(row.get("confidence") or "low"),
+                    score=score,
+                )
+            )
+            if len(items) >= self._glint_sandbox_limit:
+                break
+        return items
+
+    async def _pull_glint_feed_direct(self) -> List[Dict[str, Any]]:
+        html = await self._fetch_text(self._glint_source_url, timeout=10.0)
         candidates = [match.strip() for match in _GLINT_TITLE_RE.findall(html)]
         unique_titles: List[str] = []
         for title in candidates:
@@ -518,5 +615,8 @@ class IntelFeedAggregator:
             "sources": self._source_status,
             "glint_scrape_enabled": self._glint_scrape_enabled,
             "glint_scrape_sandbox_only": self._glint_sandbox_only,
+            "glint_use_scout_sandbox": self._glint_use_scout_sandbox,
+            "glint_scout_configured": bool(self._scout_sandbox_url and self._scout_sandbox_token),
+            "glint_source_url": self._glint_source_url,
             "runtime_env": self._runtime_env,
         }

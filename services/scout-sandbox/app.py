@@ -5,6 +5,7 @@ import re
 import time
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Pattern, Tuple
 from urllib.parse import urlparse
 
@@ -27,6 +28,9 @@ _MOLTBOOK_KEY_RE = re.compile(r"\bmoltbook_[A-Za-z0-9\-_]{8,}\b", flags=re.IGNOR
 _INLINE_TOKEN_RE = re.compile(
     r"(?i)\b(api[_-]?key|token|secret|password|authorization)\b\s*[:=]\s*([^\s,;]+)"
 )
+_GLINT_FEED_TITLE_RE = re.compile(r'"(?:headline|title)"\s*:\s*"([^"]{18,220})"')
+_GLINT_HTML_TAG_RE = re.compile(r"<[^>]+>")
+_GLINT_WS_RE = re.compile(r"\s+")
 
 
 def _bool_env(name: str, default: bool = False) -> bool:
@@ -75,6 +79,10 @@ class SandboxConfig:
     verify_url: str
     allowed_hosts: Tuple[str, ...]
     allowed_path_patterns: Tuple[Pattern[str], ...]
+    intel_enabled: bool
+    intel_allowed_hosts: Tuple[str, ...]
+    intel_glint_api_url: str
+    intel_glint_bearer_token: str
     audit_collection: str
 
     @classmethod
@@ -104,6 +112,11 @@ class SandboxConfig:
         if not compiled_patterns:
             compiled_patterns = [re.compile(item) for item in default_patterns]
 
+        intel_default_hosts = "glint.trade,www.glint.trade"
+        intel_hosts = tuple(
+            sorted(set(_split_csv(os.getenv("SCOUT_SANDBOX_INTEL_ALLOWED_HOSTS", intel_default_hosts))))
+        )
+
         return cls(
             project_id=str(os.getenv("GCP_PROJECT_ID", os.getenv("GOOGLE_CLOUD_PROJECT", ""))).strip(),
             sandbox_token=str(os.getenv("SCOUT_SANDBOX_TOKEN", "")).strip(),
@@ -118,6 +131,14 @@ class SandboxConfig:
             verify_url=str(os.getenv("SCOUT_SANDBOX_VERIFY_URL", "")).strip(),
             allowed_hosts=hosts,
             allowed_path_patterns=tuple(compiled_patterns),
+            intel_enabled=_bool_env("SCOUT_SANDBOX_INTEL_ENABLED", True),
+            intel_allowed_hosts=intel_hosts,
+            intel_glint_api_url=str(
+                os.getenv("SCOUT_SANDBOX_INTEL_GLINT_API_URL", "https://api.glint.trade/api/feed/v2")
+            ).strip(),
+            intel_glint_bearer_token=str(
+                os.getenv("SCOUT_SANDBOX_INTEL_GLINT_BEARER_TOKEN", "")
+            ).strip(),
             audit_collection=str(os.getenv("SCOUT_SANDBOX_AUDIT_COLLECTION", "scout_sandbox_audit")).strip() or "scout_sandbox_audit",
         )
 
@@ -129,6 +150,12 @@ class DispatchRequest(BaseModel):
     note: str = ""
     source: str = "alpha-engine"
     request_id: str = ""
+
+
+class GlintCollectRequest(BaseModel):
+    limit: int = Field(default=20, ge=1, le=100)
+    query: str = ""
+    source_url: str = Field(default="https://glint.trade/feed")
 
 
 class FirestoreAuditLogger:
@@ -211,6 +238,232 @@ class ScoutSandboxBroker:
         if action == "comment":
             return req.external_url_hint.strip(), "comment"
         return "", "unknown"
+
+    @staticmethod
+    def _clean_glint_text(value: Any, limit: int = 220) -> str:
+        text = _GLINT_HTML_TAG_RE.sub(" ", str(value or ""))
+        text = _GLINT_WS_RE.sub(" ", text).strip()
+        if len(text) > limit:
+            text = text[: limit - 1].rstrip() + "…"
+        return text
+
+    @staticmethod
+    def _extract_glint_titles(html: str, *, limit: int, query: str = "") -> List[str]:
+        query_lower = str(query or "").strip().lower()
+        seen = set()
+        titles: List[str] = []
+        for match in _GLINT_FEED_TITLE_RE.findall(str(html or "")):
+            cleaned = ScoutSandboxBroker._clean_glint_text(match, limit=220)
+            if len(cleaned) < 18:
+                continue
+            key = cleaned.lower()
+            if key in seen:
+                continue
+            if query_lower and query_lower not in key:
+                continue
+            seen.add(key)
+            titles.append(cleaned)
+            if len(titles) >= limit:
+                break
+        return titles
+
+    def _extract_glint_api_items(
+        self, payload: Any, *, limit: int, query: str = ""
+    ) -> List[Dict[str, Any]]:
+        query_lower = str(query or "").strip().lower()
+        candidates: List[Dict[str, Any]] = []
+
+        if isinstance(payload, list):
+            candidates = [row for row in payload if isinstance(row, dict)]
+        elif isinstance(payload, dict):
+            for key in ("items", "feed", "data", "results", "entries"):
+                value = payload.get(key)
+                if isinstance(value, list):
+                    candidates = [row for row in value if isinstance(row, dict)]
+                    if candidates:
+                        break
+
+        items: List[Dict[str, Any]] = []
+        seen = set()
+        now_iso = datetime.now(timezone.utc).isoformat()
+        for idx, row in enumerate(candidates):
+            raw_title = row.get("headline") or row.get("title") or row.get("text") or ""
+            title = self._clean_glint_text(raw_title, limit=220)
+            if len(title) < 18:
+                continue
+            key = title.lower()
+            if key in seen:
+                continue
+            if query_lower and query_lower not in key:
+                continue
+            seen.add(key)
+
+            summary = self._clean_glint_text(
+                row.get("summary") or row.get("description") or row.get("content") or "",
+                limit=320,
+            )
+            link = str(
+                row.get("url")
+                or row.get("link")
+                or row.get("source_url")
+                or "https://glint.trade/feed"
+            ).strip()
+            tags = row.get("tags", [])
+            if not isinstance(tags, list):
+                tags = []
+
+            items.append(
+                {
+                    "id": f"glint_api:{idx}:{uuid.uuid4().hex[:10]}",
+                    "source": "glint_feed_api",
+                    "category": str(row.get("category") or "market"),
+                    "title": title,
+                    "summary": summary or "Collected by SCOUT sandbox from Glint API.",
+                    "url": link,
+                    "published_at": str(
+                        row.get("published_at")
+                        or row.get("created_at")
+                        or row.get("timestamp")
+                        or now_iso
+                    ),
+                    "tags": [str(tag).strip().lower() for tag in tags if str(tag).strip()],
+                    "confidence": "medium",
+                    "score": round(max(0.45, 0.72 - (idx * 0.02)), 3),
+                }
+            )
+            if len(items) >= limit:
+                break
+        return items
+
+    async def _collect_glint_api_items(self, *, limit: int, query: str = "") -> Tuple[List[Dict[str, Any]], str]:
+        api_url = str(self.config.intel_glint_api_url or "").strip()
+        token = str(self.config.intel_glint_bearer_token or "").strip()
+        if not api_url:
+            return [], "glint_api_url_missing"
+        if not token:
+            return [], "glint_api_token_missing"
+
+        timeout = aiohttp.ClientTimeout(total=self.config.timeout_seconds)
+        headers = {
+            "Accept": "application/json",
+            "Authorization": f"Bearer {token}",
+        }
+        params = {
+            "page": 1,
+            "limit": max(1, min(limit, 100)),
+        }
+        try:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(api_url, headers=headers, params=params) as response:
+                    if int(response.status) != 200:
+                        return [], f"glint_api_http_{response.status}"
+                    payload = await response.json(content_type=None)
+        except Exception as exc:
+            return [], f"glint_api_failed:{_safe_excerpt(str(exc), max_len=140)}"
+
+        return self._extract_glint_api_items(payload, limit=limit, query=query), "ok"
+
+    async def collect_glint_feed(
+        self, *, source_url: str, limit: int = 20, query: str = ""
+    ) -> Dict[str, Any]:
+        if not self.config.intel_enabled:
+            return {
+                "ok": False,
+                "reason": "intel_collection_disabled",
+                "items": [],
+                "count": 0,
+            }
+
+        parsed = urlparse(str(source_url or "").strip())
+        host = parsed.netloc.lower().split(":", 1)[0]
+        if parsed.scheme.lower() != "https":
+            return {"ok": False, "reason": "only_https_allowed", "items": [], "count": 0}
+        if host not in self.config.intel_allowed_hosts:
+            return {"ok": False, "reason": "host_not_allowlisted", "items": [], "count": 0}
+        if parsed.path not in {"/feed", "/feed/"}:
+            return {"ok": False, "reason": "path_not_allowlisted", "items": [], "count": 0}
+
+        started = time.time()
+        normalized_limit = max(1, min(limit, 100))
+        now = int(time.time())
+
+        api_items, api_reason = await self._collect_glint_api_items(limit=normalized_limit, query=query)
+        items = list(api_items)
+        collector_mode = "glint_api"
+
+        if not items:
+            timeout = aiohttp.ClientTimeout(total=self.config.timeout_seconds)
+            try:
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.get(source_url) as response:
+                        body = await response.text()
+                        if int(response.status) != 200:
+                            return {
+                                "ok": False,
+                                "reason": f"http_{response.status}",
+                                "status": int(response.status),
+                                "items": [],
+                                "count": 0,
+                                "collector_mode": "html_shell_scrape",
+                            }
+            except Exception as exc:
+                return {
+                    "ok": False,
+                    "reason": f"request_failed:{_safe_excerpt(str(exc), max_len=140)}",
+                    "items": [],
+                    "count": 0,
+                    "collector_mode": "html_shell_scrape",
+                }
+
+            titles = self._extract_glint_titles(body, limit=normalized_limit, query=query)
+            collector_mode = "html_shell_scrape"
+            items = [
+                {
+                    "id": f"glint:{idx}:{uuid.uuid4().hex[:10]}",
+                    "source": "glint_feed_scrape",
+                    "category": "market",
+                    "title": title,
+                    "summary": "Collected by SCOUT sandbox collector from glint.trade/feed.",
+                    "url": source_url,
+                    "published_at": datetime.now(timezone.utc).isoformat(),
+                    "tags": ["glint", "sandbox", "scrape"],
+                    "confidence": "low",
+                    "score": round(max(0.35, 0.62 - (idx * 0.02)), 3),
+                }
+                for idx, title in enumerate(titles)
+            ]
+
+        self.audit.write(
+            {
+                "audit_id": str(uuid.uuid4()),
+                "timestamp": now,
+                "source": "intel_collector",
+                "action": "glint_collect",
+                "target_host": host,
+                "target_path": parsed.path,
+                "latency_ms": int((time.time() - started) * 1000),
+                "result": {
+                    "dispatched": True,
+                    "reason": "ok" if items else "no_items_extracted",
+                    "status": 200,
+                    "count": len(items),
+                    "collector_mode": collector_mode,
+                    "api_reason": api_reason,
+                },
+            }
+        )
+
+        return {
+            "ok": True,
+            "reason": "ok" if items else "no_items_extracted",
+            "status": 200,
+            "source_url": source_url,
+            "count": len(items),
+            "items": items,
+            "timestamp": now,
+            "collector_mode": collector_mode,
+            "api_reason": api_reason,
+        }
 
     def _audit_record(self, req: DispatchRequest, target_url: str, dispatch: Dict[str, Any], latency_ms: int) -> Dict[str, Any]:
         payload_json = json.dumps(req.outbound_payload, sort_keys=True, default=str)
@@ -735,6 +988,10 @@ async def health() -> Dict[str, Any]:
         "post_url_configured": bool(CONFIG.post_url),
         "external_api_token_configured": bool(CONFIG.external_api_token),
         "sandbox_token_configured": bool(CONFIG.sandbox_token),
+        "intel_collection_enabled": bool(CONFIG.intel_enabled),
+        "intel_allowed_hosts": list(CONFIG.intel_allowed_hosts),
+        "intel_glint_api_url": CONFIG.intel_glint_api_url,
+        "intel_glint_api_token_configured": bool(CONFIG.intel_glint_bearer_token),
     }
 
 
@@ -751,3 +1008,17 @@ async def scout_dispatch(
         "dispatch": dispatch,
         "timestamp": int(time.time()),
     }
+
+
+@app.post("/v1/intel/glint_collect")
+async def glint_collect(
+    request: GlintCollectRequest,
+    authorization: Optional[str] = Header(default=""),
+    x_scout_sandbox_token: Optional[str] = Header(default=""),
+) -> Dict[str, Any]:
+    _require_inbound_auth(authorization or "", x_scout_sandbox_token or "")
+    return await BROKER.collect_glint_feed(
+        source_url=request.source_url,
+        limit=request.limit,
+        query=request.query,
+    )

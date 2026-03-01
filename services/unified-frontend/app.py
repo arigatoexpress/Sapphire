@@ -250,36 +250,67 @@ def _probe_http(url: str, timeout: float = 6, auth_required: bool = False):
         return {'status': 'unreachable', 'healthy': False, 'status_code': None, 'latency_ms': round((time.time() - start) * 1000, 2), 'error': str(exc)}
 
 
-def _get_json(url: str, *, timeout: float = 4.0, params: dict | None = None):
+def _get_json(
+    url: str,
+    *,
+    timeout: float = 4.0,
+    params: dict | None = None,
+    retries: int = 2,
+    retry_backoff_seconds: float = 0.35,
+):
     """Fetch JSON payload from an endpoint with standardized error shape."""
+    transient_statuses = {408, 425, 429, 500, 502, 503, 504}
     started = time.time()
-    try:
-        response = requests.get(url, timeout=timeout, params=params)
-        latency_ms = round((time.time() - started) * 1000, 2)
-        if response.status_code != 200:
+    attempts = max(0, int(retries)) + 1
+    last_error = None
+    last_status = None
+
+    for attempt in range(attempts):
+        try:
+            response = requests.get(url, timeout=timeout, params=params)
+            last_status = response.status_code
+            if response.status_code == 200:
+                payload = response.json() if response.content else {}
+                return {
+                    'ok': True,
+                    'status_code': 200,
+                    'latency_ms': round((time.time() - started) * 1000, 2),
+                    'error': None,
+                    'data': payload if isinstance(payload, dict) else {},
+                }
+
+            last_error = f'http_{response.status_code}'
+            if response.status_code in transient_statuses and attempt < (attempts - 1):
+                time.sleep(retry_backoff_seconds * (attempt + 1))
+                continue
+
             return {
                 'ok': False,
                 'status_code': response.status_code,
-                'latency_ms': latency_ms,
-                'error': f'http_{response.status_code}',
+                'latency_ms': round((time.time() - started) * 1000, 2),
+                'error': last_error,
                 'data': {},
             }
-        payload = response.json() if response.content else {}
-        return {
-            'ok': True,
-            'status_code': 200,
-            'latency_ms': latency_ms,
-            'error': None,
-            'data': payload if isinstance(payload, dict) else {},
-        }
-    except requests.RequestException as exc:
-        return {
-            'ok': False,
-            'status_code': None,
-            'latency_ms': round((time.time() - started) * 1000, 2),
-            'error': str(exc),
-            'data': {},
-        }
+        except requests.RequestException as exc:
+            last_error = str(exc)
+            if attempt < (attempts - 1):
+                time.sleep(retry_backoff_seconds * (attempt + 1))
+                continue
+            return {
+                'ok': False,
+                'status_code': last_status,
+                'latency_ms': round((time.time() - started) * 1000, 2),
+                'error': last_error,
+                'data': {},
+            }
+
+    return {
+        'ok': False,
+        'status_code': last_status,
+        'latency_ms': round((time.time() - started) * 1000, 2),
+        'error': last_error or 'unknown_error',
+        'data': {},
+    }
 
 
 def _collect_system_status():
@@ -894,15 +925,40 @@ def _fetch_intel_feed_payload(limit: int = 80, category: str = '', query: str = 
     if refresh:
         params['refresh'] = 'true'
 
+    def _extract_items(payload: dict) -> list[dict]:
+        raw_items = payload.get('items', [])
+        if not isinstance(raw_items, list):
+            return []
+        return [_normalize_intel_item(item) for item in raw_items if isinstance(item, dict)]
+
     response = _get_json(alpha_url, timeout=8.0, params=params)
     if response.get('ok'):
         data = response.get('data', {})
-        raw_items = data.get('items', [])
-        if isinstance(raw_items, list):
-            items = [_normalize_intel_item(item) for item in raw_items if isinstance(item, dict)]
-        else:
-            items = []
+        items = _extract_items(data)
         if not items:
+            # Alpha cold-start windows can return empty feed before first refresh cycle.
+            # Do one forced refresh attempt before degrading to Firestore logs fallback.
+            if not refresh:
+                refresh_params = dict(params)
+                refresh_params['refresh'] = 'true'
+                retry_response = _get_json(alpha_url, timeout=12.0, params=refresh_params)
+                if retry_response.get('ok'):
+                    retry_data = retry_response.get('data', {})
+                    retry_items = _extract_items(retry_data)
+                    if retry_items:
+                        payload = {
+                            'enabled': bool(retry_data.get('enabled', True)),
+                            'running': bool(retry_data.get('running', True)),
+                            'source': 'alpha_engine',
+                            'count': len(retry_items),
+                            'items': retry_items[: max(1, min(limit, 200))],
+                            'status': retry_data.get('status', {}),
+                            'timestamp': datetime.utcnow().isoformat(),
+                        }
+                        if not query and not category:
+                            set_cache(cache_key, payload)
+                        return payload
+
             fallback = _fallback_intel_from_logs(limit=limit, category=category, query=query)
             fallback['warning'] = 'alpha_engine_empty'
             fallback['status'] = {
