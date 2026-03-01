@@ -39,8 +39,8 @@ if [[ "$EXISTS" -eq 0 ]]; then
     --time-zone "$TIME_ZONE" \
     --uri "$TARGET_URL" \
     --http-method POST \
-    --headers "$HEADERS" \
-    --message-body "$BODY"
+    --update-headers "$HEADERS" \
+    --message-body "$BODY" >/dev/null
 else
   echo "Creating scheduler job: $JOB_NAME"
   gcloud scheduler jobs create http "$JOB_NAME" \
@@ -51,7 +51,7 @@ else
     --uri "$TARGET_URL" \
     --http-method POST \
     --headers "$HEADERS" \
-    --message-body "$BODY"
+    --message-body "$BODY" >/dev/null
 fi
 
 echo "Job configured: $JOB_NAME"
