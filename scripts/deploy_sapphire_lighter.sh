@@ -23,6 +23,7 @@ STARTUP_CPU_BOOST="${STARTUP_CPU_BOOST:-true}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LIGHTER_DIR="${ROOT_DIR}/services/bot-lighter"
+LIGHTER_ACCOUNT_INDEX="${LIGHTER_ACCOUNT_INDEX:-1}"
 
 IMAGE_URI="${AR_REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${IMAGE_NAME}:${IMAGE_TAG}"
 IMAGE_LATEST="${AR_REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${IMAGE_NAME}:latest"
@@ -76,6 +77,7 @@ gcloud run deploy "${SERVICE_NAME}" \
   --update-env-vars "SERVICE_NAME=bot-lighter" \
   --update-env-vars "LOG_LEVEL=${LOG_LEVEL:-INFO}" \
   --update-env-vars "LIGHTER_TESTNET=${LIGHTER_TESTNET:-false}" \
+  --update-env-vars "LIGHTER_ACCOUNT_INDEX=${LIGHTER_ACCOUNT_INDEX}" \
   --update-secrets "LIGHTER_PRIV_KEY=LIGHTER_API_KEY_0:latest,LIGHTER_PUB_KEY=LIGHTER_API_PUBLIC_KEY_0:latest"
 
 if [[ "${STARTUP_CPU_BOOST}" == "true" ]]; then

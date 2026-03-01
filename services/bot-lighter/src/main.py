@@ -264,7 +264,7 @@ class LighterBot:
             else:
                 self.account_index = 0
 
-    async def _validate_account_index(self, account_index: int) -> bool:
+    async def _validate_account_index(self, account_index: int, require_pub_match: bool = True) -> bool:
         """Validate account index by probing api key listing endpoint."""
         if account_index < 0:
             return False
@@ -279,7 +279,7 @@ class LighterBot:
             api_keys = getattr(result, "api_keys", None) or getattr(result, "apikeys", None) or []
             if not api_keys:
                 return False
-            if not self._pub_key:
+            if not self._pub_key or not require_pub_match:
                 return True
             target = str(self._pub_key).lower().replace("0x", "")
             for row in api_keys:
@@ -295,9 +295,17 @@ class LighterBot:
             return False
 
     async def _discover_account_index_by_api_key(self) -> Optional[int]:
-        """Brute-force a small account-index window and match configured API public key."""
+        """
+        Discover account index in two passes:
+        1) strict match against configured API public key
+        2) loose fallback to first index with any api key slot present
+        """
         for idx in range(0, 16):
-            ok = await self._validate_account_index(idx)
+            ok = await self._validate_account_index(idx, require_pub_match=True)
+            if ok:
+                return idx
+        for idx in range(0, 16):
+            ok = await self._validate_account_index(idx, require_pub_match=False)
             if ok:
                 return idx
         return None
