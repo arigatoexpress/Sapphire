@@ -90,6 +90,7 @@ class LighterBot:
         self.trades_executed = 0
         self.trades_failed = 0
         self.avg_latency_ms = 0.0
+        self._execution_block_reason: Optional[str] = None
 
         # Signal idempotency guard: prevent duplicate execution on Pub/Sub redelivery.
         self._processed_signal_ids: Dict[str, float] = {}
@@ -159,10 +160,26 @@ class LighterBot:
                         account_index=int(self.account_index or 0),
                         api_private_keys={0: self._priv_key},
                     )
-                    logger.info("SignerClient initialized (api_key_index=0)")
+                    signer_check = self.signer_client.check_client()
+                    if signer_check:
+                        self.signer_client = None
+                        self._execution_block_reason = (
+                            "Lighter API credentials do not match exchange api key mapping"
+                        )
+                        logger.error(f"SignerClient validation failed: {signer_check}")
+                    else:
+                        logger.info("SignerClient initialized (api_key_index=0)")
                 except Exception as signer_exc:
                     self.signer_client = None
                     logger.warning(f"SignerClient unavailable; using legacy path: {signer_exc}")
+
+            if self.signer_client is None and not hasattr(lighter, "Signer"):
+                # Newer SDK variants need SignerClient; without it live execution is unavailable.
+                self._execution_block_reason = (
+                    self._execution_block_reason
+                    or "No compatible Lighter signer path available for this SDK/runtime"
+                )
+                logger.error(self._execution_block_reason)
 
             # Initialize Pub/Sub
             pubsub = get_pubsub_client()
@@ -632,6 +649,8 @@ class LighterBot:
         try:
             if not self.transaction_api:
                 raise Exception("Transaction API not initialized")
+            if self._execution_block_reason:
+                raise Exception(self._execution_block_reason)
 
             # Normalize symbol
             coin = self._normalize_coin_symbol(signal.symbol)
