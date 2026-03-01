@@ -234,6 +234,34 @@
     color: var(--warning);
 }
 
+.mini-kpi-row {
+    margin-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.mini-kpi {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.06);
+    padding: 8px 10px;
+    min-width: 120px;
+}
+
+.mini-kpi .label {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.mini-kpi .value {
+    font-size: 0.96rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
 @media (max-width: 980px) {
     .overview-hero-body {
         grid-template-columns: 1fr;
@@ -346,6 +374,24 @@
                 </p>
                 <div class="loop-pill-row" id="loop-state-pills">
                     <span class="loop-pill">loading...</span>
+                </div>
+                <div class="mini-kpi-row">
+                    <div class="mini-kpi">
+                        <div class="label">Experiment Win Rate</div>
+                        <div class="value" id="exp-win-rate">--</div>
+                    </div>
+                    <div class="mini-kpi">
+                        <div class="label">Closed Experiments</div>
+                        <div class="value" id="exp-closed">--</div>
+                    </div>
+                    <div class="mini-kpi">
+                        <div class="label">Pending Outcomes</div>
+                        <div class="value" id="exp-pending">--</div>
+                    </div>
+                </div>
+                <h4 style="margin-top:12px;">Source Efficacy Leaderboard</h4>
+                <div class="breakdown-list" id="source-efficacy-breakdown">
+                    <div class="loading"><div class="spinner"></div>Loading source efficacy...</div>
                 </div>
             </section>
         </div>
@@ -520,6 +566,7 @@
         const superswarm = payload || {};
         const series = superswarm.series || {};
         const breakdowns = superswarm.breakdowns || {};
+        const analysis = superswarm.analysis || {};
         const summary = superswarm.summary || {};
         const loop = superswarm.loop || {};
         const windowHours = Number(superswarm.window_hours || 24);
@@ -578,6 +625,24 @@
             <span class="loop-pill ${loop.readiness_ok ? 'ok' : 'warn'}">readiness ${loop.readiness_ok ? 'green' : 'watch'}</span>
             <span class="loop-pill">experiments ${fmtNumber(loop.experiments_queued || 0)}</span>
         `;
+
+        const experiment = analysis.experiment_win_rate || {};
+        const expWins = Number(experiment.wins || 0);
+        const expLosses = Number(experiment.losses || 0);
+        const expPending = Number(experiment.pending || 0);
+        const expClosed = expWins + expLosses;
+        const expRate = Number(experiment.win_rate || 0);
+        document.getElementById('exp-win-rate').textContent = `${expRate.toFixed(1)}%`;
+        document.getElementById('exp-closed').textContent = fmtNumber(expClosed);
+        document.getElementById('exp-pending').textContent = fmtNumber(expPending);
+
+        const efficacyRows = Array.isArray(analysis.source_efficacy)
+            ? analysis.source_efficacy.slice(0, 6).map((row) => ({
+                label: String(row.source || 'unknown').replace(/^execution:/, 'exec:').slice(0, 18),
+                value: Math.max(0, Math.round(Number(row.avg_quality || 0) * 100)),
+            }))
+            : [];
+        renderBreakdownRows('source-efficacy-breakdown', efficacyRows);
     }
 
     async function loadOverview() {

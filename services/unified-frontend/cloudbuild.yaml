@@ -29,6 +29,8 @@ steps:
       - 'sapphirev3@sapphire-479610.iam.gserviceaccount.com'
       - '--set-env-vars'
       - 'GCP_PROJECT=sapphire-479610,ENABLE_AUTH=false,PUBLIC_READ_ONLY=true,MAC_OPERATOR_APP_URL=sapphirebook://operator,MAC_OPERATOR_APP_LABEL=Open macOS Operator App'
+      - '--update-secrets'
+      - 'SAPPHIRE_CONTROL_API_TOKEN=SAPPHIRE_CONTROL_API_TOKEN:latest'
 
 images:
   - 'gcr.io/$PROJECT_ID/sapphire-unified-frontend:latest'

@@ -7,6 +7,7 @@ Multi-page dashboard with shared navigation and live status APIs.
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from concurrent.futures import ThreadPoolExecutor
+import hashlib
 import os
 import time
 from urllib.parse import urljoin
@@ -39,6 +40,8 @@ TRADING_METRICS_COLLECTION = os.environ.get('TRADING_METRICS_COLLECTION', 'tradi
 TRADE_EXECUTIONS_COLLECTION = os.environ.get('TRADE_EXECUTIONS_COLLECTION', 'trade_executions')
 SYSTEM_LOGS_COLLECTION = os.environ.get('SYSTEM_LOGS_COLLECTION', 'system_logs')
 EDGE_CAPABILITIES_COLLECTION = os.environ.get('EDGE_CAPABILITIES_COLLECTION', 'edge_capabilities')
+LEARNING_OUTCOMES_COLLECTION = os.environ.get('LEARNING_OUTCOMES_COLLECTION', 'learning_outcomes')
+SUPERSWARM_ROLLUPS_COLLECTION = os.environ.get('SUPERSWARM_ROLLUPS_COLLECTION', 'superswarm_rollups')
 
 CRITICAL_EDGE_SERVICES = {
     item.strip() for item in os.environ.get(
@@ -71,6 +74,7 @@ ENABLE_AUTH = os.environ.get('ENABLE_AUTH', 'false').lower() == 'true'
 PUBLIC_READ_ONLY = os.environ.get('PUBLIC_READ_ONLY', 'true').lower() == 'true'
 MAC_OPERATOR_APP_URL = os.environ.get('MAC_OPERATOR_APP_URL', 'sapphirebook://operator')
 MAC_OPERATOR_APP_LABEL = os.environ.get('MAC_OPERATOR_APP_LABEL', 'Open macOS Operator App')
+CONTROL_API_TOKEN = os.environ.get('SAPPHIRE_CONTROL_API_TOKEN', '')
 
 # Simple in-memory cache
 cache = {}
@@ -163,6 +167,28 @@ def requires_auth(f):
         auth = request.authorization
         if not auth or not check_auth(auth.username, auth.password):
             return authenticate()
+        return f(*args, **kwargs)
+    return decorated
+
+
+def requires_control_token(f):
+    """Decorator for internal scheduler/webhook jobs that mutate analytics state."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not CONTROL_API_TOKEN:
+            return jsonify({'error': 'control_token_not_configured'}), 503
+
+        token = (
+            request.headers.get('X-Sapphire-Token', '').strip()
+            or request.headers.get('x-sapphire-token', '').strip()
+        )
+        if not token:
+            auth_header = request.headers.get('Authorization', '').strip()
+            if auth_header.lower().startswith('bearer '):
+                token = auth_header[7:].strip()
+
+        if token != CONTROL_API_TOKEN:
+            return jsonify({'error': 'unauthorized'}), 403
         return f(*args, **kwargs)
     return decorated
 
@@ -1118,10 +1144,275 @@ def _fetch_trade_executions(
     }
 
 
-def _platform_superswarm_payload(hours: int = 24):
+def _confidence_to_base_score(confidence: str) -> float:
+    value = str(confidence or '').strip().lower()
+    if value in {'high', 'strong'}:
+        return 0.8
+    if value in {'medium', 'moderate'}:
+        return 0.62
+    if value in {'low', 'weak'}:
+        return 0.42
+    return 0.5
+
+
+def _score_to_verdict(score: float) -> str:
+    if score >= 0.72:
+        return 'win'
+    if score <= 0.38:
+        return 'loss'
+    return 'pending'
+
+
+def _sync_learning_outcomes(hours: int = 24) -> dict:
+    if db is None:
+        return {'written': 0, 'intel_written': 0, 'trade_written': 0, 'error': 'firestore_unavailable'}
+
+    safe_hours = max(6, min(int(hours or 24), 168))
+    now_utc = datetime.now(timezone.utc)
+    cutoff = now_utc - timedelta(hours=safe_hours)
+    written = 0
+    intel_written = 0
+    trade_written = 0
+
+    def _upsert(doc_id: str, payload: dict):
+        nonlocal written
+        db.collection(LEARNING_OUTCOMES_COLLECTION).document(doc_id).set(payload, merge=True)
+        written += 1
+
+    # Intel-derived outcomes
+    intel_payload = _fetch_intel_feed_payload(limit=120)
+    intel_items = intel_payload.get('items', []) if isinstance(intel_payload.get('items'), list) else []
+    for item in intel_items:
+        if not isinstance(item, dict):
+            continue
+        ts = _coerce_datetime(item.get('published_at')) or now_utc
+        if ts < cutoff:
+            continue
+        source = str(item.get('source', 'intel')).strip().lower() or 'intel'
+        confidence = str(item.get('confidence', 'medium')).strip().lower()
+        item_score = float(item.get('score', 0.5) or 0.5)
+        score = max(0.0, min(1.0, round((_confidence_to_base_score(confidence) * 0.65) + (item_score * 0.35), 4)))
+        verdict = _score_to_verdict(score)
+        stable_key = f"{source}|{item.get('id','')}|{item.get('published_at','')}"
+        doc_id = f"intel-{hashlib.sha1(stable_key.encode('utf-8')).hexdigest()[:24]}"
+        _upsert(
+            doc_id,
+            {
+                'id': doc_id,
+                'timestamp': ts.isoformat(),
+                'created_at': now_utc.isoformat(),
+                'outcome_type': 'intel_insight',
+                'experiment_id': str(item.get('id', '')).strip() or doc_id,
+                'source': source,
+                'category': str(item.get('category', 'operations')).strip().lower() or 'operations',
+                'confidence': confidence,
+                'quality_score': score,
+                'verdict': verdict,
+                'summary': str(item.get('title', '')).strip(),
+                'metadata': {
+                    'url': str(item.get('url', '')).strip(),
+                    'tags': item.get('tags', []) if isinstance(item.get('tags'), list) else [],
+                    'raw_score': item_score,
+                    'pipeline_source': intel_payload.get('source', 'intel'),
+                },
+            },
+        )
+        intel_written += 1
+
+    # Execution-derived outcomes
+    trades_payload = _fetch_trade_executions(hours=safe_hours, limit=500, include_simulated=False, include_failed=True)
+    trades = trades_payload.get('trades', [])
+    for trade in trades:
+        if not isinstance(trade, dict):
+            continue
+        ts = _coerce_datetime(trade.get('timestamp')) or now_utc
+        if ts < cutoff:
+            continue
+        trade_id = str(trade.get('trade_id', '')).strip()
+        if not trade_id:
+            continue
+        pnl = float(trade.get('realized_pnl', 0.0) or 0.0)
+        success = bool(trade.get('success', False))
+        if success:
+            score = min(1.0, round(0.72 + min(max(pnl, 0.0), 50.0) / 250.0, 4))
+            verdict = 'win'
+        else:
+            score = max(0.0, round(0.28 - min(abs(pnl), 50.0) / 250.0, 4))
+            verdict = 'loss'
+        doc_id = f"trade-{trade_id}"
+        _upsert(
+            doc_id,
+            {
+                'id': doc_id,
+                'timestamp': ts.isoformat(),
+                'created_at': now_utc.isoformat(),
+                'outcome_type': 'execution_result',
+                'experiment_id': str(trade.get('signal_id', '')).strip() or trade_id,
+                'source': f"execution:{str(trade.get('platform', 'unknown')).strip().lower() or 'unknown'}",
+                'category': 'execution',
+                'confidence': 'high' if success else 'low',
+                'quality_score': score,
+                'verdict': verdict,
+                'summary': f"{str(trade.get('side', 'TRADE')).upper()} {str(trade.get('symbol', 'UNKNOWN')).upper()}",
+                'metadata': {
+                    'trade_id': trade_id,
+                    'signal_id': str(trade.get('signal_id', '')).strip(),
+                    'pnl': pnl,
+                    'qty': float(trade.get('filled_quantity', 0.0) or 0.0),
+                    'success': success,
+                },
+            },
+        )
+        trade_written += 1
+
+    return {
+        'written': written,
+        'intel_written': intel_written,
+        'trade_written': trade_written,
+        'window_hours': safe_hours,
+    }
+
+
+def _compute_learning_rollup(hours: int = 168) -> dict:
+    if db is None:
+        return {
+            'window_hours': max(24, min(int(hours or 168), 24 * 30)),
+            'summary': {'total': 0, 'wins': 0, 'losses': 0, 'pending': 0, 'win_rate': 0.0},
+            'source_efficacy': [],
+            'experiment_win_rate': {'total': 0, 'wins': 0, 'losses': 0, 'pending': 0, 'win_rate': 0.0},
+        }
+
+    safe_hours = max(24, min(int(hours or 168), 24 * 30))
+    since = datetime.now(timezone.utc) - timedelta(hours=safe_hours)
+
+    try:
+        docs = list(
+            db.collection(LEARNING_OUTCOMES_COLLECTION)
+            .where('timestamp', '>=', since.isoformat())
+            .order_by('timestamp', direction=firestore.Query.DESCENDING)
+            .limit(2000)
+            .stream()
+        )
+    except Exception:
+        docs = list(
+            db.collection(LEARNING_OUTCOMES_COLLECTION)
+            .order_by('timestamp', direction=firestore.Query.DESCENDING)
+            .limit(2500)
+            .stream()
+        )
+
+    source_stats: dict[str, dict] = {}
+    experiment_stats: dict[str, dict] = {}
+    wins = losses = pending = 0
+
+    for doc in docs:
+        row = doc.to_dict() or {}
+        ts = _coerce_datetime(row.get('timestamp'))
+        if ts and ts < since:
+            continue
+        source = str(row.get('source', 'unknown')).strip().lower() or 'unknown'
+        experiment_id = str(row.get('experiment_id', '')).strip()
+        verdict = str(row.get('verdict', 'pending')).strip().lower()
+        score = float(row.get('quality_score', 0.5) or 0.5)
+
+        src = source_stats.setdefault(source, {'source': source, 'count': 0, 'wins': 0, 'losses': 0, 'pending': 0, 'score_sum': 0.0})
+        src['count'] += 1
+        src['score_sum'] += score
+        if verdict == 'win':
+            src['wins'] += 1
+            wins += 1
+        elif verdict == 'loss':
+            src['losses'] += 1
+            losses += 1
+        else:
+            src['pending'] += 1
+            pending += 1
+
+        if experiment_id:
+            exp = experiment_stats.setdefault(experiment_id, {'experiment_id': experiment_id, 'wins': 0, 'losses': 0, 'pending': 0, 'count': 0})
+            exp['count'] += 1
+            if verdict == 'win':
+                exp['wins'] += 1
+            elif verdict == 'loss':
+                exp['losses'] += 1
+            else:
+                exp['pending'] += 1
+
+    efficacy = []
+    for row in source_stats.values():
+        count = max(1, int(row['count']))
+        avg_quality = round(float(row['score_sum']) / count, 4)
+        win_rate = round((float(row['wins']) / max(1, (row['wins'] + row['losses']))) * 100.0, 2) if (row['wins'] + row['losses']) > 0 else 0.0
+        efficacy.append(
+            {
+                'source': row['source'],
+                'count': int(row['count']),
+                'wins': int(row['wins']),
+                'losses': int(row['losses']),
+                'pending': int(row['pending']),
+                'avg_quality': avg_quality,
+                'win_rate': win_rate,
+            }
+        )
+    efficacy.sort(key=lambda item: (item['avg_quality'], item['count']), reverse=True)
+
+    experiment_total_wins = sum(item['wins'] for item in experiment_stats.values())
+    experiment_total_losses = sum(item['losses'] for item in experiment_stats.values())
+    experiment_total_pending = sum(item['pending'] for item in experiment_stats.values())
+    experiment_closed = experiment_total_wins + experiment_total_losses
+    experiment_win_rate = round((experiment_total_wins / experiment_closed) * 100.0, 2) if experiment_closed > 0 else 0.0
+
+    total = wins + losses + pending
+    overall_closed = wins + losses
+    overall_win_rate = round((wins / overall_closed) * 100.0, 2) if overall_closed > 0 else 0.0
+
+    return {
+        'window_hours': safe_hours,
+        'summary': {
+            'total': int(total),
+            'wins': int(wins),
+            'losses': int(losses),
+            'pending': int(pending),
+            'win_rate': overall_win_rate,
+        },
+        'source_efficacy': efficacy[:8],
+        'experiment_win_rate': {
+            'total': int(len(experiment_stats)),
+            'wins': int(experiment_total_wins),
+            'losses': int(experiment_total_losses),
+            'pending': int(experiment_total_pending),
+            'win_rate': experiment_win_rate,
+        },
+    }
+
+
+def _persist_superswarm_rollup(payload: dict):
+    if db is None:
+        return {'written': False, 'error': 'firestore_unavailable'}
+    try:
+        now_iso = datetime.utcnow().isoformat()
+        current_ref = db.collection(SUPERSWARM_ROLLUPS_COLLECTION).document('current')
+        current_ref.set({**payload, 'updated_at': now_iso}, merge=True)
+        point_id = now_iso.replace(':', '-').replace('.', '-')
+        db.collection(SUPERSWARM_ROLLUPS_COLLECTION).document(point_id).set(
+            {
+                'timestamp': now_iso,
+                'window_hours': payload.get('window_hours', 24),
+                'summary': payload.get('summary', {}),
+                'analysis': payload.get('analysis', {}),
+                'loop': payload.get('loop', {}),
+            },
+            merge=True,
+        )
+        return {'written': True, 'timestamp': now_iso}
+    except Exception as exc:
+        return {'written': False, 'error': str(exc)}
+
+
+def _platform_superswarm_payload(hours: int = 24, force_refresh: bool = False):
     safe_hours = max(6, min(int(hours or 24), 168))
     cache_key = f'platform_superswarm_{safe_hours}'
-    cached = get_cached(cache_key, duration=20)
+    cached = None if force_refresh else get_cached(cache_key, duration=20)
     if cached:
         return cached
 
@@ -1270,6 +1561,14 @@ def _platform_superswarm_payload(hours: int = 24):
             'projects_source': 'pm_hub',
         },
     }
+
+    learning_rollup = _compute_learning_rollup(hours=max(24, safe_hours * 7))
+    payload['analysis'] = {
+        'source_efficacy': learning_rollup.get('source_efficacy', []),
+        'experiment_win_rate': learning_rollup.get('experiment_win_rate', {}),
+        'learning_summary': learning_rollup.get('summary', {}),
+    }
+
     set_cache(cache_key, payload)
     return payload
 
@@ -2223,7 +2522,8 @@ def api_platform_intel_feed():
 @requires_auth
 def api_platform_superswarm():
     hours = request.args.get('hours', 24, type=int)
-    return jsonify(_platform_superswarm_payload(hours=hours))
+    refresh = request.args.get('refresh', 'false', type=str).lower() == 'true'
+    return jsonify(_platform_superswarm_payload(hours=hours, force_refresh=refresh))
 
 
 @app.route('/api/platform/windows-lab')
@@ -2306,6 +2606,33 @@ def api_intel_feed():
 @requires_auth
 def api_superswarm():
     return api_platform_superswarm()
+
+
+@app.route('/jobs/superswarm/hourly-rollup', methods=['POST', 'GET'])
+@requires_control_token
+def job_superswarm_hourly_rollup():
+    payload = request.get_json(silent=True) if request.method == 'POST' else {}
+    if not isinstance(payload, dict):
+        payload = {}
+
+    hours = request.args.get('hours', payload.get('hours', 24), type=int)
+    hours = max(6, min(int(hours or 24), 168))
+
+    outcome_sync = _sync_learning_outcomes(hours=max(24, hours))
+    superswarm = _platform_superswarm_payload(hours=hours, force_refresh=True)
+    persist = _persist_superswarm_rollup(superswarm)
+
+    return jsonify(
+        {
+            'ok': bool(persist.get('written', False)),
+            'timestamp': datetime.utcnow().isoformat(),
+            'window_hours': hours,
+            'outcomes': outcome_sync,
+            'rollup': persist,
+            'superswarm_summary': superswarm.get('summary', {}),
+            'analysis_summary': (superswarm.get('analysis') or {}).get('learning_summary', {}),
+        }
+    ), 200 if persist.get('written', False) else 500
 
 
 if __name__ == '__main__':
