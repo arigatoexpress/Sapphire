@@ -171,7 +171,7 @@ class LighterBot:
             if order_books and hasattr(order_books, "order_books"):
                 for ob in order_books.order_books:
                     symbol = ob.symbol if hasattr(ob, "symbol") else str(ob.order_book_id)
-                    self.market_info[symbol.upper()] = {
+                    market_row = {
                         "order_book_id": ob.order_book_id if hasattr(ob, "order_book_id") else 0,
                         "symbol": symbol,
                         "base_asset": getattr(ob, "base_asset", symbol),
@@ -179,6 +179,15 @@ class LighterBot:
                         "tick_size": getattr(ob, "tick_size", 0.01),
                         "step_size": getattr(ob, "step_size", 0.001),
                     }
+                    # Canonical key
+                    self.market_info[symbol.upper()] = market_row
+                    # Alias lookups for normalized forms (ex: SOL, ETH, BTC)
+                    symbol_norm = self._normalize_coin_symbol(symbol)
+                    base_norm = self._normalize_coin_symbol(str(market_row.get("base_asset", "")))
+                    if symbol_norm and symbol_norm not in self.market_info:
+                        self.market_info[symbol_norm] = market_row
+                    if base_norm and base_norm not in self.market_info:
+                        self.market_info[base_norm] = market_row
                 logger.info(f"Loaded {len(self.market_info)} markets")
         except Exception as e:
             logger.warning(f"Failed to load market info: {e}")
@@ -481,6 +490,31 @@ class LighterBot:
     def _mark_signal_processed(self, signal_id: str):
         self._processed_signal_ids[signal_id] = time.time()
 
+    def _resolve_market(self, symbol: str) -> Dict[str, Any]:
+        """
+        Resolve a market row from any symbol style:
+        - raw order-book symbol (ex: SOL-USDC)
+        - normalized routing symbol (ex: SOLUSDT/SOL-PERP)
+        - base asset (ex: SOL)
+        """
+        raw = str(symbol or "").strip().upper()
+        coin = self._normalize_coin_symbol(raw)
+
+        direct = self.market_info.get(raw) or self.market_info.get(coin)
+        if direct:
+            return direct
+
+        for key, row in self.market_info.items():
+            if not isinstance(row, dict):
+                continue
+            key_norm = self._normalize_coin_symbol(str(key))
+            base_norm = self._normalize_coin_symbol(str(row.get("base_asset", "")))
+            sym_norm = self._normalize_coin_symbol(str(row.get("symbol", "")))
+            if coin in {key_norm, base_norm, sym_norm}:
+                return row
+
+        return {}
+
     async def _handle_risk_alert(self, alert_data: Dict[str, Any]):
         """Handle risk alerts."""
         action = alert_data.get("action", "none")
@@ -505,8 +539,10 @@ class LighterBot:
             coin = self._normalize_coin_symbol(signal.symbol)
 
             # Get market info
-            market = self.market_info.get(coin, {})
-            order_book_id = market.get("order_book_id", 0)
+            market = self._resolve_market(signal.symbol)
+            order_book_id = int(market.get("order_book_id", 0) or 0)
+            if order_book_id <= 0:
+                raise ValueError(f"No order book mapping for symbol {signal.symbol} (normalized={coin})")
 
             is_buy = signal.side in (TradeSide.BUY, TradeSide.LONG)
 
@@ -744,8 +780,11 @@ class LighterBot:
 
         try:
             coin = self._normalize_coin_symbol(symbol)
-            market = self.market_info.get(coin, {})
-            order_book_id = market.get("order_book_id", 0)
+            market = self._resolve_market(symbol)
+            order_book_id = int(market.get("order_book_id", 0) or 0)
+            if order_book_id <= 0:
+                logger.warning(f"Ticker lookup has no market mapping for {symbol} (normalized={coin})")
+                return None
 
             details = await self._call_lighter_api(
                 self.order_api.order_book_details,
