@@ -117,7 +117,17 @@ p=json.load(sys.stdin)
 print("contract_version=", p.get("version"))
 print("endpoint_count=", (p.get("counts") or {}).get("total"))
 print("auth_enabled=", (p.get("auth") or {}).get("enabled"))
+print("public_read_only=", (p.get("auth") or {}).get("public_read_only"))
+print("internal_jobs_enabled=", (p.get("auth") or {}).get("internal_jobs_enabled"))
 '
+
+printf "\n[extra] Public mutation route policy\n"
+job_code=$(curl -s -o /tmp/sapphire_public_job_probe.json -w '%{http_code}' "$DOMAIN/jobs/superswarm/hourly-rollup")
+printf "%-40s %s\n" "/jobs/superswarm/hourly-rollup" "$job_code"
+if [[ "$job_code" != "404" ]]; then
+  echo "FAIL: public mutation route must return 404 on business surface"
+  exit 1
+fi
 
 printf "\n[6/7] Scheduler inventory\n"
 gcloud scheduler jobs list \
