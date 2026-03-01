@@ -65,11 +65,26 @@ class TradeSignal:
     timestamp: datetime = field(default_factory=datetime.utcnow)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
+    @staticmethod
+    def _normalize_platform_name(value: Any) -> str:
+        """Normalize platform identifiers for robust matching."""
+        if value is None:
+            return ""
+        return str(value).strip().lower()
+
     def should_execute_on(self, platform: str) -> bool:
         """Check if this signal should be executed on a given platform."""
+        normalized_platform = self._normalize_platform_name(platform)
         if not self.target_platforms:
             return True  # Empty list means all platforms
-        return platform in self.target_platforms
+        normalized_targets = {
+            self._normalize_platform_name(target)
+            for target in self.target_platforms
+            if self._normalize_platform_name(target)
+        }
+        if not normalized_targets:
+            return True
+        return normalized_platform in normalized_targets
 
 
 @dataclass

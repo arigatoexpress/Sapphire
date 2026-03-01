@@ -25,6 +25,32 @@ PUBSUB_EMULATOR_HOST = os.getenv("PUBSUB_EMULATOR_HOST")
 
 # GCP Project ID
 PROJECT_ID = os.getenv("GCP_PROJECT_ID", "sapphire-479610")
+SUBSCRIPTION_ACK_DEADLINE_SECONDS = max(
+    10,
+    min(int(os.getenv("PUBSUB_SUB_ACK_DEADLINE_SECONDS", "60")), 600),
+)
+
+
+def _resolve_runtime_service_name() -> str:
+    """
+    Resolve a stable runtime service name for subscription fanout isolation.
+
+    Priority:
+      1) explicit SERVICE_NAME env
+      2) Cloud Run K_SERVICE
+      3) local HOSTNAME fallback
+    """
+    candidates = [
+        os.getenv("SERVICE_NAME"),
+        os.getenv("K_SERVICE"),
+        os.getenv("HOSTNAME"),
+    ]
+    for candidate in candidates:
+        if candidate:
+            value = str(candidate).strip()
+            if value:
+                return value
+    return "unknown"
 
 
 class PubSubClient:
@@ -145,7 +171,7 @@ class PubSubClient:
         self._handlers[topic].append(handler)
 
         # Create subscription name
-        service_name = os.getenv("SERVICE_NAME", "unknown")
+        service_name = _resolve_runtime_service_name()
         sub_name = subscription_name or f"{topic}-{service_name}-sub"
         subscription_path = f"projects/{PROJECT_ID}/subscriptions/{sub_name}"
 
@@ -160,10 +186,26 @@ class PubSubClient:
                         self._subscriber.create_subscription,
                         name=subscription_path,
                         topic=topic_path,
+                        ack_deadline_seconds=SUBSCRIPTION_ACK_DEADLINE_SECONDS,
                     )
                     logger.info(f"📥 Created subscription: {sub_name}")
                 except Exception:
                     pass  # Subscription already exists
+
+                # Enforce ack deadline on existing subscriptions as well.
+                try:
+                    await asyncio.to_thread(
+                        self._subscriber.update_subscription,
+                        request={
+                            "subscription": {
+                                "name": subscription_path,
+                                "ack_deadline_seconds": SUBSCRIPTION_ACK_DEADLINE_SECONDS,
+                            },
+                            "update_mask": {"paths": ["ack_deadline_seconds"]},
+                        },
+                    )
+                except Exception as exc:
+                    logger.debug(f"Could not update ack deadline for {sub_name}: {exc}")
 
                 # Start pulling messages in background
                 asyncio.create_task(self._pull_messages(subscription_path, topic))

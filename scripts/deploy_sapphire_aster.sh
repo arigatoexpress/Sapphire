@@ -11,6 +11,7 @@ SERVICE_NAME="${SERVICE_NAME:-sapphire-aster}"
 IMAGE_NAME="${IMAGE_NAME:-sapphire-aster}"
 IMAGE_TAG="${IMAGE_TAG:-$(date -u +%Y%m%d%H%M)-aster}"
 PLATFORM="${PLATFORM:-linux/amd64}"
+BUILD_SERVICE_ACCOUNT="${BUILD_SERVICE_ACCOUNT:-sapphirev3@${PROJECT_ID}.iam.gserviceaccount.com}"
 
 CPU="${CPU:-1}"
 MEMORY="${MEMORY:-1Gi}"
@@ -26,8 +27,7 @@ ASTER_DIR="${ROOT_DIR}/services/bot-aster"
 IMAGE_URI="${AR_REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${IMAGE_NAME}:${IMAGE_TAG}"
 IMAGE_LATEST="${AR_REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${IMAGE_NAME}:latest"
 
-PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" --format='value(projectNumber)')"
-DEFAULT_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+DEFAULT_SA="sapphire-main-sa@${PROJECT_ID}.iam.gserviceaccount.com"
 SERVICE_ACCOUNT="${SERVICE_ACCOUNT:-${DEFAULT_SA}}"
 
 echo "== Sapphire Aster Bot Deploy =="
@@ -39,12 +39,24 @@ echo "Service Account: ${SERVICE_ACCOUNT}"
 echo
 
 if [[ "${SKIP_BUILD:-false}" != "true" ]]; then
-  docker buildx build \
-    --platform "${PLATFORM}" \
-    -f "${ASTER_DIR}/Dockerfile" \
-    -t "${IMAGE_URI}" \
-    -t "${IMAGE_LATEST}" \
-    --push "${ASTER_DIR}"
+  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    docker buildx build \
+      --platform "${PLATFORM}" \
+      -f "${ASTER_DIR}/Dockerfile" \
+      -t "${IMAGE_URI}" \
+      -t "${IMAGE_LATEST}" \
+      --push "${ROOT_DIR}"
+  else
+    echo "Docker daemon unavailable; using Cloud Build fallback."
+    gcloud builds submit \
+      --project "${PROJECT_ID}" \
+      --service-account "projects/${PROJECT_ID}/serviceAccounts/${BUILD_SERVICE_ACCOUNT}" \
+      --default-buckets-behavior=regional-user-owned-bucket \
+      --config "${ROOT_DIR}/cloudbuild-bot-aster.yaml" \
+      --substitutions "_IMAGE=${IMAGE_URI}" \
+      "${ROOT_DIR}"
+    gcloud artifacts docker tags add "${IMAGE_URI}" "${IMAGE_LATEST}" --project "${PROJECT_ID}" >/dev/null
+  fi
 fi
 
 gcloud run deploy "${SERVICE_NAME}" \
@@ -60,9 +72,9 @@ gcloud run deploy "${SERVICE_NAME}" \
   --timeout "${TIMEOUT}" \
   --min-instances "${MIN_INSTANCES}" \
   --max-instances "${MAX_INSTANCES}" \
-  --set-env-vars "GCP_PROJECT_ID=${PROJECT_ID}" \
-  --set-env-vars "SERVICE_NAME=bot-aster" \
-  --set-env-vars "LOG_LEVEL=${LOG_LEVEL:-INFO}" \
+  --update-env-vars "GCP_PROJECT_ID=${PROJECT_ID}" \
+  --update-env-vars "SERVICE_NAME=bot-aster" \
+  --update-env-vars "LOG_LEVEL=${LOG_LEVEL:-INFO}" \
   --update-secrets "ASTER_API_KEY=ASTER_API_KEY:latest,ASTER_SECRET_KEY=ASTER_SECRET_KEY:latest"
 
 if [[ "${STARTUP_CPU_BOOST}" == "true" ]]; then

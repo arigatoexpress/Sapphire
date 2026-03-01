@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 try:
     from google.cloud import firestore as g_firestore
@@ -1139,7 +1139,7 @@ class TradingSignalRequest(BaseModel):
     side: str  # BUY, SELL, LONG, SHORT
     signal_type: str = "entry"
     confidence: float = 0.7
-    target_platforms: List[str] = []  # Empty = all
+    target_platforms: List[str] = Field(default_factory=list)  # Empty = all
     entry_price: Optional[float] = None
     stop_loss: Optional[float] = None
     take_profit: Optional[float] = None
@@ -1150,6 +1150,16 @@ class TradingSignalRequest(BaseModel):
 async def create_signal(request: TradingSignalRequest):
     """Create and publish a trading signal to all bots."""
     try:
+        normalized_targets = []
+        for target in request.target_platforms:
+            value = str(target or "").strip().lower()
+            if value:
+                normalized_targets.append(value)
+
+        quantity = request.quantity
+        if quantity is not None and float(quantity) <= 0:
+            raise ValueError("quantity must be > 0 when provided")
+
         signal = TradeSignal(
             signal_id=f"manual-{datetime.now().timestamp()}",
             symbol=request.symbol,
@@ -1157,16 +1167,18 @@ async def create_signal(request: TradingSignalRequest):
             signal_type=SignalType[request.signal_type.upper()],
             confidence=request.confidence,
             source="api-gateway",
-            target_platforms=request.target_platforms,
+            target_platforms=normalized_targets,
             entry_price=request.entry_price,
             stop_loss=request.stop_loss,
             take_profit=request.take_profit,
-            quantity=request.quantity,
+            quantity=quantity,
         )
 
-        await publish("trading-signals", signal)
+        message_id = await publish("trading-signals", signal)
+        if not message_id:
+            raise RuntimeError("Failed to publish signal to Pub/Sub")
 
-        return {"status": "published", "signal_id": signal.signal_id}
+        return {"status": "published", "signal_id": signal.signal_id, "message_id": message_id}
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

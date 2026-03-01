@@ -109,6 +109,7 @@ class TradingViewAlert:
     z_score: Optional[float] = None
     confidence: Optional[float] = None
     regime_score: Optional[float] = None
+    quantity: Optional[float] = None
     ai_verdict: Optional[str] = None  # Ollama enrichment
 
     def to_dict(self):
@@ -130,6 +131,7 @@ class TradingViewAlert:
             z_score=float(data["z_score"]) if "z_score" in data else None,
             confidence=float(data["confidence"]) if "confidence" in data else None,
             regime_score=float(data["regime_score"]) if "regime_score" in data else None,
+            quantity=float(data["quantity"]) if "quantity" in data else None,
         )
 
 
@@ -397,7 +399,7 @@ def build_trade_signal(alert: TradingViewAlert) -> dict:
         "entry_price": alert.price,
         "stop_loss": None,
         "take_profit": None,
-        "quantity": None,
+        "quantity": alert.quantity,
         "leverage": None,
         "timestamp": alert.timestamp,
         "metadata": {
@@ -408,6 +410,7 @@ def build_trade_signal(alert: TradingViewAlert) -> dict:
             "interval": alert.interval,
             "message": alert.message,
             "origin": "windows_pc_webhook",
+            "requested_quantity": alert.quantity,
             # Safety flag — bots should treat confidence < 0.70 as paper only
             "dry_run": bool(alert.confidence is not None and alert.confidence < 0.70),
         },

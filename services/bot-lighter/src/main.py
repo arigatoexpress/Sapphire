@@ -89,6 +89,12 @@ class LighterBot:
         self.trades_failed = 0
         self.avg_latency_ms = 0.0
 
+        # Signal idempotency guard: prevent duplicate execution on Pub/Sub redelivery.
+        self._processed_signal_ids: Dict[str, float] = {}
+        self._signal_dedupe_ttl_seconds = max(
+            60, int(os.getenv("SIGNAL_DEDUPE_TTL_SECONDS", "900"))
+        )
+
         # Telemetry publishing (consumed by api-gateway for realtime dashboard)
         self._position_publish_interval_seconds = max(
             3, int(os.getenv("POSITION_PUBLISH_INTERVAL_SECONDS", "10"))
@@ -431,6 +437,27 @@ class LighterBot:
                 logger.info(f"Trading disabled, ignoring signal: {signal.symbol}")
                 return
 
+            metadata = signal.metadata or {}
+            if bool(metadata.get("dry_run", False)):
+                logger.info(f"Dry-run signal ignored on {PLATFORM.value}: {signal.signal_id}")
+                return
+
+            if signal.quantity is None:
+                logger.warning(
+                    f"Rejected signal without explicit quantity on {PLATFORM.value}: {signal.signal_id} {signal.symbol}"
+                )
+                return
+
+            signal_id = str(signal.signal_id or "").strip()
+            if not signal_id:
+                logger.warning(f"Rejected signal without signal_id on {PLATFORM.value}: {signal.symbol}")
+                return
+
+            if self._is_duplicate_signal(signal_id):
+                logger.warning(f"Duplicate signal ignored on {PLATFORM.value}: {signal_id}")
+                return
+            self._mark_signal_processed(signal_id)
+
             logger.info(f"Received signal: {signal.side} {signal.symbol}")
             result = await self._execute_trade(signal)
             # Don't emit trade events for explicit no-op signals (ex: reduce-only without exposure).
@@ -439,6 +466,20 @@ class LighterBot:
 
         except Exception as e:
             logger.error(f"Signal handling error: {e}")
+
+    def _prune_processed_signals(self):
+        now_ts = time.time()
+        cutoff = now_ts - self._signal_dedupe_ttl_seconds
+        stale = [key for key, ts in self._processed_signal_ids.items() if ts < cutoff]
+        for key in stale:
+            self._processed_signal_ids.pop(key, None)
+
+    def _is_duplicate_signal(self, signal_id: str) -> bool:
+        self._prune_processed_signals()
+        return signal_id in self._processed_signal_ids
+
+    def _mark_signal_processed(self, signal_id: str):
+        self._processed_signal_ids[signal_id] = time.time()
 
     async def _handle_risk_alert(self, alert_data: Dict[str, Any]):
         """Handle risk alerts."""
@@ -469,8 +510,12 @@ class LighterBot:
 
             is_buy = signal.side in (TradeSide.BUY, TradeSide.LONG)
 
+            # Safety: require explicit quantity in inbound signal.
+            if signal.quantity is None:
+                raise ValueError("Signal quantity is required for live execution")
+
             # Calculate quantity
-            quantity = signal.quantity or self._calculate_position_size(signal)
+            quantity = float(signal.quantity)
 
             reduce_only = bool((signal.metadata or {}).get("reduce_only", False))
             if reduce_only:
