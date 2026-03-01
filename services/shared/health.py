@@ -104,6 +104,7 @@ async def start_health_server(
     forum_scout_register_handler: Optional[Callable[[Any, Dict[str, Any]], Awaitable[Any]]] = None,
     forum_scout_publish_handler: Optional[Callable[[Any, Dict[str, Any]], Awaitable[Any]]] = None,
     prediction_dashboard_handler: Optional[Callable[[Any, Dict[str, Any]], Awaitable[Any]]] = None,
+    intel_feed_handler: Optional[Callable[[Any, Dict[str, Any]], Awaitable[Any]]] = None,
 ):
     """Start a lightweight HTTP server for Cloud Run health checks."""
     port = int(os.getenv("PORT", "8080"))
@@ -200,6 +201,10 @@ async def start_health_server(
     # Prediction Dashboard (GET)
     if prediction_dashboard_handler:
         app.router.add_get("/prediction/dashboard", lambda r: adapt_get(prediction_dashboard_handler, r))
+
+    # Intel Feed (GET)
+    if intel_feed_handler:
+        app.router.add_get("/intel/feed", lambda r: adapt_get(intel_feed_handler, r))
 
     runner = web.AppRunner(app)
     await runner.setup()

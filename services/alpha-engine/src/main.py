@@ -32,6 +32,7 @@ from src.api_handlers import (
     handle_routing_info,
     handle_performance_stats,
     handle_system_logs,
+    handle_intel_feed,
     handle_control_status,
 
     handle_security_skills_status,
@@ -265,6 +266,9 @@ class AlphaEngine:
         self.swarm._prediction_aggregator = self.prediction_aggregator
         self._prediction_market_task: Optional[asyncio.Task[Any]] = None
         self._prediction_forum_task: Optional[asyncio.Task[Any]] = None
+        # Glint-style intel feed aggregator (public source-first).
+        from src.feeds.intel_feed import IntelFeedAggregator
+        self.intel_feed = IntelFeedAggregator()
         # Internal alpha signal scanner — autonomous trade idea generation
         self.alpha_scanner = AlphaSignalScanner(
             market_data=self.market_data,
@@ -272,6 +276,7 @@ class AlphaEngine:
             memory=self.memory,
             strategy=self.strategy,
             prediction_aggregator=self.prediction_aggregator,
+            intel_feed=self.intel_feed,
         )
         self._alpha_scanner_task: Optional[asyncio.Task[Any]] = None
         # Grid trader — leveraged grid-style signal generator
@@ -2977,6 +2982,7 @@ class AlphaEngine:
                 security_skills_status_handler=self._handle_security_skills_status_request,
                 security_skills_scan_handler=self._handle_security_skill_scan_request,
                 prediction_dashboard_handler=self._handle_prediction_dashboard_request,
+                intel_feed_handler=self._handle_intel_feed_request,
             )
         else:
             await start_health_server(
@@ -2998,6 +3004,7 @@ class AlphaEngine:
                 security_skills_status_handler=self._handle_security_skills_status_request,
                 security_skills_scan_handler=self._handle_security_skill_scan_request,
                 prediction_dashboard_handler=self._handle_prediction_dashboard_request,
+                intel_feed_handler=self._handle_intel_feed_request,
             )
 
         # 1. Start Telegram FIRST for immediate status
@@ -3083,6 +3090,18 @@ class AlphaEngine:
             )
         else:
             logger.info("Prediction market feeds disabled (SAPPHIRE_PREDICTION_MARKET_ENABLED=false)")
+
+        # 8. Start Intel Feed (Glint-style market/news/research stream)
+        if self.intel_feed.enabled:
+            await self.intel_feed.start()
+            await self.intel_feed.refresh_once(force=True)
+            logger.info("🧠 Intel feed active")
+            self.telegram.record_activity(
+                SCOUT, "intel_feed",
+                "Intel feed started (Google News + HN + GitHub; scrape fallback sandbox-gated)",
+            )
+        else:
+            logger.info("Intel feed disabled (SAPPHIRE_INTEL_FEED_ENABLED=false)")
 
         # Keep-alive loop
         while self.running:
@@ -3268,6 +3287,9 @@ class AlphaEngine:
     async def _handle_prediction_dashboard_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
         return self.prediction_aggregator.get_prediction_dashboard_data()
 
+    async def _handle_intel_feed_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        return await handle_intel_feed(self, payload)
+
     async def stop(self):
         logger.info("🛑 Stopping Alpha Engine...")
         self.running = False
@@ -3276,6 +3298,7 @@ class AlphaEngine:
         if self._autonomy_task:
             self._autonomy_task.cancel()
         await self.media_manager.stop()
+        await self.intel_feed.stop()
         await self.prediction_aggregator.stop()
         if self._prediction_forum_task:
             self._prediction_forum_task.cancel()

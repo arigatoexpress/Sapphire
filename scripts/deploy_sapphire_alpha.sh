@@ -131,6 +131,7 @@ if [[ "${SKIP_BUILD:-false}" != "true" ]]; then
     gcloud builds submit \
       --project "${PROJECT_ID}" \
       --service-account "projects/${PROJECT_ID}/serviceAccounts/${BUILD_SERVICE_ACCOUNT}" \
+      --default-buckets-behavior=regional-user-owned-bucket \
       --config "${ROOT_DIR}/cloudbuild-alpha.yaml" \
       --substitutions "_IMAGE=${IMAGE_URI}" \
       "${ROOT_DIR}"

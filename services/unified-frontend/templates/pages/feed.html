@@ -1,0 +1,361 @@
+{% extends "base.html" %}
+
+{% block page_subtitle %}A Glint-style intelligence stream across markets, AI developments, and research momentum using safe-source ingestion.{% endblock %}
+
+{% block extra_css %}
+.intel-hero {
+    position: relative;
+    overflow: hidden;
+    margin-bottom: var(--space-xl);
+}
+
+.intel-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 10% 18%, rgba(105, 212, 255, 0.22), transparent 45%),
+        radial-gradient(circle at 88% 10%, rgba(143, 125, 255, 0.2), transparent 40%);
+    pointer-events: none;
+}
+
+.intel-hero-body {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: var(--space-lg);
+    align-items: center;
+}
+
+.intel-hero h2 {
+    font-size: 1.9rem;
+    line-height: 1.08;
+    margin-bottom: var(--space-sm);
+}
+
+.intel-hero p {
+    color: var(--text-secondary);
+    max-width: 66ch;
+}
+
+.intel-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    margin-top: var(--space-md);
+}
+
+.intel-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    padding: 6px 12px;
+}
+
+.intel-toolbar {
+    display: grid;
+    grid-template-columns: 160px 1fr auto;
+    gap: var(--space-sm);
+}
+
+.intel-input,
+.intel-select {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    padding: 10px 12px;
+    font: inherit;
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.intel-feed-list {
+    display: grid;
+    gap: var(--space-sm);
+}
+
+.intel-item {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 14px;
+    transition: border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.intel-item:hover {
+    border-color: var(--border-accent);
+    transform: translateY(-1px);
+}
+
+.intel-item-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    color: var(--text-muted);
+    font-size: 0.74rem;
+    margin-bottom: 8px;
+}
+
+.intel-source {
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+}
+
+.intel-title {
+    color: var(--text);
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.45;
+    margin-bottom: 6px;
+}
+
+.intel-summary {
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+    line-height: 1.6;
+}
+
+.intel-tags {
+    margin-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.intel-tag {
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+@media (max-width: 980px) {
+    .intel-hero-body {
+        grid-template-columns: 1fr;
+    }
+
+    .intel-hero h2 {
+        font-size: 1.55rem;
+    }
+
+    .intel-toolbar {
+        grid-template-columns: 1fr;
+    }
+}
+{% endblock %}
+
+{% block content %}
+<div class="card intel-hero">
+    <div class="card-body intel-hero-body">
+        <div>
+            <span class="intel-chip">Intelligence Feed · Read-Only</span>
+            <h2>Signal, News, and Research in One Tactical Stream</h2>
+            <p>
+                This page mirrors the high-signal feed style you requested, while staying compliant with source policies.
+                Primary ingestion uses public APIs and RSS. Direct scraping paths are sandbox-gated and disabled in production by default.
+            </p>
+            <div class="intel-chip-row" id="intel-chip-row">
+                <span class="intel-chip"><i class="fas fa-spinner fa-spin"></i> Loading source health...</span>
+            </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:var(--space-sm);">
+            <a href="/trading" class="btn btn-primary"><i class="fas fa-chart-line"></i> Market Intelligence</a>
+            <a href="/system-health" class="btn btn-secondary"><i class="fas fa-heartbeat"></i> Platform Status</a>
+            <a href="/settings" class="btn btn-secondary"><i class="fas fa-shield-halved"></i> Security Policy</a>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-filter" style="margin-right:8px;color:var(--primary);"></i>Feed Controls</h3>
+    </div>
+    <div class="card-body">
+        <div class="intel-toolbar">
+            <select class="intel-select" id="intel-category">
+                <option value="">All Categories</option>
+                <option value="market">Market</option>
+                <option value="ai">AI</option>
+                <option value="research">Research</option>
+                <option value="operations">Operations</option>
+                <option value="security">Security</option>
+            </select>
+            <input class="intel-input" id="intel-query" placeholder="Filter by keyword (e.g. bitcoin, qwen, deepseek)" />
+            <button class="btn btn-secondary" onclick="refreshIntelFeed(true)">
+                <i class="fas fa-rotate-right"></i> Refresh
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-3" style="margin-bottom: var(--space-xl);">
+    <div class="stat-card">
+        <div class="stat-label">Visible Items</div>
+        <div class="stat-value" id="intel-count">--</div>
+        <div class="stat-change">Current filtered feed rows</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Healthy Sources</div>
+        <div class="stat-value" id="intel-sources">--</div>
+        <div class="stat-change" id="intel-sources-note">Collecting status</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Data Policy</div>
+        <div class="stat-value" id="intel-policy">Safe</div>
+        <div class="stat-change" id="intel-policy-note">Public-source first ingestion</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-stream" style="margin-right:8px;color:var(--accent);"></i>Live Intelligence Feed</h3>
+    </div>
+    <div class="card-body" id="intel-feed-body">
+        <div class="loading"><div class="spinner"></div>Loading intelligence feed...</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function fmtTs(iso) {
+        if (!iso) return '--';
+        try {
+            return new Date(iso).toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+            });
+        } catch (_) {
+            return '--';
+        }
+    }
+
+    function confidenceBadge(confRaw) {
+        const conf = String(confRaw || 'medium').toLowerCase();
+        if (conf === 'high') return '<span class="badge badge-success">high</span>';
+        if (conf === 'low') return '<span class="badge badge-warning">low</span>';
+        return '<span class="badge badge-info">medium</span>';
+    }
+
+    function categoryBadge(catRaw) {
+        const cat = String(catRaw || 'market').toLowerCase();
+        const map = {
+            market: 'badge-info',
+            ai: 'badge-success',
+            research: 'badge-warning',
+            operations: 'badge-info',
+            security: 'badge-danger',
+        };
+        const cls = map[cat] || 'badge-info';
+        return `<span class="badge ${cls}">${cat}</span>`;
+    }
+
+    function renderFeedItems(items) {
+        const body = document.getElementById('intel-feed-body');
+        if (!items.length) {
+            body.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon"><i class="fas fa-satellite-dish"></i></div>
+                    <h3>No feed items for this filter</h3>
+                    <p>Try removing filters or refreshing the feed.</p>
+                </div>
+            `;
+            return;
+        }
+
+        body.innerHTML = `
+            <div class="intel-feed-list">
+                ${items.map((item) => `
+                    <article class="intel-item">
+                        <div class="intel-item-meta">
+                            <span class="intel-source">${item.source || 'source'}</span>
+                            <span>•</span>
+                            <span>${fmtTs(item.published_at)}</span>
+                            <span>•</span>
+                            ${categoryBadge(item.category)}
+                            ${confidenceBadge(item.confidence)}
+                        </div>
+                        <div class="intel-title">
+                            ${item.url ? `<a href="${item.url}" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:none;">${item.title || 'Untitled'}</a>` : (item.title || 'Untitled')}
+                        </div>
+                        <div class="intel-summary">${item.summary || ''}</div>
+                        <div class="intel-tags">
+                            ${(item.tags || []).slice(0, 6).map((tag) => `<span class="intel-tag">#${tag}</span>`).join('')}
+                        </div>
+                    </article>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    async function refreshIntelFeed(forceRefresh = false) {
+        const category = document.getElementById('intel-category').value || '';
+        const query = (document.getElementById('intel-query').value || '').trim();
+        try {
+            const payload = await window.platformApi.getIntelFeed({
+                limit: 120,
+                category,
+                query,
+                refresh: forceRefresh ? 'true' : '',
+            });
+            const items = payload.items || [];
+            renderFeedItems(items);
+
+            const status = payload.status || {};
+            document.getElementById('intel-count').textContent = String(payload.count || items.length || 0);
+            const healthy = Number(status.sources_healthy || 0);
+            const total = Number(status.sources_total || 0);
+            document.getElementById('intel-sources').textContent = `${healthy}/${total || '--'}`;
+            document.getElementById('intel-sources-note').textContent = `runtime: ${status.runtime_env || 'n/a'}`;
+
+            const sandboxOnly = status.glint_scrape_sandbox_only !== false;
+            const glintEnabled = !!status.glint_scrape_enabled;
+            document.getElementById('intel-policy').textContent = sandboxOnly ? 'Sandboxed' : 'Open';
+            document.getElementById('intel-policy').style.color = sandboxOnly ? 'var(--success)' : 'var(--warning)';
+            document.getElementById('intel-policy-note').textContent =
+                glintEnabled
+                    ? (sandboxOnly ? 'Glint scrape only allowed in sandbox' : 'Glint scrape path enabled')
+                    : 'Glint scrape disabled; safe-source feeds active';
+
+            document.getElementById('intel-chip-row').innerHTML = `
+                <span class="intel-chip"><i class="fas fa-satellite"></i> ${payload.source || 'alpha_engine'}</span>
+                <span class="intel-chip"><i class="fas fa-shield-halved"></i> sandbox scrape policy ${sandboxOnly ? 'on' : 'off'}</span>
+                <span class="intel-chip"><i class="fas fa-database"></i> ${payload.count || 0} visible items</span>
+            `;
+        } catch (error) {
+            console.error('Failed to load intel feed', error);
+            document.getElementById('intel-feed-body').innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon"><i class="fas fa-circle-exclamation"></i></div>
+                    <h3>Feed load failed</h3>
+                    <p>${error.message || 'Unable to fetch feed data'}</p>
+                </div>
+            `;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        refreshIntelFeed();
+        const query = document.getElementById('intel-query');
+        const category = document.getElementById('intel-category');
+        let queryTimer = null;
+
+        query.addEventListener('input', () => {
+            clearTimeout(queryTimer);
+            queryTimer = setTimeout(() => refreshIntelFeed(false), 300);
+        });
+        category.addEventListener('change', () => refreshIntelFeed(false));
+        setInterval(() => refreshIntelFeed(false), 60000);
+    });
+</script>
+{% endblock %}

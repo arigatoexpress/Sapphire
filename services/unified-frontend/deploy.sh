@@ -26,6 +26,7 @@ echo
 echo "Pages available:"
 echo "  /                      - Overview"
 echo "  /trading               - Trading"
+echo "  /feed                  - Intelligence Feed"
 echo "  /command-deck          - Command Deck"
 echo "  /system-health         - System Health"
 echo "  /logs                  - Logs"

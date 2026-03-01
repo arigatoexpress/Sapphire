@@ -59,5 +59,8 @@
     getWindowsLab() {
       return request('/api/platform/windows-lab');
     },
+    getIntelFeed(params) {
+      return request(withParams('/api/platform/intel-feed', params));
+    },
   };
 })();

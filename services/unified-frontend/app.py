@@ -793,6 +793,145 @@ def _fetch_logs(hours: int = 24, limit: int = 100, service: str = '', level: str
             return {'logs': [], 'count': 0, 'error': str(fallback_exc), 'source': 'firestore_error'}
 
 
+def _normalize_intel_item(raw: dict, fallback_source: str = 'alpha_engine') -> dict:
+    item = dict(raw or {})
+    title = str(item.get('title', '')).strip() or 'Untitled intelligence update'
+    summary = str(item.get('summary', '')).strip()
+    source = str(item.get('source', fallback_source)).strip() or fallback_source
+    category = str(item.get('category', 'market')).strip().lower() or 'market'
+    confidence = str(item.get('confidence', 'medium')).strip().lower() or 'medium'
+    tags = item.get('tags', [])
+    if not isinstance(tags, list):
+        tags = []
+    score = item.get('score', 0.0)
+    try:
+        score = float(score)
+    except (TypeError, ValueError):
+        score = 0.0
+
+    normalized = {
+        'id': str(item.get('id', '')).strip() or f"{source}:{hash(title)}",
+        'source': source,
+        'category': category,
+        'title': title,
+        'summary': summary,
+        'url': str(item.get('url', '')).strip(),
+        'published_at': _iso_or_default(item.get('published_at') or item.get('timestamp')),
+        'tags': [str(tag).strip().lower() for tag in tags if str(tag).strip()],
+        'confidence': confidence,
+        'score': round(score, 3),
+    }
+    return normalized
+
+
+def _fallback_intel_from_logs(limit: int = 80, category: str = '', query: str = '') -> dict:
+    logs_payload = _fetch_logs(hours=24, limit=max(60, limit * 2))
+    logs = logs_payload.get('logs', [])
+    items = []
+    for idx, row in enumerate(logs):
+        message = str(row.get('message', '')).strip()
+        if not message:
+            continue
+        level = str(row.get('level', 'INFO')).lower()
+        service = str(row.get('service', 'platform')).lower()
+        inferred_category = 'security' if 'security' in message.lower() else (
+            'market' if ('signal' in message.lower() or 'trade' in message.lower()) else 'operations'
+        )
+        if category and inferred_category != category:
+            continue
+        if query:
+            q = query.lower()
+            if q not in message.lower() and q not in service:
+                continue
+        items.append(
+            {
+                'id': row.get('id', f'log-{idx}'),
+                'source': f'log:{service}',
+                'category': inferred_category,
+                'title': message[:140] + ('…' if len(message) > 140 else ''),
+                'summary': message,
+                'url': '',
+                'published_at': _iso_or_default(row.get('timestamp')),
+                'tags': [level, service, 'firestore'],
+                'confidence': 'low',
+                'score': 0.44 if level == 'info' else 0.55,
+            }
+        )
+        if len(items) >= limit:
+            break
+
+    return {
+        'enabled': True,
+        'running': True,
+        'source': 'firestore_logs_fallback',
+        'count': len(items),
+        'items': items[:limit],
+        'status': {
+            'enabled': True,
+            'running': True,
+            'source': 'fallback',
+            'note': 'Alpha intel feed unavailable; using platform logs fallback.',
+        },
+        'timestamp': datetime.utcnow().isoformat(),
+    }
+
+
+def _fetch_intel_feed_payload(limit: int = 80, category: str = '', query: str = '', refresh: bool = False):
+    cache_key = f"intel_feed:{limit}:{category}:{query}:{int(bool(refresh))}"
+    if not refresh and not query and not category:
+        cached = get_cached(cache_key, duration=15)
+        if cached:
+            return cached
+
+    alpha_url = _join_url(ALPHA_ENGINE_URL, '/intel/feed')
+    params = {
+        'limit': max(1, min(limit, 200)),
+    }
+    if category:
+        params['category'] = category
+    if query:
+        params['query'] = query
+    if refresh:
+        params['refresh'] = 'true'
+
+    response = _get_json(alpha_url, timeout=8.0, params=params)
+    if response.get('ok'):
+        data = response.get('data', {})
+        raw_items = data.get('items', [])
+        if isinstance(raw_items, list):
+            items = [_normalize_intel_item(item) for item in raw_items if isinstance(item, dict)]
+        else:
+            items = []
+        if not items:
+            fallback = _fallback_intel_from_logs(limit=limit, category=category, query=query)
+            fallback['warning'] = 'alpha_engine_empty'
+            fallback['status'] = {
+                **(data.get('status', {}) if isinstance(data.get('status'), dict) else {}),
+                'fallback_reason': 'alpha_engine_returned_zero_items',
+            }
+            if not refresh and not query and not category:
+                set_cache(cache_key, fallback)
+            return fallback
+        payload = {
+            'enabled': bool(data.get('enabled', True)),
+            'running': bool(data.get('running', True)),
+            'source': 'alpha_engine',
+            'count': len(items),
+            'items': items[: max(1, min(limit, 200))],
+            'status': data.get('status', {}),
+            'timestamp': datetime.utcnow().isoformat(),
+        }
+        if not refresh and not query and not category:
+            set_cache(cache_key, payload)
+        return payload
+
+    payload = _fallback_intel_from_logs(limit=limit, category=category, query=query)
+    payload['warning'] = response.get('error') or f"http_{response.get('status_code')}"
+    if not refresh and not query and not category:
+        set_cache(cache_key, payload)
+    return payload
+
+
 def _platform_health_summary(status_data=None):
     status_data = status_data or _collect_system_status()
     summary = status_data.get('summary', {})
@@ -1054,6 +1193,12 @@ def trading():
     return render_template('pages/trading.html', current_page='trading', page_title='Market Intelligence')
 
 
+@app.route('/feed')
+@requires_auth
+def feed():
+    return render_template('pages/feed.html', current_page='feed', page_title='Intelligence Feed')
+
+
 @app.route('/command-deck')
 @requires_auth
 def command_deck():
@@ -1179,6 +1324,16 @@ def api_platform_projects():
     return jsonify(_fetch_projects_payload())
 
 
+@app.route('/api/platform/intel-feed')
+@requires_auth
+def api_platform_intel_feed():
+    limit = request.args.get('limit', 80, type=int)
+    category = request.args.get('category', '', type=str).strip().lower()
+    query = request.args.get('query', '', type=str).strip()
+    refresh = request.args.get('refresh', 'false', type=str).lower() == 'true'
+    return jsonify(_fetch_intel_feed_payload(limit=limit, category=category, query=query, refresh=refresh))
+
+
 @app.route('/api/platform/windows-lab')
 @requires_auth
 def api_platform_windows_lab():
@@ -1232,6 +1387,12 @@ def api_trading_metrics():
 @requires_auth
 def api_windows_lab():
     return api_platform_windows_lab()
+
+
+@app.route('/api/intel/feed')
+@requires_auth
+def api_intel_feed():
+    return api_platform_intel_feed()
 
 
 if __name__ == '__main__':

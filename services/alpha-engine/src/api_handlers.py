@@ -210,6 +210,38 @@ async def handle_system_logs(engine: Any, payload: Dict[str, Any]) -> List[Dict[
     return list(engine._system_logs)[-limit:]
 
 
+async def handle_intel_feed(engine: Any, payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Return normalized intelligence feed payload."""
+    intel = getattr(engine, "intel_feed", None)
+    if intel is None:
+        return {"enabled": False, "status": "unavailable", "items": [], "count": 0}
+
+    limit_raw = payload.get("limit", 60)
+    try:
+        limit = int(limit_raw)
+    except (TypeError, ValueError):
+        limit = 60
+    limit = max(1, min(limit, 200))
+
+    category = str(payload.get("category", "")).strip().lower()
+    query = str(payload.get("query", "")).strip()
+    refresh = str(payload.get("refresh", "false")).strip().lower() in {"1", "true", "yes", "on"}
+
+    if refresh:
+        await intel.refresh_once(force=True)
+
+    items = intel.get_feed(limit=limit, category=category, query=query)
+    status = intel.get_status()
+    return {
+        "enabled": bool(status.get("enabled", False)),
+        "running": bool(status.get("running", False)),
+        "status": status,
+        "items": items,
+        "count": len(items),
+        "timestamp": int(time.time()),
+    }
+
+
 async def handle_control_status(engine: Any, _: Dict[str, Any]) -> Dict[str, Any]:
     """Return control plane snapshot."""
     return engine._control_snapshot()
