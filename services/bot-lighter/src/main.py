@@ -170,9 +170,14 @@ class LighterBot:
 
             if order_books and hasattr(order_books, "order_books"):
                 for ob in order_books.order_books:
-                    symbol = ob.symbol if hasattr(ob, "symbol") else str(ob.order_book_id)
+                    market_id = getattr(ob, "order_book_id", 0) or getattr(ob, "market_id", 0) or 0
+                    symbol = (
+                        getattr(ob, "symbol", None)
+                        or getattr(ob, "base_asset", None)
+                        or str(market_id)
+                    )
                     market_row = {
-                        "order_book_id": ob.order_book_id if hasattr(ob, "order_book_id") else 0,
+                        "order_book_id": int(market_id or 0),
                         "symbol": symbol,
                         "base_asset": getattr(ob, "base_asset", symbol),
                         "quote_asset": getattr(ob, "quote_asset", "USDC"),
@@ -786,10 +791,26 @@ class LighterBot:
                 logger.warning(f"Ticker lookup has no market mapping for {symbol} (normalized={coin})")
                 return None
 
-            details = await self._call_lighter_api(
-                self.order_api.order_book_details,
-                order_book_id=order_book_id,
-            )
+            details = None
+            attempts = [
+                ((), {"market_id": order_book_id}),
+                ((), {"order_book_id": order_book_id}),
+                ((order_book_id,), {}),
+            ]
+            last_error: Optional[Exception] = None
+            for args, kwargs in attempts:
+                try:
+                    details = await self._call_lighter_api(
+                        self.order_api.order_book_details,
+                        *args,
+                        **kwargs,
+                    )
+                    break
+                except TypeError as exc:
+                    last_error = exc
+                    continue
+            if details is None and last_error is not None:
+                raise last_error
 
             if details and hasattr(details, "mid_price"):
                 return float(details.mid_price)
