@@ -1910,7 +1910,9 @@ def _platform_health_summary(status_data=None):
     return {
         # `healthy` intentionally tracks core production health, not optional edge devices.
         'healthy': core_unhealthy_count == 0,
-        'overall_healthy': (summary.get('service_unhealthy', 0) == 0 and summary.get('node_unhealthy', 0) == 0),
+        # `overall_healthy` reflects production-critical core only; optional edge devices are reported separately.
+        'overall_healthy': core_unhealthy_count == 0,
+        'overall_healthy_all': (summary.get('service_unhealthy', 0) == 0 and summary.get('node_unhealthy', 0) == 0),
         'healthy_count': core_healthy_count,
         'unhealthy_count': core_unhealthy_count,
         'optional_total': len(optional_rows),

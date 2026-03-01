@@ -135,7 +135,10 @@ if [[ -x "./scripts/platform_contract_audit.sh" ]]; then
   DOMAIN="$DOMAIN" AUTH_USER="$AUTH_USER" AUTH_PASS="$AUTH_PASS" ./scripts/platform_contract_audit.sh
 fi
 
-MONITOR_SCRIPT="/Users/aribs/sapphire_trading_monitor/unified_health_monitor.py"
+MONITOR_SCRIPT="${MONITOR_SCRIPT:-./scripts/unified_health_monitor.py}"
+if [[ ! -f "$MONITOR_SCRIPT" && -f "/Users/aribs/sapphire_trading_monitor/unified_health_monitor.py" ]]; then
+  MONITOR_SCRIPT="/Users/aribs/sapphire_trading_monitor/unified_health_monitor.py"
+fi
 if [[ -f "$MONITOR_SCRIPT" ]]; then
   printf "\n[extra] Cross-environment monitor snapshot\n"
   python3 "$MONITOR_SCRIPT" --check | python3 -c '
@@ -149,6 +152,10 @@ p=json.loads(m.group(0))
 print("overall_healthy={} healthy={}/{}".format(p.get("overall_healthy"), p.get("healthy_count"), p.get("total_services")))
 for s in p.get("unhealthy_services", [])[:10]:
     print(" -", s.get("category"), s.get("name"), s.get("error"))
+if (p.get("optional_degraded_count") or 0) > 0:
+    print("optional_degraded={}".format(p.get("optional_degraded_count")))
+    for s in p.get("optional_degraded_services", [])[:10]:
+        print(" - optional", s.get("category"), s.get("name"), s.get("error"))
 '
 fi
 
