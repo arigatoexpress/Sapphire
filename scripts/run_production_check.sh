@@ -130,6 +130,11 @@ if [[ -x "./scripts/cleanup_scheduler_drift.sh" ]]; then
   ./scripts/cleanup_scheduler_drift.sh --dry-run
 fi
 
+if [[ -x "./scripts/platform_contract_audit.sh" ]]; then
+  printf "\n[extra] Platform contract audit\n"
+  DOMAIN="$DOMAIN" AUTH_USER="$AUTH_USER" AUTH_PASS="$AUTH_PASS" ./scripts/platform_contract_audit.sh
+fi
+
 MONITOR_SCRIPT="/Users/aribs/sapphire_trading_monitor/unified_health_monitor.py"
 if [[ -f "$MONITOR_SCRIPT" ]]; then
   printf "\n[extra] Cross-environment monitor snapshot\n"

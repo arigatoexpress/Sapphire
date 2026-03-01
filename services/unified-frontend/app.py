@@ -14,7 +14,7 @@ from urllib.parse import urljoin
 
 import requests
 from firebase_admin import credentials, firestore, get_app, initialize_app
-from flask import Flask, render_template, jsonify, request, Response
+from flask import Flask, render_template, jsonify, request, Response, make_response
 
 app = Flask(__name__)
 
@@ -36,6 +36,8 @@ WINDOWS_HEALTH_URL = os.environ.get('WINDOWS_HEALTH_URL', f'http://{WINDOWS_IP}:
 CACHE_DURATION = int(os.environ.get('CACHE_DURATION', '10'))
 PRICE_CACHE_DURATION = int(os.environ.get('PRICE_CACHE_DURATION', '30'))
 GCP_PROJECT = os.environ.get('GCP_PROJECT', 'sapphire-479610')
+PLATFORM_CONTRACT_VERSION = os.environ.get('PLATFORM_CONTRACT_VERSION', 'v1')
+LEGACY_ALIAS_SUNSET = os.environ.get('LEGACY_ALIAS_SUNSET', 'Sat, 01 Aug 2026 00:00:00 GMT')
 TRADING_METRICS_COLLECTION = os.environ.get('TRADING_METRICS_COLLECTION', 'trading_metrics')
 TRADE_EXECUTIONS_COLLECTION = os.environ.get('TRADE_EXECUTIONS_COLLECTION', 'trade_executions')
 SYSTEM_LOGS_COLLECTION = os.environ.get('SYSTEM_LOGS_COLLECTION', 'system_logs')
@@ -300,12 +302,29 @@ def requires_control_token(f):
     return decorated
 
 
+def _deprecated_alias_response(payload, canonical_path: str):
+    response = make_response(payload)
+    canonical_url = canonical_path
+    if canonical_path.startswith('/'):
+        canonical_url = f"{(request.url_root or '').rstrip('/')}{canonical_path}"
+
+    response.headers['Deprecation'] = 'true'
+    response.headers['Sunset'] = LEGACY_ALIAS_SUNSET
+    response.headers['Link'] = f'<{canonical_url}>; rel=\"successor-version\"'
+    response.headers['X-Sapphire-API-Tier'] = 'legacy-alias'
+    response.headers['X-Sapphire-Contract-Version'] = PLATFORM_CONTRACT_VERSION
+    return response
+
+
 @app.after_request
 def add_api_response_headers(response):
     path = request.path or ''
     if path.startswith('/api/'):
         response.headers['Cache-Control'] = 'no-store, max-age=0'
         response.headers['Pragma'] = 'no-cache'
+    if path.startswith('/api/platform/'):
+        response.headers['X-Sapphire-API-Tier'] = 'canonical'
+        response.headers['X-Sapphire-Contract-Version'] = PLATFORM_CONTRACT_VERSION
     return response
 
 
@@ -2457,7 +2476,7 @@ def _platform_contracts_payload():
 
     return {
         'name': 'Sapphire Platform Contract Manifest',
-        'version': 'v1',
+        'version': PLATFORM_CONTRACT_VERSION,
         'generated_at': datetime.utcnow().isoformat(),
         'revision': revision,
         'auth': {
@@ -2482,6 +2501,11 @@ def _platform_contracts_payload():
             '/api/superswarm': '/api/platform/superswarm',
             '/api/windows-lab': '/api/platform/windows-lab',
             '/api/contracts': '/api/platform/contracts',
+        },
+        'alias_policy': {
+            'deprecated': True,
+            'sunset': LEGACY_ALIAS_SUNSET,
+            'successor_prefix': '/api/platform/',
         },
         'notes': [
             'Use /api/platform/* contracts for all new clients.',
@@ -2594,13 +2618,13 @@ def health():
 @app.route('/api/status')
 @requires_auth
 def api_status():
-    return jsonify(_collect_system_status())
+    return _deprecated_alias_response(jsonify(_collect_system_status()), '/api/platform/status')
 
 
 @app.route('/api/health/summary')
 @requires_auth
 def api_health_summary():
-    return jsonify(_platform_health_summary())
+    return _deprecated_alias_response(jsonify(_platform_health_summary()), '/api/platform/readiness')
 
 
 @app.route('/api/platform/status')
@@ -2720,7 +2744,7 @@ def api_logs():
     service = request.args.get('service', '')
     level = request.args.get('level', '')
     include_simulated = request.args.get('include_simulated', 'false').lower() == 'true'
-    return jsonify(
+    return _deprecated_alias_response(jsonify(
         _fetch_logs(
             hours=hours,
             limit=limit,
@@ -2728,7 +2752,7 @@ def api_logs():
             level=level,
             include_simulated=include_simulated,
         )
-    )
+    ), '/api/platform/logs')
 
 
 @app.route('/api/market/prices')
@@ -2736,62 +2760,62 @@ def api_logs():
 def api_market_prices():
     data = _platform_metrics_payload().get('market', {})
     if 'error' in data:
-        return jsonify(data), 502
-    return jsonify(data)
+        return _deprecated_alias_response((jsonify(data), 502), '/api/platform/metrics')
+    return _deprecated_alias_response(jsonify(data), '/api/platform/metrics')
 
 
 @app.route('/api/projects')
 @requires_auth
 def api_projects():
-    return api_platform_projects()
+    return _deprecated_alias_response(api_platform_projects(), '/api/platform/projects')
 
 
 @app.route('/api/organization')
 @requires_auth
 def api_organization():
-    return api_platform_organization()
+    return _deprecated_alias_response(api_platform_organization(), '/api/platform/organization')
 
 
 @app.route('/api/production/readiness')
 @requires_auth
 def api_production_readiness():
-    return api_platform_readiness()
+    return _deprecated_alias_response(api_platform_readiness(), '/api/platform/readiness')
 
 
 @app.route('/api/trading/metrics')
 @requires_auth
 def api_trading_metrics():
-    return jsonify(_platform_metrics_payload().get('trading', {}))
+    return _deprecated_alias_response(jsonify(_platform_metrics_payload().get('trading', {})), '/api/platform/metrics')
 
 
 @app.route('/api/trades')
 @requires_auth
 def api_trades():
-    return api_platform_trades()
+    return _deprecated_alias_response(api_platform_trades(), '/api/platform/trades')
 
 
 @app.route('/api/windows-lab')
 @requires_auth
 def api_windows_lab():
-    return api_platform_windows_lab()
+    return _deprecated_alias_response(api_platform_windows_lab(), '/api/platform/windows-lab')
 
 
 @app.route('/api/intel/feed')
 @requires_auth
 def api_intel_feed():
-    return api_platform_intel_feed()
+    return _deprecated_alias_response(api_platform_intel_feed(), '/api/platform/intel-feed')
 
 
 @app.route('/api/superswarm')
 @requires_auth
 def api_superswarm():
-    return api_platform_superswarm()
+    return _deprecated_alias_response(api_platform_superswarm(), '/api/platform/superswarm')
 
 
 @app.route('/api/contracts')
 @requires_auth
 def api_contracts():
-    return api_platform_contracts()
+    return _deprecated_alias_response(api_platform_contracts(), '/api/platform/contracts')
 
 
 @app.route('/jobs/superswarm/hourly-rollup', methods=['POST', 'GET'])
