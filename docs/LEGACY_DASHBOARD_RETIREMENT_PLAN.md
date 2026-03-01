@@ -4,7 +4,7 @@
 Retire duplicate dashboard UIs and keep one operator-facing surface:
 
 - Canonical operator site: `https://sapphirealpha.xyz`
-- Canonical contracts: `/api/platform/status|metrics|logs|organization|readiness|projects`
+- Canonical contracts: `/api/platform/status|metrics|autonomy|home-snapshot|logs|organization|readiness|projects`
 
 ## Current dependency map
 

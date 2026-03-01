@@ -47,6 +47,8 @@ check_platform_contracts() {
   local endpoints=(
     "/api/platform/status"
     "/api/platform/metrics"
+    "/api/platform/autonomy"
+    "/api/platform/home-snapshot"
     "/api/platform/logs"
     "/api/platform/organization"
     "/api/platform/readiness"

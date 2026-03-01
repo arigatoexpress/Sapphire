@@ -22,6 +22,7 @@ printf "[1/6] Platform contract endpoints\n"
 for path in \
   /api/platform/status \
   /api/platform/metrics \
+  /api/platform/autonomy \
   /api/platform/home-snapshot \
   /api/platform/logs \
   /api/platform/organization \
@@ -36,6 +37,7 @@ printf "\n[2/6] Frontend routes\n"
 for path in \
   / \
   /trading \
+  /autonomy \
   /command-deck \
   /system-health \
   /logs \

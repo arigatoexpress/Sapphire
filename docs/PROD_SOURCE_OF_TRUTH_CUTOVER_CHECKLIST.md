@@ -13,6 +13,8 @@ GCP project: `sapphire-479610`
 1. Confirm platform API contracts exist and return stable schema:
    - `GET /api/platform/status`
    - `GET /api/platform/metrics`
+   - `GET /api/platform/autonomy`
+   - `GET /api/platform/home-snapshot`
    - `GET /api/platform/logs`
    - `GET /api/platform/organization`
    - `GET /api/platform/readiness`

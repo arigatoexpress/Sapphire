@@ -1106,6 +1106,283 @@ def _platform_home_snapshot_payload():
     return payload
 
 
+def _build_experiment_backlog(
+    control: dict | None,
+    routing: dict | None,
+    readiness: dict | None,
+    intel_payload: dict | None,
+) -> list[dict]:
+    """Generate a safe, read-only experimentation backlog from live telemetry."""
+    control = control or {}
+    routing = routing or {}
+    readiness = readiness or {}
+    intel_payload = intel_payload or {}
+    experiments: list[dict] = []
+
+    def add_experiment(
+        *,
+        title: str,
+        lane: str,
+        priority: str,
+        hypothesis: str,
+        success_metric: str,
+        safety: str,
+        next_step: str,
+        source: str = 'derived',
+    ) -> None:
+        experiments.append(
+            {
+                'id': f"exp-{len(experiments) + 1:02d}",
+                'title': title,
+                'lane': lane,
+                'priority': priority,
+                'hypothesis': hypothesis,
+                'success_metric': success_metric,
+                'safety': safety,
+                'next_step': next_step,
+                'source': source,
+            }
+        )
+
+    if not bool(control.get('full_autonomy_enabled', False)):
+        add_experiment(
+            title='Autonomy loop activation drill',
+            lane='operations',
+            priority='high',
+            hypothesis='Enabling full autonomy with current guardrails increases throughput without raising incident count.',
+            success_metric='Autonomy dispatches > 0 and no new readiness blockers across 24h.',
+            safety='Keep DEX stage in paper and owner approval ON during first run.',
+            next_step='Toggle only in staging or with supervised maintenance window.',
+            source='control_status',
+        )
+
+    if str(control.get('dex_execution_stage', 'paper')).lower() == 'paper':
+        add_experiment(
+            title='Paper-to-live promotion gate calibration',
+            lane='trading',
+            priority='high',
+            hypothesis='Promotion criteria based on paper expectancy and drawdown reduce live-stage regression risk.',
+            success_metric='7-day paper run with positive expectancy and zero kill-switch activations.',
+            safety='No live dispatch changes from web; promotion remains operator-only.',
+            next_step='Define promotion threshold packet in macOS operator client workflow.',
+            source='control_status',
+        )
+
+    failure_pressure = int(control.get('failure_pressure', 0) or 0)
+    if failure_pressure > 0 or not bool(readiness.get('overall_ok', False)):
+        add_experiment(
+            title='Failure-pressure reduction cycle',
+            lane='reliability',
+            priority='high',
+            hypothesis='Targeted remediation on unstable rails lowers failure pressure and increases readiness stability.',
+            success_metric='Failure pressure returns to 0 and readiness gate stays green for 24h.',
+            safety='Use no-mutation diagnostics first, then apply reversible fixes.',
+            next_step='Triaging blockers from readiness and monitor snapshots.',
+            source='readiness',
+        )
+
+    pending = int(control.get('pending_autonomy_decisions', 0) or 0)
+    if pending > 0:
+        add_experiment(
+            title='Decision queue latency reduction',
+            lane='governance',
+            priority='medium',
+            hypothesis='Reducing pending autonomy decisions shortens execution feedback loops.',
+            success_metric='Pending autonomy decisions reduced to <= 1 within one cycle.',
+            safety='Keep approval policy unchanged; optimize workflow not permissions.',
+            next_step='Process pending sessions with clear approve/reject rationale.',
+            source='control_status',
+        )
+
+    memory_stats = control.get('memory_stats', {}) if isinstance(control.get('memory_stats'), dict) else {}
+    total_episodes = int(memory_stats.get('total_episodes', 0) or 0)
+    if bool(control.get('memory_enabled', False)) and total_episodes < 50:
+        add_experiment(
+            title='Episodic memory density uplift',
+            lane='learning',
+            priority='medium',
+            hypothesis='Higher episode density improves regime awareness and post-incident learning quality.',
+            success_metric='Total episodes > 100 with regime distribution tracked weekly.',
+            safety='Data collection only; no autonomous mutation of live execution logic.',
+            next_step='Increase instrumentation for trade context capture in non-critical paths.',
+            source='memory',
+        )
+
+    cognition_metrics = control.get('cognition_metrics', {}) if isinstance(control.get('cognition_metrics'), dict) else {}
+    override_rate = float(cognition_metrics.get('override_rate', 0) or 0)
+    if bool(control.get('cognition_enabled', False)) and override_rate > 35:
+        add_experiment(
+            title='Dual-speed cognition tuning',
+            lane='learning',
+            priority='medium',
+            hypothesis='Reducing unnecessary System2 overrides improves latency without harming decision quality.',
+            success_metric='Override rate reduced by 20% while incident rate stays flat.',
+            safety='Apply threshold tuning in dry-run first.',
+            next_step='Adjust escalation thresholds and compare before/after telemetry.',
+            source='cognition',
+        )
+
+    confidence = float(routing.get('confidence', 0.0) or 0.0)
+    if confidence < 0.75:
+        add_experiment(
+            title='Routing confidence uplift',
+            lane='trading',
+            priority='medium',
+            hypothesis='Venue health and allocation rebalance improves routing confidence under stress.',
+            success_metric='Routing confidence sustained >= 0.80 for 24h.',
+            safety='No live allocation changes from web; proposal only.',
+            next_step='Generate allocation proposal from platform/routing metrics.',
+            source='routing',
+        )
+
+    intel_items = intel_payload.get('items', []) if isinstance(intel_payload.get('items'), list) else []
+    for idx, item in enumerate(intel_items[:2]):
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get('title', '')).strip() or 'Intel signal'
+        source = str(item.get('source', 'intel_feed')).strip() or 'intel_feed'
+        category = str(item.get('category', 'research')).strip().lower() or 'research'
+        url = str(item.get('url', '')).strip()
+        next_step = 'Run sandbox validation and summarize expected impact.'
+        if url:
+            next_step = f"Validate source signal and run sandbox-only experiment for: {url}"
+        add_experiment(
+            title=f"Intel-driven experiment: {title[:80]}",
+            lane=category,
+            priority='low' if idx > 0 else 'medium',
+            hypothesis='External signal may improve strategy quality or operational safety when validated.',
+            success_metric='Experiment outcome documented with adopt/reject decision.',
+            safety='Sandbox-only execution; no production mutation without operator approval.',
+            next_step=next_step,
+            source=source,
+        )
+
+    if not experiments:
+        add_experiment(
+            title='Steady-state resilience exercise',
+            lane='operations',
+            priority='low',
+            hypothesis='Regular disaster recovery drills preserve high readiness in steady-state periods.',
+            success_metric='Monthly failover drill completed with documented MTTR.',
+            safety='Run in controlled drill mode only.',
+            next_step='Schedule next resilience drill and capture postmortem.',
+            source='baseline',
+        )
+
+    priority_order = {'high': 0, 'medium': 1, 'low': 2}
+    experiments.sort(key=lambda item: priority_order.get(str(item.get('priority', 'low')), 9))
+    return experiments
+
+
+def _platform_autonomy_payload():
+    """Aggregate autonomy + learning + experimentation telemetry."""
+    cached = get_cached('platform_autonomy', duration=12)
+    if cached:
+        return cached
+
+    control_url = _join_url(ALPHA_ENGINE_URL, '/control/status')
+    routing_url = _join_url(ALPHA_ENGINE_URL, '/routing')
+    performance_url = _join_url(ALPHA_ENGINE_URL, '/performance/stats')
+    scout_url = _join_url(ALPHA_ENGINE_URL, '/forum/scout/status')
+    host_root = request.url_root
+
+    workers = {
+        # Keep autonomy surface responsive: fail fast and degrade gracefully.
+        'control': lambda: _get_json(control_url, timeout=4.0, retries=0),
+        'routing': lambda: _get_json(routing_url, timeout=4.0, retries=0),
+        'performance': lambda: _get_json(performance_url, timeout=4.0, retries=0),
+        'scout': lambda: _get_json(scout_url, timeout=4.0, retries=0),
+        'readiness': lambda: {'ok': True, 'status_code': 200, 'latency_ms': 0.0, 'error': None, 'data': _build_readiness_payload(host_root)},
+        'intel': lambda: {'ok': True, 'status_code': 200, 'latency_ms': 0.0, 'error': None, 'data': _fetch_intel_feed_payload(limit=16)},
+    }
+
+    results = {}
+    with ThreadPoolExecutor(max_workers=len(workers)) as pool:
+        futures = {pool.submit(fn): name for name, fn in workers.items()}
+        for future, name in ((f, futures[f]) for f in futures):
+            try:
+                results[name] = future.result()
+            except Exception as exc:
+                results[name] = {
+                    'ok': False,
+                    'status_code': None,
+                    'latency_ms': None,
+                    'error': str(exc)[:220],
+                    'data': {},
+                }
+
+    control = results.get('control', {}).get('data', {}) or {}
+    routing = results.get('routing', {}).get('data', {}) or {}
+    performance = results.get('performance', {}).get('data', {}) or {}
+    scout = results.get('scout', {}).get('data', {}) or {}
+    readiness = results.get('readiness', {}).get('data', {}) or {}
+    intel = results.get('intel', {}).get('data', {}) or {}
+    monitor = _get_monitor_snapshot()
+
+    autonomy = {
+        'kill_switch_active': bool(control.get('kill_switch_active', False)),
+        'full_autonomy_enabled': bool(control.get('full_autonomy_enabled', False)),
+        'owner_approval_required': bool(control.get('owner_approval_required', False)),
+        'dex_execution_stage': str(control.get('dex_execution_stage', 'paper')),
+        'dex_live_dispatch_enabled': bool(control.get('dex_live_dispatch_enabled', False)),
+        'tradingview_execution_enabled': bool(control.get('tradingview_execution_enabled', False)),
+        'autonomy_dispatch_count': int(control.get('autonomy_dispatch_count', 0) or 0),
+        'pending_autonomy_decisions': int(control.get('pending_autonomy_decisions', 0) or 0),
+        'failure_pressure': int(control.get('failure_pressure', 0) or 0),
+    }
+
+    learning = {
+        'memory_enabled': bool(control.get('memory_enabled', False)),
+        'memory_stats': control.get('memory_stats', {}) if isinstance(control.get('memory_stats'), dict) else {},
+        'cognition_enabled': bool(control.get('cognition_enabled', False)),
+        'cognition_metrics': control.get('cognition_metrics', {}) if isinstance(control.get('cognition_metrics'), dict) else {},
+        'alpha_scanner': control.get('alpha_scanner', {}) if isinstance(control.get('alpha_scanner'), dict) else {},
+        'grid_trader': control.get('grid_trader', {}) if isinstance(control.get('grid_trader'), dict) else {},
+    }
+
+    experiments = _build_experiment_backlog(control, routing, readiness, intel)
+    risk = {
+        'readiness_ok': bool(readiness.get('overall_ok', False)),
+        'readiness_blockers': readiness.get('blockers', []) if isinstance(readiness.get('blockers'), list) else [],
+        'dispatcher_hardening': control.get('dispatcher_hardening', {}),
+        'routing_confidence': float(routing.get('confidence', 0.0) or 0.0),
+    }
+
+    sources = {}
+    for name, result in results.items():
+        sources[name] = {
+            'ok': bool(result.get('ok', False)),
+            'status_code': result.get('status_code'),
+            'latency_ms': result.get('latency_ms'),
+            'error': result.get('error'),
+        }
+    sources['monitor'] = {
+        'ok': bool(monitor.get('available', False)),
+        'status_code': 200 if monitor.get('available', False) else None,
+        'latency_ms': None,
+        'error': monitor.get('error'),
+    }
+
+    payload = {
+        'timestamp': datetime.utcnow().isoformat(),
+        'overall_ok': bool(readiness.get('overall_ok', False)),
+        'autonomy': autonomy,
+        'learning': learning,
+        'risk': risk,
+        'performance': performance.get('metrics', {}) if isinstance(performance.get('metrics'), dict) else {},
+        'scout': scout,
+        'experiments': experiments,
+        'sources': sources,
+        'readiness': {
+            'overall_ok': bool(readiness.get('overall_ok', False)),
+            'gates': readiness.get('gates', {}),
+        },
+    }
+
+    set_cache('platform_autonomy', payload)
+    return payload
+
+
 def _fetch_windows_lab_payload():
     cached = get_cached('windows_lab', duration=20)
     if cached:
@@ -1311,6 +1588,12 @@ def feed():
     return render_template('pages/feed.html', current_page='feed', page_title='Intelligence Feed')
 
 
+@app.route('/autonomy')
+@requires_auth
+def autonomy():
+    return render_template('pages/autonomy.html', current_page='autonomy', page_title='Autonomy Lab')
+
+
 @app.route('/command-deck')
 @requires_auth
 def command_deck():
@@ -1405,6 +1688,12 @@ def api_platform_status():
 @requires_auth
 def api_platform_metrics():
     return jsonify(_platform_metrics_payload())
+
+
+@app.route('/api/platform/autonomy')
+@requires_auth
+def api_platform_autonomy():
+    return jsonify(_platform_autonomy_payload())
 
 
 @app.route('/api/platform/home-snapshot')

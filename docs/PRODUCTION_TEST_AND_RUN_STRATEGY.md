@@ -6,7 +6,7 @@ Project: Sapphire Autonomous Organization Platform
 ## 1) Test Matrix (by environment)
 
 ### Cloud (GCP / Cloud Run)
-- Contract tests: `/api/platform/{status,metrics,logs,organization,readiness,projects}`.
+- Contract tests: `/api/platform/{status,metrics,autonomy,home-snapshot,logs,organization,readiness,projects}`.
 - Service health tests: cloud run readiness + response latency.
 - Secret binding checks for runtime dependencies.
 - Domain routing checks (`sapphirealpha.xyz`, `dashboard`, `gateway`, `pm`).
@@ -40,6 +40,7 @@ Project: Sapphire Autonomous Organization Platform
 - **Scenario E2E-03**: Dispatch to execution venue succeeds (or safe-blocked with reason).
 - **Scenario E2E-04**: SCOUT outbound dispatch routes through sandbox and is audited.
 - **Scenario E2E-05**: Unified frontend renders status/metrics/logs/readiness from canonical contracts.
+- **Scenario E2E-06**: Autonomy Lab renders control + learning + experiment backlog from `/api/platform/autonomy`.
 
 ### Single-command validator
 - Canonical runner: `./scripts/run_e2e_signal_validation.sh`

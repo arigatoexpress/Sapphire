@@ -44,6 +44,9 @@
     getMetrics() {
       return request('/api/platform/metrics');
     },
+    getAutonomy() {
+      return request('/api/platform/autonomy');
+    },
     getHomeSnapshot() {
       return request('/api/platform/home-snapshot');
     },
