@@ -312,9 +312,17 @@ class AlphaEngine:
         self._auto_deallocated: Set[str] = set()
         self._owner_directive_updated_at: int = 0
         # TradingView integration attributes (disabled by default, wired by TradingViewAutonomyPlugin if enabled)
-        self._tradingview_integration_enabled = self._env_flag("SAPPHIRE_TRADINGVIEW_INTEGRATION_ENABLED", default=False)
-        self._tradingview_execution_enabled = False
-        self._tradingview_enforce_strategy_rules = False
+        self._tradingview_integration_enabled = self._env_flag(
+            "SAPPHIRE_TRADINGVIEW_INTEGRATION_ENABLED", default=False
+        )
+        # Respect deploy-time execution mode so Cloud Run rollouts can deterministically
+        # move between dry-run and live routing without requiring a Telegram command.
+        self._tradingview_execution_enabled = self._env_flag(
+            "TRADINGVIEW_EXECUTION_ENABLED", default=False
+        )
+        self._tradingview_enforce_strategy_rules = self._env_flag(
+            "TRADINGVIEW_ENFORCE_STRATEGY_RULES", default=False
+        )
         self._tradingview_strategy_rules: Dict[str, Dict[str, Any]] = {}
         self._tradingview_allowed_symbols: Set[str] = set()
         self._tradingview_allowed_symbols_by_venue: Dict[str, Set[str]] = {}
