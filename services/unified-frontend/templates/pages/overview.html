@@ -274,8 +274,33 @@
     }
 
     async function loadOverview() {
+        const defaults = {
+            status: { services: {} },
+            metrics: { health: {} },
+            projects: { projects: [] },
+            organization: { summary: {} },
+            readiness: { overall_ok: false, gates: {} },
+            logs: { logs: [] },
+        };
+
+        let status = defaults.status;
+        let metrics = defaults.metrics;
+        let projectsData = defaults.projects;
+        let orgData = defaults.organization;
+        let readiness = defaults.readiness;
+        let logsData = defaults.logs;
+
         try {
-            const [status, metrics, projectsData, orgData, readiness, logsData] = await Promise.all([
+            const snapshot = await window.platformApi.getHomeSnapshot();
+            status = snapshot.status || defaults.status;
+            metrics = snapshot.metrics || defaults.metrics;
+            projectsData = snapshot.projects || defaults.projects;
+            orgData = snapshot.organization || defaults.organization;
+            readiness = snapshot.readiness || defaults.readiness;
+            logsData = snapshot.logs || defaults.logs;
+        } catch (snapshotError) {
+            console.warn('home-snapshot failed, using direct endpoint fallback', snapshotError);
+            const [statusRes, metricsRes, projectsRes, orgRes, readinessRes, logsRes] = await Promise.allSettled([
                 window.platformApi.getStatus(),
                 window.platformApi.getMetrics(),
                 window.platformApi.getProjects(),
@@ -284,6 +309,15 @@
                 window.platformApi.getLogs({ limit: 8, hours: 24 }),
             ]);
 
+            if (statusRes.status === 'fulfilled') status = statusRes.value || defaults.status;
+            if (metricsRes.status === 'fulfilled') metrics = metricsRes.value || defaults.metrics;
+            if (projectsRes.status === 'fulfilled') projectsData = projectsRes.value || defaults.projects;
+            if (orgRes.status === 'fulfilled') orgData = orgRes.value || defaults.organization;
+            if (readinessRes.status === 'fulfilled') readiness = readinessRes.value || defaults.readiness;
+            if (logsRes.status === 'fulfilled') logsData = logsRes.value || defaults.logs;
+        }
+
+        try {
             const services = status.services || {};
             const serviceValues = Object.values(services);
             const healthyCount = serviceValues.filter((row) => row && row.status === 'healthy').length;
@@ -376,10 +410,10 @@
                 <span class="overview-chip"><i class="fas fa-clock"></i> Snapshot ${fmtTime(health.timestamp || readiness.timestamp)}</span>
             `;
         } catch (error) {
-            console.error('Failed to load overview:', error);
+            console.error('Failed to render overview:', error);
             const activityEl = document.getElementById('activity-highlights');
             activityEl.className = 'empty-state';
-            activityEl.innerHTML = '<p>Unable to load live platform data right now.</p>';
+            activityEl.innerHTML = '<p>Unable to render platform data right now.</p>';
             const snapshot = document.getElementById('service-snapshot');
             snapshot.className = 'empty-state';
             snapshot.innerHTML = '<p>Snapshot unavailable.</p>';

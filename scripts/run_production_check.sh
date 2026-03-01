@@ -22,10 +22,12 @@ printf "[1/6] Platform contract endpoints\n"
 for path in \
   /api/platform/status \
   /api/platform/metrics \
+  /api/platform/home-snapshot \
   /api/platform/logs \
   /api/platform/organization \
   /api/platform/readiness \
-  /api/platform/projects
+  /api/platform/projects \
+  /api/platform/intel-feed
   do
   check_endpoint "$path"
 done

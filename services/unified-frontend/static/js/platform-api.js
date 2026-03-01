@@ -44,6 +44,9 @@
     getMetrics() {
       return request('/api/platform/metrics');
     },
+    getHomeSnapshot() {
+      return request('/api/platform/home-snapshot');
+    },
     getLogs(params) {
       return request(withParams('/api/platform/logs', params));
     },

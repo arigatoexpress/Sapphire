@@ -1050,6 +1050,62 @@ def _platform_metrics_payload():
     return payload
 
 
+def _platform_home_snapshot_payload():
+    """Aggregate homepage dependencies into one resilient payload."""
+    cached = get_cached('platform_home_snapshot', duration=12)
+    if cached:
+        return cached
+    host_root = request.url_root
+
+    def _run(name: str, fn):
+        started = time.time()
+        try:
+            return {
+                'name': name,
+                'ok': True,
+                'latency_ms': round((time.time() - started) * 1000, 2),
+                'data': fn(),
+            }
+        except Exception as exc:
+            return {
+                'name': name,
+                'ok': False,
+                'latency_ms': round((time.time() - started) * 1000, 2),
+                'error': str(exc)[:240],
+                'data': None,
+            }
+
+    workers = {
+        'status': lambda: _collect_system_status(),
+        'metrics': lambda: _platform_metrics_payload(),
+        'projects': lambda: _fetch_projects_payload(),
+        'organization': lambda: _platform_organization_payload(),
+        'readiness': lambda: _build_readiness_payload(host_root),
+        'logs': lambda: _fetch_logs(limit=8, hours=24),
+    }
+
+    results = {}
+    with ThreadPoolExecutor(max_workers=len(workers)) as pool:
+        futures = {pool.submit(_run, name, fn): name for name, fn in workers.items()}
+        for future, name in ((f, futures[f]) for f in futures):
+            results[name] = future.result()
+
+    payload = {
+        'timestamp': datetime.utcnow().isoformat(),
+        'overall_ok': all(result.get('ok', False) for result in results.values()),
+        'results': results,
+        'status': results.get('status', {}).get('data') or _collect_system_status(),
+        'metrics': results.get('metrics', {}).get('data') or _platform_metrics_payload(),
+        'projects': results.get('projects', {}).get('data') or {'projects': [], 'count': 0},
+        'organization': results.get('organization', {}).get('data') or {'summary': {}},
+        'readiness': results.get('readiness', {}).get('data') or {'overall_ok': False, 'gates': {}},
+        'logs': results.get('logs', {}).get('data') or {'logs': [], 'count': 0},
+    }
+
+    set_cache('platform_home_snapshot', payload)
+    return payload
+
+
 def _fetch_windows_lab_payload():
     cached = get_cached('windows_lab', duration=20)
     if cached:
@@ -1349,6 +1405,12 @@ def api_platform_status():
 @requires_auth
 def api_platform_metrics():
     return jsonify(_platform_metrics_payload())
+
+
+@app.route('/api/platform/home-snapshot')
+@requires_auth
+def api_platform_home_snapshot():
+    return jsonify(_platform_home_snapshot_payload())
 
 
 @app.route('/api/platform/logs')

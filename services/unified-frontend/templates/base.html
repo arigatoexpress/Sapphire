@@ -192,7 +192,9 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            white-space: nowrap;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            line-height: 1.15;
         }
         
         .app.sidebar-collapsed .brand-text,
@@ -399,11 +401,18 @@
             top: 0;
             z-index: 50;
         }
+
+        .top-header > div:first-child {
+            min-width: 0;
+        }
         
         .page-title {
             font-size: 1.5rem;
             font-weight: 700;
             color: var(--text);
+            line-height: 1.2;
+            white-space: normal;
+            overflow-wrap: anywhere;
         }
         
         .page-subtitle {
@@ -416,6 +425,7 @@
             display: flex;
             align-items: center;
             gap: var(--space-md);
+            flex-shrink: 0;
         }
         
         .btn {
