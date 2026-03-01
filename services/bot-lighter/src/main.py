@@ -6,6 +6,7 @@ Lighter is a decentralized L2 order book exchange built on ZK-rollups.
 """
 
 import asyncio
+import json
 import inspect
 import logging
 import os
@@ -71,6 +72,7 @@ class LighterBot:
         self.account_api = None
         self.transaction_api = None
         self.order_api = None
+        self.signer_client = None
 
         # Credentials
         self._pub_key = os.getenv("LIGHTER_PUB_KEY", "")
@@ -149,6 +151,19 @@ class LighterBot:
             # Get account index from pub key
             await self._load_account_info()
 
+            # Prefer SignerClient on newer SDK builds (constructs tx_info for send_tx v1).
+            if hasattr(lighter, "SignerClient"):
+                try:
+                    self.signer_client = lighter.SignerClient(
+                        url=base_url,
+                        account_index=int(self.account_index or 0),
+                        api_private_keys={0: self._priv_key},
+                    )
+                    logger.info("SignerClient initialized (api_key_index=0)")
+                except Exception as signer_exc:
+                    self.signer_client = None
+                    logger.warning(f"SignerClient unavailable; using legacy path: {signer_exc}")
+
             # Initialize Pub/Sub
             pubsub = get_pubsub_client()
             await pubsub.initialize()
@@ -183,6 +198,12 @@ class LighterBot:
                         "quote_asset": getattr(ob, "quote_asset", "USDC"),
                         "tick_size": getattr(ob, "tick_size", 0.01),
                         "step_size": getattr(ob, "step_size", 0.001),
+                        "supported_size_decimals": int(
+                            getattr(ob, "supported_size_decimals", 0) or 0
+                        ),
+                        "supported_price_decimals": int(
+                            getattr(ob, "supported_price_decimals", 0) or 0
+                        ),
                     }
                     # Canonical key
                     self.market_info[symbol.upper()] = market_row
@@ -637,10 +658,6 @@ class LighterBot:
                 f"Placing {signal.side} order | Symbol: {coin} | Qty: {quantity} | OrderBookId: {order_book_id}"
             )
 
-            # Get next nonce for transaction
-            nonce_response = await self._fetch_next_nonce()
-            nonce = nonce_response.nonce if hasattr(nonce_response, "nonce") else 0
-
             # Get current price for market order execution
             current_price = await self._get_ticker(coin)
             if not current_price:
@@ -649,69 +666,88 @@ class LighterBot:
             # Apply slippage for market order
             limit_price = current_price * 1.05 if is_buy else current_price * 0.95
 
-            # Create order parameters
-            order_params = {
-                "account_index": self.account_index,
-                "order_book_id": order_book_id,
-                "side": 0 if is_buy else 1,
-                "price": limit_price,
-                "quantity": quantity,
-                "nonce": nonce,
-                "time_in_force": 1,  # IOC
-            }
-
-            # Sign and send transaction
-            signature = self._sign_transaction(order_params)
-
-            result = await self._call_lighter_api(
-                self.transaction_api.send_tx,
-                tx_type="CreateOrder",
-                body=order_params,
-                signature=signature,
+            result = await self._submit_order_with_signer(
+                order_book_id=int(order_book_id),
+                quantity=float(quantity),
+                limit_price=float(limit_price),
+                is_buy=bool(is_buy),
+                reduce_only=bool(reduce_only),
+                signal_id=signal.signal_id,
+                market_meta=market,
             )
+
+            # Legacy fallback for SDKs without SignerClient support.
+            if result is None:
+                nonce_response = await self._fetch_next_nonce()
+                nonce = nonce_response.nonce if hasattr(nonce_response, "nonce") else 0
+                order_params = {
+                    "account_index": self.account_index,
+                    "order_book_id": order_book_id,
+                    "side": 0 if is_buy else 1,
+                    "price": limit_price,
+                    "quantity": quantity,
+                    "nonce": nonce,
+                    "time_in_force": 1,  # IOC
+                }
+                signature = self._sign_transaction(order_params)
+                result = await self._submit_order_legacy_send_tx(
+                    order_params=order_params,
+                    signature=signature,
+                    signal_id=signal.signal_id,
+                )
 
             execution_time = (datetime.now() - start_time).total_seconds() * 1000
             self.avg_latency_ms = (self.avg_latency_ms + execution_time) / 2
 
-            if result and hasattr(result, "success") and result.success:
-                fill_price = getattr(result, "avg_fill_price", limit_price)
-                filled_qty = getattr(result, "filled_quantity", quantity)
+            if result and bool(result.get("success", False)):
+                fill_price = float(result.get("avg_fill_price", 0.0) or 0.0)
+                filled_qty = float(result.get("filled_quantity", 0.0) or 0.0)
 
                 self.trades_executed += 1
 
                 # Create position record (reduce-only fills are reconciled via _check_positions).
-                if not reduce_only:
+                if not reduce_only and filled_qty > 0:
                     self.positions[coin] = Position(
-                        position_id=getattr(result, "order_id", ""),
+                        position_id=str(result.get("order_id", "")),
                         platform=PLATFORM.value,
                         symbol=coin,
                         side=signal.side,
                         quantity=filled_qty,
-                        entry_price=fill_price,
+                        entry_price=fill_price if fill_price > 0 else limit_price,
                         stop_loss=signal.stop_loss,
                         take_profit=signal.take_profit,
                     )
 
-                logger.info(f"Order FILLED | Symbol: {coin} | Avg Price: ${fill_price}")
+                exec_state = ((result.get("metadata") or {}).get("execution_state")) or (
+                    "filled" if filled_qty > 0 else "accepted"
+                )
+                logger.info(
+                    "Order %s | Symbol: %s | Qty: %s | Avg Price: %s",
+                    exec_state.upper(),
+                    coin,
+                    filled_qty,
+                    fill_price,
+                )
 
                 return TradeResult(
-                    trade_id=getattr(result, "order_id", ""),
+                    trade_id=str(result.get("order_id", "")),
                     signal_id=signal.signal_id,
                     platform=PLATFORM.value,
                     symbol=signal.symbol,
                     side=signal.side,
                     success=True,
-                    order_id=getattr(result, "order_id", ""),
+                    order_id=str(result.get("order_id", "")),
                     filled_quantity=filled_qty,
                     avg_price=fill_price,
                     execution_time_ms=execution_time,
                     metadata={
                         **(signal.metadata or {}),
                         "reduce_only": reduce_only,
+                        **(result.get("metadata") or {}),
                     },
                 )
             else:
-                error_msg = getattr(result, "error", "Unknown error")
+                error_msg = (result or {}).get("error", "Unknown error")
                 self.trades_failed += 1
                 logger.error(f"Order failed: {error_msg}")
                 return TradeResult(
@@ -777,6 +813,142 @@ class LighterBot:
         except Exception as e:
             logger.error(f"Signing failed: {e}")
             return ""
+
+    @staticmethod
+    def _scale_for_market(value: float, decimals: int) -> int:
+        scale = 10 ** max(0, int(decimals or 0))
+        return int(round(float(value) * scale))
+
+    async def _submit_order_with_signer(
+        self,
+        *,
+        order_book_id: int,
+        quantity: float,
+        limit_price: float,
+        is_buy: bool,
+        reduce_only: bool,
+        signal_id: str,
+        market_meta: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Submit via SignerClient (preferred for lighter-sdk with tx_info send_tx)."""
+        if not self.signer_client:
+            return None
+
+        market_meta = market_meta or {}
+        size_decimals = int(market_meta.get("supported_size_decimals", 0) or 0)
+        price_decimals = int(market_meta.get("supported_price_decimals", 0) or 0)
+        if size_decimals <= 0:
+            step_size = market_meta.get("step_size", 0)
+            size_decimals = max(0, len(str(step_size).split(".")[-1]) if step_size else 0)
+        if price_decimals <= 0:
+            tick_size = market_meta.get("tick_size", 0)
+            price_decimals = max(0, len(str(tick_size).split(".")[-1]) if tick_size else 0)
+
+        base_amount_int = self._scale_for_market(quantity, size_decimals)
+        price_int = self._scale_for_market(limit_price, price_decimals)
+        client_order_index = int(time.time() * 1000) % 2147483647
+
+        logger.info(
+            "Signer submit | market=%s coi=%s base_int=%s price_int=%s",
+            order_book_id,
+            client_order_index,
+            base_amount_int,
+            price_int,
+        )
+
+        create_order, api_response, err = await self._call_lighter_api(
+            self.signer_client.create_market_order,
+            market_index=int(order_book_id),
+            client_order_index=int(client_order_index),
+            base_amount=int(base_amount_int),
+            avg_execution_price=int(price_int),
+            is_ask=not bool(is_buy),
+            reduce_only=bool(reduce_only),
+        )
+        if err is not None:
+            raise RuntimeError(f"Signer create_market_order failed: {err}")
+
+        tx_hash = getattr(api_response, "tx_hash", "") if api_response else ""
+        code = getattr(api_response, "code", None) if api_response else None
+        message = getattr(api_response, "message", "") if api_response else ""
+        accepted = bool(code == 200)
+        return {
+            "success": accepted,
+            "order_id": tx_hash or f"lighter_tx_{signal_id}",
+            # accepted != filled; keep 0 until reconciliation from account positions.
+            "filled_quantity": 0.0,
+            "avg_fill_price": 0.0,
+            "error": None if accepted else (message or "send_tx rejected"),
+            "metadata": {
+                "execution_state": "accepted" if accepted else "rejected",
+                "sdk_path": "signer_client",
+                "tx_hash": tx_hash,
+                "resp_code": code,
+                "resp_message": message,
+                "create_order": create_order.to_json() if create_order else None,
+            },
+        }
+
+    async def _submit_order_legacy_send_tx(
+        self,
+        *,
+        order_params: Dict[str, Any],
+        signature: str,
+        signal_id: str,
+    ) -> Dict[str, Any]:
+        """Fallback sender for older SDK method signatures."""
+        tx_info = json.dumps(
+            {"body": order_params, "signature": signature},
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        attempts = [
+            ((), {"tx_type": "CreateOrder", "body": order_params, "signature": signature}),
+            ((), {"tx_type": "CreateOrder", "tx_info": tx_info}),
+            ((), {"tx_type": 0, "tx_info": tx_info}),
+            ((0, tx_info), {}),
+        ]
+
+        last_error: Optional[Exception] = None
+        for args, kwargs in attempts:
+            try:
+                raw = await self._call_lighter_api(self.transaction_api.send_tx, *args, **kwargs)
+                if raw is None:
+                    continue
+                success = bool(getattr(raw, "success", False))
+                code = getattr(raw, "code", None)
+                if not success and code is not None:
+                    success = int(code) == 200
+                tx_hash = getattr(raw, "tx_hash", "") or getattr(raw, "order_id", "")
+                filled_qty = float(getattr(raw, "filled_quantity", 0.0) or 0.0)
+                avg_fill_price = float(getattr(raw, "avg_fill_price", 0.0) or 0.0)
+                err = getattr(raw, "error", None) or getattr(raw, "message", None)
+                return {
+                    "success": success,
+                    "order_id": tx_hash or f"lighter_tx_{signal_id}",
+                    "filled_quantity": filled_qty,
+                    "avg_fill_price": avg_fill_price,
+                    "error": None if success else str(err or "Unknown send_tx failure"),
+                    "metadata": {
+                        "execution_state": (
+                            "filled" if filled_qty > 0 else ("accepted" if success else "failed")
+                        ),
+                        "sdk_path": "transaction_api",
+                        "tx_hash": tx_hash,
+                        "resp_code": code,
+                        "resp_message": getattr(raw, "message", None),
+                    },
+                }
+            except TypeError as exc:
+                last_error = exc
+                continue
+            except Exception as exc:
+                last_error = exc
+                continue
+
+        if last_error:
+            raise last_error
+        raise RuntimeError("No compatible send_tx signature succeeded")
 
     async def _get_ticker(self, symbol: str) -> Optional[float]:
         """Get current price for a symbol."""
