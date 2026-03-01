@@ -74,6 +74,7 @@ AUTH_USERNAME = os.environ.get('AUTH_USERNAME', 'sapphire')
 AUTH_PASSWORD = os.environ.get('AUTH_PASSWORD', 'alpha2024')
 ENABLE_AUTH = os.environ.get('ENABLE_AUTH', 'false').lower() == 'true'
 PUBLIC_READ_ONLY = os.environ.get('PUBLIC_READ_ONLY', 'true').lower() == 'true'
+ENABLE_INTERNAL_JOBS = os.environ.get('ENABLE_INTERNAL_JOBS', 'false').lower() == 'true'
 MAC_OPERATOR_APP_URL = os.environ.get('MAC_OPERATOR_APP_URL', 'sapphirebook://operator')
 MAC_OPERATOR_APP_LABEL = os.environ.get('MAC_OPERATOR_APP_LABEL', 'Open macOS Operator App')
 CONTROL_API_TOKEN = os.environ.get('SAPPHIRE_CONTROL_API_TOKEN', '')
@@ -284,6 +285,8 @@ def requires_control_token(f):
     """Decorator for internal scheduler/webhook jobs that mutate analytics state."""
     @wraps(f)
     def decorated(*args, **kwargs):
+        if not ENABLE_INTERNAL_JOBS:
+            return jsonify({'error': 'not_found'}), 404
         if not CONTROL_API_TOKEN:
             return jsonify({'error': 'control_token_not_configured'}), 503
 
@@ -1230,6 +1233,8 @@ def _normalize_trade_record(doc_id, raw):
     entry['filled_quantity'] = float(entry.get('filled_quantity', 0.0) or 0.0)
     entry['avg_price'] = float(entry.get('avg_price', 0.0) or 0.0)
     entry['simulated'] = _is_simulated_trade_payload(entry)
+    trade_id = str(entry.get('trade_id', '')).strip().lower()
+    entry['executed'] = bool(entry['success'] and entry['filled_quantity'] > 0 and trade_id not in {'', 'noop', 'none', 'null'})
     return entry
 
 
@@ -1269,7 +1274,7 @@ def _fetch_trade_executions(
             continue
         if not include_simulated and row.get('simulated', False):
             continue
-        if not include_failed and not row.get('success', False):
+        if not include_failed and not row.get('executed', False):
             continue
         rows.append(row)
 
@@ -2485,6 +2490,7 @@ def _platform_contracts_payload():
             'enabled': bool(ENABLE_AUTH),
             'mode': 'basic' if ENABLE_AUTH else 'public',
             'public_read_only': bool(PUBLIC_READ_ONLY),
+            'internal_jobs_enabled': bool(ENABLE_INTERNAL_JOBS),
         },
         'endpoints': endpoints,
         'counts': {
@@ -2512,7 +2518,7 @@ def _platform_contracts_payload():
         'notes': [
             'Use /api/platform/* contracts for all new clients.',
             'Legacy aliases are maintained for compatibility and will be retired after migration.',
-            'Control/mutation routes are not public and require explicit control token.',
+            'Public web is read-only; control/mutation routes are disabled on this service.',
         ],
     }
 
@@ -2524,7 +2530,7 @@ def _platform_contracts_payload():
 @app.route('/')
 @requires_auth
 def index():
-    return render_template('pages/overview.html', current_page='overview', page_title='Sapphire Operations')
+    return render_template('pages/overview.html', current_page='overview', page_title='Sapphire Overview')
 
 
 @app.route('/trading')

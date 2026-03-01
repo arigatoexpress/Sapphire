@@ -777,10 +777,14 @@ class AsterBot:
 
             execution_time = (datetime.now() - start_time).total_seconds() * 1000
 
-            if order_result.get("status") in ("FILLED", "NEW"):
+            status = str(order_result.get("status", "")).upper()
+            executed_qty = float(order_result.get("executedQty", 0) or 0)
+            is_filled = status in ("FILLED", "PARTIALLY_FILLED") or executed_qty > 0
+
+            if is_filled:
                 self.trades_executed += 1
 
-                filled_qty = float(order_result.get("executedQty", quantity))
+                filled_qty = executed_qty if executed_qty > 0 else float(quantity)
                 avg_price = float(order_result.get("avgPrice", 0))
 
                 # Create position record (reduce-only fills are reconciled via WS/REST sync).
@@ -837,7 +841,7 @@ class AsterBot:
                     symbol=symbol,
                     side=signal.side,
                     success=False,
-                    error_message=order_result.get("msg", "Order failed"),
+                    error_message=order_result.get("msg", f"Order not filled (status={status or 'UNKNOWN'})"),
                     execution_time_ms=execution_time,
                 )
 
