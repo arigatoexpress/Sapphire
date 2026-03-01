@@ -816,6 +816,32 @@ class LighterBot:
                 return float(details.mid_price)
             elif details and hasattr(details, "last_price"):
                 return float(details.last_price)
+            else:
+                # SDK v1.0.0 returns a container with per-market rows.
+                for bucket_name in ("order_book_details", "spot_order_book_details"):
+                    bucket = getattr(details, bucket_name, None)
+                    if not bucket:
+                        continue
+                    for row in bucket:
+                        row_market_id = int(getattr(row, "market_id", 0) or 0)
+                        row_symbol = str(getattr(row, "symbol", "") or "")
+                        if row_market_id and row_market_id != order_book_id:
+                            continue
+                        if row_symbol and self._normalize_coin_symbol(row_symbol) != coin:
+                            # If market_id matched, keep it; otherwise keep scanning.
+                            if not row_market_id:
+                                continue
+                        for price_field in ("last_trade_price", "mid_price", "last_price"):
+                            raw_price = getattr(row, price_field, None)
+                            try:
+                                px = float(raw_price)
+                            except (TypeError, ValueError):
+                                px = 0.0
+                            if px > 0:
+                                return px
+                logger.warning(
+                    f"Ticker payload has no usable price for {symbol} (market_id={order_book_id})"
+                )
 
         except Exception as e:
             logger.warning(f"Failed to get ticker for {symbol}: {e}")
