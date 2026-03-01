@@ -28,7 +28,8 @@ for path in \
   /api/platform/organization \
   /api/platform/readiness \
   /api/platform/projects \
-  /api/platform/intel-feed
+  /api/platform/intel-feed \
+  /api/platform/superswarm
   do
   check_endpoint "$path"
 done

@@ -71,5 +71,8 @@
     getIntelFeed(params) {
       return request(withParams('/api/platform/intel-feed', params));
     },
+    getSuperswarm(params) {
+      return request(withParams('/api/platform/superswarm', params));
+    },
   };
 })();

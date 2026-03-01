@@ -115,6 +115,125 @@
     line-height: 1.5;
 }
 
+.superswarm-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-md);
+}
+
+.viz-panel {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.04);
+    padding: var(--space-md);
+}
+
+.viz-panel h4 {
+    font-size: 0.94rem;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.viz-meta {
+    font-size: 0.76rem;
+    color: var(--text-muted);
+}
+
+.viz-chart {
+    width: 100%;
+    height: 170px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: linear-gradient(180deg, rgba(10, 20, 34, 0.55), rgba(7, 13, 23, 0.4));
+    margin-bottom: 8px;
+}
+
+.viz-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 0.74rem;
+    color: var(--text-muted);
+}
+
+.viz-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.viz-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.breakdown-list {
+    display: grid;
+    gap: 8px;
+}
+
+.breakdown-row {
+    display: grid;
+    grid-template-columns: minmax(90px, 130px) 1fr auto;
+    gap: 10px;
+    align-items: center;
+}
+
+.breakdown-label {
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+    text-transform: capitalize;
+}
+
+.breakdown-track {
+    height: 8px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.09);
+}
+
+.breakdown-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(105, 212, 255, 0.9), rgba(143, 125, 255, 0.85));
+}
+
+.breakdown-value {
+    font-size: 0.76rem;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+}
+
+.loop-pill-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.loop-pill {
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+}
+
+.loop-pill.ok {
+    border-color: rgba(54, 211, 153, 0.45);
+    color: var(--success);
+}
+
+.loop-pill.warn {
+    border-color: rgba(255, 204, 102, 0.45);
+    color: var(--warning);
+}
+
 @media (max-width: 980px) {
     .overview-hero-body {
         grid-template-columns: 1fr;
@@ -122,6 +241,10 @@
 
     .overview-hero h2 {
         font-size: 1.6rem;
+    }
+
+    .superswarm-grid {
+        grid-template-columns: 1fr;
     }
 }
 {% endblock %}
@@ -174,6 +297,58 @@
         <div class="stat-label">Readiness</div>
         <div class="stat-value" id="metric-readiness">--</div>
         <div class="stat-change" id="metric-readiness-note">Production gates</div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-brain-circuit" style="margin-right: 8px; color: var(--accent);"></i>Superswarm Analytics</h3>
+        <span class="badge badge-info" id="superswarm-window">window --</span>
+    </div>
+    <div class="card-body">
+        <div class="superswarm-grid" style="margin-bottom: var(--space-md);">
+            <section class="viz-panel">
+                <h4>
+                    Signal Flow
+                    <span class="viz-meta" id="signal-flow-meta">loading...</span>
+                </h4>
+                <div id="signal-flow-chart" class="viz-chart"></div>
+                <div class="viz-legend">
+                    <span><i class="viz-dot" style="background:#69d4ff;"></i>Published</span>
+                    <span><i class="viz-dot" style="background:#ff6b6b;"></i>Failed</span>
+                    <span><i class="viz-dot" style="background:#8f7dff;"></i>Received</span>
+                </div>
+            </section>
+            <section class="viz-panel">
+                <h4>
+                    Execution Flow + PnL
+                    <span class="viz-meta" id="execution-flow-meta">loading...</span>
+                </h4>
+                <div id="execution-flow-chart" class="viz-chart"></div>
+                <div class="viz-legend">
+                    <span><i class="viz-dot" style="background:#36d399;"></i>Executed</span>
+                    <span><i class="viz-dot" style="background:#ff6b6b;"></i>Failed</span>
+                    <span><i class="viz-dot" style="background:#ffcc66;"></i>PnL trend</span>
+                </div>
+            </section>
+        </div>
+        <div class="superswarm-grid">
+            <section class="viz-panel">
+                <h4>Intelligence + Program Mix</h4>
+                <div class="breakdown-list" id="mix-breakdown">
+                    <div class="loading"><div class="spinner"></div>Loading mix analysis...</div>
+                </div>
+            </section>
+            <section class="viz-panel">
+                <h4>Self-Improvement Loop State</h4>
+                <p style="font-size:0.84rem;color:var(--text-secondary);line-height:1.6;">
+                    This reflects whether autonomy cognition, memory, and experimentation lanes are running coherently.
+                </p>
+                <div class="loop-pill-row" id="loop-state-pills">
+                    <span class="loop-pill">loading...</span>
+                </div>
+            </section>
+        </div>
     </div>
 </div>
 
@@ -274,6 +449,137 @@
         return '<span class="badge badge-danger">down</span>';
     }
 
+    function fmtNumber(value) {
+        const n = Number(value || 0);
+        if (!Number.isFinite(n)) return '0';
+        return n.toLocaleString();
+    }
+
+    function renderLineChart(containerId, labels, series, maxValue) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        if (!labels.length || !series.length) {
+            container.innerHTML = '<div class="empty-state"><p>No telemetry in this window.</p></div>';
+            return;
+        }
+
+        const width = 680;
+        const height = 170;
+        const pad = 18;
+        const usableW = width - pad * 2;
+        const usableH = height - pad * 2;
+        const count = labels.length;
+        const maxY = Math.max(1, maxValue || 1);
+
+        const grid = [];
+        for (let i = 0; i < 5; i += 1) {
+            const y = pad + (usableH / 4) * i;
+            grid.push(`<line x1="${pad}" y1="${y}" x2="${width - pad}" y2="${y}" stroke="rgba(255,255,255,0.08)" stroke-width="1" />`);
+        }
+
+        const traces = series.map((trace) => {
+            const points = trace.values.map((value, idx) => {
+                const x = pad + (count === 1 ? 0 : (idx / (count - 1)) * usableW);
+                const y = pad + usableH - ((Number(value || 0) / maxY) * usableH);
+                return `${x},${y}`;
+            }).join(' ');
+            return `<polyline points="${points}" fill="none" stroke="${trace.color}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />`;
+        }).join('');
+
+        container.innerHTML = `
+            <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" width="100%" height="100%" role="img" aria-label="Telemetry line chart">
+                ${grid.join('')}
+                ${traces}
+            </svg>
+        `;
+    }
+
+    function renderBreakdownRows(containerId, rows) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        if (!rows.length) {
+            container.innerHTML = '<div class="empty-state"><p>No distribution data available.</p></div>';
+            return;
+        }
+        const maxValue = Math.max(...rows.map((r) => Number(r.value || 0)), 1);
+        container.innerHTML = rows.map((row) => {
+            const widthPct = Math.max(4, (Number(row.value || 0) / maxValue) * 100);
+            return `
+                <div class="breakdown-row">
+                    <div class="breakdown-label">${row.label}</div>
+                    <div class="breakdown-track">
+                        <div class="breakdown-fill" style="width:${widthPct}%;"></div>
+                    </div>
+                    <div class="breakdown-value">${fmtNumber(row.value)}</div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function renderSuperswarmVisuals(payload) {
+        const superswarm = payload || {};
+        const series = superswarm.series || {};
+        const breakdowns = superswarm.breakdowns || {};
+        const summary = superswarm.summary || {};
+        const loop = superswarm.loop || {};
+        const windowHours = Number(superswarm.window_hours || 24);
+
+        document.getElementById('superswarm-window').textContent = `${windowHours}h window`;
+
+        const signalFlow = Array.isArray(series.signal_flow) ? series.signal_flow : [];
+        const labels = signalFlow.map((row) => row.hour);
+        const published = signalFlow.map((row) => Number(row.published || 0));
+        const failedSignals = signalFlow.map((row) => Number(row.failed || 0));
+        const received = signalFlow.map((row) => Number(row.received || 0));
+        const signalMax = Math.max(...published, ...failedSignals, ...received, 1);
+        renderLineChart(
+            'signal-flow-chart',
+            labels,
+            [
+                { color: '#69d4ff', values: published },
+                { color: '#ff6b6b', values: failedSignals },
+                { color: '#8f7dff', values: received },
+            ],
+            signalMax,
+        );
+        document.getElementById('signal-flow-meta').textContent = `${fmtNumber(summary.signals)} signal events`;
+
+        const executionFlow = Array.isArray(series.execution_flow) ? series.execution_flow : [];
+        const executionLabels = executionFlow.map((row) => row.hour);
+        const executed = executionFlow.map((row) => Number(row.executed || 0));
+        const failedExec = executionFlow.map((row) => Number(row.failed || 0));
+        const pnlAbs = executionFlow.map((row) => Math.abs(Number(row.pnl || 0)));
+        const executionMax = Math.max(...executed, ...failedExec, ...pnlAbs, 1);
+        renderLineChart(
+            'execution-flow-chart',
+            executionLabels,
+            [
+                { color: '#36d399', values: executed },
+                { color: '#ff6b6b', values: failedExec },
+                { color: '#ffcc66', values: pnlAbs },
+            ],
+            executionMax,
+        );
+        document.getElementById('execution-flow-meta').textContent = `${fmtNumber(summary.executions)} executions · pnl ${Number(summary.pnl_total || 0).toFixed(2)}`;
+
+        const intel = Array.isArray(breakdowns.intel_categories) ? breakdowns.intel_categories.slice(0, 4) : [];
+        const projects = Array.isArray(breakdowns.project_status) ? breakdowns.project_status.slice(0, 4) : [];
+        const mixRows = [
+            ...intel.map((row) => ({ label: `intel:${row.label}`, value: row.value })),
+            ...projects.map((row) => ({ label: `project:${row.label}`, value: row.value })),
+        ];
+        renderBreakdownRows('mix-breakdown', mixRows);
+
+        const pills = document.getElementById('loop-state-pills');
+        pills.innerHTML = `
+            <span class="loop-pill ${loop.full_autonomy_enabled ? 'ok' : 'warn'}">autonomy ${loop.full_autonomy_enabled ? 'on' : 'off'}</span>
+            <span class="loop-pill ${loop.memory_enabled ? 'ok' : 'warn'}">memory ${loop.memory_enabled ? 'on' : 'off'}</span>
+            <span class="loop-pill ${loop.cognition_enabled ? 'ok' : 'warn'}">cognition ${loop.cognition_enabled ? 'on' : 'off'}</span>
+            <span class="loop-pill ${loop.readiness_ok ? 'ok' : 'warn'}">readiness ${loop.readiness_ok ? 'green' : 'watch'}</span>
+            <span class="loop-pill">experiments ${fmtNumber(loop.experiments_queued || 0)}</span>
+        `;
+    }
+
     async function loadOverview() {
         const defaults = {
             status: { services: {} },
@@ -282,6 +588,7 @@
             organization: { summary: {} },
             readiness: { overall_ok: false, gates: {} },
             logs: { logs: [] },
+            superswarm: { summary: {}, series: {}, breakdowns: {}, loop: {}, window_hours: 24 },
         };
 
         let status = defaults.status;
@@ -290,6 +597,7 @@
         let orgData = defaults.organization;
         let readiness = defaults.readiness;
         let logsData = defaults.logs;
+        let superswarmData = defaults.superswarm;
 
         try {
             const snapshot = await window.platformApi.getHomeSnapshot();
@@ -299,15 +607,17 @@
             orgData = snapshot.organization || defaults.organization;
             readiness = snapshot.readiness || defaults.readiness;
             logsData = snapshot.logs || defaults.logs;
+            superswarmData = snapshot.superswarm || defaults.superswarm;
         } catch (snapshotError) {
             console.warn('home-snapshot failed, using direct endpoint fallback', snapshotError);
-            const [statusRes, metricsRes, projectsRes, orgRes, readinessRes, logsRes] = await Promise.allSettled([
+            const [statusRes, metricsRes, projectsRes, orgRes, readinessRes, logsRes, superswarmRes] = await Promise.allSettled([
                 window.platformApi.getStatus(),
                 window.platformApi.getMetrics(),
                 window.platformApi.getProjects(),
                 window.platformApi.getOrganization(),
                 window.platformApi.getReadiness(),
                 window.platformApi.getLogs({ limit: 8, hours: 24 }),
+                window.platformApi.getSuperswarm({ hours: 24 }),
             ]);
 
             if (statusRes.status === 'fulfilled') status = statusRes.value || defaults.status;
@@ -316,6 +626,7 @@
             if (orgRes.status === 'fulfilled') orgData = orgRes.value || defaults.organization;
             if (readinessRes.status === 'fulfilled') readiness = readinessRes.value || defaults.readiness;
             if (logsRes.status === 'fulfilled') logsData = logsRes.value || defaults.logs;
+            if (superswarmRes.status === 'fulfilled') superswarmData = superswarmRes.value || defaults.superswarm;
         }
 
         try {
@@ -350,7 +661,7 @@
             const snapshotRows = [
                 { label: 'Signal Gateway', key: 'gateway' },
                 { label: 'PM Hub', key: 'pm_hub' },
-                { label: 'Unified Frontend', key: 'unified_frontend' },
+                { label: 'Alpha Engine', key: 'alpha_engine' },
                 { label: 'SCOUT Sandbox', key: 'scout_sandbox' },
                 { label: 'Windows Webhook', key: 'windows_webhook' },
                 { label: 'Rari2 Trading', key: 'rari2_lighter_api' },
@@ -410,6 +721,8 @@
                 <span class="overview-chip"><i class="fas fa-triangle-exclamation"></i> ${health.unhealthy_count || 0} core issues</span>
                 <span class="overview-chip"><i class="fas fa-clock"></i> Snapshot ${fmtTime(health.timestamp || readiness.timestamp)}</span>
             `;
+
+            renderSuperswarmVisuals(superswarmData);
         } catch (error) {
             console.error('Failed to render overview:', error);
             const activityEl = document.getElementById('activity-highlights');
@@ -418,6 +731,7 @@
             const snapshot = document.getElementById('service-snapshot');
             snapshot.className = 'empty-state';
             snapshot.innerHTML = '<p>Snapshot unavailable.</p>';
+            renderSuperswarmVisuals(defaults.superswarm);
         }
     }
 

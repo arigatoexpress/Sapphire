@@ -624,6 +624,7 @@ def _build_readiness_payload(host_root: str):
         run_contract_check('/api/platform/status', _collect_system_status),
         run_contract_check('/api/platform/metrics', _platform_metrics_payload),
         run_contract_check('/api/platform/logs', lambda: _fetch_logs(limit=1)),
+        run_contract_check('/api/platform/superswarm', lambda: _platform_superswarm_payload(hours=24)),
         run_contract_check('/api/platform/organization', _platform_organization_payload),
         run_contract_check('/api/platform/readiness', lambda: True),
         run_contract_check('/api/platform/projects', _fetch_projects_payload),
@@ -1117,6 +1118,162 @@ def _fetch_trade_executions(
     }
 
 
+def _platform_superswarm_payload(hours: int = 24):
+    safe_hours = max(6, min(int(hours or 24), 168))
+    cache_key = f'platform_superswarm_{safe_hours}'
+    cached = get_cached(cache_key, duration=20)
+    if cached:
+        return cached
+
+    now_utc = datetime.now(timezone.utc)
+    start_utc = now_utc - timedelta(hours=safe_hours)
+
+    hourly_keys = []
+    cursor = start_utc.replace(minute=0, second=0, microsecond=0)
+    end_key = now_utc.replace(minute=0, second=0, microsecond=0)
+    while cursor <= end_key:
+        hourly_keys.append(cursor)
+        cursor += timedelta(hours=1)
+
+    signal_by_hour = {
+        slot.isoformat(): {'received': 0, 'published': 0, 'failed': 0}
+        for slot in hourly_keys
+    }
+    execution_by_hour = {
+        slot.isoformat(): {'executed': 0, 'failed': 0, 'pnl': 0.0}
+        for slot in hourly_keys
+    }
+    source_activity: dict[str, int] = {}
+
+    logs_payload = _fetch_logs(hours=safe_hours, limit=max(160, safe_hours * 24), include_simulated=False)
+    logs = logs_payload.get('logs', [])
+    for row in logs:
+        ts = _coerce_datetime(row.get('timestamp')) or now_utc
+        if ts < start_utc:
+            continue
+        slot = ts.replace(minute=0, second=0, microsecond=0).isoformat()
+        event_type = str(row.get('event_type', '')).strip().lower()
+        message = str(row.get('message', '')).strip().lower()
+        service = str(row.get('service', 'platform')).strip().lower() or 'platform'
+        source_activity[service] = source_activity.get(service, 0) + 1
+
+        if event_type == 'signal_received' or 'signal received' in message:
+            signal_by_hour.setdefault(slot, {'received': 0, 'published': 0, 'failed': 0})['received'] += 1
+        elif event_type == 'signal_published' or ('signal published' in message and 'trade' not in message):
+            signal_by_hour.setdefault(slot, {'received': 0, 'published': 0, 'failed': 0})['published'] += 1
+        elif event_type == 'signal_publish_failed' or 'signal publish failed' in message:
+            signal_by_hour.setdefault(slot, {'received': 0, 'published': 0, 'failed': 0})['failed'] += 1
+
+    trades_payload = _fetch_trade_executions(hours=safe_hours, limit=max(120, safe_hours * 12), include_simulated=False, include_failed=True)
+    trades = trades_payload.get('trades', [])
+    for row in trades:
+        ts = _coerce_datetime(row.get('timestamp')) or now_utc
+        if ts < start_utc:
+            continue
+        slot = ts.replace(minute=0, second=0, microsecond=0).isoformat()
+        bucket = execution_by_hour.setdefault(slot, {'executed': 0, 'failed': 0, 'pnl': 0.0})
+        pnl = float(row.get('realized_pnl', 0.0) or 0.0)
+        if bool(row.get('success', False)):
+            bucket['executed'] += 1
+        else:
+            bucket['failed'] += 1
+        bucket['pnl'] = round(bucket['pnl'] + pnl, 6)
+
+    intel = _fetch_intel_feed_payload(limit=96)
+    intel_items = intel.get('items', []) if isinstance(intel.get('items'), list) else []
+    intel_categories: dict[str, int] = {}
+    for item in intel_items:
+        if not isinstance(item, dict):
+            continue
+        category = str(item.get('category', 'operations')).strip().lower() or 'operations'
+        intel_categories[category] = intel_categories.get(category, 0) + 1
+
+    projects = _fetch_projects_payload().get('projects', [])
+    project_status: dict[str, int] = {}
+    for item in projects:
+        if not isinstance(item, dict):
+            continue
+        status = str(item.get('status', 'unknown')).strip().lower() or 'unknown'
+        project_status[status] = project_status.get(status, 0) + 1
+
+    status_data = _collect_system_status()
+    summary = status_data.get('summary', {})
+    control_url = _join_url(ALPHA_ENGINE_URL, '/control/status')
+    control_resp = _get_json(control_url, timeout=4.0, retries=0)
+    control = control_resp.get('data', {}) if control_resp.get('ok') else {}
+
+    signal_series = []
+    execution_series = []
+    for slot in hourly_keys:
+        iso_slot = slot.isoformat()
+        signal_row = signal_by_hour.get(iso_slot, {'received': 0, 'published': 0, 'failed': 0})
+        execution_row = execution_by_hour.get(iso_slot, {'executed': 0, 'failed': 0, 'pnl': 0.0})
+        signal_series.append(
+            {
+                'hour': iso_slot,
+                'received': int(signal_row.get('received', 0)),
+                'published': int(signal_row.get('published', 0)),
+                'failed': int(signal_row.get('failed', 0)),
+            }
+        )
+        execution_series.append(
+            {
+                'hour': iso_slot,
+                'executed': int(execution_row.get('executed', 0)),
+                'failed': int(execution_row.get('failed', 0)),
+                'pnl': float(round(execution_row.get('pnl', 0.0), 6)),
+            }
+        )
+
+    total_signals = sum(item['published'] + item['received'] for item in signal_series)
+    total_executions = sum(item['executed'] for item in execution_series)
+    total_pnl = round(sum(item['pnl'] for item in execution_series), 6)
+
+    payload = {
+        'timestamp': datetime.utcnow().isoformat(),
+        'window_hours': safe_hours,
+        'summary': {
+            'signals': total_signals,
+            'executions': total_executions,
+            'pnl_total': total_pnl,
+            'services_healthy': int(summary.get('service_healthy', 0)),
+            'services_total': int(summary.get('service_total', 0)),
+            'nodes_healthy': int(summary.get('node_healthy', 0)),
+            'nodes_total': int(summary.get('node_total', 0)),
+        },
+        'series': {
+            'signal_flow': signal_series,
+            'execution_flow': execution_series,
+        },
+        'breakdowns': {
+            'intel_categories': [{'label': k, 'value': v} for k, v in sorted(intel_categories.items(), key=lambda item: item[1], reverse=True)],
+            'project_status': [{'label': k, 'value': v} for k, v in sorted(project_status.items(), key=lambda item: item[1], reverse=True)],
+            'service_health': [
+                {'label': 'healthy_services', 'value': int(summary.get('service_healthy', 0))},
+                {'label': 'unhealthy_services', 'value': int(summary.get('service_unhealthy', 0))},
+                {'label': 'healthy_nodes', 'value': int(summary.get('node_healthy', 0))},
+                {'label': 'unhealthy_nodes', 'value': int(summary.get('node_unhealthy', 0))},
+            ],
+            'source_activity': [{'label': k, 'value': v} for k, v in sorted(source_activity.items(), key=lambda item: item[1], reverse=True)[:8]],
+        },
+        'loop': {
+            'full_autonomy_enabled': bool(control.get('full_autonomy_enabled', False)),
+            'memory_enabled': bool(control.get('memory_enabled', False)),
+            'cognition_enabled': bool(control.get('cognition_enabled', False)),
+            'experiments_queued': int(control.get('pending_autonomy_decisions', 0) or 0),
+            'readiness_ok': int(summary.get('service_unhealthy', 1)) == 0 and int(summary.get('node_unhealthy', 1)) == 0,
+        },
+        'sources': {
+            'logs_source': logs_payload.get('source'),
+            'trades_source': trades_payload.get('source'),
+            'intel_source': intel.get('source'),
+            'projects_source': 'pm_hub',
+        },
+    }
+    set_cache(cache_key, payload)
+    return payload
+
+
 def _normalize_intel_item(raw: dict, fallback_source: str = 'alpha_engine') -> dict:
     item = dict(raw or {})
     title = str(item.get('title', '')).strip() or 'Untitled intelligence update'
@@ -1375,6 +1532,7 @@ def _platform_home_snapshot_payload():
         'organization': lambda: _platform_organization_payload(),
         'readiness': lambda: _build_readiness_payload(host_root),
         'logs': lambda: _fetch_logs(limit=8, hours=24),
+        'superswarm': lambda: _platform_superswarm_payload(hours=24),
     }
 
     results = {}
@@ -1393,6 +1551,7 @@ def _platform_home_snapshot_payload():
         'organization': results.get('organization', {}).get('data') or {'summary': {}},
         'readiness': results.get('readiness', {}).get('data') or {'overall_ok': False, 'gates': {}},
         'logs': results.get('logs', {}).get('data') or {'logs': [], 'count': 0},
+        'superswarm': results.get('superswarm', {}).get('data') or {'summary': {}, 'series': {}, 'breakdowns': {}},
     }
 
     set_cache('platform_home_snapshot', payload)
@@ -2060,6 +2219,13 @@ def api_platform_intel_feed():
     return jsonify(_fetch_intel_feed_payload(limit=limit, category=category, query=query, refresh=refresh))
 
 
+@app.route('/api/platform/superswarm')
+@requires_auth
+def api_platform_superswarm():
+    hours = request.args.get('hours', 24, type=int)
+    return jsonify(_platform_superswarm_payload(hours=hours))
+
+
 @app.route('/api/platform/windows-lab')
 @requires_auth
 def api_platform_windows_lab():
@@ -2134,6 +2300,12 @@ def api_windows_lab():
 @requires_auth
 def api_intel_feed():
     return api_platform_intel_feed()
+
+
+@app.route('/api/superswarm')
+@requires_auth
+def api_superswarm():
+    return api_platform_superswarm()
 
 
 if __name__ == '__main__':
