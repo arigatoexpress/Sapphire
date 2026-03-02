@@ -513,6 +513,133 @@
             to { transform: rotate(360deg); }
         }
 
+        /* ── Apple Glass Visual Polish ── */
+
+        @keyframes fadeSlideUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes subtlePulse {
+            0%, 100% { opacity: 0.85; }
+            50%      { opacity: 1; }
+        }
+
+        .card {
+            animation: fadeSlideUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+            transition: transform var(--transition-fast),
+                        border-color var(--transition-fast),
+                        box-shadow var(--transition-fast);
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            border-color: var(--border-accent);
+            box-shadow: var(--shadow-md);
+        }
+
+        /* Stagger card entrance when inside grids or content */
+        .content .card:nth-child(1) { animation-delay: 0s; }
+        .content .card:nth-child(2) { animation-delay: 0.06s; }
+        .content .card:nth-child(3) { animation-delay: 0.12s; }
+        .content .card:nth-child(4) { animation-delay: 0.14s; }
+        .content .card:nth-child(5) { animation-delay: 0.16s; }
+        .content .card:nth-child(n+6) { animation-delay: 0.18s; }
+
+        .stat-card {
+            animation: fadeSlideUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+
+        .grid .stat-card:nth-child(1) { animation-delay: 0s; }
+        .grid .stat-card:nth-child(2) { animation-delay: 0.05s; }
+        .grid .stat-card:nth-child(3) { animation-delay: 0.1s; }
+        .grid .stat-card:nth-child(4) { animation-delay: 0.15s; }
+
+        /* Glass table rows */
+        table {
+            border-spacing: 0 4px;
+            border-collapse: separate;
+        }
+
+        tbody tr {
+            transition: all var(--transition-fast);
+            border-radius: 10px;
+        }
+
+        tbody tr:hover td {
+            background: rgba(105, 212, 255, 0.06);
+        }
+
+        tbody tr:hover td:first-child {
+            border-radius: 10px 0 0 10px;
+        }
+
+        tbody tr:hover td:last-child {
+            border-radius: 0 10px 10px 0;
+        }
+
+        /* Live status indicator pulse */
+        .status-online::before {
+            animation: subtlePulse 2.4s ease-in-out infinite;
+        }
+
+        /* Smooth page title entrance */
+        .page-title {
+            animation: fadeSlideUp 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+
+        .page-subtitle {
+            animation: fadeSlideUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) 0.05s both;
+        }
+
+        /* Hero section entrance */
+        .overview-hero {
+            animation: fadeSlideUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+
+        /* Section header gradient accent */
+        .card-title i {
+            filter: drop-shadow(0 0 6px currentColor);
+            transition: filter var(--transition-fast);
+        }
+
+        .card:hover .card-title i {
+            filter: drop-shadow(0 0 10px currentColor);
+        }
+
+        /* Badge hover glow */
+        .badge {
+            transition: box-shadow var(--transition-fast);
+        }
+
+        .badge:hover {
+            box-shadow: 0 0 12px rgba(105, 212, 255, 0.12);
+        }
+
+        /* Nav item smooth underline */
+        .nav-item::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 50%;
+            width: 0;
+            height: 2px;
+            background: var(--primary);
+            border-radius: 2px;
+            transition: width var(--transition-normal), left var(--transition-normal);
+        }
+
+        .nav-item {
+            position: relative;
+        }
+
+        .nav-item.active::after {
+            width: 60%;
+            left: 20%;
+        }
+
+        /* ── End Apple Glass Polish ── */
+
         @media (max-width: 1200px) {
             .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
@@ -550,6 +677,11 @@
                 border-radius: 12px;
                 justify-content: flex-start;
                 padding: 0.65rem 0.78rem;
+            }
+
+            .nav-item::after,
+            .nav-item.active::after {
+                display: none;
             }
 
             .mobile-overlay {
@@ -596,6 +728,15 @@
             .header-actions .status-indicator:nth-child(3),
             .top-actions .status-indicator:nth-child(2) {
                 display: none;
+            }
+        }
+
+        /* Respect reduce-motion preference */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
             }
         }
 
