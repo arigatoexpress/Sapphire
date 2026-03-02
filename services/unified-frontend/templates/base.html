@@ -240,6 +240,8 @@
             font-size: 1.45rem;
             font-weight: 700;
             line-height: 1.2;
+            overflow-wrap: anywhere;
+            word-break: break-word;
         }
 
         .page-subtitle {
@@ -460,6 +462,20 @@
             color: var(--text-muted);
         }
 
+        .viz-shell {
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: linear-gradient(180deg, rgba(14, 22, 36, 0.55), rgba(10, 16, 28, 0.42));
+            padding: 10px;
+            min-height: 120px;
+        }
+
+        .viz-caption {
+            margin-top: 8px;
+            font-size: 0.76rem;
+            color: var(--text-muted);
+        }
+
         .loading {
             display: flex;
             align-items: center;
@@ -617,14 +633,9 @@
             <nav class="primary-nav" id="primary-nav">
                 <a href="/" class="nav-item {% if current_page == 'overview' %}active{% endif %}"><i class="fas fa-house nav-icon"></i><span>Home</span></a>
                 <a href="/organization" class="nav-item {% if current_page == 'organization' %}active{% endif %}"><i class="fas fa-sitemap nav-icon"></i><span>Organization</span></a>
-                <a href="/projects" class="nav-item {% if current_page == 'projects' %}active{% endif %}"><i class="fas fa-briefcase nav-icon"></i><span>Client Programs</span></a>
-                <a href="/trading" class="nav-item {% if current_page == 'trading' %}active{% endif %}"><i class="fas fa-chart-line nav-icon"></i><span>Market Intelligence</span></a>
-                <a href="/feed" class="nav-item {% if current_page == 'feed' %}active{% endif %}"><i class="fas fa-stream nav-icon"></i><span>Intelligence Feed</span></a>
-                <a href="/autonomy" class="nav-item {% if current_page == 'autonomy' %}active{% endif %}"><i class="fas fa-robot nav-icon"></i><span>Autonomy Lab</span></a>
-                <a href="/infrastructure" class="nav-item {% if current_page == 'infrastructure' %}active{% endif %}"><i class="fas fa-network-wired nav-icon"></i><span>Infrastructure</span></a>
-                <a href="/system-health" class="nav-item {% if current_page == 'health' %}active{% endif %}"><i class="fas fa-heart-pulse nav-icon"></i><span>Platform Status</span><span class="nav-badge" id="health-badge" style="display:none;">!</span></a>
-                <a href="/logs" class="nav-item {% if current_page == 'logs' %}active{% endif %}"><i class="fas fa-list-check nav-icon"></i><span>Activity</span></a>
-                <a href="/production-readiness" class="nav-item {% if current_page == 'production' %}active{% endif %}"><i class="fas fa-shield-check nav-icon"></i><span>Readiness</span></a>
+                <a href="/intelligence" class="nav-item {% if current_page == 'intelligence' %}active{% endif %}"><i class="fas fa-chart-line nav-icon"></i><span>Intelligence</span></a>
+                <a href="/platform" class="nav-item {% if current_page == 'platform' %}active{% endif %}"><i class="fas fa-heart-pulse nav-icon"></i><span>Platform</span><span class="nav-badge" id="health-badge" style="display:none;">!</span></a>
+                <a href="/activity" class="nav-item {% if current_page == 'activity' %}active{% endif %}"><i class="fas fa-list-check nav-icon"></i><span>Activity</span></a>
                 <a href="/sapphire-book" class="nav-item {% if current_page == 'sapphire-book' %}active{% endif %}"><i class="fas fa-book-open nav-icon"></i><span>Sapphire Book</span></a>
             </nav>
         </header>
@@ -633,7 +644,7 @@
 
         <main class="main">
             <header class="top-header">
-                <div>
+                <div class="top-header-copy" style="min-width:0;">
                     <h1 class="page-title">{% block page_title %}{{ page_title }}{% endblock %}</h1>
                     <p class="page-subtitle" id="page-subtitle">{% block page_subtitle %}Business-facing public visibility into Sapphire operations{% endblock %}</p>
                 </div>
@@ -698,6 +709,132 @@
                 console.error('Health badge update failed:', error);
             }
         }
+
+        function _vizEscape(value) {
+            return String(value || '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#039;');
+        }
+
+        function _vizStat(values) {
+            const nums = (Array.isArray(values) ? values : [])
+                .map((v) => Number(v))
+                .filter((v) => Number.isFinite(v));
+            if (!nums.length) {
+                return { min: 0, max: 1, range: 1, values: [] };
+            }
+            const min = Math.min(...nums);
+            const max = Math.max(...nums);
+            const range = Math.max(1e-6, max - min);
+            return { min, max, range, values: nums };
+        }
+
+        function renderSparkline(containerId, values, options = {}) {
+            const el = document.getElementById(containerId);
+            if (!el) return;
+
+            const stats = _vizStat(values);
+            if (!stats.values.length) {
+                el.innerHTML = '<div class="empty-state"><p>No trend data.</p></div>';
+                return;
+            }
+
+            const width = Math.max(260, Math.min(900, el.clientWidth || 640));
+            const height = options.height || 140;
+            const pad = 10;
+            const xStep = stats.values.length > 1 ? (width - pad * 2) / (stats.values.length - 1) : 0;
+            const points = stats.values.map((value, index) => {
+                const x = pad + index * xStep;
+                const y = height - pad - ((value - stats.min) / stats.range) * (height - pad * 2);
+                return [x, y];
+            });
+
+            const linePath = points
+                .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point[0].toFixed(1)} ${point[1].toFixed(1)}`)
+                .join(' ');
+            const areaPath = `${linePath} L ${(pad + (stats.values.length - 1) * xStep).toFixed(1)} ${(height - pad).toFixed(1)} L ${pad} ${(height - pad).toFixed(1)} Z`;
+
+            const line = options.lineColor || 'rgba(105, 212, 255, 0.95)';
+            const fill = options.fillColor || 'rgba(105, 212, 255, 0.22)';
+
+            el.innerHTML = `
+                <svg viewBox="0 0 ${width} ${height}" width="100%" height="${height}" role="img" aria-label="${_vizEscape(options.ariaLabel || 'trend chart')}">
+                    <defs>
+                        <linearGradient id="${containerId}-area" x1="0" x2="0" y1="0" y2="1">
+                            <stop offset="0%" stop-color="${fill}" />
+                            <stop offset="100%" stop-color="rgba(105, 212, 255, 0.02)" />
+                        </linearGradient>
+                    </defs>
+                    <path d="${areaPath}" fill="url(#${containerId}-area)"></path>
+                    <path d="${linePath}" stroke="${line}" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"></path>
+                    ${points.map((point) => `<circle cx="${point[0].toFixed(1)}" cy="${point[1].toFixed(1)}" r="2.3" fill="${line}" opacity="0.95"></circle>`).join('')}
+                </svg>
+            `;
+        }
+
+        function renderCategoryBars(containerId, categories, options = {}) {
+            const el = document.getElementById(containerId);
+            if (!el) return;
+            const rows = (Array.isArray(categories) ? categories : [])
+                .filter((row) => row && Number.isFinite(Number(row.value)))
+                .map((row) => ({ label: String(row.label || 'unknown'), value: Number(row.value) }));
+            if (!rows.length) {
+                el.innerHTML = '<div class="empty-state"><p>No distribution data.</p></div>';
+                return;
+            }
+
+            const max = Math.max(1, ...rows.map((row) => row.value));
+            el.innerHTML = `
+                <div style="display:grid;gap:8px;">
+                    ${rows.map((row) => {
+                        const pct = Math.max(0, Math.min(100, (row.value / max) * 100));
+                        return `
+                            <div style="display:grid;grid-template-columns:minmax(90px,130px) 1fr auto;gap:8px;align-items:center;">
+                                <div style="font-size:0.76rem;color:var(--text-secondary);text-transform:capitalize;">${_vizEscape(row.label)}</div>
+                                <div style="height:8px;border-radius:999px;background:rgba(255,255,255,0.09);overflow:hidden;">
+                                    <span style="display:block;height:100%;width:${pct.toFixed(2)}%;background:linear-gradient(90deg, rgba(105,212,255,.95), rgba(143,125,255,.86));"></span>
+                                </div>
+                                <div style="font-size:0.75rem;color:var(--text-muted);font-family:var(--font-mono);">${row.value}</div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }
+
+        function renderStackBar(containerId, segments, options = {}) {
+            const el = document.getElementById(containerId);
+            if (!el) return;
+            const rows = (Array.isArray(segments) ? segments : [])
+                .filter((row) => row && Number.isFinite(Number(row.value)))
+                .map((row) => ({
+                    label: String(row.label || 'segment'),
+                    value: Math.max(0, Number(row.value)),
+                    color: row.color || 'rgba(105, 212, 255, 0.9)',
+                }));
+            if (!rows.length) {
+                el.innerHTML = '<div class="empty-state"><p>No segment data.</p></div>';
+                return;
+            }
+            const total = rows.reduce((acc, row) => acc + row.value, 0) || 1;
+            el.innerHTML = `
+                <div style="height:12px;border-radius:999px;background:rgba(255,255,255,0.08);overflow:hidden;display:flex;">
+                    ${rows.map((row) => `<span title="${_vizEscape(row.label)} ${row.value}" style="width:${((row.value / total) * 100).toFixed(2)}%;background:${row.color};display:block;"></span>`).join('')}
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;font-size:0.74rem;color:var(--text-muted);">
+                    ${rows.map((row) => `<span style="display:inline-flex;align-items:center;gap:6px;"><i style="width:8px;height:8px;border-radius:50%;display:inline-block;background:${row.color};"></i>${_vizEscape(row.label)} (${row.value})</span>`).join('')}
+                </div>
+            `;
+        }
+
+        window.sapphireViz = {
+            renderSparkline,
+            renderCategoryBars,
+            renderStackBar,
+        };
 
         document.addEventListener('DOMContentLoaded', () => {
             updateTimestamp();

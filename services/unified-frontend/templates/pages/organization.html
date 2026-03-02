@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block page_subtitle %}Organization blueprint for Sapphire's autonomous operating model, delivery lanes, and governance readiness.{% endblock %}
+{% block page_subtitle %}Organization blueprint and client program portfolio in one business-facing, read-only surface.{% endblock %}
 
 {% block extra_css %}
 .org-hero {
@@ -59,6 +59,69 @@
 .org-kpi-note {
     color: var(--text-muted);
     font-size: 0.8rem;
+}
+
+.org-view-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 4px;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.org-view-toggle .btn {
+    border-radius: 999px;
+    padding: 0.42rem 0.8rem;
+}
+
+.org-view-toggle .btn.active {
+    border-color: var(--border-accent);
+    background: linear-gradient(135deg, rgba(105, 212, 255, 0.2), rgba(143, 125, 255, 0.2));
+    color: var(--primary);
+}
+
+.org-client-brief {
+    border: 1px solid rgba(105, 212, 255, 0.32);
+    background: linear-gradient(145deg, rgba(105, 212, 255, 0.14), rgba(143, 125, 255, 0.1));
+}
+
+.org-client-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: var(--space-sm);
+    margin-top: var(--space-md);
+}
+
+.org-client-tile {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.06);
+    padding: 10px 12px;
+}
+
+.org-client-tile .label {
+    color: var(--text-muted);
+    font-size: 0.74rem;
+}
+
+.org-client-tile .value {
+    color: var(--text);
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.client-only {
+    display: none;
+}
+
+.org-view-client .operator-only {
+    display: none !important;
+}
+
+.org-view-client .client-only {
+    display: block !important;
 }
 
 .org-surface-grid {
@@ -172,6 +235,87 @@
     font-size: 0.75rem;
 }
 
+.org-visual-shell {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(13, 22, 36, 0.58), rgba(8, 14, 24, 0.44));
+    padding: var(--space-md);
+}
+
+.org-visual-root {
+    border: 1px solid var(--border-accent);
+    border-radius: 14px;
+    background: rgba(105, 212, 255, 0.12);
+    padding: 12px;
+}
+
+.org-visual-root .name {
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.org-visual-root .framework {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    margin-top: 2px;
+}
+
+.org-visual-divider {
+    height: 18px;
+    position: relative;
+}
+
+.org-visual-divider::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: 1px;
+    height: 18px;
+    background: rgba(129, 201, 255, 0.42);
+}
+
+.org-visual-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--space-sm);
+}
+
+.org-visual-node {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.06);
+    padding: 10px;
+}
+
+.org-visual-node .node-title {
+    font-size: 0.9rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.org-visual-node .node-focus {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-bottom: 8px;
+    min-height: 30px;
+}
+
+.org-visual-node .node-systems {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.org-visual-node .node-systems span {
+    border-radius: 999px;
+    border: 1px solid rgba(110, 168, 255, 0.36);
+    background: rgba(110, 168, 255, 0.15);
+    color: var(--info);
+    padding: 3px 8px;
+    font-size: 0.72rem;
+}
+
 .org-source-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -195,6 +339,39 @@
     font-size: 0.75rem;
 }
 
+.org-program-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--space-md);
+}
+
+.org-program-card {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: var(--space-md);
+}
+
+.org-program-card .meta {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin: 6px 0 10px;
+}
+
+.org-program-progress {
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.09);
+    overflow: hidden;
+}
+
+.org-program-progress span {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(105, 212, 255, 0.9), rgba(143, 125, 255, 0.85));
+}
+
 @media (max-width: 980px) {
     .org-hero-body {
         grid-template-columns: 1fr;
@@ -202,6 +379,15 @@
 
     .org-hero-title {
         font-size: 1.55rem;
+    }
+
+    .org-view-toggle {
+        width: 100%;
+        justify-content: stretch;
+    }
+
+    .org-view-toggle .btn {
+        flex: 1;
     }
 }
 {% endblock %}
@@ -221,9 +407,26 @@
             </div>
         </div>
         <div style="display:flex; gap: var(--space-sm); justify-content:flex-end; flex-wrap:wrap;">
+            <div class="org-view-toggle" role="group" aria-label="Organization view mode">
+                <button class="btn btn-secondary active" id="org-view-operator" type="button" onclick="setOrgViewMode('operator')">
+                    <i class="fas fa-briefcase"></i> Operator View
+                </button>
+                <button class="btn btn-secondary" id="org-view-client" type="button" onclick="setOrgViewMode('client')">
+                    <i class="fas fa-handshake"></i> Client View
+                </button>
+            </div>
             <span class="badge badge-warning" style="align-self:center;">Public Read-Only</span>
             <button class="btn btn-secondary" onclick="refreshOrganization(true)">
                 <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+            <button class="btn btn-secondary" type="button" onclick="window.print()">
+                <i class="fas fa-print"></i> Print
+            </button>
+            <button class="btn btn-secondary" id="org-export-png" onclick="exportOrganizationSnapshot('png')">
+                <i class="fas fa-image"></i> Export PNG
+            </button>
+            <button class="btn btn-secondary" id="org-export-pdf" onclick="exportOrganizationSnapshot('pdf')">
+                <i class="fas fa-file-pdf"></i> Export PDF
             </button>
         </div>
     </div>
@@ -252,6 +455,33 @@
     </div>
 </div>
 
+<div class="card org-client-brief client-only" style="margin-bottom: var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-file-lines" style="margin-right: 8px; color: var(--primary);"></i>Client Brief Snapshot</h3>
+    </div>
+    <div class="card-body">
+        <p id="org-client-summary" class="org-hero-copy">Loading client summary...</p>
+        <div class="org-client-grid">
+            <article class="org-client-tile">
+                <div class="label">Portfolio Programs</div>
+                <div class="value" id="org-client-programs">--</div>
+            </article>
+            <article class="org-client-tile">
+                <div class="label">In Active Delivery</div>
+                <div class="value" id="org-client-active">--</div>
+            </article>
+            <article class="org-client-tile">
+                <div class="label">Delivery Health</div>
+                <div class="value" id="org-client-health">--</div>
+            </article>
+            <article class="org-client-tile">
+                <div class="label">Coverage</div>
+                <div class="value" id="org-client-coverage">--</div>
+            </article>
+        </div>
+    </div>
+</div>
+
 <div class="grid grid-2" style="margin-bottom: var(--space-xl);">
     <div class="card">
         <div class="card-header">
@@ -263,7 +493,7 @@
             </ul>
         </div>
     </div>
-    <div class="card">
+    <div class="card operator-only">
         <div class="card-header">
             <h3 class="card-title"><i class="fas fa-triangle-exclamation" style="margin-right: 8px; color: var(--warning);"></i>Blockers</h3>
         </div>
@@ -286,7 +516,44 @@
     </div>
 </div>
 
-<div class="grid grid-2" style="margin-bottom: var(--space-xl);">
+<div id="programs" class="card" style="margin-bottom: var(--space-xl); scroll-margin-top: 170px;">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-briefcase" style="margin-right: 8px; color: var(--primary);"></i>Client Programs Portfolio</h3>
+    </div>
+    <div class="card-body">
+        <div class="grid grid-4" style="margin-bottom: var(--space-md);">
+            <div class="stat-card">
+                <div class="stat-label">Tracked</div>
+                <div class="stat-value" id="program-count">--</div>
+                <div class="org-kpi-note">Portfolio-wide</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Active</div>
+                <div class="stat-value" id="program-active">--</div>
+                <div class="org-kpi-note">In-flight delivery</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Blocked</div>
+                <div class="stat-value" id="program-blocked">--</div>
+                <div class="org-kpi-note">Needs intervention</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Avg Progress</div>
+                <div class="stat-value" id="program-progress">--%</div>
+                <div class="org-kpi-note">Portfolio maturity</div>
+            </div>
+        </div>
+        <div class="org-program-grid" id="program-grid">
+            <article class="org-program-card">
+                <h4>Loading programs…</h4>
+                <div class="meta">Fetching project telemetry from canonical contracts.</div>
+                <div class="org-program-progress"><span style="width: 10%;"></span></div>
+            </article>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-2 operator-only" style="margin-bottom: var(--space-xl);">
     <div class="card">
         <div class="card-header">
             <h3 class="card-title"><i class="fas fa-route" style="margin-right: 8px; color: var(--secondary);"></i>Trading Rail Readiness</h3>
@@ -326,16 +593,30 @@
     <div class="card-header">
             <h3 class="card-title"><i class="fas fa-sitemap" style="margin-right: 8px; color: var(--success);"></i>Canonical Organizational Structure</h3>
     </div>
-    <div class="card-body org-chart" id="org-chart">
-        <div class="org-chart-root">
-            <strong id="org-root-name">Sapphire Autonomous Organization</strong>
-            <div style="color: var(--text-muted); margin-top: 4px;" id="org-root-framework">Loading framework…</div>
+    <div class="card-body org-chart" id="org-export-target">
+        <div class="org-visual-shell">
+            <div class="org-visual-root">
+                <div class="name" id="org-root-name">Sapphire Autonomous Organization</div>
+                <div class="framework" id="org-root-framework">Loading framework…</div>
+            </div>
+            <div class="org-visual-divider"></div>
+            <div class="org-visual-grid" id="org-visual-grid">
+                <article class="org-visual-node">
+                    <div class="node-title">Loading…</div>
+                    <div class="node-focus">Rendering department topology.</div>
+                    <div class="node-systems"><span>pending</span></div>
+                </article>
+            </div>
+        </div>
+        <div class="org-chart-root" style="margin-top: var(--space-md);">
+            <strong>Detailed Department Cards</strong>
+            <div style="color: var(--text-muted); margin-top: 4px;">Expanded systems and focus details.</div>
         </div>
         <div class="org-chart-lanes" id="org-chart-lanes"></div>
     </div>
 </div>
 
-<div class="card">
+<div class="card operator-only">
     <div class="card-header">
         <h3 class="card-title"><i class="fas fa-plug" style="margin-right: 8px; color: var(--primary);"></i>Integration Sources</h3>
     </div>
@@ -358,6 +639,36 @@ function fmtIso(value) {
 
 function safeArray(value) {
     return Array.isArray(value) ? value : [];
+}
+
+const ORG_VIEW_MODE_KEY = 'sapphire.organization.view_mode';
+
+function getOrgViewMode() {
+    try {
+        const mode = localStorage.getItem(ORG_VIEW_MODE_KEY);
+        return mode === 'client' ? 'client' : 'operator';
+    } catch (_) {
+        return 'operator';
+    }
+}
+
+function applyOrgViewMode(mode) {
+    const resolved = mode === 'client' ? 'client' : 'operator';
+    document.body.classList.toggle('org-view-client', resolved === 'client');
+    const operatorBtn = document.getElementById('org-view-operator');
+    const clientBtn = document.getElementById('org-view-client');
+    if (operatorBtn) operatorBtn.classList.toggle('active', resolved === 'operator');
+    if (clientBtn) clientBtn.classList.toggle('active', resolved === 'client');
+}
+
+function setOrgViewMode(mode) {
+    const resolved = mode === 'client' ? 'client' : 'operator';
+    try {
+        localStorage.setItem(ORG_VIEW_MODE_KEY, resolved);
+    } catch (_) {
+        // no-op: localStorage unavailable
+    }
+    applyOrgViewMode(resolved);
 }
 
 function badgeClass(status) {
@@ -423,7 +734,8 @@ function renderOrgChart(model) {
     const rootName = document.getElementById('org-root-name');
     const rootFramework = document.getElementById('org-root-framework');
     const lanes = document.getElementById('org-chart-lanes');
-    if (!lanes) return;
+    const visualGrid = document.getElementById('org-visual-grid');
+    if (!lanes || !visualGrid) return;
 
     rootName.textContent = model.name || 'Sapphire Autonomous Organization';
     rootFramework.textContent = model.framework || 'Agentic framework';
@@ -431,8 +743,20 @@ function renderOrgChart(model) {
     const departments = safeArray(model.departments);
     if (!departments.length) {
         lanes.innerHTML = '<article class="org-lane"><h4>No departments loaded</h4></article>';
+        visualGrid.innerHTML = '<article class="org-visual-node"><div class="node-title">No departments loaded</div><div class="node-focus">Waiting for canonical org model.</div><div class="node-systems"><span>n/a</span></div></article>';
         return;
     }
+
+    visualGrid.innerHTML = departments.map((dept) => {
+        const systems = safeArray(dept.systems);
+        return `
+            <article class="org-visual-node">
+                <div class="node-title">${String(dept.name || 'Department')}</div>
+                <div class="node-focus">${String(dept.focus || 'No focus description')}</div>
+                <div class="node-systems">${systems.length ? systems.map((s) => `<span>${String(s)}</span>`).join('') : '<span>No systems listed</span>'}</div>
+            </article>
+        `;
+    }).join('');
 
     lanes.innerHTML = departments.map((dept) => {
         const systems = safeArray(dept.systems);
@@ -473,6 +797,169 @@ function renderSourceStatus(sources) {
     }).join('');
 }
 
+function clampProgress(value) {
+    const num = Number(value || 0);
+    if (!Number.isFinite(num)) return 0;
+    return Math.max(0, Math.min(100, Math.round(num)));
+}
+
+function statusBadge(statusRaw) {
+    const status = String(statusRaw || 'unknown').toLowerCase();
+    if (status === 'active' || status === 'healthy') return '<span class="badge badge-success">active</span>';
+    if (status === 'in_progress') return '<span class="badge badge-info">in progress</span>';
+    if (status === 'blocked') return '<span class="badge badge-warning">blocked</span>';
+    if (status === 'completed') return '<span class="badge badge-success">completed</span>';
+    return `<span class="badge">${status}</span>`;
+}
+
+function renderPrograms(projects) {
+    const safeProjects = safeArray(projects);
+    const total = safeProjects.length;
+    const active = safeProjects.filter((p) => ['active', 'in_progress'].includes(String(p.status || '').toLowerCase())).length;
+    const blocked = safeProjects.filter((p) => String(p.status || '').toLowerCase() === 'blocked').length;
+    const avg = total ? Math.round(safeProjects.reduce((acc, p) => acc + clampProgress(p.progress), 0) / total) : 0;
+
+    document.getElementById('program-count').textContent = total;
+    document.getElementById('program-active').textContent = active;
+    document.getElementById('program-blocked').textContent = blocked;
+    document.getElementById('program-progress').textContent = `${avg}%`;
+
+    const grid = document.getElementById('program-grid');
+    if (!grid) return;
+    if (!safeProjects.length) {
+        grid.innerHTML = `
+            <article class="org-program-card">
+                <h4>No programs found</h4>
+                <div class="meta">No client program telemetry is currently available.</div>
+            </article>
+        `;
+        return;
+    }
+
+    grid.innerHTML = safeProjects.map((project) => {
+        const progress = clampProgress(project.progress);
+        return `
+            <article class="org-program-card">
+                <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
+                    <h4 style="margin:0;">${String(project.name || project.id || 'Unnamed program')}</h4>
+                    ${statusBadge(project.status)}
+                </div>
+                <div class="meta">${String(project.phase || 'phase unspecified')} · ${String(project.owner || 'owner pending')}</div>
+                <div class="org-program-progress"><span style="width: ${progress}%;"></span></div>
+                <div class="meta">Progress ${progress}%</div>
+            </article>
+        `;
+    }).join('');
+}
+
+function renderClientBrief(payload, projectPayload) {
+    const summaryEl = document.getElementById('org-client-summary');
+    const programsEl = document.getElementById('org-client-programs');
+    const activeEl = document.getElementById('org-client-active');
+    const healthEl = document.getElementById('org-client-health');
+    const coverageEl = document.getElementById('org-client-coverage');
+    if (!summaryEl || !programsEl || !activeEl || !healthEl || !coverageEl) return;
+
+    const summary = payload.summary || {};
+    const projects = safeArray((projectPayload && projectPayload.projects) || []);
+    const total = Number(summary.tracked_projects ?? projects.length ?? 0);
+    const active = projects.filter((p) => {
+        const status = String(p.status || '').toLowerCase();
+        return status === 'active' || status === 'in_progress';
+    }).length;
+    const blocked = projects.filter((p) => String(p.status || '').toLowerCase() === 'blocked').length;
+    const coverage = Number(summary.workspaces ?? 0);
+    const railsReady = Number(summary.rails_ready ?? 0);
+    const railsTotal = Number(summary.rails_total ?? 0);
+    const agentsOnline = Number(summary.agents_online ?? 0);
+    const agentsTotal = Number(summary.agents_total ?? 0);
+
+    const healthLabel = blocked > 0
+        ? `At risk (${blocked} blocked)`
+        : (active > 0 ? 'On track' : 'Monitoring');
+
+    programsEl.textContent = String(total);
+    activeEl.textContent = String(active);
+    healthEl.textContent = healthLabel;
+    coverageEl.textContent = `${coverage} workspaces`;
+
+    summaryEl.textContent = `Sapphire currently tracks ${total} client and internal delivery programs across ${coverage} workspaces, with ${active} active programs, ${railsReady}/${railsTotal} trading rails ready, and ${agentsOnline}/${agentsTotal} autonomous agents online.`;
+}
+
+function setExportBusy(isBusy) {
+    const pngBtn = document.getElementById('org-export-png');
+    const pdfBtn = document.getElementById('org-export-pdf');
+    if (pngBtn) pngBtn.disabled = isBusy;
+    if (pdfBtn) pdfBtn.disabled = isBusy;
+}
+
+function ensureScript(src) {
+    return new Promise((resolve, reject) => {
+        const existing = Array.from(document.scripts).find((s) => s.src === src);
+        if (existing) {
+            if (existing.dataset.loaded === 'true') {
+                resolve();
+                return;
+            }
+            existing.addEventListener('load', () => resolve(), { once: true });
+            existing.addEventListener('error', () => reject(new Error(`Failed to load ${src}`)), { once: true });
+            return;
+        }
+
+        const script = document.createElement('script');
+        script.src = src;
+        script.async = true;
+        script.onload = () => {
+            script.dataset.loaded = 'true';
+            resolve();
+        };
+        script.onerror = () => reject(new Error(`Failed to load ${src}`));
+        document.head.appendChild(script);
+    });
+}
+
+async function exportOrganizationSnapshot(format) {
+    const target = document.getElementById('org-export-target');
+    if (!target) return;
+    setExportBusy(true);
+
+    try {
+        await ensureScript('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js');
+        const canvas = await window.html2canvas(target, {
+            scale: 2,
+            backgroundColor: '#09121f',
+            useCORS: true,
+        });
+        const now = new Date();
+        const stamp = now.toISOString().replace(/[:.]/g, '-');
+        const baseName = `sapphire-organization-${stamp}`;
+
+        if (format === 'png') {
+            const link = document.createElement('a');
+            link.href = canvas.toDataURL('image/png');
+            link.download = `${baseName}.png`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            return;
+        }
+
+        await ensureScript('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js');
+        const imageData = canvas.toDataURL('image/png');
+        const pdfWidth = 297;
+        const pdfHeight = Math.max(210, (canvas.height * pdfWidth) / canvas.width);
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        pdf.addImage(imageData, 'PNG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+        pdf.save(`${baseName}.pdf`);
+    } catch (error) {
+        console.error('Organization export failed:', error);
+        alert('Export failed. Please try again or use browser Print > Save as PDF.');
+    } finally {
+        setExportBusy(false);
+    }
+}
+
 async function refreshOrganization(force = false) {
     const generated = document.getElementById('org-generated');
     const workspacesMetric = document.getElementById('org-workspaces');
@@ -485,7 +972,12 @@ async function refreshOrganization(force = false) {
     const recommendationsList = document.getElementById('org-recommendations-list');
 
     try {
-        const payload = await window.platformApi.getOrganization(force);
+        const [orgResult, projectResult] = await Promise.allSettled([
+            window.platformApi.getOrganization(force),
+            window.platformApi.getProjects(),
+        ]);
+        const payload = orgResult.status === 'fulfilled' ? (orgResult.value || {}) : {};
+        const projectPayload = projectResult.status === 'fulfilled' ? (projectResult.value || {}) : { projects: [] };
         const overview = payload.overview || {};
         const ops = payload.ops_status || {};
         const model = payload.model || {};
@@ -539,9 +1031,15 @@ async function refreshOrganization(force = false) {
             ...queueRecommendations,
         ];
         renderList(recommendationsList, recommendations, 'No recommendations currently reported.');
+        renderPrograms((projectPayload && projectPayload.projects) || []);
+        renderClientBrief(payload, projectPayload);
 
     } catch (err) {
         console.error('Organization refresh failed:', err);
+        const clientSummary = document.getElementById('org-client-summary');
+        if (clientSummary) {
+            clientSummary.textContent = 'Client summary is temporarily unavailable while organization services refresh.';
+        }
         renderList(document.getElementById('org-blockers-list'), [
             `Could not load organization data: ${err.message || 'request failed'}`,
         ], 'Could not load organization data.');
@@ -549,6 +1047,7 @@ async function refreshOrganization(force = false) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    applyOrgViewMode(getOrgViewMode());
     refreshOrganization(false);
     setInterval(() => refreshOrganization(false), 60000);
 });
