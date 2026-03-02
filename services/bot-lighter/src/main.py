@@ -16,21 +16,46 @@ import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+# Load .env file if present (for local/Pi deployment)
+try:
+    from pathlib import Path
+    env_path = Path(__file__).parent.parent / ".env"
+    if env_path.exists():
+        from dotenv import load_dotenv
+        load_dotenv(env_path)
+        print(f"[INIT] Loaded environment from {env_path}")
+except ImportError:
+    pass  # python-dotenv not installed, rely on system env
+
 # Add shared library to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))  # For Sapphire/services structure
 
-from pubsub import get_pubsub_client, publish, subscribe
-from utils import ServiceConfig, format_percent, format_price, setup_logging, utc_now
-
-from models import (
-    BalanceUpdate,
-    Platform,
-    Position,
-    SignalType,
-    TradeResult,
-    TradeSide,
-    TradeSignal,
-)
+# Try imports - support both direct and nested package structure
+try:
+    from shared.pubsub import get_pubsub_client, publish, subscribe
+    from shared.utils import ServiceConfig, format_percent, format_price, setup_logging, utc_now
+    from shared.models import (
+        BalanceUpdate,
+        Platform,
+        Position,
+        SignalType,
+        TradeResult,
+        TradeSide,
+        TradeSignal,
+    )
+except ImportError:
+    from pubsub import get_pubsub_client, publish, subscribe
+    from utils import ServiceConfig, format_percent, format_price, setup_logging, utc_now
+    from models import (
+        BalanceUpdate,
+        Platform,
+        Position,
+        SignalType,
+        TradeResult,
+        TradeSide,
+        TradeSignal,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -161,8 +186,19 @@ class LighterBot:
                 else "https://mainnet.zklighter.elliot.ai"
             )
 
-            # Initialize the API client
-            self.client = lighter.ApiClient()
+            # Configure proxy if set (for VPN tunneling)
+            proxy_url = os.getenv("HTTP_PROXY") or os.getenv("HTTPS_PROXY")
+            if proxy_url:
+                logger.info(f"Using proxy: {proxy_url}")
+
+            # Initialize the API client with proxy support
+            config = lighter.Configuration(
+                host=base_url,
+            )
+            if proxy_url:
+                config.proxy = proxy_url
+                
+            self.client = lighter.ApiClient(configuration=config)
 
             # Initialize API endpoints
             self.account_api = lighter.AccountApi(self.client)
@@ -178,21 +214,33 @@ class LighterBot:
             # Prefer SignerClient on newer SDK builds (constructs tx_info for send_tx v1).
             if hasattr(lighter, "SignerClient"):
                 try:
+                    # Check if we're using VPN mode (skip validation if geofenced)
+                    skip_validation = os.getenv("LIGHTER_SKIP_VALIDATION", "false").lower() == "true"
+                    if skip_validation:
+                        logger.info("VPN mode: Skipping credential validation (geofencing workaround)")
+                    
                     self.signer_client = lighter.SignerClient(
                         url=base_url,
                         account_index=int(self.account_index or 0),
                         api_private_keys={self._api_key_index: self._priv_key},
                     )
-                    signer_check = self.signer_client.check_client()
-                    if signer_check:
-                        self.signer_client = None
-                        self._execution_block_reason = (
-                            "Lighter API credentials do not match exchange api key mapping"
-                        )
-                        logger.error(f"SignerClient validation failed: {signer_check}")
+                    
+                    if not skip_validation:
+                        signer_check = self.signer_client.check_client()
+                        if signer_check:
+                            self.signer_client = None
+                            self._execution_block_reason = (
+                                "Lighter API credentials do not match exchange api key mapping"
+                            )
+                            logger.error(f"SignerClient validation failed: {signer_check}")
+                        else:
+                            logger.info(
+                                "SignerClient initialized (api_key_index=%s)",
+                                self._api_key_index,
+                            )
                     else:
                         logger.info(
-                            "SignerClient initialized (api_key_index=%s)",
+                            "SignerClient initialized (VPN mode, validation skipped) (api_key_index=%s)",
                             self._api_key_index,
                         )
                 except Exception as signer_exc:
@@ -258,6 +306,8 @@ class LighterBot:
                     if base_norm and base_norm not in self.market_info:
                         self.market_info[base_norm] = market_row
                 logger.info(f"Loaded {len(self.market_info)} markets")
+            logger.info(f"Coin aliases: {self._COIN_ALIASES}")
+            logger.info(f"All markets: {sorted(self.market_info.keys())}")
         except Exception as e:
             logger.warning(f"Failed to load market info: {e}")
 
@@ -379,7 +429,10 @@ class LighterBot:
     async def start(self):
         """Start the bot's main trading loop."""
         # Start Execution Gateway FIRST (Cloud Run Health Check requirement)
-        from gateway import start_gateway_server
+        try:
+            from shared.gateway import start_gateway_server
+        except ImportError:
+            from gateway import start_gateway_server
 
         self.command_queue = await start_gateway_server()
 
@@ -452,6 +505,12 @@ class LighterBot:
             finally:
                 if has_command:
                     self.command_queue.task_done()
+
+    # Alias map: route common TradingView symbols to Lighter's native asset names
+    _COIN_ALIASES: Dict[str, str] = {
+        "ETH": "WETH",
+        "BTC": "WBTC",
+    }
 
     @staticmethod
     def _normalize_coin_symbol(value: str) -> str:
@@ -677,21 +736,37 @@ class LighterBot:
         - raw order-book symbol (ex: SOL-USDC)
         - normalized routing symbol (ex: SOLUSDT/SOL-PERP)
         - base asset (ex: SOL)
+        - common alias (ETH→WETH, BTC→WBTC for wrapped assets on L2)
         """
         raw = str(symbol or "").strip().upper()
         coin = self._normalize_coin_symbol(raw)
 
-        direct = self.market_info.get(raw) or self.market_info.get(coin)
-        if direct:
-            return direct
+        # Direct lookups: raw symbol, normalized, and alias-resolved
+        candidates = [raw, coin]
+        alias = self._COIN_ALIASES.get(coin)
+        if alias:
+            candidates.append(alias)
+        logger.error(f"DEBUG: Resolving symbol '{raw}' -> coin='{coin}', alias='{alias}', candidates={candidates}, markets={list(self.market_info.keys())[:5]}")
 
+        for candidate in candidates:
+            direct = self.market_info.get(candidate)
+            logger.error(f"DEBUG: Looking up candidate='{candidate}' -> found={direct is not None}")
+            if direct:
+                return direct
+
+        # Fuzzy scan — compare normalized forms of all loaded markets
+        search_set = set(candidates)
         for key, row in self.market_info.items():
             if not isinstance(row, dict):
                 continue
             key_norm = self._normalize_coin_symbol(str(key))
             base_norm = self._normalize_coin_symbol(str(row.get("base_asset", "")))
             sym_norm = self._normalize_coin_symbol(str(row.get("symbol", "")))
-            if coin in {key_norm, base_norm, sym_norm}:
+            market_norms = {key_norm, base_norm, sym_norm}
+            # Also resolve aliases on the market side
+            market_aliases = {self._COIN_ALIASES.get(n, n) for n in market_norms}
+            combined = market_norms | market_aliases
+            if search_set & combined:
                 return row
 
         return {}

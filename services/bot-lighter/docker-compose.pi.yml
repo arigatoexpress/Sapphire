@@ -1,0 +1,91 @@
+# Docker Compose for Raspberry Pi + ProtonVPN
+# This runs the trading bot through a VPN container
+
+version: "3.8"
+
+services:
+  # ProtonVPN container - routes all traffic through VPN
+  vpn:
+    image: ghcr.io/tprasadtp/protonvpn:latest
+    container_name: lighter-vpn
+    environment:
+      # Get these from https://account.protonvpn.com/account#openvpn
+      PROTONVPN_USERNAME: ${PROTONVPN_USERNAME}
+      PROTONVPN_PASSWORD: ${PROTONVPN_PASSWORD}
+      PROTONVPN_SERVER: ${PROTONVPN_SERVER:-NL}  # Netherlands for low latency
+      PROTONVPN_TIER: ${PROTONVPN_TIER:-0}  # 0=Free, 1=Basic, 2=Plus
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "https://ipinfo.io"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - trading-net
+
+  # Trading bot - uses VPN container's network
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.pi
+    container_name: lighter-bot
+    environment:
+      # Trading Configuration
+      SAPPHIRE_ENV: production
+      
+      # Lighter Exchange Credentials
+      LIGHTER_ACCOUNT_INDEX: ${LIGHTER_ACCOUNT_INDEX:-699444}
+      LIGHTER_API_KEY_INDEX: ${LIGHTER_API_KEY_INDEX:-2}
+      LIGHTER_PRIVATE_KEY: ${LIGHTER_PRIVATE_KEY}
+      
+      # Pub/Sub Configuration (optional - for signal subscription)
+      PUBSUB_PROJECT_ID: ${PUBSUB_PROJECT_ID:-sapphire-479610}
+      PUBSUB_SUBSCRIPTION_ID: ${PUBSUB_SUBSCRIPTION_ID:-lighter-signals-pi}
+      GOOGLE_APPLICATION_CREDENTIALS: /app/secrets/pubsub-key.json
+      
+      # API Gateway (optional - for REST API mode)
+      API_BASE_URL: ${API_BASE_URL:-https://sapphire-trading-api-699444.us-central1.run.app}
+      
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      
+    volumes:
+      - ./secrets:/app/secrets:ro
+      - ./logs:/app/logs
+      - ./data:/app/data
+    network_mode: service:vpn  # Routes all traffic through VPN
+    depends_on:
+      vpn:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Optional: Health monitoring dashboard
+  monitor:
+    image: prom/node-exporter:latest
+    container_name: lighter-monitor
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    restart: unless-stopped
+
+networks:
+  trading-net:
+    driver: bridge
