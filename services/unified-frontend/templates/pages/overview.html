@@ -64,6 +64,39 @@
     justify-content: center;
 }
 
+.view-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 4px;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.view-toggle .btn {
+    border-radius: 999px;
+    padding: 0.42rem 0.8rem;
+}
+
+.view-toggle .btn.active {
+    border-color: var(--border-accent);
+    background: linear-gradient(135deg, rgba(105, 212, 255, 0.2), rgba(143, 125, 255, 0.2));
+    color: var(--primary);
+}
+
+.client-only {
+    display: none;
+}
+
+.mode-client .operator-only {
+    display: none !important;
+}
+
+.mode-client .client-only {
+    display: block !important;
+}
+
 .capability-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -262,6 +295,45 @@
     color: var(--text);
 }
 
+.storyline-grid {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: var(--space-md);
+}
+
+.story-lanes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-sm);
+}
+
+.story-lane {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 12px;
+}
+
+.story-lane .title {
+    font-size: 0.84rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+}
+
+.story-lane .value {
+    font-size: 1.02rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.story-lane .desc {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    line-height: 1.45;
+}
+
 @media (max-width: 980px) {
     .overview-hero-body {
         grid-template-columns: 1fr;
@@ -274,10 +346,25 @@
     .superswarm-grid {
         grid-template-columns: 1fr;
     }
+
+    .storyline-grid,
+    .story-lanes {
+        grid-template-columns: 1fr;
+    }
+
+    .view-toggle {
+        width: 100%;
+        justify-content: stretch;
+    }
+
+    .view-toggle .btn {
+        flex: 1;
+    }
 }
 {% endblock %}
 
 {% block content %}
+<div id="overview-page-root">
 <div class="card overview-hero">
     <div class="card-body overview-hero-body">
         <div>
@@ -296,11 +383,42 @@
             </div>
         </div>
         <div class="overview-actions">
-            <a href="/feed" class="btn btn-primary"><i class="fas fa-stream"></i> Live Intelligence Feed</a>
-            <a href="/autonomy" class="btn btn-primary"><i class="fas fa-robot"></i> Autonomy Lab</a>
+            <div class="view-toggle" role="group" aria-label="Overview view mode">
+                <button class="btn btn-secondary active" id="overview-view-operator" type="button" onclick="setOverviewViewMode('operator')">
+                    <i class="fas fa-briefcase"></i> Operator View
+                </button>
+                <button class="btn btn-secondary" id="overview-view-client" type="button" onclick="setOverviewViewMode('client')">
+                    <i class="fas fa-handshake"></i> Client View
+                </button>
+            </div>
+            <a href="/intelligence" class="btn btn-primary"><i class="fas fa-stream"></i> Intelligence Surface</a>
+            <a href="/platform" class="btn btn-primary"><i class="fas fa-heart-pulse"></i> Platform Reliability</a>
             <a href="/organization" class="btn btn-primary"><i class="fas fa-sitemap"></i> View Organization</a>
-            <a href="/projects" class="btn btn-secondary"><i class="fas fa-briefcase"></i> Explore Client Programs</a>
+            <a href="/organization#programs" class="btn btn-secondary"><i class="fas fa-briefcase"></i> Client Programs</a>
             <a href="/sapphire-book" class="btn btn-secondary"><i class="fas fa-book-open"></i> Sapphire Book</a>
+        </div>
+    </div>
+</div>
+
+<div class="card client-only" style="margin-bottom: var(--space-xl); border-color: rgba(105, 212, 255, 0.35); background: rgba(105, 212, 255, 0.10);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-file-lines" style="margin-right: 8px; color: var(--primary);"></i>Client Business Brief</h3>
+    </div>
+    <div class="card-body">
+        <p id="overview-client-summary" style="color: var(--text-secondary); line-height: 1.75;">Loading business summary...</p>
+        <div class="grid grid-3" style="margin-top: var(--space-sm);">
+            <div class="stat-card">
+                <div class="stat-label">Platform Health</div>
+                <div class="stat-value" style="font-size:1.2rem;" id="overview-client-health">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Delivery Programs</div>
+                <div class="stat-value" style="font-size:1.2rem;" id="overview-client-programs">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Readiness</div>
+                <div class="stat-value" style="font-size:1.2rem;" id="overview-client-readiness">--</div>
+            </div>
         </div>
     </div>
 </div>
@@ -325,6 +443,29 @@
         <div class="stat-label">Readiness</div>
         <div class="stat-value" id="metric-readiness">--</div>
         <div class="stat-change" id="metric-readiness-note">Production gates</div>
+    </div>
+</div>
+
+<div class="card operator-only" style="margin-bottom: var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-route" style="margin-right: 8px; color: var(--primary);"></i>Operational Storyline</h3>
+        <span class="badge badge-info" id="storyline-meta">loading...</span>
+    </div>
+    <div class="card-body storyline-grid">
+        <section>
+            <div class="story-lanes" id="story-lanes">
+                <article class="story-lane"><div class="title">Organization</div><div class="value">Loading…</div><div class="desc">Preparing storyline lanes.</div></article>
+                <article class="story-lane"><div class="title">Intelligence</div><div class="value">Loading…</div><div class="desc">Preparing storyline lanes.</div></article>
+                <article class="story-lane"><div class="title">Platform</div><div class="value">Loading…</div><div class="desc">Preparing storyline lanes.</div></article>
+                <article class="story-lane"><div class="title">Activity</div><div class="value">Loading…</div><div class="desc">Preparing storyline lanes.</div></article>
+            </div>
+        </section>
+        <section>
+            <div class="viz-shell" id="story-momentum-chart"></div>
+            <div class="viz-caption" id="story-momentum-note">Operational event momentum over the current window.</div>
+            <div class="viz-shell" id="story-domain-mix" style="margin-top:10px;"></div>
+            <div class="viz-caption" id="story-domain-note">Domain contribution mix.</div>
+        </section>
     </div>
 </div>
 
@@ -438,11 +579,11 @@
     </div>
 </div>
 
-<div class="grid grid-2">
+<div class="grid grid-2 operator-only">
     <div class="card">
         <div class="card-header">
             <h3 class="card-title"><i class="fas fa-list-check" style="margin-right: 8px; color: var(--accent);"></i>Recent Activity Highlights</h3>
-            <a href="/logs" class="btn btn-secondary" style="font-size: 0.8rem;">View Full Feed</a>
+            <a href="/activity" class="btn btn-secondary" style="font-size: 0.8rem;">View Full Feed</a>
         </div>
         <div class="card-body">
             <div id="activity-highlights" class="loading">
@@ -471,10 +612,42 @@
         </div>
     </div>
 </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+    const OVERVIEW_VIEW_MODE_KEY = 'sapphire.overview.view_mode';
+
+    function getOverviewViewMode() {
+        try {
+            const mode = localStorage.getItem(OVERVIEW_VIEW_MODE_KEY);
+            return mode === 'client' ? 'client' : 'operator';
+        } catch (_) {
+            return 'operator';
+        }
+    }
+
+    function applyOverviewViewMode(mode) {
+        const resolved = mode === 'client' ? 'client' : 'operator';
+        const root = document.getElementById('overview-page-root');
+        if (root) root.classList.toggle('mode-client', resolved === 'client');
+        const operatorBtn = document.getElementById('overview-view-operator');
+        const clientBtn = document.getElementById('overview-view-client');
+        if (operatorBtn) operatorBtn.classList.toggle('active', resolved === 'operator');
+        if (clientBtn) clientBtn.classList.toggle('active', resolved === 'client');
+    }
+
+    function setOverviewViewMode(mode) {
+        const resolved = mode === 'client' ? 'client' : 'operator';
+        try {
+            localStorage.setItem(OVERVIEW_VIEW_MODE_KEY, resolved);
+        } catch (_) {
+            // no-op
+        }
+        applyOverviewViewMode(resolved);
+    }
+
     function fmtTime(iso) {
         if (!iso) return '--';
         try {
@@ -487,6 +660,33 @@
         } catch (_) {
             return '--';
         }
+    }
+
+    function renderClientOverviewBrief(status, metrics, projectsData, orgData, readiness, logsData, superswarmData) {
+        const summaryEl = document.getElementById('overview-client-summary');
+        const healthEl = document.getElementById('overview-client-health');
+        const programsEl = document.getElementById('overview-client-programs');
+        const readinessEl = document.getElementById('overview-client-readiness');
+        if (!summaryEl || !healthEl || !programsEl || !readinessEl) return;
+
+        const services = status.services || {};
+        const serviceValues = Object.values(services);
+        const healthyCount = serviceValues.filter((row) => row && row.status === 'healthy').length;
+        const totalCount = serviceValues.length || Number((metrics.health || {}).total_count || 0);
+        const projects = projectsData.projects || [];
+        const activeProjects = projects.filter((p) => ['active', 'in_progress'].includes(String(p.status || '').toLowerCase())).length;
+        const summary = orgData.summary || {};
+        const signalEvents = Number((superswarmData.summary || {}).signals || 0);
+        const executionEvents = Number((superswarmData.summary || {}).executions || 0);
+        const activityCount = (logsData.logs || []).length;
+        const readinessState = readiness.overall_ok ? 'PASS' : 'WATCH';
+
+        healthEl.textContent = `${healthyCount}/${totalCount || 0}`;
+        programsEl.textContent = `${activeProjects}/${projects.length || 0}`;
+        readinessEl.textContent = readinessState;
+        readinessEl.style.color = readiness.overall_ok ? 'var(--success)' : 'var(--warning)';
+
+        summaryEl.textContent = `Sapphire currently runs ${summary.workspaces || 0} operational lanes with ${activeProjects} active programs out of ${projects.length || 0} tracked. Platform health is ${healthyCount}/${totalCount || 0} services healthy, with ${signalEvents} signal events, ${executionEvents} execution events, and ${activityCount} recent activity logs in the current telemetry window.`;
     }
 
     function statusPill(status) {
@@ -645,6 +845,89 @@
         renderBreakdownRows('source-efficacy-breakdown', efficacyRows);
     }
 
+    function renderStoryline(status, metrics, projectsData, orgData, readiness, logsData, superswarmData) {
+        const services = status.services || {};
+        const projects = projectsData.projects || [];
+        const orgSummary = orgData.summary || {};
+        const logs = logsData.logs || [];
+        const health = metrics.health || {};
+        const superswarm = superswarmData || {};
+        const breakdowns = superswarm.breakdowns || {};
+        const signalFlow = Array.isArray((superswarm.series || {}).signal_flow) ? superswarm.series.signal_flow : [];
+        const executionFlow = Array.isArray((superswarm.series || {}).execution_flow) ? superswarm.series.execution_flow : [];
+
+        const activeProjects = projects.filter((p) => ['active', 'in_progress'].includes(String(p.status || '').toLowerCase())).length;
+        const intelCount = Array.isArray(breakdowns.intel_categories)
+            ? breakdowns.intel_categories.reduce((acc, row) => acc + Number(row.value || 0), 0)
+            : logs.filter((row) => String(row.message || '').toLowerCase().includes('intel')).length;
+        const activityCount = logs.length;
+        const totalServices = Object.values(services).length || Number(health.healthy_count || 0);
+        const healthyServices = Object.values(services).filter((svc) => svc && svc.status === 'healthy').length || Number(health.healthy_count || 0);
+
+        const lanes = [
+            {
+                title: 'Organization',
+                value: `${orgSummary.workspaces || 0} lanes · ${projects.length} programs`,
+                desc: `${activeProjects} active delivery programs`,
+                ok: (orgSummary.workspaces || 0) > 0,
+            },
+            {
+                title: 'Intelligence',
+                value: `${fmtNumber(intelCount)} feed events`,
+                desc: `${fmtNumber((superswarm.summary || {}).signals || 0)} signal telemetry points`,
+                ok: intelCount > 0 || Number((superswarm.summary || {}).signals || 0) > 0,
+            },
+            {
+                title: 'Platform',
+                value: `${healthyServices}/${totalServices} healthy`,
+                desc: readiness.overall_ok ? 'Readiness gates are green' : 'One or more gates need attention',
+                ok: readiness.overall_ok === true,
+            },
+            {
+                title: 'Activity',
+                value: `${fmtNumber(activityCount)} events`,
+                desc: `${fmtNumber((superswarm.summary || {}).executions || 0)} execution events in window`,
+                ok: activityCount > 0,
+            },
+        ];
+
+        const laneHtml = lanes.map((lane) => `
+            <article class="story-lane">
+                <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
+                    <div class="title">${lane.title}</div>
+                    <span class="badge badge-${lane.ok ? 'success' : 'warning'}">${lane.ok ? 'ok' : 'watch'}</span>
+                </div>
+                <div class="value">${lane.value}</div>
+                <div class="desc">${lane.desc}</div>
+            </article>
+        `).join('');
+        document.getElementById('story-lanes').innerHTML = laneHtml;
+        document.getElementById('storyline-meta').textContent = readiness.overall_ok ? 'Narrative healthy' : 'Narrative watch';
+
+        const signalSeries = signalFlow.map((row) => Number(row.received || 0) + Number(row.published || 0));
+        const execSeries = executionFlow.map((row) => Number(row.executed || 0));
+        const momentum = signalSeries.length
+            ? signalSeries.map((v, i) => v + Number(execSeries[i] || 0))
+            : [activityCount];
+        window.sapphireViz.renderSparkline('story-momentum-chart', momentum, {
+            ariaLabel: 'Operational storyline momentum',
+            lineColor: 'rgba(105, 212, 255, 0.95)',
+            fillColor: 'rgba(105, 212, 255, 0.24)',
+            height: 146,
+        });
+        const peak = momentum.reduce((acc, value, index) => (value > acc.value ? { value, index } : acc), { value: 0, index: 0 });
+        document.getElementById('story-momentum-note').textContent = `Peak momentum bucket ${peak.index + 1} · ${fmtNumber(peak.value)} composite events.`;
+
+        const domainRows = [
+            { label: 'programs', value: projects.length, color: 'rgba(110, 168, 255, 0.92)' },
+            { label: 'intel', value: intelCount, color: 'rgba(143, 125, 255, 0.9)' },
+            { label: 'platform', value: healthyServices, color: 'rgba(54, 211, 153, 0.92)' },
+            { label: 'activity', value: activityCount, color: 'rgba(255, 204, 102, 0.9)' },
+        ];
+        window.sapphireViz.renderStackBar('story-domain-mix', domainRows);
+        document.getElementById('story-domain-note').textContent = `Mix across organization, intelligence, platform, and activity domains.`;
+    }
+
     async function loadOverview() {
         const defaults = {
             status: { services: {} },
@@ -787,7 +1070,9 @@
                 <span class="overview-chip"><i class="fas fa-clock"></i> Snapshot ${fmtTime(health.timestamp || readiness.timestamp)}</span>
             `;
 
+            renderClientOverviewBrief(status, metrics, projectsData, orgData, readiness, logsData, superswarmData);
             renderSuperswarmVisuals(superswarmData);
+            renderStoryline(status, metrics, projectsData, orgData, readiness, logsData, superswarmData);
         } catch (error) {
             console.error('Failed to render overview:', error);
             const activityEl = document.getElementById('activity-highlights');
@@ -796,11 +1081,17 @@
             const snapshot = document.getElementById('service-snapshot');
             snapshot.className = 'empty-state';
             snapshot.innerHTML = '<p>Snapshot unavailable.</p>';
+            const clientSummary = document.getElementById('overview-client-summary');
+            if (clientSummary) {
+                clientSummary.textContent = 'Business summary is temporarily unavailable while platform telemetry refreshes.';
+            }
             renderSuperswarmVisuals(defaults.superswarm);
+            renderStoryline(defaults.status, defaults.metrics, defaults.projects, defaults.organization, defaults.readiness, defaults.logs, defaults.superswarm);
         }
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+        applyOverviewViewMode(getOverviewViewMode());
         loadOverview();
         setInterval(loadOverview, 60000);
     });
