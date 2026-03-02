@@ -1,0 +1,571 @@
+{% extends "base.html" %}
+
+{% block page_subtitle %}Consolidated platform status across cloud, Pi edge, and Windows AI lab with production readiness context.{% endblock %}
+
+{% block extra_css %}
+.platform-hero {
+    position: relative;
+    overflow: hidden;
+    margin-bottom: var(--space-xl);
+}
+
+.platform-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 16% 18%, rgba(105, 212, 255, 0.22), transparent 42%),
+        radial-gradient(circle at 86% 14%, rgba(143, 125, 255, 0.18), transparent 36%);
+    pointer-events: none;
+}
+
+.platform-hero-body {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: var(--space-lg);
+    align-items: center;
+}
+
+.platform-hero h2 {
+    font-size: 1.95rem;
+    line-height: 1.08;
+    margin-bottom: var(--space-sm);
+}
+
+.platform-hero p {
+    color: var(--text-secondary);
+    max-width: 66ch;
+}
+
+.platform-chip-row {
+    margin-top: var(--space-md);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+}
+
+.platform-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    padding: 6px 12px;
+}
+
+.view-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 4px;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.view-toggle .btn {
+    border-radius: 999px;
+    padding: 0.42rem 0.8rem;
+}
+
+.view-toggle .btn.active {
+    border-color: var(--border-accent);
+    background: linear-gradient(135deg, rgba(105, 212, 255, 0.2), rgba(143, 125, 255, 0.2));
+    color: var(--primary);
+}
+
+.client-only {
+    display: none;
+}
+
+.mode-client .operator-only {
+    display: none !important;
+}
+
+.mode-client .client-only {
+    display: block !important;
+}
+
+.service-list {
+    display: grid;
+    gap: var(--space-sm);
+}
+
+.service-item {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-sm);
+}
+
+.service-item .meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.gate-list {
+    display: grid;
+    gap: var(--space-sm);
+}
+
+.gate-item {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-sm);
+}
+
+.platform-viz-grid {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: var(--space-md);
+}
+
+@media (max-width: 980px) {
+    .platform-hero-body {
+        grid-template-columns: 1fr;
+    }
+
+    .platform-hero h2 {
+        font-size: 1.55rem;
+    }
+
+    .platform-viz-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .view-toggle {
+        width: 100%;
+        justify-content: stretch;
+    }
+
+    .view-toggle .btn {
+        flex: 1;
+    }
+}
+{% endblock %}
+
+{% block content %}
+<div id="platform-page-root">
+<div class="card platform-hero">
+    <div class="card-body platform-hero-body">
+        <div>
+            <span class="platform-chip">Platform Reliability Surface</span>
+            <h2>Unified Reliability View Across All Environments</h2>
+            <p>
+                This page consolidates health, infrastructure, and readiness into one clear operating picture for external stakeholders.
+                It keeps reliability transparent while operational controls remain internal.
+            </p>
+            <div class="platform-chip-row" id="platform-chip-row">
+                <span class="platform-chip"><i class="fas fa-spinner fa-spin"></i> Loading status...</span>
+            </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:var(--space-sm);">
+            <div class="view-toggle" role="group" aria-label="Platform view mode">
+                <button class="btn btn-secondary active" id="platform-view-operator" type="button" onclick="setPlatformViewMode('operator')">
+                    <i class="fas fa-briefcase"></i> Operator View
+                </button>
+                <button class="btn btn-secondary" id="platform-view-client" type="button" onclick="setPlatformViewMode('client')">
+                    <i class="fas fa-handshake"></i> Client View
+                </button>
+            </div>
+            <a class="btn btn-primary" href="/activity"><i class="fas fa-list-check"></i> Activity Stream</a>
+            <a class="btn btn-secondary" href="/intelligence"><i class="fas fa-chart-line"></i> Intelligence Surface</a>
+            <a class="btn btn-secondary" href="/organization"><i class="fas fa-sitemap"></i> Organization & Programs</a>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-4" style="margin-bottom: var(--space-xl);">
+    <div class="stat-card">
+        <div class="stat-label">Core Health</div>
+        <div class="stat-value" id="platform-overall">--</div>
+        <div class="stat-change" id="platform-overall-note">Core systems status</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Healthy Services</div>
+        <div class="stat-value" id="platform-healthy">--</div>
+        <div class="stat-change">Across cloud + edge</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Optional Degraded</div>
+        <div class="stat-value" id="platform-optional">--</div>
+        <div class="stat-change">Non-blocking edge checks</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Readiness</div>
+        <div class="stat-value" id="platform-readiness">--</div>
+        <div class="stat-change" id="platform-readiness-note">Production gate summary</div>
+    </div>
+</div>
+
+<div class="card client-only" style="margin-bottom: var(--space-xl); border-color: rgba(105, 212, 255, 0.35); background: rgba(105, 212, 255, 0.10);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-file-lines" style="margin-right:8px;color:var(--primary);"></i>Client Reliability Brief</h3>
+    </div>
+    <div class="card-body">
+        <p id="platform-client-summary" style="color:var(--text-secondary);line-height:1.7;">Loading client reliability summary...</p>
+        <div class="grid grid-3" style="margin-top: var(--space-sm);">
+            <div class="stat-card">
+                <div class="stat-label">Core Services</div>
+                <div class="stat-value" style="font-size:1.2rem;" id="platform-client-core">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Edge Posture</div>
+                <div class="stat-value" style="font-size:1.2rem;" id="platform-client-edge">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Delivery Readiness</div>
+                <div class="stat-value" style="font-size:1.2rem;" id="platform-client-ready">--</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-chart-pie" style="margin-right:8px;color:var(--primary);"></i>Reliability Analytics</h3>
+    </div>
+    <div class="card-body platform-viz-grid">
+        <section>
+            <div class="viz-shell" id="platform-health-segments"></div>
+            <div class="viz-caption" id="platform-health-segments-note">Healthy vs watch segments.</div>
+        </section>
+        <section>
+            <div class="viz-shell" id="platform-latency-trend"></div>
+            <div class="viz-caption" id="platform-latency-note">Observed service latency distribution.</div>
+        </section>
+    </div>
+</div>
+
+<div class="grid grid-2 operator-only" style="margin-bottom: var(--space-xl);">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-cloud" style="margin-right:8px;color:var(--primary);"></i>Environment Matrix</h3>
+        </div>
+        <div class="card-body">
+            <div class="grid grid-2">
+                <section>
+                    <div class="stat-label" style="margin-bottom:8px;">Cloud</div>
+                    <div class="service-list" id="services-cloud"><div class="service-item"><span>Loading...</span></div></div>
+                </section>
+                <section>
+                    <div class="stat-label" style="margin-bottom:8px;">Pi Edge</div>
+                    <div class="service-list" id="services-pi"><div class="service-item"><span>Loading...</span></div></div>
+                </section>
+                <section>
+                    <div class="stat-label" style="margin-bottom:8px;">Windows</div>
+                    <div class="service-list" id="services-windows"><div class="service-item"><span>Loading...</span></div></div>
+                </section>
+                <section>
+                    <div class="stat-label" style="margin-bottom:8px;">Data</div>
+                    <div class="service-list" id="services-firestore"><div class="service-item"><span>Loading...</span></div></div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-shield-check" style="margin-right:8px;color:var(--success);"></i>Readiness Gates</h3>
+        </div>
+        <div class="card-body" id="platform-gates">
+            <div class="loading"><div class="spinner"></div>Loading gates...</div>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-2 operator-only" style="margin-bottom: var(--space-xl);">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-microchip" style="margin-right:8px;color:var(--accent);"></i>Windows AI Lab</h3>
+        </div>
+        <div class="card-body" id="windows-lab-panel">
+            <div class="loading"><div class="spinner"></div>Loading lab capabilities...</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-file-contract" style="margin-right:8px;color:var(--info);"></i>Contract Surface</h3>
+        </div>
+        <div class="card-body" id="contract-panel">
+            <div class="loading"><div class="spinner"></div>Loading contract manifest...</div>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="border-color: rgba(255, 204, 102, 0.45); background: rgba(255, 204, 102, 0.07);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-lock" style="margin-right:8px;color:var(--warning);"></i>Public Policy</h3>
+    </div>
+    <div class="card-body" style="color: var(--text-secondary); line-height: 1.75;">
+        Reliability telemetry is public. Restart, deploy, and dispatch actions are intentionally disabled on this website.
+    </div>
+</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function escapeHtml(value) {
+        return String(value || '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+    }
+
+    function statusBadge(ok) {
+        return `<span class="badge badge-${ok ? 'success' : 'warning'}">${ok ? 'healthy' : 'watch'}</span>`;
+    }
+
+    const PLATFORM_VIEW_MODE_KEY = 'sapphire.platform.view_mode';
+
+    function getPlatformViewMode() {
+        try {
+            const mode = localStorage.getItem(PLATFORM_VIEW_MODE_KEY);
+            return mode === 'client' ? 'client' : 'operator';
+        } catch (_) {
+            return 'operator';
+        }
+    }
+
+    function applyPlatformViewMode(mode) {
+        const resolved = mode === 'client' ? 'client' : 'operator';
+        const root = document.getElementById('platform-page-root');
+        if (root) root.classList.toggle('mode-client', resolved === 'client');
+        const operatorBtn = document.getElementById('platform-view-operator');
+        const clientBtn = document.getElementById('platform-view-client');
+        if (operatorBtn) operatorBtn.classList.toggle('active', resolved === 'operator');
+        if (clientBtn) clientBtn.classList.toggle('active', resolved === 'client');
+    }
+
+    function setPlatformViewMode(mode) {
+        const resolved = mode === 'client' ? 'client' : 'operator';
+        try {
+            localStorage.setItem(PLATFORM_VIEW_MODE_KEY, resolved);
+        } catch (_) {
+            // no-op
+        }
+        applyPlatformViewMode(resolved);
+    }
+
+    function renderServiceList(id, rows) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const safeRows = Array.isArray(rows) ? rows : [];
+        if (!safeRows.length) {
+            el.innerHTML = '<div class="service-item"><span>No data</span></div>';
+            return;
+        }
+
+        el.innerHTML = safeRows.map((row) => `
+            <div class="service-item">
+                <div>
+                    <div style="font-weight:600;">${escapeHtml(row.name || 'service')}</div>
+                    <div class="meta">${row.response_time_ms ? `${row.response_time_ms}ms` : '--'}</div>
+                </div>
+                ${statusBadge(!!row.healthy)}
+            </div>
+        `).join('');
+    }
+
+    function renderReliabilityAnalytics(health, byCategory) {
+        const groups = ['cloud', 'pi', 'windows', 'firestore'];
+        const rows = groups.flatMap((group) => Array.isArray(byCategory[group]) ? byCategory[group] : []);
+        const healthy = rows.filter((row) => !!row.healthy).length;
+        const watch = Math.max(0, rows.length - healthy);
+
+        window.sapphireViz.renderStackBar('platform-health-segments', [
+            { label: 'healthy', value: healthy, color: 'rgba(54, 211, 153, 0.95)' },
+            { label: 'watch', value: watch, color: 'rgba(255, 204, 102, 0.9)' },
+        ]);
+        document.getElementById('platform-health-segments-note').textContent = `${healthy}/${rows.length || 0} healthy · optional degraded ${Number(health.optional_degraded_count || 0)}`;
+
+        const latencies = rows.map((row) => Number(row.response_time_ms || 0)).filter((v) => Number.isFinite(v) && v > 0);
+        window.sapphireViz.renderSparkline('platform-latency-trend', latencies, {
+            ariaLabel: 'Latency trend',
+            lineColor: 'rgba(143, 125, 255, 0.95)',
+            fillColor: 'rgba(143, 125, 255, 0.24)',
+            height: 150,
+        });
+        if (latencies.length) {
+            const avg = latencies.reduce((acc, value) => acc + value, 0) / latencies.length;
+            const p95 = [...latencies].sort((a, b) => a - b)[Math.floor(latencies.length * 0.95)] || latencies[latencies.length - 1];
+            document.getElementById('platform-latency-note').textContent = `Avg ${Math.round(avg)}ms · p95 ${Math.round(p95)}ms across ${latencies.length} probes.`;
+        } else {
+            document.getElementById('platform-latency-note').textContent = 'No latency probes available.';
+        }
+    }
+
+    async function safeCall(call, fallback) {
+        try {
+            return await call();
+        } catch (_) {
+            return fallback;
+        }
+    }
+
+    function renderGates(readiness) {
+        const el = document.getElementById('platform-gates');
+        const gates = readiness.gates || {};
+        const items = Object.entries(gates);
+        if (!items.length) {
+            el.innerHTML = '<div class="empty-state"><p>Readiness data unavailable.</p></div>';
+            return;
+        }
+
+        el.innerHTML = `
+            <div class="gate-list">
+                ${items.map(([name, gate]) => `
+                    <article class="gate-item">
+                        <div>
+                            <div style="font-weight:600;">${escapeHtml(name)}</div>
+                            <div class="meta">${Number(gate.pass || 0)}/${Number(gate.total || 0)}</div>
+                        </div>
+                        <span class="badge badge-${gate.ok ? 'success' : 'warning'}">${gate.ok ? 'PASS' : 'WATCH'}</span>
+                    </article>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    function renderWindowsLab(lab) {
+        const el = document.getElementById('windows-lab-panel');
+        if (!lab || !lab.available) {
+            el.innerHTML = '<div class="empty-state"><p>Windows lab capability snapshot is unavailable.</p></div>';
+            return;
+        }
+
+        const gpuCount = Number((lab.hardware || {}).gpu_count || 0);
+        const modelCount = Number(((lab.models || {}).ollama_model_count) || 0);
+        const host = lab.host || {};
+        const services = lab.services || {};
+        const serviceRows = Object.entries(services).map(([name, row]) => `
+            <div class="service-item">
+                <div>
+                    <div style="font-weight:600;">${escapeHtml(name)}</div>
+                    <div class="meta">${row.latency_ms ? `${row.latency_ms}ms` : '--'}</div>
+                </div>
+                ${statusBadge(!!row.healthy)}
+            </div>
+        `).join('');
+
+        el.innerHTML = `
+            <div class="grid grid-3" style="margin-bottom: var(--space-md);">
+                <div class="stat-card"><div class="stat-label">GPU</div><div class="stat-value" style="font-size:1.3rem;">${gpuCount}</div></div>
+                <div class="stat-card"><div class="stat-label">Models</div><div class="stat-value" style="font-size:1.3rem;">${modelCount}</div></div>
+                <div class="stat-card"><div class="stat-label">Host</div><div class="stat-value" style="font-size:1rem;">${escapeHtml(host.hostname || '--')}</div></div>
+            </div>
+            <div class="metric-mini" style="margin-bottom: 8px;">${escapeHtml(host.os || '--')} · updated ${escapeHtml(lab.updated_at || lab.timestamp || '--')}</div>
+            <div class="service-list">${serviceRows || '<div class="service-item"><span>No service probes found.</span></div>'}</div>
+        `;
+    }
+
+    function renderContracts(contracts) {
+        const el = document.getElementById('contract-panel');
+        const auth = contracts.auth || {};
+        const endpoints = Array.isArray(contracts.endpoints) ? contracts.endpoints : [];
+
+        el.innerHTML = `
+            <div class="grid grid-2" style="margin-bottom: var(--space-md);">
+                <div class="stat-card">
+                    <div class="stat-label">Contract Version</div>
+                    <div class="stat-value" style="font-size:1.25rem;">${escapeHtml(contracts.version || '--')}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Endpoints</div>
+                    <div class="stat-value" style="font-size:1.25rem;">${endpoints.length}</div>
+                </div>
+            </div>
+            <div class="service-list">
+                <div class="service-item"><span>Public Read-Only</span><span class="badge badge-${auth.public_read_only ? 'success' : 'warning'}">${auth.public_read_only ? 'enabled' : 'disabled'}</span></div>
+                <div class="service-item"><span>Internal Jobs</span><span class="badge badge-${auth.internal_jobs_enabled ? 'warning' : 'success'}">${auth.internal_jobs_enabled ? 'enabled' : 'disabled'}</span></div>
+                <div class="service-item"><span>Auth Mode</span><span class="badge badge-info">${escapeHtml(auth.mode || 'public')}</span></div>
+            </div>
+        `;
+    }
+
+    async function refreshPlatform() {
+        const [metrics, readiness, windowsLab, contracts] = await Promise.all([
+            safeCall(() => window.platformApi.getMetrics(), {}),
+            safeCall(() => window.platformApi.getReadiness(), {}),
+            safeCall(() => window.platformApi.getWindowsLab(), { available: false }),
+            safeCall(() => window.platformApi.getContracts(), {}),
+        ]);
+
+        const health = metrics.health || {};
+        const status = health.healthy ? 'Healthy' : 'Watch';
+        document.getElementById('platform-overall').textContent = status;
+        document.getElementById('platform-overall').style.color = health.healthy ? 'var(--success)' : 'var(--warning)';
+        document.getElementById('platform-overall-note').textContent = health.timestamp || 'No timestamp';
+        document.getElementById('platform-healthy').textContent = Number(health.healthy_count || 0).toLocaleString();
+        document.getElementById('platform-optional').textContent = Number(health.optional_degraded_count || 0).toLocaleString();
+        document.getElementById('platform-readiness').textContent = readiness.overall_ok ? 'PASS' : 'WATCH';
+        document.getElementById('platform-readiness').style.color = readiness.overall_ok ? 'var(--success)' : 'var(--warning)';
+        document.getElementById('platform-readiness-note').textContent = `${(readiness.blockers || []).length || 0} blocker(s)`;
+
+        const byCategory = (metrics.status || {}).by_category || {};
+        renderServiceList('services-cloud', byCategory.cloud || []);
+        renderServiceList('services-pi', byCategory.pi || []);
+        renderServiceList('services-windows', byCategory.windows || []);
+        renderServiceList('services-firestore', byCategory.firestore || []);
+        renderReliabilityAnalytics(health, byCategory);
+        renderGates(readiness);
+        renderWindowsLab(windowsLab);
+        renderContracts(contracts);
+
+        const chips = [];
+        chips.push(`<span class="platform-chip">Core ${health.healthy ? 'healthy' : 'watch'}</span>`);
+        chips.push(`<span class="platform-chip">Readiness ${readiness.overall_ok ? 'pass' : 'watch'}</span>`);
+        chips.push(`<span class="platform-chip">Optional degraded ${Number(health.optional_degraded_count || 0)}</span>`);
+        document.getElementById('platform-chip-row').innerHTML = chips.join('');
+        renderClientPlatformBrief(health, readiness, byCategory);
+    }
+
+    function renderClientPlatformBrief(health, readiness, byCategory) {
+        const summaryEl = document.getElementById('platform-client-summary');
+        const coreEl = document.getElementById('platform-client-core');
+        const edgeEl = document.getElementById('platform-client-edge');
+        const readyEl = document.getElementById('platform-client-ready');
+        if (!summaryEl || !coreEl || !edgeEl || !readyEl) return;
+
+        const cloudRows = Array.isArray(byCategory.cloud) ? byCategory.cloud : [];
+        const piRows = Array.isArray(byCategory.pi) ? byCategory.pi : [];
+        const winRows = Array.isArray(byCategory.windows) ? byCategory.windows : [];
+        const coreHealthy = cloudRows.filter((row) => !!row.healthy).length;
+        const coreTotal = cloudRows.length || Number(health.total_count || 0);
+        const optionalDegraded = Number(health.optional_degraded_count || 0);
+        const edgeWatch = piRows.filter((row) => !row.healthy).length + winRows.filter((row) => !row.healthy).length;
+        const readinessState = readiness && readiness.overall_ok ? 'PASS' : 'WATCH';
+
+        coreEl.textContent = `${coreHealthy}/${coreTotal || 0}`;
+        edgeEl.textContent = edgeWatch > 0 ? `Watch (${edgeWatch})` : `Stable`;
+        edgeEl.style.color = edgeWatch > 0 ? 'var(--warning)' : 'var(--success)';
+        readyEl.textContent = readinessState;
+        readyEl.style.color = readinessState === 'PASS' ? 'var(--success)' : 'var(--warning)';
+
+        summaryEl.textContent = `Core cloud services are ${health.healthy ? 'healthy' : 'under watch'} with ${Number(health.healthy_count || 0)} healthy checks. Optional edge degraded signals: ${optionalDegraded}. Production readiness is currently ${readinessState}.`;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        applyPlatformViewMode(getPlatformViewMode());
+        refreshPlatform();
+        setInterval(refreshPlatform, 45000);
+    });
+</script>
+{% endblock %}

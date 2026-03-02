@@ -1,0 +1,516 @@
+{% extends "base.html" %}
+
+{% block page_subtitle %}Unified activity stream combining system events, signal flow, and verified trade outcomes.{% endblock %}
+
+{% block extra_css %}
+.activity-toolbar {
+    display: grid;
+    grid-template-columns: 140px 140px 1fr auto;
+    gap: var(--space-sm);
+    align-items: end;
+}
+
+.view-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 4px;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.view-toggle .btn {
+    border-radius: 999px;
+    padding: 0.42rem 0.8rem;
+}
+
+.view-toggle .btn.active {
+    border-color: var(--border-accent);
+    background: linear-gradient(135deg, rgba(105, 212, 255, 0.2), rgba(143, 125, 255, 0.2));
+    color: var(--primary);
+}
+
+.client-only {
+    display: none;
+}
+
+.mode-client .operator-only {
+    display: none !important;
+}
+
+.mode-client .client-only {
+    display: block !important;
+}
+
+.activity-input,
+.activity-select {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    padding: 10px 12px;
+    font: inherit;
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.stream-list {
+    display: grid;
+    gap: var(--space-sm);
+}
+
+.stream-item {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 12px;
+}
+
+.stream-item .meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: 6px;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.stream-item .msg {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.55;
+}
+
+.activity-viz-grid {
+    display: grid;
+    grid-template-columns: 1.35fr 1fr;
+    gap: var(--space-md);
+}
+
+@media (max-width: 980px) {
+    .activity-toolbar {
+        grid-template-columns: 1fr;
+    }
+
+    .activity-viz-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .view-toggle {
+        width: 100%;
+        justify-content: stretch;
+    }
+
+    .view-toggle .btn {
+        flex: 1;
+    }
+}
+{% endblock %}
+
+{% block content %}
+<div id="activity-page-root">
+<div class="card" style="margin-bottom: var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-filter" style="margin-right:8px;color:var(--primary);"></i>Activity Filters</h3>
+        <div style="display:flex;align-items:center;gap:var(--space-sm);flex-wrap:wrap;">
+            <div class="view-toggle" role="group" aria-label="Activity view mode">
+                <button class="btn btn-secondary active" id="activity-view-operator" type="button" onclick="setActivityViewMode('operator')">
+                    <i class="fas fa-briefcase"></i> Operator View
+                </button>
+                <button class="btn btn-secondary" id="activity-view-client" type="button" onclick="setActivityViewMode('client')">
+                    <i class="fas fa-handshake"></i> Client View
+                </button>
+            </div>
+            <button class="btn btn-secondary operator-only" onclick="loadActivity()"><i class="fas fa-rotate-right"></i> Refresh</button>
+        </div>
+    </div>
+    <div class="card-body operator-only">
+        <div class="activity-toolbar">
+            <div>
+                <label style="display:block;font-size:0.78rem;color:var(--text-muted);margin-bottom:4px;">Window</label>
+                <select id="activity-hours" class="activity-select">
+                    <option value="1">1 hour</option>
+                    <option value="24" selected>24 hours</option>
+                    <option value="168">7 days</option>
+                </select>
+            </div>
+            <div>
+                <label style="display:block;font-size:0.78rem;color:var(--text-muted);margin-bottom:4px;">Type</label>
+                <select id="activity-type" class="activity-select">
+                    <option value="all" selected>All</option>
+                    <option value="logs">Logs</option>
+                    <option value="trades">Trades</option>
+                </select>
+            </div>
+            <div>
+                <label style="display:block;font-size:0.78rem;color:var(--text-muted);margin-bottom:4px;">Search</label>
+                <input id="activity-query" class="activity-input" placeholder="Search message, symbol, service" />
+            </div>
+            <button class="btn btn-primary" onclick="loadActivity()"><i class="fas fa-play"></i> Apply</button>
+        </div>
+    </div>
+</div>
+
+<div class="card client-only" style="margin-bottom: var(--space-xl); border-color: rgba(105, 212, 255, 0.35); background: rgba(105, 212, 255, 0.10);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-file-lines" style="margin-right:8px;color:var(--primary);"></i>Client Activity Brief</h3>
+        <button class="btn btn-secondary" onclick="loadActivity()"><i class="fas fa-rotate-right"></i> Refresh</button>
+    </div>
+    <div class="card-body">
+        <p id="activity-client-summary" style="color:var(--text-secondary);line-height:1.7;">Loading activity summary...</p>
+        <div class="grid grid-3" style="margin-top: var(--space-sm);">
+            <div class="stat-card">
+                <div class="stat-label">Event Volume</div>
+                <div class="stat-value" style="font-size:1.2rem;" id="activity-client-volume">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Execution Posture</div>
+                <div class="stat-value" style="font-size:1.2rem;" id="activity-client-posture">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Operational Risk</div>
+                <div class="stat-value" style="font-size:1.2rem;" id="activity-client-risk">--</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-4" style="margin-bottom: var(--space-xl);">
+    <div class="stat-card">
+        <div class="stat-label">Total Events</div>
+        <div class="stat-value" id="activity-total">--</div>
+        <div class="stat-change">Merged logs + trades</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Errors</div>
+        <div class="stat-value" id="activity-errors" style="color: var(--danger);">--</div>
+        <div class="stat-change">Platform errors</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Signals</div>
+        <div class="stat-value" id="activity-signals">--</div>
+        <div class="stat-change">Signal-related events</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Executed Trades</div>
+        <div class="stat-value" id="activity-executed">--</div>
+        <div class="stat-change">Verified fills</div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-chart-column" style="margin-right:8px;color:var(--primary);"></i>Activity Analytics</h3>
+        <span class="badge badge-info" id="activity-viz-meta">Window view</span>
+    </div>
+    <div class="card-body activity-viz-grid">
+        <section>
+            <div class="viz-shell" id="activity-cadence-chart"></div>
+            <div class="viz-caption" id="activity-cadence-note">Hourly event cadence.</div>
+        </section>
+        <section>
+            <div class="viz-shell" id="activity-type-mix"></div>
+            <div class="viz-caption" id="activity-type-note">Log/trade composition.</div>
+        </section>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-timeline" style="margin-right:8px;color:var(--accent);"></i>Unified Timeline</h3>
+    </div>
+    <div class="card-body" id="activity-timeline">
+        <div class="loading"><div class="spinner"></div>Loading timeline...</div>
+    </div>
+</div>
+
+<div class="grid grid-2 operator-only">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-list-check" style="margin-right:8px;color:var(--secondary);"></i>Latest Logs</h3>
+        </div>
+        <div class="card-body" id="activity-logs">
+            <div class="loading"><div class="spinner"></div>Loading logs...</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-check-circle" style="margin-right:8px;color:var(--success);"></i>Latest Trade Events</h3>
+        </div>
+        <div class="card-body" id="activity-trades">
+            <div class="loading"><div class="spinner"></div>Loading trades...</div>
+        </div>
+    </div>
+</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function escapeHtml(value) {
+        return String(value || '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+    }
+
+    function fmtTime(iso) {
+        if (!iso) return '--';
+        try {
+            return new Date(iso).toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+            });
+        } catch (_) {
+            return '--';
+        }
+    }
+
+    function levelBadge(levelRaw) {
+        const level = String(levelRaw || 'info').toLowerCase();
+        if (level === 'error') return '<span class="badge badge-danger">error</span>';
+        if (level === 'warning' || level === 'warn') return '<span class="badge badge-warning">warn</span>';
+        return '<span class="badge badge-info">info</span>';
+    }
+
+    async function safeCall(call, fallback) {
+        try {
+            return await call();
+        } catch (_) {
+            return fallback;
+        }
+    }
+
+    const ACTIVITY_VIEW_MODE_KEY = 'sapphire.activity.view_mode';
+
+    function getActivityViewMode() {
+        try {
+            const mode = localStorage.getItem(ACTIVITY_VIEW_MODE_KEY);
+            return mode === 'client' ? 'client' : 'operator';
+        } catch (_) {
+            return 'operator';
+        }
+    }
+
+    function applyActivityViewMode(mode) {
+        const resolved = mode === 'client' ? 'client' : 'operator';
+        const root = document.getElementById('activity-page-root');
+        if (root) root.classList.toggle('mode-client', resolved === 'client');
+        const operatorBtn = document.getElementById('activity-view-operator');
+        const clientBtn = document.getElementById('activity-view-client');
+        if (operatorBtn) operatorBtn.classList.toggle('active', resolved === 'operator');
+        if (clientBtn) clientBtn.classList.toggle('active', resolved === 'client');
+    }
+
+    function setActivityViewMode(mode) {
+        const resolved = mode === 'client' ? 'client' : 'operator';
+        try {
+            localStorage.setItem(ACTIVITY_VIEW_MODE_KEY, resolved);
+        } catch (_) {
+            // no-op
+        }
+        applyActivityViewMode(resolved);
+    }
+
+    function normalizeLog(log) {
+        return {
+            kind: 'log',
+            timestamp: log.timestamp,
+            label: String(log.service || 'platform'),
+            level: String(log.level || 'info'),
+            message: String(log.message || 'No message provided.'),
+        };
+    }
+
+    function normalizeTrade(trade) {
+        const side = String(trade.side || '').toUpperCase();
+        const symbol = String(trade.symbol || 'symbol');
+        const qty = Number(trade.filled_quantity || 0);
+        return {
+            kind: 'trade',
+            timestamp: trade.timestamp || trade.received_at,
+            label: String(trade.platform || 'trade-engine'),
+            level: trade.executed ? 'info' : 'warning',
+            message: `${symbol} ${side} qty ${qty.toFixed(4)} (${trade.executed ? 'executed' : 'non-executed'})`,
+        };
+    }
+
+    function sortByTimeDesc(items) {
+        return [...items].sort((a, b) => {
+            const at = new Date(a.timestamp || 0).getTime();
+            const bt = new Date(b.timestamp || 0).getTime();
+            return bt - at;
+        });
+    }
+
+    function renderTimeline(items) {
+        const el = document.getElementById('activity-timeline');
+        if (!items.length) {
+            el.innerHTML = '<div class="empty-state"><p>No activity for this filter.</p></div>';
+            return;
+        }
+
+        el.innerHTML = `
+            <div class="stream-list">
+                ${items.slice(0, 80).map((row) => `
+                    <article class="stream-item">
+                        <div class="meta">
+                            <span>${fmtTime(row.timestamp)}</span>
+                            <span>•</span>
+                            <span>${escapeHtml(row.kind)}</span>
+                            <span>•</span>
+                            <span>${escapeHtml(row.label)}</span>
+                            <span>•</span>
+                            ${levelBadge(row.level)}
+                        </div>
+                        <div class="msg">${escapeHtml(row.message)}</div>
+                    </article>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    function renderSubset(id, rows, formatter) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (!rows.length) {
+            el.innerHTML = '<div class="empty-state"><p>No events in this window.</p></div>';
+            return;
+        }
+
+        el.innerHTML = `
+            <div class="stream-list">
+                ${rows.slice(0, 24).map(formatter).join('')}
+            </div>
+        `;
+    }
+
+    function filterByQuery(items, query) {
+        const q = String(query || '').trim().toLowerCase();
+        if (!q) return items;
+        return items.filter((row) => (
+            String(row.message || '').toLowerCase().includes(q)
+            || String(row.label || '').toLowerCase().includes(q)
+            || String(row.kind || '').toLowerCase().includes(q)
+        ));
+    }
+
+    function renderActivityAnalytics(logs, trades, merged, hours) {
+        const buckets = Array.from({ length: 24 }, () => 0);
+        merged.forEach((row) => {
+            const ts = new Date(row.timestamp || 0);
+            if (Number.isNaN(ts.getTime())) return;
+            buckets[ts.getHours()] += 1;
+        });
+        window.sapphireViz.renderSparkline('activity-cadence-chart', buckets, {
+            ariaLabel: 'Activity cadence by hour',
+            lineColor: 'rgba(105, 212, 255, 0.95)',
+            fillColor: 'rgba(105, 212, 255, 0.22)',
+            height: 150,
+        });
+        const peak = buckets.reduce((acc, value, index) => (value > acc.value ? { value, index } : acc), { value: 0, index: 0 });
+        document.getElementById('activity-cadence-note').textContent = `Peak ${String(peak.index).padStart(2, '0')}:00 · ${peak.value} events in ${hours}h window.`;
+
+        const executed = trades.filter((row) => row.level === 'info').length;
+        const nonExecuted = Math.max(0, trades.length - executed);
+        const errors = logs.filter((row) => row.level === 'error').length;
+        const warnings = logs.filter((row) => row.level === 'warning' || row.level === 'warn').length;
+        window.sapphireViz.renderStackBar('activity-type-mix', [
+            { label: 'logs', value: logs.length, color: 'rgba(138, 180, 255, 0.9)' },
+            { label: 'trades', value: trades.length, color: 'rgba(54, 211, 153, 0.9)' },
+            { label: 'errors', value: errors, color: 'rgba(255, 107, 107, 0.9)' },
+            { label: 'warn', value: warnings, color: 'rgba(255, 204, 102, 0.9)' },
+            { label: 'trade-watch', value: nonExecuted, color: 'rgba(143, 125, 255, 0.9)' },
+        ]);
+        document.getElementById('activity-type-note').textContent = `Executed trades ${executed}/${trades.length} · errors ${errors}`;
+        document.getElementById('activity-viz-meta').textContent = `${merged.length} merged events`;
+    }
+
+    function renderClientActivityBrief({ merged, logs, executedCount, errorCount, signalCount, hours }) {
+        const summaryEl = document.getElementById('activity-client-summary');
+        const volumeEl = document.getElementById('activity-client-volume');
+        const postureEl = document.getElementById('activity-client-posture');
+        const riskEl = document.getElementById('activity-client-risk');
+        if (!summaryEl || !volumeEl || !postureEl || !riskEl) return;
+
+        const volume = Number((Array.isArray(merged) ? merged.length : 0) || 0);
+        const warnings = Array.isArray(logs)
+            ? logs.filter((row) => row.level === 'warning' || row.level === 'warn').length
+            : 0;
+        const posture = executedCount > 0 ? 'Active' : 'Passive';
+        const riskState = errorCount > 0 ? 'Watch' : (warnings > 0 ? 'Moderate' : 'Stable');
+
+        volumeEl.textContent = `${volume} / ${hours}h`;
+        postureEl.textContent = posture;
+        postureEl.style.color = posture === 'Active' ? 'var(--success)' : 'var(--info)';
+        riskEl.textContent = riskState;
+        riskEl.style.color = riskState === 'Watch' ? 'var(--warning)' : (riskState === 'Moderate' ? 'var(--info)' : 'var(--success)');
+
+        summaryEl.textContent = `In the selected ${hours}h window, Sapphire recorded ${volume} total platform events, including ${signalCount} signal-related events and ${executedCount} verified executions. Current operational risk is ${riskState.toLowerCase()}.`;
+    }
+
+    async function loadActivity() {
+        const hours = Number(document.getElementById('activity-hours').value || 24);
+        const type = document.getElementById('activity-type').value || 'all';
+        const query = document.getElementById('activity-query').value || '';
+
+        const [logsPayload, tradesPayload] = await Promise.all([
+            safeCall(() => window.platformApi.getLogs({ hours, limit: 200 }), { logs: [] }),
+            safeCall(() => window.platformApi.getTrades({ hours, limit: 160, include_failed: true }), { trades: [] }),
+        ]);
+
+        const logs = (logsPayload.logs || []).map(normalizeLog);
+        const trades = (tradesPayload.trades || []).map(normalizeTrade);
+
+        let merged = [];
+        if (type === 'logs') merged = logs;
+        else if (type === 'trades') merged = trades;
+        else merged = [...logs, ...trades];
+
+        merged = filterByQuery(sortByTimeDesc(merged), query);
+
+        const errorCount = logs.filter((row) => row.level === 'error').length;
+        const signalCount = logs.filter((row) => row.message.toLowerCase().includes('signal')).length;
+        const executedCount = (tradesPayload.trades || []).filter((row) => !!row.executed).length;
+
+        document.getElementById('activity-total').textContent = merged.length.toLocaleString();
+        document.getElementById('activity-errors').textContent = errorCount.toLocaleString();
+        document.getElementById('activity-signals').textContent = signalCount.toLocaleString();
+        document.getElementById('activity-executed').textContent = executedCount.toLocaleString();
+
+        renderTimeline(merged);
+        renderActivityAnalytics(logs, trades, merged, hours);
+        renderClientActivityBrief({ merged, logs, executedCount, errorCount, signalCount, hours });
+        renderSubset('activity-logs', logs, (row) => `
+            <article class="stream-item">
+                <div class="meta"><span>${fmtTime(row.timestamp)}</span><span>•</span><span>${escapeHtml(row.label)}</span><span>•</span>${levelBadge(row.level)}</div>
+                <div class="msg">${escapeHtml(row.message)}</div>
+            </article>
+        `);
+
+        renderSubset('activity-trades', trades, (row) => `
+            <article class="stream-item">
+                <div class="meta"><span>${fmtTime(row.timestamp)}</span><span>•</span><span>${escapeHtml(row.label)}</span><span>•</span>${levelBadge(row.level)}</div>
+                <div class="msg">${escapeHtml(row.message)}</div>
+            </article>
+        `);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        applyActivityViewMode(getActivityViewMode());
+        loadActivity();
+        setInterval(loadActivity, 60000);
+        document.getElementById('activity-query').addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                loadActivity();
+            }
+        });
+    });
+</script>
+{% endblock %}
