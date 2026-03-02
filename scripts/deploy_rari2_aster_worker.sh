@@ -95,6 +95,16 @@ if [[ "${DISABLE_CLOUD_ASTER}" == "true" ]]; then
 fi
 
 echo "🔎 Probing Pi worker health"
-ssh -o BatchMode=yes "${PI_HOST}" "curl -fsS http://127.0.0.1:18080/health >/dev/null && echo 'Pi worker health OK'"
+ssh -o BatchMode=yes "${PI_HOST}" "
+for i in 1 2 3 4 5 6; do
+  if curl -fsS http://127.0.0.1:18080/health >/dev/null; then
+    echo 'Pi worker health OK'
+    exit 0
+  fi
+  sleep 2
+done
+echo 'Pi worker health check failed' >&2
+exit 1
+"
 
 echo "✅ rari2 ASTER worker deploy complete"

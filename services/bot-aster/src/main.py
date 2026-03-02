@@ -826,10 +826,42 @@ class AsterBot:
                 )
                 logger.info(f"✅ Aster Order Result: {order_result}")
 
+                # Market orders can return NEW before exchange matching finishes.
+                # Poll briefly for terminal status so telemetry reflects real fills.
+                order_id = str(order_result.get("orderId", "") or "").strip()
+                status = str(order_result.get("status", "")).upper()
+                if order_id and status in {"", "NEW", "PENDING_NEW"}:
+                    terminal_statuses = {
+                        "FILLED",
+                        "PARTIALLY_FILLED",
+                        "CANCELED",
+                        "EXPIRED",
+                        "REJECTED",
+                    }
+                    for _ in range(max(1, int(os.getenv("ASTER_ORDER_STATUS_POLLS", "5")))):
+                        await asyncio.sleep(
+                            max(
+                                0.05,
+                                float(os.getenv("ASTER_ORDER_STATUS_POLL_INTERVAL_SECONDS", "0.35")),
+                            )
+                        )
+                        try:
+                            latest = await self.client.get_order(symbol=symbol, order_id=order_id)
+                        except Exception:
+                            latest = {}
+                        if isinstance(latest, dict) and latest:
+                            order_result = {**order_result, **latest}
+                            status = str(order_result.get("status", "")).upper()
+                            if status in terminal_statuses:
+                                break
+                    logger.info(f"📊 Aster Final Order State: {order_result}")
+
             execution_time = (datetime.now() - start_time).total_seconds() * 1000
 
             status = str(order_result.get("status", "")).upper()
-            executed_qty = float(order_result.get("executedQty", 0) or 0)
+            executed_qty = float(
+                order_result.get("executedQty", order_result.get("cumQty", 0)) or 0
+            )
             is_filled = status in ("FILLED", "PARTIALLY_FILLED") or executed_qty > 0
 
             if is_filled:
