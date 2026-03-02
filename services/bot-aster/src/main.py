@@ -92,6 +92,15 @@ class AsterBot:
             3, int(os.getenv("POSITION_PUBLISH_INTERVAL_SECONDS", "10"))
         )
 
+        # Optional signal auto-sizing for edge workers receiving signals without explicit quantity.
+        # Disabled by default in cloud; enable on trusted edge nodes with a small notional budget.
+        self._auto_size_notional_usd = max(
+            0.0, float(os.getenv("ASTER_AUTO_SIZE_NOTIONAL_USD", "0") or 0)
+        )
+        self._auto_size_fallback_quantity = max(
+            0.0, float(os.getenv("ASTER_AUTO_SIZE_FALLBACK_QUANTITY", "0.01") or 0.01)
+        )
+
         # Cache leverage set per-symbol to avoid spamming the exchange API.
         self._last_leverage_by_symbol: Dict[str, int] = {}
 
@@ -491,10 +500,25 @@ class AsterBot:
                 return
 
             if signal.quantity is None:
-                logger.warning(
-                    f"🧯 Rejected signal without explicit quantity on {PLATFORM}: {signal.signal_id} {signal.symbol}"
+                auto_quantity = await self._derive_auto_quantity(signal)
+                if auto_quantity is None:
+                    logger.warning(
+                        f"🧯 Rejected signal without explicit quantity on {PLATFORM}: "
+                        f"{signal.signal_id} {signal.symbol}"
+                    )
+                    return
+                signal.quantity = auto_quantity
+                metadata = {
+                    **metadata,
+                    "auto_sized": True,
+                    "auto_size_notional_usd": self._auto_size_notional_usd,
+                    "auto_size_quantity": auto_quantity,
+                }
+                signal.metadata = metadata
+                logger.info(
+                    f"🧮 Auto-sized signal quantity on {PLATFORM}: "
+                    f"{signal.signal_id} {signal.symbol} qty={auto_quantity}"
                 )
-                return
 
             signal_id = str(signal.signal_id or "").strip()
             if not signal_id:
@@ -528,6 +552,33 @@ class AsterBot:
 
     def _mark_signal_processed(self, signal_id: str):
         self._processed_signal_ids[signal_id] = time.time()
+
+    async def _derive_auto_quantity(self, signal: TradeSignal) -> Optional[float]:
+        """Best-effort quantity derivation for trusted edge execution paths."""
+        if self._auto_size_notional_usd <= 0:
+            return None
+        if not self.client:
+            return self._auto_size_fallback_quantity if self._auto_size_fallback_quantity > 0 else None
+
+        symbol = str(signal.symbol or "").strip().upper()
+        normalized_symbol = (
+            self.client._normalize_symbol(symbol)
+            if hasattr(self.client, "_normalize_symbol")
+            else symbol
+        )
+        raw_price = signal.entry_price
+        if not raw_price or float(raw_price) <= 0:
+            try:
+                ticker = await self.client.get_ticker_price(normalized_symbol)
+                raw_price = float((ticker or {}).get("price", 0) or 0)
+            except Exception:
+                raw_price = 0.0
+
+        if raw_price and float(raw_price) > 0:
+            return max(0.0, self._auto_size_notional_usd / float(raw_price))
+        if self._auto_size_fallback_quantity > 0:
+            return self._auto_size_fallback_quantity
+        return None
 
     async def _handle_risk_alert(self, alert_data: Dict[str, Any]):
         """Handle risk alerts."""
