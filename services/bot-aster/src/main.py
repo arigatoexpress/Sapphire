@@ -485,7 +485,8 @@ class AsterBot:
     async def _handle_signal(self, signal_data: Dict[str, Any]):
         """Handle incoming trading signal."""
         try:
-            signal = TradeSignal(**signal_data)
+            payload = self._sanitize_trade_signal_payload(signal_data)
+            signal = TradeSignal(**payload)
 
             if not signal.should_execute_on(PLATFORM.value):
                 return
@@ -552,6 +553,18 @@ class AsterBot:
 
     def _mark_signal_processed(self, signal_id: str):
         self._processed_signal_ids[signal_id] = time.time()
+
+    @staticmethod
+    def _sanitize_trade_signal_payload(signal_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Drop unknown keys so malformed debug payloads don't break signal handling."""
+        if not isinstance(signal_data, dict):
+            return {}
+        allowed = set(getattr(TradeSignal, "__dataclass_fields__", {}).keys())
+        payload = {key: value for key, value in signal_data.items() if key in allowed}
+        dropped = sorted(set(signal_data.keys()) - set(payload.keys()))
+        if dropped:
+            logger.warning("Ignoring unsupported signal keys on %s: %s", PLATFORM.value, ",".join(dropped))
+        return payload
 
     async def _derive_auto_quantity(self, signal: TradeSignal) -> Optional[float]:
         """Best-effort quantity derivation for trusted edge execution paths."""
@@ -1076,7 +1089,9 @@ class AsterBot:
         if symbol not in self.positions:
             return
 
-        pos = self.positions[symbol]
+        pos = self.positions.get(symbol)
+        if pos is None:
+            return
 
         try:
             exit_side = "SELL" if pos.side in (TradeSide.BUY, TradeSide.LONG) else "BUY"
@@ -1097,9 +1112,60 @@ class AsterBot:
             logger.error(f"Error closing position {symbol}: {e}")
 
     async def _close_all_positions(self):
-        """Close all positions."""
-        for symbol in list(self.positions.keys()):
-            await self._close_position(symbol, "risk_alert")
+        """Close all positions (exchange source-of-truth with local fallback)."""
+        if not self.client:
+            logger.warning("Close-all ignored: Aster client not initialized")
+            return
+
+        exchange_positions: Dict[str, float] = {}
+        try:
+            raw_positions = await self.client.get_position_risk()
+            for row in raw_positions or []:
+                symbol = str((row or {}).get("symbol", "")).strip().upper()
+                qty = float((row or {}).get("positionAmt", 0) or 0)
+                if symbol and abs(qty) > 0:
+                    exchange_positions[symbol] = qty
+        except Exception as exc:
+            logger.warning(f"Failed to fetch exchange positions for close-all: {exc}")
+
+        symbols = set(self.positions.keys()) | set(exchange_positions.keys())
+        if not symbols:
+            logger.info("Close-all requested but no positions are open")
+            return
+
+        closed = 0
+        failed = 0
+        for symbol in sorted(symbols):
+            signed_qty = exchange_positions.get(symbol)
+            if signed_qty is None:
+                local = self.positions.get(symbol)
+                if local is not None:
+                    qty = float(getattr(local, "quantity", 0.0) or 0.0)
+                    if qty > 0:
+                        side = getattr(local, "side", None)
+                        signed_qty = qty if side in (TradeSide.BUY, TradeSide.LONG) else -qty
+
+            if signed_qty is None or abs(float(signed_qty)) <= 0:
+                continue
+
+            close_side = "SELL" if float(signed_qty) > 0 else "BUY"
+            close_qty = abs(float(signed_qty))
+            try:
+                await self.client.place_market_order(
+                    symbol=symbol,
+                    side=close_side,
+                    quantity=close_qty,
+                    reduce_only=True,
+                )
+                self.positions.pop(symbol, None)
+                self.trailing_stops.pop(symbol, None)
+                closed += 1
+                logger.info(f"✅ Closed position {symbol} (close_all)")
+            except Exception as exc:
+                failed += 1
+                logger.error(f"Error closing position {symbol}: {exc}")
+
+        logger.info(f"Close-all complete | closed={closed} failed={failed}")
 
     def get_status(self) -> Dict[str, Any]:
         """Get bot status."""

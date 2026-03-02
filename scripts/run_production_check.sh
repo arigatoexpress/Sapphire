@@ -24,6 +24,7 @@ for path in \
   /api/platform/metrics \
   /api/platform/autonomy \
   /api/platform/home-snapshot \
+  /api/platform/business-brief \
   /api/platform/logs \
   /api/platform/trades \
   /api/platform/organization \

@@ -77,6 +77,29 @@ class LighterBot:
         # Credentials
         self._pub_key = os.getenv("LIGHTER_PUB_KEY", "")
         self._priv_key = os.getenv("LIGHTER_PRIV_KEY", "")
+        api_key_index_raw = os.getenv("LIGHTER_API_KEY_INDEX", "0").strip()
+        try:
+            self._api_key_index = max(0, int(api_key_index_raw or "0"))
+        except ValueError:
+            logger.warning(
+                "Invalid LIGHTER_API_KEY_INDEX=%s; defaulting to 0",
+                api_key_index_raw,
+            )
+            self._api_key_index = 0
+        self._l1_address = os.getenv("LIGHTER_L1_ADDRESS", "").strip()
+        self._account_discovery_scan_limit = max(
+            4, int(os.getenv("LIGHTER_ACCOUNT_DISCOVERY_SCAN_LIMIT", "64") or 64)
+        )
+        hints_raw = os.getenv("LIGHTER_ACCOUNT_DISCOVERY_HINTS", "699444")
+        self._account_discovery_hints = []
+        for item in str(hints_raw or "").split(","):
+            item = item.strip()
+            if not item:
+                continue
+            try:
+                self._account_discovery_hints.append(int(item))
+            except ValueError:
+                continue
 
         # Account tracking
         self.account_index: Optional[int] = None
@@ -158,7 +181,7 @@ class LighterBot:
                     self.signer_client = lighter.SignerClient(
                         url=base_url,
                         account_index=int(self.account_index or 0),
-                        api_private_keys={0: self._priv_key},
+                        api_private_keys={self._api_key_index: self._priv_key},
                     )
                     signer_check = self.signer_client.check_client()
                     if signer_check:
@@ -168,7 +191,10 @@ class LighterBot:
                         )
                         logger.error(f"SignerClient validation failed: {signer_check}")
                     else:
-                        logger.info("SignerClient initialized (api_key_index=0)")
+                        logger.info(
+                            "SignerClient initialized (api_key_index=%s)",
+                            self._api_key_index,
+                        )
                 except Exception as signer_exc:
                     self.signer_client = None
                     logger.warning(f"SignerClient unavailable; using legacy path: {signer_exc}")
@@ -254,15 +280,30 @@ class LighterBot:
                 )
 
         try:
-            # Query accounts by the public key (L1 address)
-            accounts = await self._call_lighter_api(
-                self.account_api.accounts_by_l1_address,
-                l1_address=self._pub_key[:42] if len(self._pub_key) > 42 else self._pub_key,
-            )
+            accounts = None
+            if self._l1_address:
+                logger.info("Looking up Lighter account by configured L1 address")
+                accounts = await self._call_lighter_api(
+                    self.account_api.accounts_by_l1_address,
+                    l1_address=self._l1_address,
+                )
+            elif len(self._pub_key) >= 42:
+                # Legacy fallback: this may not always be an L1 address.
+                accounts = await self._call_lighter_api(
+                    self.account_api.accounts_by_l1_address,
+                    l1_address=self._pub_key[:42],
+                )
 
-            if accounts and hasattr(accounts, "accounts") and len(accounts.accounts) > 0:
-                self.account_index = accounts.accounts[0].index
-                logger.info(f"Account index: {self.account_index}")
+            account_rows = []
+            if accounts is not None:
+                account_rows = (
+                    getattr(accounts, "sub_accounts", None)
+                    or getattr(accounts, "accounts", None)
+                    or []
+                )
+            if account_rows:
+                self.account_index = int(min(account_rows, key=lambda row: int(row.index)).index)
+                logger.info(f"Account index discovered from accounts_by_l1_address: {self.account_index}")
             else:
                 discovered = await self._discover_account_index_by_api_key()
                 if discovered is not None:
@@ -289,7 +330,7 @@ class LighterBot:
             result = await self._call_lighter_api(
                 self.account_api.apikeys,
                 account_index=int(account_index),
-                api_key_index=0,
+                api_key_index=int(self._api_key_index),
             )
             if result is None:
                 return False
@@ -317,11 +358,19 @@ class LighterBot:
         1) strict match against configured API public key
         2) loose fallback to first index with any api key slot present
         """
-        for idx in range(0, 16):
+        for idx in self._account_discovery_hints:
             ok = await self._validate_account_index(idx, require_pub_match=True)
             if ok:
                 return idx
-        for idx in range(0, 16):
+        for idx in range(0, self._account_discovery_scan_limit):
+            ok = await self._validate_account_index(idx, require_pub_match=True)
+            if ok:
+                return idx
+        for idx in self._account_discovery_hints:
+            ok = await self._validate_account_index(idx, require_pub_match=False)
+            if ok:
+                return idx
+        for idx in range(0, self._account_discovery_scan_limit):
             ok = await self._validate_account_index(idx, require_pub_match=False)
             if ok:
                 return idx
@@ -552,7 +601,8 @@ class LighterBot:
     async def _handle_signal(self, signal_data: Dict[str, Any]):
         """Handle incoming trading signal."""
         try:
-            signal = TradeSignal(**signal_data)
+            payload = self._sanitize_trade_signal_payload(signal_data)
+            signal = TradeSignal(**payload)
 
             if not signal.should_execute_on(PLATFORM.value):
                 return
@@ -590,6 +640,22 @@ class LighterBot:
 
         except Exception as e:
             logger.error(f"Signal handling error: {e}")
+
+    @staticmethod
+    def _sanitize_trade_signal_payload(signal_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Drop unknown keys so malformed debug payloads don't break signal handling."""
+        if not isinstance(signal_data, dict):
+            return {}
+        allowed = set(getattr(TradeSignal, "__dataclass_fields__", {}).keys())
+        payload = {key: value for key, value in signal_data.items() if key in allowed}
+        dropped = sorted(set(signal_data.keys()) - set(payload.keys()))
+        if dropped:
+            logger.warning(
+                "Ignoring unsupported signal keys on %s: %s",
+                PLATFORM.value,
+                ",".join(dropped),
+            )
+        return payload
 
     def _prune_processed_signals(self):
         now_ts = time.time()

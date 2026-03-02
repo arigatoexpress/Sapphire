@@ -14,7 +14,7 @@ from urllib.parse import urljoin
 
 import requests
 from firebase_admin import credentials, firestore, get_app, initialize_app
-from flask import Flask, render_template, jsonify, request, Response, make_response
+from flask import Flask, render_template, jsonify, request, Response, make_response, redirect
 
 app = Flask(__name__)
 
@@ -44,6 +44,7 @@ SYSTEM_LOGS_COLLECTION = os.environ.get('SYSTEM_LOGS_COLLECTION', 'system_logs')
 EDGE_CAPABILITIES_COLLECTION = os.environ.get('EDGE_CAPABILITIES_COLLECTION', 'edge_capabilities')
 LEARNING_OUTCOMES_COLLECTION = os.environ.get('LEARNING_OUTCOMES_COLLECTION', 'learning_outcomes')
 SUPERSWARM_ROLLUPS_COLLECTION = os.environ.get('SUPERSWARM_ROLLUPS_COLLECTION', 'superswarm_rollups')
+BUSINESS_BRIEFS_COLLECTION = os.environ.get('BUSINESS_BRIEFS_COLLECTION', 'platform_business_briefs')
 
 CRITICAL_EDGE_SERVICES = {
     item.strip() for item in os.environ.get(
@@ -178,6 +179,14 @@ PLATFORM_CONTRACTS = [
         'auth': 'basic_or_public',
         'category': 'core',
         'description': 'Single-call payload for homepage hydration.',
+    },
+    {
+        'name': 'business_brief',
+        'path': '/api/platform/business-brief',
+        'method': 'GET',
+        'auth': 'basic_or_public',
+        'category': 'core',
+        'description': 'Narrative business-state snapshot for public/client surfaces.',
     },
     {
         'name': 'logs',
@@ -758,7 +767,7 @@ def _get_monitor_snapshot():
         return {'available': False, 'error': str(exc)}
 
 
-def _build_readiness_payload(host_root: str):
+def _build_readiness_payload(host_root: str, include_business_brief_check: bool = True):
     """Compute production readiness gates from live APIs + monitor snapshot."""
     status_data = _collect_system_status()
     service_summary = status_data.get('summary', {})
@@ -799,6 +808,10 @@ def _build_readiness_payload(host_root: str):
         run_contract_check('/api/platform/windows-lab', _fetch_windows_lab_payload),
         run_contract_check('/api/platform/contracts', _platform_contracts_payload),
     ]
+    if include_business_brief_check:
+        contract_checks.append(
+            run_contract_check('/api/platform/business-brief', lambda: _platform_business_brief_payload(hours=24))
+        )
 
     contract_ok = all(check.get('healthy', False) for check in contract_checks)
     cloud_ok = service_summary.get('service_unhealthy', 1) == 0
@@ -1980,6 +1993,7 @@ def _platform_home_snapshot_payload():
         'readiness': lambda: _build_readiness_payload(host_root),
         'logs': lambda: _fetch_logs(limit=8, hours=24),
         'superswarm': lambda: _platform_superswarm_payload(hours=24),
+        'business_brief': lambda: _platform_business_brief_payload(hours=24),
     }
 
     results = {}
@@ -1999,10 +2013,171 @@ def _platform_home_snapshot_payload():
         'readiness': results.get('readiness', {}).get('data') or {'overall_ok': False, 'gates': {}},
         'logs': results.get('logs', {}).get('data') or {'logs': [], 'count': 0},
         'superswarm': results.get('superswarm', {}).get('data') or {'summary': {}, 'series': {}, 'breakdowns': {}},
+        'business_brief': results.get('business_brief', {}).get('data') or {'summary': {}, 'narrative': {}},
     }
 
     set_cache('platform_home_snapshot', payload)
     return payload
+
+
+def _build_business_brief_narrative(
+    *,
+    readiness_ok: bool,
+    services_healthy: int,
+    services_total: int,
+    projects_total: int,
+    projects_active: int,
+    workspaces: int,
+    signals: int,
+    executions: int,
+    pnl_total: float,
+    risk_state: str,
+) -> dict:
+    readiness_phrase = 'green' if readiness_ok else 'under watch'
+    headline = (
+        f"Sapphire platform is {readiness_phrase} with {services_healthy}/{services_total} services healthy, "
+        f"{projects_active}/{projects_total} active programs, and {executions} execution events in window."
+    )
+    operations = (
+        f"Operations span {workspaces} lanes with {signals} signal events and {executions} execution events "
+        f"over the current telemetry window."
+    )
+    delivery = (
+        f"Client delivery tracks {projects_total} programs, with {projects_active} currently active."
+    )
+    reliability = (
+        f"Core reliability is {services_healthy}/{services_total}; readiness is {'PASS' if readiness_ok else 'WATCH'} "
+        f"with risk posture {risk_state.upper()}."
+    )
+    performance = f"Window realized PnL: {round(float(pnl_total or 0.0), 6)}"
+    return {
+        'headline': headline,
+        'operations': operations,
+        'delivery': delivery,
+        'reliability': reliability,
+        'performance': performance,
+        'risk_state': risk_state,
+    }
+
+
+def _platform_business_brief_payload(hours: int = 24, force_refresh: bool = False):
+    safe_hours = max(6, min(int(hours or 24), 168))
+    cache_key = f'platform_business_brief_{safe_hours}'
+    cached = None if force_refresh else get_cached(cache_key, duration=30)
+    if cached:
+        return cached
+
+    status_data = _collect_system_status()
+    metrics = _platform_metrics_payload()
+    projects_payload = _fetch_projects_payload()
+    organization = _platform_organization_payload(refresh=False)
+    readiness = _build_readiness_payload(request.url_root, include_business_brief_check=False)
+    superswarm = _platform_superswarm_payload(hours=safe_hours, force_refresh=force_refresh)
+    logs_payload = _fetch_logs(hours=safe_hours, limit=max(120, safe_hours * 12), include_simulated=False)
+
+    summary = status_data.get('summary', {})
+    project_rows = projects_payload.get('projects', []) if isinstance(projects_payload, dict) else []
+    active_projects = sum(
+        1 for row in project_rows
+        if str((row or {}).get('status', '')).strip().lower() in ('active', 'in_progress')
+    )
+    blocked_projects = sum(
+        1 for row in project_rows
+        if str((row or {}).get('status', '')).strip().lower() == 'blocked'
+    )
+    logs = logs_payload.get('logs', []) if isinstance(logs_payload, dict) else []
+    warning_count = sum(
+        1 for row in logs
+        if str((row or {}).get('level', '')).strip().lower() in ('warn', 'warning', 'error')
+    )
+    health = (metrics or {}).get('health', {}) if isinstance(metrics, dict) else {}
+    optional_degraded = int(health.get('optional_degraded_count', 0) or 0)
+    readiness_ok = bool(readiness.get('overall_ok', False))
+    service_unhealthy = int(summary.get('service_unhealthy', 0) or 0)
+    risk_state = 'stable'
+    if not readiness_ok or service_unhealthy > 0:
+        risk_state = 'watch'
+    elif blocked_projects > 0 or optional_degraded > 0 or warning_count > 0:
+        risk_state = 'attention'
+
+    superswarm_summary = (superswarm or {}).get('summary', {}) if isinstance(superswarm, dict) else {}
+    services_healthy = int(summary.get('service_healthy', 0) or 0)
+    services_total = int(summary.get('service_total', 0) or 0)
+    projects_total = int(len(project_rows))
+    workspaces = int((organization.get('summary') or {}).get('workspaces', 0) or 0)
+    signals = int(superswarm_summary.get('signals', 0) or 0)
+    executions = int(superswarm_summary.get('executions', 0) or 0)
+    pnl_total = float(superswarm_summary.get('pnl_total', 0.0) or 0.0)
+
+    payload = {
+        'timestamp': datetime.utcnow().isoformat(),
+        'window_hours': safe_hours,
+        'summary': {
+            'services_healthy': services_healthy,
+            'services_total': services_total,
+            'services_unhealthy': int(summary.get('service_unhealthy', 0) or 0),
+            'nodes_healthy': int(summary.get('node_healthy', 0) or 0),
+            'nodes_total': int(summary.get('node_total', 0) or 0),
+            'projects_total': projects_total,
+            'projects_active': active_projects,
+            'projects_blocked': blocked_projects,
+            'workspaces': workspaces,
+            'signals': signals,
+            'executions': executions,
+            'pnl_total': round(pnl_total, 6),
+            'optional_degraded': optional_degraded,
+            'warning_events': warning_count,
+            'readiness_ok': readiness_ok,
+            'risk_state': risk_state,
+        },
+        'narrative': _build_business_brief_narrative(
+            readiness_ok=readiness_ok,
+            services_healthy=services_healthy,
+            services_total=services_total,
+            projects_total=projects_total,
+            projects_active=active_projects,
+            workspaces=workspaces,
+            signals=signals,
+            executions=executions,
+            pnl_total=pnl_total,
+            risk_state=risk_state,
+        ),
+        'sources': {
+            'status': 'api/platform/status',
+            'metrics': 'api/platform/metrics',
+            'projects': 'api/platform/projects',
+            'organization': 'api/platform/organization',
+            'readiness': 'api/platform/readiness',
+            'superswarm': 'api/platform/superswarm',
+            'logs': 'api/platform/logs',
+        },
+        'generated_at': datetime.utcnow().isoformat(),
+    }
+    set_cache(cache_key, payload)
+    return payload
+
+
+def _persist_business_brief(payload: dict):
+    if db is None:
+        return {'written': False, 'error': 'firestore_unavailable'}
+    try:
+        now_iso = datetime.utcnow().isoformat()
+        current_ref = db.collection(BUSINESS_BRIEFS_COLLECTION).document('current')
+        current_ref.set({**payload, 'updated_at': now_iso}, merge=True)
+        point_id = now_iso.replace(':', '-').replace('.', '-')
+        db.collection(BUSINESS_BRIEFS_COLLECTION).document(point_id).set(
+            {
+                'timestamp': now_iso,
+                'window_hours': payload.get('window_hours', 24),
+                'summary': payload.get('summary', {}),
+                'narrative': payload.get('narrative', {}),
+                'sources': payload.get('sources', {}),
+            },
+            merge=True,
+        )
+        return {'written': True, 'timestamp': now_iso}
+    except Exception as exc:
+        return {'written': False, 'error': str(exc)}
 
 
 def _build_experiment_backlog(
@@ -2500,6 +2675,7 @@ def _platform_contracts_payload():
         'aliases': {
             '/api/status': '/api/platform/status',
             '/api/trading/metrics': '/api/platform/metrics',
+            '/api/business-brief': '/api/platform/business-brief',
             '/api/logs': '/api/platform/logs',
             '/api/trades': '/api/platform/trades',
             '/api/organization': '/api/platform/organization',
@@ -2533,64 +2709,34 @@ def index():
     return render_template('pages/overview.html', current_page='overview', page_title='Sapphire Overview')
 
 
-@app.route('/trading')
-@requires_auth
-def trading():
-    return render_template('pages/trading.html', current_page='trading', page_title='Market Intelligence')
-
-
-@app.route('/feed')
-@requires_auth
-def feed():
-    return render_template('pages/feed.html', current_page='feed', page_title='Intelligence Feed')
-
-
-@app.route('/autonomy')
-@requires_auth
-def autonomy():
-    return render_template('pages/autonomy.html', current_page='autonomy', page_title='Autonomy Lab')
-
-
-@app.route('/command-deck')
-@requires_auth
-def command_deck():
-    return render_template('pages/command_deck.html', current_page='command-deck', page_title='Command Deck')
-
-
-@app.route('/system-health')
-@requires_auth
-def system_health():
-    return render_template('pages/health.html', current_page='health', page_title='Platform Status')
-
-
-@app.route('/logs')
-@requires_auth
-def logs():
-    return render_template('pages/logs.html', current_page='logs', page_title='Activity Highlights')
-
-
-@app.route('/projects')
-@requires_auth
-def projects():
-    return render_template('pages/projects.html', current_page='projects', page_title='Client Programs')
-
-
 @app.route('/organization')
 @requires_auth
 def organization():
-    return render_template('pages/organization.html', current_page='organization', page_title='Organization')
+    return render_template('pages/organization.html', current_page='organization', page_title='Organization & Programs')
 
 
-@app.route('/production-readiness')
+@app.route('/intelligence')
 @requires_auth
-def production_readiness():
-    return render_template('pages/production_readiness.html', current_page='production', page_title='Operational Readiness')
+def intelligence():
+    return render_template('pages/intelligence.html', current_page='intelligence', page_title='Market & Intelligence')
 
 
-@app.route('/infrastructure')
+@app.route('/platform')
 @requires_auth
-def infrastructure():
-    return render_template('pages/infrastructure.html', current_page='infrastructure', page_title='Technology Infrastructure')
+def platform():
+    return render_template('pages/platform.html', current_page='platform', page_title='Platform Reliability')
+
+
+@app.route('/activity')
+@requires_auth
+def activity():
+    return render_template('pages/activity.html', current_page='activity', page_title='Activity Stream')
+
+
+@app.route('/sapphire-book')
+@requires_auth
+def sapphire_book():
+    return render_template('pages/sapphire_book.html', current_page='sapphire-book', page_title='Sapphire Book')
 
 
 @app.route('/settings')
@@ -2599,10 +2745,59 @@ def settings():
     return render_template('pages/settings.html', current_page='settings', page_title='Security Policy')
 
 
-@app.route('/sapphire-book')
+# Legacy page routes -> consolidated IA
+@app.route('/trading')
 @requires_auth
-def sapphire_book():
-    return render_template('pages/sapphire_book.html', current_page='sapphire-book', page_title='Sapphire Book')
+def trading_legacy():
+    return redirect('/intelligence', code=302)
+
+
+@app.route('/feed')
+@requires_auth
+def feed_legacy():
+    return redirect('/intelligence', code=302)
+
+
+@app.route('/autonomy')
+@requires_auth
+def autonomy_legacy():
+    return redirect('/platform', code=302)
+
+
+@app.route('/command-deck')
+@requires_auth
+def command_deck_legacy():
+    return redirect('/platform', code=302)
+
+
+@app.route('/system-health')
+@requires_auth
+def system_health_legacy():
+    return redirect('/platform', code=302)
+
+
+@app.route('/logs')
+@requires_auth
+def logs_legacy():
+    return redirect('/activity', code=302)
+
+
+@app.route('/projects')
+@requires_auth
+def projects_legacy():
+    return redirect('/organization#programs', code=302)
+
+
+@app.route('/production-readiness')
+@requires_auth
+def production_readiness_legacy():
+    return redirect('/platform', code=302)
+
+
+@app.route('/infrastructure')
+@requires_auth
+def infrastructure_legacy():
+    return redirect('/platform', code=302)
 
 
 @app.route('/ping')
@@ -2657,6 +2852,14 @@ def api_platform_autonomy():
 @requires_auth
 def api_platform_home_snapshot():
     return jsonify(_platform_home_snapshot_payload())
+
+
+@app.route('/api/platform/business-brief')
+@requires_auth
+def api_platform_business_brief():
+    hours = request.args.get('hours', 24, type=int)
+    refresh = request.args.get('refresh', 'false', type=str).lower() == 'true'
+    return jsonify(_platform_business_brief_payload(hours=hours, force_refresh=refresh))
 
 
 @app.route('/api/platform/logs')
@@ -2796,6 +2999,12 @@ def api_trading_metrics():
     return _deprecated_alias_response(jsonify(_platform_metrics_payload().get('trading', {})), '/api/platform/metrics')
 
 
+@app.route('/api/business-brief')
+@requires_auth
+def api_business_brief():
+    return _deprecated_alias_response(api_platform_business_brief(), '/api/platform/business-brief')
+
+
 @app.route('/api/trades')
 @requires_auth
 def api_trades():
@@ -2849,6 +3058,31 @@ def job_superswarm_hourly_rollup():
             'rollup': persist,
             'superswarm_summary': superswarm.get('summary', {}),
             'analysis_summary': (superswarm.get('analysis') or {}).get('learning_summary', {}),
+        }
+    ), 200 if persist.get('written', False) else 500
+
+
+@app.route('/jobs/platform/hourly-brief', methods=['POST', 'GET'])
+@requires_control_token
+def job_platform_hourly_brief():
+    payload = request.get_json(silent=True) if request.method == 'POST' else {}
+    if not isinstance(payload, dict):
+        payload = {}
+
+    hours = request.args.get('hours', payload.get('hours', 24), type=int)
+    hours = max(6, min(int(hours or 24), 168))
+
+    brief = _platform_business_brief_payload(hours=hours, force_refresh=True)
+    persist = _persist_business_brief(brief)
+
+    return jsonify(
+        {
+            'ok': bool(persist.get('written', False)),
+            'timestamp': datetime.utcnow().isoformat(),
+            'window_hours': hours,
+            'rollup': persist,
+            'brief_summary': brief.get('summary', {}),
+            'brief_narrative': brief.get('narrative', {}),
         }
     ), 200 if persist.get('written', False) else 500
 

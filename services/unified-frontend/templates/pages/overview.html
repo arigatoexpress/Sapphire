@@ -662,12 +662,15 @@
         }
     }
 
-    function renderClientOverviewBrief(status, metrics, projectsData, orgData, readiness, logsData, superswarmData) {
+    function renderClientOverviewBrief(status, metrics, projectsData, orgData, readiness, logsData, superswarmData, businessBrief) {
         const summaryEl = document.getElementById('overview-client-summary');
         const healthEl = document.getElementById('overview-client-health');
         const programsEl = document.getElementById('overview-client-programs');
         const readinessEl = document.getElementById('overview-client-readiness');
         if (!summaryEl || !healthEl || !programsEl || !readinessEl) return;
+
+        const briefSummary = (businessBrief && businessBrief.summary) || {};
+        const briefNarrative = (businessBrief && businessBrief.narrative) || {};
 
         const services = status.services || {};
         const serviceValues = Object.values(services);
@@ -681,12 +684,23 @@
         const activityCount = (logsData.logs || []).length;
         const readinessState = readiness.overall_ok ? 'PASS' : 'WATCH';
 
-        healthEl.textContent = `${healthyCount}/${totalCount || 0}`;
-        programsEl.textContent = `${activeProjects}/${projects.length || 0}`;
+        const displayHealthy = Number(briefSummary.services_healthy ?? healthyCount);
+        const displayTotal = Number(briefSummary.services_total ?? totalCount);
+        const displayActive = Number(briefSummary.projects_active ?? activeProjects);
+        const displayProjectsTotal = Number(briefSummary.projects_total ?? projects.length);
+        const displayReadiness = briefSummary.readiness_ok === true ? 'PASS' : (briefSummary.readiness_ok === false ? 'WATCH' : readinessState);
+
+        healthEl.textContent = `${displayHealthy}/${displayTotal || 0}`;
+        programsEl.textContent = `${displayActive}/${displayProjectsTotal || 0}`;
         readinessEl.textContent = readinessState;
         readinessEl.style.color = readiness.overall_ok ? 'var(--success)' : 'var(--warning)';
+        if (displayReadiness !== readinessState) {
+            readinessEl.textContent = displayReadiness;
+            readinessEl.style.color = displayReadiness === 'PASS' ? 'var(--success)' : 'var(--warning)';
+        }
 
-        summaryEl.textContent = `Sapphire currently runs ${summary.workspaces || 0} operational lanes with ${activeProjects} active programs out of ${projects.length || 0} tracked. Platform health is ${healthyCount}/${totalCount || 0} services healthy, with ${signalEvents} signal events, ${executionEvents} execution events, and ${activityCount} recent activity logs in the current telemetry window.`;
+        summaryEl.textContent = briefNarrative.headline
+            || `Sapphire currently runs ${summary.workspaces || 0} operational lanes with ${activeProjects} active programs out of ${projects.length || 0} tracked. Platform health is ${healthyCount}/${totalCount || 0} services healthy, with ${signalEvents} signal events, ${executionEvents} execution events, and ${activityCount} recent activity logs in the current telemetry window.`;
     }
 
     function statusPill(status) {
@@ -937,6 +951,7 @@
             readiness: { overall_ok: false, gates: {} },
             logs: { logs: [] },
             superswarm: { summary: {}, series: {}, breakdowns: {}, loop: {}, window_hours: 24 },
+            business_brief: { summary: {}, narrative: {} },
         };
 
         let status = defaults.status;
@@ -946,6 +961,7 @@
         let readiness = defaults.readiness;
         let logsData = defaults.logs;
         let superswarmData = defaults.superswarm;
+        let businessBriefData = defaults.business_brief;
 
         try {
             const snapshot = await window.platformApi.getHomeSnapshot();
@@ -956,9 +972,10 @@
             readiness = snapshot.readiness || defaults.readiness;
             logsData = snapshot.logs || defaults.logs;
             superswarmData = snapshot.superswarm || defaults.superswarm;
+            businessBriefData = snapshot.business_brief || defaults.business_brief;
         } catch (snapshotError) {
             console.warn('home-snapshot failed, using direct endpoint fallback', snapshotError);
-            const [statusRes, metricsRes, projectsRes, orgRes, readinessRes, logsRes, superswarmRes] = await Promise.allSettled([
+            const [statusRes, metricsRes, projectsRes, orgRes, readinessRes, logsRes, superswarmRes, businessBriefRes] = await Promise.allSettled([
                 window.platformApi.getStatus(),
                 window.platformApi.getMetrics(),
                 window.platformApi.getProjects(),
@@ -966,6 +983,7 @@
                 window.platformApi.getReadiness(),
                 window.platformApi.getLogs({ limit: 8, hours: 24 }),
                 window.platformApi.getSuperswarm({ hours: 24 }),
+                window.platformApi.getBusinessBrief({ hours: 24 }),
             ]);
 
             if (statusRes.status === 'fulfilled') status = statusRes.value || defaults.status;
@@ -975,6 +993,7 @@
             if (readinessRes.status === 'fulfilled') readiness = readinessRes.value || defaults.readiness;
             if (logsRes.status === 'fulfilled') logsData = logsRes.value || defaults.logs;
             if (superswarmRes.status === 'fulfilled') superswarmData = superswarmRes.value || defaults.superswarm;
+            if (businessBriefRes.status === 'fulfilled') businessBriefData = businessBriefRes.value || defaults.business_brief;
         }
 
         try {
@@ -1070,7 +1089,7 @@
                 <span class="overview-chip"><i class="fas fa-clock"></i> Snapshot ${fmtTime(health.timestamp || readiness.timestamp)}</span>
             `;
 
-            renderClientOverviewBrief(status, metrics, projectsData, orgData, readiness, logsData, superswarmData);
+            renderClientOverviewBrief(status, metrics, projectsData, orgData, readiness, logsData, superswarmData, businessBriefData);
             renderSuperswarmVisuals(superswarmData);
             renderStoryline(status, metrics, projectsData, orgData, readiness, logsData, superswarmData);
         } catch (error) {

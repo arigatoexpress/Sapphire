@@ -9,6 +9,7 @@ ALLOWLIST=(
   "agentic-pm-hub-autonomy-15m"
   "agentic-pm-hub-assistant-checkin-30m"
   "bis-automation-job"
+  "sapphire-platform-brief-hourly"
   "sapphire-superswarm-rollup-hourly"
   "weekly-self-improvement"
   "sapphire-gateway-health-6h"

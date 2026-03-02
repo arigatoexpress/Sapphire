@@ -91,6 +91,16 @@ VALID_TV_ACTIONS = {
     "exit_short",
 }
 
+_ALLOWED_TRADE_EXECUTION_PLATFORMS = {
+    value.strip().lower()
+    for value in os.getenv(
+        "TRADE_EXECUTION_ALLOWED_PLATFORMS",
+        "aster,lighter",
+    ).split(",")
+    if value.strip()
+}
+_ALLOWED_TRADE_EXECUTION_SIDES = {"BUY", "SELL", "LONG", "SHORT", "CLOSE"}
+
 
 class ServiceState:
     """Shared state for aggregated platform data."""
@@ -414,6 +424,24 @@ def _build_trade_execution_event(data: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _validate_trade_execution_event(event: Dict[str, Any]) -> tuple[bool, str]:
+    platform = str(event.get("platform", "")).strip().lower()
+    symbol = str(event.get("symbol", "")).strip().upper()
+    side = str(event.get("side", "")).strip().upper()
+
+    if platform in {"", "unknown"}:
+        return False, "invalid_platform"
+    if _ALLOWED_TRADE_EXECUTION_PLATFORMS and platform not in _ALLOWED_TRADE_EXECUTION_PLATFORMS:
+        return False, f"unsupported_platform:{platform}"
+    if symbol in {"", "UNKNOWN", "NONE"}:
+        return False, "invalid_symbol"
+    if side in {"", "UNKNOWN", "NONE"}:
+        return False, "invalid_side"
+    if side not in _ALLOWED_TRADE_EXECUTION_SIDES:
+        return False, f"unsupported_side:{side}"
+    return True, ""
+
+
 def _compute_window_metrics(client: Any) -> Dict[str, Any]:
     now = datetime.now(timezone.utc)
     day_start = now - timedelta(hours=24)
@@ -527,6 +555,14 @@ def _record_trade_execution(data: Dict[str, Any]) -> Dict[str, Any]:
     trade_id = str(event.get("trade_id", "")).strip()
     if not trade_id:
         return {"stored": False, "reason": "invalid_trade_id", "event": event}
+    valid, invalid_reason = _validate_trade_execution_event(event)
+    if not valid:
+        return {
+            "stored": False,
+            "invalid": True,
+            "reason": invalid_reason,
+            "event": event,
+        }
 
     try:
         client.collection(TRADE_EXECUTIONS_COLLECTION).document(trade_id).create(event)
@@ -721,6 +757,18 @@ async def handle_trade_executed(data: Dict[str, Any]):
         )
     elif persist_result.get("duplicate"):
         logger.info("Duplicate trade execution ignored: %s", event.get("trade_id"))
+    elif persist_result.get("invalid"):
+        logger.warning(
+            "Ignored malformed trade execution event: reason=%s payload=%s",
+            persist_result.get("reason"),
+            {
+                "trade_id": event.get("trade_id"),
+                "signal_id": event.get("signal_id"),
+                "platform": event.get("platform"),
+                "symbol": event.get("symbol"),
+                "side": event.get("side"),
+            },
+        )
     elif persist_result.get("error"):
         logger.warning("Trade execution persistence failed: %s", persist_result.get("error"))
 

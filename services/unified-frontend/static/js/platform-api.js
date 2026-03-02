@@ -50,6 +50,9 @@
     getHomeSnapshot() {
       return request('/api/platform/home-snapshot');
     },
+    getBusinessBrief(params) {
+      return request(withParams('/api/platform/business-brief', params));
+    },
     getLogs(params) {
       return request(withParams('/api/platform/logs', params));
     },

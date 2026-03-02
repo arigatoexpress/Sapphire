@@ -33,6 +33,16 @@ from typing import Any
 # Configuration
 DAEMON_STATE_FILE = Path("/home/rari/.openclaw/runtime/codex-projects/output/trading-daemon/daemon_state.json")
 KIMI_BIN = os.getenv("KIMI_BIN", "/home/rari/.local/bin/kimi")
+GATEWAY_SIGNAL_URL = os.getenv(
+    "SAPPHIRE_GATEWAY_SIGNAL_URL",
+    "https://sapphire-gateway-267358751314.us-central1.run.app/api/signals/create",
+).strip()
+KNOWN_TRADE_PLATFORMS = {"aster", "lighter", "both"}
+ENV_FILES = [
+    Path("/home/rari/kimi-claw/.env"),
+    Path("/home/rari/kimi-claw-v2/.env"),
+    Path("/home/rari/.openclaw/trading_api/.env"),
+]
 
 
 def _load_env_value(key: str, files: list[Path]) -> str:
@@ -59,8 +69,10 @@ def _load_env_value(key: str, files: list[Path]) -> str:
 
 BOT_TOKEN = _load_env_value(
     "TELEGRAM_BOT_TOKEN",
-    [Path("/home/rari/kimi-claw/.env"), Path("/home/rari/kimi-claw-v2/.env")],
+    ENV_FILES,
 )
+
+CONTROL_API_TOKEN = _load_env_value("SAPPHIRE_CONTROL_API_TOKEN", ENV_FILES)
 
 if not BOT_TOKEN:
     print("ERROR: TELEGRAM_BOT_TOKEN is not configured")
@@ -126,28 +138,51 @@ def update_daemon_state(updates: dict) -> bool:
         print(f"Error updating state: {e}")
         return False
 
-def execute_trade(symbol: str, side: str, size: float) -> dict:
-    """Execute a trade via the trading bridge."""
-    import subprocess
-    
-    signal = json.dumps({"symbol": symbol, "side": side, "size": size})
-    cmd = [
-        "python3",
-        "/home/rari/.openclaw/runtime/codex-projects/scripts/tradingview_aster_bridge_live.py",
-        "--test-signal", signal,
-        "--live",
-    ]
-    
+def execute_trade(platform: str, symbol: str, side: str, size: float) -> dict:
+    """Execute a manual trade by publishing a signal through the canonical gateway."""
+    if not CONTROL_API_TOKEN:
+        return {"success": False, "error": "SAPPHIRE_CONTROL_API_TOKEN missing on Pi env"}
+
+    target_platforms = (
+        ["aster", "lighter"] if platform == "both" else [platform]
+    )
+    payload = {
+        "symbol": str(symbol or "").upper(),
+        "side": str(side or "").upper(),
+        "signal_type": "entry",
+        "confidence": 0.95,
+        "target_platforms": target_platforms,
+        "quantity": float(size),
+    }
+
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-        if proc.returncode == 0:
-            try:
-                return json.loads(proc.stdout)
-            except:
-                return {"success": True, "raw": proc.stdout}
-        return {"success": False, "error": proc.stderr}
+        req = urllib.request.Request(
+            GATEWAY_SIGNAL_URL,
+            data=json.dumps(payload).encode(),
+            headers={
+                "Content-Type": "application/json",
+                "X-Sapphire-Control-Token": CONTROL_API_TOKEN,
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            body = json.loads(resp.read().decode() or "{}")
+            body["success"] = True
+            body["platforms"] = target_platforms
+            return body
+    except urllib.error.HTTPError as e:
+        try:
+            detail = json.loads(e.read().decode() or "{}")
+        except Exception:
+            detail = {"detail": str(e)}
+        return {
+            "success": False,
+            "error": f"Gateway HTTP {e.code}",
+            "detail": detail,
+            "platforms": target_platforms,
+        }
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": str(e), "platforms": target_platforms}
 
 
 def query_kimi(prompt: str, timeout: int = 90) -> str:
@@ -194,8 +229,9 @@ def handle_command(message: dict) -> str:
             "/status - Check system status\n"
             "/pause - Pause trading\n"
             "/resume - Resume trading\n"
-            "/trade SYMBOL SIDE SIZE - Execute trade\n"
-            "   Example: /trade BTC-USDC buy 0.001\n"
+            "/trade [PLATFORM] SYMBOL SIDE SIZE - Execute trade\n"
+            "   Example: /trade aster SOLUSDT buy 0.05\n"
+            "   Example: /trade lighter BTCUSDT sell 0.01\n"
             "/mode - Check trading mode\n"
             "/stats - Show statistics\n"
             "/help - Show this help\n\n"
@@ -209,8 +245,9 @@ def handle_command(message: dict) -> str:
             "⏸️ <b>/pause</b> - Pause all trading\n"
             "▶️ <b>/resume</b> - Resume trading\n"
             "💰 <b>/trade</b> - Execute manual trade\n"
-            "   Usage: /trade SYMBOL SIDE SIZE\n"
-            "   Example: /trade BTC-USDC buy 0.001\n"
+            "   Usage: /trade [platform] SYMBOL SIDE SIZE\n"
+            "   Platforms: aster | lighter | both (default: aster)\n"
+            "   Example: /trade aster SOLUSDT buy 0.05\n"
             "🎮 <b>/mode</b> - Check live/paper mode\n"
             "📈 <b>/stats</b> - Show trade statistics\n"
             "💬 <b>plain text</b> - Ask Kimi directly\n"
@@ -261,39 +298,64 @@ def handle_command(message: dict) -> str:
         if len(args) < 3:
             return (
                 "❌ <b>Invalid Trade Command</b>\n\n"
-                "Usage: /trade SYMBOL SIDE SIZE\n"
-                "Example: /trade BTC-USDC buy 0.001"
+                "Usage: /trade [platform] SYMBOL SIDE SIZE\n"
+                "Platforms: aster | lighter | both\n"
+                "Example: /trade aster SOLUSDT buy 0.05"
             )
-        
-        symbol = args[0].upper()
-        side = args[1].lower()
+
+        platform = "aster"
+        symbol_idx = 0
+        if args and args[0].lower() in KNOWN_TRADE_PLATFORMS:
+            platform = args[0].lower()
+            symbol_idx = 1
+
+        if len(args) - symbol_idx < 3:
+            return (
+                "❌ <b>Invalid Trade Command</b>\n\n"
+                "Usage: /trade [platform] SYMBOL SIDE SIZE\n"
+                "Example: /trade lighter BTCUSDT sell 0.01"
+            )
+
+        symbol = args[symbol_idx].upper()
+        side = args[symbol_idx + 1].lower()
         try:
-            size = float(args[2])
+            size = float(args[symbol_idx + 2])
         except ValueError:
             return "❌ Size must be a number"
-        
+
         if side not in ["buy", "sell"]:
             return "❌ Side must be 'buy' or 'sell'"
-        
-        # Send processing message
-        send_message(chat_id, f"⏳ Executing {side.upper()} {size} {symbol}...")
-        
-        # Execute trade
-        result = execute_trade(symbol, side, size)
-        
+        if size <= 0:
+            return "❌ Size must be > 0"
+
+        send_message(
+            chat_id,
+            f"⏳ Dispatching {side.upper()} {size} {symbol} on {platform.upper()} via gateway...",
+            parse_mode=None,
+        )
+
+        result = execute_trade(platform, symbol, side, size)
+
         if result.get("success"):
-            is_live = not result.get("paper", True)
-            emoji = "🚀" if is_live else "📄"
+            signal_id = result.get("signal_id", "n/a")
+            message_id = result.get("message_id", "n/a")
+            platforms = ", ".join([p.upper() for p in result.get("platforms", [])]) or platform.upper()
             return (
-                f"{emoji} <b>Trade Executed!</b>\n\n"
+                f"🚀 <b>Manual Trade Signal Published</b>\n\n"
                 f"Symbol: {symbol}\n"
                 f"Side: {side.upper()}\n"
                 f"Size: {size}\n"
-                f"Mode: {'LIVE' if is_live else 'PAPER'}"
+                f"Platforms: {platforms}\n"
+                f"Signal ID: <code>{signal_id}</code>\n"
+                f"Message ID: <code>{message_id}</code>"
             )
         else:
-            error = result.get("error", "Unknown error")
-            return f"❌ <b>Trade Failed</b>\n\nError: {error[:200]}"
+            error = str(result.get("error", "Unknown error"))
+            detail = result.get("detail")
+            detail_text = ""
+            if isinstance(detail, dict) and detail.get("detail"):
+                detail_text = f"\nDetail: {str(detail.get('detail'))[:220]}"
+            return f"❌ <b>Trade Dispatch Failed</b>\n\nError: {error[:200]}{detail_text}"
     
     else:
         return f"❓ Unknown command: {command}\nUse /help for available commands"
