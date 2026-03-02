@@ -3087,6 +3087,198 @@ def job_platform_hourly_brief():
     ), 200 if persist.get('written', False) else 500
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# Terminal Commands (from Command Deck v3.0)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+TERMINAL_COMMANDS = {
+    'help': {
+        'output': '''Available commands:
+  status     - Show unified system status
+  nodes      - List all infrastructure nodes
+  metrics    - Show trading metrics
+  pm         - Show PM dashboard summary
+  logs       - Show recent log summary
+  prices     - Show current market prices
+  health     - Show platform health summary
+  clear      - Clear terminal
+  help       - Show this help''',
+        'type': 'info'
+    },
+    'clear': {'output': '', 'type': 'clear'}
+}
+
+
+def _terminal_status_command():
+    """Get live status for terminal"""
+    try:
+        status = _collect_system_status()
+        by_cat = status.get('by_category', {})
+        cloud = by_cat.get('cloud', [])
+        pi = by_cat.get('pi', [])
+        
+        cloud_healthy = sum(1 for s in cloud if s.get('healthy'))
+        pi_healthy = sum(1 for s in pi if s.get('healthy'))
+        
+        # Get PM data
+        pm = _fetch_projects_payload()
+        pm_count = pm.get('count', 0)
+        
+        output = f'''System Status:
+  Cloud Services: {cloud_healthy}/{len(cloud)} healthy
+  Pi Services: {pi_healthy}/{len(pi)} healthy
+  PM Projects: {pm_count}
+  Timestamp: {datetime.utcnow().strftime('%H:%M:%S UTC')}'''
+        
+        return {'output': output, 'type': 'success'}
+    except Exception as e:
+        return {'output': f'Error fetching status: {e}', 'type': 'error'}
+
+
+def _terminal_nodes_command():
+    """Get live nodes for terminal"""
+    try:
+        status = _collect_system_status()
+        nodes = status.get('nodes', {})
+        
+        lines = ['Network Nodes:']
+        for name, node in nodes.items():
+            healthy = node.get('healthy', False)
+            status_str = 'ONLINE' if healthy else 'OFFLINE'
+            ip = node.get('ip', 'unknown')
+            lines.append(f"  [{status_str}] {name.upper()} - {ip}")
+        
+        return {'output': '\n'.join(lines), 'type': 'info'}
+    except Exception as e:
+        return {'output': f'Error fetching nodes: {e}', 'type': 'error'}
+
+
+def _terminal_metrics_command():
+    """Get trading metrics for terminal"""
+    try:
+        payload = _platform_metrics_payload()
+        perf = payload.get('performance', {})
+        
+        output = f'''Trading Metrics:
+  24h PnL: {perf.get('pnl_24h', 0):.2f}%
+  Win Rate: {perf.get('win_rate', 0):.1f}%
+  Active Signals: {perf.get('active_signals', 0)}
+  Latency: {perf.get('latency_ms', 0)}ms'''
+        
+        return {'output': output, 'type': 'success'}
+    except Exception as e:
+        return {'output': f'Error fetching metrics: {e}', 'type': 'error'}
+
+
+def _terminal_pm_command():
+    """Get PM summary for terminal"""
+    try:
+        pm = _fetch_projects_payload()
+        projects = pm.get('projects', [])
+        
+        active = sum(1 for p in projects if p.get('status') == 'active')
+        blocked = sum(1 for p in projects if p.get('status') == 'blocked')
+        
+        output = f'''PM Dashboard:
+  Total Projects: {len(projects)}
+  Active: {active}
+  Blocked: {blocked}
+  Source: {pm.get('source', 'unknown')}'''
+        
+        return {'output': output, 'type': 'success'}
+    except Exception as e:
+        return {'output': f'Error fetching PM data: {e}', 'type': 'error'}
+
+
+def _terminal_prices_command():
+    """Get market prices for terminal"""
+    try:
+        prices = _fetch_market_prices()
+        
+        output = f'''Market Prices:
+  BTC: ${prices.get('BTC', {}).get('price', 0):,.0f} ({prices.get('BTC', {}).get('change', 0):+.2f}%)
+  ETH: ${prices.get('ETH', {}).get('price', 0):,.0f} ({prices.get('ETH', {}).get('change', 0):+.2f}%)
+  SOL: ${prices.get('SOL', {}).get('price', 0):,.0f} ({prices.get('SOL', {}).get('change', 0):+.2f}%)
+  HYPE: ${prices.get('HYPE', {}).get('price', 0):,.0f} ({prices.get('HYPE', {}).get('change', 0):+.2f}%)'''
+        
+        return {'output': output, 'type': 'success'}
+    except Exception as e:
+        return {'output': f'Error fetching prices: {e}', 'type': 'error'}
+
+
+def _terminal_health_command():
+    """Get health summary for terminal"""
+    try:
+        status = _collect_system_status()
+        summary = _platform_health_summary(status)
+        
+        overall = summary.get('overall', {})
+        healthy_count = overall.get('healthy_count', 0)
+        total_count = overall.get('total_count', 0)
+        
+        output = f'''Health Summary:
+  Status: {overall.get('status', 'unknown').upper()}
+  Healthy: {healthy_count}/{total_count}
+  Degraded: {overall.get('degraded_count', 0)}
+  Unhealthy: {overall.get('unhealthy_count', 0)}'''
+        
+        return {'output': output, 'type': 'success'}
+    except Exception as e:
+        return {'output': f'Error fetching health: {e}', 'type': 'error'}
+
+
+def _terminal_logs_command():
+    """Get logs summary for terminal"""
+    try:
+        # Fetch recent logs
+        logs_url = _join_url(GATEWAY_URL, '/api/v1/logs')
+        resp = requests.get(logs_url, params={'limit': '5'}, timeout=3)
+        
+        if resp.status_code == 200:
+            data = resp.json()
+            logs = data.get('logs', [])
+            return {'output': f'Recent logs: {len(logs)} entries fetched\nUse /api/logs for full details', 'type': 'info'}
+        else:
+            return {'output': f'Logs unavailable (HTTP {resp.status_code})', 'type': 'warning'}
+    except Exception as e:
+        return {'output': f'Error fetching logs: {e}', 'type': 'error'}
+
+
+@app.route('/api/terminal', methods=['POST'])
+@requires_auth
+def api_terminal():
+    """Execute terminal commands with live data (from Command Deck v3.0)"""
+    data = request.get_json(silent=True) or {}
+    command = str(data.get('command', '')).strip().lower()
+    
+    # Static commands
+    if command in TERMINAL_COMMANDS:
+        return jsonify(TERMINAL_COMMANDS[command])
+    
+    # Live data commands
+    handlers = {
+        'status': _terminal_status_command,
+        'nodes': _terminal_nodes_command,
+        'metrics': _terminal_metrics_command,
+        'pm': _terminal_pm_command,
+        'prices': _terminal_prices_command,
+        'health': _terminal_health_command,
+        'logs': _terminal_logs_command,
+    }
+    
+    if command in handlers:
+        return jsonify(handlers[command]())
+    else:
+        return jsonify({
+            'output': f"Command not found: {command}. Type 'help' for available commands.",
+            'type': 'error'
+        })
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Main Entry Point
+# ═══════════════════════════════════════════════════════════════════════════════
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port, debug=False)
