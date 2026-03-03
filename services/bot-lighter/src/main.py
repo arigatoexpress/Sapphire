@@ -22,7 +22,7 @@ try:
     env_path = Path(__file__).parent.parent / ".env"
     if env_path.exists():
         from dotenv import load_dotenv
-        load_dotenv(env_path)
+        load_dotenv(env_path, override=True)
         print(f"[INIT] Loaded environment from {env_path}")
 except ImportError:
     pass  # python-dotenv not installed, rely on system env
@@ -44,6 +44,8 @@ try:
         TradeSide,
         TradeSignal,
     )
+    from shared.circuit_breaker import CircuitBreaker, CircuitBreakerOpen
+    from shared.execution_idempotency import ExecutionIdempotency
 except ImportError:
     from pubsub import get_pubsub_client, publish, subscribe
     from utils import ServiceConfig, format_percent, format_price, setup_logging, utc_now
@@ -56,6 +58,8 @@ except ImportError:
         TradeSide,
         TradeSignal,
     )
+    from circuit_breaker import CircuitBreaker, CircuitBreakerOpen
+    from execution_idempotency import ExecutionIdempotency
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +76,25 @@ try:
     import lighter
     LIGHTER_SDK_AVAILABLE = True
     logger.info("Lighter SDK loaded")
+    # ── ARM64 signer patch ────────────────────────────────────────────────
+    # Lighter SDK ≤1.0.0 checks machine() == "arm64" but Raspberry Pi (aarch64)
+    # reports "aarch64".  Monkeypatch __get_shared_library so the correct .so
+    # is loaded without modifying the installed package files (survives upgrades).
+    import platform as _plat
+    if _plat.machine().lower() == "aarch64":
+        try:
+            import os as _os, ctypes as _ct
+            import lighter.signer_client as _lsc
+            for _k, _v in list(vars(_lsc).items()):
+                if callable(_v) and "shared_library" in _k:
+                    def _arm64_lib(_d=_os.path.dirname(_os.path.abspath(_lsc.__file__))):
+                        return _ct.CDLL(_os.path.join(_d, "signers", "lighter-signer-linux-arm64.so"))
+                    setattr(_lsc, _k, _arm64_lib)
+                    logger.info("Lighter SDK: ARM64 signer patch applied (key=%s)", _k)
+                    break
+        except Exception as _e:
+            logger.warning("Lighter SDK: ARM64 patch failed: %s", _e)
+    # ─────────────────────────────────────────────────────────────────────
 except ImportError:
     LIGHTER_SDK_AVAILABLE = False
     logger.warning("Lighter SDK not available - install lighter-sdk")
@@ -140,10 +163,21 @@ class LighterBot:
         self.avg_latency_ms = 0.0
         self._execution_block_reason: Optional[str] = None
 
-        # Signal idempotency guard: prevent duplicate execution on Pub/Sub redelivery.
-        self._processed_signal_ids: Dict[str, float] = {}
+        # Firestore client shared by idempotency guard + position persistence.
+        self._db = None
+        # Signal idempotency guard: Firestore-backed (durable across restarts) with
+        # in-memory fast path.  Initialized without a Firestore client; warm() is
+        # called after initialize() connects to GCP.
+        self._idempotency: Optional[ExecutionIdempotency] = None
         self._signal_dedupe_ttl_seconds = max(
             60, int(os.getenv("SIGNAL_DEDUPE_TTL_SECONDS", "900"))
+        )
+
+        # Circuit breaker: open after 5 consecutive venue API failures, reset after 120s.
+        self._circuit_breaker = CircuitBreaker(
+            "lighter",
+            fail_max=int(os.getenv("LIGHTER_CIRCUIT_BREAKER_FAIL_MAX", "5")),
+            reset_timeout=float(os.getenv("LIGHTER_CIRCUIT_BREAKER_RESET_SECONDS", "120")),
         )
 
         # Telemetry publishing (consumed by api-gateway for realtime dashboard)
@@ -153,18 +187,47 @@ class LighterBot:
 
     @staticmethod
     async def _call_lighter_api(api_callable, *args, **kwargs):
-        """Invoke Lighter SDK methods that may be sync or async across SDK versions."""
+        """
+        Invoke Lighter SDK methods (sync or async) with exponential-backoff retry.
+
+        Retries up to 3 attempts (delays: 1 s, 2 s) on transient connection
+        errors (SSL failures, connection refused, network timeouts).  API-level
+        errors (bad request, auth, etc.) are NOT retried.
+        """
         if api_callable is None:
             return None
 
-        if inspect.iscoroutinefunction(api_callable):
-            return await api_callable(*args, **kwargs)
+        _RETRYABLE: tuple = (ConnectionError, TimeoutError, OSError)
+        try:
+            import aiohttp as _aio
+            _RETRYABLE = _RETRYABLE + (_aio.ClientConnectionError,)
+        except ImportError:
+            pass
 
-        loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(None, lambda: api_callable(*args, **kwargs))
-        if inspect.isawaitable(result):
-            return await result
-        return result
+        last_exc: Optional[Exception] = None
+        for attempt in range(1, 4):  # attempts 1, 2, 3
+            try:
+                if inspect.iscoroutinefunction(api_callable):
+                    return await api_callable(*args, **kwargs)
+
+                loop = asyncio.get_running_loop()
+                result = await loop.run_in_executor(None, lambda: api_callable(*args, **kwargs))
+                if inspect.isawaitable(result):
+                    return await result
+                return result
+
+            except _RETRYABLE as exc:
+                last_exc = exc
+                if attempt == 3:
+                    break
+                wait = 2 ** (attempt - 1)  # 1 s, 2 s
+                logger.warning(
+                    "Lighter API connection error (attempt %d/3, retry in %ds): %s: %s",
+                    attempt, wait, type(exc).__name__, exc,
+                )
+                await asyncio.sleep(wait)
+
+        raise last_exc  # type: ignore[misc]
 
     async def initialize(self):
         """Initialize the Lighter SDK clients."""
@@ -261,6 +324,26 @@ class LighterBot:
 
             await subscribe("trading-signals", self._handle_signal)
             await subscribe("risk-alerts", self._handle_risk_alert)
+
+            # Initialize Firestore-backed idempotency guard and warm from recent history.
+            try:
+                from google.cloud import firestore as _fs
+                _fs_client = _fs.AsyncClient(project=os.getenv("GCP_PROJECT_ID", "sapphire-479610"))
+                self._db = _fs_client
+                self._idempotency = ExecutionIdempotency(
+                    platform=PLATFORM.value,
+                    firestore_client=_fs_client,
+                    ttl_seconds=self._signal_dedupe_ttl_seconds,
+                )
+                warmed = await self._idempotency.warm_from_firestore()
+                logger.info("Idempotency guard ready (warmed %d recent IDs from Firestore)", warmed)
+            except Exception as _idem_err:
+                logger.warning("Idempotency guard degraded to memory-only: %s", _idem_err)
+                self._idempotency = ExecutionIdempotency(
+                    platform=PLATFORM.value,
+                    firestore_client=None,
+                    ttl_seconds=self._signal_dedupe_ttl_seconds,
+                )
 
             logger.info(f"{SERVICE_NAME} initialized successfully | Testnet: {LIGHTER_TESTNET}")
             return True
@@ -462,7 +545,7 @@ class LighterBot:
         while self.running:
             has_command = False
             try:
-                command = await self.command_queue.get()
+                command = await asyncio.wait_for(self.command_queue.get(), timeout=1.0)
                 has_command = True
                 logger.info(f"Processing Hub Command: {command}")
 
@@ -497,6 +580,8 @@ class LighterBot:
                 logger.info(f"Hub Command Executed: {result.success}")
                 await publish("trade-executed", result)
 
+            except asyncio.TimeoutError:
+                continue  # No command arrived; loop back and recheck self.running
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -592,6 +677,11 @@ class LighterBot:
         logger.info(f"Stopping {SERVICE_NAME}...")
         self.running = False
         self._shutdown_event.set()
+        # Cancel all sibling tasks so loops (especially queue.get()) exit immediately
+        current = asyncio.current_task()
+        for task in asyncio.all_tasks():
+            if task is not current and not task.done():
+                task.cancel()
 
     async def _main_loop(self):
         """Main trading loop."""
@@ -636,6 +726,7 @@ class LighterBot:
     async def _position_publish_loop(self):
         """Periodically publish a snapshot of positions for the realtime dashboard."""
         from dataclasses import asdict
+        from datetime import datetime, timezone
 
         while self.running:
             try:
@@ -653,6 +744,22 @@ class LighterBot:
                         "positions": positions_payload,
                     },
                 )
+
+                # Persist snapshot to Firestore for position reconciliation.
+                if self._db is not None:
+                    try:
+                        doc_ref = self._db.collection("live_positions").document(PLATFORM.value)
+                        await doc_ref.set(
+                            {
+                                "platform": PLATFORM.value,
+                                "position_count": len(positions_payload),
+                                "positions": positions_payload,
+                                "updated_at": datetime.now(timezone.utc),
+                            }
+                        )
+                    except Exception as _fs_err:
+                        logger.debug("Position Firestore write error: %s", _fs_err)
+
             except Exception as e:
                 logger.error(f"Position publish error: {e}")
             await asyncio.sleep(self._position_publish_interval_seconds)
@@ -686,13 +793,29 @@ class LighterBot:
                 logger.warning(f"Rejected signal without signal_id on {PLATFORM.value}: {signal.symbol}")
                 return
 
-            if self._is_duplicate_signal(signal_id):
-                logger.warning(f"Duplicate signal ignored on {PLATFORM.value}: {signal_id}")
-                return
-            self._mark_signal_processed(signal_id)
+            # Durable idempotency check (memory-first, Firestore-backed).
+            idempotency = self._idempotency
+            if idempotency is not None:
+                claimed = await idempotency.claim(signal_id, signal.symbol)
+                if not claimed:
+                    return
+            else:
+                # Fallback: legacy in-memory check before idempotency is initialised.
+                if self._is_duplicate_signal(signal_id):
+                    logger.warning(f"Duplicate signal ignored on {PLATFORM.value}: {signal_id}")
+                    return
+                self._mark_signal_processed(signal_id)
 
             logger.info(f"Received signal: {signal.side} {signal.symbol}")
             result = await self._execute_trade(signal)
+
+            # Persist outcome to idempotency store.
+            if idempotency is not None:
+                if result.success:
+                    await idempotency.mark_executed(signal_id, result.order_id or "")
+                else:
+                    await idempotency.mark_failed(signal_id, result.error_message or "")
+
             # Don't emit trade events for explicit no-op signals (ex: reduce-only without exposure).
             if not (result.metadata or {}).get("noop"):
                 await publish("trade-executed", result)
@@ -898,35 +1021,51 @@ class LighterBot:
             # Apply slippage for market order
             limit_price = current_price * 1.05 if is_buy else current_price * 0.95
 
-            result = await self._submit_order_with_signer(
-                order_book_id=int(order_book_id),
-                quantity=float(quantity),
-                limit_price=float(limit_price),
-                is_buy=bool(is_buy),
-                reduce_only=bool(reduce_only),
-                signal_id=signal.signal_id,
-                market_meta=market,
-            )
+            # Circuit breaker gate — raises CircuitBreakerOpen if venue is halted.
+            self._circuit_breaker.check()
 
-            # Legacy fallback for SDKs without SignerClient support.
-            if result is None:
-                nonce_response = await self._fetch_next_nonce()
-                nonce = nonce_response.nonce if hasattr(nonce_response, "nonce") else 0
-                order_params = {
-                    "account_index": self.account_index,
-                    "order_book_id": order_book_id,
-                    "side": 0 if is_buy else 1,
-                    "price": limit_price,
-                    "quantity": quantity,
-                    "nonce": nonce,
-                    "time_in_force": 1,  # IOC
-                }
-                signature = self._sign_transaction(order_params)
-                result = await self._submit_order_legacy_send_tx(
-                    order_params=order_params,
-                    signature=signature,
+            try:
+                result = await self._submit_order_with_signer(
+                    order_book_id=int(order_book_id),
+                    quantity=float(quantity),
+                    limit_price=float(limit_price),
+                    is_buy=bool(is_buy),
+                    reduce_only=bool(reduce_only),
                     signal_id=signal.signal_id,
+                    market_meta=market,
                 )
+
+                # Legacy fallback for SDKs without SignerClient support.
+                if result is None:
+                    nonce_response = await self._fetch_next_nonce()
+                    nonce = nonce_response.nonce if hasattr(nonce_response, "nonce") else 0
+                    order_params = {
+                        "account_index": self.account_index,
+                        "order_book_id": order_book_id,
+                        "side": 0 if is_buy else 1,
+                        "price": limit_price,
+                        "quantity": quantity,
+                        "nonce": nonce,
+                        "time_in_force": 1,  # IOC
+                    }
+                    signature = self._sign_transaction(order_params)
+                    result = await self._submit_order_legacy_send_tx(
+                        order_params=order_params,
+                        signature=signature,
+                        signal_id=signal.signal_id,
+                    )
+                # Record outcome to circuit breaker.
+                if result and result.get("success"):
+                    self._circuit_breaker.record_success()
+                else:
+                    self._circuit_breaker.record_failure(
+                        Exception(result.get("error") if result else "null result")
+                    )
+            except CircuitBreakerOpen:
+                raise
+            except Exception as _venue_err:
+                self._circuit_breaker.record_failure(_venue_err)
+                raise
 
             execution_time = (datetime.now() - start_time).total_seconds() * 1000
             self.avg_latency_ms = (self.avg_latency_ms + execution_time) / 2
@@ -993,6 +1132,20 @@ class LighterBot:
                     execution_time_ms=execution_time,
                 )
 
+        except CircuitBreakerOpen as _cb_err:
+            execution_time = (datetime.now() - start_time).total_seconds() * 1000
+            logger.warning("Trade blocked by circuit breaker: %s", _cb_err)
+            return TradeResult(
+                trade_id="",
+                signal_id=signal.signal_id,
+                platform=PLATFORM.value,
+                symbol=signal.symbol,
+                side=signal.side,
+                success=False,
+                error_message=str(_cb_err),
+                execution_time_ms=execution_time,
+                metadata={"circuit_breaker_open": True},
+            )
         except Exception as e:
             self.trades_failed += 1
             execution_time = (datetime.now() - start_time).total_seconds() * 1000
@@ -1078,7 +1231,9 @@ class LighterBot:
 
         base_amount_int = self._scale_for_market(quantity, size_decimals)
         price_int = self._scale_for_market(limit_price, price_decimals)
-        client_order_index = int(time.time() * 1000) % 2147483647
+        # Derive client_order_index from signal_id so retries are idempotent on-chain.
+        import hashlib as _hl
+        client_order_index = int(_hl.sha256(signal_id.encode()).hexdigest(), 16) % 2_147_483_647
 
         logger.info(
             "Signer submit | market=%s coi=%s base_int=%s price_int=%s",
@@ -1358,6 +1513,17 @@ async def main():
     """Main entry point."""
     setup_logging(os.getenv("LOG_LEVEL", "INFO"))
 
+    # Validate required config at startup — fail fast with a clear error.
+    try:
+        from shared.startup_validator import validate_config
+    except ImportError:
+        from startup_validator import validate_config
+    validate_config(
+        service=SERVICE_NAME,
+        required=["LIGHTER_PUB_KEY", "LIGHTER_PRIV_KEY"],
+        warn_if_missing=["LIGHTER_API_URL", "GCP_PROJECT_ID", "SIGNAL_DEDUPE_TTL_SECONDS"],
+    )
+
     logger.info("=" * 50)
     logger.info(f"LIGHTER BOT SERVICE (L2 Order Book)")
     logger.info(f"{datetime.now().isoformat()}")
@@ -1365,14 +1531,24 @@ async def main():
 
     bot = LighterBot()
 
-    def handle_shutdown(sig, frame):
-        logger.info(f"Received signal {sig}, shutting down...")
-        asyncio.create_task(bot.stop())
-
-    signal.signal(signal.SIGTERM, handle_shutdown)
-    signal.signal(signal.SIGINT, handle_shutdown)
+    # Use asyncio-safe signal handlers (loop.add_signal_handler is non-blocking
+    # and schedules the coroutine on the running event loop, unlike signal.signal
+    # which can race with the loop).
+    loop = asyncio.get_event_loop()
+    for _sig in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(
+            _sig,
+            lambda s=_sig: asyncio.ensure_future(
+                _shutdown(bot, s), loop=loop
+            ),
+        )
 
     await bot.start()
+
+
+async def _shutdown(bot: "LighterBot", sig: int) -> None:
+    logger.info("Received signal %s, shutting down...", sig)
+    await bot.stop()
 
 
 if __name__ == "__main__":
