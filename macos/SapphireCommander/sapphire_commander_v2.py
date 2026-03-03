@@ -13,7 +13,27 @@ import json
 import os
 import subprocess
 import webbrowser
-from plyer import notification
+# macOS native notifications via osascript
+def show_mac_notification(title, message, sound=True):
+    """Show native macOS notification using AppleScript"""
+    import subprocess
+    sound_cmd = 'sound name "Default"' if sound else ''
+    script = f'''
+    display notification "{message}" with title "{title}" {sound_cmd}
+    '''
+    try:
+        subprocess.run(['osascript', '-e', script], check=False)
+        return True
+    except Exception as e:
+        print(f"Notification error: {e}")
+        return False
+
+# Fallback for plyer if available
+try:
+    from plyer import notification
+    HAS_PLYER = True
+except ImportError:
+    HAS_PLYER = False
 
 # Configuration
 CONFIG = {
@@ -61,15 +81,25 @@ class SapphireCommander(rumps.App):
     
     def show_notification(self, title, message, sound=True):
         """Show native macOS notification"""
-        try:
-            notification.notify(
-                title=title,
-                message=message,
-                app_name="Sapphire Commander",
-                timeout=5
-            )
-        except Exception as e:
-            print(f"Notification error: {e}")
+        # Try native AppleScript first (most reliable on macOS)
+        if show_mac_notification(title, message, sound):
+            return
+        
+        # Fallback to plyer if available
+        if HAS_PLYER:
+            try:
+                notification.notify(
+                    title=title,
+                    message=message,
+                    app_name="Sapphire Commander",
+                    timeout=5
+                )
+                return
+            except Exception as e:
+                print(f"Plyer notification error: {e}")
+        
+        # Last resort: print to console
+        print(f"[NOTIFICATION] {title}: {message}")
     
     def _build_menu(self):
         """Build the menu bar menu"""
