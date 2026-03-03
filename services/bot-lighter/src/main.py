@@ -172,6 +172,7 @@ class LighterBot:
         self._signal_dedupe_ttl_seconds = max(
             60, int(os.getenv("SIGNAL_DEDUPE_TTL_SECONDS", "900"))
         )
+        self._processed_signal_ids: Dict[str, float] = {}
 
         # Circuit breaker: open after 5 consecutive venue API failures, reset after 120s.
         self._circuit_breaker = CircuitBreaker(
@@ -184,6 +185,42 @@ class LighterBot:
         self._position_publish_interval_seconds = max(
             3, int(os.getenv("POSITION_PUBLISH_INTERVAL_SECONDS", "10"))
         )
+        self._single_symbol_mode = self._env_flag(
+            "LIGHTER_SINGLE_SYMBOL_MODE",
+            default=True,
+        )
+        self._default_take_profit_pct = self._env_float(
+            ("LIGHTER_DEFAULT_TAKE_PROFIT_PCT", "SAPPHIRE_TV_TAKE_PROFIT_PCT"),
+            default=3.0,
+        )
+        self._default_stop_loss_pct = self._env_float(
+            ("LIGHTER_DEFAULT_STOP_LOSS_PCT", "SAPPHIRE_TV_STOP_LOSS_PCT"),
+            default=2.0,
+        )
+        self._risk_exit_cooldown_seconds = max(
+            5.0,
+            self._env_float(("LIGHTER_RISK_EXIT_COOLDOWN_SECONDS",), default=15.0),
+        )
+        self._risk_exit_attempted_at: Dict[str, float] = {}
+
+    @staticmethod
+    def _env_flag(name: str, default: bool = False) -> bool:
+        raw = str(os.getenv(name, "")).strip().lower()
+        if not raw:
+            return bool(default)
+        return raw in {"1", "true", "yes", "on"}
+
+    @staticmethod
+    def _env_float(names: tuple[str, ...], default: float = 0.0) -> float:
+        for name in names:
+            raw = str(os.getenv(name, "")).strip()
+            if not raw:
+                continue
+            try:
+                return float(raw)
+            except ValueError:
+                continue
+        return float(default)
 
     @staticmethod
     async def _call_lighter_api(api_callable, *args, **kwargs):
@@ -732,6 +769,7 @@ class LighterBot:
         while self.running:
             try:
                 await self._check_positions()
+                await self._enforce_position_risk_exits()
                 await self._sleep_or_stop(loop_interval)
             except Exception as e:
                 logger.error(f"Main loop error: {e}")
@@ -895,6 +933,58 @@ class LighterBot:
     def _mark_signal_processed(self, signal_id: str):
         self._processed_signal_ids[signal_id] = time.time()
 
+    def _active_position_symbols(self) -> set[str]:
+        active: set[str] = set()
+        for symbol, position in self.positions.items():
+            try:
+                qty = float(getattr(position, "quantity", 0.0) or 0.0)
+            except (TypeError, ValueError):
+                qty = 0.0
+            if qty > 0:
+                active.add(self._normalize_coin_symbol(symbol))
+        return active
+
+    def _apply_default_risk_levels(
+        self,
+        signal: TradeSignal,
+        *,
+        is_buy: bool,
+        reference_price: float,
+        reduce_only: bool,
+    ) -> None:
+        if reduce_only:
+            return
+        if signal.signal_type not in {SignalType.ENTRY, SignalType.SCALE_IN}:
+            return
+        if reference_price <= 0:
+            return
+
+        tp = None
+        sl = None
+        try:
+            tp = float(signal.take_profit) if signal.take_profit is not None else None
+        except (TypeError, ValueError):
+            tp = None
+        try:
+            sl = float(signal.stop_loss) if signal.stop_loss is not None else None
+        except (TypeError, ValueError):
+            sl = None
+
+        if (tp is None or tp <= 0.0) and self._default_take_profit_pct > 0:
+            signal.take_profit = round(
+                reference_price * (1 + self._default_take_profit_pct / 100.0)
+                if is_buy
+                else reference_price * (1 - self._default_take_profit_pct / 100.0),
+                8,
+            )
+        if (sl is None or sl <= 0.0) and self._default_stop_loss_pct > 0:
+            signal.stop_loss = round(
+                reference_price * (1 - self._default_stop_loss_pct / 100.0)
+                if is_buy
+                else reference_price * (1 + self._default_stop_loss_pct / 100.0),
+                8,
+            )
+
     def _resolve_market(self, symbol: str) -> Dict[str, Any]:
         """
         Resolve a market row from any symbol style:
@@ -911,11 +1001,18 @@ class LighterBot:
         alias = self._COIN_ALIASES.get(coin)
         if alias:
             candidates.append(alias)
-        logger.error(f"DEBUG: Resolving symbol '{raw}' -> coin='{coin}', alias='{alias}', candidates={candidates}, markets={list(self.market_info.keys())[:5]}")
+        logger.debug(
+            "Resolving symbol '%s' -> coin='%s', alias='%s', candidates=%s, markets=%s",
+            raw,
+            coin,
+            alias,
+            candidates,
+            list(self.market_info.keys())[:5],
+        )
 
         for candidate in candidates:
             direct = self.market_info.get(candidate)
-            logger.error(f"DEBUG: Looking up candidate='{candidate}' -> found={direct is not None}")
+            logger.debug("Looking up candidate='%s' -> found=%s", candidate, direct is not None)
             if direct:
                 return direct
 
@@ -977,6 +1074,23 @@ class LighterBot:
             quantity = float(signal.quantity)
 
             reduce_only = bool((signal.metadata or {}).get("reduce_only", False))
+            if signal.signal_type in {
+                SignalType.EXIT,
+                SignalType.SCALE_OUT,
+                SignalType.TAKE_PROFIT,
+                SignalType.STOP_LOSS,
+            }:
+                reduce_only = True
+            entry_like = signal.signal_type in {SignalType.ENTRY, SignalType.SCALE_IN}
+
+            if self._single_symbol_mode and entry_like and not reduce_only:
+                active_symbols = self._active_position_symbols()
+                if active_symbols and coin not in active_symbols:
+                    locked = sorted(active_symbols)[0]
+                    raise ValueError(
+                        f"Single-symbol mode active: open symbol={locked}, rejected symbol={coin}"
+                    )
+
             if reduce_only:
                 current = self.positions.get(coin)
                 current_qty = float(getattr(current, "quantity", 0.0) or 0.0) if current else 0.0
@@ -1059,6 +1173,13 @@ class LighterBot:
             current_price = await self._get_ticker(coin)
             if not current_price:
                 raise Exception(f"Could not get current price for {coin}")
+
+            self._apply_default_risk_levels(
+                signal,
+                is_buy=is_buy,
+                reference_price=float(current_price),
+                reduce_only=reduce_only,
+            )
 
             # Apply slippage for market order
             limit_price = current_price * 1.05 if is_buy else current_price * 0.95
@@ -1156,6 +1277,8 @@ class LighterBot:
                     metadata={
                         **(signal.metadata or {}),
                         "reduce_only": reduce_only,
+                        "stop_loss": signal.stop_loss,
+                        "take_profit": signal.take_profit,
                         **(result.get("metadata") or {}),
                     },
                 )
@@ -1529,6 +1652,14 @@ class LighterBot:
                     side = TradeSide.LONG if size > 0 else TradeSide.SHORT
                     qty = abs(size)
                     entry_price = float(getattr(pos, "entry_price", 0) or 0.0)
+                    current_price = 0.0
+                    for field in ("mark_price", "current_price", "last_price", "index_price", "mid_price"):
+                        try:
+                            current_price = float(getattr(pos, field, 0) or 0.0)
+                        except (TypeError, ValueError):
+                            current_price = 0.0
+                        if current_price > 0:
+                            break
 
                     existing = self.positions.get(symbol)
                     if existing is None:
@@ -1545,6 +1676,13 @@ class LighterBot:
                         existing.quantity = qty
                         if entry_price > 0:
                             existing.entry_price = entry_price
+                        if current_price > 0:
+                            existing.current_price = current_price
+                        if current_price > 0 and existing.entry_price > 0:
+                            if existing.side in (TradeSide.BUY, TradeSide.LONG):
+                                existing.unrealized_pnl = (current_price - existing.entry_price) * qty
+                            else:
+                                existing.unrealized_pnl = (existing.entry_price - current_price) * qty
                         existing.updated_at = utc_now()
 
                     next_positions[symbol] = existing
@@ -1554,6 +1692,89 @@ class LighterBot:
 
         except Exception as e:
             logger.error(f"Position check error: {e}")
+
+    async def _enforce_position_risk_exits(self) -> None:
+        """Trigger reduce-only closes when TP/SL thresholds are reached."""
+        if not self.positions:
+            return
+
+        now = time.time()
+        for symbol, position in list(self.positions.items()):
+            try:
+                qty = float(getattr(position, "quantity", 0.0) or 0.0)
+            except (TypeError, ValueError):
+                qty = 0.0
+            if qty <= 0:
+                continue
+
+            tp = getattr(position, "take_profit", None)
+            sl = getattr(position, "stop_loss", None)
+            try:
+                tp = float(tp) if tp is not None else None
+            except (TypeError, ValueError):
+                tp = None
+            try:
+                sl = float(sl) if sl is not None else None
+            except (TypeError, ValueError):
+                sl = None
+            if (tp is None or tp <= 0) and (sl is None or sl <= 0):
+                self._risk_exit_attempted_at.pop(symbol, None)
+                continue
+
+            price = float(getattr(position, "current_price", 0.0) or 0.0)
+            if price <= 0:
+                price = float(await self._get_ticker(symbol) or 0.0)
+                if price > 0:
+                    position.current_price = price
+                    position.updated_at = utc_now()
+            if price <= 0:
+                continue
+
+            is_long = position.side in (TradeSide.BUY, TradeSide.LONG, "BUY", "LONG")
+            hit_tp = bool(tp and ((price >= tp) if is_long else (price <= tp)))
+            hit_sl = bool(sl and ((price <= sl) if is_long else (price >= sl)))
+            if not hit_tp and not hit_sl:
+                self._risk_exit_attempted_at.pop(symbol, None)
+                continue
+
+            last_attempt = float(self._risk_exit_attempted_at.get(symbol, 0.0))
+            if now - last_attempt < self._risk_exit_cooldown_seconds:
+                continue
+            self._risk_exit_attempted_at[symbol] = now
+
+            reason = "take_profit" if hit_tp else "stop_loss"
+            exit_side = TradeSide.SELL if is_long else TradeSide.BUY
+            exit_type = SignalType.TAKE_PROFIT if hit_tp else SignalType.STOP_LOSS
+            exit_signal = TradeSignal(
+                signal_id=f"risk-{reason}-{symbol}-{int(now * 1000)}",
+                symbol=symbol,
+                side=exit_side,
+                signal_type=exit_type,
+                confidence=1.0,
+                source=f"{SERVICE_NAME}-risk-guard",
+                quantity=qty,
+                metadata={
+                    "reduce_only": True,
+                    "risk_exit": reason,
+                    "trigger_price": price,
+                    "origin": "tp_sl_guard",
+                },
+            )
+
+            logger.warning(
+                "Risk exit trigger %s on %s | price=%s tp=%s sl=%s qty=%s",
+                reason,
+                symbol,
+                price,
+                tp,
+                sl,
+                qty,
+            )
+            result = await self._execute_trade(exit_signal)
+            if not (result.metadata or {}).get("noop"):
+                await publish("trade-executed", result)
+            if result.success:
+                self._risk_exit_attempted_at.pop(symbol, None)
 
     async def _close_all_positions(self):
         """Close all positions on Lighter."""

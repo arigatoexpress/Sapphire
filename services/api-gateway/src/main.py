@@ -73,6 +73,32 @@ TRADINGVIEW_IDEMPOTENCY_WINDOW_SECONDS = max(
 TRADINGVIEW_IDEMPOTENCY_MAX_KEYS = max(
     50, int(os.getenv("SAPPHIRE_TRADINGVIEW_IDEMPOTENCY_MAX_KEYS", "1000"))
 )
+# TP/SL defaults applied to all TradingView signals when not set by payload
+TV_TAKE_PROFIT_PCT: Optional[float] = None
+_tp_raw = os.getenv("SAPPHIRE_TV_TAKE_PROFIT_PCT", "").strip()
+if _tp_raw:
+    try:
+        TV_TAKE_PROFIT_PCT = max(0.0, float(_tp_raw))
+    except ValueError:
+        pass
+
+TV_STOP_LOSS_PCT: Optional[float] = None
+_sl_raw = os.getenv("SAPPHIRE_TV_STOP_LOSS_PCT", "").strip()
+if _sl_raw:
+    try:
+        TV_STOP_LOSS_PCT = max(0.0, float(_sl_raw))
+    except ValueError:
+        pass
+
+TV_TRAILING_STOP: bool = os.getenv("SAPPHIRE_TV_TRAILING_STOP", "").strip().lower() in {"1", "true", "yes", "on"}
+TV_TRAILING_STOP_PCT: Optional[float] = None
+_tsl_raw = os.getenv("SAPPHIRE_TV_TRAILING_STOP_PCT", "").strip()
+if _tsl_raw:
+    try:
+        TV_TRAILING_STOP_PCT = max(0.0, float(_tsl_raw))
+    except ValueError:
+        pass
+
 SYSTEM_LOGS_COLLECTION = os.getenv("SYSTEM_LOGS_COLLECTION", "system_logs")
 TRADE_EXECUTIONS_COLLECTION = os.getenv("TRADE_EXECUTIONS_COLLECTION", "trade_executions")
 TRADING_METRICS_COLLECTION = os.getenv("TRADING_METRICS_COLLECTION", "trading_metrics")
@@ -602,9 +628,27 @@ def _fetch_trade_history_from_firestore(limit: int = 50) -> List[Dict[str, Any]]
     return rows[:safe_limit]
 
 
+def _validate_gateway_config() -> None:
+    """Fail fast at startup if critical gateway config is missing."""
+    import sys as _sys
+    missing = [v for v in ["SAPPHIRE_TRADINGVIEW_WEBHOOK_SECRET"] if not os.getenv(v, "").strip()]
+    if missing:
+        logger.critical(
+            "❌ API Gateway STARTUP FAILED — missing required env vars: %s", ", ".join(missing)
+        )
+        print(f"FATAL [api-gateway]: missing env vars: {', '.join(missing)}", file=_sys.stderr, flush=True)
+        _sys.exit(1)
+    if not os.getenv("SAPPHIRE_CONTROL_API_TOKEN", "").strip():
+        logger.warning(
+            "⚠️  SAPPHIRE_CONTROL_API_TOKEN not set — control endpoints are UNPROTECTED. "
+            "Set this variable before going to production."
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize and cleanup on startup/shutdown."""
+    _validate_gateway_config()
     logger.info("🚀 Starting API Gateway...")
 
     # Initialize Pub/Sub subscriptions (Non-blocking / Robust)
@@ -659,13 +703,24 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS for dashboard
+# CORS — restrict to known origins; falls back to open only if explicitly requested.
+_cors_env = os.getenv("SAPPHIRE_CORS_ORIGINS", "").strip()
+_ALLOWED_ORIGINS: list[str] = (
+    [o.strip() for o in _cors_env.split(",") if o.strip()]
+    if _cors_env
+    else [
+        "https://sapphirealpha.xyz",
+        "https://www.sapphirealpha.xyz",
+        "http://localhost:5000",   # local dev only
+        "http://localhost:3000",
+    ]
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure for production
+    allow_origins=_ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Sapphire-Control-Token", "X-Sapphire-Webhook-Secret"],
 )
 
 
@@ -960,17 +1015,31 @@ async def get_trades(limit: int = 50):
 
 
 def _validate_tradingview_secret(payload: Dict[str, Any], header_secret: Optional[str]) -> None:
+    """
+    Validate the webhook secret using constant-time comparison to prevent timing attacks.
+
+    Accepts the secret via:
+    1. ``X-Sapphire-Webhook-Secret`` HTTP header (preferred for TradingView alerts)
+    2. ``passphrase`` / ``secret`` / ``token`` field in the JSON body (TradingView legacy)
+    """
+    import hmac as _hmac
+
     if not TRADINGVIEW_WEBHOOK_SECRET:
         raise HTTPException(
             status_code=503,
             detail="TradingView webhook secret is not configured",
         )
 
+    expected = TRADINGVIEW_WEBHOOK_SECRET.encode()
+
+    def _ct_compare(candidate: Optional[str]) -> bool:
+        """Constant-time string equality — prevents timing side-channels."""
+        if not candidate:
+            return False
+        return _hmac.compare_digest(candidate.encode(), expected)
+
     body_secret = _extract_text(payload, ["passphrase", "secret", "token"])
-    if (
-        (header_secret and header_secret == TRADINGVIEW_WEBHOOK_SECRET)
-        or (body_secret and body_secret == TRADINGVIEW_WEBHOOK_SECRET)
-    ):
+    if _ct_compare(header_secret) or _ct_compare(body_secret):
         return
     state.tradingview_ingress_stats["rejected"] += 1
     raise HTTPException(status_code=401, detail="Invalid webhook secret")
@@ -982,6 +1051,12 @@ def _build_trade_signal_from_tv_payload(payload: Dict[str, Any]) -> Dict[str, An
 
     symbol = _normalize_tv_symbol(_extract_text(merged, ["symbol", "ticker", "pair", "instrument"]))
     action = _normalize_tv_action(_extract_text(merged, ["action", "side", "signal"]))
+    if not action:
+        message_text = _extract_text(merged, ["message", "alert_message", "text"]).lower()
+        if "bullish breakout detected" in message_text or "bullish signal" in message_text:
+            action = "buy"
+        elif "bearish breakout detected" in message_text or "bearish signal" in message_text:
+            action = "sell"
     if not symbol:
         raise HTTPException(status_code=400, detail="Missing symbol")
     if action not in VALID_TV_ACTIONS:
@@ -1027,6 +1102,31 @@ def _build_trade_signal_from_tv_payload(payload: Dict[str, Any]) -> Dict[str, An
         }
 
     signal_id = f"tv-{uuid.uuid4()}"
+
+    # ── TP / SL ─────────────────────────────────────────────────────────────
+    # Explicit values from the payload win; fall back to env-var % defaults.
+    def _coerce_opt(v: Any) -> Optional[float]:
+        try:
+            return float(v) if v is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    _tp_price: Optional[float] = _coerce_opt(merged.get("take_profit"))
+    _sl_price: Optional[float] = _coerce_opt(merged.get("stop_loss"))
+    _is_buy = action in {"buy", "long"}
+    if price and price > 0:
+        if _tp_price is None and TV_TAKE_PROFIT_PCT and TV_TAKE_PROFIT_PCT > 0:
+            _tp_price = round(
+                price * (1 + TV_TAKE_PROFIT_PCT / 100) if _is_buy else price * (1 - TV_TAKE_PROFIT_PCT / 100),
+                8,
+            )
+        if _sl_price is None and TV_STOP_LOSS_PCT and TV_STOP_LOSS_PCT > 0:
+            _sl_price = round(
+                price * (1 - TV_STOP_LOSS_PCT / 100) if _is_buy else price * (1 + TV_STOP_LOSS_PCT / 100),
+                8,
+            )
+    # ────────────────────────────────────────────────────────────────────────
+
     trade_signal = TradeSignal(
         signal_id=signal_id,
         symbol=symbol,
@@ -1037,8 +1137,10 @@ def _build_trade_signal_from_tv_payload(payload: Dict[str, Any]) -> Dict[str, An
         target_platforms=[],
         entry_price=price,
         quantity=quantity,
+        stop_loss=_sl_price,
+        take_profit=_tp_price,
     )
-    trade_signal.metadata = {
+    _metadata: Dict[str, Any] = {
         "origin": "cloud_gateway_webhook",
         "signal_key": signal_key,
         "raw_action": action,
@@ -1049,6 +1151,11 @@ def _build_trade_signal_from_tv_payload(payload: Dict[str, Any]) -> Dict[str, An
         "message": _extract_text(merged, ["message"]),
         "dry_run": confidence < 0.7,
     }
+    if TV_TRAILING_STOP:
+        _metadata["trailing_stop"] = True
+        if TV_TRAILING_STOP_PCT and TV_TRAILING_STOP_PCT > 0:
+            _metadata["trailing_stop_pct"] = TV_TRAILING_STOP_PCT
+    trade_signal.metadata = _metadata
     trade_signal.timestamp = datetime.now(timezone.utc)
 
     return {
