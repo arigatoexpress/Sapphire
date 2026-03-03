@@ -1,0 +1,16 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install dependencies
+RUN pip install --no-cache-dir requests
+
+# Copy script
+COPY health_monitor.py .
+
+# Environment
+ENV PYTHONUNBUFFERED=1
+ENV SAPPHIRE_URL=https://sapphirealpha.xyz
+ENV ALERT_THRESHOLD=0.7
+
+CMD ["python3", "health_monitor.py"]

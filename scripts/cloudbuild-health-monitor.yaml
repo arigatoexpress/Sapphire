@@ -1,0 +1,41 @@
+# Cloud Build configuration for Health Monitor
+# Deploys as a Cloud Run job for scheduled health checks
+
+steps:
+  # Build container
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/sapphire-479610/sapphire-health-monitor:latest'
+      - '-f'
+      - 'Dockerfile.health-monitor'
+      - '.'
+  
+  # Push container
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/sapphire-479610/sapphire-health-monitor:latest'
+  
+  # Deploy as Cloud Run job
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'jobs'
+      - 'deploy'
+      - 'sapphire-health-monitor'
+      - '--image'
+      - 'gcr.io/sapphire-479610/sapphire-health-monitor:latest'
+      - '--region'
+      - 'us-central1'
+      - '--set-env-vars'
+      - 'SAPPHIRE_URL=https://sapphirealpha.xyz,ALERT_THRESHOLD=0.7'
+      - '--max-retries'
+      - '3'
+      - '--task-timeout'
+      - '120s'
+
+images:
+  - 'gcr.io/sapphire-479610/sapphire-health-monitor:latest'
