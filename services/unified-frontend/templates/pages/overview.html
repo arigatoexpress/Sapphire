@@ -1,1118 +1,534 @@
 {% extends "base.html" %}
 
-{% block page_subtitle %}A public, read-only view of Sapphire's autonomous organization, client delivery, and live platform reliability.{% endblock %}
+{% block title %}System_Overview{% endblock %}
 
 {% block extra_css %}
-.overview-hero {
-    position: relative;
-    overflow: hidden;
+/* Overview-specific styles */
+.mission-status {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-md);
     margin-bottom: var(--space-xl);
 }
 
-.overview-hero::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background:
-        radial-gradient(circle at 15% 18%, rgba(105, 212, 255, 0.22), transparent 42%),
-        radial-gradient(circle at 88% 15%, rgba(143, 125, 255, 0.18), transparent 38%);
-    pointer-events: none;
+@media (max-width: 992px) {
+    .mission-status {
+        grid-template-columns: repeat(2, 1fr);
+    }
 }
 
-.overview-hero-body {
+@media (max-width: 576px) {
+    .mission-status {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Radar Display */
+.radar-container {
     position: relative;
-    display: grid;
-    grid-template-columns: 1.6fr 1fr;
-    gap: var(--space-lg);
-    align-items: center;
+    height: 300px;
+    border: 1px solid var(--border-dim);
+    background: 
+        radial-gradient(circle at center, transparent 0%, rgba(0,0,0,0.8) 100%),
+        repeating-radial-gradient(circle at center, var(--grid-line) 0px, transparent 1px, transparent 40px, var(--grid-line) 41px);
+    overflow: hidden;
 }
 
-.overview-hero h2 {
-    font-size: 2rem;
-    line-height: 1.1;
-    margin-bottom: var(--space-sm);
+.radar-sweep {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 150%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--green), transparent);
+    transform-origin: left center;
+    animation: radar-sweep 4s linear infinite;
+    opacity: 0.6;
 }
 
-.overview-hero p {
-    color: var(--text-secondary);
-    max-width: 65ch;
+@keyframes radar-sweep {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 
-.overview-chip-row {
-    margin-top: var(--space-md);
+.radar-blip {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: var(--green);
+    border-radius: 50%;
+    box-shadow: var(--glow-green);
+    animation: blip-pulse 2s ease-in-out infinite;
+}
+
+@keyframes blip-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.2); }
+}
+
+/* Mini Chart */
+.mini-chart {
+    height: 60px;
     display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-sm);
+    align-items: flex-end;
+    gap: 2px;
+    padding: var(--space-sm) 0;
 }
 
-.overview-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    border-radius: 999px;
-    border: 1px solid var(--border);
-    background: rgba(255, 255, 255, 0.08);
-    color: var(--text-secondary);
-    font-size: 0.8rem;
-    padding: 6px 12px;
+.mini-chart-bar {
+    flex: 1;
+    background: linear-gradient(180deg, var(--amber), var(--amber-dim));
+    min-height: 4px;
+    transition: height 0.3s ease;
 }
 
-.overview-actions {
+.mini-chart-bar:hover {
+    background: var(--amber);
+    box-shadow: var(--glow-amber);
+}
+
+/* Service List */
+.service-list {
     display: flex;
     flex-direction: column;
     gap: var(--space-sm);
-    justify-content: center;
 }
 
-.view-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: 4px;
-    background: rgba(255, 255, 255, 0.06);
-}
-
-.view-toggle .btn {
-    border-radius: 999px;
-    padding: 0.42rem 0.8rem;
-}
-
-.view-toggle .btn.active {
-    border-color: var(--border-accent);
-    background: linear-gradient(135deg, rgba(105, 212, 255, 0.2), rgba(143, 125, 255, 0.2));
-    color: var(--primary);
-}
-
-.client-only {
-    display: none;
-}
-
-.mode-client .operator-only {
-    display: none !important;
-}
-
-.mode-client .client-only {
-    display: block !important;
-}
-
-.capability-grid {
+.service-item {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: 1fr auto auto;
     gap: var(--space-md);
-}
-
-.capability-card {
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.05);
-    padding: var(--space-md);
-}
-
-.capability-card h4 {
-    margin-bottom: 8px;
-    font-size: 0.95rem;
-}
-
-.capability-card p {
-    color: var(--text-muted);
-    font-size: 0.86rem;
-    line-height: 1.6;
-}
-
-.activity-list {
-    display: grid;
-    gap: var(--space-sm);
-}
-
-.activity-item {
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.04);
-    padding: 10px 12px;
-}
-
-.activity-item .meta {
-    display: flex;
-    gap: var(--space-sm);
     align-items: center;
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    margin-bottom: 4px;
+    padding: var(--space-sm) var(--space-md);
+    border: 1px solid var(--border-dim);
+    background: rgba(255, 176, 0, 0.02);
 }
 
-.activity-item .msg {
-    color: var(--text-secondary);
-    font-size: 0.88rem;
-    line-height: 1.5;
+.service-item:hover {
+    background: rgba(255, 176, 0, 0.05);
+    border-color: var(--border-color);
 }
 
-.superswarm-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-md);
-}
-
-.viz-panel {
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.04);
-    padding: var(--space-md);
-}
-
-.viz-panel h4 {
-    font-size: 0.94rem;
-    margin-bottom: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-}
-
-.viz-meta {
-    font-size: 0.76rem;
-    color: var(--text-muted);
-}
-
-.viz-chart {
-    width: 100%;
-    height: 170px;
-    border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: linear-gradient(180deg, rgba(10, 20, 34, 0.55), rgba(7, 13, 23, 0.4));
-    margin-bottom: 8px;
-}
-
-.viz-legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    font-size: 0.74rem;
-    color: var(--text-muted);
-}
-
-.viz-legend span {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.viz-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-}
-
-.breakdown-list {
-    display: grid;
-    gap: 8px;
-}
-
-.breakdown-row {
-    display: grid;
-    grid-template-columns: minmax(90px, 130px) 1fr auto;
-    gap: 10px;
-    align-items: center;
-}
-
-.breakdown-label {
-    font-size: 0.76rem;
-    color: var(--text-secondary);
-    text-transform: capitalize;
-}
-
-.breakdown-track {
-    height: 8px;
-    border-radius: 999px;
-    overflow: hidden;
-    background: rgba(255, 255, 255, 0.09);
-}
-
-.breakdown-fill {
-    height: 100%;
-    border-radius: 999px;
-    background: linear-gradient(90deg, rgba(105, 212, 255, 0.9), rgba(143, 125, 255, 0.85));
-}
-
-.breakdown-value {
-    font-size: 0.76rem;
-    color: var(--text-muted);
-    font-family: var(--font-mono);
-}
-
-.loop-pill-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 6px;
-}
-
-.loop-pill {
-    border: 1px solid var(--border);
-    background: rgba(255, 255, 255, 0.08);
-    border-radius: 999px;
-    padding: 6px 10px;
-    font-size: 0.76rem;
-    color: var(--text-secondary);
-}
-
-.loop-pill.ok {
-    border-color: rgba(54, 211, 153, 0.45);
-    color: var(--success);
-}
-
-.loop-pill.warn {
-    border-color: rgba(255, 204, 102, 0.45);
-    color: var(--warning);
-}
-
-.mini-kpi-row {
-    margin-top: 10px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-.mini-kpi {
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.06);
-    padding: 8px 10px;
-    min-width: 120px;
-}
-
-.mini-kpi .label {
-    font-size: 0.72rem;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
-.mini-kpi .value {
-    font-size: 0.96rem;
-    font-weight: 700;
-    color: var(--text);
-}
-
-.storyline-grid {
-    display: grid;
-    grid-template-columns: 1.3fr 1fr;
-    gap: var(--space-md);
-}
-
-.story-lanes {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-sm);
-}
-
-.story-lane {
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.05);
-    padding: 12px;
-}
-
-.story-lane .title {
-    font-size: 0.84rem;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 4px;
-}
-
-.story-lane .value {
-    font-size: 1.02rem;
-    font-weight: 700;
-    margin-bottom: 6px;
-}
-
-.story-lane .desc {
+.service-name {
     font-size: 0.8rem;
     color: var(--text-secondary);
-    line-height: 1.45;
 }
 
-@media (max-width: 980px) {
-    .overview-hero-body {
+.service-latency {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-family: var(--font-terminal);
+}
+
+/* Quick Actions */
+.action-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-md);
+}
+
+@media (max-width: 768px) {
+    .action-grid {
         grid-template-columns: 1fr;
     }
+}
 
-    .overview-hero h2 {
-        font-size: 1.6rem;
-    }
+.action-card {
+    border: 1px solid var(--border-dim);
+    padding: var(--space-md);
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
 
-    .superswarm-grid {
-        grid-template-columns: 1fr;
-    }
+.action-card:hover {
+    border-color: var(--amber);
+    background: rgba(255, 176, 0, 0.05);
+}
 
-    .storyline-grid,
-    .story-lanes {
-        grid-template-columns: 1fr;
-    }
+.action-icon {
+    font-size: 1.5rem;
+    margin-bottom: var(--space-sm);
+    color: var(--amber);
+}
 
-    .view-toggle {
-        width: 100%;
-        justify-content: stretch;
-    }
+.action-title {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: var(--space-xs);
+}
 
-    .view-toggle .btn {
-        flex: 1;
-    }
+.action-desc {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+/* Price Ticker */
+.price-ticker {
+    display: flex;
+    gap: var(--space-lg);
+    overflow-x: auto;
+    padding: var(--space-sm) 0;
+}
+
+.price-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    border: 1px solid var(--border-dim);
+    background: rgba(255, 176, 0, 0.02);
+    white-space: nowrap;
+}
+
+.price-symbol {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.price-value {
+    font-family: var(--font-header);
+    font-size: 1.1rem;
+    color: var(--amber);
+}
+
+.price-change {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+}
+
+.price-change.up {
+    color: var(--green);
+    background: rgba(51, 255, 0, 0.1);
+}
+
+.price-change.down {
+    color: var(--red);
+    background: rgba(255, 51, 51, 0.1);
 }
 {% endblock %}
 
 {% block content %}
-<div id="overview-page-root">
-<div class="card overview-hero">
-    <div class="card-body overview-hero-body">
-        <div>
-            <span class="overview-chip">Sapphire Inc. · Autonomous Operations</span>
-            <h2>Professional AI Operations Across Projects, Markets, and Infrastructure</h2>
-            <p>
-                Sapphire runs a unified autonomous operating system for project management, client delivery, market intelligence,
-                and resilient multi-environment infrastructure. This public surface is intentionally read-only and reflects live
-                production telemetry.
-            </p>
-            <div class="overview-chip-row">
-                <span class="overview-chip"><i class="fas fa-lock"></i> No web-side controls</span>
-                <span class="overview-chip"><i class="fas fa-shield-check"></i> Production readiness tracked</span>
-                <span class="overview-chip"><i class="fas fa-globe"></i> Public transparency portal</span>
-                <span class="overview-chip"><i class="fas fa-user-shield"></i> zk attestations roadmap</span>
-            </div>
-        </div>
-        <div class="overview-actions">
-            <div class="view-toggle" role="group" aria-label="Overview view mode">
-                <button class="btn btn-secondary active" id="overview-view-operator" type="button" onclick="setOverviewViewMode('operator')">
-                    <i class="fas fa-briefcase"></i> Operator View
-                </button>
-                <button class="btn btn-secondary" id="overview-view-client" type="button" onclick="setOverviewViewMode('client')">
-                    <i class="fas fa-handshake"></i> Client View
-                </button>
-            </div>
-            <a href="/intelligence" class="btn btn-primary"><i class="fas fa-stream"></i> Intelligence Surface</a>
-            <a href="/platform" class="btn btn-primary"><i class="fas fa-heart-pulse"></i> Platform Reliability</a>
-            <a href="/organization" class="btn btn-primary"><i class="fas fa-sitemap"></i> View Organization</a>
-            <a href="/organization#programs" class="btn btn-secondary"><i class="fas fa-briefcase"></i> Client Programs</a>
-            <a href="/sapphire-book" class="btn btn-secondary"><i class="fas fa-book-open"></i> Sapphire Book</a>
-        </div>
+<!-- Mission Status Grid -->
+<div class="mission-status" id="mission-status">
+    <div class="stat-block">
+        <div class="stat-label">System Status</div>
+        <div class="stat-value green" id="stat-system">ONLINE</div>
+        <div class="stat-delta" id="stat-system-detail">13/13 Services</div>
+    </div>
+    <div class="stat-block">
+        <div class="stat-label">Active Programs</div>
+        <div class="stat-value" id="stat-programs">--</div>
+        <div class="stat-delta" id="stat-programs-detail">In Progress</div>
+    </div>
+    <div class="stat-block">
+        <div class="stat-label">Platform Health</div>
+        <div class="stat-value" id="stat-health">--%</div>
+        <div class="stat-delta" id="stat-health-detail">All Gates Clear</div>
+    </div>
+    <div class="stat-block">
+        <div class="stat-label">24h Activity</div>
+        <div class="stat-value" id="stat-activity">--</div>
+        <div class="stat-delta" id="stat-activity-detail">Events Processed</div>
     </div>
 </div>
 
-<div class="card client-only" style="margin-bottom: var(--space-xl); border-color: rgba(105, 212, 255, 0.35); background: rgba(105, 212, 255, 0.10);">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-file-lines" style="margin-right: 8px; color: var(--primary);"></i>Client Business Brief</h3>
-    </div>
-    <div class="card-body">
-        <p id="overview-client-summary" style="color: var(--text-secondary); line-height: 1.75;">Loading business summary...</p>
-        <div class="grid grid-3" style="margin-top: var(--space-sm);">
-            <div class="stat-card">
-                <div class="stat-label">Platform Health</div>
-                <div class="stat-value" style="font-size:1.2rem;" id="overview-client-health">--</div>
+<!-- Main Dashboard Grid -->
+<div class="grid grid-2">
+    <!-- Left Column -->
+    <div>
+        <!-- Market Intelligence -->
+        <div class="panel">
+            <span class="panel-corner tl"></span>
+            <span class="panel-corner tr"></span>
+            <span class="panel-corner bl"></span>
+            <span class="panel-corner br"></span>
+            <div class="panel-header">
+                <div class="panel-title">Market_Intelligence</div>
+                <span class="badge online" id="market-status">LIVE</span>
             </div>
-            <div class="stat-card">
-                <div class="stat-label">Delivery Programs</div>
-                <div class="stat-value" style="font-size:1.2rem;" id="overview-client-programs">--</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Readiness</div>
-                <div class="stat-value" style="font-size:1.2rem;" id="overview-client-readiness">--</div>
+            <div class="panel-body">
+                <div class="price-ticker" id="price-ticker">
+                    <div class="loading">Initializing market feed...</div>
+                </div>
+                <div class="ascii-divider">────────────────────────────────────────</div>
+                <div class="mini-chart" id="price-chart">
+                    <!-- Bars injected by JS -->
+                </div>
             </div>
         </div>
-    </div>
-</div>
 
-<div class="grid grid-4" style="margin-bottom: var(--space-xl);">
-    <div class="stat-card">
-        <div class="stat-label">Live Services</div>
-        <div class="stat-value" id="metric-services">--</div>
-        <div class="stat-change" id="metric-services-note">Checking cloud + edge</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Tracked Programs</div>
-        <div class="stat-value" id="metric-projects">--</div>
-        <div class="stat-change" id="metric-projects-note">Loading project portfolio</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Organization Lanes</div>
-        <div class="stat-value" id="metric-workspaces">--</div>
-        <div class="stat-change" id="metric-workspaces-note">PM Hub alignment</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Readiness</div>
-        <div class="stat-value" id="metric-readiness">--</div>
-        <div class="stat-change" id="metric-readiness-note">Production gates</div>
-    </div>
-</div>
-
-<div class="card operator-only" style="margin-bottom: var(--space-xl);">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-route" style="margin-right: 8px; color: var(--primary);"></i>Operational Storyline</h3>
-        <span class="badge badge-info" id="storyline-meta">loading...</span>
-    </div>
-    <div class="card-body storyline-grid">
-        <section>
-            <div class="story-lanes" id="story-lanes">
-                <article class="story-lane"><div class="title">Organization</div><div class="value">Loading…</div><div class="desc">Preparing storyline lanes.</div></article>
-                <article class="story-lane"><div class="title">Intelligence</div><div class="value">Loading…</div><div class="desc">Preparing storyline lanes.</div></article>
-                <article class="story-lane"><div class="title">Platform</div><div class="value">Loading…</div><div class="desc">Preparing storyline lanes.</div></article>
-                <article class="story-lane"><div class="title">Activity</div><div class="value">Loading…</div><div class="desc">Preparing storyline lanes.</div></article>
+        <!-- Service Status -->
+        <div class="panel">
+            <span class="panel-corner tl"></span>
+            <span class="panel-corner tr"></span>
+            <span class="panel-corner bl"></span>
+            <span class="panel-corner br"></span>
+            <div class="panel-header">
+                <div class="panel-title">Service_Status</div>
+                <a href="/platform" class="btn small">View_All</a>
             </div>
-        </section>
-        <section>
-            <div class="viz-shell" id="story-momentum-chart"></div>
-            <div class="viz-caption" id="story-momentum-note">Operational event momentum over the current window.</div>
-            <div class="viz-shell" id="story-domain-mix" style="margin-top:10px;"></div>
-            <div class="viz-caption" id="story-domain-note">Domain contribution mix.</div>
-        </section>
-    </div>
-</div>
-
-<div class="card" style="margin-bottom: var(--space-xl);">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-brain-circuit" style="margin-right: 8px; color: var(--accent);"></i>Superswarm Analytics</h3>
-        <span class="badge badge-info" id="superswarm-window">window --</span>
-    </div>
-    <div class="card-body">
-        <div class="superswarm-grid" style="margin-bottom: var(--space-md);">
-            <section class="viz-panel">
-                <h4>
-                    Signal Flow
-                    <span class="viz-meta" id="signal-flow-meta">loading...</span>
-                </h4>
-                <div id="signal-flow-chart" class="viz-chart"></div>
-                <div class="viz-legend">
-                    <span><i class="viz-dot" style="background:#69d4ff;"></i>Published</span>
-                    <span><i class="viz-dot" style="background:#ff6b6b;"></i>Failed</span>
-                    <span><i class="viz-dot" style="background:#8f7dff;"></i>Received</span>
-                </div>
-            </section>
-            <section class="viz-panel">
-                <h4>
-                    Execution Flow + PnL
-                    <span class="viz-meta" id="execution-flow-meta">loading...</span>
-                </h4>
-                <div id="execution-flow-chart" class="viz-chart"></div>
-                <div class="viz-legend">
-                    <span><i class="viz-dot" style="background:#36d399;"></i>Executed</span>
-                    <span><i class="viz-dot" style="background:#ff6b6b;"></i>Failed</span>
-                    <span><i class="viz-dot" style="background:#ffcc66;"></i>PnL trend</span>
-                </div>
-            </section>
-        </div>
-        <div class="superswarm-grid">
-            <section class="viz-panel">
-                <h4>Intelligence + Program Mix</h4>
-                <div class="breakdown-list" id="mix-breakdown">
-                    <div class="loading"><div class="spinner"></div>Loading mix analysis...</div>
-                </div>
-            </section>
-            <section class="viz-panel">
-                <h4>Self-Improvement Loop State</h4>
-                <p style="font-size:0.84rem;color:var(--text-secondary);line-height:1.6;">
-                    This reflects whether autonomy cognition, memory, and experimentation lanes are running coherently.
-                </p>
-                <div class="loop-pill-row" id="loop-state-pills">
-                    <span class="loop-pill">loading...</span>
-                </div>
-                <div class="mini-kpi-row">
-                    <div class="mini-kpi">
-                        <div class="label">Experiment Win Rate</div>
-                        <div class="value" id="exp-win-rate">--</div>
-                    </div>
-                    <div class="mini-kpi">
-                        <div class="label">Closed Experiments</div>
-                        <div class="value" id="exp-closed">--</div>
-                    </div>
-                    <div class="mini-kpi">
-                        <div class="label">Pending Outcomes</div>
-                        <div class="value" id="exp-pending">--</div>
-                    </div>
-                </div>
-                <h4 style="margin-top:12px;">Source Efficacy Leaderboard</h4>
-                <div class="breakdown-list" id="source-efficacy-breakdown">
-                    <div class="loading"><div class="spinner"></div>Loading source efficacy...</div>
-                </div>
-            </section>
-        </div>
-    </div>
-</div>
-
-<div class="grid grid-2" style="margin-bottom: var(--space-xl);">
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-layer-group" style="margin-right: 8px; color: var(--primary);"></i>What Sapphire Operates</h3>
-        </div>
-        <div class="card-body">
-            <div class="capability-grid">
-                <div class="capability-card">
-                    <h4><i class="fas fa-diagram-project" style="margin-right: 6px; color: var(--primary);"></i>Agentic PM</h4>
-                    <p>Autonomous planning loops, execution governance, and structured project visibility across departments.</p>
-                </div>
-                <div class="capability-card">
-                    <h4><i class="fas fa-chart-line" style="margin-right: 6px; color: var(--secondary);"></i>Market Intelligence</h4>
-                    <p>Signal processing, research telemetry, and read-only performance insights from production contracts.</p>
-                </div>
-                <div class="capability-card">
-                    <h4><i class="fas fa-rocket" style="margin-right: 6px; color: var(--accent);"></i>Client Delivery</h4>
-                    <p>Execution lanes for THO and BIS programs with centralized reporting and operational checkpoints.</p>
-                </div>
-                <div class="capability-card">
-                    <h4><i class="fas fa-server" style="margin-right: 6px; color: var(--success);"></i>Resilient Infrastructure</h4>
-                    <p>Tailscale-connected cloud, Pi, macOS, and Windows environments with monitored failover pathways.</p>
+            <div class="panel-body">
+                <div class="service-list" id="service-list">
+                    <div class="loading">Scanning services...</div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-wave-square" style="margin-right: 8px; color: var(--info);"></i>Live Platform Snapshot</h3>
+    <!-- Right Column -->
+    <div>
+        <!-- System Radar -->
+        <div class="panel">
+            <span class="panel-corner tl"></span>
+            <span class="panel-corner tr"></span>
+            <span class="panel-corner bl"></span>
+            <span class="panel-corner br"></span>
+            <div class="panel-header">
+                <div class="panel-title">System_Radar</div>
+                <span class="timestamp" id="radar-timestamp">SCANNING...</span>
+            </div>
+            <div class="panel-body" style="padding: 0;">
+                <div class="radar-container" id="radar">
+                    <div class="radar-sweep"></div>
+                    <!-- Blips injected by JS -->
+                </div>
+            </div>
         </div>
-        <div class="card-body">
-            <div id="service-snapshot" class="loading">
-                <div class="spinner"></div>
-                Loading platform snapshot...
+
+        <!-- Quick Actions -->
+        <div class="panel">
+            <span class="panel-corner tl"></span>
+            <span class="panel-corner tr"></span>
+            <span class="panel-corner bl"></span>
+            <span class="panel-corner br"></span>
+            <div class="panel-header">
+                <div class="panel-title">Quick_Access</div>
+            </div>
+            <div class="panel-body">
+                <div class="action-grid">
+                    <a href="/architecture" class="action-card">
+                        <div class="action-icon">◈</div>
+                        <div class="action-title">Architecture</div>
+                        <div class="action-desc">System topology</div>
+                    </a>
+                    <a href="/intelligence" class="action-card">
+                        <div class="action-icon">◉</div>
+                        <div class="action-title">Intelligence</div>
+                        <div class="action-desc">Market analysis</div>
+                    </a>
+                    <a href="/organization" class="action-card">
+                        <div class="action-icon">◎</div>
+                        <div class="action-title">Organization</div>
+                        <div class="action-desc">Programs & lanes</div>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="panel">
+            <span class="panel-corner tl"></span>
+            <span class="panel-corner tr"></span>
+            <span class="panel-corner bl"></span>
+            <span class="panel-corner br"></span>
+            <div class="panel-header">
+                <div class="panel-title">Recent_Activity</div>
+                <a href="/activity" class="btn small">Full_Log</a>
+            </div>
+            <div class="panel-body">
+                <div class="terminal-output" id="activity-log">
+                    <div class="loading">Retrieving logs...</div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<div class="grid grid-2 operator-only">
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-list-check" style="margin-right: 8px; color: var(--accent);"></i>Recent Activity Highlights</h3>
-            <a href="/activity" class="btn btn-secondary" style="font-size: 0.8rem;">View Full Feed</a>
-        </div>
-        <div class="card-body">
-            <div id="activity-highlights" class="loading">
-                <div class="spinner"></div>
-                Loading activity...
-            </div>
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-shield-halved" style="margin-right: 8px; color: var(--warning);"></i>Public Site Policy</h3>
-        </div>
-        <div class="card-body" style="color: var(--text-secondary); line-height: 1.8;">
-            <p>
-                This website is built for business visibility only. Operational controls are intentionally excluded from the public surface.
-            </p>
-            <p>
-                Execution controls, dispatch actions, and privileged workflows run in the dedicated macOS operator client.
-            </p>
-            {% if mac_operator_app_url %}
-            <a class="btn btn-secondary" href="{{ mac_operator_app_url }}">
-                <i class="fab fa-apple"></i> {{ mac_operator_app_label }}
-            </a>
-            {% endif %}
-        </div>
-    </div>
-</div>
+<!-- ASCII Art Footer -->
+<div class="ascii-divider" style="text-align: center; margin-top: var(--space-xl);">
+╔══════════════════════════════════════════════════════════════════╗<br>
+║  SAPPHIRE AUTONOMOUS SYSTEMS - AUTHORIZED PERSONNEL ONLY         ║<br>
+╚══════════════════════════════════════════════════════════════════╝
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    const OVERVIEW_VIEW_MODE_KEY = 'sapphire.overview.view_mode';
-
-    function getOverviewViewMode() {
+    // Load dashboard data
+    async function loadDashboard() {
         try {
-            const mode = localStorage.getItem(OVERVIEW_VIEW_MODE_KEY);
-            return mode === 'client' ? 'client' : 'operator';
-        } catch (_) {
-            return 'operator';
-        }
-    }
-
-    function applyOverviewViewMode(mode) {
-        const resolved = mode === 'client' ? 'client' : 'operator';
-        const root = document.getElementById('overview-page-root');
-        if (root) root.classList.toggle('mode-client', resolved === 'client');
-        const operatorBtn = document.getElementById('overview-view-operator');
-        const clientBtn = document.getElementById('overview-view-client');
-        if (operatorBtn) operatorBtn.classList.toggle('active', resolved === 'operator');
-        if (clientBtn) clientBtn.classList.toggle('active', resolved === 'client');
-    }
-
-    function setOverviewViewMode(mode) {
-        const resolved = mode === 'client' ? 'client' : 'operator';
-        try {
-            localStorage.setItem(OVERVIEW_VIEW_MODE_KEY, resolved);
-        } catch (_) {
-            // no-op
-        }
-        applyOverviewViewMode(resolved);
-    }
-
-    function fmtTime(iso) {
-        if (!iso) return '--';
-        try {
-            return new Date(iso).toLocaleString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-            });
-        } catch (_) {
-            return '--';
-        }
-    }
-
-    function renderClientOverviewBrief(status, metrics, projectsData, orgData, readiness, logsData, superswarmData, businessBrief) {
-        const summaryEl = document.getElementById('overview-client-summary');
-        const healthEl = document.getElementById('overview-client-health');
-        const programsEl = document.getElementById('overview-client-programs');
-        const readinessEl = document.getElementById('overview-client-readiness');
-        if (!summaryEl || !healthEl || !programsEl || !readinessEl) return;
-
-        const briefSummary = (businessBrief && businessBrief.summary) || {};
-        const briefNarrative = (businessBrief && businessBrief.narrative) || {};
-
-        const services = status.services || {};
-        const serviceValues = Object.values(services);
-        const healthyCount = serviceValues.filter((row) => row && row.status === 'healthy').length;
-        const totalCount = serviceValues.length || Number((metrics.health || {}).total_count || 0);
-        const projects = projectsData.projects || [];
-        const activeProjects = projects.filter((p) => ['active', 'in_progress'].includes(String(p.status || '').toLowerCase())).length;
-        const summary = orgData.summary || {};
-        const signalEvents = Number((superswarmData.summary || {}).signals || 0);
-        const executionEvents = Number((superswarmData.summary || {}).executions || 0);
-        const activityCount = (logsData.logs || []).length;
-        const readinessState = readiness.overall_ok ? 'PASS' : 'WATCH';
-
-        const displayHealthy = Number(briefSummary.services_healthy ?? healthyCount);
-        const displayTotal = Number(briefSummary.services_total ?? totalCount);
-        const displayActive = Number(briefSummary.projects_active ?? activeProjects);
-        const displayProjectsTotal = Number(briefSummary.projects_total ?? projects.length);
-        const displayReadiness = briefSummary.readiness_ok === true ? 'PASS' : (briefSummary.readiness_ok === false ? 'WATCH' : readinessState);
-
-        healthEl.textContent = `${displayHealthy}/${displayTotal || 0}`;
-        programsEl.textContent = `${displayActive}/${displayProjectsTotal || 0}`;
-        readinessEl.textContent = readinessState;
-        readinessEl.style.color = readiness.overall_ok ? 'var(--success)' : 'var(--warning)';
-        if (displayReadiness !== readinessState) {
-            readinessEl.textContent = displayReadiness;
-            readinessEl.style.color = displayReadiness === 'PASS' ? 'var(--success)' : 'var(--warning)';
-        }
-
-        summaryEl.textContent = briefNarrative.headline
-            || `Sapphire currently runs ${summary.workspaces || 0} operational lanes with ${activeProjects} active programs out of ${projects.length || 0} tracked. Platform health is ${healthyCount}/${totalCount || 0} services healthy, with ${signalEvents} signal events, ${executionEvents} execution events, and ${activityCount} recent activity logs in the current telemetry window.`;
-    }
-
-    function statusPill(status) {
-        if (status === 'healthy') return '<span class="badge badge-success">healthy</span>';
-        if (status === 'degraded') return '<span class="badge badge-warning">degraded</span>';
-        return '<span class="badge badge-danger">down</span>';
-    }
-
-    function fmtNumber(value) {
-        const n = Number(value || 0);
-        if (!Number.isFinite(n)) return '0';
-        return n.toLocaleString();
-    }
-
-    function renderLineChart(containerId, labels, series, maxValue) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
-        if (!labels.length || !series.length) {
-            container.innerHTML = '<div class="empty-state"><p>No telemetry in this window.</p></div>';
-            return;
-        }
-
-        const width = 680;
-        const height = 170;
-        const pad = 18;
-        const usableW = width - pad * 2;
-        const usableH = height - pad * 2;
-        const count = labels.length;
-        const maxY = Math.max(1, maxValue || 1);
-
-        const grid = [];
-        for (let i = 0; i < 5; i += 1) {
-            const y = pad + (usableH / 4) * i;
-            grid.push(`<line x1="${pad}" y1="${y}" x2="${width - pad}" y2="${y}" stroke="rgba(255,255,255,0.08)" stroke-width="1" />`);
-        }
-
-        const traces = series.map((trace) => {
-            const points = trace.values.map((value, idx) => {
-                const x = pad + (count === 1 ? 0 : (idx / (count - 1)) * usableW);
-                const y = pad + usableH - ((Number(value || 0) / maxY) * usableH);
-                return `${x},${y}`;
-            }).join(' ');
-            return `<polyline points="${points}" fill="none" stroke="${trace.color}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />`;
-        }).join('');
-
-        container.innerHTML = `
-            <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" width="100%" height="100%" role="img" aria-label="Telemetry line chart">
-                ${grid.join('')}
-                ${traces}
-            </svg>
-        `;
-    }
-
-    function renderBreakdownRows(containerId, rows) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
-        if (!rows.length) {
-            container.innerHTML = '<div class="empty-state"><p>No distribution data available.</p></div>';
-            return;
-        }
-        const maxValue = Math.max(...rows.map((r) => Number(r.value || 0)), 1);
-        container.innerHTML = rows.map((row) => {
-            const widthPct = Math.max(4, (Number(row.value || 0) / maxValue) * 100);
-            return `
-                <div class="breakdown-row">
-                    <div class="breakdown-label">${row.label}</div>
-                    <div class="breakdown-track">
-                        <div class="breakdown-fill" style="width:${widthPct}%;"></div>
-                    </div>
-                    <div class="breakdown-value">${fmtNumber(row.value)}</div>
-                </div>
-            `;
-        }).join('');
-    }
-
-    function renderSuperswarmVisuals(payload) {
-        const superswarm = payload || {};
-        const series = superswarm.series || {};
-        const breakdowns = superswarm.breakdowns || {};
-        const analysis = superswarm.analysis || {};
-        const summary = superswarm.summary || {};
-        const loop = superswarm.loop || {};
-        const windowHours = Number(superswarm.window_hours || 24);
-
-        document.getElementById('superswarm-window').textContent = `${windowHours}h window`;
-
-        const signalFlow = Array.isArray(series.signal_flow) ? series.signal_flow : [];
-        const labels = signalFlow.map((row) => row.hour);
-        const published = signalFlow.map((row) => Number(row.published || 0));
-        const failedSignals = signalFlow.map((row) => Number(row.failed || 0));
-        const received = signalFlow.map((row) => Number(row.received || 0));
-        const signalMax = Math.max(...published, ...failedSignals, ...received, 1);
-        renderLineChart(
-            'signal-flow-chart',
-            labels,
-            [
-                { color: '#69d4ff', values: published },
-                { color: '#ff6b6b', values: failedSignals },
-                { color: '#8f7dff', values: received },
-            ],
-            signalMax,
-        );
-        document.getElementById('signal-flow-meta').textContent = `${fmtNumber(summary.signals)} signal events`;
-
-        const executionFlow = Array.isArray(series.execution_flow) ? series.execution_flow : [];
-        const executionLabels = executionFlow.map((row) => row.hour);
-        const executed = executionFlow.map((row) => Number(row.executed || 0));
-        const failedExec = executionFlow.map((row) => Number(row.failed || 0));
-        const pnlAbs = executionFlow.map((row) => Math.abs(Number(row.pnl || 0)));
-        const executionMax = Math.max(...executed, ...failedExec, ...pnlAbs, 1);
-        renderLineChart(
-            'execution-flow-chart',
-            executionLabels,
-            [
-                { color: '#36d399', values: executed },
-                { color: '#ff6b6b', values: failedExec },
-                { color: '#ffcc66', values: pnlAbs },
-            ],
-            executionMax,
-        );
-        document.getElementById('execution-flow-meta').textContent = `${fmtNumber(summary.executions)} executions · pnl ${Number(summary.pnl_total || 0).toFixed(2)}`;
-
-        const intel = Array.isArray(breakdowns.intel_categories) ? breakdowns.intel_categories.slice(0, 4) : [];
-        const projects = Array.isArray(breakdowns.project_status) ? breakdowns.project_status.slice(0, 4) : [];
-        const mixRows = [
-            ...intel.map((row) => ({ label: `intel:${row.label}`, value: row.value })),
-            ...projects.map((row) => ({ label: `project:${row.label}`, value: row.value })),
-        ];
-        renderBreakdownRows('mix-breakdown', mixRows);
-
-        const pills = document.getElementById('loop-state-pills');
-        pills.innerHTML = `
-            <span class="loop-pill ${loop.full_autonomy_enabled ? 'ok' : 'warn'}">autonomy ${loop.full_autonomy_enabled ? 'on' : 'off'}</span>
-            <span class="loop-pill ${loop.memory_enabled ? 'ok' : 'warn'}">memory ${loop.memory_enabled ? 'on' : 'off'}</span>
-            <span class="loop-pill ${loop.cognition_enabled ? 'ok' : 'warn'}">cognition ${loop.cognition_enabled ? 'on' : 'off'}</span>
-            <span class="loop-pill ${loop.readiness_ok ? 'ok' : 'warn'}">readiness ${loop.readiness_ok ? 'green' : 'watch'}</span>
-            <span class="loop-pill">experiments ${fmtNumber(loop.experiments_queued || 0)}</span>
-        `;
-
-        const experiment = analysis.experiment_win_rate || {};
-        const expWins = Number(experiment.wins || 0);
-        const expLosses = Number(experiment.losses || 0);
-        const expPending = Number(experiment.pending || 0);
-        const expClosed = expWins + expLosses;
-        const expRate = Number(experiment.win_rate || 0);
-        document.getElementById('exp-win-rate').textContent = `${expRate.toFixed(1)}%`;
-        document.getElementById('exp-closed').textContent = fmtNumber(expClosed);
-        document.getElementById('exp-pending').textContent = fmtNumber(expPending);
-
-        const efficacyRows = Array.isArray(analysis.source_efficacy)
-            ? analysis.source_efficacy.slice(0, 6).map((row) => ({
-                label: String(row.source || 'unknown').replace(/^execution:/, 'exec:').slice(0, 18),
-                value: Math.max(0, Math.round(Number(row.avg_quality || 0) * 100)),
-            }))
-            : [];
-        renderBreakdownRows('source-efficacy-breakdown', efficacyRows);
-    }
-
-    function renderStoryline(status, metrics, projectsData, orgData, readiness, logsData, superswarmData) {
-        const services = status.services || {};
-        const projects = projectsData.projects || [];
-        const orgSummary = orgData.summary || {};
-        const logs = logsData.logs || [];
-        const health = metrics.health || {};
-        const superswarm = superswarmData || {};
-        const breakdowns = superswarm.breakdowns || {};
-        const signalFlow = Array.isArray((superswarm.series || {}).signal_flow) ? superswarm.series.signal_flow : [];
-        const executionFlow = Array.isArray((superswarm.series || {}).execution_flow) ? superswarm.series.execution_flow : [];
-
-        const activeProjects = projects.filter((p) => ['active', 'in_progress'].includes(String(p.status || '').toLowerCase())).length;
-        const intelCount = Array.isArray(breakdowns.intel_categories)
-            ? breakdowns.intel_categories.reduce((acc, row) => acc + Number(row.value || 0), 0)
-            : logs.filter((row) => String(row.message || '').toLowerCase().includes('intel')).length;
-        const activityCount = logs.length;
-        const totalServices = Object.values(services).length || Number(health.healthy_count || 0);
-        const healthyServices = Object.values(services).filter((svc) => svc && svc.status === 'healthy').length || Number(health.healthy_count || 0);
-
-        const lanes = [
-            {
-                title: 'Organization',
-                value: `${orgSummary.workspaces || 0} lanes · ${projects.length} programs`,
-                desc: `${activeProjects} active delivery programs`,
-                ok: (orgSummary.workspaces || 0) > 0,
-            },
-            {
-                title: 'Intelligence',
-                value: `${fmtNumber(intelCount)} feed events`,
-                desc: `${fmtNumber((superswarm.summary || {}).signals || 0)} signal telemetry points`,
-                ok: intelCount > 0 || Number((superswarm.summary || {}).signals || 0) > 0,
-            },
-            {
-                title: 'Platform',
-                value: `${healthyServices}/${totalServices} healthy`,
-                desc: readiness.overall_ok ? 'Readiness gates are green' : 'One or more gates need attention',
-                ok: readiness.overall_ok === true,
-            },
-            {
-                title: 'Activity',
-                value: `${fmtNumber(activityCount)} events`,
-                desc: `${fmtNumber((superswarm.summary || {}).executions || 0)} execution events in window`,
-                ok: activityCount > 0,
-            },
-        ];
-
-        const laneHtml = lanes.map((lane) => `
-            <article class="story-lane">
-                <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
-                    <div class="title">${lane.title}</div>
-                    <span class="badge badge-${lane.ok ? 'success' : 'warning'}">${lane.ok ? 'ok' : 'watch'}</span>
-                </div>
-                <div class="value">${lane.value}</div>
-                <div class="desc">${lane.desc}</div>
-            </article>
-        `).join('');
-        document.getElementById('story-lanes').innerHTML = laneHtml;
-        document.getElementById('storyline-meta').textContent = readiness.overall_ok ? 'Narrative healthy' : 'Narrative watch';
-
-        const signalSeries = signalFlow.map((row) => Number(row.received || 0) + Number(row.published || 0));
-        const execSeries = executionFlow.map((row) => Number(row.executed || 0));
-        const momentum = signalSeries.length
-            ? signalSeries.map((v, i) => v + Number(execSeries[i] || 0))
-            : [activityCount];
-        window.sapphireViz.renderSparkline('story-momentum-chart', momentum, {
-            ariaLabel: 'Operational storyline momentum',
-            lineColor: 'rgba(105, 212, 255, 0.95)',
-            fillColor: 'rgba(105, 212, 255, 0.24)',
-            height: 146,
-        });
-        const peak = momentum.reduce((acc, value, index) => (value > acc.value ? { value, index } : acc), { value: 0, index: 0 });
-        document.getElementById('story-momentum-note').textContent = `Peak momentum bucket ${peak.index + 1} · ${fmtNumber(peak.value)} composite events.`;
-
-        const domainRows = [
-            { label: 'programs', value: projects.length, color: 'rgba(110, 168, 255, 0.92)' },
-            { label: 'intel', value: intelCount, color: 'rgba(143, 125, 255, 0.9)' },
-            { label: 'platform', value: healthyServices, color: 'rgba(54, 211, 153, 0.92)' },
-            { label: 'activity', value: activityCount, color: 'rgba(255, 204, 102, 0.9)' },
-        ];
-        window.sapphireViz.renderStackBar('story-domain-mix', domainRows);
-        document.getElementById('story-domain-note').textContent = `Mix across organization, intelligence, platform, and activity domains.`;
-    }
-
-    async function loadOverview() {
-        const defaults = {
-            status: { services: {} },
-            metrics: { health: {} },
-            projects: { projects: [] },
-            organization: { summary: {} },
-            readiness: { overall_ok: false, gates: {} },
-            logs: { logs: [] },
-            superswarm: { summary: {}, series: {}, breakdowns: {}, loop: {}, window_hours: 24 },
-            business_brief: { summary: {}, narrative: {} },
-        };
-
-        let status = defaults.status;
-        let metrics = defaults.metrics;
-        let projectsData = defaults.projects;
-        let orgData = defaults.organization;
-        let readiness = defaults.readiness;
-        let logsData = defaults.logs;
-        let superswarmData = defaults.superswarm;
-        let businessBriefData = defaults.business_brief;
-
-        try {
-            const snapshot = await window.platformApi.getHomeSnapshot();
-            status = snapshot.status || defaults.status;
-            metrics = snapshot.metrics || defaults.metrics;
-            projectsData = snapshot.projects || defaults.projects;
-            orgData = snapshot.organization || defaults.organization;
-            readiness = snapshot.readiness || defaults.readiness;
-            logsData = snapshot.logs || defaults.logs;
-            superswarmData = snapshot.superswarm || defaults.superswarm;
-            businessBriefData = snapshot.business_brief || defaults.business_brief;
-        } catch (snapshotError) {
-            console.warn('home-snapshot failed, using direct endpoint fallback', snapshotError);
-            const [statusRes, metricsRes, projectsRes, orgRes, readinessRes, logsRes, superswarmRes, businessBriefRes] = await Promise.allSettled([
+            const [status, metrics, projects, logs, superswarm] = await Promise.all([
                 window.platformApi.getStatus(),
                 window.platformApi.getMetrics(),
                 window.platformApi.getProjects(),
-                window.platformApi.getOrganization(),
-                window.platformApi.getReadiness(),
-                window.platformApi.getLogs({ limit: 8, hours: 24 }),
-                window.platformApi.getSuperswarm({ hours: 24 }),
-                window.platformApi.getBusinessBrief({ hours: 24 }),
+                window.platformApi.getLogs({ limit: 5, hours: 24 }),
+                window.platformApi.getSuperswarm({ hours: 24 })
             ]);
 
-            if (statusRes.status === 'fulfilled') status = statusRes.value || defaults.status;
-            if (metricsRes.status === 'fulfilled') metrics = metricsRes.value || defaults.metrics;
-            if (projectsRes.status === 'fulfilled') projectsData = projectsRes.value || defaults.projects;
-            if (orgRes.status === 'fulfilled') orgData = orgRes.value || defaults.organization;
-            if (readinessRes.status === 'fulfilled') readiness = readinessRes.value || defaults.readiness;
-            if (logsRes.status === 'fulfilled') logsData = logsRes.value || defaults.logs;
-            if (superswarmRes.status === 'fulfilled') superswarmData = superswarmRes.value || defaults.superswarm;
-            if (businessBriefRes.status === 'fulfilled') businessBriefData = businessBriefRes.value || defaults.business_brief;
-        }
-
-        try {
-            const services = status.services || {};
-            const serviceValues = Object.values(services);
-            const healthyCount = serviceValues.filter((row) => row && row.status === 'healthy').length;
-            const totalCount = serviceValues.length;
-
-            document.getElementById('metric-services').textContent = `${healthyCount}/${totalCount || 0}`;
-            document.getElementById('metric-services-note').textContent = totalCount
-                ? `${totalCount - healthyCount} degraded or offline`
-                : 'No service telemetry';
-            document.getElementById('metric-services-note').className = `stat-change ${healthyCount === totalCount ? 'positive' : ''}`;
-
-            const projects = projectsData.projects || [];
-            const activeProjects = projects.filter((p) => ['active', 'in_progress'].includes((p.status || '').toLowerCase())).length;
-            document.getElementById('metric-projects').textContent = projects.length;
-            document.getElementById('metric-projects-note').textContent = `${activeProjects} currently active`;
-
-            const summary = orgData.summary || {};
-            const workspaces = Number(summary.workspaces || 0);
-            document.getElementById('metric-workspaces').textContent = workspaces;
-            document.getElementById('metric-workspaces-note').textContent = `${summary.agents_online || 0}/${summary.agents_total || 0} agents online`;
-
-            document.getElementById('metric-readiness').textContent = readiness.overall_ok ? 'Ready' : 'Watch';
-            document.getElementById('metric-readiness').style.color = readiness.overall_ok ? 'var(--success)' : 'var(--warning)';
-            const gateA = readiness.gates?.A_contracts || { pass: 0, total: 0 };
-            const gateB = readiness.gates?.B_cloud || { pass: 0, total: 0 };
-            const gateC = readiness.gates?.C_edge || { pass: 0, total: 0 };
-            document.getElementById('metric-readiness-note').textContent = `A:${gateA.pass}/${gateA.total} B:${gateB.pass}/${gateB.total} C:${gateC.pass}/${gateC.total}`;
-
-            const snapshotRows = [
-                { label: 'Signal Gateway', key: 'gateway' },
-                { label: 'PM Hub', key: 'pm_hub' },
-                { label: 'Alpha Engine', key: 'alpha_engine' },
-                { label: 'SCOUT Sandbox', key: 'scout_sandbox' },
-                { label: 'Windows Webhook', key: 'windows_webhook' },
-                { label: 'Rari2 Trading', key: 'rari2_lighter_api' },
-            ];
-
-            const snapshot = document.getElementById('service-snapshot');
-            snapshot.className = '';
-            snapshot.innerHTML = `
-                <div style="display: grid; gap: var(--space-sm);">
-                    ${snapshotRows.map((row) => {
-                        const svc = services[row.key] || {};
-                        const state = svc.status || 'down';
-                        const latency = svc.latency_ms ? `${svc.latency_ms}ms` : '--';
-                        return `
-                            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,0.04);">
-                                <div>
-                                    <div style="font-weight:600;">${row.label}</div>
-                                    <div style="font-size:0.75rem;color:var(--text-muted);">Latency ${latency}</div>
-                                </div>
-                                ${statusPill(state)}
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            `;
-
-            const activities = logsData.logs || [];
-            const activityEl = document.getElementById('activity-highlights');
-            if (!activities.length) {
-                activityEl.className = 'empty-state';
-                activityEl.innerHTML = '<p>No recent platform events.</p>';
-            } else {
-                activityEl.className = 'activity-list';
-                activityEl.innerHTML = activities.slice(0, 8).map((entry) => {
-                    const level = String(entry.level || 'info').toUpperCase();
-                    const service = entry.service || 'platform';
-                    const message = entry.message || 'No message';
-                    return `
-                        <div class="activity-item">
-                            <div class="meta">
-                                <span>${fmtTime(entry.timestamp)}</span>
-                                <span>•</span>
-                                <span>${service}</span>
-                                <span>•</span>
-                                <span>${level}</span>
-                            </div>
-                            <div class="msg">${message}</div>
-                        </div>
-                    `;
-                }).join('');
-            }
-
-            const health = metrics.health || {};
-            const chips = document.querySelector('.overview-chip-row');
-            chips.innerHTML = `
-                <span class="overview-chip"><i class="fas fa-heartbeat"></i> ${health.healthy_count || 0} healthy services</span>
-                <span class="overview-chip"><i class="fas fa-triangle-exclamation"></i> ${health.unhealthy_count || 0} core issues</span>
-                <span class="overview-chip"><i class="fas fa-clock"></i> Snapshot ${fmtTime(health.timestamp || readiness.timestamp)}</span>
-            `;
-
-            renderClientOverviewBrief(status, metrics, projectsData, orgData, readiness, logsData, superswarmData, businessBriefData);
-            renderSuperswarmVisuals(superswarmData);
-            renderStoryline(status, metrics, projectsData, orgData, readiness, logsData, superswarmData);
-        } catch (error) {
-            console.error('Failed to render overview:', error);
-            const activityEl = document.getElementById('activity-highlights');
-            activityEl.className = 'empty-state';
-            activityEl.innerHTML = '<p>Unable to render platform data right now.</p>';
-            const snapshot = document.getElementById('service-snapshot');
-            snapshot.className = 'empty-state';
-            snapshot.innerHTML = '<p>Snapshot unavailable.</p>';
-            const clientSummary = document.getElementById('overview-client-summary');
-            if (clientSummary) {
-                clientSummary.textContent = 'Business summary is temporarily unavailable while platform telemetry refreshes.';
-            }
-            renderSuperswarmVisuals(defaults.superswarm);
-            renderStoryline(defaults.status, defaults.metrics, defaults.projects, defaults.organization, defaults.readiness, defaults.logs, defaults.superswarm);
+            updateMissionStatus(status, metrics, projects, superswarm);
+            updateServiceList(status);
+            updateActivityLog(logs);
+            updateRadar(status);
+        } catch (e) {
+            console.error('Dashboard load failed:', e);
         }
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
-        applyOverviewViewMode(getOverviewViewMode());
-        loadOverview();
-        setInterval(loadOverview, 60000);
-    });
+    function updateMissionStatus(status, metrics, projects, superswarm) {
+        const services = status.services || {};
+        const totalServices = Object.keys(services).length;
+        const healthyServices = Object.values(services).filter(s => s.healthy).length;
+        const healthPct = totalServices ? Math.round((healthyServices / totalServices) * 100) : 0;
+
+        const projectList = projects.projects || [];
+        const activeProjects = projectList.filter(p => 
+            ['active', 'in_progress'].includes(String(p.status).toLowerCase())
+        ).length;
+
+        const activityCount = (superswarm.summary?.signals || 0) + (superswarm.summary?.executions || 0);
+
+        document.getElementById('stat-system').textContent = healthPct === 100 ? 'ONLINE' : 'DEGRADED';
+        document.getElementById('stat-system').className = healthPct === 100 ? 'stat-value green' : 'stat-value red';
+        document.getElementById('stat-system-detail').textContent = `${healthyServices}/${totalServices} Services`;
+
+        document.getElementById('stat-programs').textContent = activeProjects;
+        document.getElementById('stat-programs-detail').textContent = `${projectList.length} Total Programs`;
+
+        document.getElementById('stat-health').textContent = `${healthPct}%`;
+        document.getElementById('stat-health-detail').textContent = healthPct === 100 ? 'All Gates Clear' : 'Attention Required';
+
+        document.getElementById('stat-activity').textContent = activityCount || '--';
+    }
+
+    function updateServiceList(status) {
+        const services = status.services || {};
+        const container = document.getElementById('service-list');
+        
+        const items = Object.entries(services).slice(0, 6).map(([name, data]) => {
+            const statusClass = data.healthy ? 'online' : 'error';
+            const statusText = data.healthy ? 'ONLINE' : 'DOWN';
+            const latency = data.latency_ms ? `${data.latency_ms}ms` : '--';
+            
+            return `
+                <div class="service-item">
+                    <span class="service-name">${name.replace(/_/g, ' ').toUpperCase()}</span>
+                    <span class="service-latency">${latency}</span>
+                    <span class="badge ${statusClass}">${statusText}</span>
+                </div>
+            `;
+        }).join('');
+        
+        container.innerHTML = items || '<div class="empty-state">No services found</div>';
+    }
+
+    function updateActivityLog(logsData) {
+        const logs = logsData.logs || [];
+        const container = document.getElementById('activity-log');
+        
+        if (!logs.length) {
+            container.innerHTML = '<div class="empty-state">No recent activity</div>';
+            return;
+        }
+
+        const lines = logs.slice(0, 5).map(log => {
+            const timestamp = log.timestamp ? new Date(log.timestamp).toLocaleTimeString('en-US', { hour12: false }) : '--:--:--';
+            const level = (log.level || 'info').toLowerCase();
+            const message = log.message || 'No message';
+            
+            return `
+                <div class="line">
+                    <span class="timestamp">[${timestamp}]</span>
+                    <span class="level-${level}">${level.toUpperCase()}</span>
+                    <span>${message}</span>
+                </div>
+            `;
+        }).join('');
+        
+        container.innerHTML = lines;
+    }
+
+    function updateRadar(status) {
+        const radar = document.getElementById('radar');
+        const services = Object.entries(status.services || {});
+        
+        // Clear existing blips
+        radar.querySelectorAll('.radar-blip').forEach(b => b.remove());
+        
+        // Add service blips
+        services.forEach(([name, data], i) => {
+            const blip = document.createElement('div');
+            blip.className = 'radar-blip';
+            
+            // Position in a circle pattern
+            const angle = (i / Math.max(services.length, 1)) * Math.PI * 2;
+            const radius = 30 + Math.random() * 40;
+            const x = 50 + Math.cos(angle) * radius;
+            const y = 50 + Math.sin(angle) * radius;
+            
+            blip.style.left = `${x}%`;
+            blip.style.top = `${y}%`;
+            blip.style.animationDelay = `${i * 0.2}s`;
+            blip.style.background = data.healthy ? 'var(--green)' : 'var(--red)';
+            blip.style.boxShadow = data.healthy ? 'var(--glow-green)' : '0 0 10px rgba(255,51,51,0.4)';
+            
+            radar.appendChild(blip);
+        });
+
+        document.getElementById('radar-timestamp').textContent = new Date().toLocaleTimeString('en-US', { hour12: false });
+    }
+
+    // Load market prices
+    async function loadMarketPrices() {
+        try {
+            const response = await fetch('/api/market/prices');
+            const data = await response.json();
+            
+            const container = document.getElementById('price-ticker');
+            const prices = ['BTC', 'ETH', 'SOL'];
+            
+            const items = prices.map(symbol => {
+                const priceData = data[symbol] || {};
+                const price = priceData.price ? `$${priceData.price.toLocaleString()}` : '--';
+                const change = priceData.change_24h || 0;
+                const changeClass = change >= 0 ? 'up' : 'down';
+                const changeSign = change >= 0 ? '+' : '';
+                
+                return `
+                    <div class="price-item">
+                        <span class="price-symbol">${symbol}/USD</span>
+                        <span class="price-value">${price}</span>
+                        <span class="price-change ${changeClass}">${changeSign}${change.toFixed(2)}%</span>
+                    </div>
+                `;
+            }).join('');
+            
+            container.innerHTML = items;
+            
+            // Generate mini chart bars
+            const chartContainer = document.getElementById('price-chart');
+            const bars = Array(20).fill(0).map(() => {
+                const height = 20 + Math.random() * 80;
+                return `<div class="mini-chart-bar" style="height: ${height}%"></div>`;
+            }).join('');
+            chartContainer.innerHTML = bars;
+            
+        } catch (e) {
+            document.getElementById('price-ticker').innerHTML = '<div class="empty-state">Market feed offline</div>';
+        }
+    }
+
+    // Initial load
+    loadDashboard();
+    loadMarketPrices();
+    
+    // Refresh every 30 seconds
+    setInterval(loadDashboard, 30000);
+    setInterval(loadMarketPrices, 60000);
 </script>
 {% endblock %}

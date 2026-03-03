@@ -1,321 +1,303 @@
 {% extends "base.html" %}
 
-{% block page_subtitle %}Sapphire Book roadmap for operator workflows, Kimi integration, and unified public/private surface separation.{% endblock %}
+{% block title %}Sapphire_Book{% endblock %}
 
 {% block extra_css %}
-.book-hero {
-    position: relative;
+.book-container {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.chapter-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.chapter-item {
+    border: 1px solid var(--border-dim);
+    background: rgba(255, 176, 0, 0.02);
     overflow: hidden;
-    margin-bottom: var(--space-xl);
 }
 
-.book-hero::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background:
-        radial-gradient(circle at 12% 18%, rgba(105, 212, 255, 0.2), transparent 42%),
-        radial-gradient(circle at 86% 14%, rgba(143, 125, 255, 0.2), transparent 36%);
-    pointer-events: none;
-}
-
-.book-hero-body {
-    position: relative;
-    display: grid;
-    grid-template-columns: 1.6fr 1fr;
-    gap: var(--space-lg);
+.chapter-header {
+    padding: var(--space-md) var(--space-lg);
+    display: flex;
+    justify-content: space-between;
     align-items: center;
+    cursor: pointer;
+    transition: background 0.2s;
 }
 
-.book-hero h2 {
-    font-size: 1.9rem;
-    line-height: 1.1;
+.chapter-header:hover {
+    background: rgba(255, 176, 0, 0.05);
+}
+
+.chapter-number {
+    font-family: var(--font-header);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-right: var(--space-md);
+}
+
+.chapter-title {
+    font-size: 0.9rem;
+    color: var(--amber);
+    flex: 1;
+}
+
+.chapter-toggle {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.chapter-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+}
+
+.chapter-content.open {
+    max-height: 1000px;
+}
+
+.chapter-body {
+    padding: 0 var(--space-lg) var(--space-lg);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.7;
+}
+
+.chapter-body h4 {
+    color: var(--amber);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin: var(--space-md) 0 var(--space-sm);
+}
+
+.chapter-body ul {
+    margin-left: var(--space-lg);
+    margin-bottom: var(--space-md);
+}
+
+.chapter-body li {
+    margin-bottom: var(--space-xs);
+}
+
+.chapter-body code {
+    background: rgba(255, 176, 0, 0.1);
+    padding: 2px 6px;
+    font-family: var(--font-terminal);
+    font-size: 0.8rem;
+    color: var(--amber);
+}
+
+.book-meta {
+    text-align: center;
+    margin-bottom: var(--space-xl);
+    padding: var(--space-xl);
+    border: 1px solid var(--border-dim);
+    background: rgba(255, 176, 0, 0.02);
+}
+
+.book-title {
+    font-family: var(--font-header);
+    font-size: 1.5rem;
+    color: var(--amber);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
     margin-bottom: var(--space-sm);
 }
 
-.book-hero p {
-    color: var(--text-secondary);
-    max-width: 66ch;
-}
-
-.book-chip-row {
-    margin-top: var(--space-md);
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-sm);
-}
-
-.book-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    border-radius: 999px;
-    border: 1px solid var(--border);
-    background: rgba(255, 255, 255, 0.08);
-    color: var(--text-secondary);
+.book-subtitle {
     font-size: 0.8rem;
-    padding: 6px 12px;
-}
-
-.book-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: var(--space-md);
-}
-
-.book-card {
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.04);
-    padding: 10px 12px;
-}
-
-.book-card h4 {
-    margin-bottom: 6px;
-    font-size: 0.93rem;
-}
-
-.book-card p {
-    font-size: 0.84rem;
     color: var(--text-muted);
-    line-height: 1.55;
 }
 
-.book-list {
-    display: grid;
-    gap: var(--space-sm);
-}
-
-.book-item {
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.04);
-    padding: 10px 12px;
-    color: var(--text-secondary);
-}
-
-@media (max-width: 980px) {
-    .book-hero-body {
-        grid-template-columns: 1fr;
-    }
-
-    .book-hero h2 {
-        font-size: 1.6rem;
-    }
+.book-version {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: var(--space-md);
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--border-dim);
 }
 {% endblock %}
 
 {% block content %}
-<div class="card book-hero">
-    <div class="card-body book-hero-body">
-        <div>
-            <span class="book-chip">Sapphire Book · Operator Client Strategy</span>
-            <h2>Unified Public Website + Private Operator Experience</h2>
-            <p>
-                Sapphire Book defines how privileged operator workflows move out of the public web and into the macOS client,
-                while preserving transparent business reporting on sapphirealpha.xyz.
-            </p>
-            <div class="book-chip-row" id="book-chip-row">
-                <span class="book-chip"><i class="fas fa-clock"></i> Loading live status...</span>
+<div class="book-container">
+    <div class="book-meta">
+        <div class="book-title">The Sapphire Book</div>
+        <div class="book-subtitle">Operational Manual & System Documentation</div>
+        <div class="book-version">Version 2.0 | Classification: OPERATOR</div>
+    </div>
+
+    <div class="chapter-list">
+        <div class="chapter-item">
+            <div class="chapter-header" onclick="toggleChapter(this)">
+                <span class="chapter-number">01</span>
+                <span class="chapter-title">System Overview</span>
+                <span class="chapter-toggle">[+]</span>
+            </div>
+            <div class="chapter-content">
+                <div class="chapter-body">
+                    <p>Sapphire is an autonomous trading and operations platform designed for 24/7 market participation with minimal human intervention. The system consists of:</p>
+                    <ul>
+                        <li><strong>Alpha Engine:</strong> Core signal generation and execution logic</li>
+                        <li><strong>Gateway:</strong> API routing and webhook ingress</li>
+                        <li><strong>PM Hub:</strong> Project management and operational governance</li>
+                        <li><strong>Edge Infrastructure:</strong> Raspberry Pi nodes for trade execution</li>
+                    </ul>
+                    <p>All components communicate via encrypted channels with health monitoring and automatic failover.</p>
+                </div>
             </div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:var(--space-sm);">
-            {% if mac_operator_app_url %}
-            <a class="btn btn-primary" href="{{ mac_operator_app_url }}">
-                <i class="fab fa-apple"></i> {{ mac_operator_app_label }}
-            </a>
-            {% endif %}
-            <a class="btn btn-secondary" href="/organization"><i class="fas fa-sitemap"></i> Organization</a>
-            <a class="btn btn-secondary" href="/production-readiness"><i class="fas fa-shield-check"></i> Readiness</a>
-        </div>
-    </div>
-</div>
 
-<div class="grid grid-4" style="margin-bottom: var(--space-xl);">
-    <div class="stat-card">
-        <div class="stat-label">Public Mode</div>
-        <div class="stat-value" style="color: var(--warning);">Read-Only</div>
-        <div class="stat-change">No privileged controls</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Operator Surface</div>
-        <div class="stat-value">macOS App</div>
-        <div class="stat-change">Execution workflows</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Kimi Runtime</div>
-        <div class="stat-value" id="book-kimi">--</div>
-        <div class="stat-change" id="book-kimi-note">Checking Windows + edge</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Contracts</div>
-        <div class="stat-value" id="book-contracts">--</div>
-        <div class="stat-change" id="book-contracts-note">Platform API health</div>
-    </div>
-</div>
-
-<div class="grid grid-2" style="margin-bottom: var(--space-xl);">
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-compass" style="margin-right: 8px; color: var(--primary);"></i>Product Direction</h3>
-        </div>
-        <div class="card-body">
-            <div class="book-grid">
-                <article class="book-card">
-                    <h4>Public Surface</h4>
-                    <p>Business-facing, shareable, and read-only. Focused on transparency, credibility, and operational visibility.</p>
-                </article>
-                <article class="book-card">
-                    <h4>Operator Surface</h4>
-                    <p>Privileged controls run in the authenticated macOS app with policy checks and secure runtime boundaries.</p>
-                </article>
-                <article class="book-card">
-                    <h4>Unified Contracts</h4>
-                    <p>Web and app clients consume the same `/api/platform/*` contracts for consistency and reduced drift.</p>
-                </article>
-                <article class="book-card">
-                    <h4>SCOUT Safety</h4>
-                    <p>External dispatch remains sandboxed and policy-controlled before any operational integration.</p>
-                </article>
+        <div class="chapter-item">
+            <div class="chapter-header" onclick="toggleChapter(this)">
+                <span class="chapter-number">02</span>
+                <span class="chapter-title">Architecture</span>
+                <span class="chapter-toggle">[+]</span>
+            </div>
+            <div class="chapter-content">
+                <div class="chapter-body">
+                    <p>Sapphire uses a hub-and-spoke architecture with the Unified Frontend as the central coordination point:</p>
+                    <h4>Cloud Layer</h4>
+                    <ul>
+                        <li>Google Cloud Run for stateless services</li>
+                        <li>Cloud Firestore for persistent data</li>
+                        <li>Cloud Scheduler for automated jobs</li>
+                    </ul>
+                    <h4>Edge Layer</h4>
+                    <ul>
+                        <li>RARI-1 & RARI-2: Trading execution nodes</li>
+                        <li>Windows Lab: TradingView integration</li>
+                        <li>Tailscale mesh for secure connectivity</li>
+                    </ul>
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-road" style="margin-right: 8px; color: var(--accent);"></i>Restoration Milestones</h3>
+        <div class="chapter-item">
+            <div class="chapter-header" onclick="toggleChapter(this)">
+                <span class="chapter-number">03</span>
+                <span class="chapter-title">Security Protocols</span>
+                <span class="chapter-toggle">[+]</span>
+            </div>
+            <div class="chapter-content">
+                <div class="chapter-body">
+                    <p>Sapphire implements defense-in-depth with multiple security layers:</p>
+                    <h4>Access Control</h4>
+                    <ul>
+                        <li>Basic Auth for API endpoints</li>
+                        <li>X-Sapphire-Token for internal jobs</li>
+                        <li>Read-only web interface - no mutations</li>
+                    </ul>
+                    <h4>Operational Safety</h4>
+                    <ul>
+                        <li>Kill switch for emergency halt</li>
+                        <li>Owner approval gate for autonomy</li>
+                        <li>Failure pressure monitoring</li>
+                        <li>Automatic paper-trade fallback</li>
+                    </ul>
+                </div>
+            </div>
         </div>
-        <div class="card-body" id="book-milestones">
-            <div class="loading"><div class="spinner"></div>Loading milestones...</div>
-        </div>
-    </div>
-</div>
 
-<div class="card" style="margin-bottom: var(--space-xl);">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-link" style="margin-right: 8px; color: var(--secondary);"></i>Connected System Surfaces</h3>
-    </div>
-    <div class="card-body">
-        <div class="book-list" id="book-surfaces">
-            <div class="book-item">Loading connected surfaces...</div>
+        <div class="chapter-item">
+            <div class="chapter-header" onclick="toggleChapter(this)">
+                <span class="chapter-number">04</span>
+                <span class="chapter-title">Trading Operations</span>
+                <span class="chapter-toggle">[+]</span>
+            </div>
+            <div class="chapter-content">
+                <div class="chapter-body">
+                    <p>Trading follows a multi-stage pipeline from signal to execution:</p>
+                    <ol>
+                        <li><strong>Signal Generation:</strong> Alpha Engine produces trading signals</li>
+                        <li><strong>Validation:</strong> Risk checks and sanity filters applied</li>
+                        <li><strong>Routing:</strong> Signal routed to appropriate execution venue</li>
+                        <li><strong>Execution:</strong> Edge node executes via exchange API</li>
+                        <li><strong>Confirmation:</strong> Trade logged and PnL tracked</li>
+                    </ol>
+                    <p>All stages are monitored with telemetry sent to Firestore for analysis.</p>
+                </div>
+            </div>
         </div>
-    </div>
-</div>
 
-<div class="card" style="border-color: rgba(255, 204, 102, 0.4); background: rgba(255, 204, 102, 0.07);">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-lock" style="margin-right: 8px; color: var(--warning);"></i>Access Boundary Policy</h3>
-    </div>
-    <div class="card-body" style="color: var(--text-secondary); line-height: 1.8;">
-        Public web pages remain strictly non-operational. Any control surface (dispatch, execution, configuration, credentials) is app-only.
+        <div class="chapter-item">
+            <div class="chapter-header" onclick="toggleChapter(this)">
+                <span class="chapter-number">05</span>
+                <span class="chapter-title">API Reference</span>
+                <span class="chapter-toggle">[+]</span>
+            </div>
+            <div class="chapter-content">
+                <div class="chapter-body">
+                    <p>Key API endpoints for operators:</p>
+                    <h4>Status Endpoints</h4>
+                    <ul>
+                        <li><code>/api/platform/status</code> - Full system status</li>
+                        <li><code>/api/platform/health</code> - Health summary</li>
+                        <li><code>/api/platform/readiness</code> - Readiness gates</li>
+                    </ul>
+                    <h4>Data Endpoints</h4>
+                    <ul>
+                        <li><code>/api/platform/metrics</code> - Trading metrics</li>
+                        <li><code>/api/platform/logs</code> - Activity logs</li>
+                        <li><code>/api/platform/trades</code> - Trade history</li>
+                    </ul>
+                    <h4>Management Endpoints</h4>
+                    <ul>
+                        <li><code>/api/platform/projects</code> - Program portfolio</li>
+                        <li><code>/api/platform/organization</code> - Org structure</li>
+                        <li><code>/api/platform/contracts</code> - API manifest</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="chapter-item">
+            <div class="chapter-header" onclick="toggleChapter(this)">
+                <span class="chapter-number">06</span>
+                <span class="chapter-title">Troubleshooting</span>
+                <span class="chapter-toggle">[+]</span>
+            </div>
+            <div class="chapter-content">
+                <div class="chapter-body">
+                    <h4>Common Issues</h4>
+                    <p><strong>Service Degraded:</strong> Check /api/platform/status for unhealthy services. Restart via Cloud Console if needed.</p>
+                    <p><strong>Edge Node Offline:</strong> Verify Tailscale connection on the node. Check power and network.</p>
+                    <p><strong>Signal Not Executing:</strong> Verify dex_execution_stage is not 'paper' and kill_switch is not active.</p>
+                    <h4>Emergency Procedures</h4>
+                    <ul>
+                        <li>Activate kill switch via macOS Commander app</li>
+                        <li>Contact operator via Telegram bot</li>
+                        <li>Check Cloud Run logs in GCP Console</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    function boolBadge(ok, textOk, textNo) {
-        return ok
-            ? `<span class="badge badge-success">${textOk}</span>`
-            : `<span class="badge badge-warning">${textNo}</span>`;
-    }
-
-    function fmtTime(iso) {
-        if (!iso) return '--';
-        try {
-            return new Date(iso).toLocaleString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-            });
-        } catch (_) {
-            return '--';
+    function toggleChapter(header) {
+        const content = header.nextElementSibling;
+        const toggle = header.querySelector('.chapter-toggle');
+        
+        if (content.classList.contains('open')) {
+            content.classList.remove('open');
+            toggle.textContent = '[+]';
+        } else {
+            // Close all others
+            document.querySelectorAll('.chapter-content').forEach(c => c.classList.remove('open'));
+            document.querySelectorAll('.chapter-toggle').forEach(t => t.textContent = '[+]');
+            
+            content.classList.add('open');
+            toggle.textContent = '[-]';
         }
     }
-
-    async function refreshSapphireBook() {
-        try {
-            const [status, readiness, org, logs] = await Promise.all([
-                window.platformApi.getStatus(),
-                window.platformApi.getReadiness(),
-                window.platformApi.getOrganization(),
-                window.platformApi.getLogs({ hours: 24, limit: 40 }),
-            ]);
-
-            const windows = (status.by_category && status.by_category.windows) || [];
-            const windowsHealthy = windows.length ? windows.every((row) => !!row.healthy) : false;
-            const kimiEl = document.getElementById('book-kimi');
-            kimiEl.textContent = windowsHealthy ? 'Online' : 'Watch';
-            kimiEl.style.color = windowsHealthy ? 'var(--success)' : 'var(--warning)';
-            document.getElementById('book-kimi-note').textContent = `${windows.filter((row) => row.healthy).length}/${windows.length || 0} Windows endpoints healthy`;
-
-            const contractsGate = readiness.gates?.A_contracts;
-            const contractsOk = !!(contractsGate && contractsGate.ok);
-            document.getElementById('book-contracts').textContent = contractsGate ? `${contractsGate.pass}/${contractsGate.total}` : '--';
-            document.getElementById('book-contracts').style.color = contractsOk ? 'var(--success)' : 'var(--warning)';
-            document.getElementById('book-contracts-note').textContent = contractsOk ? 'Canonical contracts green' : 'Contract gate requires attention';
-
-            const chipRow = document.getElementById('book-chip-row');
-            chipRow.innerHTML = `
-                <span class="book-chip"><i class="fas fa-shield-check"></i> readiness ${readiness.overall_ok ? 'green' : 'watch'}</span>
-                <span class="book-chip"><i class="fas fa-sitemap"></i> ${org.summary?.workspaces || 0} workspaces mapped</span>
-                <span class="book-chip"><i class="fas fa-clock"></i> ${fmtTime(readiness.timestamp)}</span>
-            `;
-
-            const milestones = [
-                { ok: contractsOk, text: 'Platform contracts normalized across web + app' },
-                { ok: readiness.overall_ok, text: 'Production readiness gates currently passing' },
-                { ok: windowsHealthy, text: 'Windows edge services healthy for operator runtime' },
-                { ok: !!(status.services?.scout_sandbox && status.services.scout_sandbox.status === 'healthy'), text: 'SCOUT sandbox ingress healthy' },
-            ];
-
-            document.getElementById('book-milestones').innerHTML = `
-                <div class="book-list">
-                    ${milestones.map((m) => `
-                        <div class="book-item" style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-sm);">
-                            <span>${m.text}</span>
-                            ${boolBadge(m.ok, 'done', 'in progress')}
-                        </div>
-                    `).join('')}
-                </div>
-            `;
-
-            const eventRows = (logs.logs || []).filter((row) => {
-                const msg = String(row.message || '').toLowerCase();
-                const svc = String(row.service || '').toLowerCase();
-                return msg.includes('kimi') || msg.includes('signal') || svc.includes('gateway') || svc.includes('webhook');
-            }).slice(0, 5);
-
-            const surfaces = [
-                { name: 'Public Website', value: 'sapphirealpha.xyz', ok: true },
-                { name: 'Organization Model', value: `${org.summary?.workspaces || 0} workspaces`, ok: true },
-                { name: 'Operator App', value: 'macOS-only control surface', ok: true },
-                { name: 'Recent Runtime Events', value: `${eventRows.length} relevant events (24h)`, ok: true },
-            ];
-
-            document.getElementById('book-surfaces').innerHTML = surfaces.map((s) => `
-                <div class="book-item" style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-sm);">
-                    <div>
-                        <div style="font-weight:600;">${s.name}</div>
-                        <div style="font-size:0.78rem;color:var(--text-muted);">${s.value}</div>
-                    </div>
-                    ${boolBadge(s.ok, 'connected', 'pending')}
-                </div>
-            `).join('');
-        } catch (error) {
-            console.error('Failed to refresh Sapphire Book status:', error);
-            const kimiEl = document.getElementById('book-kimi');
-            kimiEl.textContent = 'Unknown';
-            kimiEl.style.color = 'var(--text-muted)';
-            document.getElementById('book-milestones').innerHTML = '<div class="empty-state"><p>Unable to load milestone telemetry.</p></div>';
-            document.getElementById('book-surfaces').innerHTML = '<div class="book-item">Unable to load connected surfaces.</div>';
-        }
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        refreshSapphireBook();
-        setInterval(refreshSapphireBook, 60000);
-    });
 </script>
 {% endblock %}

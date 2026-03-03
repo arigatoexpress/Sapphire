@@ -1,0 +1,815 @@
+{% extends "base.html" %}
+
+{% block title %}System_Architecture{% endblock %}
+
+{% block extra_css %}
+/* Architecture Diagram Styles */
+.architecture-container {
+    position: relative;
+    padding: var(--space-xl);
+    min-height: 800px;
+}
+
+/* Central Hub */
+.system-hub {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 180px;
+    height: 180px;
+    border: 2px solid var(--amber);
+    background: rgba(255, 176, 0, 0.05);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+.system-hub::before {
+    content: '';
+    position: absolute;
+    inset: 8px;
+    border: 1px solid var(--amber-dim);
+}
+
+.system-hub::after {
+    content: '';
+    position: absolute;
+    inset: -10px;
+    border: 1px dashed var(--border-color);
+    animation: rotate 60s linear infinite;
+}
+
+@keyframes rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.hub-icon {
+    font-size: 2.5rem;
+    margin-bottom: var(--space-sm);
+    color: var(--amber);
+    text-shadow: var(--glow-amber);
+}
+
+.hub-title {
+    font-family: var(--font-header);
+    font-size: 1.1rem;
+    color: var(--amber);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    text-align: center;
+}
+
+.hub-subtitle {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    margin-top: var(--space-xs);
+}
+
+/* Orbital Rings */
+.orbital-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border: 1px solid var(--border-dim);
+    border-radius: 50%;
+}
+
+.orbital-ring.ring-1 {
+    width: 400px;
+    height: 400px;
+}
+
+.orbital-ring.ring-2 {
+    width: 650px;
+    height: 650px;
+}
+
+.orbital-ring.ring-3 {
+    width: 900px;
+    height: 900px;
+}
+
+/* Orbital Nodes */
+.orbit-nodes {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: 100%;
+}
+
+.orbit-node {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.orbit-node:hover {
+    z-index: 100;
+}
+
+.node-box {
+    border: 1px solid var(--border-color);
+    background: rgba(10, 10, 10, 0.95);
+    padding: var(--space-sm) var(--space-md);
+    min-width: 140px;
+    text-align: center;
+    position: relative;
+}
+
+.node-box::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--amber);
+    opacity: 0.5;
+}
+
+.node-box.online {
+    border-color: var(--green);
+    box-shadow: 0 0 15px rgba(51, 255, 0, 0.2);
+}
+
+.node-box.online::before {
+    background: var(--green);
+}
+
+.node-box.warning {
+    border-color: var(--amber);
+    box-shadow: 0 0 15px rgba(255, 176, 0, 0.2);
+}
+
+.node-title {
+    font-family: var(--font-header);
+    font-size: 0.9rem;
+    color: var(--amber);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.node-box.online .node-title {
+    color: var(--green);
+}
+
+.node-type {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-top: 2px;
+}
+
+.node-status {
+    font-size: 0.65rem;
+    margin-top: var(--space-xs);
+    padding: 2px 6px;
+    display: inline-block;
+}
+
+.node-status.online {
+    color: var(--green);
+    background: rgba(51, 255, 0, 0.1);
+}
+
+.node-status.offline {
+    color: var(--red);
+    background: rgba(255, 51, 51, 0.1);
+}
+
+/* Connection Lines */
+.connection-lines {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.connection-line {
+    stroke: var(--border-dim);
+    stroke-width: 1;
+    fill: none;
+    stroke-dasharray: 5, 5;
+    animation: dash 20s linear infinite;
+}
+
+.connection-line.active {
+    stroke: var(--green);
+    stroke-dasharray: none;
+    filter: drop-shadow(0 0 3px var(--green));
+}
+
+@keyframes dash {
+    to { stroke-dashoffset: -100; }
+}
+
+/* Data Flow Animation */
+.data-packet {
+    fill: var(--green);
+    filter: drop-shadow(0 0 5px var(--green));
+}
+
+/* Legend */
+.architecture-legend {
+    position: absolute;
+    bottom: var(--space-xl);
+    right: var(--space-xl);
+    border: 1px solid var(--border-dim);
+    background: rgba(10, 10, 10, 0.95);
+    padding: var(--space-md);
+    min-width: 200px;
+}
+
+.legend-title {
+    font-family: var(--font-header);
+    font-size: 0.8rem;
+    color: var(--amber);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: var(--space-sm);
+    padding-bottom: var(--space-xs);
+    border-bottom: 1px solid var(--border-dim);
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-xs);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.legend-symbol {
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+}
+
+.legend-symbol.online {
+    border-color: var(--green);
+    background: rgba(51, 255, 0, 0.1);
+}
+
+.legend-symbol.hub {
+    border-color: var(--amber);
+    background: rgba(255, 176, 0, 0.1);
+}
+
+.legend-symbol.edge {
+    border-style: dashed;
+}
+
+/* Info Panel */
+.node-info-panel {
+    position: absolute;
+    top: var(--space-xl);
+    left: var(--space-xl);
+    width: 300px;
+    border: 1px solid var(--border-color);
+    background: rgba(10, 10, 10, 0.98);
+    padding: var(--space-lg);
+}
+
+.info-title {
+    font-family: var(--font-header);
+    font-size: 1rem;
+    color: var(--amber);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: var(--space-md);
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: var(--space-xs) 0;
+    border-bottom: 1px solid var(--border-dim);
+    font-size: 0.75rem;
+}
+
+.info-label {
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.info-value {
+    color: var(--text-secondary);
+    font-family: var(--font-terminal);
+}
+
+.info-value.online {
+    color: var(--green);
+}
+
+.info-value.offline {
+    color: var(--red);
+}
+
+/* Stats Overlay */
+.arch-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-md);
+    margin-bottom: var(--space-xl);
+}
+
+@media (max-width: 1200px) {
+    .architecture-container {
+        min-height: 600px;
+    }
+    
+    .orbital-ring.ring-1 { width: 300px; height: 300px; }
+    .orbital-ring.ring-2 { width: 450px; height: 450px; }
+    .orbital-ring.ring-3 { width: 600px; height: 600px; }
+    
+    .system-hub {
+        width: 120px;
+        height: 120px;
+    }
+    
+    .hub-icon { font-size: 1.8rem; }
+    .hub-title { font-size: 0.8rem; }
+    
+    .node-box {
+        min-width: 100px;
+        padding: var(--space-xs) var(--space-sm);
+    }
+    
+    .node-title { font-size: 0.7rem; }
+    
+    .node-info-panel {
+        position: relative;
+        top: auto;
+        left: auto;
+        width: 100%;
+        margin-bottom: var(--space-lg);
+    }
+    
+    .architecture-legend {
+        position: relative;
+        bottom: auto;
+        right: auto;
+        margin-top: var(--space-lg);
+    }
+}
+
+@media (max-width: 768px) {
+    .arch-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .architecture-container {
+        padding: var(--space-md);
+    }
+}
+{% endblock %}
+
+{% block content %}
+<!-- Architecture Stats -->
+<div class="arch-stats">
+    <div class="stat-block">
+        <div class="stat-label">Total Services</div>
+        <div class="stat-value" id="arch-total-services">--</div>
+    </div>
+    <div class="stat-block">
+        <div class="stat-label">Online</div>
+        <div class="stat-value green" id="arch-online">--</div>
+    </div>
+    <div class="stat-block">
+        <div class="stat-label">Edge Nodes</div>
+        <div class="stat-value" id="arch-edge">--</div>
+    </div>
+    <div class="stat-block">
+        <div class="stat-label">Cloud Region</div>
+        <div class="stat-value small" id="arch-region">US-CENTRAL1</div>
+    </div>
+</div>
+
+<!-- Architecture Diagram -->
+<div class="architecture-container">
+    <!-- Node Info Panel -->
+    <div class="node-info-panel" id="node-info">
+        <div class="info-title">System Details</div>
+        <div class="info-row">
+            <span class="info-label">Select a node</span>
+            <span class="info-value">--</span>
+        </div>
+        <div style="margin-top: var(--space-md); color: var(--text-muted); font-size: 0.75rem; line-height: 1.6;">
+            Hover over any system node to view detailed status information, latency metrics, and connection health.
+        </div>
+    </div>
+
+    <!-- SVG Connection Lines -->
+    <svg class="connection-lines" viewBox="0 0 1000 800" preserveAspectRatio="xMidYMid meet">
+        <!-- Lines from hub to ring 1 -->
+        <line class="connection-line active" x1="500" y1="400" x2="500" y2="200" />
+        <line class="connection-line active" x1="500" y1="400" x2="700" y2="400" />
+        <line class="connection-line active" x1="500" y1="400" x2="500" y2="600" />
+        <line class="connection-line active" x1="500" y1="400" x2="300" y2="400" />
+        
+        <!-- Lines from ring 1 to ring 2 -->
+        <line class="connection-line" x1="500" y1="200" x2="500" y2="75" />
+        <line class="connection-line" x1="500" y1="200" x2="825" y2="275" />
+        <line class="connection-line" x1="700" y1="400" x2="825" y2="525" />
+        <line class="connection-line" x1="500" y1="600" x2="500" y2="725" />
+        <line class="connection-line" x1="300" y1="400" x2="175" y2="525" />
+        <line class="connection-line" x1="500" y1="200" x2="175" y2="275" />
+    </svg>
+
+    <!-- Orbital Rings -->
+    <div class="orbital-ring ring-1"></div>
+    <div class="orbital-ring ring-2"></div>
+    <div class="orbital-ring ring-3"></div>
+
+    <!-- Central Hub -->
+    <div class="system-hub">
+        <div class="hub-icon">💎</div>
+        <div class="hub-title">SAPPHIRE<br>CORE</div>
+        <div class="hub-subtitle">Unified Gateway</div>
+    </div>
+
+    <!-- Ring 1: Core Cloud Services -->
+    <div class="orbit-nodes" id="ring-1">
+        <!-- North -->
+        <div class="orbit-node" style="top: 20%; left: 50%;" data-service="gateway">
+            <div class="node-box online">
+                <div class="node-title">Gateway</div>
+                <div class="node-type">Cloud Run</div>
+                <div class="node-status online">● Online</div>
+            </div>
+        </div>
+        <!-- East -->
+        <div class="orbit-node" style="top: 50%; left: 80%;" data-service="alpha">
+            <div class="node-box online">
+                <div class="node-title">Alpha Engine</div>
+                <div class="node-type">Cloud Run</div>
+                <div class="node-status online">● Online</div>
+            </div>
+        </div>
+        <!-- South -->
+        <div class="orbit-node" style="top: 80%; left: 50%;" data-service="pm_hub">
+            <div class="node-box online">
+                <div class="node-title">PM Hub</div>
+                <div class="node-type">Cloud Run</div>
+                <div class="node-status online">● Online</div>
+            </div>
+        </div>
+        <!-- West -->
+        <div class="orbit-node" style="top: 50%; left: 20%;" data-service="telegram">
+            <div class="node-box online">
+                <div class="node-title">Telegram Bot</div>
+                <div class="node-type">Cloud Run</div>
+                <div class="node-status online">● Online</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ring 2: Supporting Services -->
+    <div class="orbit-nodes" id="ring-2">
+        <!-- North -->
+        <div class="orbit-node" style="top: 9%; left: 50%;" data-service="scout">
+            <div class="node-box online">
+                <div class="node-title">Scout Sandbox</div>
+                <div class="node-type">Research</div>
+            </div>
+        </div>
+        <!-- Northeast -->
+        <div class="orbit-node" style="top: 34%; left: 82%;" data-service="tho">
+            <div class="node-box online">
+                <div class="node-title">THO Agent</div>
+                <div class="node-type">Research</div>
+            </div>
+        </div>
+        <!-- Southeast -->
+        <div class="orbit-node" style="top: 66%; left: 82%;" data-service="blanga">
+            <div class="node-box online">
+                <div class="node-title">Blanga BIS</div>
+                <div class="node-type">Intelligence</div>
+            </div>
+        </div>
+        <!-- South -->
+        <div class="orbit-node" style="top: 91%; left: 50%;" data-service="aster">
+            <div class="node-box online">
+                <div class="node-title">Aster</div>
+                <div class="node-type">Cloud Run</div>
+            </div>
+        </div>
+        <!-- Southwest -->
+        <div class="orbit-node" style="top: 66%; left: 18%;" data-service="jobs">
+            <div class="node-box online">
+                <div class="node-title">Unified Jobs</div>
+                <div class="node-type">Batch</div>
+            </div>
+        </div>
+        <!-- Northwest -->
+        <div class="orbit-node" style="top: 34%; left: 18%;" data-service="firestore">
+            <div class="node-box online">
+                <div class="node-title">Firestore</div>
+                <div class="node-type">Database</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ring 3: Edge Infrastructure -->
+    <div class="orbit-nodes" id="ring-3">
+        <!-- Pi Nodes -->
+        <div class="orbit-node" style="top: 50%; left: 5%;" data-service="rari1">
+            <div class="node-box online">
+                <div class="node-title">RARI-1</div>
+                <div class="node-type">Edge Pi</div>
+            </div>
+        </div>
+        <div class="orbit-node" style="top: 30%; left: 10%;" data-service="rari2">
+            <div class="node-box online">
+                <div class="node-title">RARI-2</div>
+                <div class="node-type">Edge Pi</div>
+            </div>
+        </div>
+        <!-- Windows Node -->
+        <div class="orbit-node" style="top: 70%; left: 10%;" data-service="windows">
+            <div class="node-box online">
+                <div class="node-title">Windows Lab</div>
+                <div class="node-type">Edge Node</div>
+            </div>
+        </div>
+        <!-- macOS -->
+        <div class="orbit-node" style="top: 50%; left: 95%;" data-service="macos">
+            <div class="node-box online">
+                <div class="node-title">Commander</div>
+                <div class="node-type">macOS</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="architecture-legend">
+        <div class="legend-title">Legend</div>
+        <div class="legend-item">
+            <div class="legend-symbol hub">◈</div>
+            <span>Core Hub</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-symbol online">●</div>
+            <span>Online Service</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-symbol">◆</div>
+            <span>Offline/Degraded</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-symbol edge">◉</div>
+            <span>Edge Node</span>
+        </div>
+        <div class="legend-item">
+            <div style="width: 20px; height: 1px; background: var(--green);"></div>
+            <span>Active Data Flow</span>
+        </div>
+    </div>
+</div>
+
+<div class="ascii-divider" style="text-align: center; margin-top: var(--space-xl);">
+┌─────────────────────────────────────────────────────────────────┐<br>
+│  SYSTEM ARCHITECTURE v2.0 • SYMMETRICAL DISTRIBUTED TOPOLOGY   │<br>
+└─────────────────────────────────────────────────────────────────┘
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Node data mapping
+    const nodeData = {
+        gateway: {
+            name: 'Sapphire Gateway',
+            type: 'Cloud Run Service',
+            region: 'us-central1',
+            purpose: 'API Gateway & Signal Ingress',
+            connections: ['Alpha Engine', 'PM Hub', 'Telegram Bot']
+        },
+        alpha: {
+            name: 'Alpha Engine',
+            type: 'Cloud Run Service',
+            region: 'us-central1',
+            purpose: 'Trading Signal Processing',
+            connections: ['Gateway', 'Firestore']
+        },
+        pm_hub: {
+            name: 'Agentic PM Hub',
+            type: 'Cloud Run Service',
+            region: 'us-central1',
+            purpose: 'Project Management & Governance',
+            connections: ['Gateway', 'Firestore']
+        },
+        telegram: {
+            name: 'Telegram Bot',
+            type: 'Cloud Run Service',
+            region: 'us-central1',
+            purpose: 'Operator Notifications',
+            connections: ['Gateway']
+        },
+        scout: {
+            name: 'Scout Sandbox',
+            type: 'Research Environment',
+            region: 'us-central1',
+            purpose: 'Experimental AI Testing',
+            connections: ['THO Agent']
+        },
+        tho: {
+            name: 'THO Agent',
+            type: 'Research Service',
+            region: 'us-central1',
+            purpose: 'THO Data Processing',
+            connections: ['Scout Sandbox', 'Blanga BIS']
+        },
+        blanga: {
+            name: 'Blanga BIS Beta',
+            type: 'Intelligence Service',
+            region: 'us-central1',
+            purpose: 'Business Intelligence System',
+            connections: ['THO Agent']
+        },
+        aster: {
+            name: 'Aster',
+            type: 'Cloud Run Service',
+            region: 'us-central1',
+            purpose: 'Analytics & Processing',
+            connections: ['Unified Jobs']
+        },
+        jobs: {
+            name: 'Unified Jobs',
+            type: 'Cloud Run Jobs',
+            region: 'us-central1',
+            purpose: 'Batch Processing & Health Checks',
+            connections: ['Aster', 'Firestore']
+        },
+        firestore: {
+            name: 'Cloud Firestore',
+            type: 'NoSQL Database',
+            region: 'us-central1',
+            purpose: 'Persistent Data Storage',
+            connections: ['All Services']
+        },
+        rari1: {
+            name: 'RARI-1',
+            type: 'Raspberry Pi 5',
+            region: 'Edge (Tailscale)',
+            purpose: 'Trading Execution & Monitoring',
+            connections: ['Gateway (Webhook)']
+        },
+        rari2: {
+            name: 'RARI-2',
+            type: 'Raspberry Pi 5',
+            region: 'Edge (Tailscale)',
+            purpose: 'Trading API & Lighter',
+            connections: ['Gateway (Webhook)']
+        },
+        windows: {
+            name: 'Windows Lab',
+            type: 'Windows 11 Pro',
+            region: 'Edge (Tailscale)',
+            purpose: 'TradingView Agent & Model Testing',
+            connections: ['Gateway (Webhook)']
+        },
+        macos: {
+            name: 'Sapphire Commander',
+            type: 'macOS App',
+            region: 'Operator Workstation',
+            purpose: 'Operator Interface & Control',
+            connections: ['All Services (Read)']
+        }
+    };
+
+    // Update architecture with live data
+    async function loadArchitecture() {
+        try {
+            const status = await window.platformApi.getStatus();
+            const services = status.services || {};
+            const nodes = status.nodes || {};
+            
+            // Update stats
+            const totalServices = Object.keys(services).length + Object.keys(nodes).length;
+            const healthyServices = [
+                ...Object.values(services),
+                ...Object.values(nodes)
+            ].filter(s => s.healthy).length;
+            
+            document.getElementById('arch-total-services').textContent = totalServices;
+            document.getElementById('arch-online').textContent = healthyServices;
+            document.getElementById('arch-edge').textContent = Object.keys(nodes).length;
+            
+            // Update node status
+            updateNodeStatus('gateway', services.gateway);
+            updateNodeStatus('alpha', services.alpha_engine);
+            updateNodeStatus('pm_hub', services.pm_hub);
+            updateNodeStatus('telegram', services.telegram_bot);
+            updateNodeStatus('scout', services.scout_sandbox);
+            updateNodeStatus('tho', services.tho_agent);
+            updateNodeStatus('rari1', nodes.rari1);
+            updateNodeStatus('rari2', nodes.rari2);
+            updateNodeStatus('windows', nodes.windows);
+            
+        } catch (e) {
+            console.error('Architecture load failed:', e);
+        }
+    }
+
+    function updateNodeStatus(nodeId, data) {
+        const node = document.querySelector(`[data-service="${nodeId}"]`);
+        if (!node || !data) return;
+        
+        const box = node.querySelector('.node-box');
+        const status = node.querySelector('.node-status');
+        
+        if (data.healthy) {
+            box.classList.add('online');
+            box.classList.remove('warning');
+            if (status) {
+                status.textContent = '● Online';
+                status.className = 'node-status online';
+            }
+        } else {
+            box.classList.remove('online');
+            box.classList.add('warning');
+            if (status) {
+                status.textContent = '● Offline';
+                status.className = 'node-status offline';
+            }
+        }
+    }
+
+    // Node hover interactions
+    document.querySelectorAll('.orbit-node').forEach(node => {
+        node.addEventListener('mouseenter', function() {
+            const serviceId = this.dataset.service;
+            const data = nodeData[serviceId];
+            
+            if (data) {
+                updateInfoPanel(data);
+            }
+        });
+        
+        node.addEventListener('mouseleave', function() {
+            resetInfoPanel();
+        });
+    });
+
+    function updateInfoPanel(data) {
+        const panel = document.getElementById('node-info');
+        panel.innerHTML = `
+            <div class="info-title">${data.name}</div>
+            <div class="info-row">
+                <span class="info-label">Type</span>
+                <span class="info-value">${data.type}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Region</span>
+                <span class="info-value">${data.region}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Purpose</span>
+                <span class="info-value">${data.purpose}</span>
+            </div>
+            <div style="margin-top: var(--space-md);">
+                <div class="info-label" style="margin-bottom: var(--space-xs);">Connections:</div>
+                ${data.connections.map(c => `<div style="font-size: 0.7rem; color: var(--text-secondary); margin-left: var(--space-sm);">→ ${c}</div>`).join('')}
+            </div>
+        `;
+    }
+
+    function resetInfoPanel() {
+        const panel = document.getElementById('node-info');
+        panel.innerHTML = `
+            <div class="info-title">System Details</div>
+            <div class="info-row">
+                <span class="info-label">Select a node</span>
+                <span class="info-value">--</span>
+            </div>
+            <div style="margin-top: var(--space-md); color: var(--text-muted); font-size: 0.75rem; line-height: 1.6;">
+                Hover over any system node to view detailed status information, latency metrics, and connection health.
+            </div>
+        `;
+    }
+
+    // Initial load
+    loadArchitecture();
+    setInterval(loadArchitecture, 30000);
+</script>
+{% endblock %}

@@ -2739,6 +2739,12 @@ def sapphire_book():
     return render_template('pages/sapphire_book.html', current_page='sapphire-book', page_title='Sapphire Book')
 
 
+@app.route('/architecture')
+@requires_auth
+def architecture():
+    return render_template('pages/architecture.html', current_page='architecture', page_title='System Architecture')
+
+
 @app.route('/settings')
 @requires_auth
 def settings():
