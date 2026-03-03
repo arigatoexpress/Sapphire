@@ -363,18 +363,57 @@
     // Load dashboard data
     async function loadDashboard() {
         try {
-            const [status, metrics, projects, logs, superswarm] = await Promise.all([
-                window.platformApi.getStatus(),
-                window.platformApi.getMetrics(),
-                window.platformApi.getProjects(),
-                window.platformApi.getLogs({ limit: 5, hours: 24 }),
-                window.platformApi.getSuperswarm({ hours: 24 })
-            ]);
+            console.log('Loading dashboard...');
+            
+            // Load data sequentially to better catch errors
+            let status, metrics, projects, logs, superswarm;
+            
+            try {
+                status = await window.platformApi.getStatus();
+                console.log('Status loaded:', status);
+            } catch (e) {
+                console.error('Status load failed:', e);
+                status = { services: {}, summary: {} };
+            }
+            
+            try {
+                metrics = await window.platformApi.getMetrics();
+                console.log('Metrics loaded:', metrics);
+            } catch (e) {
+                console.error('Metrics load failed:', e);
+                metrics = {};
+            }
+            
+            try {
+                projects = await window.platformApi.getProjects();
+                console.log('Projects loaded:', projects);
+            } catch (e) {
+                console.error('Projects load failed:', e);
+                projects = { projects: [] };
+            }
+            
+            try {
+                logs = await window.platformApi.getLogs({ limit: 5, hours: 24 });
+                console.log('Logs loaded:', logs);
+            } catch (e) {
+                console.error('Logs load failed:', e);
+                logs = { logs: [] };
+            }
+            
+            try {
+                superswarm = await window.platformApi.getSuperswarm({ hours: 24 });
+                console.log('Superswarm loaded:', superswarm);
+            } catch (e) {
+                console.error('Superswarm load failed:', e);
+                superswarm = { summary: {} };
+            }
 
             updateMissionStatus(status, metrics, projects, superswarm);
             updateServiceList(status);
             updateActivityLog(logs);
             updateRadar(status);
+            
+            console.log('Dashboard updated successfully');
         } catch (e) {
             console.error('Dashboard load failed:', e);
         }

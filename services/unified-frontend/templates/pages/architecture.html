@@ -200,17 +200,20 @@
 }
 
 .connection-line {
-    stroke: var(--border-dim);
-    stroke-width: 1;
+    stroke: var(--border-color);
+    stroke-width: 2;
     fill: none;
     stroke-dasharray: 5, 5;
     animation: dash 20s linear infinite;
+    opacity: 0.6;
 }
 
 .connection-line.active {
     stroke: var(--green);
     stroke-dasharray: none;
     filter: drop-shadow(0 0 3px var(--green));
+    opacity: 1;
+    stroke-width: 2.5;
 }
 
 @keyframes dash {
