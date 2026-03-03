@@ -1301,15 +1301,45 @@ class LighterBot:
         code = getattr(api_response, "code", None) if api_response else None
         message = getattr(api_response, "message", "") if api_response else ""
         accepted = bool(code == 200)
+
+        filled_qty = 0.0
+        avg_fill_price = 0.0
+        execution_state = "accepted" if accepted else "rejected"
+
+        # Best-effort reconciliation: if the tx is already indexed, parse fill data
+        # so platform telemetry reflects real execution instead of 0/0 placeholders.
+        if accepted and tx_hash and self.transaction_api:
+            for _ in range(3):
+                try:
+                    tx = await self._call_lighter_api(
+                        self.transaction_api.tx,
+                        by="hash",
+                        value=str(tx_hash),
+                    )
+                    event_info_raw = getattr(tx, "event_info", "") if tx else ""
+                    if event_info_raw:
+                        event = json.loads(str(event_info_raw))
+                        trade = event.get("t") or {}
+                        size_int = float(trade.get("s") or 0.0)
+                        price_int_fill = float(trade.get("p") or 0.0)
+                        if size_int > 0:
+                            filled_qty = size_int / float(10 ** max(0, size_decimals))
+                            avg_fill_price = price_int_fill / float(10 ** max(0, price_decimals)) if price_int_fill > 0 else 0.0
+                            execution_state = "filled"
+                            break
+                except Exception:
+                    # tx may not be visible immediately after send_tx
+                    pass
+                await asyncio.sleep(0.5)
+
         return {
             "success": accepted,
             "order_id": tx_hash or f"lighter_tx_{signal_id}",
-            # accepted != filled; keep 0 until reconciliation from account positions.
-            "filled_quantity": 0.0,
-            "avg_fill_price": 0.0,
+            "filled_quantity": float(filled_qty),
+            "avg_fill_price": float(avg_fill_price),
             "error": None if accepted else (message or "send_tx rejected"),
             "metadata": {
-                "execution_state": "accepted" if accepted else "rejected",
+                "execution_state": execution_state,
                 "sdk_path": "signer_client",
                 "tx_hash": tx_hash,
                 "resp_code": code,
