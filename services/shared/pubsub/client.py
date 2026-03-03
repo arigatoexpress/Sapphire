@@ -9,6 +9,7 @@ import asyncio
 import json
 import logging
 import os
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import asdict, is_dataclass
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
@@ -29,6 +30,10 @@ SUBSCRIPTION_ACK_DEADLINE_SECONDS = max(
     10,
     min(int(os.getenv("PUBSUB_SUB_ACK_DEADLINE_SECONDS", "60")), 600),
 )
+PUBLISH_RESULT_TIMEOUT_SECONDS = max(
+    5.0, float(os.getenv("PUBSUB_PUBLISH_RESULT_TIMEOUT_SECONDS", "20"))
+)
+FIRE_AND_FORGET_TOPICS = {"position-updates", "balance-updates"}
 
 
 def _resolve_runtime_service_name() -> str:
@@ -136,16 +141,40 @@ class PubSubClient:
             if self._publisher:
                 # Publish to GCP Pub/Sub in thread
                 future = await asyncio.to_thread(self._publisher.publish, topic_path, message_bytes)
-                message_id = await asyncio.to_thread(future.result, timeout=10)
-                logger.debug(f"📤 Published to {topic}: {message_id}")
-                return message_id
+                if topic in FIRE_AND_FORGET_TOPICS:
+                    # High-frequency telemetry should never block critical loops
+                    # (or shutdown) while waiting for broker acknowledgement.
+                    logger.debug("📤 Queued telemetry publish to %s", topic)
+                    return None
+                try:
+                    message_id = await asyncio.to_thread(
+                        future.result,
+                        timeout=PUBLISH_RESULT_TIMEOUT_SECONDS,
+                    )
+                    logger.debug(f"📤 Published to {topic}: {message_id}")
+                    return message_id
+                except FuturesTimeoutError:
+                    # Timeout waiting for publish acknowledgement is not always a
+                    # delivery failure; under CPU/network pressure the future can
+                    # still complete shortly after. We keep this non-fatal.
+                    logger.warning(
+                        "⚠️ Publish ack timeout on %s after %.1fs (message may still publish)",
+                        topic,
+                        PUBLISH_RESULT_TIMEOUT_SECONDS,
+                    )
+                    return None
             else:
                 # Mock mode - just log
                 logger.info(f"📤 [MOCK] Would publish to {topic}: {data}")
                 return "mock-message-id"
 
         except Exception as e:
-            logger.error(f"❌ Failed to publish to {topic}: {e}")
+            logger.error(
+                "❌ Failed to publish to %s: %s (%r)",
+                topic,
+                type(e).__name__,
+                e,
+            )
             return None
 
     async def subscribe(

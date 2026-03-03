@@ -197,6 +197,10 @@ class LighterBot:
         if api_callable is None:
             return None
 
+        call_timeout = max(
+            2.0,
+            float(os.getenv("LIGHTER_API_CALL_TIMEOUT_SECONDS", "10") or 10),
+        )
         _RETRYABLE: tuple = (ConnectionError, TimeoutError, OSError)
         try:
             import aiohttp as _aio
@@ -208,12 +212,18 @@ class LighterBot:
         for attempt in range(1, 4):  # attempts 1, 2, 3
             try:
                 if inspect.iscoroutinefunction(api_callable):
-                    return await api_callable(*args, **kwargs)
+                    return await asyncio.wait_for(
+                        api_callable(*args, **kwargs),
+                        timeout=call_timeout,
+                    )
 
                 loop = asyncio.get_running_loop()
-                result = await loop.run_in_executor(None, lambda: api_callable(*args, **kwargs))
+                result = await asyncio.wait_for(
+                    loop.run_in_executor(None, lambda: api_callable(*args, **kwargs)),
+                    timeout=call_timeout,
+                )
                 if inspect.isawaitable(result):
-                    return await result
+                    return await asyncio.wait_for(result, timeout=call_timeout)
                 return result
 
             except _RETRYABLE as exc:
@@ -677,11 +687,43 @@ class LighterBot:
         logger.info(f"Stopping {SERVICE_NAME}...")
         self.running = False
         self._shutdown_event.set()
-        # Cancel all sibling tasks so loops (especially queue.get()) exit immediately
-        current = asyncio.current_task()
-        for task in asyncio.all_tasks():
-            if task is not current and not task.done():
-                task.cancel()
+        await self._close_clients()
+
+    async def _sleep_or_stop(self, timeout_seconds: float) -> None:
+        """Sleep with early wakeup when shutdown is requested."""
+        if timeout_seconds <= 0:
+            return
+        try:
+            await asyncio.wait_for(
+                self._shutdown_event.wait(),
+                timeout=float(timeout_seconds),
+            )
+        except asyncio.TimeoutError:
+            return
+
+    async def _close_clients(self) -> None:
+        """Best-effort close of SDK/network clients to avoid aiohttp session leaks."""
+        api_client = getattr(self.client, "api_client", None)
+        if api_client is None:
+            return
+
+        close_fn = getattr(api_client, "close", None)
+        if callable(close_fn):
+            try:
+                maybe = close_fn()
+                if inspect.isawaitable(maybe):
+                    await maybe
+            except Exception as exc:
+                logger.debug("API client close failed: %s", exc)
+
+        rest_client = getattr(api_client, "rest_client", None)
+        pool_manager = getattr(rest_client, "pool_manager", None) if rest_client else None
+        close_pool = getattr(pool_manager, "close", None) if pool_manager else None
+        if callable(close_pool):
+            try:
+                close_pool()
+            except Exception as exc:
+                logger.debug("REST pool close failed: %s", exc)
 
     async def _main_loop(self):
         """Main trading loop."""
@@ -690,10 +732,10 @@ class LighterBot:
         while self.running:
             try:
                 await self._check_positions()
-                await asyncio.sleep(loop_interval)
+                await self._sleep_or_stop(loop_interval)
             except Exception as e:
                 logger.error(f"Main loop error: {e}")
-                await asyncio.sleep(2)
+                await self._sleep_or_stop(2)
 
     async def _balance_sync_loop(self):
         """Periodically sync and publish balance."""
@@ -721,7 +763,7 @@ class LighterBot:
                         )
             except Exception as e:
                 logger.error(f"Balance sync error: {e}")
-            await asyncio.sleep(30)
+            await self._sleep_or_stop(30)
 
     async def _position_publish_loop(self):
         """Periodically publish a snapshot of positions for the realtime dashboard."""
@@ -762,7 +804,7 @@ class LighterBot:
 
             except Exception as e:
                 logger.error(f"Position publish error: {e}")
-            await asyncio.sleep(self._position_publish_interval_seconds)
+            await self._sleep_or_stop(self._position_publish_interval_seconds)
 
     async def _handle_signal(self, signal_data: Dict[str, Any]):
         """Handle incoming trading signal."""
