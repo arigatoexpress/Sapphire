@@ -1048,6 +1048,9 @@ def _validate_tradingview_secret(payload: Dict[str, Any], header_secret: Optiona
 def _build_trade_signal_from_tv_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
     message_payload = _parse_message_payload(payload.get("message"))
     merged: Dict[str, Any] = {**message_payload, **payload}
+    incoming_metadata = merged.get("metadata")
+    if not isinstance(incoming_metadata, dict):
+        incoming_metadata = {}
 
     symbol = _normalize_tv_symbol(_extract_text(merged, ["symbol", "ticker", "pair", "instrument"]))
     action = _normalize_tv_action(_extract_text(merged, ["action", "side", "signal"]))
@@ -1144,6 +1147,11 @@ def _build_trade_signal_from_tv_payload(payload: Dict[str, Any]) -> Dict[str, An
         "origin": "cloud_gateway_webhook",
         "signal_key": signal_key,
         "raw_action": action,
+        "strategy": _extract_text(merged, ["strategy", "strategy_name", "system"], default="").strip()
+        or str(incoming_metadata.get("strategy", "")).strip(),
+        "timeframe": _extract_text(merged, ["timeframe", "tf", "interval"], default="").strip()
+        or str(incoming_metadata.get("timeframe", "")).strip()
+        or str(incoming_metadata.get("tf", "")).strip(),
         "exchange": _extract_text(merged, ["exchange"]),
         "interval": _extract_text(merged, ["interval", "timeframe"]),
         "z_score": z_score,
@@ -1151,6 +1159,10 @@ def _build_trade_signal_from_tv_payload(payload: Dict[str, Any]) -> Dict[str, An
         "message": _extract_text(merged, ["message"]),
         "dry_run": confidence < 0.7,
     }
+    if incoming_metadata:
+        for key in ("strategy_id", "model", "regime", "tag"):
+            if key in incoming_metadata and key not in _metadata:
+                _metadata[key] = incoming_metadata.get(key)
     if TV_TRAILING_STOP:
         _metadata["trailing_stop"] = True
         if TV_TRAILING_STOP_PCT and TV_TRAILING_STOP_PCT > 0:

@@ -202,6 +202,29 @@ class LighterBot:
             0.0,
             self._env_float(("LIGHTER_MAX_ORDER_NOTIONAL_USD",), default=0.0),
         )
+        self._max_position_notional_usd = max(
+            0.0,
+            self._env_float(("LIGHTER_MAX_POSITION_NOTIONAL_USD",), default=0.0),
+        )
+        self._entry_cooldown_seconds = max(
+            0.0,
+            self._env_float(("LIGHTER_ENTRY_COOLDOWN_SECONDS",), default=0.0),
+        )
+        self._last_entry_ts: Dict[str, float] = {}
+        self._allowed_strategies = {
+            s.strip().lower()
+            for s in str(os.getenv("LIGHTER_ALLOWED_STRATEGIES", "")).split(",")
+            if s.strip()
+        }
+        self._allowed_timeframes = {
+            s.strip().lower()
+            for s in str(os.getenv("LIGHTER_ALLOWED_TIMEFRAMES", "")).split(",")
+            if s.strip()
+        }
+        self._strategy_require_metadata = self._env_flag(
+            "LIGHTER_STRATEGY_REQUIRE_METADATA",
+            default=False,
+        )
         self._trading_enabled = self._env_flag("TRADING_ENABLED", default=True)
         self._allow_live_trading = self._env_flag("ALLOW_LIVE_TRADING", default=True)
         self._trading_mode = str(os.getenv("TRADING_MODE", "live")).strip().lower() or "live"
@@ -215,6 +238,17 @@ class LighterBot:
             str(os.getenv("TELEGRAM_CHAT_ID", "")).strip()
             or str(os.getenv("TELEGRAM_BOT_CHAT_ID", "")).strip()
             or str(os.getenv("TELEGRAM_OWNER_USER_ID", "")).strip()
+        )
+        logger.info(
+            "Strategy policy | allowed_strategies=%s allowed_timeframes=%s "
+            "require_metadata=%s entry_cooldown=%.1fs max_order_notional=%.2f "
+            "max_position_notional=%.2f",
+            sorted(self._allowed_strategies) if self._allowed_strategies else ["*"],
+            sorted(self._allowed_timeframes) if self._allowed_timeframes else ["*"],
+            self._strategy_require_metadata,
+            self._entry_cooldown_seconds,
+            self._max_order_notional_usd,
+            self._max_position_notional_usd,
         )
 
     @staticmethod
@@ -883,6 +917,29 @@ class LighterBot:
                 )
                 return
 
+            allowed, reason = self._is_signal_allowed_by_policy(signal)
+            if not allowed:
+                logger.warning(
+                    "Policy reject on %s: signal=%s symbol=%s reason=%s",
+                    PLATFORM.value,
+                    signal.signal_id,
+                    signal.symbol,
+                    reason,
+                )
+                result = TradeResult(
+                    trade_id="",
+                    signal_id=str(signal.signal_id or ""),
+                    platform=PLATFORM.value,
+                    symbol=signal.symbol,
+                    side=signal.side,
+                    success=False,
+                    error_message=f"policy_reject: {reason}",
+                    metadata={"policy_reject": True, "reason": reason},
+                )
+                await publish("trade-executed", result)
+                await self._send_trade_telegram_alert(signal, result, channel="signal")
+                return
+
             signal_id = str(signal.signal_id or "").strip()
             if not signal_id:
                 logger.warning(f"Rejected signal without signal_id on {PLATFORM.value}: {signal.symbol}")
@@ -1026,6 +1083,36 @@ class LighterBot:
             if qty > 0:
                 active.add(self._normalize_coin_symbol(symbol))
         return active
+
+    def _signal_strategy_info(self, signal: TradeSignal) -> tuple[str, str]:
+        metadata = signal.metadata or {}
+        strategy = str(
+            metadata.get("strategy")
+            or metadata.get("strategy_id")
+            or metadata.get("system")
+            or ""
+        ).strip().lower()
+        timeframe = str(
+            metadata.get("timeframe")
+            or metadata.get("tf")
+            or metadata.get("interval")
+            or ""
+        ).strip().lower()
+        return strategy, timeframe
+
+    def _is_signal_allowed_by_policy(self, signal: TradeSignal) -> tuple[bool, str]:
+        strategy, timeframe = self._signal_strategy_info(signal)
+        if self._strategy_require_metadata and (not strategy or not timeframe):
+            return False, "strategy metadata required"
+        if self._allowed_strategies and strategy and strategy not in self._allowed_strategies:
+            return False, f"strategy '{strategy}' not allowed"
+        if self._allowed_timeframes and timeframe and timeframe not in self._allowed_timeframes:
+            return False, f"timeframe '{timeframe}' not allowed"
+        if self._allowed_strategies and not strategy and self._strategy_require_metadata:
+            return False, "missing strategy metadata"
+        if self._allowed_timeframes and not timeframe and self._strategy_require_metadata:
+            return False, "missing timeframe metadata"
+        return True, ""
 
     def _apply_default_risk_levels(
         self,
@@ -1177,6 +1264,14 @@ class LighterBot:
                     raise ValueError(
                         f"Single-symbol mode active: open symbol={locked}, rejected symbol={coin}"
                     )
+                if self._entry_cooldown_seconds > 0:
+                    now_ts = time.time()
+                    last_ts = float(self._last_entry_ts.get(coin, 0.0) or 0.0)
+                    if last_ts and (now_ts - last_ts) < self._entry_cooldown_seconds:
+                        wait_s = self._entry_cooldown_seconds - (now_ts - last_ts)
+                        raise ValueError(
+                            f"Entry cooldown active for {coin}: wait {wait_s:.1f}s"
+                        )
 
             if reduce_only:
                 current = self.positions.get(coin)
@@ -1290,6 +1385,34 @@ class LighterBot:
                     )
                     quantity = float(capped_qty)
 
+            if (
+                not reduce_only
+                and entry_like
+                and self._max_position_notional_usd > 0
+                and current_price > 0
+                and quantity > 0
+            ):
+                requested_notional = float(quantity) * float(current_price)
+                current = self.positions.get(coin)
+                current_qty = float(getattr(current, "quantity", 0.0) or 0.0) if current else 0.0
+                current_notional = abs(current_qty * float(current_price))
+                current_side = getattr(current, "side", None) if current else None
+                same_direction = (
+                    (is_buy and current_side in (TradeSide.BUY, TradeSide.LONG, "BUY", "LONG"))
+                    or ((not is_buy) and current_side in (TradeSide.SELL, TradeSide.SHORT, "SELL", "SHORT"))
+                )
+                if not current or current_qty <= 0:
+                    projected_notional = requested_notional
+                elif same_direction:
+                    projected_notional = current_notional + requested_notional
+                else:
+                    projected_notional = abs(current_notional - requested_notional)
+                if projected_notional > self._max_position_notional_usd:
+                    raise ValueError(
+                        f"Max position notional exceeded for {coin}: "
+                        f"projected={projected_notional:.4f} cap={self._max_position_notional_usd:.4f}"
+                    )
+
             self._apply_default_risk_levels(
                 signal,
                 is_buy=is_buy,
@@ -1367,6 +1490,8 @@ class LighterBot:
                         stop_loss=signal.stop_loss,
                         take_profit=signal.take_profit,
                     )
+                    if entry_like:
+                        self._last_entry_ts[coin] = time.time()
 
                 exec_state = ((result.get("metadata") or {}).get("execution_state")) or (
                     "filled" if filled_qty > 0 else "accepted"
