@@ -161,12 +161,39 @@ class SapphireCtl:
             stderr=proc.stderr or "",
         )
 
+    def _close_all_positions(self, *, target_host: str) -> CommandResult:
+        cmd = [
+            "ssh",
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            "ConnectTimeout=10",
+            target_host,
+            (
+                "curl -sS -X POST http://127.0.0.1:8080/execute "
+                "-H 'Content-Type: application/json' "
+                "-d '{\"action\":\"CLOSE_ALL\",\"source\":\"sapphirectl\",\"reason\":\"post_test_flatten\"}'"
+            ),
+        ]
+        result = self._run(cmd, cwd=REPO_ROOT, env=os.environ.copy())
+        self._event(
+            "close_all_requested",
+            {
+                "target_host": target_host,
+                "ok": result.ok,
+                "returncode": result.returncode,
+                "output": _short_output(result.combined_output, limit=2000),
+            },
+        )
+        return result
+
     def _build_desired_state(
         self,
         *,
         profile: str,
         target_host: str,
         run_test: bool,
+        close_after_test: bool,
         test_quantity: str,
         notes: str,
         overrides: Dict[str, str],
@@ -190,6 +217,7 @@ class SapphireCtl:
             "requested_at_iso": _utc_now_iso(),
             "requested_by": requested_by,
             "run_test": bool(run_test),
+            "close_after_test": bool(close_after_test),
             "test_quantity": str(test_quantity),
             "notes": notes.strip(),
             "state": "pending_apply",
@@ -202,6 +230,7 @@ class SapphireCtl:
         profile: str,
         target_host: str,
         run_test: bool,
+        close_after_test: bool,
         test_quantity: str,
         notes: str,
         overrides: Dict[str, str],
@@ -213,6 +242,7 @@ class SapphireCtl:
             profile=profile,
             target_host=target_host,
             run_test=run_test,
+            close_after_test=close_after_test,
             test_quantity=test_quantity,
             notes=notes,
             overrides=overrides,
@@ -256,7 +286,21 @@ class SapphireCtl:
             }
             test_result = self._run([str(TEST_SCRIPT)], cwd=REPO_ROOT, env=test_env)
 
-        status = "applied" if deploy.ok and test_result.ok else "failed"
+        close_result = CommandResult(
+            ok=True,
+            returncode=0,
+            cmd=[],
+            stdout="skipped",
+            stderr="",
+        )
+        if deploy.ok and run_test and close_after_test and test_result.ok:
+            close_result = self._close_all_positions(target_host=target_host)
+
+        status = (
+            "applied"
+            if deploy.ok and test_result.ok and close_result.ok
+            else "failed"
+        )
         applied_payload: Dict[str, Any] = {
             "platform": PLATFORM,
             "service": DEFAULT_SERVICE,
@@ -268,10 +312,12 @@ class SapphireCtl:
             "requested_by": requested_by,
             "status": status,
             "run_test": run_test,
+            "close_after_test": close_after_test,
             "test_quantity": str(test_quantity),
             "effective_settings": desired["effective_settings"],
             "deploy": deploy.to_dict(),
             "test": test_result.to_dict(),
+            "close": close_result.to_dict(),
         }
         applied_ref.set(applied_payload)
 
@@ -351,6 +397,7 @@ class SapphireCtl:
         profile = str(desired.get("profile") or "luxalgo_sol_5m_active")
         target_host = str(desired.get("target_host") or DEFAULT_HOST)
         run_test = bool(desired.get("run_test", True))
+        close_after_test = bool(desired.get("close_after_test", False))
         test_quantity = str(desired.get("test_quantity") or "0.005")
         notes = str(desired.get("notes") or "")
         overrides = desired.get("overrides") or {}
@@ -361,6 +408,7 @@ class SapphireCtl:
             profile=profile,
             target_host=target_host,
             run_test=run_test,
+            close_after_test=close_after_test,
             test_quantity=test_quantity,
             notes=notes,
             overrides={str(k): str(v) for k, v in overrides.items()},
@@ -396,6 +444,11 @@ def _build_parser() -> argparse.ArgumentParser:
     apply_p.add_argument("--notes", default="")
     apply_p.add_argument("--override", action="append", default=[], help="KEY=VALUE")
     apply_p.add_argument("--no-test", action="store_true", help="Skip unified canary test")
+    apply_p.add_argument(
+        "--close-after-test",
+        action="store_true",
+        help="After successful test canary, request CLOSE_ALL on the local execution gateway.",
+    )
     apply_p.add_argument("--test-quantity", default="0.005")
 
     sub.add_parser("status", help="Show desired/applied/live status")
@@ -415,6 +468,7 @@ def main() -> int:
             profile=args.profile,
             target_host=args.target_host,
             run_test=not args.no_test,
+            close_after_test=bool(args.close_after_test),
             test_quantity=args.test_quantity,
             notes=args.notes,
             overrides=overrides,
