@@ -1,0 +1,7 @@
+# Shannon production denylist
+# Any host matching one of these patterns is blocked unless SHANNON_ALLOW_PRODUCTION=true.
+
+sapphirealpha.xyz
+www.sapphirealpha.xyz
+*.production.*
+*.prod.*

@@ -1,0 +1,31 @@
+authentication:
+  login_type: form
+  login_url: "https://staging.example.com/login"
+  credentials:
+    username: "security-test@example.com"
+    password: "CHANGE_ME"
+    # totp_secret: "BASE32SECRET"
+
+  login_flow:
+    - "Type $username into the email field"
+    - "Type $password into the password field"
+    - "Click the sign in button"
+
+  success_condition:
+    type: url_contains
+    value: "/dashboard"
+
+rules:
+  avoid:
+    - description: "Avoid destructive billing workflows"
+      type: path
+      url_path: "/billing"
+
+  focus:
+    - description: "Prioritize API attack surface"
+      type: path
+      url_path: "/api"
+
+pipeline:
+  retry_preset: subscription
+  max_concurrent_pipelines: 2
