@@ -14,7 +14,7 @@ import os
 import signal
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 # Load .env file if present (for local/Pi deployment)
@@ -233,6 +233,35 @@ class LighterBot:
             self._env_float(("LIGHTER_RISK_EXIT_COOLDOWN_SECONDS",), default=15.0),
         )
         self._risk_exit_attempted_at: Dict[str, float] = {}
+        self._progress_verify_interval_seconds = max(
+            30,
+            int(self._env_float(("LIGHTER_PROGRESS_VERIFY_INTERVAL_SECONDS",), default=180.0)),
+        )
+        self._max_drawdown_alert_pct = max(
+            0.0,
+            self._env_float(("LIGHTER_MAX_DRAWDOWN_ALERT_PCT",), default=5.0),
+        )
+        self._drawdown_alert_cooldown_seconds = max(
+            60.0,
+            self._env_float(("LIGHTER_DRAWDOWN_ALERT_COOLDOWN_SECONDS",), default=900.0),
+        )
+        self._sync_stale_alert_seconds = max(
+            60,
+            int(self._env_float(("LIGHTER_SYNC_STALE_ALERT_SECONDS",), default=300.0)),
+        )
+        self._sync_stale_alert_cooldown_seconds = max(
+            60.0,
+            self._env_float(("LIGHTER_SYNC_STALE_ALERT_COOLDOWN_SECONDS",), default=900.0),
+        )
+        self._equity_baseline: Optional[float] = None
+        self._equity_peak: Optional[float] = None
+        self._equity_trough: Optional[float] = None
+        self._last_drawdown_alert_ts: float = 0.0
+        self._last_sync_stale_alert_ts: float = 0.0
+        self._last_balance_sync_ts: float = 0.0
+        self._last_position_check_ts: float = 0.0
+        self._last_balance_sync_error: str = ""
+        self._last_position_check_error: str = ""
         self._telegram_bot_token = str(os.getenv("TELEGRAM_BOT_TOKEN", "")).strip()
         self._telegram_chat_id = (
             str(os.getenv("TELEGRAM_CHAT_ID", "")).strip()
@@ -242,13 +271,17 @@ class LighterBot:
         logger.info(
             "Strategy policy | allowed_strategies=%s allowed_timeframes=%s "
             "require_metadata=%s entry_cooldown=%.1fs max_order_notional=%.2f "
-            "max_position_notional=%.2f",
+            "max_position_notional=%.2f progress_verify=%.0fs dd_alert=%.2f%% "
+            "sync_stale_alert=%.0fs",
             sorted(self._allowed_strategies) if self._allowed_strategies else ["*"],
             sorted(self._allowed_timeframes) if self._allowed_timeframes else ["*"],
             self._strategy_require_metadata,
             self._entry_cooldown_seconds,
             self._max_order_notional_usd,
             self._max_position_notional_usd,
+            self._progress_verify_interval_seconds,
+            self._max_drawdown_alert_pct,
+            self._sync_stale_alert_seconds,
         )
 
     @staticmethod
@@ -627,6 +660,7 @@ class LighterBot:
                 self._gateway_loop(),
                 self._balance_sync_loop(),
                 self._position_publish_loop(),
+                self._progress_verification_loop(),
             ]
             await asyncio.gather(*tasks)
 
@@ -672,6 +706,7 @@ class LighterBot:
                     f"EXECUTING HUB COMMAND: {signal.side} {signal.quantity} {signal.symbol}"
                 )
                 result = await self._execute_trade(signal)
+                await self._record_execution_verification(signal, result, channel="hub")
                 logger.info(f"Hub Command Executed: {result.success}")
                 await publish("trade-executed", result)
                 await self._send_trade_telegram_alert(signal, result, channel="hub")
@@ -838,6 +873,8 @@ class LighterBot:
                     if account:
                         equity = float(getattr(account, "equity", 0))
                         self.balance = equity
+                        self._last_balance_sync_ts = time.time()
+                        self._last_balance_sync_error = ""
 
                         await publish(
                             "balance-updates",
@@ -849,6 +886,7 @@ class LighterBot:
                             ),
                         )
             except Exception as e:
+                self._last_balance_sync_error = f"{type(e).__name__}: {e}"
                 logger.error(f"Balance sync error: {e}")
             await self._sleep_or_stop(30)
 
@@ -936,6 +974,7 @@ class LighterBot:
                     error_message=f"policy_reject: {reason}",
                     metadata={"policy_reject": True, "reason": reason},
                 )
+                await self._record_execution_verification(signal, result, channel="signal")
                 await publish("trade-executed", result)
                 await self._send_trade_telegram_alert(signal, result, channel="signal")
                 return
@@ -960,6 +999,7 @@ class LighterBot:
 
             logger.info(f"Received signal: {signal.side} {signal.symbol}")
             result = await self._execute_trade(signal)
+            await self._record_execution_verification(signal, result, channel="signal")
 
             # Persist outcome to idempotency store.
             if idempotency is not None:
@@ -1155,6 +1195,251 @@ class LighterBot:
                 8,
             )
 
+    @staticmethod
+    def _to_float(value: Any, default: float = 0.0) -> float:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return float(default)
+
+    async def _estimate_equity_snapshot(self) -> Dict[str, Any]:
+        """
+        Build a lightweight equity snapshot from current balance + tracked positions.
+        Uses current_price when available, otherwise falls back to entry_price.
+        """
+        now_ts = time.time()
+        now_iso = datetime.now(timezone.utc).isoformat()
+        cash_balance = self._to_float(self.balance, 0.0)
+        unrealized_pnl = 0.0
+        position_notional = 0.0
+        stale_price_positions = 0
+        positions_count = 0
+
+        for symbol, position in self.positions.items():
+            qty = abs(self._to_float(getattr(position, "quantity", 0.0), 0.0))
+            if qty <= 0:
+                continue
+            positions_count += 1
+
+            entry = self._to_float(getattr(position, "entry_price", 0.0), 0.0)
+            mark = self._to_float(getattr(position, "current_price", 0.0), 0.0)
+            if mark <= 0 and entry > 0:
+                mark = entry
+                stale_price_positions += 1
+            elif mark <= 0:
+                stale_price_positions += 1
+                continue
+
+            side = getattr(position, "side", None)
+            is_long = side in (TradeSide.BUY, TradeSide.LONG, "BUY", "LONG")
+            if entry > 0:
+                pnl = ((mark - entry) * qty) if is_long else ((entry - mark) * qty)
+                unrealized_pnl += pnl
+
+            position_notional += abs(mark * qty)
+
+        equity_estimate = cash_balance + unrealized_pnl
+        balance_sync_age_sec = (
+            round(max(0.0, now_ts - self._last_balance_sync_ts), 3)
+            if self._last_balance_sync_ts > 0
+            else None
+        )
+        position_check_age_sec = (
+            round(max(0.0, now_ts - self._last_position_check_ts), 3)
+            if self._last_position_check_ts > 0
+            else None
+        )
+        balance_sync_stale = (
+            balance_sync_age_sec is None or balance_sync_age_sec > self._sync_stale_alert_seconds
+        )
+        position_check_stale = (
+            position_check_age_sec is None or position_check_age_sec > self._sync_stale_alert_seconds
+        )
+
+        return {
+            "platform": PLATFORM.value,
+            "timestamp": now_iso,
+            "cash_balance": round(cash_balance, 8),
+            "unrealized_pnl": round(unrealized_pnl, 8),
+            "equity_estimate": round(equity_estimate, 8),
+            "position_notional_usd": round(position_notional, 8),
+            "positions_count": int(positions_count),
+            "stale_price_positions": int(stale_price_positions),
+            "balance_sync_age_sec": balance_sync_age_sec,
+            "position_check_age_sec": position_check_age_sec,
+            "balance_sync_stale": bool(balance_sync_stale),
+            "position_check_stale": bool(position_check_stale),
+            "last_balance_sync_at": (
+                datetime.fromtimestamp(self._last_balance_sync_ts, tz=timezone.utc).isoformat()
+                if self._last_balance_sync_ts > 0
+                else None
+            ),
+            "last_position_check_at": (
+                datetime.fromtimestamp(self._last_position_check_ts, tz=timezone.utc).isoformat()
+                if self._last_position_check_ts > 0
+                else None
+            ),
+            "last_balance_sync_error": self._last_balance_sync_error,
+            "last_position_check_error": self._last_position_check_error,
+        }
+
+    async def _persist_equity_snapshot(self, snapshot: Dict[str, Any], reason: str) -> None:
+        if self._db is None:
+            return
+        payload = dict(snapshot)
+        payload["reason"] = str(reason)
+        payload["recorded_at"] = datetime.now(timezone.utc)
+        payload["service"] = SERVICE_NAME
+        snapshot_id = f"{PLATFORM.value}_{int(time.time() * 1000)}"
+        try:
+            await self._db.collection("equity_snapshots").document(snapshot_id).set(payload)
+            await self._db.collection("equity_snapshots_current").document(PLATFORM.value).set(payload)
+        except Exception as exc:
+            logger.debug("Equity snapshot write error: %s", exc)
+
+    async def _record_execution_verification(
+        self,
+        signal: TradeSignal,
+        result: TradeResult,
+        channel: str,
+    ) -> None:
+        """Persist per-signal execution audit row for traceability."""
+        strategy, timeframe = self._signal_strategy_info(signal)
+        snapshot = await self._estimate_equity_snapshot()
+        payload: Dict[str, Any] = {
+            "service": SERVICE_NAME,
+            "platform": PLATFORM.value,
+            "channel": channel,
+            "signal_id": str(signal.signal_id or ""),
+            "symbol": str(signal.symbol or ""),
+            "side": str(signal.side),
+            "signal_type": str(signal.signal_type),
+            "strategy": strategy,
+            "timeframe": timeframe,
+            "quantity": self._to_float(getattr(signal, "quantity", 0.0), 0.0),
+            "take_profit": self._to_float(getattr(signal, "take_profit", 0.0), 0.0),
+            "stop_loss": self._to_float(getattr(signal, "stop_loss", 0.0), 0.0),
+            "success": bool(getattr(result, "success", False)),
+            "error_message": str(getattr(result, "error_message", "") or ""),
+            "filled_quantity": self._to_float(getattr(result, "filled_quantity", 0.0), 0.0),
+            "avg_price": self._to_float(getattr(result, "avg_price", 0.0), 0.0),
+            "order_id": str(getattr(result, "order_id", "") or ""),
+            "execution_time_ms": self._to_float(getattr(result, "execution_time_ms", 0.0), 0.0),
+            "equity_estimate": snapshot.get("equity_estimate", 0.0),
+            "cash_balance": snapshot.get("cash_balance", 0.0),
+            "position_notional_usd": snapshot.get("position_notional_usd", 0.0),
+            "metadata": (signal.metadata or {}),
+            "recorded_at": datetime.now(timezone.utc),
+        }
+        logger.info(
+            "Execution verify | signal=%s ok=%s fill=%s@%s equity=%s",
+            payload["signal_id"],
+            payload["success"],
+            payload["filled_quantity"],
+            payload["avg_price"],
+            payload["equity_estimate"],
+        )
+        if self._db is None:
+            return
+        try:
+            key = payload["signal_id"] or f"noid-{int(time.time() * 1000)}"
+            doc_id = f"{PLATFORM.value}_{key}_{channel}"
+            await self._db.collection("execution_verifications").document(doc_id).set(payload)
+        except Exception as exc:
+            logger.debug("Execution verification write error: %s", exc)
+
+    async def _progress_verification_loop(self) -> None:
+        """
+        Periodic process verifier:
+        - snapshots equity estimates
+        - tracks baseline/peak/trough progress
+        - alerts on sustained drawdown breaches
+        """
+        while self.running:
+            try:
+                snap = await self._estimate_equity_snapshot()
+                equity = self._to_float(snap.get("equity_estimate"), 0.0)
+                if equity > 0 and self._equity_baseline is None:
+                    self._equity_baseline = equity
+                    self._equity_peak = equity
+                    self._equity_trough = equity
+
+                if equity > 0:
+                    self._equity_peak = max(self._equity_peak or equity, equity)
+                    self._equity_trough = min(self._equity_trough or equity, equity)
+
+                baseline = self._equity_baseline or 0.0
+                peak = self._equity_peak or 0.0
+                progress_pct = ((equity - baseline) / baseline * 100.0) if baseline > 0 else 0.0
+                drawdown_pct = ((equity - peak) / peak * 100.0) if peak > 0 else 0.0
+                snap["progress_pct"] = round(progress_pct, 6)
+                snap["drawdown_pct"] = round(drawdown_pct, 6)
+                snap["baseline_equity"] = round(baseline, 8) if baseline > 0 else 0.0
+                snap["peak_equity"] = round(peak, 8) if peak > 0 else 0.0
+
+                logger.info(
+                    "Progress verify | equity=%.6f progress=%.3f%% drawdown=%.3f%% "
+                    "cash=%.6f upnl=%.6f pos_notional=%.6f positions=%s "
+                    "bal_age=%ss pos_age=%ss",
+                    equity,
+                    progress_pct,
+                    drawdown_pct,
+                    self._to_float(snap.get("cash_balance"), 0.0),
+                    self._to_float(snap.get("unrealized_pnl"), 0.0),
+                    self._to_float(snap.get("position_notional_usd"), 0.0),
+                    snap.get("positions_count", 0),
+                    snap.get("balance_sync_age_sec"),
+                    snap.get("position_check_age_sec"),
+                )
+
+                await self._persist_equity_snapshot(snap, reason="progress_loop")
+
+                now_ts = time.time()
+                if bool(snap.get("balance_sync_stale")) or bool(snap.get("position_check_stale")):
+                    logger.warning(
+                        "Data freshness warning | balance_stale=%s age=%ss pos_stale=%s age=%ss "
+                        "balance_err=%s position_err=%s",
+                        snap.get("balance_sync_stale"),
+                        snap.get("balance_sync_age_sec"),
+                        snap.get("position_check_stale"),
+                        snap.get("position_check_age_sec"),
+                        snap.get("last_balance_sync_error") or "none",
+                        snap.get("last_position_check_error") or "none",
+                    )
+                    if (
+                        (now_ts - self._last_sync_stale_alert_ts)
+                        >= self._sync_stale_alert_cooldown_seconds
+                    ):
+                        self._last_sync_stale_alert_ts = now_ts
+                        await self._send_telegram_message(
+                            (
+                                "LIGHTER DATA FRESHNESS ALERT\n"
+                                f"balance_sync_age={snap.get('balance_sync_age_sec')}s "
+                                f"position_check_age={snap.get('position_check_age_sec')}s\n"
+                                f"balance_error={snap.get('last_balance_sync_error') or 'none'}\n"
+                                f"position_error={snap.get('last_position_check_error') or 'none'}"
+                            )
+                        )
+
+                if (
+                    self._max_drawdown_alert_pct > 0
+                    and drawdown_pct <= -abs(self._max_drawdown_alert_pct)
+                    and (now_ts - self._last_drawdown_alert_ts) >= self._drawdown_alert_cooldown_seconds
+                ):
+                    self._last_drawdown_alert_ts = now_ts
+                    await self._send_telegram_message(
+                        (
+                            "LIGHTER DRAWDOWN ALERT\n"
+                            f"equity={equity:.4f} baseline={baseline:.4f} peak={peak:.4f}\n"
+                            f"progress={progress_pct:.2f}% drawdown={drawdown_pct:.2f}%"
+                        )
+                    )
+
+            except Exception as exc:
+                logger.error("Progress verification error: %s", exc)
+
+            await self._sleep_or_stop(self._progress_verify_interval_seconds)
+
     def _resolve_market(self, symbol: str) -> Dict[str, Any]:
         """
         Resolve a market row from any symbol style:
@@ -1212,8 +1497,10 @@ class LighterBot:
             await self._close_all_positions()
         elif action == "halt_trading":
             self.config.trading_enabled = False
+            self._trading_enabled = False
         elif action == "resume_trading":
             self.config.trading_enabled = True
+            self._trading_enabled = True
 
     async def _execute_trade(self, signal: TradeSignal) -> TradeResult:
         """Execute trade on Lighter with L2 order book."""
@@ -1931,8 +2218,11 @@ class LighterBot:
 
                 # Replace with the authoritative snapshot (clears closed positions).
                 self.positions = next_positions
+                self._last_position_check_ts = time.time()
+                self._last_position_check_error = ""
 
         except Exception as e:
+            self._last_position_check_error = f"{type(e).__name__}: {e}"
             logger.error(f"Position check error: {e}")
 
     async def _enforce_position_risk_exits(self) -> None:
