@@ -202,6 +202,9 @@ class LighterBot:
             0.0,
             self._env_float(("LIGHTER_MAX_ORDER_NOTIONAL_USD",), default=0.0),
         )
+        self._trading_enabled = self._env_flag("TRADING_ENABLED", default=True)
+        self._allow_live_trading = self._env_flag("ALLOW_LIVE_TRADING", default=True)
+        self._trading_mode = str(os.getenv("TRADING_MODE", "live")).strip().lower() or "live"
         self._risk_exit_cooldown_seconds = max(
             5.0,
             self._env_float(("LIGHTER_RISK_EXIT_COOLDOWN_SECONDS",), default=15.0),
@@ -932,14 +935,22 @@ class LighterBot:
         ok = bool(getattr(result, "success", False))
         order_id = str(getattr(result, "order_id", "") or "")
         fill_qty = float(getattr(result, "filled_quantity", 0.0) or 0.0)
-        fill_price = float(getattr(result, "fill_price", 0.0) or 0.0)
+        fill_price = float(
+            getattr(result, "avg_price", None)
+            or getattr(result, "fill_price", 0.0)
+            or 0.0
+        )
         err = str(getattr(result, "error_message", "") or "")
+        tp = getattr(signal, "take_profit", None)
+        sl = getattr(signal, "stop_loss", None)
         status = "FILLED" if ok else "REJECTED"
         lines = [
             f"LIGHTER {status}",
             f"src={channel} signal={signal.signal_id}",
             f"{side} {symbol} qty={qty:g}",
         ]
+        if tp or sl:
+            lines.append(f"tp={tp or '-'} sl={sl or '-'}")
         if fill_qty > 0:
             lines.append(f"filled={fill_qty:g} @ {fill_price:g}")
         if order_id:
@@ -1122,6 +1133,10 @@ class LighterBot:
         start_time = datetime.now()
 
         try:
+            if not self._trading_enabled:
+                raise Exception("Trading disabled (TRADING_ENABLED=false)")
+            if self._trading_mode == "live" and not self._allow_live_trading:
+                raise Exception("Live trading disabled (ALLOW_LIVE_TRADING=0)")
             if not self.transaction_api:
                 raise Exception("Transaction API not initialized")
             if self._execution_block_reason:
