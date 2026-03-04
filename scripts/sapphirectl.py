@@ -34,6 +34,7 @@ TEST_SCRIPT = REPO_ROOT / "scripts" / "run_unified_lighter_prod_test.sh"
 
 DESIRED_COLLECTION = "control_plane_desired"
 APPLIED_COLLECTION = "control_plane_applied"
+APPLIED_HISTORY_COLLECTION = "control_plane_applied_history"
 EVENTS_COLLECTION = "control_plane_events"
 
 
@@ -70,6 +71,48 @@ PROFILE_SETTINGS: Dict[str, Dict[str, str]] = {
         "LIGHTER_ENTRY_COOLDOWN_SECONDS": "300",
         "LIGHTER_DEFAULT_TAKE_PROFIT_PCT": "1.0",
         "LIGHTER_DEFAULT_STOP_LOSS_PCT": "0.7",
+    },
+}
+
+PROMOTION_STAGES: Dict[str, Dict[str, Any]] = {
+    "paper": {
+        "profile": "luxalgo_sol_5m_active",
+        "run_test": False,
+        "close_after_test": False,
+        "test_quantity": "0.001",
+        "overrides": {
+            "ALLOW_LIVE_TRADING": "0",
+            "TRADING_ENABLED": "1",
+            "LIGHTER_MAX_ORDER_NOTIONAL_USD": "0.5",
+            "LIGHTER_MAX_POSITION_NOTIONAL_USD": "1.5",
+            "LIGHTER_ENTRY_COOLDOWN_SECONDS": "300",
+        },
+    },
+    "canary": {
+        "profile": "luxalgo_sol_5m_active",
+        "run_test": True,
+        "close_after_test": True,
+        "test_quantity": "0.002",
+        "overrides": {
+            "ALLOW_LIVE_TRADING": "1",
+            "TRADING_ENABLED": "1",
+            "LIGHTER_MAX_ORDER_NOTIONAL_USD": "1.0",
+            "LIGHTER_MAX_POSITION_NOTIONAL_USD": "3.0",
+            "LIGHTER_ENTRY_COOLDOWN_SECONDS": "240",
+        },
+    },
+    "live": {
+        "profile": "luxalgo_sol_5m_active",
+        "run_test": True,
+        "close_after_test": False,
+        "test_quantity": "0.003",
+        "overrides": {
+            "ALLOW_LIVE_TRADING": "1",
+            "TRADING_ENABLED": "1",
+            "LIGHTER_MAX_ORDER_NOTIONAL_USD": "5",
+            "LIGHTER_MAX_POSITION_NOTIONAL_USD": "8",
+            "LIGHTER_ENTRY_COOLDOWN_SECONDS": "180",
+        },
     },
 }
 
@@ -187,6 +230,133 @@ class SapphireCtl:
         )
         return result
 
+    def _apply_overrides_remote(
+        self,
+        *,
+        target_host: str,
+        overrides: Dict[str, str],
+    ) -> CommandResult:
+        if not overrides:
+            return CommandResult(
+                ok=True,
+                returncode=0,
+                cmd=[],
+                stdout="skipped",
+                stderr="",
+            )
+
+        env_path = "/home/rari/Sapphire/services/bot-lighter/.env"
+        updates_json = json.dumps(overrides, separators=(",", ":"))
+        remote_script = (
+            "python3 - <<'PY'\n"
+            "from pathlib import Path\n"
+            "import json\n"
+            f"env_file = Path('{env_path}')\n"
+            f"updates = json.loads('''{updates_json}''')\n"
+            "lines = env_file.read_text().splitlines() if env_file.exists() else []\n"
+            "out = []\n"
+            "seen = set()\n"
+            "for ln in lines:\n"
+            "    if '=' in ln and not ln.strip().startswith('#'):\n"
+            "        k, _ = ln.split('=', 1)\n"
+            "        key = k.strip()\n"
+            "        if key in updates:\n"
+            "            out.append(f\"{key}={updates[key]}\")\n"
+            "            seen.add(key)\n"
+            "            continue\n"
+            "    out.append(ln)\n"
+            "for key, value in updates.items():\n"
+            "    if key not in seen:\n"
+            "        out.append(f\"{key}={value}\")\n"
+            "env_file.write_text('\\n'.join(out) + '\\n')\n"
+            "print(f'Updated {env_file}')\n"
+            "for key in sorted(updates):\n"
+            "    print(f'{key}={updates[key]}')\n"
+            "PY"
+        )
+        set_result = self._run(
+            [
+                "ssh",
+                "-o",
+                "BatchMode=yes",
+                "-o",
+                "ConnectTimeout=10",
+                target_host,
+                remote_script,
+            ],
+            cwd=REPO_ROOT,
+            env=os.environ.copy(),
+        )
+        if not set_result.ok:
+            return set_result
+
+        restart_result = self._run(
+            [
+                "ssh",
+                "-o",
+                "BatchMode=yes",
+                "-o",
+                "ConnectTimeout=10",
+                target_host,
+                (
+                    "sudo systemctl restart lighter-trading && "
+                    "sleep 6 && "
+                    "systemctl is-active lighter-trading && "
+                    "systemctl show lighter-trading -p ActiveState -p SubState -p MainPID"
+                ),
+            ],
+            cwd=REPO_ROOT,
+            env=os.environ.copy(),
+        )
+        merged_stdout = "\n".join(
+            part for part in [set_result.stdout, restart_result.stdout] if part
+        )
+        merged_stderr = "\n".join(
+            part for part in [set_result.stderr, restart_result.stderr] if part
+        )
+        merged = CommandResult(
+            ok=restart_result.ok,
+            returncode=restart_result.returncode,
+            cmd=restart_result.cmd,
+            stdout=merged_stdout,
+            stderr=merged_stderr,
+        )
+        self._event(
+            "remote_overrides_applied",
+            {
+                "target_host": target_host,
+                "override_keys": sorted(list(overrides.keys())),
+                "ok": merged.ok,
+                "returncode": merged.returncode,
+            },
+        )
+        return merged
+
+    @staticmethod
+    def _effective_overrides_for_profile(
+        profile: str,
+        effective_settings: Dict[str, str],
+    ) -> Dict[str, str]:
+        base = PROFILE_SETTINGS.get(profile, {})
+        overrides: Dict[str, str] = {}
+        for key, value in (effective_settings or {}).items():
+            val = str(value)
+            if str(base.get(key, "")) != val:
+                overrides[str(key)] = val
+        return overrides
+
+    def _load_applied_history(self, *, limit: int = 50) -> List[Dict[str, Any]]:
+        rows: List[Dict[str, Any]] = []
+        for doc in self.db.collection(APPLIED_HISTORY_COLLECTION).stream():
+            row = doc.to_dict() or {}
+            row["_id"] = doc.id
+            rows.append(row)
+        rows.sort(
+            key=lambda r: str(r.get("applied_at_iso") or ""),
+            reverse=True,
+        )
+        return rows[: max(1, int(limit))]
+
     def _build_desired_state(
         self,
         *,
@@ -263,6 +433,17 @@ class SapphireCtl:
             env={**os.environ, "PROJECT_ID": self.project},
         )
 
+        override_apply_result = self._apply_overrides_remote(
+            target_host=target_host,
+            overrides=overrides,
+        ) if deploy.ok else CommandResult(
+            ok=False,
+            returncode=1,
+            cmd=[],
+            stdout="skipped_due_to_deploy_failure",
+            stderr="",
+        )
+
         test_result = CommandResult(
             ok=True,
             returncode=0,
@@ -270,7 +451,7 @@ class SapphireCtl:
             stdout="skipped",
             stderr="",
         )
-        if deploy.ok and run_test:
+        if deploy.ok and override_apply_result.ok and run_test:
             strategy_list = str(desired["effective_settings"].get("LIGHTER_ALLOWED_STRATEGIES", "")).split(",")
             timeframe_list = str(desired["effective_settings"].get("LIGHTER_ALLOWED_TIMEFRAMES", "")).split(",")
             strategy = (strategy_list[0].strip() if strategy_list and strategy_list[0].strip() else "luxalgo_msb_ob")
@@ -293,12 +474,12 @@ class SapphireCtl:
             stdout="skipped",
             stderr="",
         )
-        if deploy.ok and run_test and close_after_test and test_result.ok:
+        if deploy.ok and override_apply_result.ok and run_test and close_after_test and test_result.ok:
             close_result = self._close_all_positions(target_host=target_host)
 
         status = (
             "applied"
-            if deploy.ok and test_result.ok and close_result.ok
+            if deploy.ok and override_apply_result.ok and test_result.ok and close_result.ok
             else "failed"
         )
         applied_payload: Dict[str, Any] = {
@@ -316,10 +497,13 @@ class SapphireCtl:
             "test_quantity": str(test_quantity),
             "effective_settings": desired["effective_settings"],
             "deploy": deploy.to_dict(),
+            "override_apply": override_apply_result.to_dict(),
             "test": test_result.to_dict(),
             "close": close_result.to_dict(),
         }
         applied_ref.set(applied_payload)
+        history_id = f"{_utc_now().strftime('%Y%m%dT%H%M%SZ')}_{desired['desired_version']}"
+        self.db.collection(APPLIED_HISTORY_COLLECTION).document(history_id).set(applied_payload)
 
         desired_update = {
             "state": "applied" if status == "applied" else "apply_failed",
@@ -344,10 +528,126 @@ class SapphireCtl:
             "applied": applied_payload,
         }
 
+    def promote(
+        self,
+        *,
+        to_stage: str,
+        target_host: str,
+        requested_by: str,
+        profile_override: str | None,
+        test_quantity_override: str | None,
+        run_test_override: bool | None,
+        close_after_test_override: bool | None,
+        notes: str,
+        extra_overrides: Dict[str, str],
+    ) -> Dict[str, Any]:
+        stage_cfg = PROMOTION_STAGES.get(to_stage)
+        if not stage_cfg:
+            raise ValueError(f"Unknown promotion stage: {to_stage}")
+
+        profile = profile_override or str(stage_cfg["profile"])
+        run_test = bool(stage_cfg["run_test"]) if run_test_override is None else bool(run_test_override)
+        close_after_test = (
+            bool(stage_cfg.get("close_after_test", False))
+            if close_after_test_override is None
+            else bool(close_after_test_override)
+        )
+        test_quantity = test_quantity_override or str(stage_cfg["test_quantity"])
+
+        merged_overrides = dict(stage_cfg.get("overrides", {}))
+        merged_overrides.update(extra_overrides)
+        note = notes.strip() or f"promote_to_{to_stage}"
+
+        result = self.apply(
+            profile=profile,
+            target_host=target_host,
+            run_test=run_test,
+            close_after_test=close_after_test,
+            test_quantity=test_quantity,
+            notes=note,
+            overrides=merged_overrides,
+            requested_by=requested_by,
+        )
+        desired_ref = self.db.collection(DESIRED_COLLECTION).document(PLATFORM)
+        desired_ref.set(
+            {
+                "stage": to_stage,
+                "last_promoted_at": _utc_now(),
+                "last_promoted_at_iso": _utc_now_iso(),
+                "last_promoted_by": requested_by,
+            },
+            merge=True,
+        )
+        self._event(
+            "stage_promoted",
+            {
+                "to_stage": to_stage,
+                "profile": profile,
+                "run_test": run_test,
+                "close_after_test": close_after_test,
+                "target_host": target_host,
+                "status": (result.get("applied") or {}).get("status"),
+            },
+        )
+        return {"stage": to_stage, "result": result}
+
+    def rollback(
+        self,
+        *,
+        steps: int,
+        target_host: str,
+        requested_by: str,
+        run_test: bool,
+        close_after_test: bool,
+        test_quantity: str,
+        notes: str,
+    ) -> Dict[str, Any]:
+        steps = max(1, int(steps))
+        history = [
+            row for row in self._load_applied_history(limit=120)
+            if str(row.get("status", "")).lower() == "applied"
+        ]
+        if len(history) <= steps:
+            raise RuntimeError(
+                f"Rollback needs at least {steps + 1} applied history records; found {len(history)}"
+            )
+        target = history[steps]
+        profile = str(target.get("profile") or "luxalgo_sol_5m_active")
+        effective = target.get("effective_settings") or {}
+        if not isinstance(effective, dict):
+            effective = {}
+        overrides = self._effective_overrides_for_profile(profile, {str(k): str(v) for k, v in effective.items()})
+        note = notes.strip() or f"rollback_to_{target.get('desired_version', 'unknown')}"
+        result = self.apply(
+            profile=profile,
+            target_host=target_host,
+            run_test=run_test,
+            close_after_test=close_after_test,
+            test_quantity=test_quantity,
+            notes=note,
+            overrides=overrides,
+            requested_by=requested_by,
+        )
+        self._event(
+            "rollback_applied",
+            {
+                "rollback_steps": steps,
+                "rolled_back_to_desired_version": target.get("desired_version"),
+                "target_host": target_host,
+                "status": (result.get("applied") or {}).get("status"),
+            },
+        )
+        return {
+            "rollback_steps": steps,
+            "target_history_record": target,
+            "result": result,
+        }
+
     def status(self) -> Dict[str, Any]:
         desired = self.db.collection(DESIRED_COLLECTION).document(PLATFORM).get().to_dict() or {}
         applied = self.db.collection(APPLIED_COLLECTION).document(PLATFORM).get().to_dict() or {}
         live_position = self.db.collection("live_positions").document(PLATFORM).get().to_dict() or {}
+        history = self._load_applied_history(limit=5)
 
         systemctl = self._run(
             [
@@ -367,6 +667,7 @@ class SapphireCtl:
             "project": self.project,
             "desired": desired,
             "applied": applied,
+            "applied_history": history,
             "live_positions": {
                 "position_count": live_position.get("position_count"),
                 "updated_at": str(live_position.get("updated_at")),
@@ -451,6 +752,42 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     apply_p.add_argument("--test-quantity", default="0.005")
 
+    promote_p = sub.add_parser("promote", help="Promote runtime stage (paper/canary/live)")
+    promote_p.add_argument("--to", required=True, choices=sorted(PROMOTION_STAGES.keys()))
+    promote_p.add_argument("--target-host", default=DEFAULT_HOST)
+    promote_p.add_argument(
+        "--profile",
+        choices=sorted(PROFILE_SETTINGS.keys()),
+        default="",
+        help="Optional profile override for the stage",
+    )
+    promote_p.add_argument("--override", action="append", default=[], help="KEY=VALUE")
+    promote_p.add_argument("--notes", default="")
+    promote_p.add_argument("--test-quantity", default="")
+    promote_p.add_argument(
+        "--skip-test",
+        action="store_true",
+        help="Override stage default and skip canary test",
+    )
+    promote_p.add_argument(
+        "--close-after-test",
+        action="store_true",
+        help="Force CLOSE_ALL after successful test (overrides stage default).",
+    )
+    promote_p.add_argument(
+        "--no-close-after-test",
+        action="store_true",
+        help="Disable CLOSE_ALL post-test even if stage default enables it.",
+    )
+
+    rollback_p = sub.add_parser("rollback", help="Rollback to a previous applied state")
+    rollback_p.add_argument("--steps", type=int, default=1, help="How many applied versions back")
+    rollback_p.add_argument("--target-host", default=DEFAULT_HOST)
+    rollback_p.add_argument("--notes", default="")
+    rollback_p.add_argument("--test-quantity", default="0.002")
+    rollback_p.add_argument("--skip-test", action="store_true")
+    rollback_p.add_argument("--close-after-test", action="store_true")
+
     sub.add_parser("status", help="Show desired/applied/live status")
     sub.add_parser("reconcile", help="Apply desired state if not converged")
     return p
@@ -476,6 +813,44 @@ def main() -> int:
         )
         _json_print(out)
         return 0 if out["applied"]["status"] == "applied" else 2
+
+    if args.command == "promote":
+        if args.close_after_test and args.no_close_after_test:
+            raise SystemExit("Cannot set both --close-after-test and --no-close-after-test")
+        close_after_test_override = None
+        if args.close_after_test:
+            close_after_test_override = True
+        elif args.no_close_after_test:
+            close_after_test_override = False
+        run_test_override = None if not args.skip_test else False
+        out = ctl.promote(
+            to_stage=args.to,
+            target_host=args.target_host,
+            requested_by=args.requested_by,
+            profile_override=args.profile or None,
+            test_quantity_override=args.test_quantity or None,
+            run_test_override=run_test_override,
+            close_after_test_override=close_after_test_override,
+            notes=args.notes,
+            extra_overrides=_parse_overrides(args.override),
+        )
+        _json_print(out)
+        status = (((out.get("result") or {}).get("applied") or {}).get("status") or "").lower()
+        return 0 if status == "applied" else 2
+
+    if args.command == "rollback":
+        out = ctl.rollback(
+            steps=args.steps,
+            target_host=args.target_host,
+            requested_by=args.requested_by,
+            run_test=not args.skip_test,
+            close_after_test=bool(args.close_after_test),
+            test_quantity=args.test_quantity,
+            notes=args.notes,
+        )
+        _json_print(out)
+        status = (((out.get("result") or {}).get("applied") or {}).get("status") or "").lower()
+        return 0 if status == "applied" else 2
 
     if args.command == "status":
         _json_print(ctl.status())
