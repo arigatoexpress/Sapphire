@@ -1625,6 +1625,15 @@ class LighterBot:
 
     async def _handle_risk_alert(self, alert_data: Dict[str, Any]):
         """Handle risk alerts."""
+        platform = str(alert_data.get("platform", "") or "").strip().lower()
+        if platform and platform not in {PLATFORM.value, "lighter"}:
+            logger.info(
+                "Ignoring risk alert for foreign platform '%s': %s",
+                platform,
+                alert_data.get("message", ""),
+            )
+            return
+
         action = alert_data.get("action", "none")
         logger.warning(f"Risk alert: {alert_data.get('message')}")
 
