@@ -2061,7 +2061,14 @@ class LighterBot:
         logger.warning(f"Risk alert: {alert_data.get('message')}")
 
         if action == "close_all":
-            await self._close_all_positions()
+            summary = await self._close_all_positions()
+            if summary.get("failed", 0) > 0:
+                logger.warning(
+                    "Risk close_all completed with failures | requested=%d closed=%d failed=%d",
+                    summary.get("requested", 0),
+                    summary.get("closed", 0),
+                    summary.get("failed", 0),
+                )
         elif action == "halt_trading":
             self.config.trading_enabled = False
             self._trading_enabled = False
@@ -3024,15 +3031,16 @@ class LighterBot:
             if result.success and (filled_qty > 0 or (result.metadata or {}).get("noop")):
                 self._risk_exit_attempted_at.pop(symbol, None)
 
-    async def _close_all_positions(self):
+    async def _close_all_positions(self) -> Dict[str, int]:
         """Close all positions on Lighter."""
+        summary = {"requested": 0, "closed": 0, "failed": 0}
         try:
+            # Refresh local view first so close-all uses latest exchange state.
+            await self._check_positions()
             if not self.positions:
                 logger.info("Close-all requested but no local positions are tracked")
-                return
+                return summary
 
-            closed = 0
-            failed = 0
             for symbol, position in list(self.positions.items()):
                 try:
                     qty = float(getattr(position, "quantity", 0.0) or 0.0)
@@ -3041,6 +3049,7 @@ class LighterBot:
                 if qty <= 0:
                     continue
 
+                summary["requested"] += 1
                 pos_side = getattr(position, "side", None)
                 close_side = (
                     TradeSide.SELL
@@ -3052,23 +3061,32 @@ class LighterBot:
                     symbol=symbol,
                     side=close_side,
                     signal_type=SignalType.EXIT,
+                    confidence=1.0,
                     quantity=abs(qty),
                     source="risk-close-all",
                     metadata={"reduce_only": True, "origin": "risk_close_all"},
                 )
                 result = await self._execute_trade(exit_signal, ignore_trading_guard=True)
-                if result.success:
-                    closed += 1
+                filled_qty = self._to_float(getattr(result, "filled_quantity", 0.0), 0.0)
+                if result.success and (filled_qty > 0 or (result.metadata or {}).get("noop")):
+                    summary["closed"] += 1
                 else:
-                    failed += 1
+                    summary["failed"] += 1
                     logger.error(
                         "Close-all failed for %s: %s",
                         symbol,
                         result.error_message or "unknown_error",
                     )
-            logger.info("Close-all complete | requested=%d failed=%d", closed, failed)
+            logger.info(
+                "Close-all complete | requested=%d closed=%d failed=%d",
+                summary["requested"],
+                summary["closed"],
+                summary["failed"],
+            )
         except Exception as e:
             logger.error(f"Close all error: {e}")
+            summary["failed"] = max(summary["failed"], 1)
+        return summary
 
     def get_status(self) -> Dict[str, Any]:
         """Get bot status."""
