@@ -6,6 +6,7 @@ Lighter is a decentralized L2 order book exchange built on ZK-rollups.
 """
 
 import asyncio
+import math
 import json
 import inspect
 import logging
@@ -197,11 +198,21 @@ class LighterBot:
             ("LIGHTER_DEFAULT_STOP_LOSS_PCT", "SAPPHIRE_TV_STOP_LOSS_PCT"),
             default=2.0,
         )
+        self._max_order_notional_usd = max(
+            0.0,
+            self._env_float(("LIGHTER_MAX_ORDER_NOTIONAL_USD",), default=0.0),
+        )
         self._risk_exit_cooldown_seconds = max(
             5.0,
             self._env_float(("LIGHTER_RISK_EXIT_COOLDOWN_SECONDS",), default=15.0),
         )
         self._risk_exit_attempted_at: Dict[str, float] = {}
+        self._telegram_bot_token = str(os.getenv("TELEGRAM_BOT_TOKEN", "")).strip()
+        self._telegram_chat_id = (
+            str(os.getenv("TELEGRAM_CHAT_ID", "")).strip()
+            or str(os.getenv("TELEGRAM_BOT_CHAT_ID", "")).strip()
+            or str(os.getenv("TELEGRAM_OWNER_USER_ID", "")).strip()
+        )
 
     @staticmethod
     def _env_flag(name: str, default: bool = False) -> bool:
@@ -626,6 +637,7 @@ class LighterBot:
                 result = await self._execute_trade(signal)
                 logger.info(f"Hub Command Executed: {result.success}")
                 await publish("trade-executed", result)
+                await self._send_trade_telegram_alert(signal, result, channel="hub")
 
             except asyncio.TimeoutError:
                 continue  # No command arrived; loop back and recheck self.running
@@ -899,9 +911,69 @@ class LighterBot:
             # Don't emit trade events for explicit no-op signals (ex: reduce-only without exposure).
             if not (result.metadata or {}).get("noop"):
                 await publish("trade-executed", result)
+                await self._send_trade_telegram_alert(signal, result, channel="signal")
 
         except Exception as e:
             logger.error(f"Signal handling error: {e}")
+
+    async def _send_trade_telegram_alert(
+        self,
+        signal: TradeSignal,
+        result: TradeResult,
+        channel: str = "signal",
+    ) -> None:
+        """Push a compact execution/rejection alert to Telegram."""
+        if not self._telegram_bot_token or not self._telegram_chat_id:
+            return
+
+        side = str(getattr(signal, "side", "")).upper()
+        symbol = str(getattr(signal, "symbol", "")).upper()
+        qty = float(getattr(signal, "quantity", 0.0) or 0.0)
+        ok = bool(getattr(result, "success", False))
+        order_id = str(getattr(result, "order_id", "") or "")
+        fill_qty = float(getattr(result, "filled_quantity", 0.0) or 0.0)
+        fill_price = float(getattr(result, "fill_price", 0.0) or 0.0)
+        err = str(getattr(result, "error_message", "") or "")
+        status = "FILLED" if ok else "REJECTED"
+        lines = [
+            f"LIGHTER {status}",
+            f"src={channel} signal={signal.signal_id}",
+            f"{side} {symbol} qty={qty:g}",
+        ]
+        if fill_qty > 0:
+            lines.append(f"filled={fill_qty:g} @ {fill_price:g}")
+        if order_id:
+            lines.append(f"order={order_id}")
+        if err:
+            lines.append(f"error={err[:180]}")
+        text = "\n".join(lines)
+        await self._send_telegram_message(text)
+
+    async def _send_telegram_message(self, text: str) -> None:
+        if not self._telegram_bot_token or not self._telegram_chat_id:
+            return
+
+        try:
+            import aiohttp
+
+            timeout = aiohttp.ClientTimeout(total=8)
+            url = f"https://api.telegram.org/bot{self._telegram_bot_token}/sendMessage"
+            payload = {
+                "chat_id": self._telegram_chat_id,
+                "text": text,
+                "disable_web_page_preview": True,
+            }
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(url, json=payload) as response:
+                    if response.status >= 400:
+                        body = await response.text()
+                        logger.warning(
+                            "Telegram alert failed (%s): %s",
+                            response.status,
+                            body[:160],
+                        )
+        except Exception as exc:
+            logger.warning("Telegram alert error: %s", exc)
 
     @staticmethod
     def _sanitize_trade_signal_payload(signal_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -1174,6 +1246,35 @@ class LighterBot:
             if not current_price:
                 raise Exception(f"Could not get current price for {coin}")
 
+            if (
+                not reduce_only
+                and self._max_order_notional_usd > 0
+                and current_price > 0
+                and quantity > 0
+            ):
+                requested_notional = float(quantity) * float(current_price)
+                if requested_notional > self._max_order_notional_usd:
+                    size_decimals = int(market.get("size_decimals", 3) or 3)
+                    scale = 10 ** max(0, size_decimals)
+                    capped_qty = math.floor(
+                        (self._max_order_notional_usd / float(current_price)) * scale
+                    ) / scale
+                    if capped_qty <= 0:
+                        raise ValueError(
+                            f"Max order notional cap too low for {coin}: "
+                            f"cap={self._max_order_notional_usd} price={current_price}"
+                        )
+                    logger.warning(
+                        "Notional cap applied for %s: requested %.6f USD -> cap %.2f USD "
+                        "(qty %.8f -> %.8f)",
+                        coin,
+                        requested_notional,
+                        self._max_order_notional_usd,
+                        quantity,
+                        capped_qty,
+                    )
+                    quantity = float(capped_qty)
+
             self._apply_default_risk_levels(
                 signal,
                 is_buy=is_buy,
@@ -1416,6 +1517,7 @@ class LighterBot:
             avg_execution_price=int(price_int),
             is_ask=not bool(is_buy),
             reduce_only=bool(reduce_only),
+            api_key_index=int(self._api_key_index),
         )
         if err is not None:
             raise RuntimeError(f"Signer create_market_order failed: {err}")
