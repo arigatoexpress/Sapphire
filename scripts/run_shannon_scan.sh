@@ -127,16 +127,30 @@ mkdir -p "$SHANNON_OUTPUT_DIR"
 mkdir -p "$SHANNON_HOME/repos"
 
 # Shannon expects source under ./repos/<REPO>.
-safe_repo_name="$(echo "$TARGET_REPO_NAME" | tr -cs '[:alnum:]_-' '-')"
+# Use printf (not echo) so trailing newline doesn't become a trailing '-'.
+safe_repo_name="$(
+  printf '%s' "$TARGET_REPO_NAME" \
+    | tr -cs '[:alnum:]_-' '-' \
+    | sed -E 's/^-+//; s/-+$//'
+)"
+if [[ -z "$safe_repo_name" ]]; then
+  echo "ERROR: TARGET_REPO_NAME resolved to an empty safe repo name."
+  exit 11
+fi
 scan_repo_dir="$SHANNON_HOME/repos/$safe_repo_name"
 mkdir -p "$scan_repo_dir"
 rsync -a \
-  --exclude ".git" \
   --exclude "node_modules" \
   --exclude ".venv" \
   --exclude ".pytest_cache" \
   --exclude "output" \
   "$TARGET_REPO_PATH"/ "$scan_repo_dir"/
+
+# Preflight requires a git repository. If the source path has no .git folder
+# (or was synced without it), initialize a local repo in-place.
+if [[ ! -d "$scan_repo_dir/.git" ]]; then
+  git -C "$scan_repo_dir" init >/dev/null 2>&1 || true
+fi
 
 config_arg=""
 if [[ -n "$SHANNON_CONFIG_SOURCE" ]]; then
