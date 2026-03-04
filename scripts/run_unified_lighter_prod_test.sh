@@ -206,6 +206,19 @@ print("  timeframe=", row.get("timeframe"))
 print("  filled_quantity=", row.get("filled_quantity"))
 print("  avg_price=", row.get("avg_price"))
 print("  error_message=", row.get("error_message"))
+
+success = bool(row.get("success"))
+filled_qty = 0.0
+try:
+    filled_qty = float(row.get("filled_quantity") or 0.0)
+except Exception:
+    filled_qty = 0.0
+
+if not success or filled_qty <= 0:
+    raise SystemExit(
+        "FAIL: execution_verifications row indicates no real fill "
+        f"(success={success}, filled_quantity={filled_qty}, error={row.get('error_message')})"
+    )
 PY
 
 echo
