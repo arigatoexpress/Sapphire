@@ -237,6 +237,40 @@ class LighterBot:
             self._env_float(("LIGHTER_RISK_EXIT_COOLDOWN_SECONDS",), default=15.0),
         )
         self._risk_exit_attempted_at: Dict[str, float] = {}
+        self._dynamic_risk_enabled = self._env_flag(
+            "LIGHTER_DYNAMIC_RISK_ENABLED",
+            default=True,
+        )
+        self._dynamic_risk_update_seconds = max(
+            15.0,
+            self._env_float(("LIGHTER_DYNAMIC_RISK_UPDATE_SECONDS",), default=60.0),
+        )
+        self._dynamic_tp_trend_boost = max(
+            0.0,
+            self._env_float(("LIGHTER_DYNAMIC_TP_TREND_BOOST_PCT",), default=25.0),
+        )
+        self._dynamic_sl_tighten = max(
+            0.0,
+            self._env_float(("LIGHTER_DYNAMIC_SL_TIGHTEN_PCT",), default=20.0),
+        )
+        self._dynamic_volatility_widen = max(
+            0.0,
+            self._env_float(("LIGHTER_DYNAMIC_VOL_WIDEN_PCT",), default=20.0),
+        )
+        self._opportunity_rotation_enabled = self._env_flag(
+            "LIGHTER_OPPORTUNITY_ROTATION_ENABLED",
+            default=True,
+        )
+        self._opportunity_rotation_min_edge_pct = max(
+            0.0,
+            self._env_float(("LIGHTER_OPPORTUNITY_MIN_EDGE_PCT",), default=0.20),
+        )
+        self._opportunity_rotation_cooldown_seconds = max(
+            30.0,
+            self._env_float(("LIGHTER_OPPORTUNITY_COOLDOWN_SECONDS",), default=180.0),
+        )
+        self._last_opportunity_rotation_ts: float = 0.0
+        self._last_dynamic_risk_update_ts: Dict[str, float] = {}
         self._progress_verify_interval_seconds = max(
             30,
             int(self._env_float(("LIGHTER_PROGRESS_VERIFY_INTERVAL_SECONDS",), default=180.0)),
@@ -299,6 +333,15 @@ class LighterBot:
             ),
         )
         self._last_telegram_digest_ts: float = 0.0
+        self._assistant_brief_enabled = self._env_flag(
+            "LIGHTER_ASSISTANT_BRIEF_ENABLED",
+            default=True,
+        )
+        self._assistant_brief_interval_seconds = max(
+            60.0,
+            self._env_float(("LIGHTER_ASSISTANT_BRIEF_INTERVAL_SECONDS",), default=300.0),
+        )
+        self._last_assistant_brief_ts: float = 0.0
         self._price_history_limit = max(
             30,
             int(self._env_float(("LIGHTER_PRICE_HISTORY_POINTS",), default=90.0)),
@@ -311,7 +354,7 @@ class LighterBot:
             "require_metadata=%s entry_cooldown=%.1fs max_order_notional=%.2f "
             "max_position_notional=%.2f progress_verify=%.0fs dd_alert=%.2f%% "
             "sync_stale_alert=%.0fs risk_level_max_dev=%.1f%% empty_pos_confirm=%d "
-            "tg_digest=%.0fs tg_charts=%s",
+            "tg_digest=%.0fs tg_charts=%s dynamic_risk=%s rotation=%s edge=%.3f%%",
             sorted(self._allowed_strategies) if self._allowed_strategies else ["*"],
             sorted(self._allowed_timeframes) if self._allowed_timeframes else ["*"],
             self._strategy_require_metadata,
@@ -325,6 +368,9 @@ class LighterBot:
             self._empty_position_confirmations,
             self._telegram_digest_seconds,
             self._telegram_enable_charts,
+            self._dynamic_risk_enabled,
+            self._opportunity_rotation_enabled,
+            self._opportunity_rotation_min_edge_pct,
         )
 
     @staticmethod
@@ -1356,14 +1402,14 @@ class LighterBot:
         joined = " | ".join(candidates)
         return joined[:280]
 
-    def _market_condition_for_symbol(self, symbol: str) -> tuple[str, str]:
+    def _market_stats_for_symbol(self, symbol: str) -> Dict[str, float]:
         prices = self._recent_prices(symbol)
         if len(prices) < 6:
-            return "insufficient data", "warming price history"
+            return {"drift_pct": 0.0, "vol_pct": 0.0, "samples": float(len(prices))}
         first = prices[0]
         last = prices[-1]
         if first <= 0 or last <= 0:
-            return "insufficient data", "invalid prices"
+            return {"drift_pct": 0.0, "vol_pct": 0.0, "samples": float(len(prices))}
         drift_pct = ((last - first) / first) * 100.0
         returns: List[float] = []
         for idx in range(1, len(prices)):
@@ -1376,6 +1422,19 @@ class LighterBot:
             mean = sum(returns) / len(returns)
             var = sum((r - mean) ** 2 for r in returns) / max(len(returns), 1)
             vol_pct = (var ** 0.5) * 100.0
+        return {
+            "drift_pct": float(drift_pct),
+            "vol_pct": float(vol_pct),
+            "samples": float(len(prices)),
+        }
+
+    def _market_condition_for_symbol(self, symbol: str) -> tuple[str, str]:
+        stats = self._market_stats_for_symbol(symbol)
+        drift_pct = self._to_float(stats.get("drift_pct"), 0.0)
+        vol_pct = self._to_float(stats.get("vol_pct"), 0.0)
+        samples = int(self._to_float(stats.get("samples"), 0.0))
+        if samples < 6:
+            return "insufficient data", "warming price history"
         if abs(drift_pct) < 0.2 and vol_pct < 0.25:
             regime = "flat/range"
         elif drift_pct > 0:
@@ -1384,6 +1443,79 @@ class LighterBot:
             regime = "downtrend"
         detail = f"drift {drift_pct:+.2f}% · vol {vol_pct:.2f}%"
         return regime, detail
+
+    def _estimate_signal_ev_pct(
+        self,
+        signal: TradeSignal,
+        *,
+        coin: str,
+        is_buy: bool,
+        reference_price: float,
+    ) -> float:
+        """
+        Lightweight expected-value estimate (percent) from confidence + market regime.
+        Positive EV means the signal has favorable reward/risk odds for this symbol.
+        """
+        confidence = self._to_float(getattr(signal, "confidence", 0.0), 0.0)
+        confidence = min(1.0, max(0.0, confidence))
+
+        tp_pct = max(0.01, self._default_take_profit_pct)
+        sl_pct = max(0.01, self._default_stop_loss_pct)
+        if reference_price > 0:
+            tp_val = self._to_float(getattr(signal, "take_profit", None), 0.0)
+            sl_val = self._to_float(getattr(signal, "stop_loss", None), 0.0)
+            if tp_val > 0:
+                tp_pct = abs((tp_val - reference_price) / reference_price) * 100.0
+            if sl_val > 0:
+                sl_pct = abs((sl_val - reference_price) / reference_price) * 100.0
+
+        stats = self._market_stats_for_symbol(coin)
+        drift_pct = self._to_float(stats.get("drift_pct"), 0.0)
+        vol_pct = self._to_float(stats.get("vol_pct"), 0.0)
+        drift_dir = 1.0 if drift_pct > 0 else -1.0 if drift_pct < 0 else 0.0
+        side_dir = 1.0 if is_buy else -1.0
+        alignment = drift_dir * side_dir
+
+        base_win_prob = 0.45 + confidence * 0.35
+        win_prob = base_win_prob + (0.10 * alignment) - min(0.10, vol_pct / 8.0)
+        win_prob = min(0.92, max(0.08, win_prob))
+
+        fee_pct = 0.10  # round-trip friction budget
+        ev_pct = (win_prob * tp_pct) - ((1.0 - win_prob) * sl_pct) - fee_pct
+        return round(ev_pct, 4)
+
+    def _estimate_position_ev_pct(self, symbol: str, position: Position) -> float:
+        meta = position.metadata if isinstance(position.metadata, dict) else {}
+        cached = self._to_float(meta.get("ev_score_pct"), 0.0)
+        if cached != 0.0:
+            return float(cached)
+
+        entry = self._to_float(getattr(position, "entry_price", 0.0), 0.0)
+        if entry <= 0:
+            entry = self._to_float(getattr(position, "current_price", 0.0), 0.0)
+        if entry <= 0:
+            return 0.0
+
+        side = getattr(position, "side", None)
+        is_buy = side in (TradeSide.BUY, TradeSide.LONG, "BUY", "LONG")
+        pseudo_signal = TradeSignal(
+            signal_id=f"ev-{symbol}",
+            symbol=symbol,
+            side=TradeSide.BUY if is_buy else TradeSide.SELL,
+            signal_type=SignalType.ENTRY,
+            confidence=self._to_float(meta.get("confidence"), 0.55),
+            source="position-ev",
+            take_profit=self._to_float(getattr(position, "take_profit", 0.0), 0.0) or None,
+            stop_loss=self._to_float(getattr(position, "stop_loss", 0.0), 0.0) or None,
+            quantity=self._to_float(getattr(position, "quantity", 0.0), 0.0),
+            metadata=meta,
+        )
+        return self._estimate_signal_ev_pct(
+            pseudo_signal,
+            coin=symbol,
+            is_buy=is_buy,
+            reference_price=entry,
+        )
 
     def _build_trade_chart_card(
         self,
@@ -1636,6 +1768,119 @@ class LighterBot:
         ).strip().lower()
         return strategy, timeframe
 
+    async def _close_position_for_rotation(self, symbol: str, reason: str) -> TradeResult:
+        current = self.positions.get(symbol)
+        if current is None:
+            return TradeResult(
+                trade_id="noop",
+                signal_id=f"rotate-close-{symbol}-{int(time.time())}",
+                platform=PLATFORM.value,
+                symbol=symbol,
+                side=TradeSide.SELL,
+                success=True,
+                metadata={"noop": True, "reason": "no_position_for_rotation"},
+            )
+
+        qty = self._to_float(getattr(current, "quantity", 0.0), 0.0)
+        if qty <= 0:
+            return TradeResult(
+                trade_id="noop",
+                signal_id=f"rotate-close-{symbol}-{int(time.time())}",
+                platform=PLATFORM.value,
+                symbol=symbol,
+                side=TradeSide.SELL,
+                success=True,
+                metadata={"noop": True, "reason": "zero_quantity_for_rotation"},
+            )
+
+        side = getattr(current, "side", None)
+        close_side = (
+            TradeSide.SELL
+            if side in (TradeSide.BUY, TradeSide.LONG, "BUY", "LONG")
+            else TradeSide.BUY
+        )
+        exit_signal = TradeSignal(
+            signal_id=f"rotate-close-{symbol.lower()}-{int(time.time() * 1000)}",
+            symbol=symbol,
+            side=close_side,
+            signal_type=SignalType.EXIT,
+            confidence=1.0,
+            source="opportunity-rotation",
+            quantity=abs(qty),
+            metadata={
+                "reduce_only": True,
+                "origin": "opportunity_rotation",
+                "reason": reason,
+            },
+        )
+        result = await self._execute_trade(exit_signal, ignore_trading_guard=True)
+        if result.success and self._to_float(getattr(result, "filled_quantity", 0.0), 0.0) > 0:
+            self.positions.pop(symbol, None)
+        return result
+
+    async def _maybe_rotate_opportunity(
+        self,
+        *,
+        target_coin: str,
+        signal: TradeSignal,
+        is_buy: bool,
+        reference_price: float,
+    ) -> None:
+        active_symbols = self._active_position_symbols()
+        if not active_symbols or target_coin in active_symbols:
+            return
+
+        locked = sorted(active_symbols)[0]
+        if not self._opportunity_rotation_enabled:
+            raise ValueError(
+                f"Single-symbol mode active: open symbol={locked}, rejected symbol={target_coin}"
+            )
+
+        now_ts = time.time()
+        if (now_ts - self._last_opportunity_rotation_ts) < self._opportunity_rotation_cooldown_seconds:
+            wait_s = self._opportunity_rotation_cooldown_seconds - (
+                now_ts - self._last_opportunity_rotation_ts
+            )
+            raise ValueError(
+                f"Opportunity rotation cooldown active: wait {wait_s:.1f}s"
+            )
+
+        incoming_ev = self._estimate_signal_ev_pct(
+            signal,
+            coin=target_coin,
+            is_buy=is_buy,
+            reference_price=reference_price,
+        )
+        locked_pos = self.positions.get(locked)
+        locked_ev = self._estimate_position_ev_pct(locked, locked_pos) if locked_pos else 0.0
+        edge = incoming_ev - locked_ev
+
+        if edge < self._opportunity_rotation_min_edge_pct:
+            raise ValueError(
+                f"Single-symbol mode active: {target_coin} EV edge {edge:+.3f}% "
+                f"below threshold {self._opportunity_rotation_min_edge_pct:.3f}% (locked={locked})"
+            )
+
+        close_result = await self._close_position_for_rotation(
+            locked,
+            reason=f"rotate_{locked}_to_{target_coin}_edge_{edge:+.3f}",
+        )
+        closed_qty = self._to_float(getattr(close_result, "filled_quantity", 0.0), 0.0)
+        if not close_result.success or closed_qty <= 0:
+            raise ValueError(
+                f"Opportunity rotation failed: could not close {locked} before opening {target_coin}"
+            )
+
+        self._last_opportunity_rotation_ts = now_ts
+        logger.warning(
+            "Opportunity rotation executed: %s -> %s | locked_ev=%.3f%% incoming_ev=%.3f%% edge=%.3f%%",
+            locked,
+            target_coin,
+            locked_ev,
+            incoming_ev,
+            edge,
+        )
+
     def _is_signal_allowed_by_policy(self, signal: TradeSignal) -> tuple[bool, str]:
         strategy, timeframe = self._signal_strategy_info(signal)
         if self._strategy_require_metadata and (not strategy or not timeframe):
@@ -1853,6 +2098,78 @@ class LighterBot:
         except Exception as exc:
             logger.debug("Equity snapshot write error: %s", exc)
 
+    async def _maybe_publish_assistant_brief(self, snapshot: Dict[str, Any]) -> None:
+        """
+        Publish a compact operational brief for Kimi/OpenClaw assistant consumption.
+        """
+        if not self._assistant_brief_enabled or self._db is None:
+            return
+        now_ts = time.time()
+        if (now_ts - self._last_assistant_brief_ts) < self._assistant_brief_interval_seconds:
+            return
+        self._last_assistant_brief_ts = now_ts
+
+        positions_payload: List[Dict[str, Any]] = []
+        for symbol, pos in sorted(self.positions.items()):
+            qty = self._to_float(getattr(pos, "quantity", 0.0), 0.0)
+            if qty <= 0:
+                continue
+            ev_pct = self._estimate_position_ev_pct(symbol, pos)
+            regime, detail = self._market_condition_for_symbol(symbol)
+            positions_payload.append(
+                {
+                    "symbol": symbol,
+                    "side": str(getattr(pos, "side", "")),
+                    "quantity": qty,
+                    "entry_price": self._to_float(getattr(pos, "entry_price", 0.0), 0.0),
+                    "mark_price": self._to_float(getattr(pos, "current_price", 0.0), 0.0),
+                    "take_profit": self._to_float(getattr(pos, "take_profit", 0.0), 0.0),
+                    "stop_loss": self._to_float(getattr(pos, "stop_loss", 0.0), 0.0),
+                    "unrealized_pnl": self._to_float(getattr(pos, "unrealized_pnl", 0.0), 0.0),
+                    "ev_score_pct": ev_pct,
+                    "regime": regime,
+                    "regime_detail": detail,
+                    "metadata": pos.metadata if isinstance(pos.metadata, dict) else {},
+                }
+            )
+
+        advice: List[str] = []
+        if not positions_payload:
+            advice.append("Flat book: wait for high-confidence entry matching allowed strategy/timeframe.")
+        else:
+            top = sorted(positions_payload, key=lambda x: x.get("ev_score_pct", 0.0), reverse=True)[0]
+            if self._to_float(top.get("ev_score_pct"), 0.0) < 0:
+                advice.append("Current EV negative: tighten risk and prioritize rotation on stronger signal.")
+            advice.append(
+                f"Top position {top.get('symbol')} EV {self._to_float(top.get('ev_score_pct'), 0.0):+.3f}%."
+            )
+
+        brief = {
+            "service": SERVICE_NAME,
+            "platform": PLATFORM.value,
+            "generated_at": datetime.now(timezone.utc),
+            "snapshot": snapshot,
+            "positions": positions_payload,
+            "policy": {
+                "single_symbol_mode": self._single_symbol_mode,
+                "dynamic_risk_enabled": self._dynamic_risk_enabled,
+                "opportunity_rotation_enabled": self._opportunity_rotation_enabled,
+                "opportunity_min_edge_pct": self._opportunity_rotation_min_edge_pct,
+                "allowed_strategies": sorted(self._allowed_strategies),
+                "allowed_timeframes": sorted(self._allowed_timeframes),
+                "max_order_notional_usd": self._max_order_notional_usd,
+                "max_position_notional_usd": self._max_position_notional_usd,
+                "entry_cooldown_seconds": self._entry_cooldown_seconds,
+            },
+            "assistant_advice": advice,
+        }
+        try:
+            doc_id = f"{PLATFORM.value}_{int(now_ts * 1000)}"
+            await self._db.collection("assistant_ops_briefs").document(doc_id).set(brief)
+            await self._db.collection("assistant_ops_briefs").document("latest").set(brief)
+        except Exception as exc:
+            logger.debug("Assistant brief write error: %s", exc)
+
     async def _record_execution_verification(
         self,
         signal: TradeSignal,
@@ -1992,6 +2309,7 @@ class LighterBot:
                     )
 
                 await self._maybe_send_portfolio_digest(snap)
+                await self._maybe_publish_assistant_brief(snap)
 
             except Exception as exc:
                 logger.error("Progress verification error: %s", exc)
@@ -2123,13 +2441,19 @@ class LighterBot:
             }:
                 reduce_only = True
             entry_like = signal.signal_type in {SignalType.ENTRY, SignalType.SCALE_IN}
+            current_price = 0.0
 
             if self._single_symbol_mode and entry_like and not reduce_only:
                 active_symbols = self._active_position_symbols()
                 if active_symbols and coin not in active_symbols:
-                    locked = sorted(active_symbols)[0]
-                    raise ValueError(
-                        f"Single-symbol mode active: open symbol={locked}, rejected symbol={coin}"
+                    current_price = await self._get_ticker(coin)
+                    if not current_price:
+                        raise Exception(f"Could not get current price for {coin}")
+                    await self._maybe_rotate_opportunity(
+                        target_coin=coin,
+                        signal=signal,
+                        is_buy=is_buy,
+                        reference_price=float(current_price),
                     )
                 if self._entry_cooldown_seconds > 0:
                     now_ts = time.time()
@@ -2214,14 +2538,14 @@ class LighterBot:
                         },
                     )
 
+            if current_price <= 0:
+                current_price = await self._get_ticker(coin)
+            if not current_price:
+                raise Exception(f"Could not get current price for {coin}")
+
             logger.info(
                 f"Placing {signal.side} order | Symbol: {coin} | Qty: {quantity} | OrderBookId: {order_book_id}"
             )
-
-            # Get current price for market order execution
-            current_price = await self._get_ticker(coin)
-            if not current_price:
-                raise Exception(f"Could not get current price for {coin}")
 
             if (
                 not reduce_only
@@ -2360,6 +2684,12 @@ class LighterBot:
                         "strategy": strategy or "",
                         "timeframe": timeframe or "",
                         "confidence": self._to_float(getattr(signal, "confidence", 0.0), 0.0),
+                        "ev_score_pct": self._estimate_signal_ev_pct(
+                            signal,
+                            coin=coin,
+                            is_buy=is_buy,
+                            reference_price=float(fill_price if fill_price > 0 else current_price),
+                        ),
                         "reasoning": self._compact_reasoning(signal.metadata or {}),
                     }
                     self.positions[coin] = Position(
@@ -2755,6 +3085,110 @@ class LighterBot:
 
         return position_usd
 
+    def _maybe_adjust_position_risk_levels(self, symbol: str, position: Position) -> bool:
+        """
+        Dynamically adjust TP/SL based on short-term regime and volatility.
+        Returns True when risk levels were changed.
+        """
+        if not self._dynamic_risk_enabled:
+            return False
+
+        now_ts = time.time()
+        last_update = float(self._last_dynamic_risk_update_ts.get(symbol, 0.0))
+        if (now_ts - last_update) < self._dynamic_risk_update_seconds:
+            return False
+
+        qty = self._to_float(getattr(position, "quantity", 0.0), 0.0)
+        entry = self._to_float(getattr(position, "entry_price", 0.0), 0.0)
+        if qty <= 0 or entry <= 0:
+            return False
+
+        is_long = getattr(position, "side", None) in (TradeSide.BUY, TradeSide.LONG, "BUY", "LONG")
+        current_price = self._to_float(getattr(position, "current_price", 0.0), 0.0)
+
+        tp = self._to_float(getattr(position, "take_profit", 0.0), 0.0)
+        sl = self._to_float(getattr(position, "stop_loss", 0.0), 0.0)
+        base_tp_pct = (
+            abs((tp - entry) / entry) * 100.0
+            if tp > 0
+            else max(0.01, self._default_take_profit_pct)
+        )
+        base_sl_pct = (
+            abs((entry - sl) / entry) * 100.0
+            if sl > 0
+            else max(0.01, self._default_stop_loss_pct)
+        )
+
+        stats = self._market_stats_for_symbol(symbol)
+        drift_pct = self._to_float(stats.get("drift_pct"), 0.0)
+        vol_pct = self._to_float(stats.get("vol_pct"), 0.0)
+        favorable = (drift_pct >= 0 and is_long) or (drift_pct <= 0 and (not is_long))
+
+        tp_factor = 1.0
+        sl_factor = 1.0
+        if favorable:
+            tp_factor += min(0.6, (abs(drift_pct) / 100.0) * self._dynamic_tp_trend_boost)
+            sl_factor *= max(0.35, 1.0 - (self._dynamic_sl_tighten / 100.0))
+        else:
+            tp_factor *= max(0.4, 1.0 - (self._dynamic_sl_tighten / 100.0))
+            sl_factor *= max(0.2, 1.0 - ((self._dynamic_sl_tighten * 1.2) / 100.0))
+
+        vol_boost = min(0.8, (vol_pct / 100.0) * self._dynamic_volatility_widen)
+        tp_factor *= (1.0 + vol_boost * 0.6)
+        sl_factor *= (1.0 + vol_boost)
+
+        next_tp_pct = max(0.05, base_tp_pct * tp_factor)
+        next_sl_pct = max(0.03, base_sl_pct * sl_factor)
+
+        if is_long:
+            next_tp = entry * (1.0 + next_tp_pct / 100.0)
+            next_sl = entry * (1.0 - next_sl_pct / 100.0)
+            if current_price > 0 and current_price >= entry * 1.002:
+                next_sl = max(next_sl, entry * 1.0005)
+        else:
+            next_tp = entry * (1.0 - next_tp_pct / 100.0)
+            next_sl = entry * (1.0 + next_sl_pct / 100.0)
+            if current_price > 0 and current_price <= entry * 0.998:
+                next_sl = min(next_sl, entry * 0.9995)
+
+        next_tp = round(float(next_tp), 8)
+        next_sl = round(float(next_sl), 8)
+        if next_tp <= 0 or next_sl <= 0:
+            return False
+
+        changed = False
+        if tp <= 0 or abs(next_tp - tp) / max(abs(tp), 1e-9) > 0.015:
+            position.take_profit = next_tp
+            changed = True
+        if sl <= 0 or abs(next_sl - sl) / max(abs(sl), 1e-9) > 0.015:
+            position.stop_loss = next_sl
+            changed = True
+
+        if changed:
+            if not isinstance(position.metadata, dict):
+                position.metadata = {}
+            position.metadata["risk_regime"] = {
+                "drift_pct": round(drift_pct, 4),
+                "vol_pct": round(vol_pct, 4),
+                "favorable": bool(favorable),
+                "tp_factor": round(tp_factor, 4),
+                "sl_factor": round(sl_factor, 4),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+            self._last_dynamic_risk_update_ts[symbol] = now_ts
+            logger.info(
+                "Dynamic risk update %s | TP %.6f -> %.6f | SL %.6f -> %.6f | drift=%+.3f%% vol=%.3f%% favorable=%s",
+                symbol,
+                tp,
+                next_tp,
+                sl,
+                next_sl,
+                drift_pct,
+                vol_pct,
+                favorable,
+            )
+        return changed
+
     async def _check_positions(self):
         """Check positions using Lighter API."""
         if not self.account_api or self.account_index is None:
@@ -2960,6 +3394,8 @@ class LighterBot:
                 qty = 0.0
             if qty <= 0:
                 continue
+
+            self._maybe_adjust_position_risk_levels(symbol, position)
 
             tp = getattr(position, "take_profit", None)
             sl = getattr(position, "stop_loss", None)
