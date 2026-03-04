@@ -253,6 +253,10 @@ class LighterBot:
             60.0,
             self._env_float(("LIGHTER_SYNC_STALE_ALERT_COOLDOWN_SECONDS",), default=900.0),
         )
+        self._max_risk_level_deviation_pct = max(
+            1.0,
+            self._env_float(("LIGHTER_MAX_RISK_LEVEL_DEVIATION_PCT",), default=20.0),
+        )
         self._equity_baseline: Optional[float] = None
         self._equity_peak: Optional[float] = None
         self._equity_trough: Optional[float] = None
@@ -272,7 +276,7 @@ class LighterBot:
             "Strategy policy | allowed_strategies=%s allowed_timeframes=%s "
             "require_metadata=%s entry_cooldown=%.1fs max_order_notional=%.2f "
             "max_position_notional=%.2f progress_verify=%.0fs dd_alert=%.2f%% "
-            "sync_stale_alert=%.0fs",
+            "sync_stale_alert=%.0fs risk_level_max_dev=%.1f%%",
             sorted(self._allowed_strategies) if self._allowed_strategies else ["*"],
             sorted(self._allowed_timeframes) if self._allowed_timeframes else ["*"],
             self._strategy_require_metadata,
@@ -282,6 +286,7 @@ class LighterBot:
             self._progress_verify_interval_seconds,
             self._max_drawdown_alert_pct,
             self._sync_stale_alert_seconds,
+            self._max_risk_level_deviation_pct,
         )
 
     @staticmethod
@@ -409,7 +414,7 @@ class LighterBot:
                     skip_validation = os.getenv("LIGHTER_SKIP_VALIDATION", "false").lower() == "true"
                     if skip_validation:
                         logger.info("VPN mode: Skipping credential validation (geofencing workaround)")
-                    
+
                     self.signer_client = lighter.SignerClient(
                         url=base_url,
                         account_index=int(self.account_index or 0),
@@ -1195,6 +1200,66 @@ class LighterBot:
                 8,
             )
 
+    def _sanitize_signal_risk_levels(
+        self,
+        signal: TradeSignal,
+        *,
+        is_buy: bool,
+        reference_price: float,
+        reduce_only: bool,
+    ) -> None:
+        """
+        Guard against stale/invalid external TP/SL values.
+
+        If incoming TP/SL is on the wrong side of market price or is too far from
+        market (> LIGHTER_MAX_RISK_LEVEL_DEVIATION_PCT), drop it and let defaults
+        be re-applied from current executable price.
+        """
+        if reduce_only or reference_price <= 0:
+            return
+
+        max_dev = max(0.1, float(self._max_risk_level_deviation_pct))
+
+        def _maybe_drop(level_name: str, level_value: Optional[float]) -> Optional[float]:
+            if level_value is None or level_value <= 0:
+                return level_value
+            dev_pct = abs((float(level_value) - float(reference_price)) / float(reference_price)) * 100.0
+            invalid_side = False
+            if level_name == "take_profit":
+                invalid_side = (is_buy and level_value <= reference_price) or (
+                    (not is_buy) and level_value >= reference_price
+                )
+            elif level_name == "stop_loss":
+                invalid_side = (is_buy and level_value >= reference_price) or (
+                    (not is_buy) and level_value <= reference_price
+                )
+            if invalid_side or dev_pct > max_dev:
+                logger.warning(
+                    "Dropping stale %s for %s: level=%.8f ref=%.8f dev=%.2f%% max=%.2f%%",
+                    level_name,
+                    signal.symbol,
+                    level_value,
+                    reference_price,
+                    dev_pct,
+                    max_dev,
+                )
+                return None
+            return level_value
+
+        tp = None
+        sl = None
+        try:
+            tp = float(signal.take_profit) if signal.take_profit is not None else None
+        except (TypeError, ValueError):
+            tp = None
+        try:
+            sl = float(signal.stop_loss) if signal.stop_loss is not None else None
+        except (TypeError, ValueError):
+            sl = None
+
+        signal.take_profit = _maybe_drop("take_profit", tp)
+        signal.stop_loss = _maybe_drop("stop_loss", sl)
+
     @staticmethod
     def _to_float(value: Any, default: float = 0.0) -> float:
         try:
@@ -1502,15 +1567,21 @@ class LighterBot:
             self.config.trading_enabled = True
             self._trading_enabled = True
 
-    async def _execute_trade(self, signal: TradeSignal) -> TradeResult:
+    async def _execute_trade(
+        self,
+        signal: TradeSignal,
+        *,
+        ignore_trading_guard: bool = False,
+    ) -> TradeResult:
         """Execute trade on Lighter with L2 order book."""
         start_time = datetime.now()
 
         try:
-            if not self._trading_enabled:
-                raise Exception("Trading disabled (TRADING_ENABLED=false)")
-            if self._trading_mode == "live" and not self._allow_live_trading:
-                raise Exception("Live trading disabled (ALLOW_LIVE_TRADING=0)")
+            if not ignore_trading_guard:
+                if not self._trading_enabled:
+                    raise Exception("Trading disabled (TRADING_ENABLED=false)")
+                if self._trading_mode == "live" and not self._allow_live_trading:
+                    raise Exception("Live trading disabled (ALLOW_LIVE_TRADING=0)")
             if not self.transaction_api:
                 raise Exception("Transaction API not initialized")
             if self._execution_block_reason:
@@ -1700,6 +1771,12 @@ class LighterBot:
                         f"projected={projected_notional:.4f} cap={self._max_position_notional_usd:.4f}"
                     )
 
+            self._sanitize_signal_risk_levels(
+                signal,
+                is_buy=is_buy,
+                reference_price=float(current_price),
+                reduce_only=reduce_only,
+            )
             self._apply_default_risk_levels(
                 signal,
                 is_buy=is_buy,
@@ -2305,15 +2382,53 @@ class LighterBot:
             result = await self._execute_trade(exit_signal)
             if not (result.metadata or {}).get("noop"):
                 await publish("trade-executed", result)
-            if result.success:
+            filled_qty = self._to_float(getattr(result, "filled_quantity", 0.0), 0.0)
+            if result.success and (filled_qty > 0 or (result.metadata or {}).get("noop")):
                 self._risk_exit_attempted_at.pop(symbol, None)
 
     async def _close_all_positions(self):
         """Close all positions on Lighter."""
         try:
-            # Implement closing logic based on Lighter API
-            self.positions.clear()
-            logger.info("Closed all Lighter positions")
+            if not self.positions:
+                logger.info("Close-all requested but no local positions are tracked")
+                return
+
+            closed = 0
+            failed = 0
+            for symbol, position in list(self.positions.items()):
+                try:
+                    qty = float(getattr(position, "quantity", 0.0) or 0.0)
+                except (TypeError, ValueError):
+                    qty = 0.0
+                if qty <= 0:
+                    continue
+
+                pos_side = getattr(position, "side", None)
+                close_side = (
+                    TradeSide.SELL
+                    if pos_side in (TradeSide.BUY, TradeSide.LONG, "BUY", "LONG")
+                    else TradeSide.BUY
+                )
+                exit_signal = TradeSignal(
+                    signal_id=f"close-all-{symbol.lower()}-{int(time.time())}",
+                    symbol=symbol,
+                    side=close_side,
+                    signal_type=SignalType.EXIT,
+                    quantity=abs(qty),
+                    source="risk-close-all",
+                    metadata={"reduce_only": True, "origin": "risk_close_all"},
+                )
+                result = await self._execute_trade(exit_signal, ignore_trading_guard=True)
+                if result.success:
+                    closed += 1
+                else:
+                    failed += 1
+                    logger.error(
+                        "Close-all failed for %s: %s",
+                        symbol,
+                        result.error_message or "unknown_error",
+                    )
+            logger.info("Close-all complete | requested=%d failed=%d", closed, failed)
         except Exception as e:
             logger.error(f"Close all error: {e}")
 
