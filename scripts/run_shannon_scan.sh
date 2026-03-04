@@ -74,6 +74,26 @@ if ! command -v rsync >/dev/null 2>&1; then
   exit 6
 fi
 
+has_llm_credential="false"
+if [[ -n "${ANTHROPIC_API_KEY:-}" || -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]]; then
+  has_llm_credential="true"
+elif [[ "${CLAUDE_CODE_USE_BEDROCK:-0}" == "1" || "${CLAUDE_CODE_USE_VERTEX:-0}" == "1" ]]; then
+  has_llm_credential="true"
+elif [[ "${ROUTER:-false}" == "true" && ( -n "${OPENAI_API_KEY:-}" || -n "${OPENROUTER_API_KEY:-}" ) ]]; then
+  has_llm_credential="true"
+fi
+
+if [[ "$has_llm_credential" != "true" ]]; then
+  echo "ERROR: Missing LLM credentials for Shannon runtime."
+  echo "Set one of:"
+  echo "  - ANTHROPIC_API_KEY"
+  echo "  - CLAUDE_CODE_OAUTH_TOKEN"
+  echo "  - CLAUDE_CODE_USE_BEDROCK=1"
+  echo "  - CLAUDE_CODE_USE_VERTEX=1"
+  echo "  - ROUTER=true with OPENAI_API_KEY or OPENROUTER_API_KEY"
+  exit 12
+fi
+
 host="${TARGET_URL#*://}"
 host="${host%%/*}"
 host="${host%%:*}"
