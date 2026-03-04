@@ -407,6 +407,7 @@ class SapphireCtl:
         requested_by: str,
         desired_version: str | None = None,
         update_desired: bool = True,
+        no_restart: bool = False,
     ) -> Dict[str, Any]:
         desired = self._build_desired_state(
             profile=profile,
@@ -426,6 +427,59 @@ class SapphireCtl:
         if update_desired:
             desired_ref.set(desired)
             self._event("desired_state_updated", {"desired_version": desired["desired_version"], **desired})
+
+        if no_restart:
+            skipped = CommandResult(
+                ok=True,
+                returncode=0,
+                cmd=[],
+                stdout="skipped_no_restart",
+                stderr="",
+            )
+            applied_payload: Dict[str, Any] = {
+                "platform": PLATFORM,
+                "service": DEFAULT_SERVICE,
+                "target_host": target_host,
+                "profile": profile,
+                "desired_version": desired["desired_version"],
+                "applied_at": _utc_now(),
+                "applied_at_iso": _utc_now_iso(),
+                "requested_by": requested_by,
+                "status": "staged_no_restart",
+                "run_test": run_test,
+                "close_after_test": close_after_test,
+                "test_quantity": str(test_quantity),
+                "effective_settings": desired["effective_settings"],
+                "deploy": skipped.to_dict(),
+                "override_apply": skipped.to_dict(),
+                "test": skipped.to_dict(),
+                "close": skipped.to_dict(),
+            }
+            applied_ref.set(applied_payload)
+            history_id = f"{_utc_now().strftime('%Y%m%dT%H%M%SZ')}_{desired['desired_version']}"
+            self.db.collection(APPLIED_HISTORY_COLLECTION).document(history_id).set(applied_payload)
+            desired_ref.set(
+                {
+                    "state": "staged_no_restart",
+                    "last_apply_at": _utc_now(),
+                    "last_apply_at_iso": _utc_now_iso(),
+                    "last_apply_status": "staged_no_restart",
+                },
+                merge=True,
+            )
+            self._event(
+                "desired_state_staged_no_restart",
+                {
+                    "desired_version": desired["desired_version"],
+                    "profile": profile,
+                    "target_host": target_host,
+                    "run_test": run_test,
+                },
+            )
+            return {
+                "desired": desired,
+                "applied": applied_payload,
+            }
 
         deploy = self._run(
             [str(DEPLOY_SCRIPT), profile, target_host],
@@ -540,6 +594,7 @@ class SapphireCtl:
         close_after_test_override: bool | None,
         notes: str,
         extra_overrides: Dict[str, str],
+        no_restart: bool,
     ) -> Dict[str, Any]:
         stage_cfg = PROMOTION_STAGES.get(to_stage)
         if not stage_cfg:
@@ -567,6 +622,7 @@ class SapphireCtl:
             notes=note,
             overrides=merged_overrides,
             requested_by=requested_by,
+            no_restart=no_restart,
         )
         desired_ref = self.db.collection(DESIRED_COLLECTION).document(PLATFORM)
         desired_ref.set(
@@ -601,6 +657,7 @@ class SapphireCtl:
         close_after_test: bool,
         test_quantity: str,
         notes: str,
+        no_restart: bool,
     ) -> Dict[str, Any]:
         steps = max(1, int(steps))
         history = [
@@ -627,6 +684,7 @@ class SapphireCtl:
             notes=note,
             overrides=overrides,
             requested_by=requested_by,
+            no_restart=no_restart,
         )
         self._event(
             "rollback_applied",
@@ -679,7 +737,7 @@ class SapphireCtl:
             },
         }
 
-    def reconcile(self, *, requested_by: str) -> Dict[str, Any]:
+    def reconcile(self, *, requested_by: str, no_restart: bool = False) -> Dict[str, Any]:
         desired = self.db.collection(DESIRED_COLLECTION).document(PLATFORM).get().to_dict() or {}
         applied = self.db.collection(APPLIED_COLLECTION).document(PLATFORM).get().to_dict() or {}
         if not desired:
@@ -716,6 +774,7 @@ class SapphireCtl:
             requested_by=requested_by,
             desired_version=desired_version or None,
             update_desired=False,
+            no_restart=no_restart,
         )
         return {
             "reconciled": True,
@@ -750,6 +809,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="After successful test canary, request CLOSE_ALL on the local execution gateway.",
     )
+    apply_p.add_argument(
+        "--no-restart",
+        action="store_true",
+        help="Stage desired state only; skip deploy/restart/test/close operations.",
+    )
     apply_p.add_argument("--test-quantity", default="0.005")
 
     promote_p = sub.add_parser("promote", help="Promote runtime stage (paper/canary/live)")
@@ -779,6 +843,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Disable CLOSE_ALL post-test even if stage default enables it.",
     )
+    promote_p.add_argument(
+        "--no-restart",
+        action="store_true",
+        help="Stage desired state only; skip runtime changes.",
+    )
 
     rollback_p = sub.add_parser("rollback", help="Rollback to a previous applied state")
     rollback_p.add_argument("--steps", type=int, default=1, help="How many applied versions back")
@@ -787,9 +856,19 @@ def _build_parser() -> argparse.ArgumentParser:
     rollback_p.add_argument("--test-quantity", default="0.002")
     rollback_p.add_argument("--skip-test", action="store_true")
     rollback_p.add_argument("--close-after-test", action="store_true")
+    rollback_p.add_argument(
+        "--no-restart",
+        action="store_true",
+        help="Stage desired rollback state only; skip runtime changes.",
+    )
 
     sub.add_parser("status", help="Show desired/applied/live status")
-    sub.add_parser("reconcile", help="Apply desired state if not converged")
+    reconcile_p = sub.add_parser("reconcile", help="Apply desired state if not converged")
+    reconcile_p.add_argument(
+        "--no-restart",
+        action="store_true",
+        help="Stage desired state only; skip runtime changes.",
+    )
     return p
 
 
@@ -810,9 +889,10 @@ def main() -> int:
             notes=args.notes,
             overrides=overrides,
             requested_by=args.requested_by,
+            no_restart=bool(args.no_restart),
         )
         _json_print(out)
-        return 0 if out["applied"]["status"] == "applied" else 2
+        return 0 if out["applied"]["status"] in {"applied", "staged_no_restart"} else 2
 
     if args.command == "promote":
         if args.close_after_test and args.no_close_after_test:
@@ -833,10 +913,11 @@ def main() -> int:
             close_after_test_override=close_after_test_override,
             notes=args.notes,
             extra_overrides=_parse_overrides(args.override),
+            no_restart=bool(args.no_restart),
         )
         _json_print(out)
         status = (((out.get("result") or {}).get("applied") or {}).get("status") or "").lower()
-        return 0 if status == "applied" else 2
+        return 0 if status in {"applied", "staged_no_restart"} else 2
 
     if args.command == "rollback":
         out = ctl.rollback(
@@ -847,21 +928,22 @@ def main() -> int:
             close_after_test=bool(args.close_after_test),
             test_quantity=args.test_quantity,
             notes=args.notes,
+            no_restart=bool(args.no_restart),
         )
         _json_print(out)
         status = (((out.get("result") or {}).get("applied") or {}).get("status") or "").lower()
-        return 0 if status == "applied" else 2
+        return 0 if status in {"applied", "staged_no_restart"} else 2
 
     if args.command == "status":
         _json_print(ctl.status())
         return 0
 
     if args.command == "reconcile":
-        out = ctl.reconcile(requested_by=args.requested_by)
+        out = ctl.reconcile(requested_by=args.requested_by, no_restart=bool(args.no_restart))
         _json_print(out)
         if out.get("reconciled"):
             status = (((out.get("result") or {}).get("applied") or {}).get("status") or "").lower()
-            return 0 if status == "applied" else 2
+            return 0 if status in {"applied", "staged_no_restart"} else 2
         return 0
 
     parser.print_help()
