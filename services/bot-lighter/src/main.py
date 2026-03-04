@@ -210,6 +210,14 @@ class LighterBot:
             0.0,
             self._env_float(("LIGHTER_MAX_POSITION_NOTIONAL_USD",), default=0.0),
         )
+        self._target_order_notional_usd = max(
+            0.0,
+            self._env_float(("LIGHTER_TARGET_ORDER_NOTIONAL_USD",), default=0.0),
+        )
+        self._max_signal_leverage = max(
+            1.0,
+            self._env_float(("LIGHTER_MAX_SIGNAL_LEVERAGE",), default=20.0),
+        )
         self._entry_cooldown_seconds = max(
             0.0,
             self._env_float(("LIGHTER_ENTRY_COOLDOWN_SECONDS",), default=0.0),
@@ -352,7 +360,7 @@ class LighterBot:
         logger.info(
             "Strategy policy | allowed_strategies=%s allowed_timeframes=%s "
             "require_metadata=%s entry_cooldown=%.1fs max_order_notional=%.2f "
-            "max_position_notional=%.2f progress_verify=%.0fs dd_alert=%.2f%% "
+            "max_position_notional=%.2f target_order_notional=%.2f max_signal_leverage=%.1fx progress_verify=%.0fs dd_alert=%.2f%% "
             "sync_stale_alert=%.0fs risk_level_max_dev=%.1f%% empty_pos_confirm=%d "
             "tg_digest=%.0fs tg_charts=%s dynamic_risk=%s rotation=%s edge=%.3f%%",
             sorted(self._allowed_strategies) if self._allowed_strategies else ["*"],
@@ -361,6 +369,8 @@ class LighterBot:
             self._entry_cooldown_seconds,
             self._max_order_notional_usd,
             self._max_position_notional_usd,
+            self._target_order_notional_usd,
+            self._max_signal_leverage,
             self._progress_verify_interval_seconds,
             self._max_drawdown_alert_pct,
             self._sync_stale_alert_seconds,
@@ -2159,6 +2169,8 @@ class LighterBot:
                 "allowed_timeframes": sorted(self._allowed_timeframes),
                 "max_order_notional_usd": self._max_order_notional_usd,
                 "max_position_notional_usd": self._max_position_notional_usd,
+                "target_order_notional_usd": self._target_order_notional_usd,
+                "max_signal_leverage": self._max_signal_leverage,
                 "entry_cooldown_seconds": self._entry_cooldown_seconds,
             },
             "assistant_advice": advice,
@@ -2431,6 +2443,16 @@ class LighterBot:
 
             # Calculate quantity
             quantity = float(signal.quantity)
+            signal_leverage = self._to_float(getattr(signal, "leverage", 0.0), 0.0)
+            if signal_leverage > self._max_signal_leverage:
+                raise ValueError(
+                    f"Signal leverage {signal_leverage:.2f}x exceeds cap {self._max_signal_leverage:.2f}x"
+                )
+            if signal.metadata is None:
+                signal.metadata = {}
+            signal.metadata.setdefault("max_signal_leverage", self._max_signal_leverage)
+            if signal_leverage > 0:
+                signal.metadata.setdefault("requested_leverage", signal_leverage)
 
             reduce_only = bool((signal.metadata or {}).get("reduce_only", False))
             if signal.signal_type in {
@@ -2542,6 +2564,32 @@ class LighterBot:
                 current_price = await self._get_ticker(coin)
             if not current_price:
                 raise Exception(f"Could not get current price for {coin}")
+
+            if (
+                not reduce_only
+                and entry_like
+                and self._target_order_notional_usd > 0
+                and current_price > 0
+            ):
+                size_decimals = int(market.get("size_decimals", 3) or 3)
+                scale = 10 ** max(0, size_decimals)
+                target_qty = math.floor(
+                    (self._target_order_notional_usd / float(current_price)) * scale
+                ) / scale
+                if target_qty <= 0:
+                    raise ValueError(
+                        f"Target order notional too low for {coin}: "
+                        f"target={self._target_order_notional_usd} price={current_price}"
+                    )
+                if abs(target_qty - float(quantity)) > 1e-12:
+                    logger.info(
+                        "Target notional sizing applied for %s: qty %.8f -> %.8f (target %.2f USD)",
+                        coin,
+                        float(quantity),
+                        float(target_qty),
+                        self._target_order_notional_usd,
+                    )
+                quantity = float(target_qty)
 
             logger.info(
                 f"Placing {signal.side} order | Symbol: {coin} | Qty: {quantity} | OrderBookId: {order_book_id}"
