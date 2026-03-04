@@ -92,7 +92,7 @@ PROMOTION_STAGES: Dict[str, Dict[str, Any]] = {
         "profile": "luxalgo_sol_5m_active",
         "run_test": True,
         "close_after_test": True,
-        "test_quantity": "0.002",
+        "test_quantity": "0.01",
         "overrides": {
             "ALLOW_LIVE_TRADING": "1",
             "TRADING_ENABLED": "1",
@@ -105,7 +105,7 @@ PROMOTION_STAGES: Dict[str, Dict[str, Any]] = {
         "profile": "luxalgo_sol_5m_active",
         "run_test": True,
         "close_after_test": False,
-        "test_quantity": "0.003",
+        "test_quantity": "0.02",
         "overrides": {
             "ALLOW_LIVE_TRADING": "1",
             "TRADING_ENABLED": "1",
