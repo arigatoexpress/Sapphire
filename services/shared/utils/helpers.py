@@ -87,7 +87,13 @@ class ServiceConfig:
 
         # Trading Configuration
         # Safe-by-default: require explicit opt-in to live trade execution.
-        self.trading_enabled = os.getenv("TRADING_ENABLED", "false").lower() == "true"
+        # Accept common truthy forms used in env files ("true", "1", "yes", "on").
+        self.trading_enabled = os.getenv("TRADING_ENABLED", "false").strip().lower() in {
+            "true",
+            "1",
+            "yes",
+            "on",
+        }
         self.max_position_size = float(
             os.getenv("MAX_POSITION_SIZE", "20")
         )  # Reduced for low collateral
