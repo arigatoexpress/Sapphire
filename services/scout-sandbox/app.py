@@ -15,6 +15,11 @@ from loguru import logger
 from pydantic import BaseModel, Field
 
 try:
+    from scrapling import AsyncFetcher
+except Exception:  # pragma: no cover - optional at runtime
+    AsyncFetcher = None  # type: ignore[assignment]
+
+try:
     from google.cloud import firestore
 except Exception:  # pragma: no cover - optional at runtime
     firestore = None  # type: ignore[assignment]
@@ -31,6 +36,7 @@ _INLINE_TOKEN_RE = re.compile(
 _GLINT_FEED_TITLE_RE = re.compile(r'"(?:headline|title)"\s*:\s*"([^"]{18,220})"')
 _GLINT_HTML_TAG_RE = re.compile(r"<[^>]+>")
 _GLINT_WS_RE = re.compile(r"\s+")
+_SELECTOR_SAFE_RE = re.compile(r"^[a-zA-Z0-9\-\_\#\.\:\,\s\[\]\=\"\'\+\>\~\*\(\)]+$")
 
 
 def _bool_env(name: str, default: bool = False) -> bool:
@@ -55,6 +61,19 @@ def _split_csv(value: str) -> List[str]:
 
 def _split_regex_list(value: str) -> List[str]:
     return [part.strip() for part in str(value or "").split(";") if part.strip()]
+
+
+def _compile_regex_patterns(pattern_source: List[str], defaults: List[str], *, label: str) -> Tuple[Pattern[str], ...]:
+    compiled: List[Pattern[str]] = []
+    for item in pattern_source:
+        try:
+            compiled.append(re.compile(item))
+        except re.error as exc:
+            logger.warning(f"Ignoring invalid {label} regex '{item}': {exc}")
+
+    if not compiled:
+        compiled = [re.compile(item) for item in defaults]
+    return tuple(compiled)
 
 
 def _safe_excerpt(value: str, max_len: int = 500) -> str:
@@ -83,6 +102,16 @@ class SandboxConfig:
     intel_allowed_hosts: Tuple[str, ...]
     intel_glint_api_url: str
     intel_glint_bearer_token: str
+    scrapling_enabled: bool
+    scrapling_allowed_hosts: Tuple[str, ...]
+    scrapling_timeout_seconds: int
+    scrapling_verify_tls: bool
+    gtm_enabled: bool
+    gtm_outbound_url: str
+    gtm_api_token: str
+    gtm_require_token: bool
+    gtm_allowed_hosts: Tuple[str, ...]
+    gtm_allowed_path_patterns: Tuple[Pattern[str], ...]
     audit_collection: str
 
     @classmethod
@@ -102,19 +131,35 @@ class SandboxConfig:
         else:
             pattern_source = default_patterns
 
-        compiled_patterns: List[Pattern[str]] = []
-        for item in pattern_source:
-            try:
-                compiled_patterns.append(re.compile(item))
-            except re.error as exc:
-                logger.warning(f"Ignoring invalid SCOUT_SANDBOX path regex '{item}': {exc}")
-
-        if not compiled_patterns:
-            compiled_patterns = [re.compile(item) for item in default_patterns]
+        compiled_patterns = _compile_regex_patterns(
+            pattern_source,
+            default_patterns,
+            label="SCOUT_SANDBOX path",
+        )
 
         intel_default_hosts = "glint.trade,www.glint.trade"
         intel_hosts = tuple(
             sorted(set(_split_csv(os.getenv("SCOUT_SANDBOX_INTEL_ALLOWED_HOSTS", intel_default_hosts))))
+        )
+        scrapling_default_hosts = "glint.trade,www.glint.trade,news.ycombinator.com,github.com,www.github.com"
+        scrapling_hosts = tuple(
+            sorted(
+                set(
+                    _split_csv(
+                        os.getenv("SCOUT_SANDBOX_SCRAPLING_ALLOWED_HOSTS", scrapling_default_hosts)
+                    )
+                )
+            )
+        )
+        gtm_default_hosts = "clawgtm.com,www.clawgtm.com,app.clawgtm.com"
+        gtm_hosts = tuple(sorted(set(_split_csv(os.getenv("SCOUT_SANDBOX_GTM_ALLOWED_HOSTS", gtm_default_hosts)))))
+        gtm_default_patterns = [r"^/api/.*", r"^/v1/.*"]
+        gtm_pattern_raw = os.getenv("SCOUT_SANDBOX_GTM_ALLOWED_PATH_PATTERNS", "")
+        gtm_pattern_source = _split_regex_list(gtm_pattern_raw) if gtm_pattern_raw.strip() else gtm_default_patterns
+        gtm_patterns = _compile_regex_patterns(
+            gtm_pattern_source,
+            gtm_default_patterns,
+            label="SCOUT_SANDBOX GTM path",
         )
 
         return cls(
@@ -130,7 +175,7 @@ class SandboxConfig:
             auto_verify_enabled=_bool_env("SCOUT_SANDBOX_AUTO_VERIFY_ENABLED", True),
             verify_url=str(os.getenv("SCOUT_SANDBOX_VERIFY_URL", "")).strip(),
             allowed_hosts=hosts,
-            allowed_path_patterns=tuple(compiled_patterns),
+            allowed_path_patterns=compiled_patterns,
             intel_enabled=_bool_env("SCOUT_SANDBOX_INTEL_ENABLED", True),
             intel_allowed_hosts=intel_hosts,
             intel_glint_api_url=str(
@@ -139,12 +184,22 @@ class SandboxConfig:
             intel_glint_bearer_token=str(
                 os.getenv("SCOUT_SANDBOX_INTEL_GLINT_BEARER_TOKEN", "")
             ).strip(),
+            scrapling_enabled=_bool_env("SCOUT_SANDBOX_SCRAPLING_ENABLED", False),
+            scrapling_allowed_hosts=scrapling_hosts,
+            scrapling_timeout_seconds=_int_env("SCOUT_SANDBOX_SCRAPLING_TIMEOUT_SECONDS", 20, 5, 60),
+            scrapling_verify_tls=_bool_env("SCOUT_SANDBOX_SCRAPLING_VERIFY_TLS", True),
+            gtm_enabled=_bool_env("SCOUT_SANDBOX_GTM_ENABLED", False),
+            gtm_outbound_url=str(os.getenv("SCOUT_SANDBOX_GTM_OUTBOUND_URL", "")).strip(),
+            gtm_api_token=str(os.getenv("SCOUT_SANDBOX_GTM_API_TOKEN", "")).strip(),
+            gtm_require_token=_bool_env("SCOUT_SANDBOX_GTM_REQUIRE_TOKEN", True),
+            gtm_allowed_hosts=gtm_hosts,
+            gtm_allowed_path_patterns=gtm_patterns,
             audit_collection=str(os.getenv("SCOUT_SANDBOX_AUDIT_COLLECTION", "scout_sandbox_audit")).strip() or "scout_sandbox_audit",
         )
 
 
 class DispatchRequest(BaseModel):
-    action: str = Field(pattern="^(register|publish|comment)$")
+    action: str = Field(pattern="^(register|publish|comment|gtm_outbound)$")
     outbound_payload: Dict[str, Any] = Field(default_factory=dict)
     external_url_hint: str = ""
     note: str = ""
@@ -156,6 +211,23 @@ class GlintCollectRequest(BaseModel):
     limit: int = Field(default=20, ge=1, le=100)
     query: str = ""
     source_url: str = Field(default="https://glint.trade/feed")
+
+
+class ScraplingCollectRequest(BaseModel):
+    source_url: str
+    selectors: List[str] = Field(default_factory=lambda: ["title", "h1", "h2", "p"])
+    limit_per_selector: int = Field(default=5, ge=1, le=25)
+    include_links: bool = False
+    max_links: int = Field(default=15, ge=1, le=50)
+    query: str = ""
+
+
+class GTMOutboundRequest(BaseModel):
+    outbound_payload: Dict[str, Any] = Field(default_factory=dict)
+    external_url_hint: str = ""
+    note: str = ""
+    source: str = "alpha-engine"
+    request_id: str = ""
 
 
 class FirestoreAuditLogger:
@@ -217,17 +289,63 @@ class ScoutSandboxBroker:
             return ""
         return f"{parsed.scheme}://{parsed.netloc}/api/v1/verify"
 
-    def _is_allowed_url(self, url: str) -> Tuple[bool, str]:
+    @staticmethod
+    def _is_allowed_url_for_scope(
+        url: str,
+        *,
+        allowed_hosts: Tuple[str, ...],
+        allowed_path_patterns: Tuple[Pattern[str], ...],
+    ) -> Tuple[bool, str]:
         parsed = urlparse(str(url or "").strip())
         if parsed.scheme.lower() != "https":
             return False, "only_https_allowed"
         host = parsed.netloc.lower().split(":", 1)[0]
-        if host not in self.config.allowed_hosts:
+        if host not in allowed_hosts:
             return False, "host_not_allowlisted"
         path = parsed.path or "/"
-        if not any(pattern.match(path) for pattern in self.config.allowed_path_patterns):
+        if not any(pattern.match(path) for pattern in allowed_path_patterns):
             return False, "path_not_allowlisted"
         return True, "ok"
+
+    def _is_allowed_url(self, url: str) -> Tuple[bool, str]:
+        return self._is_allowed_url_for_scope(
+            url,
+            allowed_hosts=self.config.allowed_hosts,
+            allowed_path_patterns=self.config.allowed_path_patterns,
+        )
+
+    def _is_allowed_gtm_url(self, url: str) -> Tuple[bool, str]:
+        return self._is_allowed_url_for_scope(
+            url,
+            allowed_hosts=self.config.gtm_allowed_hosts,
+            allowed_path_patterns=self.config.gtm_allowed_path_patterns,
+        )
+
+    def _is_allowed_scrapling_url(self, url: str) -> Tuple[bool, str]:
+        parsed = urlparse(str(url or "").strip())
+        if parsed.scheme.lower() != "https":
+            return False, "only_https_allowed"
+        host = parsed.netloc.lower().split(":", 1)[0]
+        if host not in self.config.scrapling_allowed_hosts:
+            return False, "host_not_allowlisted"
+        return True, "ok"
+
+    @staticmethod
+    def _sanitize_css_selectors(selectors: List[str], *, max_count: int = 8) -> List[str]:
+        cleaned: List[str] = []
+        seen = set()
+        for raw in selectors[:max_count]:
+            selector = str(raw or "").strip()
+            if not selector or len(selector) > 120:
+                continue
+            if not _SELECTOR_SAFE_RE.fullmatch(selector):
+                continue
+            key = selector.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            cleaned.append(selector)
+        return cleaned or ["title", "h1", "h2", "p"]
 
     def _resolve_target_url(self, req: DispatchRequest) -> Tuple[str, str]:
         action = req.action
@@ -237,6 +355,8 @@ class ScoutSandboxBroker:
             return (req.external_url_hint.strip() or self.config.post_url), "publish"
         if action == "comment":
             return req.external_url_hint.strip(), "comment"
+        if action == "gtm_outbound":
+            return (req.external_url_hint.strip() or self.config.gtm_outbound_url), "gtm_outbound"
         return "", "unknown"
 
     @staticmethod
@@ -465,6 +585,157 @@ class ScoutSandboxBroker:
             "api_reason": api_reason,
         }
 
+    async def collect_scrapling_intel(
+        self,
+        *,
+        source_url: str,
+        selectors: List[str],
+        limit_per_selector: int,
+        include_links: bool,
+        max_links: int,
+        query: str = "",
+    ) -> Dict[str, Any]:
+        if not self.config.scrapling_enabled:
+            return {"ok": False, "reason": "scrapling_disabled", "items": [], "count": 0}
+        if AsyncFetcher is None:
+            return {"ok": False, "reason": "scrapling_not_installed", "items": [], "count": 0}
+
+        allowed, reason = self._is_allowed_scrapling_url(source_url)
+        if not allowed:
+            return {"ok": False, "reason": reason, "items": [], "count": 0}
+
+        normalized_selectors = self._sanitize_css_selectors(selectors, max_count=8)
+        started = time.time()
+        now = int(time.time())
+        timeout_seconds = max(5, min(self.config.scrapling_timeout_seconds, 60))
+        try:
+            page = await AsyncFetcher.get(
+                source_url,
+                timeout=timeout_seconds,
+                verify=self.config.scrapling_verify_tls,
+            )
+        except Exception as exc:
+            return {
+                "ok": False,
+                "reason": f"scrapling_request_failed:{_safe_excerpt(str(exc), max_len=160)}",
+                "items": [],
+                "count": 0,
+            }
+
+        status = int(getattr(page, "status", 0) or 0)
+        if status >= 400:
+            return {
+                "ok": False,
+                "reason": f"http_{status}",
+                "status": status,
+                "items": [],
+                "count": 0,
+            }
+
+        query_lower = str(query or "").strip().lower()
+        items: List[Dict[str, Any]] = []
+        selector_hits: Dict[str, int] = {}
+        for selector in normalized_selectors:
+            hits = 0
+            try:
+                nodes = page.css(selector)
+            except Exception:
+                nodes = []
+            for node in list(nodes)[:limit_per_selector]:
+                text_value = self._clean_glint_text(getattr(node, "text", ""), limit=320)
+                if not text_value:
+                    continue
+                if query_lower and query_lower not in text_value.lower():
+                    continue
+                href = ""
+                try:
+                    href = str(getattr(node, "attrib", {}).get("href", "")).strip()
+                except Exception:
+                    href = ""
+                if href:
+                    try:
+                        href = str(page.urljoin(href)).strip()
+                    except Exception:
+                        href = str(href).strip()
+
+                items.append(
+                    {
+                        "id": f"scrapling:{selector}:{uuid.uuid4().hex[:10]}",
+                        "source": "scrapling_fetch",
+                        "category": "web_intel",
+                        "selector": selector,
+                        "title": text_value[:220],
+                        "summary": text_value[:320],
+                        "url": href or str(getattr(page, "url", source_url)).strip(),
+                        "published_at": datetime.now(timezone.utc).isoformat(),
+                        "tags": ["scrapling", "sandbox", "intel"],
+                        "confidence": "medium",
+                        "score": round(max(0.40, 0.70 - (len(items) * 0.01)), 3),
+                    }
+                )
+                hits += 1
+            selector_hits[selector] = hits
+
+        links: List[Dict[str, str]] = []
+        if include_links:
+            try:
+                link_nodes = page.css("a[href]")
+            except Exception:
+                link_nodes = []
+            for node in list(link_nodes)[:max_links]:
+                try:
+                    raw_href = str(getattr(node, "attrib", {}).get("href", "")).strip()
+                except Exception:
+                    raw_href = ""
+                if not raw_href:
+                    continue
+                try:
+                    href = str(page.urljoin(raw_href)).strip()
+                except Exception:
+                    href = raw_href
+                links.append(
+                    {
+                        "href": _safe_excerpt(href, max_len=280),
+                        "text": self._clean_glint_text(getattr(node, "text", ""), limit=120),
+                    }
+                )
+
+        snippet = self._clean_glint_text(getattr(page, "text", ""), limit=1200)
+        parsed_url = urlparse(str(getattr(page, "url", source_url)).strip())
+        self.audit.write(
+            {
+                "audit_id": str(uuid.uuid4()),
+                "timestamp": now,
+                "source": "intel_collector",
+                "action": "scrapling_collect",
+                "target_host": parsed_url.netloc.lower().split(":", 1)[0],
+                "target_path": parsed_url.path or "/",
+                "latency_ms": int((time.time() - started) * 1000),
+                "result": {
+                    "dispatched": True,
+                    "reason": "ok" if items else "no_items_extracted",
+                    "status": status or 200,
+                    "count": len(items),
+                    "selector_hits": selector_hits,
+                },
+            }
+        )
+
+        return {
+            "ok": True,
+            "reason": "ok" if items else "no_items_extracted",
+            "status": status or 200,
+            "source_url": source_url,
+            "resolved_url": str(getattr(page, "url", source_url)).strip(),
+            "count": len(items),
+            "items": items,
+            "selector_hits": selector_hits,
+            "snippet": snippet,
+            "links": links,
+            "timestamp": now,
+            "collector_mode": "scrapling",
+        }
+
     def _audit_record(self, req: DispatchRequest, target_url: str, dispatch: Dict[str, Any], latency_ms: int) -> Dict[str, Any]:
         payload_json = json.dumps(req.outbound_payload, sort_keys=True, default=str)
         payload_hash = json.dumps(
@@ -506,7 +777,18 @@ class ScoutSandboxBroker:
             self.audit.write(self._audit_record(req, target_url, result, int((time.time() - started) * 1000)))
             return result
 
-        allowed, reason = self._is_allowed_url(target_url)
+        if mode == "gtm_outbound":
+            if not self.config.gtm_enabled:
+                result = {
+                    "dispatched": False,
+                    "reason": "gtm_dispatch_disabled",
+                    "mode": "scout_sandbox",
+                }
+                self.audit.write(self._audit_record(req, target_url, result, int((time.time() - started) * 1000)))
+                return result
+            allowed, reason = self._is_allowed_gtm_url(target_url)
+        else:
+            allowed, reason = self._is_allowed_url(target_url)
         if not allowed:
             result = {
                 "dispatched": False,
@@ -533,11 +815,21 @@ class ScoutSandboxBroker:
             token = self.config.external_api_token
         elif mode == "register" and self.config.register_use_token:
             token = self.config.external_api_token
+        elif mode == "gtm_outbound":
+            token = self.config.gtm_api_token
 
         if mode in {"publish", "comment"} and not token:
             result = {
                 "dispatched": False,
                 "reason": "external_api_token_missing",
+                "mode": "scout_sandbox",
+            }
+            self.audit.write(self._audit_record(req, target_url, result, int((time.time() - started) * 1000)))
+            return result
+        if mode == "gtm_outbound" and self.config.gtm_require_token and not token:
+            result = {
+                "dispatched": False,
+                "reason": "gtm_api_token_missing",
                 "mode": "scout_sandbox",
             }
             self.audit.write(self._audit_record(req, target_url, result, int((time.time() - started) * 1000)))
@@ -992,6 +1284,13 @@ async def health() -> Dict[str, Any]:
         "intel_allowed_hosts": list(CONFIG.intel_allowed_hosts),
         "intel_glint_api_url": CONFIG.intel_glint_api_url,
         "intel_glint_api_token_configured": bool(CONFIG.intel_glint_bearer_token),
+        "scrapling_enabled": bool(CONFIG.scrapling_enabled),
+        "scrapling_installed": bool(AsyncFetcher is not None),
+        "scrapling_allowed_hosts": list(CONFIG.scrapling_allowed_hosts),
+        "gtm_enabled": bool(CONFIG.gtm_enabled),
+        "gtm_outbound_url_configured": bool(CONFIG.gtm_outbound_url),
+        "gtm_api_token_configured": bool(CONFIG.gtm_api_token),
+        "gtm_allowed_hosts": list(CONFIG.gtm_allowed_hosts),
     }
 
 
@@ -1022,3 +1321,44 @@ async def glint_collect(
         limit=request.limit,
         query=request.query,
     )
+
+
+@app.post("/v1/intel/scrapling_collect")
+async def scrapling_collect(
+    request: ScraplingCollectRequest,
+    authorization: Optional[str] = Header(default=""),
+    x_scout_sandbox_token: Optional[str] = Header(default=""),
+) -> Dict[str, Any]:
+    _require_inbound_auth(authorization or "", x_scout_sandbox_token or "")
+    return await BROKER.collect_scrapling_intel(
+        source_url=request.source_url,
+        selectors=request.selectors,
+        limit_per_selector=request.limit_per_selector,
+        include_links=bool(request.include_links),
+        max_links=int(request.max_links),
+        query=request.query,
+    )
+
+
+@app.post("/v1/gtm/outbound")
+async def gtm_outbound(
+    request: GTMOutboundRequest,
+    authorization: Optional[str] = Header(default=""),
+    x_scout_sandbox_token: Optional[str] = Header(default=""),
+) -> Dict[str, Any]:
+    _require_inbound_auth(authorization or "", x_scout_sandbox_token or "")
+    dispatch = await BROKER.dispatch(
+        DispatchRequest(
+            action="gtm_outbound",
+            outbound_payload=request.outbound_payload,
+            external_url_hint=request.external_url_hint,
+            note=request.note,
+            source=request.source,
+            request_id=request.request_id or f"gtm-{int(time.time() * 1000)}",
+        )
+    )
+    return {
+        "ok": bool(dispatch.get("dispatched")),
+        "dispatch": dispatch,
+        "timestamp": int(time.time()),
+    }
