@@ -2241,62 +2241,83 @@ class LighterBot:
                 value=str(self.account_index),
             )
 
-            if account and hasattr(account, "positions"):
-                next_positions: Dict[str, Position] = {}
+            # Mark freshness on any successful account fetch, even if no positions.
+            self._last_position_check_ts = time.time()
+            self._last_position_check_error = ""
 
-                for pos in account.positions:
+            raw_positions = []
+            if account is None:
+                raw_positions = []
+            elif hasattr(account, "positions"):
+                raw_positions = getattr(account, "positions", None) or []
+            elif isinstance(account, dict):
+                raw_positions = account.get("positions") or []
+            elif hasattr(account, "to_dict"):
+                as_dict = account.to_dict()  # type: ignore[attr-defined]
+                if isinstance(as_dict, dict):
+                    raw_positions = as_dict.get("positions") or []
+
+            next_positions: Dict[str, Position] = {}
+
+            for pos in raw_positions:
+                getv = pos.get if isinstance(pos, dict) else lambda k, d=None: getattr(pos, k, d)
+
+                try:
+                    size = float(getv("size", 0))
+                except (TypeError, ValueError):
+                    size = 0.0
+                if size == 0:
+                    continue
+
+                symbol_raw = getv("symbol", None)
+                order_book_id = getv("order_book_id", 0)
+                symbol = str(symbol_raw or "").strip().upper() or f"MARKET_{order_book_id}"
+
+                side = TradeSide.LONG if size > 0 else TradeSide.SHORT
+                qty = abs(size)
+                try:
+                    entry_price = float(getv("entry_price", 0) or 0.0)
+                except (TypeError, ValueError):
+                    entry_price = 0.0
+
+                current_price = 0.0
+                for field in ("mark_price", "current_price", "last_price", "index_price", "mid_price"):
                     try:
-                        size = float(getattr(pos, "size", 0))
+                        current_price = float(getv(field, 0) or 0.0)
                     except (TypeError, ValueError):
-                        size = 0.0
-                    if size == 0:
-                        continue
+                        current_price = 0.0
+                    if current_price > 0:
+                        break
 
-                    symbol = pos.symbol if hasattr(pos, "symbol") else f"MARKET_{pos.order_book_id}"
-                    symbol = str(symbol or "").strip().upper() or f"MARKET_{getattr(pos, 'order_book_id', 0)}"
+                existing = self.positions.get(symbol)
+                if existing is None:
+                    existing = Position(
+                        position_id=f"{PLATFORM.value}_{order_book_id}",
+                        platform=PLATFORM.value,
+                        symbol=symbol,
+                        side=side,
+                        quantity=qty,
+                        entry_price=entry_price,
+                    )
+                else:
+                    existing.side = side
+                    existing.quantity = qty
+                    if entry_price > 0:
+                        existing.entry_price = entry_price
 
-                    side = TradeSide.LONG if size > 0 else TradeSide.SHORT
-                    qty = abs(size)
-                    entry_price = float(getattr(pos, "entry_price", 0) or 0.0)
-                    current_price = 0.0
-                    for field in ("mark_price", "current_price", "last_price", "index_price", "mid_price"):
-                        try:
-                            current_price = float(getattr(pos, field, 0) or 0.0)
-                        except (TypeError, ValueError):
-                            current_price = 0.0
-                        if current_price > 0:
-                            break
-
-                    existing = self.positions.get(symbol)
-                    if existing is None:
-                        existing = Position(
-                            position_id=f"{PLATFORM.value}_{getattr(pos, 'order_book_id', 0)}",
-                            platform=PLATFORM.value,
-                            symbol=symbol,
-                            side=side,
-                            quantity=qty,
-                            entry_price=entry_price,
-                        )
+                if current_price > 0:
+                    existing.current_price = current_price
+                if current_price > 0 and existing.entry_price > 0:
+                    if existing.side in (TradeSide.BUY, TradeSide.LONG):
+                        existing.unrealized_pnl = (current_price - existing.entry_price) * qty
                     else:
-                        existing.side = side
-                        existing.quantity = qty
-                        if entry_price > 0:
-                            existing.entry_price = entry_price
-                        if current_price > 0:
-                            existing.current_price = current_price
-                        if current_price > 0 and existing.entry_price > 0:
-                            if existing.side in (TradeSide.BUY, TradeSide.LONG):
-                                existing.unrealized_pnl = (current_price - existing.entry_price) * qty
-                            else:
-                                existing.unrealized_pnl = (existing.entry_price - current_price) * qty
-                        existing.updated_at = utc_now()
+                        existing.unrealized_pnl = (existing.entry_price - current_price) * qty
+                existing.updated_at = utc_now()
 
-                    next_positions[symbol] = existing
+                next_positions[symbol] = existing
 
-                # Replace with the authoritative snapshot (clears closed positions).
-                self.positions = next_positions
-                self._last_position_check_ts = time.time()
-                self._last_position_check_error = ""
+            # Replace with the authoritative snapshot (clears closed positions).
+            self.positions = next_positions
 
         except Exception as e:
             self._last_position_check_error = f"{type(e).__name__}: {e}"

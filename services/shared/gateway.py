@@ -21,6 +21,9 @@ class ExecutionGateway:
         self.app.router.add_get("/health", self.health_check)
         self.app.router.add_get("/readiness", self.readiness_check)
         self.app.router.add_post("/execute", self.handle_execution)
+        # Compatibility endpoint: some edge agents may still post TV payloads here.
+        # This gateway only accepts normalized /execute commands, so we ack+ignore.
+        self.app.router.add_post("/tradingview/webhook", self.handle_legacy_tradingview)
 
         # Command Buffer
         self.command_queue: asyncio.Queue = asyncio.Queue()
@@ -47,6 +50,20 @@ class ExecutionGateway:
         except Exception as e:
             logger.error(f"Command Error: {e}")
             return web.json_response({"error": str(e)}, status=400)
+
+    async def handle_legacy_tradingview(self, request):
+        """Accept legacy TV webhook posts and intentionally no-op."""
+        try:
+            data = await request.json()
+            logger.info(
+                "Ignoring legacy TradingView webhook on local gateway; expected normalized /execute command | keys=%s",
+                sorted(list(data.keys()))[:12],
+            )
+        except Exception:
+            logger.info(
+                "Ignoring legacy TradingView webhook on local gateway; non-JSON payload"
+            )
+        return web.json_response({"status": "ignored", "reason": "use /execute"}, status=202)
 
     async def start(self) -> asyncio.Queue:
         """Start the server and return the command queue for the bot to consume."""
