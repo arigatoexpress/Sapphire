@@ -44,17 +44,15 @@ OPTIONAL_HEALTH_NAMES = {
 }
 
 CLOUD_RUN_SERVICES = [
-    {"name": "sapphire-dashboard", "paths": ["/health", "/"], "ok_statuses": [200, 401, 403]},
-    {"name": "sapphire-command-deck", "paths": ["/health", "/api/health"], "ok_statuses": [200, 401, 403]},
-    {"name": "sapphire-gateway", "paths": ["/health", "/"], "ok_statuses": [200]},
-    {"name": "sapphire-log-viewer", "paths": ["/", "/api/logs"], "ok_statuses": [200, 401, 403]},
+    {"name": "sapphire-gateway", "paths": ["/health", "/webhook/health"], "ok_statuses": [200]},
     {"name": "agentic-pm-hub", "paths": ["/health", "/"], "ok_statuses": [200]},
     {"name": "tho-agent", "paths": ["/health", "/"], "ok_statuses": [200]},
-    {"name": "blanga-bis-beta", "paths": ["/health", "/"], "ok_statuses": [200]},
+    {"name": "blanga-bis-beta", "paths": ["/", "/api/bis/health"], "ok_statuses": [200]},
     {"name": "sapphire-unified-frontend", "paths": ["/health", "/"], "ok_statuses": [200, 401, 403]},
-    {"name": "sapphire-health-dashboard", "paths": ["/api/health/summary", "/"], "ok_statuses": [200, 401, 403]},
     {"name": "sapphire-scout-sandbox", "paths": ["/health", "/"], "ok_statuses": [200]},
     {"name": "sapphire-alpha", "paths": ["/health", "/"], "ok_statuses": [200]},
+    {"name": "sapphire-telegram-bot", "paths": ["/health", "/"], "ok_statuses": [200, 401, 403]},
+    {"name": "sapphire-unified-jobs", "paths": ["/health", "/"], "ok_statuses": [200, 401, 403]},
 ]
 
 PI_SERVICES = {
@@ -67,9 +65,7 @@ PI_SERVICES = {
     'rari2': {
         'ip': RARI2_IP,
         'services': [
-            {'name': 'trading_api', 'port': 18888, 'paths': ['/status'], 'ok_statuses': [200]},
-            {'name': 'lighter_api', 'port': 18889, 'paths': ['/health'], 'ok_statuses': [200]},
-            {'name': 'monitoring', 'port': 18890, 'paths': ['/api/health'], 'ok_statuses': [200]},
+            {'name': 'lighter_gateway', 'port': 8080, 'paths': ['/health'], 'ok_statuses': [200]},
         ]
     }
 }

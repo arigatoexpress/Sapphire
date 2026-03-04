@@ -7,3 +7,4 @@ aiohttp>=3.8.0
 python-dotenv>=1.0.0
 eth-account>=0.8.0
 web3>=6.0.0
+Pillow>=10.0.0

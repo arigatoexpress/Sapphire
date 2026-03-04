@@ -14,7 +14,11 @@ import os
 import signal
 import sys
 import time
+import tempfile
+import html
 from datetime import datetime, timezone
+from collections import defaultdict, deque
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 # Load .env file if present (for local/Pi deployment)
@@ -277,11 +281,37 @@ class LighterBot:
             or str(os.getenv("TELEGRAM_BOT_CHAT_ID", "")).strip()
             or str(os.getenv("TELEGRAM_OWNER_USER_ID", "")).strip()
         )
+        self._telegram_enable_charts = self._env_flag(
+            "LIGHTER_TELEGRAM_ENABLE_CHARTS",
+            default=True,
+        )
+        self._telegram_digest_seconds = max(
+            300,
+            int(self._env_float(("LIGHTER_TELEGRAM_DIGEST_SECONDS",), default=1800.0)),
+        )
+        self._telegram_digest_flat_seconds = max(
+            self._telegram_digest_seconds,
+            int(
+                self._env_float(
+                    ("LIGHTER_TELEGRAM_FLAT_DIGEST_SECONDS",),
+                    default=14400.0,
+                )
+            ),
+        )
+        self._last_telegram_digest_ts: float = 0.0
+        self._price_history_limit = max(
+            30,
+            int(self._env_float(("LIGHTER_PRICE_HISTORY_POINTS",), default=90.0)),
+        )
+        self._price_history: Dict[str, deque] = defaultdict(
+            lambda: deque(maxlen=self._price_history_limit)
+        )
         logger.info(
             "Strategy policy | allowed_strategies=%s allowed_timeframes=%s "
             "require_metadata=%s entry_cooldown=%.1fs max_order_notional=%.2f "
             "max_position_notional=%.2f progress_verify=%.0fs dd_alert=%.2f%% "
-            "sync_stale_alert=%.0fs risk_level_max_dev=%.1f%% empty_pos_confirm=%d",
+            "sync_stale_alert=%.0fs risk_level_max_dev=%.1f%% empty_pos_confirm=%d "
+            "tg_digest=%.0fs tg_charts=%s",
             sorted(self._allowed_strategies) if self._allowed_strategies else ["*"],
             sorted(self._allowed_timeframes) if self._allowed_timeframes else ["*"],
             self._strategy_require_metadata,
@@ -293,6 +323,8 @@ class LighterBot:
             self._sync_stale_alert_seconds,
             self._max_risk_level_deviation_pct,
             self._empty_position_confirmations,
+            self._telegram_digest_seconds,
+            self._telegram_enable_charts,
         )
 
     @staticmethod
@@ -1097,12 +1129,12 @@ class LighterBot:
         result: TradeResult,
         channel: str = "signal",
     ) -> None:
-        """Push a compact execution/rejection alert to Telegram."""
+        """Push a richer execution/rejection alert to Telegram."""
         if not self._telegram_bot_token or not self._telegram_chat_id:
             return
 
-        side = str(getattr(signal, "side", "")).upper()
-        symbol = str(getattr(signal, "symbol", "")).upper()
+        side = str(getattr(signal, "side", "")).upper() or "BUY"
+        symbol = self._normalize_coin_symbol(str(getattr(signal, "symbol", "")).upper())
         qty = float(getattr(signal, "quantity", 0.0) or 0.0)
         ok = bool(getattr(result, "success", False))
         order_id = str(getattr(result, "order_id", "") or "")
@@ -1115,24 +1147,102 @@ class LighterBot:
         err = str(getattr(result, "error_message", "") or "")
         tp = getattr(signal, "take_profit", None)
         sl = getattr(signal, "stop_loss", None)
-        status = "FILLED" if ok else "REJECTED"
-        lines = [
-            f"LIGHTER {status}",
-            f"src={channel} signal={signal.signal_id}",
-            f"{side} {symbol} qty={qty:g}",
-        ]
-        if tp or sl:
-            lines.append(f"tp={tp or '-'} sl={sl or '-'}")
-        if fill_qty > 0:
-            lines.append(f"filled={fill_qty:g} @ {fill_price:g}")
-        if order_id:
-            lines.append(f"order={order_id}")
-        if err:
-            lines.append(f"error={err[:180]}")
-        text = "\n".join(lines)
-        await self._send_telegram_message(text)
+        strategy, timeframe = self._signal_strategy_info(signal)
+        metadata = signal.metadata or {}
+        reasoning = self._compact_reasoning(metadata)
 
-    async def _send_telegram_message(self, text: str) -> None:
+        position = self.positions.get(symbol)
+        mark = self._to_float(getattr(position, "current_price", 0.0), 0.0) if position else 0.0
+        upnl = self._to_float(getattr(position, "unrealized_pnl", 0.0), 0.0) if position else 0.0
+        pnl_pct = self._to_float(getattr(position, "pnl_percent", 0.0), 0.0) if position else 0.0
+        entry = 0.0
+        if position:
+            entry = self._to_float(getattr(position, "entry_price", 0.0), 0.0)
+        if entry <= 0:
+            entry = fill_price
+
+        status_icon = "🟢" if ok else "🔴"
+        status_text = "FILLED" if ok else "REJECTED"
+        side_icon = "▲" if side in {"BUY", "LONG"} else "▼"
+
+        lines = [
+            f"{status_icon} <b>LIGHTER {status_text}</b>  {side_icon} <b>{html.escape(side)} {html.escape(symbol)}</b>",
+            f"<b>Signal</b> <code>{html.escape(str(signal.signal_id or 'n/a'))}</code> · <b>src</b> {html.escape(channel)}",
+        ]
+        if strategy or timeframe:
+            lines.append(
+                f"<b>Strategy</b> {html.escape(strategy or 'n/a')} · <b>TF</b> {html.escape(timeframe or 'n/a')}"
+            )
+
+        qty_text = f"{qty:g}"
+        if fill_qty > 0:
+            lines.append(
+                f"<b>Order</b> req {qty_text} · fill {fill_qty:g} @ <b>{fill_price:,.4f}</b>"
+            )
+        else:
+            lines.append(f"<b>Order</b> qty {qty_text}")
+
+        tp_v = self._to_float(tp, 0.0)
+        sl_v = self._to_float(sl, 0.0)
+        if tp_v > 0 or sl_v > 0:
+            lines.append(
+                f"<b>Risk</b> TP <code>{tp_v:,.4f}</code> · SL <code>{sl_v:,.4f}</code>"
+            )
+        if mark > 0:
+            pnl_icon = "🟢" if upnl >= 0 else "🔻"
+            lines.append(
+                f"<b>Mark</b> {mark:,.4f} · <b>uPnL</b> {pnl_icon} {upnl:+.4f} ({pnl_pct:+.2f}%)"
+            )
+        cond, cond_detail = self._market_condition_for_symbol(symbol)
+        if cond:
+            lines.append(f"<b>Market</b> {html.escape(cond)} · {html.escape(cond_detail)}")
+        if reasoning:
+            lines.append(f"<b>Why</b> {html.escape(reasoning)}")
+        if order_id:
+            lines.append(f"<b>Order ID</b> <code>{html.escape(order_id)}</code>")
+        if err:
+            lines.append(f"<b>Error</b> {html.escape(err[:220])}")
+
+        await self._send_telegram_message("\n".join(lines), parse_mode="HTML")
+
+        if (
+            ok
+            and self._telegram_enable_charts
+            and fill_qty > 0
+            and (entry > 0 or fill_price > 0 or mark > 0)
+        ):
+            chart_path: Optional[Path] = None
+            try:
+                chart_path = self._build_trade_chart_card(
+                    symbol=symbol,
+                    side=side,
+                    entry_price=float(entry or fill_price or mark),
+                    mark_price=float(mark or fill_price or entry),
+                    tp_price=float(tp_v) if tp_v > 0 else None,
+                    sl_price=float(sl_v) if sl_v > 0 else None,
+                    signal_id=str(signal.signal_id or ""),
+                )
+                if chart_path is not None:
+                    caption = (
+                        f"<b>{html.escape(symbol)}</b> · {html.escape(side)}\n"
+                        f"Entry <code>{float(entry or fill_price):,.4f}</code>"
+                    )
+                    await self._send_telegram_photo(chart_path, caption=caption, parse_mode="HTML")
+            except Exception as exc:
+                logger.debug("Trade chart send skipped: %s", exc)
+            finally:
+                if chart_path and chart_path.exists():
+                    try:
+                        chart_path.unlink(missing_ok=True)
+                    except Exception:
+                        pass
+
+    async def _send_telegram_message(
+        self,
+        text: str,
+        *,
+        parse_mode: Optional[str] = None,
+    ) -> None:
         if not self._telegram_bot_token or not self._telegram_chat_id:
             return
 
@@ -1146,6 +1256,8 @@ class LighterBot:
                 "text": text,
                 "disable_web_page_preview": True,
             }
+            if parse_mode:
+                payload["parse_mode"] = parse_mode
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.post(url, json=payload) as response:
                     if response.status >= 400:
@@ -1157,6 +1269,315 @@ class LighterBot:
                         )
         except Exception as exc:
             logger.warning("Telegram alert error: %s", exc)
+
+    async def _send_telegram_photo(
+        self,
+        image_path: Path,
+        *,
+        caption: str = "",
+        parse_mode: Optional[str] = None,
+    ) -> None:
+        if not self._telegram_bot_token or not self._telegram_chat_id or not image_path.exists():
+            return
+
+        try:
+            import aiohttp
+
+            timeout = aiohttp.ClientTimeout(total=10)
+            url = f"https://api.telegram.org/bot{self._telegram_bot_token}/sendPhoto"
+            data = aiohttp.FormData()
+            data.add_field("chat_id", self._telegram_chat_id)
+            if caption:
+                data.add_field("caption", caption[:1024])
+            if parse_mode:
+                data.add_field("parse_mode", parse_mode)
+            with open(image_path, "rb") as handle:
+                data.add_field(
+                    "photo",
+                    handle,
+                    filename=image_path.name,
+                    content_type="image/png",
+                )
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.post(url, data=data) as response:
+                        if response.status >= 400:
+                            body = await response.text()
+                            logger.warning(
+                                "Telegram photo failed (%s): %s",
+                                response.status,
+                                body[:180],
+                            )
+        except Exception as exc:
+            logger.warning("Telegram photo error: %s", exc)
+
+    def _record_price_point(self, symbol: str, price: float) -> None:
+        px = self._to_float(price, 0.0)
+        if px <= 0:
+            return
+        coin = self._normalize_coin_symbol(symbol)
+        self._price_history[coin].append((time.time(), px))
+
+    def _recent_prices(self, symbol: str) -> List[float]:
+        coin = self._normalize_coin_symbol(symbol)
+        points = list(self._price_history.get(coin, []))
+        prices: List[float] = []
+        for item in points:
+            if isinstance(item, tuple) and len(item) >= 2:
+                prices.append(self._to_float(item[1], 0.0))
+            else:
+                prices.append(self._to_float(item, 0.0))
+        return [p for p in prices if p > 0]
+
+    @staticmethod
+    def _compact_reasoning(metadata: Dict[str, Any]) -> str:
+        if not isinstance(metadata, dict):
+            return ""
+        candidates: List[str] = []
+        for key in (
+            "reason",
+            "message",
+            "analysis",
+            "market_condition",
+            "thesis",
+            "regime",
+            "regime_score",
+            "z_score",
+            "origin",
+        ):
+            value = metadata.get(key)
+            if value is None:
+                continue
+            if isinstance(value, (int, float)):
+                candidates.append(f"{key}={value}")
+            else:
+                text = str(value).strip()
+                if text:
+                    candidates.append(text)
+        joined = " | ".join(candidates)
+        return joined[:280]
+
+    def _market_condition_for_symbol(self, symbol: str) -> tuple[str, str]:
+        prices = self._recent_prices(symbol)
+        if len(prices) < 6:
+            return "insufficient data", "warming price history"
+        first = prices[0]
+        last = prices[-1]
+        if first <= 0 or last <= 0:
+            return "insufficient data", "invalid prices"
+        drift_pct = ((last - first) / first) * 100.0
+        returns: List[float] = []
+        for idx in range(1, len(prices)):
+            prev = prices[idx - 1]
+            cur = prices[idx]
+            if prev > 0:
+                returns.append((cur - prev) / prev)
+        vol_pct = 0.0
+        if returns:
+            mean = sum(returns) / len(returns)
+            var = sum((r - mean) ** 2 for r in returns) / max(len(returns), 1)
+            vol_pct = (var ** 0.5) * 100.0
+        if abs(drift_pct) < 0.2 and vol_pct < 0.25:
+            regime = "flat/range"
+        elif drift_pct > 0:
+            regime = "uptrend"
+        else:
+            regime = "downtrend"
+        detail = f"drift {drift_pct:+.2f}% · vol {vol_pct:.2f}%"
+        return regime, detail
+
+    def _build_trade_chart_card(
+        self,
+        *,
+        symbol: str,
+        side: str,
+        entry_price: float,
+        mark_price: float,
+        tp_price: Optional[float],
+        sl_price: Optional[float],
+        signal_id: str,
+    ) -> Optional[Path]:
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+        except Exception:
+            return None
+
+        series = self._recent_prices(symbol)
+        anchor = self._to_float(mark_price, 0.0) or self._to_float(entry_price, 0.0)
+        if len(series) < 24 and anchor > 0:
+            start = self._to_float(entry_price, anchor) or anchor
+            steps = 32
+            synthetic: List[float] = []
+            for i in range(steps):
+                t = i / max(steps - 1, 1)
+                synthetic.append(start + (anchor - start) * t)
+            series = synthetic
+        if len(series) < 2:
+            return None
+
+        width, height = 1200, 675
+        chart_left, chart_top, chart_right, chart_bottom = 80, 180, 1120, 590
+        chart_w = chart_right - chart_left
+        chart_h = chart_bottom - chart_top
+
+        img = Image.new("RGB", (width, height), "#0b0d11")
+        draw = ImageDraw.Draw(img)
+        draw.rectangle((0, 0, width, 120), fill="#11151d")
+        draw.rectangle((chart_left, chart_top, chart_right, chart_bottom), fill="#0f131a")
+
+        try:
+            font_title = ImageFont.truetype("Arial Bold.ttf", 58)
+            font_sub = ImageFont.truetype("Arial.ttf", 36)
+            font_small = ImageFont.truetype("Arial.ttf", 24)
+        except Exception:
+            font_title = ImageFont.load_default()
+            font_sub = ImageFont.load_default()
+            font_small = ImageFont.load_default()
+
+        side_up = str(side).upper()
+        is_long = side_up in {"BUY", "LONG"}
+        side_color = "#23c6a6" if is_long else "#ff5b6d"
+
+        last_price = series[-1]
+        first_price = series[0]
+        delta = last_price - first_price
+        delta_pct = ((delta / first_price) * 100.0) if first_price > 0 else 0.0
+
+        draw.text((60, 32), f"{symbol}/USDT", fill="#f5f7fa", font=font_title)
+        draw.text((60, 96), "LIGHTER · SAPPHIRE", fill="#8d97a5", font=font_sub)
+        draw.text((820, 52), f"{last_price:,.4f} USDT", fill="#f5f7fa", font=font_sub)
+        draw.text(
+            (820, 96),
+            f"{delta:+.4f}  ({delta_pct:+.2f}%)",
+            fill=side_color if delta >= 0 else "#ff5b6d",
+            font=font_sub,
+        )
+
+        min_y = min(series)
+        max_y = max(series)
+        line_levels = [x for x in [entry_price, mark_price, tp_price, sl_price] if self._to_float(x, 0.0) > 0]
+        if line_levels:
+            min_y = min(min_y, min(line_levels))
+            max_y = max(max_y, max(line_levels))
+        if max_y <= min_y:
+            max_y = min_y + 1.0
+        pad = (max_y - min_y) * 0.1
+        y_min = min_y - pad
+        y_max = max_y + pad
+
+        def y_of(price: float) -> int:
+            if y_max <= y_min:
+                return chart_bottom
+            ratio = (price - y_min) / (y_max - y_min)
+            return int(chart_bottom - ratio * chart_h)
+
+        for i in range(6):
+            y = chart_top + int((chart_h / 5) * i)
+            draw.line((chart_left, y, chart_right, y), fill="#1f2530", width=1)
+
+        pts = []
+        total = len(series)
+        for i, price in enumerate(series):
+            x = chart_left + int((i / max(total - 1, 1)) * chart_w)
+            y = y_of(price)
+            pts.append((x, y))
+        if len(pts) >= 2:
+            draw.line(pts, fill=side_color, width=4)
+            draw.ellipse((pts[-1][0] - 6, pts[-1][1] - 6, pts[-1][0] + 6, pts[-1][1] + 6), fill=side_color)
+
+        def dashed_hline(price: float, color: str, label: str) -> None:
+            if self._to_float(price, 0.0) <= 0:
+                return
+            y = y_of(float(price))
+            x = chart_left
+            while x < chart_right:
+                draw.line((x, y, min(x + 18, chart_right), y), fill=color, width=2)
+                x += 30
+            text = f"{label} {price:,.4f}"
+            tw = int(draw.textlength(text, font=font_small))
+            tx = max(chart_left + 10, chart_right - tw - 18)
+            draw.rectangle((tx - 8, y - 17, tx + tw + 8, y + 10), fill="#0a0f15")
+            draw.text((tx, y - 16), text, fill=color, font=font_small)
+
+        dashed_hline(entry_price, "#f5f7fa", "ENTRY")
+        dashed_hline(mark_price, side_color, "MARK")
+        if tp_price:
+            dashed_hline(float(tp_price), "#1ddf87", "TP")
+        if sl_price:
+            dashed_hline(float(sl_price), "#ff5b6d", "SL")
+
+        draw.text(
+            (60, 618),
+            f"Signal {signal_id[:18]}{'…' if len(signal_id) > 18 else ''}  ·  {side_up}",
+            fill="#7f8a98",
+            font=font_small,
+        )
+        draw.text((940, 618), "Sapphire x Lighter", fill="#7f8a98", font=font_small)
+
+        out_dir = Path(tempfile.gettempdir()) / "sapphire_telegram_charts"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / f"lighter_{symbol}_{int(time.time() * 1000)}.png"
+        img.save(out_path, format="PNG")
+        return out_path
+
+    async def _maybe_send_portfolio_digest(self, snapshot: Dict[str, Any]) -> None:
+        if not self._telegram_bot_token or not self._telegram_chat_id:
+            return
+        now_ts = time.time()
+        positions_count = int(snapshot.get("positions_count", 0) or 0)
+        interval = self._telegram_digest_seconds if positions_count > 0 else self._telegram_digest_flat_seconds
+        if (now_ts - self._last_telegram_digest_ts) < interval:
+            return
+        self._last_telegram_digest_ts = now_ts
+        await self._send_portfolio_digest(snapshot)
+
+    async def _send_portfolio_digest(self, snapshot: Dict[str, Any]) -> None:
+        equity = self._to_float(snapshot.get("equity_estimate"), 0.0)
+        cash = self._to_float(snapshot.get("cash_balance"), 0.0)
+        upnl = self._to_float(snapshot.get("unrealized_pnl"), 0.0)
+        progress_pct = self._to_float(snapshot.get("progress_pct"), 0.0)
+        drawdown_pct = self._to_float(snapshot.get("drawdown_pct"), 0.0)
+        pos_notional = self._to_float(snapshot.get("position_notional_usd"), 0.0)
+        pos_count = int(snapshot.get("positions_count", 0) or 0)
+        stale = bool(snapshot.get("balance_sync_stale")) or bool(snapshot.get("position_check_stale"))
+
+        lines = [
+            "📊 <b>LIGHTER Portfolio Digest</b>",
+            (
+                f"<b>Equity</b> {equity:,.4f} · <b>Cash</b> {cash:,.4f} · "
+                f"<b>uPnL</b> {upnl:+.4f}"
+            ),
+            (
+                f"<b>Progress</b> {progress_pct:+.2f}% · <b>Drawdown</b> {drawdown_pct:+.2f}% · "
+                f"<b>Exposure</b> {pos_notional:,.4f}"
+            ),
+            f"<b>Positions</b> {pos_count} · <b>Sync</b> {'stale ⚠️' if stale else 'fresh ✅'}",
+        ]
+
+        if self.positions:
+            lines.append("<b>Open Positions</b>")
+            for symbol, pos in sorted(self.positions.items())[:3]:
+                qty = self._to_float(getattr(pos, "quantity", 0.0), 0.0)
+                if qty <= 0:
+                    continue
+                side = str(getattr(pos, "side", "")).upper()
+                entry = self._to_float(getattr(pos, "entry_price", 0.0), 0.0)
+                mark = self._to_float(getattr(pos, "current_price", 0.0), 0.0)
+                pnl = self._to_float(getattr(pos, "unrealized_pnl", 0.0), 0.0)
+                pnl_pct = self._to_float(getattr(pos, "pnl_percent", 0.0), 0.0)
+                tp = self._to_float(getattr(pos, "take_profit", 0.0), 0.0)
+                sl = self._to_float(getattr(pos, "stop_loss", 0.0), 0.0)
+                regime, detail = self._market_condition_for_symbol(symbol)
+                lines.append(
+                    (
+                        f"• <b>{html.escape(symbol)}</b> {html.escape(side)} {qty:g} @ {entry:,.4f} | "
+                        f"mark {mark:,.4f} | {pnl:+.4f} ({pnl_pct:+.2f}%)"
+                    )
+                )
+                if tp > 0 or sl > 0:
+                    lines.append(f"  TP {tp:,.4f} · SL {sl:,.4f}")
+                lines.append(f"  {html.escape(regime)} · {html.escape(detail)}")
+
+        await self._send_telegram_message("\n".join(lines), parse_mode="HTML")
 
     @staticmethod
     def _sanitize_trade_signal_payload(signal_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -1570,6 +1991,8 @@ class LighterBot:
                         )
                     )
 
+                await self._maybe_send_portfolio_digest(snap)
+
             except Exception as exc:
                 logger.error("Progress verification error: %s", exc)
 
@@ -1923,6 +2346,15 @@ class LighterBot:
 
                 # Create position record (reduce-only fills are reconciled via _check_positions).
                 if not reduce_only and filled_qty > 0:
+                    strategy, timeframe = self._signal_strategy_info(signal)
+                    pos_meta = {
+                        "source": str(signal.source or ""),
+                        "signal_id": str(signal.signal_id or ""),
+                        "strategy": strategy or "",
+                        "timeframe": timeframe or "",
+                        "confidence": self._to_float(getattr(signal, "confidence", 0.0), 0.0),
+                        "reasoning": self._compact_reasoning(signal.metadata or {}),
+                    }
                     self.positions[coin] = Position(
                         position_id=str(result.get("order_id", "")),
                         platform=PLATFORM.value,
@@ -1932,7 +2364,10 @@ class LighterBot:
                         entry_price=fill_price if fill_price > 0 else limit_price,
                         stop_loss=signal.stop_loss,
                         take_profit=signal.take_profit,
+                        metadata=pos_meta,
                     )
+                    if fill_price > 0:
+                        self._record_price_point(coin, fill_price)
                     if entry_like:
                         self._last_entry_ts[coin] = time.time()
 
@@ -2252,9 +2687,13 @@ class LighterBot:
                 raise last_error
 
             if details and hasattr(details, "mid_price"):
-                return float(details.mid_price)
+                px = float(details.mid_price)
+                self._record_price_point(symbol, px)
+                return px
             elif details and hasattr(details, "last_price"):
-                return float(details.last_price)
+                px = float(details.last_price)
+                self._record_price_point(symbol, px)
+                return px
             else:
                 # SDK v1.0.0 returns a container with per-market rows.
                 for bucket_name in ("order_book_details", "spot_order_book_details"):
@@ -2277,6 +2716,7 @@ class LighterBot:
                             except (TypeError, ValueError):
                                 px = 0.0
                             if px > 0:
+                                self._record_price_point(symbol, px)
                                 return px
                 logger.warning(
                     f"Ticker payload has no usable price for {symbol} (market_id={order_book_id})"
@@ -2415,15 +2855,20 @@ class LighterBot:
                         side=side,
                         quantity=qty,
                         entry_price=entry_price,
+                        metadata={"source": "exchange_sync"},
                     )
                 else:
                     existing.side = side
                     existing.quantity = qty
                     if entry_price > 0:
                         existing.entry_price = entry_price
+                    if not isinstance(existing.metadata, dict):
+                        existing.metadata = {}
+                    existing.metadata.setdefault("source", "exchange_sync")
 
                 if current_price > 0:
                     existing.current_price = current_price
+                    self._record_price_point(symbol, current_price)
                 if current_price > 0 and existing.entry_price > 0:
                     if existing.side in (TradeSide.BUY, TradeSide.LONG):
                         existing.unrealized_pnl = (current_price - existing.entry_price) * qty
