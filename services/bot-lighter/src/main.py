@@ -2429,6 +2429,43 @@ class LighterBot:
                         existing.unrealized_pnl = (current_price - existing.entry_price) * qty
                     else:
                         existing.unrealized_pnl = (existing.entry_price - current_price) * qty
+
+                # Ensure reconciled exchange positions also have local TP/SL guards.
+                ref_price = 0.0
+                try:
+                    ref_price = float(existing.entry_price or 0.0)
+                except (TypeError, ValueError):
+                    ref_price = 0.0
+                if ref_price <= 0:
+                    try:
+                        ref_price = float(existing.current_price or 0.0)
+                    except (TypeError, ValueError):
+                        ref_price = 0.0
+
+                if ref_price > 0:
+                    is_long = existing.side in (TradeSide.BUY, TradeSide.LONG, "BUY", "LONG")
+                    try:
+                        tp = float(existing.take_profit) if existing.take_profit is not None else 0.0
+                    except (TypeError, ValueError):
+                        tp = 0.0
+                    try:
+                        sl = float(existing.stop_loss) if existing.stop_loss is not None else 0.0
+                    except (TypeError, ValueError):
+                        sl = 0.0
+                    if tp <= 0 and self._default_take_profit_pct > 0:
+                        existing.take_profit = round(
+                            ref_price * (1 + self._default_take_profit_pct / 100.0)
+                            if is_long
+                            else ref_price * (1 - self._default_take_profit_pct / 100.0),
+                            8,
+                        )
+                    if sl <= 0 and self._default_stop_loss_pct > 0:
+                        existing.stop_loss = round(
+                            ref_price * (1 - self._default_stop_loss_pct / 100.0)
+                            if is_long
+                            else ref_price * (1 + self._default_stop_loss_pct / 100.0),
+                            8,
+                        )
                 existing.updated_at = utc_now()
 
                 next_positions[symbol] = existing
