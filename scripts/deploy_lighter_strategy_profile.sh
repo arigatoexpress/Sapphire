@@ -40,8 +40,8 @@ case "$PROFILE" in
     KV[LIGHTER_STRATEGY_REQUIRE_METADATA]="true"
     KV[LIGHTER_SINGLE_SYMBOL_MODE]="true"
     KV[LIGHTER_MAX_ORDER_NOTIONAL_USD]="5"
-    KV[LIGHTER_MAX_POSITION_NOTIONAL_USD]="12"
-    KV[LIGHTER_ENTRY_COOLDOWN_SECONDS]="240"
+    KV[LIGHTER_MAX_POSITION_NOTIONAL_USD]="8"
+    KV[LIGHTER_ENTRY_COOLDOWN_SECONDS]="180"
     KV[LIGHTER_DEFAULT_TAKE_PROFIT_PCT]="1.2"
     KV[LIGHTER_DEFAULT_STOP_LOSS_PCT]="0.8"
     KV[LIGHTER_PROGRESS_VERIFY_INTERVAL_SECONDS]="120"
@@ -112,7 +112,14 @@ for k in sorted(updates):
 PY"
 
 ssh -o BatchMode=yes -o ConnectTimeout=10 "$TARGET_HOST" \
-  "sudo systemctl restart ${SERVICE} && sleep 8 && systemctl is-active ${SERVICE} && journalctl -u ${SERVICE} -n 50 --no-pager"
+  "sudo systemctl reset-failed ${SERVICE} || true; \
+   sudo systemctl restart ${SERVICE} || { \
+     sudo systemctl reset-failed ${SERVICE} || true; \
+     sudo systemctl start ${SERVICE}; \
+   }; \
+   sleep 8; \
+   systemctl is-active ${SERVICE}; \
+   journalctl -u ${SERVICE} -n 50 --no-pager"
 
 echo
 echo "Profile '${PROFILE}' deployed."
