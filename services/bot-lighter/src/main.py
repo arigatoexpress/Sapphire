@@ -266,6 +266,11 @@ class LighterBot:
         self._last_position_check_ts: float = 0.0
         self._last_balance_sync_error: str = ""
         self._last_position_check_error: str = ""
+        self._empty_position_snapshot_streak: int = 0
+        self._empty_position_confirmations = max(
+            1,
+            int(self._env_float(("LIGHTER_EMPTY_POSITION_CONFIRMATIONS",), default=5.0)),
+        )
         self._telegram_bot_token = str(os.getenv("TELEGRAM_BOT_TOKEN", "")).strip()
         self._telegram_chat_id = (
             str(os.getenv("TELEGRAM_CHAT_ID", "")).strip()
@@ -276,7 +281,7 @@ class LighterBot:
             "Strategy policy | allowed_strategies=%s allowed_timeframes=%s "
             "require_metadata=%s entry_cooldown=%.1fs max_order_notional=%.2f "
             "max_position_notional=%.2f progress_verify=%.0fs dd_alert=%.2f%% "
-            "sync_stale_alert=%.0fs risk_level_max_dev=%.1f%%",
+            "sync_stale_alert=%.0fs risk_level_max_dev=%.1f%% empty_pos_confirm=%d",
             sorted(self._allowed_strategies) if self._allowed_strategies else ["*"],
             sorted(self._allowed_timeframes) if self._allowed_timeframes else ["*"],
             self._strategy_require_metadata,
@@ -287,6 +292,7 @@ class LighterBot:
             self._max_drawdown_alert_pct,
             self._sync_stale_alert_seconds,
             self._max_risk_level_deviation_pct,
+            self._empty_position_confirmations,
         )
 
     @staticmethod
@@ -876,8 +882,72 @@ class LighterBot:
                     )
 
                     if account:
-                        equity = float(getattr(account, "equity", 0))
-                        self.balance = equity
+                        account_dict = {}
+                        if isinstance(account, dict):
+                            account_dict = account
+                        elif hasattr(account, "to_dict"):
+                            try:
+                                maybe = account.to_dict()  # type: ignore[attr-defined]
+                                if isinstance(maybe, dict):
+                                    account_dict = maybe
+                            except Exception:
+                                account_dict = {}
+
+                        account_record = None
+                        accounts_payload = account_dict.get("accounts")
+                        if isinstance(accounts_payload, list) and accounts_payload:
+                            target_idx = int(self.account_index)
+                            for row in accounts_payload:
+                                if not isinstance(row, dict):
+                                    continue
+                                try:
+                                    idx_val = int(
+                                        row.get("account_index", row.get("index", -1)) or -1
+                                    )
+                                except (TypeError, ValueError):
+                                    idx_val = -1
+                                if idx_val == target_idx:
+                                    account_record = row
+                                    break
+                            if account_record is None:
+                                account_record = accounts_payload[0]
+
+                        def _pick_positive(*vals: object) -> float:
+                            for v in vals:
+                                try:
+                                    f = float(v or 0.0)
+                                except (TypeError, ValueError):
+                                    f = 0.0
+                                if f > 0:
+                                    return f
+                            return 0.0
+
+                        parsed_total_balance = _pick_positive(
+                            (account_record or {}).get("collateral"),
+                            getattr(account, "equity", None),
+                            getattr(account, "total_account_value", None),
+                            getattr(account, "collateral", None),
+                            account_dict.get("equity"),
+                            account_dict.get("total_account_value"),
+                            account_dict.get("collateral"),
+                        )
+                        parsed_available_balance = _pick_positive(
+                            (account_record or {}).get("available_balance"),
+                            getattr(account, "available_balance", None),
+                            getattr(account, "free_collateral", None),
+                            account_dict.get("available_balance"),
+                            account_dict.get("free_collateral"),
+                            parsed_total_balance,
+                        )
+                        if parsed_total_balance <= 0 and self.balance > 0:
+                            logger.warning(
+                                "Balance snapshot had no positive equity fields; retaining prior balance %.6f",
+                                self.balance,
+                            )
+                            parsed_total_balance = self.balance
+                            parsed_available_balance = self.balance
+
+                        self.balance = float(parsed_total_balance)
                         self._last_balance_sync_ts = time.time()
                         self._last_balance_sync_error = ""
 
@@ -885,8 +955,8 @@ class LighterBot:
                             "balance-updates",
                             BalanceUpdate(
                                 platform=PLATFORM.value,
-                                total_balance=self.balance,
-                                available_balance=self.balance,
+                                total_balance=float(parsed_total_balance),
+                                available_balance=float(parsed_available_balance),
                                 assets={"USDC": self.balance},
                             ),
                         )
@@ -2248,14 +2318,39 @@ class LighterBot:
             raw_positions = []
             if account is None:
                 raw_positions = []
-            elif hasattr(account, "positions"):
-                raw_positions = getattr(account, "positions", None) or []
             elif isinstance(account, dict):
                 raw_positions = account.get("positions") or []
-            elif hasattr(account, "to_dict"):
-                as_dict = account.to_dict()  # type: ignore[attr-defined]
+            else:
+                as_dict = {}
+                if hasattr(account, "to_dict"):
+                    as_dict = account.to_dict()  # type: ignore[attr-defined]
                 if isinstance(as_dict, dict):
                     raw_positions = as_dict.get("positions") or []
+                    # Newer SDK schema: DetailedAccounts -> accounts[].positions[]
+                    if not raw_positions:
+                        accounts_payload = as_dict.get("accounts")
+                        if isinstance(accounts_payload, list) and accounts_payload:
+                            target_idx = int(self.account_index or -1)
+                            account_record = None
+                            for row in accounts_payload:
+                                if not isinstance(row, dict):
+                                    continue
+                                try:
+                                    idx_val = int(
+                                        row.get("account_index", row.get("index", -1)) or -1
+                                    )
+                                except (TypeError, ValueError):
+                                    idx_val = -1
+                                if idx_val == target_idx:
+                                    account_record = row
+                                    break
+                            if account_record is None:
+                                account_record = accounts_payload[0]
+                            if isinstance(account_record, dict):
+                                raw_positions = account_record.get("positions") or []
+                # Legacy schema fallback
+                if not raw_positions and hasattr(account, "positions"):
+                    raw_positions = getattr(account, "positions", None) or []
 
             next_positions: Dict[str, Position] = {}
 
@@ -2263,20 +2358,26 @@ class LighterBot:
                 getv = pos.get if isinstance(pos, dict) else lambda k, d=None: getattr(pos, k, d)
 
                 try:
-                    size = float(getv("size", 0))
+                    size = float(getv("size", getv("position", 0)))
                 except (TypeError, ValueError):
                     size = 0.0
+                if abs(size) > 0 and getv("size", None) is None and getv("position", None) is not None:
+                    try:
+                        sign = float(getv("sign", 1) or 1)
+                    except (TypeError, ValueError):
+                        sign = 1.0
+                    size = abs(size) if sign >= 0 else -abs(size)
                 if size == 0:
                     continue
 
                 symbol_raw = getv("symbol", None)
-                order_book_id = getv("order_book_id", 0)
+                order_book_id = getv("order_book_id", getv("market_id", 0))
                 symbol = str(symbol_raw or "").strip().upper() or f"MARKET_{order_book_id}"
 
                 side = TradeSide.LONG if size > 0 else TradeSide.SHORT
                 qty = abs(size)
                 try:
-                    entry_price = float(getv("entry_price", 0) or 0.0)
+                    entry_price = float(getv("entry_price", getv("avg_entry_price", 0)) or 0.0)
                 except (TypeError, ValueError):
                     entry_price = 0.0
 
@@ -2288,6 +2389,13 @@ class LighterBot:
                         current_price = 0.0
                     if current_price > 0:
                         break
+                if current_price <= 0:
+                    try:
+                        pos_val = float(getv("position_value", 0) or 0.0)
+                    except (TypeError, ValueError):
+                        pos_val = 0.0
+                    if qty > 0 and pos_val != 0:
+                        current_price = abs(pos_val) / qty
 
                 existing = self.positions.get(symbol)
                 if existing is None:
@@ -2317,6 +2425,24 @@ class LighterBot:
                 next_positions[symbol] = existing
 
             # Replace with the authoritative snapshot (clears closed positions).
+            had_local_positions = bool(self.positions)
+            if had_local_positions and not next_positions:
+                self._empty_position_snapshot_streak += 1
+                if self._empty_position_snapshot_streak < self._empty_position_confirmations:
+                    logger.warning(
+                        "Empty position snapshot (%d/%d) while local positions exist; "
+                        "retaining local state until confirmed",
+                        self._empty_position_snapshot_streak,
+                        self._empty_position_confirmations,
+                    )
+                    return
+                logger.warning(
+                    "Confirmed empty position snapshot after %d checks; clearing local positions",
+                    self._empty_position_snapshot_streak,
+                )
+            else:
+                self._empty_position_snapshot_streak = 0
+
             self.positions = next_positions
 
         except Exception as e:
