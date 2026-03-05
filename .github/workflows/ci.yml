@@ -31,7 +31,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ripgrep
           python -m pip install --upgrade pip
-          python -m pip install pytest pytest-asyncio aiohttp loguru
+          python -m pip install pytest pytest-asyncio aiohttp loguru fastapi google-api-core
 
       - name: Run focused CI gate
         run: ./scripts/ci_focused_gate.sh
@@ -82,6 +82,16 @@ jobs:
         env:
           SAPPHIRE_GATEWAY_OIDC_TOKEN: ${{ steps.gcp-oidc.outputs.id_token }}
         run: ./scripts/holistic_ops_check.sh
+
+      - name: Run scout sandbox integration smoke
+        if: ${{ steps.gcp-auth.outputs.enabled == 'true' }}
+        env:
+          PROJECT_ID: sapphire-479610
+          REGION: us-central1
+          SCOUT_SERVICE: sapphire-scout-sandbox
+          ALPHA_SERVICE: sapphire-alpha
+          EXPECT_GTM_DISABLED: "true"
+        run: ./scripts/run_scout_sandbox_smoke.sh
 
       - name: Skip cloud check when GCP secrets are unavailable
         if: ${{ steps.gcp-auth.outputs.enabled != 'true' }}

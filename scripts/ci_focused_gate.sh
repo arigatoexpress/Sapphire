@@ -71,6 +71,16 @@ for file in "${REQUIRED_SKILLS[@]}"; do
   check_file "${file}"
 done
 
+if [[ -f "scripts/run_scout_sandbox_smoke.sh" ]]; then
+  if bash -n scripts/run_scout_sandbox_smoke.sh; then
+    pass "scout sandbox smoke script syntax"
+  else
+    fail "scout sandbox smoke script syntax"
+  fi
+else
+  fail "missing scripts/run_scout_sandbox_smoke.sh"
+fi
+
 if "${PYTHON_BIN}" -m py_compile \
   services/alpha-engine/shared/telegram_bot.py \
   services/alpha-engine/shared/health.py \
@@ -84,12 +94,32 @@ else
   fail "alpha-engine syntax compile"
 fi
 
+if "${PYTHON_BIN}" -m py_compile \
+  services/shared/circuit_breaker.py \
+  services/shared/execution_idempotency.py \
+  services/shared/startup_validator.py \
+  services/shared/position_reconciler.py; then
+  pass "shared modules syntax compile"
+else
+  fail "shared modules syntax compile"
+fi
+
 if PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q -p pytest_asyncio.plugin \
   tests/unit/test_alpha_engine_telegram_control.py \
   tests/unit/test_virustotal_skill_scanner.py; then
   pass "telegram control unit tests"
 else
   fail "telegram control unit tests"
+fi
+
+if PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q \
+  tests/unit/test_circuit_breaker.py \
+  tests/unit/test_execution_idempotency.py \
+  tests/unit/test_position_reconciler.py \
+  tests/unit/test_gateway_webhook.py; then
+  pass "critical path unit tests (circuit-breaker, idempotency, reconciler, webhook)"
+else
+  fail "critical path unit tests"
 fi
 
 if [[ -d "sapphire-web" ]]; then
