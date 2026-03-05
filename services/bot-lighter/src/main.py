@@ -273,6 +273,10 @@ class LighterBot:
             5.0,
             self._env_float(("LIGHTER_RISK_EXIT_COOLDOWN_SECONDS",), default=15.0),
         )
+        self._max_position_hold_seconds = max(
+            0.0,
+            self._env_float(("LIGHTER_MAX_POSITION_HOLD_SECONDS",), default=0.0),
+        )
         self._risk_exit_attempted_at: Dict[str, float] = {}
         self._dynamic_risk_enabled = self._env_flag(
             "LIGHTER_DYNAMIC_RISK_ENABLED",
@@ -435,6 +439,7 @@ class LighterBot:
             "max_position_notional=%.2f target_order_notional=%.2f min_entry_notional=%.2f max_signal_leverage=%.1fx "
             "sync_before_entry=%s jurisdiction_block=%.0fs progress_verify=%.0fs dd_alert=%.2f%% "
             "sync_stale_alert=%.0fs risk_level_max_dev=%.1f%% empty_pos_confirm=%d "
+            "max_hold=%.0fs "
             "tg_digest=%.0fs tg_charts=%s dynamic_risk=%s rotation=%s edge=%.3f%% "
             "watchdog=%s no_fill=%.0fs cooldown=%.0fs failsafe=%s threshold=%d hold=%.0fs "
             "lane_heartbeat=%s hb_int=%.0fs",
@@ -455,6 +460,7 @@ class LighterBot:
             self._sync_stale_alert_seconds,
             self._max_risk_level_deviation_pct,
             self._empty_position_confirmations,
+            self._max_position_hold_seconds,
             self._telegram_digest_seconds,
             self._telegram_enable_charts,
             self._dynamic_risk_enabled,
@@ -1772,6 +1778,32 @@ class LighterBot:
                     candidates.append(text)
         joined = " | ".join(candidates)
         return joined[:280]
+
+    @staticmethod
+    def _position_opened_ts(position: Position) -> float:
+        """Best-effort opened timestamp resolution for hold-time risk controls."""
+        meta = position.metadata if isinstance(position.metadata, dict) else {}
+        opened_raw = meta.get("opened_at")
+        if isinstance(opened_raw, (int, float)):
+            return float(opened_raw)
+        if isinstance(opened_raw, str):
+            try:
+                return datetime.fromisoformat(opened_raw.replace("Z", "+00:00")).timestamp()
+            except Exception:
+                pass
+        created = getattr(position, "created_at", None)
+        if isinstance(created, datetime):
+            try:
+                return created.timestamp()
+            except Exception:
+                pass
+        updated = getattr(position, "updated_at", None)
+        if isinstance(updated, datetime):
+            try:
+                return updated.timestamp()
+            except Exception:
+                pass
+        return 0.0
 
     def _market_stats_for_symbol(self, symbol: str) -> Dict[str, float]:
         prices = self._recent_prices(symbol)
@@ -3363,6 +3395,7 @@ class LighterBot:
                             reference_price=float(fill_price if fill_price > 0 else current_price),
                         ),
                         "reasoning": self._compact_reasoning(signal.metadata or {}),
+                        "opened_at": datetime.now(timezone.utc).isoformat(),
                     }
                     self.positions[coin] = Position(
                         position_id=str(result.get("order_id", "")),
@@ -3980,6 +4013,9 @@ class LighterBot:
                     if not isinstance(existing.metadata, dict):
                         existing.metadata = {}
                     existing.metadata.setdefault("source", "exchange_sync")
+                if not isinstance(existing.metadata, dict):
+                    existing.metadata = {}
+                existing.metadata.setdefault("opened_at", datetime.now(timezone.utc).isoformat())
 
                 if current_price > 0:
                     existing.current_price = current_price
@@ -4074,6 +4110,50 @@ class LighterBot:
                 continue
 
             self._maybe_adjust_position_risk_levels(symbol, position)
+
+            # Time-based turnover guard: recycle stale positions so overnight flow
+            # can continue without waiting indefinitely for TP/SL only exits.
+            if self._max_position_hold_seconds > 0:
+                opened_ts = self._position_opened_ts(position)
+                hold_age = (now - opened_ts) if opened_ts > 0 else 0.0
+                if hold_age >= self._max_position_hold_seconds:
+                    last_attempt = float(self._risk_exit_attempted_at.get(symbol, 0.0))
+                    if now - last_attempt < self._risk_exit_cooldown_seconds:
+                        continue
+                    self._risk_exit_attempted_at[symbol] = now
+
+                    is_long = position.side in (TradeSide.BUY, TradeSide.LONG, "BUY", "LONG")
+                    exit_side = TradeSide.SELL if is_long else TradeSide.BUY
+                    exit_signal = TradeSignal(
+                        signal_id=f"risk-max-hold-{symbol}-{int(now * 1000)}",
+                        symbol=symbol,
+                        side=exit_side,
+                        signal_type=SignalType.EXIT,
+                        confidence=1.0,
+                        source=f"{SERVICE_NAME}-risk-guard",
+                        quantity=qty,
+                        metadata={
+                            "reduce_only": True,
+                            "risk_exit": "max_hold_timeout",
+                            "origin": "max_hold_guard",
+                            "hold_age_sec": round(hold_age, 3),
+                            "max_hold_sec": float(self._max_position_hold_seconds),
+                        },
+                    )
+                    logger.warning(
+                        "Risk exit trigger max_hold_timeout on %s | hold_age=%.1fs max_hold=%.1fs qty=%s",
+                        symbol,
+                        hold_age,
+                        self._max_position_hold_seconds,
+                        qty,
+                    )
+                    result = await self._execute_trade(exit_signal)
+                    if not (result.metadata or {}).get("noop"):
+                        await publish("trade-executed", result)
+                    filled_qty = self._to_float(getattr(result, "filled_quantity", 0.0), 0.0)
+                    if result.success and (filled_qty > 0 or (result.metadata or {}).get("noop")):
+                        self._risk_exit_attempted_at.pop(symbol, None)
+                    continue
 
             tp = getattr(position, "take_profit", None)
             sl = getattr(position, "stop_loss", None)
