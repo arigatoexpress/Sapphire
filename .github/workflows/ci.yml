@@ -77,12 +77,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y jq curl ripgrep
 
-      - name: Run holistic ops check
-        if: ${{ steps.gcp-auth.outputs.enabled == 'true' }}
-        env:
-          SAPPHIRE_GATEWAY_OIDC_TOKEN: ${{ steps.gcp-oidc.outputs.id_token }}
-        run: ./scripts/holistic_ops_check.sh
-
       - name: Run scout sandbox integration smoke
         if: ${{ steps.gcp-auth.outputs.enabled == 'true' }}
         env:
@@ -92,6 +86,12 @@ jobs:
           ALPHA_SERVICE: sapphire-alpha
           EXPECT_GTM_DISABLED: "true"
         run: ./scripts/run_scout_sandbox_smoke.sh
+
+      - name: Run holistic ops check
+        if: ${{ steps.gcp-auth.outputs.enabled == 'true' }}
+        env:
+          SAPPHIRE_GATEWAY_OIDC_TOKEN: ${{ steps.gcp-oidc.outputs.id_token }}
+        run: ./scripts/holistic_ops_check.sh
 
       - name: Skip cloud check when GCP secrets are unavailable
         if: ${{ steps.gcp-auth.outputs.enabled != 'true' }}
