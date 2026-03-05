@@ -3,7 +3,12 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-"${ROOT_DIR}/scripts/check_source_of_truth.sh"
+
+if [[ "${CI:-}" == "true" || "${SKIP_SOURCE_OF_TRUTH_CHECK:-0}" == "1" ]]; then
+  echo "INFO: skipping source-of-truth check in CI/non-canonical runner context."
+else
+  "${ROOT_DIR}/scripts/check_source_of_truth.sh"
+fi
 
 PROJECT_ID="${PROJECT_ID:-sapphire-479610}"
 REGION="${REGION:-us-central1}"
