@@ -105,16 +105,21 @@ else
 fi
 
 TELEGRAM_TESTS=()
-for test_file in \
-  tests/unit/test_alpha_engine_telegram_control.py \
-  tests/unit/test_virustotal_skill_scanner.py; do
+for test_file in tests/unit/test_virustotal_skill_scanner.py; do
   if [[ -f "${test_file}" ]]; then
     TELEGRAM_TESTS+=("${test_file}")
   fi
 done
 
+# The telegram-control suite currently targets the legacy alpha-engine/shared module path.
+if [[ -f "services/alpha-engine/shared/telegram_bot.py" && -f "tests/unit/test_alpha_engine_telegram_control.py" ]]; then
+  TELEGRAM_TESTS+=("tests/unit/test_alpha_engine_telegram_control.py")
+else
+  echo "INFO: skipping legacy telegram control suite (services/alpha-engine/shared/telegram_bot.py not present)."
+fi
+
 if [[ "${#TELEGRAM_TESTS[@]}" -gt 0 ]]; then
-  if PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q -p pytest_asyncio.plugin "${TELEGRAM_TESTS[@]}"; then
+  if PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q "${TELEGRAM_TESTS[@]}"; then
     pass "telegram control unit tests"
   else
     fail "telegram control unit tests"

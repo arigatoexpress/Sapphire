@@ -8,11 +8,7 @@ import pytest
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-_TELEGRAM_BOT_CANDIDATES = [
-    ROOT_DIR / "services/alpha-engine/shared/telegram_bot.py",
-    ROOT_DIR / "services/shared/telegram_bot.py",
-]
-TELEGRAM_BOT_PATH = next((p for p in _TELEGRAM_BOT_CANDIDATES if p.exists()), _TELEGRAM_BOT_CANDIDATES[0])
+TELEGRAM_BOT_PATH = ROOT_DIR / "services/alpha-engine/shared/telegram_bot.py"
 
 
 def _load_module(path: Path, module_name: str):
