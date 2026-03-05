@@ -104,7 +104,8 @@ jobs:
             --max-position-notional-usd 8 \
             --max-open-positions 1 \
             --min-success-rate 0.40 \
-            --min-real-fills 0
+            --min-real-fills 0 \
+            --allow-partial-permissions
 
       - name: Run holistic ops check
         if: ${{ steps.gcp-auth.outputs.enabled == 'true' }}

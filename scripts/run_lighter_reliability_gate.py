@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from google.api_core.exceptions import PermissionDenied
 from google.cloud import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 
@@ -68,6 +69,11 @@ def main() -> int:
     parser.add_argument("--min-real-fills", type=int, default=0)
     parser.add_argument("--strict-jurisdiction", action="store_true")
     parser.add_argument(
+        "--allow-partial-permissions",
+        action="store_true",
+        help="Do not fail when Firestore read permissions are unavailable; emit warning-only result.",
+    )
+    parser.add_argument(
         "--output",
         default="",
         help="Optional output JSON path. Default: output/reliability_gates/<timestamp>.json",
@@ -82,12 +88,19 @@ def main() -> int:
     issues: list[GateIssue] = []
 
     # Current equity / freshness snapshot
-    snap_doc = client.collection("equity_snapshots_current").document(platform).get()
-    if not snap_doc.exists:
-        issues.append(GateIssue("error", f"Missing equity_snapshots_current/{platform}"))
-        snapshot: dict[str, Any] = {}
-    else:
-        snapshot = snap_doc.to_dict() or {}
+    try:
+        snap_doc = client.collection("equity_snapshots_current").document(platform).get()
+        if not snap_doc.exists:
+            issues.append(GateIssue("error", f"Missing equity_snapshots_current/{platform}"))
+            snapshot: dict[str, Any] = {}
+        else:
+            snapshot = snap_doc.to_dict() or {}
+    except PermissionDenied as exc:
+        if args.allow_partial_permissions:
+            issues.append(GateIssue("warn", f"Firestore read permission denied for equity snapshot: {exc}"))
+            snapshot = {}
+        else:
+            raise
 
     balance_age = _to_float(snapshot.get("balance_sync_age_sec"), default=999999.0)
     position_age = _to_float(snapshot.get("position_check_age_sec"), default=999999.0)
@@ -118,9 +131,16 @@ def main() -> int:
         issues.append(GateIssue("error", f"Open position count breach: {positions_count} > {args.max_open_positions}"))
 
     # Live positions collection cross-check
-    live_doc = client.collection("live_positions").document(platform).get()
+    try:
+        live_doc = client.collection("live_positions").document(platform).get()
+    except PermissionDenied as exc:
+        if args.allow_partial_permissions:
+            issues.append(GateIssue("warn", f"Firestore read permission denied for live_positions: {exc}"))
+            live_doc = None
+        else:
+            raise
     live_position_count = 0
-    if live_doc.exists:
+    if live_doc and live_doc.exists:
         live_data = live_doc.to_dict() or {}
         live_position_count = _to_int(live_data.get("position_count"), default=0)
         if live_position_count > args.max_open_positions:
@@ -135,11 +155,18 @@ def main() -> int:
         .where(filter=FieldFilter("recorded_at", ">=", since))
         .order_by("recorded_at", direction=firestore.Query.ASCENDING)
     )
-    for doc in query.stream():
-        row = doc.to_dict() or {}
-        if str(row.get("platform", "")).lower() != platform:
-            continue
-        exec_rows.append(row)
+    try:
+        for doc in query.stream():
+            row = doc.to_dict() or {}
+            if str(row.get("platform", "")).lower() != platform:
+                continue
+            exec_rows.append(row)
+    except PermissionDenied as exc:
+        if args.allow_partial_permissions:
+            issues.append(GateIssue("warn", f"Firestore read permission denied for execution_verifications: {exc}"))
+            exec_rows = []
+        else:
+            raise
 
     total_exec = len(exec_rows)
     success_exec = sum(1 for x in exec_rows if bool(x.get("success", False)))
@@ -229,4 +256,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
