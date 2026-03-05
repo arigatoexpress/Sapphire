@@ -78,10 +78,16 @@ python3 /Users/aribs/Sapphire/scripts/sapphirectl.py promote --to canary --skip-
 
 Control plane can automatically fail over to a backup execution host when the requested lane is unhealthy.
 
-Set:
+Set (or use the committed default at `/Users/aribs/Sapphire/configs/controlplane/sapphirectl.env`):
 
 ```bash
 export SAPPHIRECTL_FAILOVER_HOSTS="rari@100.87.225.89,rari@100.120.191.1"
+```
+
+`sapphirectl` auto-loads env defaults from:
+
+```bash
+/Users/aribs/Sapphire/configs/controlplane/sapphirectl.env
 ```
 
 Behavior:

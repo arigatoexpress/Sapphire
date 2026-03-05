@@ -32,6 +32,7 @@ DEFAULT_SERVICE = "lighter-trading"
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEPLOY_SCRIPT = REPO_ROOT / "scripts" / "deploy_lighter_strategy_profile.sh"
 TEST_SCRIPT = REPO_ROOT / "scripts" / "run_unified_lighter_prod_test.sh"
+CONTROLPLANE_ENV_FILE = REPO_ROOT / "configs" / "controlplane" / "sapphirectl.env"
 
 DESIRED_COLLECTION = "control_plane_desired"
 APPLIED_COLLECTION = "control_plane_applied"
@@ -147,6 +148,25 @@ def _parse_overrides(items: List[str]) -> Dict[str, str]:
     return overrides
 
 
+def _load_env_file_defaults(path: Path) -> None:
+    if not path.exists():
+        return
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except Exception:
+        return
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip("'").strip('"')
+        if not key:
+            continue
+        os.environ.setdefault(key, value)
+
+
 @dataclass
 class CommandResult:
     ok: bool
@@ -175,6 +195,7 @@ class CommandResult:
 
 class SapphireCtl:
     def __init__(self, project: str):
+        _load_env_file_defaults(CONTROLPLANE_ENV_FILE)
         self.project = project
         self.db = firestore.Client(project=project)
 
