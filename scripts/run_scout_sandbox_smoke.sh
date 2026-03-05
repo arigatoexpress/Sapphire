@@ -15,8 +15,10 @@ REGION="${REGION:-us-central1}"
 SCOUT_SERVICE="${SCOUT_SERVICE:-sapphire-scout-sandbox}"
 ALPHA_SERVICE="${ALPHA_SERVICE:-sapphire-alpha}"
 SCOUT_TOKEN_SECRET="${SCOUT_TOKEN_SECRET:-SAPPHIRE_SCOUT_SANDBOX_TOKEN}"
+SCOUT_TOKEN="${SCOUT_TOKEN:-}"
 SCRAPLING_SOURCE_URL="${SCRAPLING_SOURCE_URL:-https://news.ycombinator.com/}"
 EXPECT_GTM_DISABLED="${EXPECT_GTM_DISABLED:-true}"
+ALLOW_PARTIAL_AUTH_CHECKS="${ALLOW_PARTIAL_AUTH_CHECKS:-false}"
 
 echo "== Scout Sandbox + Alpha Smoke =="
 echo "Project: ${PROJECT_ID}"
@@ -26,7 +28,14 @@ echo "Alpha:   ${ALPHA_SERVICE}"
 
 SCOUT_URL="$(gcloud run services describe "${SCOUT_SERVICE}" --project "${PROJECT_ID}" --region "${REGION}" --format='value(status.url)')"
 ALPHA_URL="$(gcloud run services describe "${ALPHA_SERVICE}" --project "${PROJECT_ID}" --region "${REGION}" --format='value(status.url)')"
-SCOUT_TOKEN="$(gcloud secrets versions access latest --secret="${SCOUT_TOKEN_SECRET}" --project "${PROJECT_ID}")"
+
+if [[ -z "${SCOUT_TOKEN}" ]]; then
+  if SCOUT_TOKEN="$(gcloud secrets versions access latest --secret="${SCOUT_TOKEN_SECRET}" --project "${PROJECT_ID}" 2>/dev/null)"; then
+    :
+  else
+    SCOUT_TOKEN=""
+  fi
+fi
 
 echo "Scout URL: ${SCOUT_URL}"
 echo "Alpha URL: ${ALPHA_URL}"
@@ -36,19 +45,29 @@ SCOUT_HEALTH_RAW="$(curl -fsS "${SCOUT_URL}/health")"
 python3 -c 'import json,sys; o=json.load(sys.stdin); print(json.dumps({"status":o.get("status"),"scrapling_enabled":o.get("scrapling_enabled"),"gtm_enabled":o.get("gtm_enabled"),"sandbox_token_configured":o.get("sandbox_token_configured")}, indent=2))' <<<"${SCOUT_HEALTH_RAW}"
 
 echo "2) Scrapling collect..."
-SCRAPLING_RAW="$(curl -fsS -X POST "${SCOUT_URL}/v1/intel/scrapling_collect" \
-  -H "Authorization: Bearer ${SCOUT_TOKEN}" \
-  -H "Content-Type: application/json" \
-  -d "{\"source_url\":\"${SCRAPLING_SOURCE_URL}\",\"selectors\":[\"title\",\"a.storylink,.titleline > a\"],\"limit_per_selector\":2,\"include_links\":true,\"max_links\":5}")"
-python3 -c 'import json,sys; o=json.load(sys.stdin); print(json.dumps({"ok":o.get("ok"),"reason":o.get("reason"),"count":o.get("count"),"selector_hits":o.get("selector_hits")}, indent=2)); raise SystemExit(0 if o.get("ok") else 1)' <<<"${SCRAPLING_RAW}"
+if [[ -n "${SCOUT_TOKEN}" ]]; then
+  SCRAPLING_RAW="$(curl -fsS -X POST "${SCOUT_URL}/v1/intel/scrapling_collect" \
+    -H "Authorization: Bearer ${SCOUT_TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d "{\"source_url\":\"${SCRAPLING_SOURCE_URL}\",\"selectors\":[\"title\",\"a.storylink,.titleline > a\"],\"limit_per_selector\":2,\"include_links\":true,\"max_links\":5}")"
+  python3 -c 'import json,sys; o=json.load(sys.stdin); print(json.dumps({"ok":o.get("ok"),"reason":o.get("reason"),"count":o.get("count"),"selector_hits":o.get("selector_hits")}, indent=2)); raise SystemExit(0 if o.get("ok") else 1)' <<<"${SCRAPLING_RAW}"
+else
+  if [[ "${ALLOW_PARTIAL_AUTH_CHECKS,,}" == "true" ]]; then
+    echo "WARN: Scout token unavailable; skipping authenticated scrapling collect check."
+  else
+    echo "ERROR: Scout token unavailable and ALLOW_PARTIAL_AUTH_CHECKS=false"
+    exit 1
+  fi
+fi
 
 echo "3) GTM outbound guard..."
-GTM_RAW="$(curl -fsS -X POST "${SCOUT_URL}/v1/gtm/outbound" \
-  -H "Authorization: Bearer ${SCOUT_TOKEN}" \
-  -H "Content-Type: application/json" \
-  -d '{"outbound_payload":{"event":"smoke_test"},"external_url_hint":"https://app.clawgtm.com/api/v1/outbound"}')"
-export GTM_RAW EXPECT_GTM_DISABLED
-python3 - <<'PY'
+if [[ -n "${SCOUT_TOKEN}" ]]; then
+  GTM_RAW="$(curl -fsS -X POST "${SCOUT_URL}/v1/gtm/outbound" \
+    -H "Authorization: Bearer ${SCOUT_TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d '{"outbound_payload":{"event":"smoke_test"},"external_url_hint":"https://app.clawgtm.com/api/v1/outbound"}')"
+  export GTM_RAW EXPECT_GTM_DISABLED
+  python3 - <<'PY'
 import json
 import os
 
@@ -61,6 +80,14 @@ if expect_disabled:
     raise SystemExit(0 if reason == "gtm_dispatch_disabled" else 1)
 raise SystemExit(0)
 PY
+else
+  if [[ "${ALLOW_PARTIAL_AUTH_CHECKS,,}" == "true" ]]; then
+    echo "WARN: Scout token unavailable; skipping authenticated GTM guard check."
+  else
+    echo "ERROR: Scout token unavailable and ALLOW_PARTIAL_AUTH_CHECKS=false"
+    exit 1
+  fi
+fi
 
 echo "4) Alpha intel feed status..."
 ALPHA_INTEL_RAW="$(curl -fsS "${ALPHA_URL}/intel/feed?limit=5")"

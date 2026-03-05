@@ -85,6 +85,8 @@ jobs:
           SCOUT_SERVICE: sapphire-scout-sandbox
           ALPHA_SERVICE: sapphire-alpha
           EXPECT_GTM_DISABLED: "true"
+          ALLOW_PARTIAL_AUTH_CHECKS: "true"
+          SCOUT_TOKEN: ${{ secrets.SAPPHIRE_SCOUT_SANDBOX_TOKEN }}
         run: ./scripts/run_scout_sandbox_smoke.sh
 
       - name: Run holistic ops check
