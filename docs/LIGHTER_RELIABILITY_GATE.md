@@ -58,3 +58,18 @@ python3 ./scripts/run_lighter_reliability_gate.py \
   --strict-jurisdiction
 ```
 
+## Control-Plane Lane Guard (sapphirectl)
+
+`/Users/aribs/Sapphire/scripts/sapphirectl.py` now runs a pre-test lane health check before canary/live test execution:
+
+- looks back recent `execution_verifications` for restricted-jurisdiction failures
+- marks lane unhealthy when restrictions are present and no successful real fill happened after the latest restriction
+- records lane snapshot in Firestore: `execution_lane_health/lighter`
+
+If lane is unhealthy, test execution is skipped and apply returns failed with `test.cmd=["lane-health-check"]`.
+
+Bypass only when intentionally forcing a test:
+
+```bash
+python3 /Users/aribs/Sapphire/scripts/sapphirectl.py promote --to canary --skip-lane-health-check
+```

@@ -16,7 +16,7 @@ import subprocess
 import sys
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -36,6 +36,7 @@ DESIRED_COLLECTION = "control_plane_desired"
 APPLIED_COLLECTION = "control_plane_applied"
 APPLIED_HISTORY_COLLECTION = "control_plane_applied_history"
 EVENTS_COLLECTION = "control_plane_events"
+LANE_HEALTH_COLLECTION = "execution_lane_health"
 
 
 PROFILE_SETTINGS: Dict[str, Dict[str, str]] = {
@@ -203,6 +204,184 @@ class SapphireCtl:
             stdout=proc.stdout or "",
             stderr=proc.stderr or "",
         )
+
+    @staticmethod
+    def _as_utc_datetime(value: Any) -> datetime | None:
+        if isinstance(value, datetime):
+            if value.tzinfo is None:
+                return value.replace(tzinfo=timezone.utc)
+            return value.astimezone(timezone.utc)
+        text = str(value or "").strip()
+        if not text:
+            return None
+        try:
+            dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc)
+        except ValueError:
+            return None
+
+    def _fetch_runtime_status(self, *, target_host: str) -> Dict[str, Any]:
+        marker = "__HTTP_STATUS__:"
+        result = self._run(
+            [
+                "ssh",
+                "-o",
+                "BatchMode=yes",
+                "-o",
+                "ConnectTimeout=8",
+                target_host,
+                (
+                    "curl -sS --max-time 6 "
+                    "-w '\\n" + marker + "%{http_code}' "
+                    "http://127.0.0.1:8080/health"
+                ),
+            ],
+            cwd=REPO_ROOT,
+            env=os.environ.copy(),
+        )
+        body = (result.stdout or "").strip()
+        http_status = ""
+        if marker in body:
+            body, http_status = body.rsplit(marker, 1)
+            body = body.strip()
+            http_status = http_status.strip()
+        healthy = result.ok and http_status == "200"
+        payload: Dict[str, Any] = {}
+        if healthy and body:
+            try:
+                payload = json.loads(body)
+            except json.JSONDecodeError:
+                payload = {}
+        return {
+            "ok": healthy,
+            "http_status": http_status or "unknown",
+            "output": _short_output(body or result.combined_output, limit=1200),
+            "endpoint": "http://127.0.0.1:8080/health",
+            "payload": payload,
+        }
+
+    def _lane_health(self, *, target_host: str, lookback_minutes: int = 45) -> Dict[str, Any]:
+        now = _utc_now()
+        since = now - timedelta(minutes=max(1, int(lookback_minutes)))
+        runtime = self._fetch_runtime_status(target_host=target_host)
+        runtime_payload = runtime.get("payload") or {}
+
+        exec_rows: List[Dict[str, Any]] = []
+        query = (
+            self.db.collection("execution_verifications")
+            .where("recorded_at", ">=", since)
+            .order_by("recorded_at", direction=firestore.Query.ASCENDING)
+        )
+        try:
+            for doc in query.stream():
+                row = doc.to_dict() or {}
+                if str(row.get("platform", "")).lower() != PLATFORM:
+                    continue
+                exec_rows.append(row)
+        except Exception as exc:
+            return {
+                "healthy": False,
+                "lookback_minutes": lookback_minutes,
+                "checked_at": _utc_now_iso(),
+                "reasons": [f"execution_verifications query failed: {exc}"],
+                "warnings": [],
+                "runtime_status": runtime,
+                "rows": 0,
+                "restricted_errors": 0,
+                "recent_real_fills": 0,
+                "last_restricted_at": "",
+                "last_real_fill_at": "",
+                "fills_after_last_restricted": 0,
+            }
+
+        restricted_errors = 0
+        recent_real_fills = 0
+        last_restricted_at: datetime | None = None
+        last_real_fill_at: datetime | None = None
+        fills_after_last_restricted = 0
+
+        for row in exec_rows:
+            err = str(row.get("error_message", "") or "").lower()
+            recorded_at = self._as_utc_datetime(row.get("recorded_at"))
+            is_restricted = ("restricted jurisdiction" in err) or ("20558" in err and "restricted" in err)
+            if is_restricted:
+                restricted_errors += 1
+                if recorded_at and (last_restricted_at is None or recorded_at > last_restricted_at):
+                    last_restricted_at = recorded_at
+
+            success = bool(row.get("success", False))
+            try:
+                fill_qty = float(row.get("filled_quantity") or 0.0)
+            except (TypeError, ValueError):
+                fill_qty = 0.0
+            if success and fill_qty > 0:
+                recent_real_fills += 1
+                if recorded_at and (last_real_fill_at is None or recorded_at > last_real_fill_at):
+                    last_real_fill_at = recorded_at
+
+        if last_restricted_at is not None:
+            for row in exec_rows:
+                recorded_at = self._as_utc_datetime(row.get("recorded_at"))
+                if not recorded_at or recorded_at <= last_restricted_at:
+                    continue
+                success = bool(row.get("success", False))
+                try:
+                    fill_qty = float(row.get("filled_quantity") or 0.0)
+                except (TypeError, ValueError):
+                    fill_qty = 0.0
+                if success and fill_qty > 0:
+                    fills_after_last_restricted += 1
+
+        block_remaining = 0.0
+        try:
+            block_remaining = float(runtime_payload.get("jurisdiction_block_remaining_sec") or 0.0)
+        except (TypeError, ValueError):
+            block_remaining = 0.0
+
+        reasons: List[str] = []
+        warnings: List[str] = []
+
+        if not runtime.get("ok", False):
+            reasons.append("runtime status endpoint unavailable via ssh/curl")
+        if block_remaining > 0:
+            reasons.append(f"runtime jurisdiction block active ({block_remaining:.0f}s remaining)")
+        if restricted_errors > 0 and fills_after_last_restricted == 0:
+            reasons.append(
+                f"restricted-jurisdiction errors observed ({restricted_errors}) with no successful fills after latest restriction"
+            )
+        elif restricted_errors > 0:
+            warnings.append(
+                f"restricted-jurisdiction errors observed ({restricted_errors}) but recent fills recovered lane"
+            )
+
+        healthy = len(reasons) == 0
+        status = {
+            "healthy": healthy,
+            "lookback_minutes": lookback_minutes,
+            "checked_at": _utc_now_iso(),
+            "reasons": reasons,
+            "warnings": warnings,
+            "runtime_status": runtime,
+            "rows": len(exec_rows),
+            "restricted_errors": restricted_errors,
+            "recent_real_fills": recent_real_fills,
+            "last_restricted_at": last_restricted_at.isoformat() if last_restricted_at else "",
+            "last_real_fill_at": last_real_fill_at.isoformat() if last_real_fill_at else "",
+            "fills_after_last_restricted": fills_after_last_restricted,
+        }
+        try:
+            self.db.collection(LANE_HEALTH_COLLECTION).document(PLATFORM).set(
+                {
+                    **status,
+                    "checked_at_dt": _utc_now(),
+                    "platform": PLATFORM,
+                }
+            )
+        except Exception:
+            pass
+        return status
 
     def _close_all_positions(self, *, target_host: str) -> CommandResult:
         cmd = [
@@ -408,6 +587,7 @@ class SapphireCtl:
         desired_version: str | None = None,
         update_desired: bool = True,
         no_restart: bool = False,
+        enforce_lane_health: bool = True,
     ) -> Dict[str, Any]:
         desired = self._build_desired_state(
             profile=profile,
@@ -505,21 +685,45 @@ class SapphireCtl:
             stdout="skipped",
             stderr="",
         )
+        lane_health: Dict[str, Any] = {}
         if deploy.ok and override_apply_result.ok and run_test:
-            strategy_list = str(desired["effective_settings"].get("LIGHTER_ALLOWED_STRATEGIES", "")).split(",")
-            timeframe_list = str(desired["effective_settings"].get("LIGHTER_ALLOWED_TIMEFRAMES", "")).split(",")
-            strategy = (strategy_list[0].strip() if strategy_list and strategy_list[0].strip() else "luxalgo_msb_ob")
-            timeframe = (timeframe_list[0].strip() if timeframe_list and timeframe_list[0].strip() else "5m")
-            test_env = {
-                **os.environ,
-                "PROJECT_ID": self.project,
-                "REGION": os.getenv("REGION", "us-central1"),
-                "STRATEGY": strategy,
-                "TIMEFRAME": timeframe,
-                "QUANTITY": str(test_quantity),
-                "WAIT_SECONDS": os.getenv("SAPPHIRECTL_TEST_WAIT_SECONDS", "150"),
-            }
-            test_result = self._run([str(TEST_SCRIPT)], cwd=REPO_ROOT, env=test_env)
+            lane_health = self._lane_health(
+                target_host=target_host,
+                lookback_minutes=int(os.getenv("SAPPHIRECTL_LANE_LOOKBACK_MINUTES", "45")),
+            )
+            self._event(
+                "lane_health_pretest",
+                {
+                    "desired_version": desired["desired_version"],
+                    "target_host": target_host,
+                    "healthy": bool(lane_health.get("healthy", False)),
+                    "reasons": lane_health.get("reasons", []),
+                    "warnings": lane_health.get("warnings", []),
+                },
+            )
+            if enforce_lane_health and not bool(lane_health.get("healthy", False)):
+                test_result = CommandResult(
+                    ok=False,
+                    returncode=3,
+                    cmd=["lane-health-check"],
+                    stdout=json.dumps(lane_health, default=str, separators=(",", ":")),
+                    stderr="lane_unhealthy",
+                )
+            else:
+                strategy_list = str(desired["effective_settings"].get("LIGHTER_ALLOWED_STRATEGIES", "")).split(",")
+                timeframe_list = str(desired["effective_settings"].get("LIGHTER_ALLOWED_TIMEFRAMES", "")).split(",")
+                strategy = (strategy_list[0].strip() if strategy_list and strategy_list[0].strip() else "luxalgo_msb_ob")
+                timeframe = (timeframe_list[0].strip() if timeframe_list and timeframe_list[0].strip() else "5m")
+                test_env = {
+                    **os.environ,
+                    "PROJECT_ID": self.project,
+                    "REGION": os.getenv("REGION", "us-central1"),
+                    "STRATEGY": strategy,
+                    "TIMEFRAME": timeframe,
+                    "QUANTITY": str(test_quantity),
+                    "WAIT_SECONDS": os.getenv("SAPPHIRECTL_TEST_WAIT_SECONDS", "150"),
+                }
+                test_result = self._run([str(TEST_SCRIPT)], cwd=REPO_ROOT, env=test_env)
 
         close_result = CommandResult(
             ok=True,
@@ -554,6 +758,7 @@ class SapphireCtl:
             "override_apply": override_apply_result.to_dict(),
             "test": test_result.to_dict(),
             "close": close_result.to_dict(),
+            "lane_health_pretest": lane_health,
         }
         applied_ref.set(applied_payload)
         history_id = f"{_utc_now().strftime('%Y%m%dT%H%M%SZ')}_{desired['desired_version']}"
@@ -595,6 +800,7 @@ class SapphireCtl:
         notes: str,
         extra_overrides: Dict[str, str],
         no_restart: bool,
+        enforce_lane_health: bool = True,
     ) -> Dict[str, Any]:
         stage_cfg = PROMOTION_STAGES.get(to_stage)
         if not stage_cfg:
@@ -623,6 +829,7 @@ class SapphireCtl:
             overrides=merged_overrides,
             requested_by=requested_by,
             no_restart=no_restart,
+            enforce_lane_health=enforce_lane_health,
         )
         desired_ref = self.db.collection(DESIRED_COLLECTION).document(PLATFORM)
         desired_ref.set(
@@ -658,6 +865,7 @@ class SapphireCtl:
         test_quantity: str,
         notes: str,
         no_restart: bool,
+        enforce_lane_health: bool = True,
     ) -> Dict[str, Any]:
         steps = max(1, int(steps))
         history = [
@@ -685,6 +893,7 @@ class SapphireCtl:
             overrides=overrides,
             requested_by=requested_by,
             no_restart=no_restart,
+            enforce_lane_health=enforce_lane_health,
         )
         self._event(
             "rollback_applied",
@@ -706,6 +915,11 @@ class SapphireCtl:
         applied = self.db.collection(APPLIED_COLLECTION).document(PLATFORM).get().to_dict() or {}
         live_position = self.db.collection("live_positions").document(PLATFORM).get().to_dict() or {}
         history = self._load_applied_history(limit=5)
+        target_host = desired.get("target_host", DEFAULT_HOST)
+        lane_health = self._lane_health(
+            target_host=target_host,
+            lookback_minutes=int(os.getenv("SAPPHIRECTL_LANE_LOOKBACK_MINUTES", "45")),
+        )
 
         systemctl = self._run(
             [
@@ -714,7 +928,7 @@ class SapphireCtl:
                 "BatchMode=yes",
                 "-o",
                 "ConnectTimeout=8",
-                desired.get("target_host", DEFAULT_HOST),
+                target_host,
                 f"systemctl show {DEFAULT_SERVICE} -p ActiveState -p SubState -p MainPID",
             ],
             cwd=REPO_ROOT,
@@ -735,9 +949,16 @@ class SapphireCtl:
                 "ok": systemctl.ok,
                 "output": _short_output(systemctl.combined_output, limit=1200),
             },
+            "lane_health": lane_health,
         }
 
-    def reconcile(self, *, requested_by: str, no_restart: bool = False) -> Dict[str, Any]:
+    def reconcile(
+        self,
+        *,
+        requested_by: str,
+        no_restart: bool = False,
+        enforce_lane_health: bool = True,
+    ) -> Dict[str, Any]:
         desired = self.db.collection(DESIRED_COLLECTION).document(PLATFORM).get().to_dict() or {}
         applied = self.db.collection(APPLIED_COLLECTION).document(PLATFORM).get().to_dict() or {}
         if not desired:
@@ -775,6 +996,7 @@ class SapphireCtl:
             desired_version=desired_version or None,
             update_desired=False,
             no_restart=no_restart,
+            enforce_lane_health=enforce_lane_health,
         )
         return {
             "reconciled": True,
@@ -814,6 +1036,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Stage desired state only; skip deploy/restart/test/close operations.",
     )
+    apply_p.add_argument(
+        "--skip-lane-health-check",
+        action="store_true",
+        help="Bypass pre-test lane health guard and run canary test anyway.",
+    )
     apply_p.add_argument("--test-quantity", default="0.005")
 
     promote_p = sub.add_parser("promote", help="Promote runtime stage (paper/canary/live)")
@@ -848,6 +1075,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Stage desired state only; skip runtime changes.",
     )
+    promote_p.add_argument(
+        "--skip-lane-health-check",
+        action="store_true",
+        help="Bypass pre-test lane health guard for stage apply.",
+    )
 
     rollback_p = sub.add_parser("rollback", help="Rollback to a previous applied state")
     rollback_p.add_argument("--steps", type=int, default=1, help="How many applied versions back")
@@ -861,6 +1093,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Stage desired rollback state only; skip runtime changes.",
     )
+    rollback_p.add_argument(
+        "--skip-lane-health-check",
+        action="store_true",
+        help="Bypass pre-test lane health guard for rollback apply.",
+    )
 
     sub.add_parser("status", help="Show desired/applied/live status")
     reconcile_p = sub.add_parser("reconcile", help="Apply desired state if not converged")
@@ -868,6 +1105,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--no-restart",
         action="store_true",
         help="Stage desired state only; skip runtime changes.",
+    )
+    reconcile_p.add_argument(
+        "--skip-lane-health-check",
+        action="store_true",
+        help="Bypass pre-test lane health guard during reconcile.",
     )
     return p
 
@@ -890,6 +1132,7 @@ def main() -> int:
             overrides=overrides,
             requested_by=args.requested_by,
             no_restart=bool(args.no_restart),
+            enforce_lane_health=not bool(args.skip_lane_health_check),
         )
         _json_print(out)
         return 0 if out["applied"]["status"] in {"applied", "staged_no_restart"} else 2
@@ -914,6 +1157,7 @@ def main() -> int:
             notes=args.notes,
             extra_overrides=_parse_overrides(args.override),
             no_restart=bool(args.no_restart),
+            enforce_lane_health=not bool(args.skip_lane_health_check),
         )
         _json_print(out)
         status = (((out.get("result") or {}).get("applied") or {}).get("status") or "").lower()
@@ -929,6 +1173,7 @@ def main() -> int:
             test_quantity=args.test_quantity,
             notes=args.notes,
             no_restart=bool(args.no_restart),
+            enforce_lane_health=not bool(args.skip_lane_health_check),
         )
         _json_print(out)
         status = (((out.get("result") or {}).get("applied") or {}).get("status") or "").lower()
@@ -939,7 +1184,11 @@ def main() -> int:
         return 0
 
     if args.command == "reconcile":
-        out = ctl.reconcile(requested_by=args.requested_by, no_restart=bool(args.no_restart))
+        out = ctl.reconcile(
+            requested_by=args.requested_by,
+            no_restart=bool(args.no_restart),
+            enforce_lane_health=not bool(args.skip_lane_health_check),
+        )
         _json_print(out)
         if out.get("reconciled"):
             status = (((out.get("result") or {}).get("applied") or {}).get("status") or "").lower()
