@@ -119,6 +119,7 @@ class LighterBot:
     def __init__(self):
         self.config = ServiceConfig(PLATFORM.value)
         self.running = False
+        self._init_complete = False
         self._shutdown_event = asyncio.Event()
 
         # Lighter SDK components
@@ -540,6 +541,7 @@ class LighterBot:
     async def initialize(self):
         """Initialize the Lighter SDK clients."""
         logger.info(f"Initializing {SERVICE_NAME}...")
+        self._init_complete = False
 
         if not LIGHTER_SDK_AVAILABLE:
             logger.error("Cannot initialize - Lighter SDK not installed")
@@ -654,11 +656,57 @@ class LighterBot:
                 )
 
             logger.info(f"{SERVICE_NAME} initialized successfully | Testnet: {LIGHTER_TESTNET}")
+            self._init_complete = True
             return True
 
         except Exception as e:
             logger.error(f"Failed to initialize: {e}")
+            self._init_complete = False
             return False
+
+    async def _gateway_status_payload(self) -> Dict[str, Any]:
+        now_ts = time.time()
+        snapshot = await self._estimate_equity_snapshot()
+        balance_age = snapshot.get("balance_sync_age_sec")
+        position_age = snapshot.get("position_check_age_sec")
+        block_remaining = max(0.0, self._jurisdiction_block_until_ts - now_ts)
+        ready_reasons: List[str] = []
+
+        if not self._init_complete:
+            ready_reasons.append("initialization_incomplete")
+        if self.account_index is None:
+            ready_reasons.append("account_index_unresolved")
+        if not self.market_info:
+            ready_reasons.append("market_metadata_missing")
+        if bool(snapshot.get("balance_sync_stale", False)):
+            ready_reasons.append("balance_sync_stale")
+        if bool(snapshot.get("position_check_stale", False)):
+            ready_reasons.append("position_sync_stale")
+        if self._execution_block_reason:
+            ready_reasons.append("execution_blocked")
+        if block_remaining > 0:
+            ready_reasons.append("jurisdiction_block_active")
+
+        ready = len(ready_reasons) == 0
+        return {
+            "service": SERVICE_NAME,
+            "platform": PLATFORM.value,
+            "ready": ready,
+            "ready_reasons": ready_reasons,
+            "running": bool(self.running),
+            "initialized": bool(self._init_complete),
+            "trading_enabled": bool(self._trading_enabled),
+            "allow_live_trading": bool(self._allow_live_trading),
+            "account_index": self.account_index,
+            "market_count": len(self.market_info),
+            "execution_block_reason": self._execution_block_reason or "",
+            "jurisdiction_block_remaining_sec": round(block_remaining, 3),
+            "balance_sync_age_sec": balance_age,
+            "position_check_age_sec": position_age,
+            "last_balance_sync_error": self._last_balance_sync_error,
+            "last_position_check_error": self._last_position_check_error,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
 
     async def _load_market_info(self):
         """Load order book metadata from API."""
@@ -825,7 +873,7 @@ class LighterBot:
         except ImportError:
             from gateway import start_gateway_server
 
-        self.command_queue = await start_gateway_server()
+        self.command_queue = await start_gateway_server(status_provider=self._gateway_status_payload)
 
         if not await self.initialize():
             logger.error("Failed to initialize, exiting")

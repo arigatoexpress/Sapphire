@@ -1,8 +1,10 @@
 import asyncio
+import inspect
 import json
 import logging
 import os
-from typing import Callable, List, Optional
+from datetime import datetime, timezone
+from typing import Any, Callable, Dict, List, Optional
 
 from aiohttp import web
 
@@ -15,7 +17,7 @@ class ExecutionGateway:
     Replaces rudimentary health.py
     """
 
-    def __init__(self):
+    def __init__(self, status_provider: Optional[Callable[[], Dict[str, Any]]] = None):
         self.app = web.Application()
         self.app.router.add_get("/", self.health_check)
         self.app.router.add_get("/health", self.health_check)
@@ -28,12 +30,41 @@ class ExecutionGateway:
         # Command Buffer
         self.command_queue: asyncio.Queue = asyncio.Queue()
         self.runner: Optional[web.AppRunner] = None
+        self.status_provider = status_provider
+
+    async def _status_payload(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "status": "ok",
+            "service": "execution-gateway",
+            "ready": True,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        if self.status_provider is None:
+            return payload
+        try:
+            details = self.status_provider()
+            if inspect.isawaitable(details):
+                details = await details
+            if isinstance(details, dict):
+                payload.update(details)
+        except Exception as exc:
+            payload["ready"] = False
+            payload["status"] = "degraded"
+            payload["status_error"] = f"{type(exc).__name__}: {exc}"
+        return payload
 
     async def health_check(self, request):
-        return web.Response(text="OK", status=200)
+        payload = await self._status_payload()
+        return web.json_response(payload, status=200)
 
     async def readiness_check(self, request):
-        return web.Response(text="READY", status=200)
+        payload = await self._status_payload()
+        ready = bool(payload.get("ready", True))
+        if ready:
+            payload.setdefault("status", "ready")
+        else:
+            payload.setdefault("status", "not_ready")
+        return web.json_response(payload, status=200 if ready else 503)
 
     async def handle_execution(self, request):
         """Handle high-priority execution command from Alpha Hub."""
@@ -86,5 +117,9 @@ class ExecutionGateway:
 gateway = ExecutionGateway()
 
 
-async def start_gateway_server() -> asyncio.Queue:
+async def start_gateway_server(
+    status_provider: Optional[Callable[[], Dict[str, Any]]] = None,
+) -> asyncio.Queue:
+    if status_provider is not None:
+        gateway.status_provider = status_provider
     return await gateway.start()

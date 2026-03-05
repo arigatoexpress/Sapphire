@@ -1130,13 +1130,14 @@ def _build_trade_signal_from_tv_payload(payload: Dict[str, Any]) -> Dict[str, An
             )
     # ────────────────────────────────────────────────────────────────────────
 
+    source_hint = _extract_text(merged, ["source", "origin"], default="").strip() or "tradingview-gateway"
     trade_signal = TradeSignal(
         signal_id=signal_id,
         symbol=symbol,
         side=side,
         signal_type=signal_type,
         confidence=confidence,
-        source="tradingview-gateway",
+        source=source_hint,
         target_platforms=[],
         entry_price=price,
         quantity=quantity,
@@ -1145,6 +1146,7 @@ def _build_trade_signal_from_tv_payload(payload: Dict[str, Any]) -> Dict[str, An
     )
     _metadata: Dict[str, Any] = {
         "origin": "cloud_gateway_webhook",
+        "source": source_hint,
         "signal_key": signal_key,
         "raw_action": action,
         "strategy": _extract_text(merged, ["strategy", "strategy_name", "system"], default="").strip()
@@ -1160,7 +1162,7 @@ def _build_trade_signal_from_tv_payload(payload: Dict[str, Any]) -> Dict[str, An
         "dry_run": confidence < 0.7,
     }
     if incoming_metadata:
-        for key in ("strategy_id", "model", "regime", "tag"):
+        for key in ("strategy_id", "model", "regime", "tag", "source"):
             if key in incoming_metadata and key not in _metadata:
                 _metadata[key] = incoming_metadata.get(key)
     if TV_TRAILING_STOP:

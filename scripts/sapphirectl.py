@@ -355,11 +355,15 @@ class SapphireCtl:
 
         for host in failover_hosts:
             runtime = self._fetch_runtime_status(target_host=host)
+            runtime_payload = runtime.get("payload") if isinstance(runtime.get("payload"), dict) else {}
+            runtime_ready = bool(runtime.get("ok", False)) and (runtime_payload.get("ready", True) is not False)
             trading_flags = self._fetch_host_trading_flags(target_host=host)
             trading_ready = bool(trading_flags.get("trading_enabled")) and bool(trading_flags.get("allow_live_trading"))
             candidate = {
                 "host": host,
                 "runtime_ok": bool(runtime.get("ok", False)),
+                "runtime_ready": runtime_ready,
+                "runtime_ready_reasons": runtime_payload.get("ready_reasons", []),
                 "runtime_http_status": runtime.get("http_status", ""),
                 "runtime_output": runtime.get("output", ""),
                 "trading_enabled": bool(trading_flags.get("trading_enabled")),
@@ -367,7 +371,7 @@ class SapphireCtl:
                 "trading_ready_for_test": trading_ready,
             }
             decision["fallback_candidates"].append(candidate)
-            if runtime.get("ok", False) and trading_ready:
+            if runtime_ready and trading_ready:
                 decision["selected_target_host"] = host
                 decision["failover_used"] = True
                 decision["reason"] = "primary_lane_unhealthy_failover_selected"
@@ -505,6 +509,13 @@ class SapphireCtl:
 
         if not runtime.get("ok", False):
             reasons.append("runtime status endpoint unavailable via ssh/curl")
+        runtime_ready = runtime_payload.get("ready")
+        if runtime.get("ok", False) and runtime_ready is False:
+            rr = runtime_payload.get("ready_reasons")
+            if isinstance(rr, list) and rr:
+                reasons.append("runtime not ready: " + ", ".join([str(x) for x in rr[:6]]))
+            else:
+                reasons.append("runtime reports not ready")
         if block_remaining > 0:
             reasons.append(f"runtime jurisdiction block active ({block_remaining:.0f}s remaining)")
         if restricted_errors > 0 and fills_after_last_restricted == 0:
