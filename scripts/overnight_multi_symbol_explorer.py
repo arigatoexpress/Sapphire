@@ -34,6 +34,9 @@ GATEWAY_WEBHOOK_URL = _env(
 )
 WEBHOOK_SECRET = _env("WEBHOOK_SECRET", "")
 SYMBOLS = [s.strip().upper() for s in _env("SYMBOLS", "BTCUSDT,ETHUSDT,SOLUSDT").split(",") if s.strip()]
+LOCKED_SYMBOL = _env("LOCKED_SYMBOL", "").upper()
+if LOCKED_SYMBOL and LOCKED_SYMBOL not in SYMBOLS:
+    SYMBOLS = [LOCKED_SYMBOL, *SYMBOLS]
 TIMEFRAME = _env("TIMEFRAME", "5m").lower()
 SCAN_SECONDS = max(30, int(float(_env("SCAN_SECONDS", "75"))))
 SYMBOL_COOLDOWN_SECONDS = max(60, int(float(_env("SYMBOL_COOLDOWN_SECONDS", "300"))))
@@ -222,6 +225,12 @@ def _should_send(symbol: str, action: str) -> bool:
     return (now - prev_ts) >= SYMBOL_COOLDOWN_SECONDS
 
 
+def _active_symbols() -> List[str]:
+    if LOCKED_SYMBOL:
+        return [LOCKED_SYMBOL]
+    return list(SYMBOLS)
+
+
 def _handle_signal(signum, frame):  # type: ignore[no-untyped-def]
     global RUNNING
     RUNNING = False
@@ -240,21 +249,29 @@ def main() -> int:
     signal.signal(signal.SIGTERM, _handle_signal)
 
     _log(
-        "overnight explorer starting | symbols=%s timeframe=%s scan=%ss cooldown=%ss strategy=%s"
-        % (",".join(SYMBOLS), TIMEFRAME, SCAN_SECONDS, SYMBOL_COOLDOWN_SECONDS, STRATEGY)
+        "overnight explorer starting | symbols=%s lock=%s timeframe=%s scan=%ss cooldown=%ss strategy=%s"
+        % (
+            ",".join(SYMBOLS),
+            (LOCKED_SYMBOL or "none"),
+            TIMEFRAME,
+            SCAN_SECONDS,
+            SYMBOL_COOLDOWN_SECONDS,
+            STRATEGY,
+        )
     )
 
     global CYCLE_COUNT
     while RUNNING:
         CYCLE_COUNT += 1
         cycle_started = time.time()
-        prices = _fetch_spot_prices(SYMBOLS)
+        active_symbols = _active_symbols()
+        prices = _fetch_spot_prices(active_symbols)
         if not prices:
             time.sleep(max(1.0, float(SCAN_SECONDS)))
             continue
 
         published_count = 0
-        for sym in SYMBOLS:
+        for sym in active_symbols:
             if not RUNNING:
                 break
             px = float(prices.get(sym, 0.0) or 0.0)
