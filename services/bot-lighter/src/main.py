@@ -16,6 +16,7 @@ import sys
 import time
 import tempfile
 import html
+from decimal import Decimal, InvalidOperation
 from datetime import datetime, timezone
 from collections import defaultdict, deque
 from pathlib import Path
@@ -190,6 +191,11 @@ class LighterBot:
         self._position_publish_interval_seconds = max(
             3, int(os.getenv("POSITION_PUBLISH_INTERVAL_SECONDS", "10"))
         )
+        # Position/account refresh loop. Keep this above 1s to avoid venue 429 storms.
+        self._position_check_interval_seconds = max(
+            2.0,
+            self._env_float(("LIGHTER_POSITION_CHECK_INTERVAL_SECONDS",), default=5.0),
+        )
         self._single_symbol_mode = self._env_flag(
             "LIGHTER_SINGLE_SYMBOL_MODE",
             default=True,
@@ -214,10 +220,24 @@ class LighterBot:
             0.0,
             self._env_float(("LIGHTER_TARGET_ORDER_NOTIONAL_USD",), default=0.0),
         )
+        self._min_entry_notional_usd = max(
+            0.0,
+            self._env_float(("LIGHTER_MIN_ENTRY_NOTIONAL_USD",), default=0.0),
+        )
         self._max_signal_leverage = max(
             1.0,
             self._env_float(("LIGHTER_MAX_SIGNAL_LEVERAGE",), default=20.0),
         )
+        self._sync_before_entry = self._env_flag(
+            "LIGHTER_SYNC_BEFORE_ENTRY",
+            default=True,
+        )
+        self._jurisdiction_block_seconds = max(
+            0.0,
+            self._env_float(("LIGHTER_JURISDICTION_BLOCK_SECONDS",), default=600.0),
+        )
+        self._jurisdiction_block_until_ts: float = 0.0
+        self._jurisdiction_block_reason: str = ""
         self._entry_cooldown_seconds = max(
             0.0,
             self._env_float(("LIGHTER_ENTRY_COOLDOWN_SECONDS",), default=0.0),
@@ -360,7 +380,8 @@ class LighterBot:
         logger.info(
             "Strategy policy | allowed_strategies=%s allowed_timeframes=%s "
             "require_metadata=%s entry_cooldown=%.1fs max_order_notional=%.2f "
-            "max_position_notional=%.2f target_order_notional=%.2f max_signal_leverage=%.1fx progress_verify=%.0fs dd_alert=%.2f%% "
+            "max_position_notional=%.2f target_order_notional=%.2f min_entry_notional=%.2f max_signal_leverage=%.1fx "
+            "sync_before_entry=%s jurisdiction_block=%.0fs progress_verify=%.0fs dd_alert=%.2f%% "
             "sync_stale_alert=%.0fs risk_level_max_dev=%.1f%% empty_pos_confirm=%d "
             "tg_digest=%.0fs tg_charts=%s dynamic_risk=%s rotation=%s edge=%.3f%%",
             sorted(self._allowed_strategies) if self._allowed_strategies else ["*"],
@@ -370,7 +391,10 @@ class LighterBot:
             self._max_order_notional_usd,
             self._max_position_notional_usd,
             self._target_order_notional_usd,
+            self._min_entry_notional_usd,
             self._max_signal_leverage,
+            self._sync_before_entry,
+            self._jurisdiction_block_seconds,
             self._progress_verify_interval_seconds,
             self._max_drawdown_alert_pct,
             self._sync_stale_alert_seconds,
@@ -401,6 +425,56 @@ class LighterBot:
             except ValueError:
                 continue
         return float(default)
+
+    @staticmethod
+    def _decimal_places_from_step(step_size: Any) -> int:
+        """Return decimal precision implied by a numeric step size."""
+        try:
+            dec = Decimal(str(step_size))
+        except (InvalidOperation, ValueError, TypeError):
+            return 0
+        norm = dec.normalize()
+        exponent = int(norm.as_tuple().exponent)
+        return max(0, -exponent)
+
+    def _market_size_decimals(self, market: Dict[str, Any]) -> int:
+        if not isinstance(market, dict):
+            return 0
+        try:
+            supported = int(
+                market.get("supported_size_decimals", market.get("size_decimals", 0)) or 0
+            )
+        except (TypeError, ValueError):
+            supported = 0
+        if supported > 0:
+            return supported
+        return self._decimal_places_from_step(market.get("step_size", 0))
+
+    def _quantize_qty_down(self, qty: float, decimals: int) -> float:
+        scale = 10 ** max(0, int(decimals or 0))
+        return math.floor(max(0.0, float(qty)) * scale) / scale
+
+    @staticmethod
+    def _is_restricted_jurisdiction_error(message: str) -> bool:
+        msg = str(message or "").lower()
+        return ("restricted jurisdiction" in msg) or ("20558" in msg and "restricted" in msg)
+
+    def _set_jurisdiction_block(self, error_message: str) -> None:
+        if self._jurisdiction_block_seconds <= 0:
+            return
+        if str(error_message or "").lower().startswith("jurisdiction block active"):
+            return
+        if not self._is_restricted_jurisdiction_error(error_message):
+            return
+        self._jurisdiction_block_until_ts = time.time() + self._jurisdiction_block_seconds
+        self._jurisdiction_block_reason = (
+            str(error_message).strip()[:220] or "restricted jurisdiction response"
+        )
+        logger.warning(
+            "Jurisdiction block activated for %.0fs due to execution error: %s",
+            self._jurisdiction_block_seconds,
+            self._jurisdiction_block_reason,
+        )
 
     @staticmethod
     async def _call_lighter_api(api_callable, *args, **kwargs):
@@ -947,7 +1021,7 @@ class LighterBot:
 
     async def _main_loop(self):
         """Main trading loop."""
-        loop_interval = 1.0  # 1 second for L2
+        loop_interval = float(self._position_check_interval_seconds)
 
         while self.running:
             try:
@@ -2170,8 +2244,15 @@ class LighterBot:
                 "max_order_notional_usd": self._max_order_notional_usd,
                 "max_position_notional_usd": self._max_position_notional_usd,
                 "target_order_notional_usd": self._target_order_notional_usd,
+                "min_entry_notional_usd": self._min_entry_notional_usd,
                 "max_signal_leverage": self._max_signal_leverage,
                 "entry_cooldown_seconds": self._entry_cooldown_seconds,
+                "sync_before_entry": self._sync_before_entry,
+                "jurisdiction_block_until": (
+                    datetime.fromtimestamp(self._jurisdiction_block_until_ts, timezone.utc).isoformat()
+                    if self._jurisdiction_block_until_ts > 0
+                    else ""
+                ),
             },
             "assistant_advice": advice,
         }
@@ -2416,11 +2497,28 @@ class LighterBot:
         start_time = datetime.now()
 
         try:
+            is_buy = signal.side in (TradeSide.BUY, TradeSide.LONG)
+            reduce_only = bool((signal.metadata or {}).get("reduce_only", False))
+            if signal.signal_type in {
+                SignalType.EXIT,
+                SignalType.SCALE_OUT,
+                SignalType.TAKE_PROFIT,
+                SignalType.STOP_LOSS,
+            }:
+                reduce_only = True
+            entry_like = signal.signal_type in {SignalType.ENTRY, SignalType.SCALE_IN}
+
             if not ignore_trading_guard:
                 if not self._trading_enabled:
                     raise Exception("Trading disabled (TRADING_ENABLED=false)")
                 if self._trading_mode == "live" and not self._allow_live_trading:
                     raise Exception("Live trading disabled (ALLOW_LIVE_TRADING=0)")
+                if entry_like and not reduce_only and self._jurisdiction_block_until_ts > time.time():
+                    wait_s = max(0.0, self._jurisdiction_block_until_ts - time.time())
+                    raise Exception(
+                        f"Jurisdiction block active ({wait_s:.0f}s remaining): "
+                        f"{self._jurisdiction_block_reason or 'restricted jurisdiction'}"
+                    )
             if not self.transaction_api:
                 raise Exception("Transaction API not initialized")
             if self._execution_block_reason:
@@ -2434,8 +2532,6 @@ class LighterBot:
             order_book_id = int(market.get("order_book_id", 0) or 0)
             if order_book_id <= 0:
                 raise ValueError(f"No order book mapping for symbol {signal.symbol} (normalized={coin})")
-
-            is_buy = signal.side in (TradeSide.BUY, TradeSide.LONG)
 
             # Safety: require explicit quantity in inbound signal.
             if signal.quantity is None:
@@ -2453,19 +2549,12 @@ class LighterBot:
             signal.metadata.setdefault("max_signal_leverage", self._max_signal_leverage)
             if signal_leverage > 0:
                 signal.metadata.setdefault("requested_leverage", signal_leverage)
-
-            reduce_only = bool((signal.metadata or {}).get("reduce_only", False))
-            if signal.signal_type in {
-                SignalType.EXIT,
-                SignalType.SCALE_OUT,
-                SignalType.TAKE_PROFIT,
-                SignalType.STOP_LOSS,
-            }:
-                reduce_only = True
-            entry_like = signal.signal_type in {SignalType.ENTRY, SignalType.SCALE_IN}
             current_price = 0.0
+            size_decimals = self._market_size_decimals(market) or 3
 
             if self._single_symbol_mode and entry_like and not reduce_only:
+                if self._sync_before_entry:
+                    await self._check_positions()
                 active_symbols = self._active_position_symbols()
                 if active_symbols and coin not in active_symbols:
                     current_price = await self._get_ticker(coin)
@@ -2571,11 +2660,10 @@ class LighterBot:
                 and self._target_order_notional_usd > 0
                 and current_price > 0
             ):
-                size_decimals = int(market.get("size_decimals", 3) or 3)
-                scale = 10 ** max(0, size_decimals)
-                target_qty = math.floor(
-                    (self._target_order_notional_usd / float(current_price)) * scale
-                ) / scale
+                target_qty = self._quantize_qty_down(
+                    self._target_order_notional_usd / float(current_price),
+                    size_decimals,
+                )
                 if target_qty <= 0:
                     raise ValueError(
                         f"Target order notional too low for {coin}: "
@@ -2603,11 +2691,10 @@ class LighterBot:
             ):
                 requested_notional = float(quantity) * float(current_price)
                 if requested_notional > self._max_order_notional_usd:
-                    size_decimals = int(market.get("size_decimals", 3) or 3)
-                    scale = 10 ** max(0, size_decimals)
-                    capped_qty = math.floor(
-                        (self._max_order_notional_usd / float(current_price)) * scale
-                    ) / scale
+                    capped_qty = self._quantize_qty_down(
+                        self._max_order_notional_usd / float(current_price),
+                        size_decimals,
+                    )
                     if capped_qty <= 0:
                         raise ValueError(
                             f"Max order notional cap too low for {coin}: "
@@ -2623,6 +2710,32 @@ class LighterBot:
                         capped_qty,
                     )
                     quantity = float(capped_qty)
+            if not reduce_only:
+                quantity = self._quantize_qty_down(float(quantity), size_decimals)
+                if quantity <= 0:
+                    raise ValueError(
+                        f"Quantity rounded to zero for {coin} at size_decimals={size_decimals}"
+                    )
+            if (
+                not reduce_only
+                and entry_like
+                and self._min_entry_notional_usd > 0
+                and current_price > 0
+            ):
+                final_notional = float(quantity) * float(current_price)
+                if final_notional < self._min_entry_notional_usd:
+                    raise ValueError(
+                        f"Entry notional too low for {coin}: "
+                        f"final={final_notional:.4f} floor={self._min_entry_notional_usd:.4f}"
+                    )
+            if not reduce_only and current_price > 0:
+                logger.info(
+                    "Final entry sizing %s | qty=%.8f notional=%.4f usd (price=%.6f)",
+                    coin,
+                    float(quantity),
+                    float(quantity) * float(current_price),
+                    float(current_price),
+                )
 
             if (
                 not reduce_only
@@ -2788,6 +2901,7 @@ class LighterBot:
                 )
             else:
                 error_msg = (result or {}).get("error", "Unknown error")
+                self._set_jurisdiction_block(str(error_msg))
                 self.trades_failed += 1
                 logger.error(f"Order failed: {error_msg}")
                 return TradeResult(
@@ -2816,6 +2930,7 @@ class LighterBot:
                 metadata={"circuit_breaker_open": True},
             )
         except Exception as e:
+            self._set_jurisdiction_block(str(e))
             self.trades_failed += 1
             execution_time = (datetime.now() - start_time).total_seconds() * 1000
             logger.error(f"Lighter Execution Failed: {e}")
@@ -3586,6 +3701,10 @@ class LighterBot:
             "account_index": self.account_index,
             "markets_loaded": len(self.market_info),
             "avg_latency_ms": self.avg_latency_ms,
+            "min_entry_notional_usd": self._min_entry_notional_usd,
+            "jurisdiction_block_remaining_sec": max(
+                0.0, self._jurisdiction_block_until_ts - time.time()
+            ),
         }
 
 
