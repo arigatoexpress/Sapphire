@@ -88,6 +88,7 @@ def main() -> int:
     issues: list[GateIssue] = []
 
     # Current equity / freshness snapshot
+    snapshot_available = True
     try:
         snap_doc = client.collection("equity_snapshots_current").document(platform).get()
         if not snap_doc.exists:
@@ -98,44 +99,50 @@ def main() -> int:
     except PermissionDenied as exc:
         if args.allow_partial_permissions:
             issues.append(GateIssue("warn", f"Firestore read permission denied for equity snapshot: {exc}"))
+            snapshot_available = False
             snapshot = {}
         else:
             raise
 
-    balance_age = _to_float(snapshot.get("balance_sync_age_sec"), default=999999.0)
-    position_age = _to_float(snapshot.get("position_check_age_sec"), default=999999.0)
-    balance_stale = _to_bool(snapshot.get("balance_sync_stale"), default=True)
-    position_stale = _to_bool(snapshot.get("position_check_stale"), default=True)
+    balance_age = _to_float(snapshot.get("balance_sync_age_sec"), default=0.0)
+    position_age = _to_float(snapshot.get("position_check_age_sec"), default=0.0)
+    balance_stale = _to_bool(snapshot.get("balance_sync_stale"), default=False)
+    position_stale = _to_bool(snapshot.get("position_check_stale"), default=False)
     drawdown_pct = _to_float(snapshot.get("drawdown_pct"), default=0.0)
     position_notional = _to_float(snapshot.get("position_notional_usd"), default=0.0)
     positions_count = _to_int(snapshot.get("positions_count"), default=0)
 
-    if balance_age > args.max_balance_age_sec:
-        issues.append(GateIssue("error", f"Balance sync age too high: {balance_age:.1f}s > {args.max_balance_age_sec:.1f}s"))
-    if position_age > args.max_position_age_sec:
-        issues.append(GateIssue("error", f"Position sync age too high: {position_age:.1f}s > {args.max_position_age_sec:.1f}s"))
-    if balance_stale:
-        issues.append(GateIssue("error", "Balance sync is marked stale"))
-    if position_stale:
-        issues.append(GateIssue("error", "Position sync is marked stale"))
-    if drawdown_pct < args.max_drawdown_pct:
-        issues.append(GateIssue("error", f"Drawdown breach: {drawdown_pct:.3f}% < {args.max_drawdown_pct:.3f}%"))
-    if position_notional > args.max_position_notional_usd:
-        issues.append(
-            GateIssue(
-                "error",
-                f"Position notional breach: ${position_notional:.4f} > ${args.max_position_notional_usd:.4f}",
+    if snapshot_available:
+        if balance_age > args.max_balance_age_sec:
+            issues.append(GateIssue("error", f"Balance sync age too high: {balance_age:.1f}s > {args.max_balance_age_sec:.1f}s"))
+        if position_age > args.max_position_age_sec:
+            issues.append(GateIssue("error", f"Position sync age too high: {position_age:.1f}s > {args.max_position_age_sec:.1f}s"))
+        if balance_stale:
+            issues.append(GateIssue("error", "Balance sync is marked stale"))
+        if position_stale:
+            issues.append(GateIssue("error", "Position sync is marked stale"))
+        if drawdown_pct < args.max_drawdown_pct:
+            issues.append(GateIssue("error", f"Drawdown breach: {drawdown_pct:.3f}% < {args.max_drawdown_pct:.3f}%"))
+        if position_notional > args.max_position_notional_usd:
+            issues.append(
+                GateIssue(
+                    "error",
+                    f"Position notional breach: ${position_notional:.4f} > ${args.max_position_notional_usd:.4f}",
+                )
             )
-        )
-    if positions_count > args.max_open_positions:
-        issues.append(GateIssue("error", f"Open position count breach: {positions_count} > {args.max_open_positions}"))
+        if positions_count > args.max_open_positions:
+            issues.append(GateIssue("error", f"Open position count breach: {positions_count} > {args.max_open_positions}"))
+    elif args.allow_partial_permissions:
+        issues.append(GateIssue("warn", "Skipped snapshot-derived checks due to partial Firestore permissions"))
 
     # Live positions collection cross-check
+    live_available = True
     try:
         live_doc = client.collection("live_positions").document(platform).get()
     except PermissionDenied as exc:
         if args.allow_partial_permissions:
             issues.append(GateIssue("warn", f"Firestore read permission denied for live_positions: {exc}"))
+            live_available = False
             live_doc = None
         else:
             raise
@@ -147,9 +154,12 @@ def main() -> int:
             issues.append(
                 GateIssue("error", f"live_positions/{platform} count breach: {live_position_count} > {args.max_open_positions}")
             )
+    elif not live_available and args.allow_partial_permissions:
+        issues.append(GateIssue("warn", "Skipped live position cross-check due to partial Firestore permissions"))
 
     # Execution quality lookback
     exec_rows = []
+    exec_available = True
     query = (
         client.collection("execution_verifications")
         .where(filter=FieldFilter("recorded_at", ">=", since))
@@ -164,6 +174,7 @@ def main() -> int:
     except PermissionDenied as exc:
         if args.allow_partial_permissions:
             issues.append(GateIssue("warn", f"Firestore read permission denied for execution_verifications: {exc}"))
+            exec_available = False
             exec_rows = []
         else:
             raise
@@ -179,20 +190,23 @@ def main() -> int:
 
     success_rate = (success_exec / total_exec) if total_exec > 0 else 1.0
 
-    if total_exec > 0 and success_rate < args.min_success_rate:
-        issues.append(
-            GateIssue(
-                "error",
-                f"Execution success rate low: {success_rate:.3f} < {args.min_success_rate:.3f} "
-                f"({success_exec}/{total_exec})",
+    if exec_available:
+        if total_exec > 0 and success_rate < args.min_success_rate:
+            issues.append(
+                GateIssue(
+                    "error",
+                    f"Execution success rate low: {success_rate:.3f} < {args.min_success_rate:.3f} "
+                    f"({success_exec}/{total_exec})",
+                )
             )
-        )
-    if real_fills < args.min_real_fills:
-        issues.append(GateIssue("error", f"Real fills below minimum: {real_fills} < {args.min_real_fills}"))
+        if real_fills < args.min_real_fills:
+            issues.append(GateIssue("error", f"Real fills below minimum: {real_fills} < {args.min_real_fills}"))
 
-    if restricted_errs > 0:
-        sev = "error" if args.strict_jurisdiction else "warn"
-        issues.append(GateIssue(sev, f"Restricted-jurisdiction execution errors in lookback: {restricted_errs}"))
+        if restricted_errs > 0:
+            sev = "error" if args.strict_jurisdiction else "warn"
+            issues.append(GateIssue(sev, f"Restricted-jurisdiction execution errors in lookback: {restricted_errs}"))
+    elif args.allow_partial_permissions:
+        issues.append(GateIssue("warn", "Skipped execution-quality checks due to partial Firestore permissions"))
 
     error_count = sum(1 for i in issues if i.severity == "error")
     warn_count = sum(1 for i in issues if i.severity == "warn")
@@ -237,6 +251,12 @@ def main() -> int:
             "restricted_jurisdiction_errors": restricted_errs,
             "window_start": since.isoformat(),
             "window_end": now.isoformat(),
+        },
+        "data_availability": {
+            "snapshot": snapshot_available,
+            "live_positions": live_available,
+            "execution_window": exec_available,
+            "partial_permissions_mode": bool(args.allow_partial_permissions),
         },
         "issues": [{"severity": i.severity, "message": i.message} for i in issues],
     }
