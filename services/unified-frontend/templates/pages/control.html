@@ -1,0 +1,352 @@
+{% extends "base.html" %}
+
+{% block title %}Control_Plane{% endblock %}
+
+{% block extra_css %}
+.control-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-lg);
+}
+
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-md);
+}
+
+.kpi {
+    border: 1px solid var(--border-dim);
+    padding: var(--space-md);
+    background: rgba(10, 10, 10, 0.72);
+}
+
+.kpi-label {
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.kpi-value {
+    margin-top: var(--space-xs);
+    font-size: 1.1rem;
+    color: var(--amber);
+    font-family: var(--font-header);
+}
+
+.kv-list {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--space-sm) var(--space-md);
+    font-size: 0.78rem;
+}
+
+.kv-list dt {
+    color: var(--text-muted);
+}
+
+.kv-list dd {
+    color: var(--text-secondary);
+    margin: 0;
+    font-family: var(--font-terminal);
+}
+
+.host-table,
+.policy-table,
+.position-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.76rem;
+}
+
+.host-table th,
+.host-table td,
+.policy-table th,
+.policy-table td,
+.position-table th,
+.position-table td {
+    text-align: left;
+    padding: 0.5rem 0.6rem;
+    border-bottom: 1px solid rgba(255, 176, 0, 0.08);
+}
+
+.host-table th,
+.policy-table th,
+.position-table th {
+    color: var(--text-muted);
+    font-weight: normal;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.mono {
+    font-family: var(--font-terminal);
+}
+
+.reason-list {
+    margin: 0;
+    padding-left: 1rem;
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+}
+
+.reason-list li {
+    margin: 0.2rem 0;
+}
+
+@media (max-width: 1040px) {
+    .control-grid {
+        grid-template-columns: 1fr;
+    }
+    .kpi-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+{% endblock %}
+
+{% block content %}
+<div class="section-header">
+    <div class="section-title">Control_Plane</div>
+    <div class="section-subtitle">Desired/applied state, lane risk, host readiness, and execution policy</div>
+</div>
+
+<div class="panel" style="margin-bottom: var(--space-lg);">
+    <span class="panel-corner tl"></span>
+    <span class="panel-corner tr"></span>
+    <span class="panel-corner bl"></span>
+    <span class="panel-corner br"></span>
+    <div class="panel-header">
+        <div class="panel-title">Execution_Truth</div>
+        <span class="badge warning" id="cp-lane-badge">CHECKING</span>
+    </div>
+    <div class="panel-body">
+        <div class="kpi-grid">
+            <div class="kpi">
+                <div class="kpi-label">Selected Target</div>
+                <div class="kpi-value mono" id="kpi-target">--</div>
+            </div>
+            <div class="kpi">
+                <div class="kpi-label">Open Positions</div>
+                <div class="kpi-value mono" id="kpi-positions">--</div>
+            </div>
+            <div class="kpi">
+                <div class="kpi-label">Failover Hosts</div>
+                <div class="kpi-value mono" id="kpi-failover">--</div>
+            </div>
+            <div class="kpi">
+                <div class="kpi-label">Last Apply Status</div>
+                <div class="kpi-value mono" id="kpi-apply">--</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="control-grid">
+    <div class="panel">
+        <div class="panel-header"><div class="panel-title">Desired_vs_Applied</div></div>
+        <div class="panel-body">
+            <dl class="kv-list">
+                <dt>Desired Version</dt><dd class="mono" id="desired-version">--</dd>
+                <dt>Desired State</dt><dd id="desired-state">--</dd>
+                <dt>Profile</dt><dd class="mono" id="desired-profile">--</dd>
+                <dt>Target Host</dt><dd class="mono" id="desired-target">--</dd>
+                <dt>Applied Version</dt><dd class="mono" id="applied-version">--</dd>
+                <dt>Applied Status</dt><dd id="applied-status">--</dd>
+                <dt>Selected Host</dt><dd class="mono" id="applied-selected">--</dd>
+                <dt>Lane Reason</dt><dd class="mono" id="applied-lane-reason">--</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header"><div class="panel-title">Lane_Health</div></div>
+        <div class="panel-body">
+            <dl class="kv-list" style="margin-bottom: var(--space-md);">
+                <dt>Rows Analysed</dt><dd id="lane-rows">--</dd>
+                <dt>Restricted Errors</dt><dd id="lane-restricted">--</dd>
+                <dt>Real Fills (Window)</dt><dd id="lane-fills">--</dd>
+                <dt>Runtime Health</dt><dd id="lane-runtime">--</dd>
+            </dl>
+            <ul class="reason-list" id="lane-reasons">
+                <li>No lane reasons reported.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header"><div class="panel-title">Host_States</div></div>
+        <div class="panel-body">
+            <table class="host-table">
+                <thead>
+                    <tr><th>Host</th><th>Status</th><th>Latency</th><th>Role</th></tr>
+                </thead>
+                <tbody id="host-table-body">
+                    <tr><td colspan="4">Loading host states...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header"><div class="panel-title">Policy_Envelope</div></div>
+        <div class="panel-body">
+            <table class="policy-table">
+                <thead>
+                    <tr><th>Policy Key</th><th>Value</th></tr>
+                </thead>
+                <tbody id="policy-table-body">
+                    <tr><td colspan="2">Loading policy...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="panel" style="grid-column: 1 / -1;">
+        <div class="panel-header"><div class="panel-title">Live_Positions</div></div>
+        <div class="panel-body">
+            <table class="position-table">
+                <thead>
+                    <tr>
+                        <th>Symbol</th><th>Side</th><th>Qty</th><th>Entry</th><th>Mark</th><th>uPnL</th><th>TP</th><th>SL</th>
+                    </tr>
+                </thead>
+                <tbody id="positions-table-body">
+                    <tr><td colspan="8">No open positions.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function fmt(value, fallback = '--') {
+        if (value === undefined || value === null || value === '') return fallback;
+        return String(value);
+    }
+
+    function boolBadge(flag) {
+        if (flag === true) return '<span class="badge online">TRUE</span>';
+        if (flag === false) return '<span class="badge error">FALSE</span>';
+        return '<span class="badge warning">N/A</span>';
+    }
+
+    function roleLabel(host, desiredTarget, selectedTarget) {
+        if (host === selectedTarget && host === desiredTarget) return 'PRIMARY';
+        if (host === selectedTarget) return 'FAILOVER_ACTIVE';
+        if (host === desiredTarget) return 'PRIMARY_STANDBY';
+        return 'STANDBY';
+    }
+
+    function renderHostStates(data) {
+        const desiredTarget = data?.desired?.target_host || '';
+        const selectedTarget = data?.applied?.selected_target_host || data?.summary?.selected_target_host || '';
+        const hosts = data?.host_states || {};
+        const rows = ['rari1', 'rari2'].map((host) => {
+            const row = hosts[host] || {};
+            const healthy = !!row.healthy;
+            const status = healthy ? 'HEALTHY' : 'DEGRADED';
+            return `
+                <tr>
+                    <td class="mono">${host}</td>
+                    <td><span class="badge ${healthy ? 'online' : 'warning'}">${status}</span></td>
+                    <td class="mono">${row.latency_ms != null ? row.latency_ms + 'ms' : '--'}</td>
+                    <td class="mono">${roleLabel(host === 'rari1' ? 'rari@100.120.191.1' : 'rari@100.87.225.89', desiredTarget, selectedTarget)}</td>
+                </tr>
+            `;
+        }).join('');
+        document.getElementById('host-table-body').innerHTML = rows || '<tr><td colspan="4">No host data.</td></tr>';
+    }
+
+    function renderPolicy(data) {
+        const policy = data?.policy || {};
+        const keys = Object.keys(policy).sort();
+        if (!keys.length) {
+            document.getElementById('policy-table-body').innerHTML = '<tr><td colspan="2">No policy data.</td></tr>';
+            return;
+        }
+        document.getElementById('policy-table-body').innerHTML = keys.map((key) => {
+            const value = policy[key];
+            const asBool = String(value).toLowerCase();
+            if (asBool === 'true' || asBool === 'false') {
+                return `<tr><td class="mono">${key}</td><td>${boolBadge(asBool === 'true')}</td></tr>`;
+            }
+            return `<tr><td class="mono">${key}</td><td class="mono">${fmt(value)}</td></tr>`;
+        }).join('');
+    }
+
+    function renderPositions(data) {
+        const rows = data?.live_positions?.positions || [];
+        if (!rows.length) {
+            document.getElementById('positions-table-body').innerHTML = '<tr><td colspan="8">No open positions.</td></tr>';
+            return;
+        }
+        document.getElementById('positions-table-body').innerHTML = rows.map((pos) => `
+            <tr>
+                <td class="mono">${fmt(pos.symbol)}</td>
+                <td class="mono">${fmt(pos.side).toUpperCase()}</td>
+                <td class="mono">${fmt(pos.quantity)}</td>
+                <td class="mono">${fmt(pos.entry_price)}</td>
+                <td class="mono">${fmt(pos.mark_price)}</td>
+                <td class="mono">${fmt(pos.unrealized_pnl)}</td>
+                <td class="mono">${fmt(pos.take_profit)}</td>
+                <td class="mono">${fmt(pos.stop_loss)}</td>
+            </tr>
+        `).join('');
+    }
+
+    function renderControlPlane(data) {
+        const summary = data?.summary || {};
+        const desired = data?.desired || {};
+        const applied = data?.applied || {};
+        const lane = data?.lane_health || {};
+
+        const laneHealthy = !!summary.lane_healthy;
+        const laneBadge = document.getElementById('cp-lane-badge');
+        laneBadge.textContent = laneHealthy ? 'LANE_HEALTHY' : 'LANE_RISK';
+        laneBadge.className = laneHealthy ? 'badge online' : 'badge warning';
+
+        document.getElementById('kpi-target').textContent = fmt(summary.selected_target_host || applied.selected_target_host);
+        document.getElementById('kpi-positions').textContent = fmt(summary.open_positions, '0');
+        document.getElementById('kpi-failover').textContent = fmt(summary.failover_hosts_configured, '0');
+        document.getElementById('kpi-apply').textContent = fmt(desired.last_apply_status || applied.status);
+
+        document.getElementById('desired-version').textContent = fmt(desired.desired_version);
+        document.getElementById('desired-state').textContent = fmt(desired.state);
+        document.getElementById('desired-profile').textContent = fmt(desired.profile);
+        document.getElementById('desired-target').textContent = fmt(desired.target_host);
+        document.getElementById('applied-version').textContent = fmt(applied.desired_version);
+        document.getElementById('applied-status').textContent = fmt(applied.status);
+        document.getElementById('applied-selected').textContent = fmt(applied.selected_target_host);
+        document.getElementById('applied-lane-reason').textContent = fmt(applied.lane_reason);
+
+        document.getElementById('lane-rows').textContent = fmt(lane.rows, '0');
+        document.getElementById('lane-restricted').textContent = fmt(lane.restricted_errors, '0');
+        document.getElementById('lane-fills').textContent = fmt(lane.recent_real_fills, '0');
+        document.getElementById('lane-runtime').innerHTML = boolBadge(!!(lane.runtime_status && lane.runtime_status.ok));
+
+        const reasons = Array.isArray(lane.reasons) && lane.reasons.length
+            ? lane.reasons
+            : ['No explicit lane-health blockers reported.'];
+        document.getElementById('lane-reasons').innerHTML = reasons.map((reason) => `<li>${reason}</li>`).join('');
+
+        renderHostStates(data);
+        renderPolicy(data);
+        renderPositions(data);
+    }
+
+    async function loadControlPlane() {
+        try {
+            const data = await window.platformApi.getControlPlane();
+            renderControlPlane(data);
+        } catch (error) {
+            console.error('Control plane load failed:', error);
+        }
+    }
+
+    loadControlPlane();
+    setInterval(loadControlPlane, 30000);
+</script>
+{% endblock %}

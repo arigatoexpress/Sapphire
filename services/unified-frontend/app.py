@@ -72,8 +72,28 @@ OPTIONAL_HEALTH_NAMES = {
 
 # Auth Configuration
 AUTH_USERNAME = os.environ.get('AUTH_USERNAME', 'sapphire')
-AUTH_PASSWORD = os.environ.get('AUTH_PASSWORD', 'alpha2024')
+_raw_password = os.environ.get('AUTH_PASSWORD', '').strip()
 ENABLE_AUTH = os.environ.get('ENABLE_AUTH', 'false').lower() == 'true'
+_INSECURE_DEFAULTS = {'alpha2024', 'password', 'sapphire', 'admin', ''}
+
+if ENABLE_AUTH and _raw_password in _INSECURE_DEFAULTS:
+    # Auth is on but the password is insecure/missing — refuse to start.
+    import sys as _sys
+    print(
+        "FATAL: ENABLE_AUTH=true but AUTH_PASSWORD is unset or a known-insecure default "
+        f"({_raw_password!r}). Set AUTH_PASSWORD to a strong password before enabling auth.",
+        file=_sys.stderr,
+    )
+    _sys.exit(1)
+elif not ENABLE_AUTH:
+    # Auth is disabled — warn loudly so operators know the dashboard is open.
+    import logging as _log
+    _log.getLogger(__name__).warning(
+        "⚠️  Dashboard auth is DISABLED (ENABLE_AUTH=false). "
+        "Set ENABLE_AUTH=true and AUTH_PASSWORD to secure the dashboard."
+    )
+
+AUTH_PASSWORD = _raw_password
 PUBLIC_READ_ONLY = os.environ.get('PUBLIC_READ_ONLY', 'true').lower() == 'true'
 ENABLE_INTERNAL_JOBS = os.environ.get('ENABLE_INTERNAL_JOBS', 'false').lower() == 'true'
 MAC_OPERATOR_APP_URL = os.environ.get('MAC_OPERATOR_APP_URL', 'sapphirebook://operator')
@@ -259,6 +279,14 @@ PLATFORM_CONTRACTS = [
         'auth': 'basic_or_public',
         'category': 'core',
         'description': 'Machine-readable endpoint manifest for clients and checks.',
+    },
+    {
+        'name': 'control_plane',
+        'path': '/api/platform/control-plane',
+        'method': 'GET',
+        'auth': 'basic_or_public',
+        'category': 'operations',
+        'description': 'Desired/applied control-plane state, lane health, and execution policy summary.',
     },
 ]
 
@@ -698,12 +726,74 @@ def _fetch_market_prices():
     if cached:
         return cached
 
-    # Primary source: CoinGecko
+    def _tracked_symbols() -> list[str]:
+        raw = os.environ.get(
+            'SAPPHIRE_TRACKED_MARKET_SYMBOLS',
+            'BTC,ETH,SOL,HYPE,DOGE,AVAX',
+        )
+        seen = set()
+        symbols = []
+        for token in raw.split(','):
+            sym = token.strip().upper()
+            if not sym or sym in seen:
+                continue
+            seen.add(sym)
+            symbols.append(sym)
+        return symbols or ['BTC', 'ETH', 'SOL']
+
+    coingecko_ids = {
+        'BTC': 'bitcoin',
+        'ETH': 'ethereum',
+        'SOL': 'solana',
+        'HYPE': 'hyperliquid',
+        'DOGE': 'dogecoin',
+        'AVAX': 'avalanche-2',
+        'ZEC': 'zcash',
+        'XRP': 'ripple',
+        'ADA': 'cardano',
+        'BNB': 'binancecoin',
+        'LINK': 'chainlink',
+        'LTC': 'litecoin',
+        'DOT': 'polkadot',
+        'UNI': 'uniswap',
+        'ATOM': 'cosmos',
+        'MATIC': 'matic-network',
+        'ARB': 'arbitrum',
+        'OP': 'optimism',
+        'INJ': 'injective-protocol',
+        'SUI': 'sui',
+        'NEAR': 'near',
+        'RNDR': 'render-token',
+        'WIF': 'dogwifcoin',
+        'BONK': 'bonk',
+        'JUP': 'jupiter-exchange-solana',
+        'PYTH': 'pyth-network',
+    }
+    coinbase_pairs = {
+        'BTC': 'BTC-USD',
+        'ETH': 'ETH-USD',
+        'SOL': 'SOL-USD',
+        'DOGE': 'DOGE-USD',
+        'AVAX': 'AVAX-USD',
+        'LTC': 'LTC-USD',
+        'LINK': 'LINK-USD',
+        'ADA': 'ADA-USD',
+        'DOT': 'DOT-USD',
+    }
+    tracked_symbols = _tracked_symbols()
+    result = {sym: {'price': 0, 'change_24h': 0} for sym in tracked_symbols}
+
+    # Primary source: CoinGecko (supports 24h % change across many assets)
     try:
+        requested = {
+            sym: coingecko_ids[sym]
+            for sym in tracked_symbols
+            if sym in coingecko_ids
+        }
         resp = requests.get(
             'https://api.coingecko.com/api/v3/simple/price',
             params={
-                'ids': 'bitcoin,ethereum,solana',
+                'ids': ','.join(requested.values()),
                 'vs_currencies': 'usd',
                 'include_24hr_change': 'true',
             },
@@ -713,37 +803,34 @@ def _fetch_market_prices():
         resp.raise_for_status()
         data = resp.json()
 
-        result = {
-            'BTC': {
-                'price': data.get('bitcoin', {}).get('usd', 0),
-                'change_24h': data.get('bitcoin', {}).get('usd_24h_change', 0),
-            },
-            'ETH': {
-                'price': data.get('ethereum', {}).get('usd', 0),
-                'change_24h': data.get('ethereum', {}).get('usd_24h_change', 0),
-            },
-            'SOL': {
-                'price': data.get('solana', {}).get('usd', 0),
-                'change_24h': data.get('solana', {}).get('usd_24h_change', 0),
-            },
-            'source': 'coingecko',
-            'timestamp': datetime.utcnow().isoformat(),
-        }
+        for sym, cg_id in requested.items():
+            quote = data.get(cg_id, {}) or {}
+            result[sym] = {
+                'price': quote.get('usd', 0) or 0,
+                'change_24h': quote.get('usd_24h_change', 0) or 0,
+            }
+
+        result['tracked_symbols'] = tracked_symbols
+        result['source'] = 'coingecko'
+        result['timestamp'] = datetime.utcnow().isoformat()
         set_cache('market_prices', result)
         return result
     except Exception:
         pass
 
-    # Fallback source: Coinbase spot prices
+    # Fallback source: Coinbase spot prices (price-only for supported majors)
     try:
-        symbols = {'BTC': 'BTC-USD', 'ETH': 'ETH-USD', 'SOL': 'SOL-USD'}
-        out = {}
-        for symbol, pair in symbols.items():
+        out = {sym: {'price': 0, 'change_24h': 0} for sym in tracked_symbols}
+        for symbol in tracked_symbols:
+            pair = coinbase_pairs.get(symbol)
+            if not pair:
+                continue
             resp = requests.get(f'https://api.coinbase.com/v2/prices/{pair}/spot', timeout=8)
             resp.raise_for_status()
             amount = float(resp.json().get('data', {}).get('amount', 0))
             out[symbol] = {'price': amount, 'change_24h': None}
 
+        out['tracked_symbols'] = tracked_symbols
         out['source'] = 'coinbase_spot'
         out['timestamp'] = datetime.utcnow().isoformat()
         set_cache('market_prices', out)
@@ -797,6 +884,7 @@ def _build_readiness_payload(host_root: str, include_business_brief_check: bool 
         run_contract_check('/api/platform/status', _collect_system_status),
         run_contract_check('/api/platform/metrics', _platform_metrics_payload),
         run_contract_check('/api/platform/autonomy', _platform_autonomy_payload),
+        run_contract_check('/api/platform/control-plane', _platform_control_plane_payload),
         run_contract_check('/api/platform/home-snapshot', _platform_home_snapshot_payload),
         run_contract_check('/api/platform/logs', lambda: _fetch_logs(limit=1)),
         run_contract_check('/api/platform/trades', lambda: _fetch_trade_executions(limit=1)),
@@ -2145,6 +2233,7 @@ def _platform_business_brief_payload(hours: int = 24, force_refresh: bool = Fals
         'sources': {
             'status': 'api/platform/status',
             'metrics': 'api/platform/metrics',
+            'control_plane': 'api/platform/control-plane',
             'projects': 'api/platform/projects',
             'organization': 'api/platform/organization',
             'readiness': 'api/platform/readiness',
@@ -2457,6 +2546,174 @@ def _platform_autonomy_payload():
     return payload
 
 
+def _read_firestore_doc(collection_name: str, doc_id: str) -> dict:
+    if db is None:
+        return {}
+    try:
+        doc = db.collection(collection_name).document(doc_id).get()
+        if not doc.exists:
+            return {}
+        value = doc.to_dict() or {}
+        return value if isinstance(value, dict) else {}
+    except Exception:
+        return {}
+
+
+def _trim_policy_settings(raw: dict) -> dict:
+    if not isinstance(raw, dict):
+        return {}
+    keys = [
+        'TRADING_ENABLED',
+        'ALLOW_LIVE_TRADING',
+        'LIGHTER_SINGLE_SYMBOL_MODE',
+        'LIGHTER_ALLOWED_STRATEGIES',
+        'LIGHTER_ALLOWED_TIMEFRAMES',
+        'LIGHTER_MAX_ORDER_NOTIONAL_USD',
+        'LIGHTER_TARGET_ORDER_NOTIONAL_USD',
+        'LIGHTER_MAX_POSITION_NOTIONAL_USD',
+        'LIGHTER_MAX_SIGNAL_LEVERAGE',
+        'LIGHTER_ENTRY_COOLDOWN_SECONDS',
+        'LIGHTER_DEFAULT_TAKE_PROFIT_PCT',
+        'LIGHTER_DEFAULT_STOP_LOSS_PCT',
+        'LIGHTER_DYNAMIC_TP_SL_ENABLED',
+        'LIGHTER_OPPORTUNITY_ROTATION_ENABLED',
+        'LIGHTER_OPPORTUNITY_MIN_EV_EDGE_PCT',
+    ]
+    out = {}
+    for key in keys:
+        if key in raw:
+            out[key] = raw.get(key)
+    return out
+
+
+def _host_row_summary(prefix: str, status_payload: dict) -> dict:
+    nodes = status_payload.get('nodes', {}) if isinstance(status_payload.get('nodes'), dict) else {}
+    by_category = status_payload.get('by_category', {}) if isinstance(status_payload.get('by_category'), dict) else {}
+    pi_rows = by_category.get('pi', []) if isinstance(by_category.get('pi'), list) else []
+    matching_rows = [
+        row for row in pi_rows
+        if isinstance(row, dict) and str(row.get('name', '')).startswith(prefix)
+    ]
+    node = nodes.get(prefix, {}) if isinstance(nodes.get(prefix), dict) else {}
+    if matching_rows:
+        healthy = all(bool(row.get('healthy', False)) for row in matching_rows)
+        latency = next((row.get('response_time_ms') for row in matching_rows if row.get('response_time_ms') is not None), None)
+        status = 'healthy' if healthy else 'degraded'
+    else:
+        healthy = bool(node.get('healthy', False))
+        latency = node.get('latency_ms')
+        status = str(node.get('status', 'unknown'))
+    return {
+        'name': prefix,
+        'healthy': healthy,
+        'status': status,
+        'latency_ms': latency,
+        'rows': matching_rows,
+        'health_url': node.get('health_url'),
+        'ip': node.get('ip'),
+    }
+
+
+def _platform_control_plane_payload():
+    cached = get_cached('platform_control_plane', duration=8)
+    if cached:
+        return cached
+
+    status_payload = _collect_system_status()
+    desired = _read_firestore_doc('control_plane_desired', 'lighter')
+    applied = _read_firestore_doc('control_plane_applied', 'lighter')
+    lane_health = _read_firestore_doc('execution_lane_health', 'lighter')
+    live_positions = _read_firestore_doc('live_positions', 'lighter')
+    assistant_latest = _read_firestore_doc('assistant_ops_briefs', 'latest')
+
+    control_url = _join_url(ALPHA_ENGINE_URL, '/control/status')
+    control_resp = _get_json(control_url, timeout=4.0, retries=0)
+    alpha_control = control_resp.get('data', {}) if control_resp.get('ok') else {}
+    if not isinstance(alpha_control, dict):
+        alpha_control = {}
+
+    desired_settings = desired.get('effective_settings', {}) if isinstance(desired.get('effective_settings'), dict) else {}
+    applied_settings = applied.get('effective_settings', {}) if isinstance(applied.get('effective_settings'), dict) else {}
+    policy = _trim_policy_settings(applied_settings or desired_settings)
+
+    host_states = {
+        'rari1': _host_row_summary('rari1', status_payload),
+        'rari2': _host_row_summary('rari2', status_payload),
+    }
+
+    selected_target_host = str(applied.get('selected_target_host') or desired.get('target_host') or '').strip()
+    lane_decision = applied.get('lane_decision') if isinstance(applied.get('lane_decision'), dict) else {}
+    failover_used = bool(lane_decision.get('failover_used', False))
+    configured_failover_hosts = lane_decision.get('failover_hosts', []) if isinstance(lane_decision.get('failover_hosts'), list) else []
+    open_positions = int(live_positions.get('position_count', 0) or 0)
+
+    payload = {
+        'timestamp': datetime.utcnow().isoformat(),
+        'summary': {
+            'lane_healthy': bool(lane_health.get('healthy', False)),
+            'failover_hosts_configured': int(len(configured_failover_hosts)),
+            'failover_used_last_apply': failover_used,
+            'selected_target_host': selected_target_host,
+            'open_positions': open_positions,
+        },
+        'desired': {
+            'desired_version': desired.get('desired_version'),
+            'state': desired.get('state'),
+            'profile': desired.get('profile'),
+            'target_host': desired.get('target_host'),
+            'run_test': desired.get('run_test'),
+            'test_quantity': desired.get('test_quantity'),
+            'notes': desired.get('notes'),
+            'last_apply_status': desired.get('last_apply_status'),
+            'last_apply_at_iso': desired.get('last_apply_at_iso'),
+        },
+        'applied': {
+            'desired_version': applied.get('desired_version'),
+            'status': applied.get('status'),
+            'profile': applied.get('profile'),
+            'target_host': applied.get('target_host'),
+            'selected_target_host': applied.get('selected_target_host'),
+            'applied_at_iso': applied.get('applied_at_iso'),
+            'run_test': applied.get('run_test'),
+            'test_quantity': applied.get('test_quantity'),
+            'close_after_test': applied.get('close_after_test'),
+            'deploy_ok': bool((applied.get('deploy') or {}).get('ok', False)) if isinstance(applied.get('deploy'), dict) else None,
+            'override_apply_ok': bool((applied.get('override_apply') or {}).get('ok', False)) if isinstance(applied.get('override_apply'), dict) else None,
+            'test_ok': bool((applied.get('test') or {}).get('ok', False)) if isinstance(applied.get('test'), dict) else None,
+            'close_ok': bool((applied.get('close') or {}).get('ok', False)) if isinstance(applied.get('close'), dict) else None,
+            'primary_disarm_ok': bool((applied.get('primary_disarm') or {}).get('ok', False)) if isinstance(applied.get('primary_disarm'), dict) else None,
+            'lane_reason': lane_decision.get('reason'),
+        },
+        'lane_health': lane_health,
+        'policy': policy,
+        'host_states': host_states,
+        'live_positions': {
+            'position_count': open_positions,
+            'updated_at': str(live_positions.get('updated_at') or ''),
+            'positions': live_positions.get('positions', []) if isinstance(live_positions.get('positions'), list) else [],
+        },
+        'alpha_control': {
+            'dex_execution_stage': alpha_control.get('dex_execution_stage'),
+            'dex_live_dispatch_enabled': alpha_control.get('dex_live_dispatch_enabled'),
+            'tradingview_execution_enabled': alpha_control.get('tradingview_execution_enabled'),
+            'owner_approval_required': alpha_control.get('owner_approval_required'),
+            'pending_autonomy_decisions': alpha_control.get('pending_autonomy_decisions'),
+            'failure_pressure': alpha_control.get('failure_pressure'),
+        },
+        'assistant_ops_latest': assistant_latest if isinstance(assistant_latest, dict) else {},
+        'sources': {
+            'control_plane_desired': bool(desired),
+            'control_plane_applied': bool(applied),
+            'execution_lane_health': bool(lane_health),
+            'live_positions': bool(live_positions),
+            'alpha_control': bool(control_resp.get('ok', False)),
+            'status': '/api/platform/status',
+        },
+    }
+    set_cache('platform_control_plane', payload)
+    return payload
+
+
 def _fetch_windows_lab_payload():
     cached = get_cached('windows_lab', duration=20)
     if cached:
@@ -2685,6 +2942,7 @@ def _platform_contracts_payload():
             '/api/superswarm': '/api/platform/superswarm',
             '/api/windows-lab': '/api/platform/windows-lab',
             '/api/contracts': '/api/platform/contracts',
+            '/api/control-plane': '/api/platform/control-plane',
         },
         'alias_policy': {
             'deprecated': True,
@@ -2749,6 +3007,12 @@ def architecture():
 @requires_auth
 def settings():
     return render_template('pages/settings.html', current_page='settings', page_title='Security Policy')
+
+
+@app.route('/control')
+@requires_auth
+def control():
+    return render_template('pages/control.html', current_page='control', page_title='Control Plane')
 
 
 # Legacy page routes -> consolidated IA
@@ -2953,6 +3217,12 @@ def api_platform_contracts():
     return jsonify(_platform_contracts_payload())
 
 
+@app.route('/api/platform/control-plane')
+@requires_auth
+def api_platform_control_plane():
+    return jsonify(_platform_control_plane_payload())
+
+
 @app.route('/api/logs')
 @requires_auth
 def api_logs():
@@ -3039,6 +3309,12 @@ def api_superswarm():
 @requires_auth
 def api_contracts():
     return _deprecated_alias_response(api_platform_contracts(), '/api/platform/contracts')
+
+
+@app.route('/api/control-plane')
+@requires_auth
+def api_control_plane():
+    return _deprecated_alias_response(api_platform_control_plane(), '/api/platform/control-plane')
 
 
 @app.route('/jobs/superswarm/hourly-rollup', methods=['POST', 'GET'])

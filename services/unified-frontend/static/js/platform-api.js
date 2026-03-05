@@ -80,5 +80,8 @@
     getContracts() {
       return request('/api/platform/contracts');
     },
+    getControlPlane() {
+      return request('/api/platform/control-plane');
+    },
   };
 })();
