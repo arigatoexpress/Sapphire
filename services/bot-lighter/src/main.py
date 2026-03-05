@@ -292,11 +292,16 @@ class LighterBot:
             5.0,
             self._env_float(("LIGHTER_RISK_EXIT_COOLDOWN_SECONDS",), default=15.0),
         )
+        self._risk_exit_reconcile_hold_seconds = max(
+            self._risk_exit_cooldown_seconds,
+            self._env_float(("LIGHTER_RISK_EXIT_RECONCILE_HOLD_SECONDS",), default=45.0),
+        )
         self._max_position_hold_seconds = max(
             0.0,
             self._env_float(("LIGHTER_MAX_POSITION_HOLD_SECONDS",), default=0.0),
         )
         self._risk_exit_attempted_at: Dict[str, float] = {}
+        self._risk_exit_reconcile_hold_until: Dict[str, float] = {}
         self._dynamic_risk_enabled = self._env_flag(
             "LIGHTER_DYNAMIC_RISK_ENABLED",
             default=True,
@@ -463,7 +468,7 @@ class LighterBot:
             "dynamic_sizing=%s mult=[%.2f,%.2f] "
             "sync_before_entry=%s jurisdiction_block=%.0fs progress_verify=%.0fs dd_alert=%.2f%% "
             "sync_stale_alert=%.0fs risk_level_max_dev=%.1f%% empty_pos_confirm=%d "
-            "max_hold=%.0fs "
+            "max_hold=%.0fs risk_reconcile_hold=%.0fs "
             "tg_digest=%.0fs tg_charts=%s dynamic_risk=%s rotation=%s edge=%.3f%% "
             "watchdog=%s no_fill=%.0fs cooldown=%.0fs failsafe=%s threshold=%d hold=%.0fs "
             "lane_heartbeat=%s hb_int=%.0fs",
@@ -489,6 +494,7 @@ class LighterBot:
             self._max_risk_level_deviation_pct,
             self._empty_position_confirmations,
             self._max_position_hold_seconds,
+            self._risk_exit_reconcile_hold_seconds,
             self._telegram_digest_seconds,
             self._telegram_enable_charts,
             self._dynamic_risk_enabled,
@@ -4318,10 +4324,14 @@ class LighterBot:
                     "Confirmed empty position snapshot after %d checks; clearing local positions",
                     self._empty_position_snapshot_streak,
                 )
+                self._risk_exit_attempted_at.clear()
+                self._risk_exit_reconcile_hold_until.clear()
             else:
                 self._empty_position_snapshot_streak = 0
 
             self.positions = next_positions
+            for symbol in next_positions.keys():
+                self._risk_exit_reconcile_hold_until.pop(symbol, None)
 
         except asyncio.CancelledError:
             return
@@ -4344,6 +4354,12 @@ class LighterBot:
                 qty = 0.0
             if qty <= 0:
                 continue
+
+            hold_until = float(self._risk_exit_reconcile_hold_until.get(symbol, 0.0))
+            if hold_until > now:
+                continue
+            if hold_until > 0:
+                self._risk_exit_reconcile_hold_until.pop(symbol, None)
 
             self._maybe_adjust_position_risk_levels(symbol, position)
 
@@ -4387,8 +4403,27 @@ class LighterBot:
                     if not (result.metadata or {}).get("noop"):
                         await publish("trade-executed", result)
                     filled_qty = self._to_float(getattr(result, "filled_quantity", 0.0), 0.0)
-                    if result.success and (filled_qty > 0 or (result.metadata or {}).get("noop")):
+                    result_meta = result.metadata or {}
+                    noop_reason = str(result_meta.get("reason", "") or "")
+                    if result.success and filled_qty > 0:
                         self._risk_exit_attempted_at.pop(symbol, None)
+                        self._risk_exit_reconcile_hold_until.pop(symbol, None)
+                    elif result.success and bool(result_meta.get("noop")) and noop_reason in {
+                        "reduce_only_no_position",
+                        "reduce_only_quantity_zero",
+                    }:
+                        hold_for = max(
+                            self._risk_exit_reconcile_hold_seconds,
+                            float(self._position_check_interval_seconds)
+                            * float(self._empty_position_confirmations),
+                        )
+                        self._risk_exit_reconcile_hold_until[symbol] = now + hold_for
+                        logger.info(
+                            "Risk exit noop on %s (%s); pausing retries for %.1fs pending reconciliation",
+                            symbol,
+                            noop_reason,
+                            hold_for,
+                        )
                     continue
 
             tp = getattr(position, "take_profit", None)
@@ -4458,8 +4493,27 @@ class LighterBot:
             if not (result.metadata or {}).get("noop"):
                 await publish("trade-executed", result)
             filled_qty = self._to_float(getattr(result, "filled_quantity", 0.0), 0.0)
-            if result.success and (filled_qty > 0 or (result.metadata or {}).get("noop")):
+            result_meta = result.metadata or {}
+            noop_reason = str(result_meta.get("reason", "") or "")
+            if result.success and filled_qty > 0:
                 self._risk_exit_attempted_at.pop(symbol, None)
+                self._risk_exit_reconcile_hold_until.pop(symbol, None)
+            elif result.success and bool(result_meta.get("noop")) and noop_reason in {
+                "reduce_only_no_position",
+                "reduce_only_quantity_zero",
+            }:
+                hold_for = max(
+                    self._risk_exit_reconcile_hold_seconds,
+                    float(self._position_check_interval_seconds)
+                    * float(self._empty_position_confirmations),
+                )
+                self._risk_exit_reconcile_hold_until[symbol] = now + hold_for
+                logger.info(
+                    "Risk exit noop on %s (%s); pausing retries for %.1fs pending reconciliation",
+                    symbol,
+                    noop_reason,
+                    hold_for,
+                )
 
     async def _close_all_positions(self) -> Dict[str, int]:
         """Close all positions on Lighter."""
