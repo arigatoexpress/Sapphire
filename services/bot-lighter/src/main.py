@@ -220,6 +220,13 @@ class LighterBot:
             0.0,
             self._env_float(("LIGHTER_MAX_POSITION_NOTIONAL_USD",), default=0.0),
         )
+        self._max_portfolio_notional_usd = max(
+            0.0,
+            self._env_float(
+                ("LIGHTER_MAX_PORTFOLIO_NOTIONAL_USD",),
+                default=self._max_position_notional_usd,
+            ),
+        )
         self._target_order_notional_usd = max(
             0.0,
             self._env_float(("LIGHTER_TARGET_ORDER_NOTIONAL_USD",), default=0.0),
@@ -231,6 +238,18 @@ class LighterBot:
         self._max_signal_leverage = max(
             1.0,
             self._env_float(("LIGHTER_MAX_SIGNAL_LEVERAGE",), default=20.0),
+        )
+        self._dynamic_sizing_enabled = self._env_flag(
+            "LIGHTER_DYNAMIC_SIZING_ENABLED",
+            default=True,
+        )
+        self._dynamic_size_min_mult = max(
+            0.05,
+            self._env_float(("LIGHTER_DYNAMIC_SIZE_MIN_MULT",), default=0.35),
+        )
+        self._dynamic_size_max_mult = max(
+            self._dynamic_size_min_mult,
+            self._env_float(("LIGHTER_DYNAMIC_SIZE_MAX_MULT",), default=1.20),
         )
         self._sync_before_entry = self._env_flag(
             "LIGHTER_SYNC_BEFORE_ENTRY",
@@ -432,11 +451,16 @@ class LighterBot:
         )
         self._stop_gateway_server: Optional[Callable[[], Any]] = None
         self._http_session = None
+        # Serialize exchange order submission to avoid nonce collisions when
+        # concurrent signals/risk exits attempt to place orders at the same time.
+        self._order_submit_lock = asyncio.Lock()
         logger.info(
             "Strategy policy | allowed_strategies=%s allowed_timeframes=%s "
             "allowed_sources=%s "
             "require_metadata=%s entry_cooldown=%.1fs max_order_notional=%.2f "
-            "max_position_notional=%.2f target_order_notional=%.2f min_entry_notional=%.2f max_signal_leverage=%.1fx "
+            "max_position_notional=%.2f max_portfolio_notional=%.2f "
+            "target_order_notional=%.2f min_entry_notional=%.2f max_signal_leverage=%.1fx "
+            "dynamic_sizing=%s mult=[%.2f,%.2f] "
             "sync_before_entry=%s jurisdiction_block=%.0fs progress_verify=%.0fs dd_alert=%.2f%% "
             "sync_stale_alert=%.0fs risk_level_max_dev=%.1f%% empty_pos_confirm=%d "
             "max_hold=%.0fs "
@@ -450,9 +474,13 @@ class LighterBot:
             self._entry_cooldown_seconds,
             self._max_order_notional_usd,
             self._max_position_notional_usd,
+            self._max_portfolio_notional_usd,
             self._target_order_notional_usd,
             self._min_entry_notional_usd,
             self._max_signal_leverage,
+            self._dynamic_sizing_enabled,
+            self._dynamic_size_min_mult,
+            self._dynamic_size_max_mult,
             self._sync_before_entry,
             self._jurisdiction_block_seconds,
             self._progress_verify_interval_seconds,
@@ -1847,6 +1875,105 @@ class LighterBot:
         detail = f"drift {drift_pct:+.2f}% · vol {vol_pct:.2f}%"
         return regime, detail
 
+    @staticmethod
+    def _clamp(value: float, low: float, high: float) -> float:
+        return max(low, min(high, value))
+
+    def _dynamic_entry_size_multiplier(
+        self,
+        *,
+        signal: TradeSignal,
+        coin: str,
+        is_buy: bool,
+        reference_price: float,
+        portfolio_notional_usd: float,
+        drawdown_pct: float,
+    ) -> tuple[float, Dict[str, float]]:
+        """
+        First-principles dynamic sizing:
+        - confidence/EV increase size
+        - high volatility, deep drawdown, high inventory reduce size
+        """
+        confidence = self._clamp(self._to_float(getattr(signal, "confidence", 0.0), 0.0), 0.0, 1.0)
+        stats = self._market_stats_for_symbol(coin)
+        vol_pct = max(0.0, self._to_float(stats.get("vol_pct"), 0.0))
+        ev_pct = self._estimate_signal_ev_pct(
+            signal,
+            coin=coin,
+            is_buy=is_buy,
+            reference_price=reference_price,
+        )
+
+        ev_score = self._clamp((ev_pct + 1.0) / 3.0, 0.0, 1.0)
+        vol_score = self._clamp(1.0 - (vol_pct / 0.60), 0.0, 1.0)
+
+        cap_ref = max(0.0001, float(self._max_portfolio_notional_usd or self._max_position_notional_usd or 0.0))
+        inventory_ratio = self._clamp(float(portfolio_notional_usd) / cap_ref, 0.0, 1.5) if cap_ref > 0 else 0.0
+        inventory_score = self._clamp(1.0 - inventory_ratio, 0.0, 1.0)
+
+        dd_ref = max(1.0, float(self._max_drawdown_alert_pct or 5.0))
+        drawdown_ratio = self._clamp(abs(min(0.0, float(drawdown_pct))) / dd_ref, 0.0, 1.0)
+        drawdown_score = self._clamp(1.0 - drawdown_ratio, 0.0, 1.0)
+
+        composite = (
+            (0.30 * confidence)
+            + (0.25 * ev_score)
+            + (0.20 * vol_score)
+            + (0.15 * inventory_score)
+            + (0.10 * drawdown_score)
+        )
+        multiplier = self._dynamic_size_min_mult + (
+            (self._dynamic_size_max_mult - self._dynamic_size_min_mult) * self._clamp(composite, 0.0, 1.0)
+        )
+        multiplier = self._clamp(multiplier, self._dynamic_size_min_mult, self._dynamic_size_max_mult)
+
+        factors = {
+            "confidence": round(confidence, 4),
+            "ev_pct": round(ev_pct, 4),
+            "vol_pct": round(vol_pct, 4),
+            "portfolio_notional_usd": round(float(portfolio_notional_usd), 6),
+            "drawdown_pct": round(float(drawdown_pct), 6),
+            "inventory_ratio": round(float(inventory_ratio), 6),
+            "composite": round(float(composite), 6),
+            "multiplier": round(float(multiplier), 6),
+        }
+        return float(multiplier), factors
+
+    def _project_entry_notional(
+        self,
+        *,
+        coin: str,
+        is_buy: bool,
+        requested_notional: float,
+        mark_price: float,
+        portfolio_notional_now: float,
+    ) -> Dict[str, float]:
+        current = self.positions.get(coin)
+        current_qty = float(getattr(current, "quantity", 0.0) or 0.0) if current else 0.0
+        current_notional = abs(current_qty * float(mark_price)) if mark_price > 0 else 0.0
+        current_side = getattr(current, "side", None) if current else None
+        same_direction = (
+            (is_buy and current_side in (TradeSide.BUY, TradeSide.LONG, "BUY", "LONG"))
+            or ((not is_buy) and current_side in (TradeSide.SELL, TradeSide.SHORT, "SELL", "SHORT"))
+        )
+        if not current or current_qty <= 0:
+            projected_symbol_notional = requested_notional
+        elif same_direction:
+            projected_symbol_notional = current_notional + requested_notional
+        else:
+            projected_symbol_notional = abs(current_notional - requested_notional)
+
+        projected_portfolio_notional = max(
+            0.0,
+            float(portfolio_notional_now) - current_notional + projected_symbol_notional,
+        )
+        return {
+            "current_symbol_notional": float(current_notional),
+            "projected_symbol_notional": float(projected_symbol_notional),
+            "projected_portfolio_notional": float(projected_portfolio_notional),
+            "same_direction": 1.0 if same_direction else 0.0,
+        }
+
     def _estimate_signal_ev_pct(
         self,
         signal: TradeSignal,
@@ -2614,6 +2741,27 @@ class LighterBot:
         """Persist per-signal execution audit row for traceability."""
         strategy, timeframe = self._signal_strategy_info(signal)
         snapshot = await self._estimate_equity_snapshot()
+        result_meta = getattr(result, "metadata", {}) or {}
+        is_noop = bool(result_meta.get("noop", False))
+        policy_reject = bool(result_meta.get("policy_reject", False)) or str(
+            getattr(result, "error_message", "") or ""
+        ).lower().startswith("policy_reject:")
+        filled_qty = self._to_float(getattr(result, "filled_quantity", 0.0), 0.0)
+        success = bool(getattr(result, "success", False))
+
+        if is_noop and policy_reject:
+            outcome = "policy_noop"
+        elif is_noop:
+            outcome = "noop"
+        elif success and filled_qty > 0:
+            outcome = "filled_success"
+        elif success:
+            outcome = "accepted_no_fill"
+        elif policy_reject:
+            outcome = "policy_reject"
+        else:
+            outcome = "hard_failed"
+
         payload: Dict[str, Any] = {
             "service": SERVICE_NAME,
             "platform": PLATFORM.value,
@@ -2627,29 +2775,33 @@ class LighterBot:
             "quantity": self._to_float(getattr(signal, "quantity", 0.0), 0.0),
             "take_profit": self._to_float(getattr(signal, "take_profit", 0.0), 0.0),
             "stop_loss": self._to_float(getattr(signal, "stop_loss", 0.0), 0.0),
-            "success": bool(getattr(result, "success", False)),
+            "success": success,
             "error_message": str(getattr(result, "error_message", "") or ""),
-            "filled_quantity": self._to_float(getattr(result, "filled_quantity", 0.0), 0.0),
+            "filled_quantity": filled_qty,
             "avg_price": self._to_float(getattr(result, "avg_price", 0.0), 0.0),
             "order_id": str(getattr(result, "order_id", "") or ""),
             "execution_time_ms": self._to_float(getattr(result, "execution_time_ms", 0.0), 0.0),
             "equity_estimate": snapshot.get("equity_estimate", 0.0),
             "cash_balance": snapshot.get("cash_balance", 0.0),
             "position_notional_usd": snapshot.get("position_notional_usd", 0.0),
+            "outcome": outcome,
+            "is_noop": is_noop,
+            "noop_reason": str(result_meta.get("reason", "") or ""),
+            "signal_metadata": (signal.metadata or {}),
+            "result_metadata": result_meta,
             "metadata": (signal.metadata or {}),
             "recorded_at": datetime.now(timezone.utc),
         }
         logger.info(
-            "Execution verify | signal=%s ok=%s fill=%s@%s equity=%s",
+            "Execution verify | signal=%s outcome=%s ok=%s fill=%s@%s equity=%s",
             payload["signal_id"],
+            payload["outcome"],
             payload["success"],
             payload["filled_quantity"],
             payload["avg_price"],
             payload["equity_estimate"],
         )
         now_ts = time.time()
-        result_meta = getattr(result, "metadata", {}) or {}
-        is_noop = bool(result_meta.get("noop", False))
         if not is_noop:
             self._last_execution_attempt_ts = now_ts
             if payload["success"] and self._to_float(payload["filled_quantity"], 0.0) > 0:
@@ -3174,20 +3326,70 @@ class LighterBot:
             if not current_price:
                 raise Exception(f"Could not get current price for {coin}")
 
+            portfolio_notional_now = 0.0
+            drawdown_pct = 0.0
+            if entry_like and not reduce_only:
+                snap = await self._estimate_equity_snapshot()
+                portfolio_notional_now = self._to_float(snap.get("position_notional_usd"), 0.0)
+                drawdown_pct = self._to_float(snap.get("drawdown_pct"), 0.0)
+                if drawdown_pct == 0.0:
+                    equity_now = self._to_float(snap.get("equity_estimate"), 0.0)
+                    peak = self._to_float(self._equity_peak, 0.0)
+                    if equity_now > 0 and peak > 0:
+                        drawdown_pct = ((equity_now - peak) / peak) * 100.0
+
             if (
                 not reduce_only
                 and entry_like
                 and self._target_order_notional_usd > 0
                 and current_price > 0
             ):
+                effective_target_notional = float(self._target_order_notional_usd)
+                dynamic_factors: Dict[str, float] = {}
+                if self._dynamic_sizing_enabled:
+                    multiplier, dynamic_factors = self._dynamic_entry_size_multiplier(
+                        signal=signal,
+                        coin=coin,
+                        is_buy=is_buy,
+                        reference_price=float(current_price),
+                        portfolio_notional_usd=float(portfolio_notional_now),
+                        drawdown_pct=float(drawdown_pct),
+                    )
+                    effective_target_notional *= multiplier
+                    if self._min_entry_notional_usd > 0:
+                        effective_target_notional = max(
+                            effective_target_notional,
+                            float(self._min_entry_notional_usd),
+                        )
+                    signal.metadata.setdefault("sizing", {})
+                    signal.metadata["sizing"].update(
+                        {
+                            "mode": "dynamic_target_notional",
+                            "base_target_notional_usd": round(float(self._target_order_notional_usd), 8),
+                            "effective_target_notional_usd": round(float(effective_target_notional), 8),
+                            **dynamic_factors,
+                        }
+                    )
+                    logger.info(
+                        "Dynamic sizing %s | base=%.4f target=%.4f mult=%.4f conf=%.2f ev=%.3f%% vol=%.3f%% inv=%.3f dd=%.3f%%",
+                        coin,
+                        float(self._target_order_notional_usd),
+                        float(effective_target_notional),
+                        self._to_float(dynamic_factors.get("multiplier"), 1.0),
+                        self._to_float(dynamic_factors.get("confidence"), 0.0),
+                        self._to_float(dynamic_factors.get("ev_pct"), 0.0),
+                        self._to_float(dynamic_factors.get("vol_pct"), 0.0),
+                        self._to_float(dynamic_factors.get("inventory_ratio"), 0.0),
+                        self._to_float(dynamic_factors.get("drawdown_pct"), 0.0),
+                    )
                 target_qty = self._quantize_qty_down(
-                    self._target_order_notional_usd / float(current_price),
+                    float(effective_target_notional) / float(current_price),
                     size_decimals,
                 )
                 if target_qty <= 0:
                     raise ValueError(
                         f"Target order notional too low for {coin}: "
-                        f"target={self._target_order_notional_usd} price={current_price}"
+                        f"target={effective_target_notional} price={current_price}"
                     )
                 if abs(target_qty - float(quantity)) > 1e-12:
                     logger.info(
@@ -3195,7 +3397,7 @@ class LighterBot:
                         coin,
                         float(quantity),
                         float(target_qty),
-                        self._target_order_notional_usd,
+                        float(effective_target_notional),
                     )
                 quantity = float(target_qty)
 
@@ -3260,52 +3462,78 @@ class LighterBot:
             if (
                 not reduce_only
                 and entry_like
-                and self._max_position_notional_usd > 0
                 and current_price > 0
                 and quantity > 0
             ):
                 requested_notional = float(quantity) * float(current_price)
-                current = self.positions.get(coin)
-                current_qty = float(getattr(current, "quantity", 0.0) or 0.0) if current else 0.0
-                current_notional = abs(current_qty * float(current_price))
-                current_side = getattr(current, "side", None) if current else None
-                same_direction = (
-                    (is_buy and current_side in (TradeSide.BUY, TradeSide.LONG, "BUY", "LONG"))
-                    or ((not is_buy) and current_side in (TradeSide.SELL, TradeSide.SHORT, "SELL", "SHORT"))
+                projected = self._project_entry_notional(
+                    coin=coin,
+                    is_buy=is_buy,
+                    requested_notional=float(requested_notional),
+                    mark_price=float(current_price),
+                    portfolio_notional_now=float(portfolio_notional_now),
                 )
-                if not current or current_qty <= 0:
-                    projected_notional = requested_notional
-                elif same_direction:
-                    projected_notional = current_notional + requested_notional
-                else:
-                    projected_notional = abs(current_notional - requested_notional)
-                if projected_notional > self._max_position_notional_usd:
-                    if same_direction and current_notional >= (self._max_position_notional_usd * 0.98):
-                        logger.info(
-                            "Entry skipped at position cap for %s | current=%.4f cap=%.4f projected=%.4f",
-                            coin,
-                            current_notional,
-                            self._max_position_notional_usd,
-                            projected_notional,
-                        )
-                        return TradeResult(
-                            trade_id="noop",
-                            signal_id=signal.signal_id,
-                            platform=PLATFORM.value,
-                            symbol=signal.symbol,
-                            side=signal.side,
-                            success=True,
-                            metadata={
-                                "noop": True,
-                                "reason": "position_cap_reached",
-                                "current_notional": current_notional,
-                                "projected_notional": projected_notional,
-                                "cap_notional": self._max_position_notional_usd,
-                            },
-                        )
-                    raise ValueError(
-                        f"Max position notional exceeded for {coin}: "
-                        f"projected={projected_notional:.4f} cap={self._max_position_notional_usd:.4f}"
+                current_symbol_notional = self._to_float(projected.get("current_symbol_notional"), 0.0)
+                projected_symbol_notional = self._to_float(projected.get("projected_symbol_notional"), 0.0)
+                projected_portfolio_notional = self._to_float(
+                    projected.get("projected_portfolio_notional"),
+                    0.0,
+                )
+
+                if (
+                    self._max_position_notional_usd > 0
+                    and projected_symbol_notional > self._max_position_notional_usd
+                ):
+                    logger.info(
+                        "Entry skipped at symbol cap for %s | current=%.4f cap=%.4f projected=%.4f",
+                        coin,
+                        current_symbol_notional,
+                        self._max_position_notional_usd,
+                        projected_symbol_notional,
+                    )
+                    return TradeResult(
+                        trade_id="noop",
+                        signal_id=signal.signal_id,
+                        platform=PLATFORM.value,
+                        symbol=signal.symbol,
+                        side=signal.side,
+                        success=True,
+                        metadata={
+                            "noop": True,
+                            "policy_reject": True,
+                            "reason": "symbol_position_cap",
+                            "current_symbol_notional": current_symbol_notional,
+                            "projected_symbol_notional": projected_symbol_notional,
+                            "cap_notional": self._max_position_notional_usd,
+                        },
+                    )
+
+                if (
+                    self._max_portfolio_notional_usd > 0
+                    and projected_portfolio_notional > self._max_portfolio_notional_usd
+                ):
+                    logger.info(
+                        "Entry skipped at portfolio cap for %s | portfolio_now=%.4f cap=%.4f projected=%.4f",
+                        coin,
+                        portfolio_notional_now,
+                        self._max_portfolio_notional_usd,
+                        projected_portfolio_notional,
+                    )
+                    return TradeResult(
+                        trade_id="noop",
+                        signal_id=signal.signal_id,
+                        platform=PLATFORM.value,
+                        symbol=signal.symbol,
+                        side=signal.side,
+                        success=True,
+                        metadata={
+                            "noop": True,
+                            "policy_reject": True,
+                            "reason": "portfolio_position_cap",
+                            "portfolio_notional_now": portfolio_notional_now,
+                            "projected_portfolio_notional": projected_portfolio_notional,
+                            "cap_notional": self._max_portfolio_notional_usd,
+                        },
                     )
 
             self._sanitize_signal_risk_levels(
@@ -3324,39 +3552,41 @@ class LighterBot:
             # Apply slippage for market order
             limit_price = current_price * 1.05 if is_buy else current_price * 0.95
 
-            # Circuit breaker gate — raises CircuitBreakerOpen if venue is halted.
-            self._circuit_breaker.check()
-
             try:
-                result = await self._submit_order_with_signer(
-                    order_book_id=int(order_book_id),
-                    quantity=float(quantity),
-                    limit_price=float(limit_price),
-                    is_buy=bool(is_buy),
-                    reduce_only=bool(reduce_only),
-                    signal_id=signal.signal_id,
-                    market_meta=market,
-                )
+                async with self._order_submit_lock:
+                    # Circuit breaker gate — raises CircuitBreakerOpen if venue is halted.
+                    self._circuit_breaker.check()
 
-                # Legacy fallback for SDKs without SignerClient support.
-                if result is None:
-                    nonce_response = await self._fetch_next_nonce()
-                    nonce = nonce_response.nonce if hasattr(nonce_response, "nonce") else 0
-                    order_params = {
-                        "account_index": self.account_index,
-                        "order_book_id": order_book_id,
-                        "side": 0 if is_buy else 1,
-                        "price": limit_price,
-                        "quantity": quantity,
-                        "nonce": nonce,
-                        "time_in_force": 1,  # IOC
-                    }
-                    signature = self._sign_transaction(order_params)
-                    result = await self._submit_order_legacy_send_tx(
-                        order_params=order_params,
-                        signature=signature,
+                    result = await self._submit_order_with_signer(
+                        order_book_id=int(order_book_id),
+                        quantity=float(quantity),
+                        limit_price=float(limit_price),
+                        is_buy=bool(is_buy),
+                        reduce_only=bool(reduce_only),
                         signal_id=signal.signal_id,
+                        market_meta=market,
                     )
+
+                    # Legacy fallback for SDKs without SignerClient support.
+                    if result is None:
+                        nonce_response = await self._fetch_next_nonce()
+                        nonce = nonce_response.nonce if hasattr(nonce_response, "nonce") else 0
+                        order_params = {
+                            "account_index": self.account_index,
+                            "order_book_id": order_book_id,
+                            "side": 0 if is_buy else 1,
+                            "price": limit_price,
+                            "quantity": quantity,
+                            "nonce": nonce,
+                            "time_in_force": 1,  # IOC
+                        }
+                        signature = self._sign_transaction(order_params)
+                        result = await self._submit_order_legacy_send_tx(
+                            order_params=order_params,
+                            signature=signature,
+                            signal_id=signal.signal_id,
+                        )
+
                 # Record outcome to circuit breaker.
                 if result and result.get("success"):
                     self._circuit_breaker.record_success()
@@ -3958,12 +4188,18 @@ class LighterBot:
                     size = float(getv("size", getv("position", 0)))
                 except (TypeError, ValueError):
                     size = 0.0
-                if abs(size) > 0 and getv("size", None) is None and getv("position", None) is not None:
+                # Respect explicit sign metadata from exchange payloads.
+                # Some account schemas provide absolute `size` plus a separate
+                # `sign` field; without this, shorts can be misread as longs.
+                if abs(size) > 0:
                     try:
-                        sign = float(getv("sign", 1) or 1)
+                        sign = float(getv("sign", 0) or 0)
                     except (TypeError, ValueError):
-                        sign = 1.0
-                    size = abs(size) if sign >= 0 else -abs(size)
+                        sign = 0.0
+                    if sign < 0:
+                        size = -abs(size)
+                    elif sign > 0:
+                        size = abs(size)
                 if size == 0:
                     continue
 

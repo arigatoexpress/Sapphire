@@ -179,24 +179,49 @@ def main() -> int:
         else:
             raise
 
-    total_exec = len(exec_rows)
-    success_exec = sum(1 for x in exec_rows if bool(x.get("success", False)))
-    real_fills = sum(1 for x in exec_rows if _to_float(x.get("filled_quantity"), 0.0) > 0.0)
+    policy_noops = sum(
+        1
+        for x in exec_rows
+        if str(x.get("outcome", "")).lower() in {"policy_noop", "noop"}
+        or _to_bool((x.get("result_metadata") or {}).get("noop"), default=False)
+    )
+    effective_exec_rows = max(
+        0,
+        len(exec_rows) - policy_noops,
+    )
+    success_exec = sum(
+        1
+        for x in exec_rows
+        if bool(x.get("success", False))
+        and not (
+            str(x.get("outcome", "")).lower() in {"policy_noop", "noop"}
+            or _to_bool((x.get("result_metadata") or {}).get("noop"), default=False)
+        )
+    )
+    real_fills = sum(
+        1
+        for x in exec_rows
+        if _to_float(x.get("filled_quantity"), 0.0) > 0.0
+        and not (
+            str(x.get("outcome", "")).lower() in {"policy_noop", "noop"}
+            or _to_bool((x.get("result_metadata") or {}).get("noop"), default=False)
+        )
+    )
     restricted_errs = sum(
         1
         for x in exec_rows
         if "restricted jurisdiction" in str(x.get("error_message", "") or "").lower()
     )
 
-    success_rate = (success_exec / total_exec) if total_exec > 0 else 1.0
+    success_rate = (success_exec / effective_exec_rows) if effective_exec_rows > 0 else 1.0
 
     if exec_available:
-        if total_exec > 0 and success_rate < args.min_success_rate:
+        if effective_exec_rows > 0 and success_rate < args.min_success_rate:
             issues.append(
                 GateIssue(
                     "error",
                     f"Execution success rate low: {success_rate:.3f} < {args.min_success_rate:.3f} "
-                    f"({success_exec}/{total_exec})",
+                    f"({success_exec}/{effective_exec_rows})",
                 )
             )
         if real_fills < args.min_real_fills:
@@ -244,9 +269,11 @@ def main() -> int:
             "progress_pct": _to_float(snapshot.get("progress_pct"), 0.0),
         },
         "execution_window": {
-            "rows": total_exec,
+            "rows": len(exec_rows),
+            "effective_rows": effective_exec_rows,
             "successes": success_exec,
             "real_fills": real_fills,
+            "policy_noops": policy_noops,
             "success_rate": round(success_rate, 6),
             "restricted_jurisdiction_errors": restricted_errs,
             "window_start": since.isoformat(),

@@ -43,6 +43,9 @@ def _as_dt(value: Any) -> datetime | None:
 
 
 def _classify_execution(row: dict[str, Any]) -> str:
+    outcome = str(row.get("outcome") or "").strip().lower()
+    if outcome:
+        return outcome
     if bool(row.get("success", False)):
         return "success"
     err = str(row.get("error_message", "") or "").lower()
