@@ -16,7 +16,7 @@ import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from google.api_core.exceptions import PermissionDenied
 from google.cloud import firestore
@@ -47,6 +47,48 @@ def _to_bool(value: Any, default: bool = False) -> bool:
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _to_dt(value: Any) -> Optional[datetime]:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+    raw = str(value).strip()
+    if not raw:
+        return None
+    try:
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except ValueError:
+        return None
+
+
+def _snapshot_rank(snapshot: dict[str, Any]) -> tuple[float, float, float]:
+    """
+    Lower rank is better.
+    Priority:
+      1) fewer stale flags
+      2) lower max sync age
+      3) newer recorded_at / timestamp
+    """
+    balance_stale = _to_bool(snapshot.get("balance_sync_stale"), default=True)
+    position_stale = _to_bool(snapshot.get("position_check_stale"), default=True)
+    stale_score = float(int(balance_stale) + int(position_stale))
+
+    balance_age_raw = snapshot.get("balance_sync_age_sec")
+    position_age_raw = snapshot.get("position_check_age_sec")
+    balance_age = _to_float(balance_age_raw, default=1e9) if balance_age_raw is not None else 1e9
+    position_age = _to_float(position_age_raw, default=1e9) if position_age_raw is not None else 1e9
+    age_score = max(balance_age, position_age)
+
+    ts = _to_dt(snapshot.get("recorded_at")) or _to_dt(snapshot.get("timestamp"))
+    recency_score = -(ts.timestamp() if ts else 0.0)
+    return (stale_score, age_score, recency_score)
 
 
 @dataclass
@@ -89,6 +131,7 @@ def main() -> int:
 
     # Current equity / freshness snapshot
     snapshot_available = True
+    snapshot_source = "equity_snapshots_current"
     try:
         snap_doc = client.collection("equity_snapshots_current").document(platform).get()
         if not snap_doc.exists:
@@ -103,6 +146,55 @@ def main() -> int:
             snapshot = {}
         else:
             raise
+
+    # If current snapshot is stale/empty, recover the best recent candidate from
+    # equity_snapshots so active lane health isn't masked by a stale writer.
+    if snapshot_available:
+        current_rank = _snapshot_rank(snapshot)
+        current_bad = (
+            current_rank[0] >= 2.0
+            or (
+                _to_float(snapshot.get("equity_estimate"), 0.0) == 0.0
+                and _to_int(snapshot.get("positions_count"), 0) == 0
+                and _to_bool(snapshot.get("balance_sync_stale"), default=True)
+                and _to_bool(snapshot.get("position_check_stale"), default=True)
+            )
+        )
+        if current_bad:
+            try:
+                fallback_since = now - timedelta(minutes=45)
+                query = (
+                    client.collection("equity_snapshots")
+                    .where(filter=FieldFilter("platform", "==", platform))
+                    .where(filter=FieldFilter("recorded_at", ">=", fallback_since))
+                    .order_by("recorded_at", direction=firestore.Query.DESCENDING)
+                    .limit(80)
+                )
+                candidates: list[dict[str, Any]] = []
+                for doc in query.stream():
+                    row = doc.to_dict() or {}
+                    if str(row.get("platform", "")).lower() != platform:
+                        continue
+                    candidates.append(row)
+                if candidates:
+                    best = min(candidates, key=_snapshot_rank)
+                    best_rank = _snapshot_rank(best)
+                    if best_rank < current_rank:
+                        snapshot = best
+                        snapshot_source = "equity_snapshots_recent_fallback"
+                        issues.append(
+                            GateIssue(
+                                "warn",
+                                "Using recent equity snapshot fallback due stale/empty current snapshot",
+                            )
+                        )
+            except PermissionDenied as exc:
+                if args.allow_partial_permissions:
+                    issues.append(
+                        GateIssue("warn", f"Firestore read permission denied for equity snapshot fallback: {exc}")
+                    )
+                else:
+                    raise
 
     balance_age = _to_float(snapshot.get("balance_sync_age_sec"), default=0.0)
     position_age = _to_float(snapshot.get("position_check_age_sec"), default=0.0)
@@ -256,6 +348,7 @@ def main() -> int:
             "strict_jurisdiction": bool(args.strict_jurisdiction),
         },
         "snapshot": {
+            "source": snapshot_source,
             "balance_sync_age_sec": balance_age,
             "position_check_age_sec": position_age,
             "balance_sync_stale": balance_stale,
