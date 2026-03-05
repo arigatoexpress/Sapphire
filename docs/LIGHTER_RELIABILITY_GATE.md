@@ -93,7 +93,7 @@ export SAPPHIRECTL_FAILOVER_HOSTS="rari@100.87.225.89,rari@100.120.191.1"
 Behavior:
 - requested host stays primary;
 - if primary lane is unhealthy and `run_test=true`, `sapphirectl` probes failover hosts for runtime health (`/health` on local gateway);
-- first healthy fallback host is selected and recorded in `applied.selected_target_host` and `applied.lane_decision`.
+- first healthy fallback host with trading enabled (`TRADING_ENABLED=1` and `ALLOW_LIVE_TRADING=1`) is selected and recorded in `applied.selected_target_host` and `applied.lane_decision`.
 
 Validate failover selection without deploy/restart:
 

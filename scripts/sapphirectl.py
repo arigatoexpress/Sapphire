@@ -167,6 +167,11 @@ def _load_env_file_defaults(path: Path) -> None:
         os.environ.setdefault(key, value)
 
 
+def _is_truthy_flag(value: Any) -> bool:
+    text = str(value or "").strip().lower()
+    return text in {"1", "true", "yes", "on"}
+
+
 @dataclass
 class CommandResult:
     ok: bool
@@ -335,21 +340,72 @@ class SapphireCtl:
 
         for host in failover_hosts:
             runtime = self._fetch_runtime_status(target_host=host)
+            trading_flags = self._fetch_host_trading_flags(target_host=host)
+            trading_ready = bool(trading_flags.get("trading_enabled")) and bool(trading_flags.get("allow_live_trading"))
             candidate = {
                 "host": host,
                 "runtime_ok": bool(runtime.get("ok", False)),
                 "runtime_http_status": runtime.get("http_status", ""),
                 "runtime_output": runtime.get("output", ""),
+                "trading_enabled": bool(trading_flags.get("trading_enabled")),
+                "allow_live_trading": bool(trading_flags.get("allow_live_trading")),
+                "trading_ready_for_test": trading_ready,
             }
             decision["fallback_candidates"].append(candidate)
-            if runtime.get("ok", False):
+            if runtime.get("ok", False) and trading_ready:
                 decision["selected_target_host"] = host
                 decision["failover_used"] = True
                 decision["reason"] = "primary_lane_unhealthy_failover_selected"
                 return host, decision
 
-        decision["reason"] = "primary_lane_unhealthy_no_healthy_failover"
+        decision["reason"] = "primary_lane_unhealthy_no_test_capable_failover"
         return requested_target_host, decision
+
+    def _fetch_host_trading_flags(self, *, target_host: str) -> Dict[str, Any]:
+        cmd = (
+            "python3 - <<'PY'\n"
+            "import os, pathlib\n"
+            "p = pathlib.Path('/home/rari/Sapphire/services/bot-lighter/.env')\n"
+            "vals = {'TRADING_ENABLED':'', 'ALLOW_LIVE_TRADING':''}\n"
+            "if p.exists():\n"
+            "  for raw in p.read_text(encoding='utf-8', errors='ignore').splitlines():\n"
+            "    line = raw.strip()\n"
+            "    if not line or line.startswith('#') or '=' not in line:\n"
+            "      continue\n"
+            "    k,v = line.split('=',1)\n"
+            "    k = k.strip(); v = v.strip().strip('\\\"').strip(\"'\")\n"
+            "    if k in vals:\n"
+            "      vals[k] = v\n"
+            "for k in ('TRADING_ENABLED','ALLOW_LIVE_TRADING'):\n"
+            "  print(f'{k}={vals.get(k, \"\")}')\n"
+            "PY"
+        )
+        result = self._run(
+            [
+                "ssh",
+                "-o",
+                "BatchMode=yes",
+                "-o",
+                "ConnectTimeout=8",
+                target_host,
+                cmd,
+            ],
+            cwd=REPO_ROOT,
+            env=os.environ.copy(),
+        )
+        values: Dict[str, str] = {}
+        if result.ok:
+            for raw in (result.stdout or "").splitlines():
+                line = raw.strip()
+                if "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                values[key.strip()] = value.strip()
+        return {
+            "trading_enabled": _is_truthy_flag(values.get("TRADING_ENABLED")),
+            "allow_live_trading": _is_truthy_flag(values.get("ALLOW_LIVE_TRADING")),
+            "raw": values,
+        }
 
     def _lane_health(self, *, target_host: str, lookback_minutes: int = 45) -> Dict[str, Any]:
         now = _utc_now()

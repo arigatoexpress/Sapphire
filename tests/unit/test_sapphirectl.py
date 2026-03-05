@@ -244,6 +244,14 @@ def test_lane_check_selects_failover_when_primary_unhealthy(monkeypatch):
         "_fetch_runtime_status",
         lambda **kwargs: {"ok": kwargs.get("target_host") == "rari@backup2", "http_status": "200"},
     )
+    monkeypatch.setattr(
+        ctl,
+        "_fetch_host_trading_flags",
+        lambda **kwargs: {
+            "trading_enabled": kwargs.get("target_host") == "rari@backup2",
+            "allow_live_trading": kwargs.get("target_host") == "rari@backup2",
+        },
+    )
     out = ctl.lane_check(
         target_host="rari@primary",
         run_test=True,
@@ -263,6 +271,16 @@ def test_lane_check_no_run_test_keeps_primary(monkeypatch):
         "_lane_health",
         lambda **_kwargs: {"healthy": False, "reasons": ["restricted-jurisdiction"]},
     )
+    monkeypatch.setattr(
+        ctl,
+        "_fetch_runtime_status",
+        lambda **_kwargs: {"ok": True, "http_status": "200"},
+    )
+    monkeypatch.setattr(
+        ctl,
+        "_fetch_host_trading_flags",
+        lambda **_kwargs: {"trading_enabled": True, "allow_live_trading": True},
+    )
     out = ctl.lane_check(
         target_host="rari@primary",
         run_test=False,
@@ -272,3 +290,32 @@ def test_lane_check_no_run_test_keeps_primary(monkeypatch):
     assert out["selected_target_host"] == "rari@primary"
     assert out["failover_used"] is False
     assert out["lane_decision"]["reason"] == "run_test_disabled"
+
+
+def test_lane_check_skips_non_trading_failover_host(monkeypatch):
+    ctl = _make_ctl()
+    monkeypatch.setenv("SAPPHIRECTL_FAILOVER_HOSTS", "rari@backup1")
+    monkeypatch.setattr(
+        ctl,
+        "_lane_health",
+        lambda **_kwargs: {"healthy": False, "reasons": ["restricted-jurisdiction"]},
+    )
+    monkeypatch.setattr(
+        ctl,
+        "_fetch_runtime_status",
+        lambda **_kwargs: {"ok": True, "http_status": "200"},
+    )
+    monkeypatch.setattr(
+        ctl,
+        "_fetch_host_trading_flags",
+        lambda **_kwargs: {"trading_enabled": False, "allow_live_trading": False},
+    )
+    out = ctl.lane_check(
+        target_host="rari@primary",
+        run_test=True,
+        enforce_lane_health=True,
+        auto_failover=True,
+    )
+    assert out["selected_target_host"] == "rari@primary"
+    assert out["failover_used"] is False
+    assert out["lane_decision"]["reason"] == "primary_lane_unhealthy_no_test_capable_failover"
