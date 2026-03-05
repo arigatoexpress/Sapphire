@@ -1,0 +1,60 @@
+# Lighter Reliability Gate
+
+This gate enforces objective production health checks for the `lighter` runtime using Firestore telemetry.
+
+Script:
+
+- `/Users/aribs/Sapphire/scripts/run_lighter_reliability_gate.py`
+
+## What It Checks
+
+1. Freshness
+- `equity_snapshots_current/lighter.balance_sync_age_sec`
+- `equity_snapshots_current/lighter.position_check_age_sec`
+- stale flags: `balance_sync_stale`, `position_check_stale`
+
+2. Risk posture
+- `drawdown_pct`
+- `position_notional_usd`
+- `positions_count`
+- cross-check with `live_positions/lighter.position_count`
+
+3. Execution quality (lookback window)
+- success rate from `execution_verifications`
+- real fills count (`filled_quantity > 0`)
+- restricted-jurisdiction errors (warn by default, optional hard-fail)
+
+## Default CI thresholds
+
+Configured in `/Users/aribs/Sapphire/.github/workflows/ci.yml`:
+
+- max balance age: `1200s`
+- max position age: `1200s`
+- max drawdown: `-10%`
+- max position notional: `$8`
+- max open positions: `1`
+- min success rate (24h): `0.40`
+- min real fills (24h): `0`
+- restricted jurisdiction errors: warning (not hard fail)
+
+## Local run
+
+```bash
+cd /Users/aribs/Sapphire
+python3 ./scripts/run_lighter_reliability_gate.py \
+  --project sapphire-479610 \
+  --platform lighter \
+  --lookback-hours 24
+```
+
+## Strict mode
+
+To fail on jurisdiction errors:
+
+```bash
+python3 ./scripts/run_lighter_reliability_gate.py \
+  --project sapphire-479610 \
+  --platform lighter \
+  --strict-jurisdiction
+```
+

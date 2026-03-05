@@ -90,6 +90,7 @@ jobs:
           OIDC_TOKEN: ${{ steps.gcp-auth.outputs.id_token }}
           EVENT_NAME: ${{ github.event_name }}
           DELIVERY_ID: ${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+          OPENCLAW_HOOK_STRICT: ${{ vars.OPENCLAW_HOOK_STRICT }}
         run: |
           set -euo pipefail
 
@@ -98,24 +99,49 @@ jobs:
             exit 1
           fi
 
-          http_code="$(curl -sS -o response.json -w "%{http_code}" \
-            -X POST "${HOOK_URL}" \
-            -H "Content-Type: application/json" \
-            -H "X-Serverless-Authorization: Bearer ${OIDC_TOKEN}" \
-            -H "X-OpenClaw-Token: ${HOOK_TOKEN}" \
-            -H "X-GitHub-Event: ${EVENT_NAME}" \
-            -H "X-GitHub-Delivery: ${DELIVERY_ID}" \
-            --data-binary @event.json)"
+          forward_once() {
+            local target="$1"
+            curl -sS -o response.json -w "%{http_code}" \
+              -X POST "${target}" \
+              -H "Content-Type: application/json" \
+              -H "X-Serverless-Authorization: Bearer ${OIDC_TOKEN}" \
+              -H "X-OpenClaw-Token: ${HOOK_TOKEN}" \
+              -H "X-GitHub-Event: ${EVENT_NAME}" \
+              -H "X-GitHub-Delivery: ${DELIVERY_ID}" \
+              --data-binary @event.json
+          }
 
-          echo "Hook response HTTP: ${http_code}"
+          target_url="${HOOK_URL}"
+          http_code="$(forward_once "${target_url}")"
+
+          echo "Hook response HTTP: ${http_code} (${target_url})"
           if [[ "${http_code}" == "200" || "${http_code}" == "202" || "${http_code}" == "204" ]]; then
             echo "OpenClaw hook forward succeeded."
             exit 0
           fi
 
+          # Backward-compatible retry: if a base URL was configured without route, try /hooks/agent.
+          if [[ "${http_code}" == "404" && ! "${target_url}" =~ /hooks/agent/?$ ]]; then
+            fallback_url="${target_url%/}/hooks/agent"
+            echo "Retrying with fallback URL: ${fallback_url}"
+            http_code="$(forward_once "${fallback_url}")"
+            echo "Hook response HTTP: ${http_code} (${fallback_url})"
+            if [[ "${http_code}" == "200" || "${http_code}" == "202" || "${http_code}" == "204" ]]; then
+              echo "OpenClaw hook forward succeeded on fallback URL."
+              exit 0
+            fi
+          fi
+
           echo "OpenClaw hook forward failed. Response:"
           cat response.json
-          exit 1
+
+          strict_mode="$(printf '%s' "${OPENCLAW_HOOK_STRICT:-false}" | tr '[:upper:]' '[:lower:]')"
+          if [[ "${strict_mode}" == "true" || "${strict_mode}" == "1" || "${strict_mode}" == "yes" ]]; then
+            exit 1
+          fi
+
+          echo "Non-strict mode enabled; continuing despite hook forwarding failure."
+          exit 0
 
       - name: Skip hook forward when secrets are unavailable
         if: ${{ steps.hook-auth.outputs.enabled != 'true' }}

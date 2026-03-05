@@ -76,6 +76,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y jq curl ripgrep
+          python3 -m pip install --upgrade pip
+          python3 -m pip install google-cloud-firestore google-api-core
 
       - name: Run scout sandbox integration smoke
         if: ${{ steps.gcp-auth.outputs.enabled == 'true' }}
@@ -88,6 +90,21 @@ jobs:
           ALLOW_PARTIAL_AUTH_CHECKS: "true"
           SCOUT_TOKEN: ${{ secrets.SAPPHIRE_SCOUT_SANDBOX_TOKEN }}
         run: ./scripts/run_scout_sandbox_smoke.sh
+
+      - name: Run lighter reliability gate
+        if: ${{ steps.gcp-auth.outputs.enabled == 'true' }}
+        run: |
+          python3 ./scripts/run_lighter_reliability_gate.py \
+            --project sapphire-479610 \
+            --platform lighter \
+            --lookback-hours 24 \
+            --max-balance-age-sec 1200 \
+            --max-position-age-sec 1200 \
+            --max-drawdown-pct -10 \
+            --max-position-notional-usd 8 \
+            --max-open-positions 1 \
+            --min-success-rate 0.40 \
+            --min-real-fills 0
 
       - name: Run holistic ops check
         if: ${{ steps.gcp-auth.outputs.enabled == 'true' }}
