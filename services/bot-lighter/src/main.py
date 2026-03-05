@@ -276,6 +276,40 @@ class LighterBot:
             for s in str(os.getenv("LIGHTER_ALLOWED_TIMEFRAMES", "")).split(",")
             if s.strip()
         }
+        self._entry_min_confidence = self._clamp(
+            self._env_float(("LIGHTER_ENTRY_MIN_CONFIDENCE",), default=0.0),
+            0.0,
+            1.0,
+        )
+        self._entry_min_edge_pct = max(
+            0.0,
+            self._env_float(("LIGHTER_ENTRY_MIN_EDGE_PCT",), default=0.0),
+        )
+        self._perf_guard_enabled = self._env_flag(
+            "LIGHTER_PERF_GUARD_ENABLED",
+            default=True,
+        )
+        self._perf_guard_window = max(
+            10,
+            int(self._env_float(("LIGHTER_PERF_GUARD_WINDOW",), default=40.0)),
+        )
+        self._perf_guard_min_samples = max(
+            5,
+            int(self._env_float(("LIGHTER_PERF_GUARD_MIN_SAMPLES",), default=20.0)),
+        )
+        self._perf_guard_min_fill_rate = self._clamp(
+            self._env_float(("LIGHTER_PERF_GUARD_MIN_FILL_RATE",), default=0.20),
+            0.0,
+            1.0,
+        )
+        self._perf_guard_max_hard_fail_rate = self._clamp(
+            self._env_float(("LIGHTER_PERF_GUARD_MAX_HARD_FAIL_RATE",), default=0.45),
+            0.0,
+            1.0,
+        )
+        self._strategy_perf_history: Dict[str, deque] = defaultdict(
+            lambda: deque(maxlen=self._perf_guard_window)
+        )
         self._strategy_require_metadata = self._env_flag(
             "LIGHTER_STRATEGY_REQUIRE_METADATA",
             default=False,
@@ -462,7 +496,9 @@ class LighterBot:
         logger.info(
             "Strategy policy | allowed_strategies=%s allowed_timeframes=%s "
             "allowed_sources=%s "
-            "require_metadata=%s entry_cooldown=%.1fs max_order_notional=%.2f "
+            "require_metadata=%s min_conf=%.2f min_edge=%.3f%% "
+            "perf_guard=%s n=%d fill>=%.2f fail<=%.2f "
+            "entry_cooldown=%.1fs max_order_notional=%.2f "
             "max_position_notional=%.2f max_portfolio_notional=%.2f "
             "target_order_notional=%.2f min_entry_notional=%.2f max_signal_leverage=%.1fx "
             "dynamic_sizing=%s mult=[%.2f,%.2f] "
@@ -476,6 +512,12 @@ class LighterBot:
             sorted(self._allowed_timeframes) if self._allowed_timeframes else ["*"],
             sorted(self._allowed_signal_sources) if self._allowed_signal_sources else ["*"],
             self._strategy_require_metadata,
+            self._entry_min_confidence,
+            self._entry_min_edge_pct,
+            self._perf_guard_enabled,
+            self._perf_guard_min_samples,
+            self._perf_guard_min_fill_rate,
+            self._perf_guard_max_hard_fail_rate,
             self._entry_cooldown_seconds,
             self._max_order_notional_usd,
             self._max_position_notional_usd,
@@ -2417,6 +2459,70 @@ class LighterBot:
             edge,
         )
 
+    @staticmethod
+    def _strategy_perf_key(strategy: str, timeframe: str) -> str:
+        s = str(strategy or "").strip().lower()
+        tf = str(timeframe or "").strip().lower()
+        if not s or not tf:
+            return ""
+        return f"{s}@{tf}"
+
+    def _strategy_perf_policy_reason(self, strategy: str, timeframe: str) -> str:
+        if not self._perf_guard_enabled:
+            return ""
+        key = self._strategy_perf_key(strategy, timeframe)
+        if not key:
+            return ""
+        history = list(self._strategy_perf_history.get(key, []))
+        if len(history) < self._perf_guard_min_samples:
+            return ""
+        actionable = [o for o in history if o in {"filled_success", "accepted_no_fill", "hard_failed"}]
+        if len(actionable) < self._perf_guard_min_samples:
+            return ""
+        filled = sum(1 for o in actionable if o == "filled_success")
+        hard_failed = sum(1 for o in actionable if o == "hard_failed")
+        total = float(len(actionable))
+        fill_rate = filled / total if total > 0 else 0.0
+        hard_fail_rate = hard_failed / total if total > 0 else 0.0
+        if fill_rate < self._perf_guard_min_fill_rate:
+            return (
+                f"perf_guard: fill_rate {fill_rate:.1%} below {self._perf_guard_min_fill_rate:.1%} "
+                f"({strategy}/{timeframe}, n={int(total)})"
+            )
+        if hard_fail_rate > self._perf_guard_max_hard_fail_rate:
+            return (
+                f"perf_guard: hard_fail_rate {hard_fail_rate:.1%} above {self._perf_guard_max_hard_fail_rate:.1%} "
+                f"({strategy}/{timeframe}, n={int(total)})"
+            )
+        return ""
+
+    def _record_strategy_perf_outcome(
+        self,
+        signal: TradeSignal,
+        *,
+        strategy: str,
+        timeframe: str,
+        outcome: str,
+    ) -> None:
+        if not self._perf_guard_enabled:
+            return
+        metadata = signal.metadata if isinstance(signal.metadata, dict) else {}
+        reduce_only = bool(metadata.get("reduce_only", False))
+        if signal.signal_type in {
+            SignalType.EXIT,
+            SignalType.SCALE_OUT,
+            SignalType.TAKE_PROFIT,
+            SignalType.STOP_LOSS,
+        }:
+            reduce_only = True
+        entry_like = signal.signal_type in {SignalType.ENTRY, SignalType.SCALE_IN}
+        if not entry_like or reduce_only:
+            return
+        key = self._strategy_perf_key(strategy, timeframe)
+        if not key:
+            return
+        self._strategy_perf_history[key].append(str(outcome or "").strip().lower())
+
     def _is_signal_allowed_by_policy(self, signal: TradeSignal) -> tuple[bool, str]:
         strategy, timeframe = self._signal_strategy_info(signal)
         metadata = signal.metadata if isinstance(signal.metadata, dict) else {}
@@ -2429,6 +2535,28 @@ class LighterBot:
         }:
             reduce_only = True
         entry_like = signal.signal_type in {SignalType.ENTRY, SignalType.SCALE_IN}
+
+        if entry_like and not reduce_only:
+            confidence = self._clamp(self._to_float(getattr(signal, "confidence", 0.0), 0.0), 0.0, 1.0)
+            if self._entry_min_confidence > 0 and confidence < self._entry_min_confidence:
+                return (
+                    False,
+                    f"confidence {confidence:.2f} below minimum {self._entry_min_confidence:.2f}",
+                )
+
+            raw_edge = metadata.get("edge_pct")
+            if raw_edge is not None and self._entry_min_edge_pct > 0:
+                edge_pct = self._to_float(raw_edge, 0.0)
+                if abs(edge_pct) < self._entry_min_edge_pct:
+                    return (
+                        False,
+                        f"edge_pct {edge_pct:+.3f}% below minimum {self._entry_min_edge_pct:.3f}%",
+                    )
+                side = str(signal.side)
+                if side in {"TradeSide.BUY", "TradeSide.LONG"} and edge_pct <= 0:
+                    return False, f"edge_pct {edge_pct:+.3f}% invalid for long entry"
+                if side in {"TradeSide.SELL", "TradeSide.SHORT"} and edge_pct >= 0:
+                    return False, f"edge_pct {edge_pct:+.3f}% invalid for short entry"
 
         if self._allowed_signal_sources and entry_like and not reduce_only:
             source_candidates = {
@@ -2452,6 +2580,10 @@ class LighterBot:
             return False, "missing strategy metadata"
         if self._allowed_timeframes and not timeframe and self._strategy_require_metadata:
             return False, "missing timeframe metadata"
+        if entry_like and not reduce_only:
+            perf_reason = self._strategy_perf_policy_reason(strategy, timeframe)
+            if perf_reason:
+                return False, perf_reason
         return True, ""
 
     def _apply_default_risk_levels(
@@ -2716,6 +2848,13 @@ class LighterBot:
                 "opportunity_min_edge_pct": self._opportunity_rotation_min_edge_pct,
                 "allowed_strategies": sorted(self._allowed_strategies),
                 "allowed_timeframes": sorted(self._allowed_timeframes),
+                "entry_min_confidence": self._entry_min_confidence,
+                "entry_min_edge_pct": self._entry_min_edge_pct,
+                "perf_guard_enabled": self._perf_guard_enabled,
+                "perf_guard_window": self._perf_guard_window,
+                "perf_guard_min_samples": self._perf_guard_min_samples,
+                "perf_guard_min_fill_rate": self._perf_guard_min_fill_rate,
+                "perf_guard_max_hard_fail_rate": self._perf_guard_max_hard_fail_rate,
                 "max_order_notional_usd": self._max_order_notional_usd,
                 "max_position_notional_usd": self._max_position_notional_usd,
                 "target_order_notional_usd": self._target_order_notional_usd,
@@ -2798,6 +2937,12 @@ class LighterBot:
             "metadata": (signal.metadata or {}),
             "recorded_at": datetime.now(timezone.utc),
         }
+        self._record_strategy_perf_outcome(
+            signal,
+            strategy=strategy,
+            timeframe=str(timeframe),
+            outcome=str(outcome),
+        )
         logger.info(
             "Execution verify | signal=%s outcome=%s ok=%s fill=%s@%s equity=%s",
             payload["signal_id"],
