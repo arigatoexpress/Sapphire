@@ -352,6 +352,19 @@ def test_apply_disarms_primary_when_failover_selected(monkeypatch):
         )
 
     monkeypatch.setattr(ctl, "_apply_overrides_remote", _fake_apply_overrides_remote)
+    monkeypatch.setattr(
+        ctl,
+        "_runtime_convergence_check",
+        lambda **_kwargs: {
+            "ok": True,
+            "target_host": "rari@backup",
+            "service_active": True,
+            "service_status": "active",
+            "missing_keys": [],
+            "mismatches": [],
+            "checked_keys": [],
+        },
+    )
 
     out = ctl.apply(
         profile="luxalgo_sol_5m_active",
@@ -374,3 +387,113 @@ def test_apply_disarms_primary_when_failover_selected(monkeypatch):
     assert calls[0][1]["TRADING_ENABLED"] == "0"
     assert calls[0][1]["ALLOW_LIVE_TRADING"] == "0"
     assert calls[1][0] == "rari@backup"
+    assert calls[1][1]["LIGHTER_ALLOWED_SIGNAL_SOURCES"] == "codex-unified-prod-test,sapphirectl-canary"
+
+
+def test_apply_fails_when_runtime_not_converged(monkeypatch):
+    ctl = _make_ctl()
+    monkeypatch.setattr(
+        ctl,
+        "_select_target_host",
+        lambda **_kwargs: ("rari@primary", {"failover_used": False, "reason": "primary_lane_healthy"}),
+    )
+    monkeypatch.setattr(
+        ctl,
+        "_run",
+        lambda *args, **kwargs: MOD.CommandResult(
+            ok=True,
+            returncode=0,
+            cmd=["fake"],
+            stdout="ok",
+            stderr="",
+        ),
+    )
+    monkeypatch.setattr(
+        ctl,
+        "_apply_overrides_remote",
+        lambda **_kwargs: MOD.CommandResult(
+            ok=True,
+            returncode=0,
+            cmd=["fake"],
+            stdout="ok",
+            stderr="",
+        ),
+    )
+    monkeypatch.setattr(
+        ctl,
+        "_runtime_convergence_check",
+        lambda **_kwargs: {
+            "ok": False,
+            "target_host": "rari@primary",
+            "service_active": False,
+            "service_status": "inactive",
+            "missing_keys": ["TRADING_ENABLED"],
+            "mismatches": [],
+            "checked_keys": ["TRADING_ENABLED"],
+        },
+    )
+
+    out = ctl.apply(
+        profile="luxalgo_sol_5m_active",
+        target_host="rari@primary",
+        run_test=False,
+        close_after_test=False,
+        test_quantity="0.01",
+        notes="runtime_drift",
+        overrides={},
+        requested_by="tester",
+        no_restart=False,
+    )
+    assert out["applied"]["status"] == "failed"
+    assert out["applied"]["runtime_convergence"]["ok"] is False
+    assert out["applied"]["runtime_convergence"]["missing_keys"] == ["TRADING_ENABLED"]
+
+
+def test_reconcile_detects_runtime_drift_and_reapplies(monkeypatch):
+    ctl = _make_ctl()
+    ctl.db.collection(MOD.DESIRED_COLLECTION).document(MOD.PLATFORM).set(
+        {
+            "desired_version": "v-runtime",
+            "profile": "luxalgo_sol_5m_active",
+            "target_host": "rari@primary",
+            "run_test": False,
+            "close_after_test": False,
+            "test_quantity": "0.01",
+            "notes": "reconcile_runtime_drift",
+            "overrides": {},
+            "effective_settings": MOD.PROFILE_SETTINGS["luxalgo_sol_5m_active"],
+        }
+    )
+    ctl.db.collection(MOD.APPLIED_COLLECTION).document(MOD.PLATFORM).set(
+        {
+            "desired_version": "v-runtime",
+            "status": "applied",
+            "selected_target_host": "rari@primary",
+        }
+    )
+
+    monkeypatch.setattr(
+        ctl,
+        "_runtime_convergence_check",
+        lambda **_kwargs: {
+            "ok": False,
+            "target_host": "rari@primary",
+            "service_active": True,
+            "service_status": "active",
+            "missing_keys": [],
+            "mismatches": [{"key": "TRADING_ENABLED", "expected": "1", "actual": "0"}],
+            "checked_keys": ["TRADING_ENABLED"],
+        },
+    )
+    monkeypatch.setattr(
+        ctl,
+        "apply",
+        lambda **kwargs: {"desired": {"desired_version": kwargs["desired_version"]}, "applied": {"status": "applied"}},
+    )
+
+    out = ctl.reconcile(requested_by="tester", no_restart=False)
+    assert out["reconciled"] is True
+    assert out["desired_version"] == "v-runtime"
+    events = ctl.db.collection(MOD.EVENTS_COLLECTION).stream()
+    event_types = [snap.to_dict().get("event_type") for snap in events]
+    assert "runtime_drift_detected" in event_types

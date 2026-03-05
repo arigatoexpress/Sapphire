@@ -284,7 +284,7 @@ PLATFORM_CONTRACTS = [
         'name': 'control_plane',
         'path': '/api/platform/control-plane',
         'method': 'GET',
-        'auth': 'basic_or_public',
+        'auth': 'operator_token_or_basic',
         'category': 'operations',
         'description': 'Desired/applied control-plane state, lane health, and execution policy summary.',
     },
@@ -315,6 +315,51 @@ def requires_auth(f):
         if not auth or not check_auth(auth.username, auth.password):
             return authenticate()
         return f(*args, **kwargs)
+    return decorated
+
+
+def _extract_operator_token() -> str:
+    token = (
+        request.headers.get('X-Sapphire-Token', '').strip()
+        or request.headers.get('x-sapphire-token', '').strip()
+        or request.headers.get('X-Sapphire-Control-Token', '').strip()
+        or request.headers.get('x-sapphire-control-token', '').strip()
+    )
+    if token:
+        return token
+    auth_header = request.headers.get('Authorization', '').strip()
+    if auth_header.lower().startswith('bearer '):
+        return auth_header[7:].strip()
+    return ''
+
+
+def _operator_denied(status_code: int):
+    if (request.path or '').startswith('/api/'):
+        if status_code == 404:
+            return jsonify({'error': 'not_found'}), 404
+        return jsonify({'error': 'unauthorized'}), 403
+    if status_code == 404:
+        return Response('Not Found', 404)
+    return Response('Forbidden', 403)
+
+
+def requires_operator_access(f):
+    """Protect control-plane/operator routes even when public dashboard mode is enabled."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if ENABLE_AUTH:
+            auth = request.authorization
+            if not auth or not check_auth(auth.username, auth.password):
+                return authenticate()
+            return f(*args, **kwargs)
+
+        if not CONTROL_API_TOKEN:
+            return _operator_denied(404)
+        token = _extract_operator_token()
+        if token != CONTROL_API_TOKEN:
+            return _operator_denied(403)
+        return f(*args, **kwargs)
+
     return decorated
 
 
@@ -3010,7 +3055,7 @@ def settings():
 
 
 @app.route('/control')
-@requires_auth
+@requires_operator_access
 def control():
     return render_template('pages/control.html', current_page='control', page_title='Control Plane')
 
@@ -3218,7 +3263,7 @@ def api_platform_contracts():
 
 
 @app.route('/api/platform/control-plane')
-@requires_auth
+@requires_operator_access
 def api_platform_control_plane():
     return jsonify(_platform_control_plane_payload())
 
@@ -3312,7 +3357,7 @@ def api_contracts():
 
 
 @app.route('/api/control-plane')
-@requires_auth
+@requires_operator_access
 def api_control_plane():
     return _deprecated_alias_response(api_platform_control_plane(), '/api/platform/control-plane')
 

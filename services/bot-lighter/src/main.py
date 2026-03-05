@@ -257,6 +257,11 @@ class LighterBot:
             "LIGHTER_STRATEGY_REQUIRE_METADATA",
             default=False,
         )
+        self._allowed_signal_sources = {
+            s.strip().lower()
+            for s in str(os.getenv("LIGHTER_ALLOWED_SIGNAL_SOURCES", "")).split(",")
+            if s.strip()
+        }
         self._trading_enabled = self._env_flag("TRADING_ENABLED", default=True)
         self._allow_live_trading = self._env_flag("ALLOW_LIVE_TRADING", default=True)
         self._trading_mode = str(os.getenv("TRADING_MODE", "live")).strip().lower() or "live"
@@ -379,6 +384,7 @@ class LighterBot:
         )
         logger.info(
             "Strategy policy | allowed_strategies=%s allowed_timeframes=%s "
+            "allowed_sources=%s "
             "require_metadata=%s entry_cooldown=%.1fs max_order_notional=%.2f "
             "max_position_notional=%.2f target_order_notional=%.2f min_entry_notional=%.2f max_signal_leverage=%.1fx "
             "sync_before_entry=%s jurisdiction_block=%.0fs progress_verify=%.0fs dd_alert=%.2f%% "
@@ -386,6 +392,7 @@ class LighterBot:
             "tg_digest=%.0fs tg_charts=%s dynamic_risk=%s rotation=%s edge=%.3f%%",
             sorted(self._allowed_strategies) if self._allowed_strategies else ["*"],
             sorted(self._allowed_timeframes) if self._allowed_timeframes else ["*"],
+            sorted(self._allowed_signal_sources) if self._allowed_signal_sources else ["*"],
             self._strategy_require_metadata,
             self._entry_cooldown_seconds,
             self._max_order_notional_usd,
@@ -1967,6 +1974,29 @@ class LighterBot:
 
     def _is_signal_allowed_by_policy(self, signal: TradeSignal) -> tuple[bool, str]:
         strategy, timeframe = self._signal_strategy_info(signal)
+        metadata = signal.metadata if isinstance(signal.metadata, dict) else {}
+        reduce_only = bool(metadata.get("reduce_only", False))
+        if signal.signal_type in {
+            SignalType.EXIT,
+            SignalType.SCALE_OUT,
+            SignalType.TAKE_PROFIT,
+            SignalType.STOP_LOSS,
+        }:
+            reduce_only = True
+        entry_like = signal.signal_type in {SignalType.ENTRY, SignalType.SCALE_IN}
+
+        if self._allowed_signal_sources and entry_like and not reduce_only:
+            source_candidates = {
+                str(signal.source or "").strip().lower(),
+                str(metadata.get("source") or "").strip().lower(),
+                str(metadata.get("origin") or "").strip().lower(),
+            }
+            source_candidates = {s for s in source_candidates if s}
+            if not source_candidates:
+                return False, "signal source metadata required"
+            if not (source_candidates & self._allowed_signal_sources):
+                return False, f"source not allowed ({', '.join(sorted(source_candidates))})"
+
         if self._strategy_require_metadata and (not strategy or not timeframe):
             return False, "strategy metadata required"
         if self._allowed_strategies and strategy and strategy not in self._allowed_strategies:

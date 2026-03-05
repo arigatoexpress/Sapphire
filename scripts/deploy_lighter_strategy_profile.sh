@@ -11,6 +11,7 @@ set -euo pipefail
 #   chartprime_sol_5m_test
 #   chartprime_sol_15m_walkforward_safe
 #   luxalgo_sol_1h_walkforward_safe
+#   failover_canary_only
 
 PROFILE="${1:-luxalgo_sol_15m_safe}"
 TARGET_HOST="${2:-rari@100.87.225.89}"
@@ -130,6 +131,31 @@ case "$PROFILE" in
     KV[LIGHTER_SYNC_STALE_ALERT_SECONDS]="300"
     KV[LIGHTER_SYNC_STALE_ALERT_COOLDOWN_SECONDS]="900"
     ;;
+  failover_canary_only)
+    KV[TRADING_ENABLED]="1"
+    KV[ALLOW_LIVE_TRADING]="1"
+    KV[LIGHTER_ALLOWED_STRATEGIES]="luxalgo_msb_ob,smart_money_breakout,algoalpha_smb"
+    KV[LIGHTER_ALLOWED_TIMEFRAMES]="5m"
+    KV[LIGHTER_ALLOWED_SIGNAL_SOURCES]="codex-unified-prod-test,sapphirectl-canary"
+    KV[LIGHTER_STRATEGY_REQUIRE_METADATA]="true"
+    KV[LIGHTER_SINGLE_SYMBOL_MODE]="true"
+    KV[LIGHTER_MAX_ORDER_NOTIONAL_USD]="1.5"
+    KV[LIGHTER_MAX_POSITION_NOTIONAL_USD]="2.0"
+    KV[LIGHTER_TARGET_ORDER_NOTIONAL_USD]="1.0"
+    KV[LIGHTER_MIN_ENTRY_NOTIONAL_USD]="0.5"
+    KV[LIGHTER_MAX_SIGNAL_LEVERAGE]="3"
+    KV[LIGHTER_SYNC_BEFORE_ENTRY]="true"
+    KV[LIGHTER_JURISDICTION_BLOCK_SECONDS]="900"
+    KV[LIGHTER_ENTRY_COOLDOWN_SECONDS]="120"
+    KV[LIGHTER_DEFAULT_TAKE_PROFIT_PCT]="1.0"
+    KV[LIGHTER_DEFAULT_STOP_LOSS_PCT]="0.7"
+    KV[LIGHTER_PROGRESS_VERIFY_INTERVAL_SECONDS]="120"
+    KV[LIGHTER_POSITION_CHECK_INTERVAL_SECONDS]="5"
+    KV[LIGHTER_MAX_DRAWDOWN_ALERT_PCT]="4"
+    KV[LIGHTER_DRAWDOWN_ALERT_COOLDOWN_SECONDS]="900"
+    KV[LIGHTER_SYNC_STALE_ALERT_SECONDS]="300"
+    KV[LIGHTER_SYNC_STALE_ALERT_COOLDOWN_SECONDS]="900"
+    ;;
   *)
     echo "Unknown profile: $PROFILE" >&2
     exit 1
@@ -177,8 +203,10 @@ PY"
 
 ssh -o BatchMode=yes -o ConnectTimeout=10 "$TARGET_HOST" \
   "sudo systemctl reset-failed ${SERVICE} || true; \
-   sudo systemctl restart ${SERVICE} || { \
+   timeout 30s sudo systemctl restart ${SERVICE} || { \
      sudo systemctl reset-failed ${SERVICE} || true; \
+     timeout 20s sudo systemctl stop ${SERVICE} || true; \
+     sudo pkill -f 'services/bot-lighter/src/main.py' || true; \
      sudo systemctl start ${SERVICE}; \
    }; \
    sleep 8; \

@@ -75,6 +75,21 @@ PROFILE_SETTINGS: Dict[str, Dict[str, str]] = {
         "LIGHTER_DEFAULT_TAKE_PROFIT_PCT": "1.0",
         "LIGHTER_DEFAULT_STOP_LOSS_PCT": "0.7",
     },
+    "failover_canary_only": {
+        "LIGHTER_ALLOWED_STRATEGIES": "luxalgo_msb_ob,smart_money_breakout,algoalpha_smb",
+        "LIGHTER_ALLOWED_TIMEFRAMES": "5m",
+        "LIGHTER_ALLOWED_SIGNAL_SOURCES": "codex-unified-prod-test,sapphirectl-canary",
+        "LIGHTER_STRATEGY_REQUIRE_METADATA": "true",
+        "LIGHTER_SINGLE_SYMBOL_MODE": "true",
+        "LIGHTER_MAX_ORDER_NOTIONAL_USD": "1.5",
+        "LIGHTER_MAX_POSITION_NOTIONAL_USD": "2.0",
+        "LIGHTER_TARGET_ORDER_NOTIONAL_USD": "1.0",
+        "LIGHTER_MIN_ENTRY_NOTIONAL_USD": "0.5",
+        "LIGHTER_MAX_SIGNAL_LEVERAGE": "3",
+        "LIGHTER_ENTRY_COOLDOWN_SECONDS": "120",
+        "LIGHTER_DEFAULT_TAKE_PROFIT_PCT": "1.0",
+        "LIGHTER_DEFAULT_STOP_LOSS_PCT": "0.7",
+    },
 }
 
 PROMOTION_STAGES: Dict[str, Dict[str, Any]] = {
@@ -656,6 +671,106 @@ class SapphireCtl:
         )
         return merged
 
+    def _fetch_remote_env_values(
+        self,
+        *,
+        target_host: str,
+        keys: List[str],
+    ) -> Dict[str, str]:
+        filtered = [str(k).strip() for k in keys if str(k).strip()]
+        if not filtered:
+            return {}
+        keys_json = json.dumps(filtered, separators=(",", ":"))
+        env_path = "/home/rari/Sapphire/services/bot-lighter/.env"
+        remote_script = (
+            "python3 - <<'PY'\n"
+            "from pathlib import Path\n"
+            "import json\n"
+            f"keys = json.loads('''{keys_json}''')\n"
+            f"env_file = Path('{env_path}')\n"
+            "values = {k: '' for k in keys}\n"
+            "if env_file.exists():\n"
+            "  for raw in env_file.read_text(encoding='utf-8', errors='ignore').splitlines():\n"
+            "    line = raw.strip()\n"
+            "    if not line or line.startswith('#') or '=' not in line:\n"
+            "      continue\n"
+            "    key, value = line.split('=', 1)\n"
+            "    key = key.strip()\n"
+            "    if key in values:\n"
+            "      values[key] = value.strip().strip('\"').strip(\"'\")\n"
+            "for key in keys:\n"
+            "  print(f'{key}={values.get(key, \"\")}')\n"
+            "PY"
+        )
+        result = self._run(
+            [
+                "ssh",
+                "-o",
+                "BatchMode=yes",
+                "-o",
+                "ConnectTimeout=10",
+                target_host,
+                remote_script,
+            ],
+            cwd=REPO_ROOT,
+            env=os.environ.copy(),
+        )
+        values: Dict[str, str] = {}
+        if not result.ok:
+            return values
+        for raw in (result.stdout or "").splitlines():
+            line = raw.strip()
+            if "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            values[key.strip()] = value.strip()
+        return values
+
+    def _runtime_convergence_check(
+        self,
+        *,
+        target_host: str,
+        effective_settings: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        expected = {str(k): str(v) for k, v in (effective_settings or {}).items()}
+        keys = sorted(list(expected.keys()))
+        actual = self._fetch_remote_env_values(target_host=target_host, keys=keys)
+        mismatches: List[Dict[str, str]] = []
+        missing: List[str] = []
+        for key in keys:
+            exp = expected.get(key, "")
+            got = actual.get(key)
+            if got is None:
+                missing.append(key)
+                continue
+            if str(got) != str(exp):
+                mismatches.append({"key": key, "expected": str(exp), "actual": str(got)})
+
+        service_state = self._run(
+            [
+                "ssh",
+                "-o",
+                "BatchMode=yes",
+                "-o",
+                "ConnectTimeout=8",
+                target_host,
+                f"systemctl is-active {DEFAULT_SERVICE}",
+            ],
+            cwd=REPO_ROOT,
+            env=os.environ.copy(),
+        )
+        service_active = service_state.ok and str(service_state.stdout or "").strip() == "active"
+        ok = service_active and not missing and not mismatches
+        return {
+            "ok": ok,
+            "target_host": target_host,
+            "service_active": service_active,
+            "service_status": str(service_state.stdout or "").strip(),
+            "missing_keys": missing,
+            "mismatches": mismatches,
+            "checked_keys": keys,
+        }
+
     @staticmethod
     def _effective_overrides_for_profile(
         profile: str,
@@ -756,6 +871,7 @@ class SapphireCtl:
 
         selected_target_host = target_host
         lane_decision: Dict[str, Any] = {}
+        runtime_overrides = {str(k): str(v) for k, v in overrides.items()}
         if not no_restart:
             selected_target_host, lane_decision = self._select_target_host(
                 requested_target_host=target_host,
@@ -773,6 +889,36 @@ class SapphireCtl:
                     "reason": lane_decision.get("reason", ""),
                 },
             )
+            if selected_target_host != target_host:
+                failover_sources = str(
+                    os.getenv(
+                        "SAPPHIRECTL_FAILOVER_ALLOWED_SIGNAL_SOURCES",
+                        "codex-unified-prod-test,sapphirectl-canary",
+                    )
+                ).strip()
+                if failover_sources and not str(runtime_overrides.get("LIGHTER_ALLOWED_SIGNAL_SOURCES", "")).strip():
+                    runtime_overrides["LIGHTER_ALLOWED_SIGNAL_SOURCES"] = failover_sources
+                    desired["overrides"] = dict(runtime_overrides)
+                    desired["effective_settings"] = self._effective_overrides_for_profile(profile, runtime_overrides)
+                    if update_desired:
+                        desired_ref.set(
+                            {
+                                "overrides": desired["overrides"],
+                                "effective_settings": desired["effective_settings"],
+                                "updated_at": _utc_now(),
+                                "updated_at_iso": _utc_now_iso(),
+                            },
+                            merge=True,
+                        )
+                    self._event(
+                        "failover_source_allowlist_enforced",
+                        {
+                            "desired_version": desired["desired_version"],
+                            "requested_target_host": target_host,
+                            "selected_target_host": selected_target_host,
+                            "allowed_sources": failover_sources,
+                        },
+                    )
 
         if no_restart:
             skipped = CommandResult(
@@ -800,6 +946,15 @@ class SapphireCtl:
                 "deploy": skipped.to_dict(),
                 "primary_disarm": skipped.to_dict(),
                 "override_apply": skipped.to_dict(),
+                "runtime_convergence": {
+                    "ok": True,
+                    "target_host": selected_target_host,
+                    "service_active": None,
+                    "service_status": "skipped_no_restart",
+                    "missing_keys": [],
+                    "mismatches": [],
+                    "checked_keys": [],
+                },
                 "test": skipped.to_dict(),
                 "close": skipped.to_dict(),
                 "lane_decision": lane_decision,
@@ -864,7 +1019,7 @@ class SapphireCtl:
 
         override_apply_result = self._apply_overrides_remote(
             target_host=selected_target_host,
-            overrides=overrides,
+            overrides=runtime_overrides,
         ) if (primary_disarm_result.ok and deploy.ok) else CommandResult(
             ok=False,
             returncode=1,
@@ -872,6 +1027,21 @@ class SapphireCtl:
             stdout="skipped_due_to_primary_disarm_or_deploy_failure",
             stderr="",
         )
+
+        runtime_convergence = {
+            "ok": True,
+            "target_host": selected_target_host,
+            "service_active": None,
+            "service_status": "skipped",
+            "missing_keys": [],
+            "mismatches": [],
+            "checked_keys": [],
+        }
+        if primary_disarm_result.ok and deploy.ok and override_apply_result.ok:
+            runtime_convergence = self._runtime_convergence_check(
+                target_host=selected_target_host,
+                effective_settings=desired["effective_settings"],
+            )
 
         test_result = CommandResult(
             ok=True,
@@ -882,6 +1052,16 @@ class SapphireCtl:
         )
         lane_health: Dict[str, Any] = lane_decision.get("primary_lane_health", {}) if lane_decision else {}
         if primary_disarm_result.ok and deploy.ok and override_apply_result.ok and run_test:
+            if not runtime_convergence.get("ok", False):
+                test_result = CommandResult(
+                    ok=False,
+                    returncode=4,
+                    cmd=["runtime-convergence-check"],
+                    stdout=json.dumps(runtime_convergence, default=str, separators=(",", ":")),
+                    stderr="runtime_not_converged",
+                )
+            
+        if primary_disarm_result.ok and deploy.ok and override_apply_result.ok and run_test and test_result.ok:
             if selected_target_host != target_host:
                 lane_health = self._lane_health(
                     target_host=selected_target_host,
@@ -933,7 +1113,14 @@ class SapphireCtl:
 
         status = (
             "applied"
-            if primary_disarm_result.ok and deploy.ok and override_apply_result.ok and test_result.ok and close_result.ok
+            if (
+                primary_disarm_result.ok
+                and deploy.ok
+                and override_apply_result.ok
+                and bool(runtime_convergence.get("ok", False))
+                and test_result.ok
+                and close_result.ok
+            )
             else "failed"
         )
         applied_payload: Dict[str, Any] = {
@@ -954,6 +1141,7 @@ class SapphireCtl:
             "deploy": deploy.to_dict(),
             "primary_disarm": primary_disarm_result.to_dict(),
             "override_apply": override_apply_result.to_dict(),
+            "runtime_convergence": runtime_convergence,
             "test": test_result.to_dict(),
             "close": close_result.to_dict(),
             "lane_health_pretest": lane_health,
@@ -1193,12 +1381,36 @@ class SapphireCtl:
         applied_version = str(applied.get("desired_version", "") or "").strip()
         applied_status = str(applied.get("status", "") or "").strip().lower()
         if desired_version and desired_version == applied_version and applied_status == "applied":
-            return {
-                "reconciled": False,
-                "reason": "already_converged",
-                "desired_version": desired_version,
-                "applied_version": applied_version,
-            }
+            if bool(no_restart):
+                return {
+                    "reconciled": False,
+                    "reason": "already_converged",
+                    "desired_version": desired_version,
+                    "applied_version": applied_version,
+                }
+            target_host = str(applied.get("selected_target_host") or desired.get("target_host") or DEFAULT_HOST)
+            expected_settings = desired.get("effective_settings") if isinstance(desired.get("effective_settings"), dict) else {}
+            runtime_convergence = self._runtime_convergence_check(
+                target_host=target_host,
+                effective_settings=expected_settings,
+            )
+            if runtime_convergence.get("ok", False):
+                return {
+                    "reconciled": False,
+                    "reason": "already_converged",
+                    "desired_version": desired_version,
+                    "applied_version": applied_version,
+                    "runtime_convergence": runtime_convergence,
+                }
+            self._event(
+                "runtime_drift_detected",
+                {
+                    "desired_version": desired_version,
+                    "applied_version": applied_version,
+                    "target_host": target_host,
+                    "runtime_convergence": runtime_convergence,
+                },
+            )
 
         profile = str(desired.get("profile") or "luxalgo_sol_5m_active")
         target_host = str(desired.get("target_host") or DEFAULT_HOST)
