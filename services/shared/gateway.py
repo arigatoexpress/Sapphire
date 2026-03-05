@@ -30,7 +30,21 @@ class ExecutionGateway:
         # Command Buffer
         self.command_queue: asyncio.Queue = asyncio.Queue()
         self.runner: Optional[web.AppRunner] = None
+        self._http_session = None
         self.status_provider = status_provider
+        self.legacy_tv_forward_url = str(
+            os.getenv("SAPPHIRE_LEGACY_TV_FORWARD_URL", "")
+        ).strip()
+
+    async def _get_http_session(self):
+        try:
+            import aiohttp
+        except Exception:
+            return None
+        if self._http_session is None or getattr(self._http_session, "closed", False):
+            timeout = aiohttp.ClientTimeout(total=10)
+            self._http_session = aiohttp.ClientSession(timeout=timeout)
+        return self._http_session
 
     async def _status_payload(self) -> Dict[str, Any]:
         payload: Dict[str, Any] = {
@@ -83,22 +97,70 @@ class ExecutionGateway:
             return web.json_response({"error": str(e)}, status=400)
 
     async def handle_legacy_tradingview(self, request):
-        """Accept legacy TV webhook posts and intentionally no-op."""
+        """Accept legacy TV webhook posts; optionally forward to canonical cloud ingress."""
+        data: Dict[str, Any] = {}
         try:
-            data = await request.json()
-            logger.info(
-                "Ignoring legacy TradingView webhook on local gateway; expected normalized /execute command | keys=%s",
-                sorted(list(data.keys()))[:12],
-            )
+            payload = await request.json()
+            if isinstance(payload, dict):
+                data = payload
         except Exception:
-            logger.info(
-                "Ignoring legacy TradingView webhook on local gateway; non-JSON payload"
-            )
-        return web.json_response({"status": "ignored", "reason": "use /execute"}, status=202)
+            logger.info("Ignoring legacy TradingView webhook on local gateway; non-JSON payload")
+            return web.json_response({"status": "ignored", "reason": "non_json_payload"}, status=202)
+
+        if self.legacy_tv_forward_url:
+            try:
+                session = await self._get_http_session()
+                if session is None:
+                    raise RuntimeError("aiohttp session unavailable")
+                headers = {"Content-Type": "application/json"}
+                secret = str(data.get("secret") or "").strip()
+                if secret:
+                    headers["X-Sapphire-Webhook-Secret"] = secret
+                async with session.post(
+                    self.legacy_tv_forward_url,
+                    json=data,
+                    headers=headers,
+                ) as resp:
+                    body = await resp.text()
+                    if resp.status >= 400:
+                        logger.warning(
+                            "Legacy TV forward failed (%s): %s",
+                            resp.status,
+                            body[:240],
+                        )
+                        return web.json_response(
+                            {"status": "forward_failed", "code": resp.status},
+                            status=502,
+                        )
+                    logger.info(
+                        "Forwarded legacy TradingView webhook to canonical ingress | keys=%s status=%s",
+                        sorted(list(data.keys()))[:12],
+                        resp.status,
+                    )
+                    return web.json_response(
+                        {"status": "forwarded", "code": resp.status},
+                        status=202,
+                    )
+            except Exception as exc:
+                logger.warning("Legacy TV forward error: %s", exc)
+                return web.json_response(
+                    {"status": "forward_error", "error": str(exc)[:180]},
+                    status=502,
+                )
+
+        logger.info(
+            "Ignoring legacy TradingView webhook on local gateway; forwarding disabled | keys=%s",
+            sorted(list(data.keys()))[:12],
+        )
+        return web.json_response({"status": "ignored", "reason": "forwarding_disabled"}, status=202)
 
     async def start(self) -> asyncio.Queue:
         """Start the server and return the command queue for the bot to consume."""
         port = int(os.getenv("PORT", "8080"))
+
+        # If already running, reuse the existing queue.
+        if self.runner is not None:
+            return self.command_queue
 
         self.runner = web.AppRunner(self.app)
         await self.runner.setup()
@@ -112,6 +174,23 @@ class ExecutionGateway:
 
         return self.command_queue
 
+    async def stop(self) -> None:
+        """Stop the gateway runner and release aiohttp resources."""
+        runner = self.runner
+        self.runner = None
+        if runner is None:
+            return
+        try:
+            await runner.cleanup()
+        except Exception as exc:
+            logger.debug("Gateway cleanup error: %s", exc)
+        try:
+            if self._http_session is not None:
+                await self._http_session.close()
+                self._http_session = None
+        except Exception as exc:
+            logger.debug("Gateway session close error: %s", exc)
+
 
 # Singleton instance for easy import
 gateway = ExecutionGateway()
@@ -123,3 +202,7 @@ async def start_gateway_server(
     if status_provider is not None:
         gateway.status_provider = status_provider
     return await gateway.start()
+
+
+async def stop_gateway_server() -> None:
+    await gateway.stop()

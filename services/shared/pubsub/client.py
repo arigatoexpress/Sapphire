@@ -79,6 +79,8 @@ class PubSubClient:
         self._subscriber = None
         self._subscriptions: Dict[str, Any] = {}
         self._handlers: Dict[str, List[Callable]] = {}
+        self._pull_tasks: List[asyncio.Task] = []
+        self._closing = False
         self._initialized = False
 
     async def initialize(self):
@@ -92,6 +94,7 @@ class PubSubClient:
             self._publisher = await loop.run_in_executor(None, pubsub_v1.PublisherClient)
             self._subscriber = await loop.run_in_executor(None, pubsub_v1.SubscriberClient)
             self._initialized = True
+            self._closing = False
 
             logger.info("✅ Pub/Sub client initialized (non-blocking)")
 
@@ -237,7 +240,8 @@ class PubSubClient:
                     logger.debug(f"Could not update ack deadline for {sub_name}: {exc}")
 
                 # Start pulling messages in background
-                asyncio.create_task(self._pull_messages(subscription_path, topic))
+                task = asyncio.create_task(self._pull_messages(subscription_path, topic))
+                self._pull_tasks.append(task)
                 logger.info(f"📥 Subscribed to {topic}")
             except Exception as e:
                 logger.error(f"❌ Failed to subscribe to {topic}: {e}")
@@ -246,7 +250,7 @@ class PubSubClient:
 
     async def _pull_messages(self, subscription_path: str, topic: str):
         """Background task to pull and process messages."""
-        while True:
+        while not self._closing:
             try:
                 # Blocking Pull call
                 response = await asyncio.to_thread(
@@ -280,6 +284,8 @@ class PubSubClient:
                         logger.error(f"Message processing error: {e}")
 
             except Exception as e:
+                if isinstance(e, asyncio.CancelledError):
+                    break
                 error_str = str(e)
                 # Only log unexpected errors, not timeouts or missing subscriptions
                 if "Deadline Exceeded" not in error_str and "NOT_FOUND" not in error_str:
@@ -290,6 +296,36 @@ class PubSubClient:
                 await asyncio.sleep(5)  # Wait before retry
 
             await asyncio.sleep(0.1)  # Small delay between pulls
+
+    async def close(self) -> None:
+        """Gracefully stop pull workers and close Pub/Sub transports."""
+        self._closing = True
+
+        tasks = [t for t in self._pull_tasks if t is not None and not t.done()]
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        self._pull_tasks = []
+
+        for client_attr in ("_subscriber", "_publisher"):
+            client = getattr(self, client_attr, None)
+            if client is None:
+                continue
+            try:
+                close_fn = getattr(client, "close", None)
+                if callable(close_fn):
+                    maybe = close_fn()
+                    if asyncio.iscoroutine(maybe):
+                        await maybe
+            except Exception as exc:
+                logger.debug("Pub/Sub %s close warning: %s", client_attr, exc)
+            finally:
+                setattr(self, client_attr, None)
+
+        self._subscriptions = {}
+        self._handlers = {}
+        self._initialized = False
 
     def _serialize_datetimes(self, data: Dict) -> Dict:
         """Convert datetime objects to ISO format strings."""

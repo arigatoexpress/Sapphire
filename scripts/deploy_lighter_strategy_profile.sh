@@ -162,6 +162,16 @@ case "$PROFILE" in
     ;;
 esac
 
+# Global operational defaults (applies unless profile explicitly overrides).
+: "${KV[LIGHTER_EXECUTION_WATCHDOG_ENABLED]:=true}"
+: "${KV[LIGHTER_EXECUTION_WATCHDOG_NO_FILL_SECONDS]:=900}"
+: "${KV[LIGHTER_EXECUTION_WATCHDOG_COOLDOWN_SECONDS]:=900}"
+: "${KV[LIGHTER_EXECUTION_FAILSAFE_ENABLED]:=true}"
+: "${KV[LIGHTER_EXECUTION_FAILSAFE_ALERT_THRESHOLD]:=3}"
+: "${KV[LIGHTER_EXECUTION_FAILSAFE_HOLD_SECONDS]:=1800}"
+: "${KV[LIGHTER_LANE_HEARTBEAT_ENABLED]:=true}"
+: "${KV[LIGHTER_LANE_HEARTBEAT_SECONDS]:=900}"
+
 echo "Applying profile '$PROFILE' to $TARGET_HOST ..."
 
 # Build Python dict literal content safely.

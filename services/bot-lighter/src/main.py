@@ -20,7 +20,7 @@ from decimal import Decimal, InvalidOperation
 from datetime import datetime, timezone
 from collections import defaultdict, deque
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 # Load .env file if present (for local/Pi deployment)
 try:
@@ -121,6 +121,8 @@ class LighterBot:
         self.running = False
         self._init_complete = False
         self._shutdown_event = asyncio.Event()
+        self._tasks: List[asyncio.Task] = []
+        self._cleanup_complete = False
 
         # Lighter SDK components
         self.client = None
@@ -176,6 +178,7 @@ class LighterBot:
         # in-memory fast path.  Initialized without a Firestore client; warm() is
         # called after initialize() connects to GCP.
         self._idempotency: Optional[ExecutionIdempotency] = None
+        self._pubsub_initialized = False
         self._signal_dedupe_ttl_seconds = max(
             60, int(os.getenv("SIGNAL_DEDUPE_TTL_SECONDS", "900"))
         )
@@ -376,6 +379,46 @@ class LighterBot:
             self._env_float(("LIGHTER_ASSISTANT_BRIEF_INTERVAL_SECONDS",), default=300.0),
         )
         self._last_assistant_brief_ts: float = 0.0
+        self._execution_watchdog_enabled = self._env_flag(
+            "LIGHTER_EXECUTION_WATCHDOG_ENABLED",
+            default=True,
+        )
+        self._execution_watchdog_no_fill_seconds = max(
+            120.0,
+            self._env_float(("LIGHTER_EXECUTION_WATCHDOG_NO_FILL_SECONDS",), default=900.0),
+        )
+        self._execution_watchdog_cooldown_seconds = max(
+            60.0,
+            self._env_float(("LIGHTER_EXECUTION_WATCHDOG_COOLDOWN_SECONDS",), default=900.0),
+        )
+        self._execution_failsafe_enabled = self._env_flag(
+            "LIGHTER_EXECUTION_FAILSAFE_ENABLED",
+            default=True,
+        )
+        self._execution_failsafe_alert_threshold = max(
+            1,
+            int(self._env_float(("LIGHTER_EXECUTION_FAILSAFE_ALERT_THRESHOLD",), default=3.0)),
+        )
+        self._execution_failsafe_hold_seconds = max(
+            300.0,
+            self._env_float(("LIGHTER_EXECUTION_FAILSAFE_HOLD_SECONDS",), default=1800.0),
+        )
+        self._execution_watchdog_alert_streak: int = 0
+        self._execution_failsafe_until_ts: float = 0.0
+        self._execution_failsafe_reason: str = ""
+        self._last_execution_attempt_ts: float = 0.0
+        self._last_successful_fill_ts: float = 0.0
+        self._last_execution_error_message: str = ""
+        self._last_execution_watchdog_alert_ts: float = 0.0
+        self._lane_heartbeat_enabled = self._env_flag(
+            "LIGHTER_LANE_HEARTBEAT_ENABLED",
+            default=True,
+        )
+        self._lane_heartbeat_seconds = max(
+            300.0,
+            self._env_float(("LIGHTER_LANE_HEARTBEAT_SECONDS",), default=900.0),
+        )
+        self._last_lane_heartbeat_ts: float = 0.0
         self._price_history_limit = max(
             30,
             int(self._env_float(("LIGHTER_PRICE_HISTORY_POINTS",), default=90.0)),
@@ -383,6 +426,8 @@ class LighterBot:
         self._price_history: Dict[str, deque] = defaultdict(
             lambda: deque(maxlen=self._price_history_limit)
         )
+        self._stop_gateway_server: Optional[Callable[[], Any]] = None
+        self._http_session = None
         logger.info(
             "Strategy policy | allowed_strategies=%s allowed_timeframes=%s "
             "allowed_sources=%s "
@@ -390,7 +435,9 @@ class LighterBot:
             "max_position_notional=%.2f target_order_notional=%.2f min_entry_notional=%.2f max_signal_leverage=%.1fx "
             "sync_before_entry=%s jurisdiction_block=%.0fs progress_verify=%.0fs dd_alert=%.2f%% "
             "sync_stale_alert=%.0fs risk_level_max_dev=%.1f%% empty_pos_confirm=%d "
-            "tg_digest=%.0fs tg_charts=%s dynamic_risk=%s rotation=%s edge=%.3f%%",
+            "tg_digest=%.0fs tg_charts=%s dynamic_risk=%s rotation=%s edge=%.3f%% "
+            "watchdog=%s no_fill=%.0fs cooldown=%.0fs failsafe=%s threshold=%d hold=%.0fs "
+            "lane_heartbeat=%s hb_int=%.0fs",
             sorted(self._allowed_strategies) if self._allowed_strategies else ["*"],
             sorted(self._allowed_timeframes) if self._allowed_timeframes else ["*"],
             sorted(self._allowed_signal_sources) if self._allowed_signal_sources else ["*"],
@@ -413,6 +460,14 @@ class LighterBot:
             self._dynamic_risk_enabled,
             self._opportunity_rotation_enabled,
             self._opportunity_rotation_min_edge_pct,
+            self._execution_watchdog_enabled,
+            self._execution_watchdog_no_fill_seconds,
+            self._execution_watchdog_cooldown_seconds,
+            self._execution_failsafe_enabled,
+            self._execution_failsafe_alert_threshold,
+            self._execution_failsafe_hold_seconds,
+            self._lane_heartbeat_enabled,
+            self._lane_heartbeat_seconds,
         )
 
     @staticmethod
@@ -484,8 +539,7 @@ class LighterBot:
             self._jurisdiction_block_reason,
         )
 
-    @staticmethod
-    async def _call_lighter_api(api_callable, *args, **kwargs):
+    async def _call_lighter_api(self, api_callable, *args, **kwargs):
         """
         Invoke Lighter SDK methods (sync or async) with exponential-backoff retry.
 
@@ -509,6 +563,8 @@ class LighterBot:
 
         last_exc: Optional[Exception] = None
         for attempt in range(1, 4):  # attempts 1, 2, 3
+            if self._shutdown_event.is_set():
+                raise asyncio.CancelledError()
             try:
                 if inspect.iscoroutinefunction(api_callable):
                     return await asyncio.wait_for(
@@ -526,6 +582,8 @@ class LighterBot:
                 return result
 
             except _RETRYABLE as exc:
+                if self._shutdown_event.is_set():
+                    raise asyncio.CancelledError()
                 last_exc = exc
                 if attempt == 3:
                     break
@@ -534,7 +592,7 @@ class LighterBot:
                     "Lighter API connection error (attempt %d/3, retry in %ds): %s: %s",
                     attempt, wait, type(exc).__name__, exc,
                 )
-                await asyncio.sleep(wait)
+                await self._sleep_or_stop(wait)
 
         raise last_exc  # type: ignore[misc]
 
@@ -552,12 +610,15 @@ class LighterBot:
             return False
 
         try:
-            # Set API base URL based on testnet flag
-            base_url = (
-                "https://testnet.zklighter.elliot.ai"
-                if LIGHTER_TESTNET
-                else "https://mainnet.zklighter.elliot.ai"
-            )
+            # Respect explicit LIGHTER_API_URL (used for VPN/proxy/tunnel egress).
+            # Fallback to network default only when env is unset.
+            base_url = str(LIGHTER_API_URL or "").strip()
+            if not base_url:
+                base_url = (
+                    "https://testnet.zklighter.elliot.ai"
+                    if LIGHTER_TESTNET
+                    else "https://mainnet.zklighter.elliot.ai"
+                )
 
             # Configure proxy if set (for VPN tunneling)
             proxy_url = os.getenv("HTTP_PROXY") or os.getenv("HTTPS_PROXY")
@@ -634,6 +695,7 @@ class LighterBot:
 
             await subscribe("trading-signals", self._handle_signal)
             await subscribe("risk-alerts", self._handle_risk_alert)
+            self._pubsub_initialized = True
 
             # Initialize Firestore-backed idempotency guard and warm from recent history.
             try:
@@ -670,6 +732,7 @@ class LighterBot:
         balance_age = snapshot.get("balance_sync_age_sec")
         position_age = snapshot.get("position_check_age_sec")
         block_remaining = max(0.0, self._jurisdiction_block_until_ts - now_ts)
+        failsafe_remaining = max(0.0, self._execution_failsafe_until_ts - now_ts)
         ready_reasons: List[str] = []
 
         if not self._init_complete:
@@ -686,6 +749,8 @@ class LighterBot:
             ready_reasons.append("execution_blocked")
         if block_remaining > 0:
             ready_reasons.append("jurisdiction_block_active")
+        if failsafe_remaining > 0:
+            ready_reasons.append("execution_failsafe_active")
 
         ready = len(ready_reasons) == 0
         return {
@@ -701,6 +766,8 @@ class LighterBot:
             "market_count": len(self.market_info),
             "execution_block_reason": self._execution_block_reason or "",
             "jurisdiction_block_remaining_sec": round(block_remaining, 3),
+            "execution_failsafe_remaining_sec": round(failsafe_remaining, 3),
+            "execution_failsafe_reason": self._execution_failsafe_reason or "",
             "balance_sync_age_sec": balance_age,
             "position_check_age_sec": position_age,
             "last_balance_sync_error": self._last_balance_sync_error,
@@ -869,10 +936,11 @@ class LighterBot:
         """Start the bot's main trading loop."""
         # Start Execution Gateway FIRST (Cloud Run Health Check requirement)
         try:
-            from shared.gateway import start_gateway_server
+            from shared.gateway import start_gateway_server, stop_gateway_server
         except ImportError:
-            from gateway import start_gateway_server
+            from gateway import start_gateway_server, stop_gateway_server
 
+        self._stop_gateway_server = stop_gateway_server
         self.command_queue = await start_gateway_server(status_provider=self._gateway_status_payload)
 
         if not await self.initialize():
@@ -880,20 +948,24 @@ class LighterBot:
             return
 
         self.running = True
+        self._cleanup_complete = False
         logger.info(f"Bot {SERVICE_NAME} is now running in HYBRID MODE")
 
         try:
-            tasks = [
-                self._main_loop(),
-                self._gateway_loop(),
-                self._balance_sync_loop(),
-                self._position_publish_loop(),
-                self._progress_verification_loop(),
+            self._tasks = [
+                asyncio.create_task(self._main_loop(), name="lighter_main_loop"),
+                asyncio.create_task(self._gateway_loop(), name="lighter_gateway_loop"),
+                asyncio.create_task(self._balance_sync_loop(), name="lighter_balance_loop"),
+                asyncio.create_task(self._position_publish_loop(), name="lighter_position_loop"),
+                asyncio.create_task(self._progress_verification_loop(), name="lighter_progress_loop"),
             ]
-            await asyncio.gather(*tasks)
+            await asyncio.gather(*self._tasks)
 
         except asyncio.CancelledError:
             logger.info("Bot stopped via cancellation")
+        finally:
+            await self._finalize_shutdown()
+            self._tasks = []
 
     async def _gateway_loop(self):
         """Listen for external execution commands from the Hub."""
@@ -1036,7 +1108,32 @@ class LighterBot:
         logger.info(f"Stopping {SERVICE_NAME}...")
         self.running = False
         self._shutdown_event.set()
+
+        current = asyncio.current_task()
+        pending = [
+            t for t in self._tasks
+            if t is not None and t is not current and not t.done()
+        ]
+        for task in pending:
+            task.cancel()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+
+        await self._finalize_shutdown()
+
+    async def _finalize_shutdown(self) -> None:
+        """Idempotent final cleanup for network clients and gateway."""
+        if self._cleanup_complete:
+            return
+        self._cleanup_complete = True
         await self._close_clients()
+        if self._stop_gateway_server is not None:
+            try:
+                maybe = self._stop_gateway_server()
+                if inspect.isawaitable(maybe):
+                    await maybe
+            except Exception as exc:
+                logger.debug("Gateway stop failed: %s", exc)
 
     async def _sleep_or_stop(self, timeout_seconds: float) -> None:
         """Sleep with early wakeup when shutdown is requested."""
@@ -1051,28 +1148,134 @@ class LighterBot:
             return
 
     async def _close_clients(self) -> None:
-        """Best-effort close of SDK/network clients to avoid aiohttp session leaks."""
-        api_client = getattr(self.client, "api_client", None)
-        if api_client is None:
-            return
+        """Best-effort close of all SDK/network clients to avoid aiohttp leaks."""
+        logger.info("Running shutdown client cleanup...")
 
-        close_fn = getattr(api_client, "close", None)
-        if callable(close_fn):
+        async def _close_aiohttp_session(session: Any) -> None:
+            if session is None or getattr(session, "closed", True):
+                return
+            owner_loop = getattr(session, "_loop", None)
+            running_loop = None
             try:
-                maybe = close_fn()
-                if inspect.isawaitable(maybe):
-                    await maybe
+                running_loop = asyncio.get_running_loop()
+            except Exception:
+                running_loop = None
+            try:
+                if owner_loop is not None and running_loop is not None and owner_loop is not running_loop:
+                    if owner_loop.is_running():
+                        fut = asyncio.run_coroutine_threadsafe(session.close(), owner_loop)
+                        await asyncio.to_thread(fut.result, timeout=3)
+                    else:
+                        await session.close()
+                else:
+                    await session.close()
             except Exception as exc:
-                logger.debug("API client close failed: %s", exc)
+                logger.debug("aiohttp close failed: %s", exc)
 
-        rest_client = getattr(api_client, "rest_client", None)
-        pool_manager = getattr(rest_client, "pool_manager", None) if rest_client else None
-        close_pool = getattr(pool_manager, "close", None) if pool_manager else None
-        if callable(close_pool):
+        async def _close_maybe_async(obj: Any) -> None:
+            close_fn = getattr(obj, "close", None)
+            if callable(close_fn):
+                try:
+                    maybe = close_fn()
+                    if inspect.isawaitable(maybe):
+                        await maybe
+                except Exception as exc:
+                    logger.debug("Close failed for %s: %s", type(obj).__name__, exc)
+
+        async def _close_embedded_sessions(obj: Any) -> None:
+            if obj is None:
+                return
             try:
-                close_pool()
+                import aiohttp as _aio
+            except Exception:
+                _aio = None
+
+            candidates: List[Any] = [obj]
+            for attr in ("session", "_session", "client_session", "_client_session", "rest_client"):
+                try:
+                    candidate = getattr(obj, attr, None)
+                    if candidate is not None:
+                        candidates.append(candidate)
+                except Exception:
+                    pass
+
+            for candidate in candidates:
+                if candidate is None:
+                    continue
+                if _aio is not None and isinstance(candidate, _aio.ClientSession):
+                    await _close_aiohttp_session(candidate)
+                await _close_maybe_async(candidate)
+
+        seen = set()
+        targets = [
+            self.client,
+            self.account_api,
+            self.transaction_api,
+            self.order_api,
+            self.signer_client,
+        ]
+
+        for obj in targets:
+            if obj is None:
+                continue
+            api_client = getattr(obj, "api_client", None) or obj
+            key = id(api_client)
+            if key in seen:
+                continue
+            seen.add(key)
+
+            await _close_maybe_async(api_client)
+            await _close_embedded_sessions(api_client)
+            await _close_embedded_sessions(obj)
+
+            rest_client = getattr(api_client, "rest_client", None)
+            pool_manager = getattr(rest_client, "pool_manager", None) if rest_client else None
+            close_pool = getattr(pool_manager, "close", None) if pool_manager else None
+            if callable(close_pool):
+                try:
+                    maybe = close_pool()
+                    if inspect.isawaitable(maybe):
+                        await maybe
+                except Exception as exc:
+                    logger.debug("REST pool close failed: %s", exc)
+
+        # Close global Pub/Sub clients to avoid transport leaks at process shutdown.
+        if self._pubsub_initialized:
+            try:
+                pubsub_client = get_pubsub_client()
+                await pubsub_client.close()
             except Exception as exc:
-                logger.debug("REST pool close failed: %s", exc)
+                logger.debug("Pub/Sub close failed: %s", exc)
+            finally:
+                self._pubsub_initialized = False
+
+        # Shared outbound HTTP client (Telegram + future integrations).
+        try:
+            if self._http_session is not None:
+                await _close_maybe_async(self._http_session)
+                self._http_session = None
+        except Exception as exc:
+            logger.debug("HTTP session close failed: %s", exc)
+
+        # Last-chance sweep: close any leaked aiohttp sessions left by SDK internals.
+        try:
+            import aiohttp as _aio
+            import gc as _gc
+
+            leaked = 0
+            for obj in _gc.get_objects():
+                if isinstance(obj, _aio.ClientSession) and not obj.closed:
+                    try:
+                        await _close_aiohttp_session(obj)
+                        leaked += 1
+                    except Exception:
+                        pass
+            if leaked:
+                logger.info("Closed %d leaked aiohttp sessions during shutdown", leaked)
+            else:
+                logger.info("Shutdown cleanup found no leaked aiohttp sessions")
+        except Exception as exc:
+            logger.debug("Leaked aiohttp sweep skipped: %s", exc)
 
     async def _main_loop(self):
         """Main trading loop."""
@@ -1242,10 +1445,23 @@ class LighterBot:
                 return
 
             if signal.quantity is None:
-                logger.warning(
-                    f"Rejected signal without explicit quantity on {PLATFORM.value}: {signal.signal_id} {signal.symbol}"
-                )
-                return
+                reduce_only = bool(metadata.get("reduce_only", False))
+                if signal.signal_type in {
+                    SignalType.EXIT,
+                    SignalType.SCALE_OUT,
+                    SignalType.TAKE_PROFIT,
+                    SignalType.STOP_LOSS,
+                }:
+                    reduce_only = True
+                entry_like = signal.signal_type in {SignalType.ENTRY, SignalType.SCALE_IN}
+                if not (entry_like and not reduce_only and self._target_order_notional_usd > 0):
+                    logger.warning(
+                        f"Rejected signal without explicit quantity on {PLATFORM.value}: {signal.signal_id} {signal.symbol}"
+                    )
+                    return
+                if signal.metadata is None:
+                    signal.metadata = {}
+                signal.metadata.setdefault("auto_quantity", "target_notional")
 
             allowed, reason = self._is_signal_allowed_by_policy(signal)
             if not allowed:
@@ -1443,15 +1659,17 @@ class LighterBot:
             }
             if parse_mode:
                 payload["parse_mode"] = parse_mode
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.post(url, json=payload) as response:
-                    if response.status >= 400:
-                        body = await response.text()
-                        logger.warning(
-                            "Telegram alert failed (%s): %s",
-                            response.status,
-                            body[:160],
-                        )
+            session = await self._get_http_session()
+            if session is None:
+                return
+            async with session.post(url, json=payload, timeout=timeout) as response:
+                if response.status >= 400:
+                    body = await response.text()
+                    logger.warning(
+                        "Telegram alert failed (%s): %s",
+                        response.status,
+                        body[:160],
+                    )
         except Exception as exc:
             logger.warning("Telegram alert error: %s", exc)
 
@@ -1483,17 +1701,31 @@ class LighterBot:
                     filename=image_path.name,
                     content_type="image/png",
                 )
-                async with aiohttp.ClientSession(timeout=timeout) as session:
-                    async with session.post(url, data=data) as response:
-                        if response.status >= 400:
-                            body = await response.text()
-                            logger.warning(
-                                "Telegram photo failed (%s): %s",
-                                response.status,
-                                body[:180],
-                            )
+                session = await self._get_http_session()
+                if session is None:
+                    return
+                async with session.post(url, data=data, timeout=timeout) as response:
+                    if response.status >= 400:
+                        body = await response.text()
+                        logger.warning(
+                            "Telegram photo failed (%s): %s",
+                            response.status,
+                            body[:180],
+                        )
         except Exception as exc:
             logger.warning("Telegram photo error: %s", exc)
+
+    async def _get_http_session(self):
+        try:
+            import aiohttp
+        except Exception:
+            return None
+        session = self._http_session
+        if session is None or getattr(session, "closed", False):
+            timeout = aiohttp.ClientTimeout(total=12)
+            self._http_session = aiohttp.ClientSession(timeout=timeout)
+            session = self._http_session
+        return session
 
     def _record_price_point(self, symbol: str, price: float) -> None:
         px = self._to_float(price, 0.0)
@@ -2383,6 +2615,17 @@ class LighterBot:
             payload["avg_price"],
             payload["equity_estimate"],
         )
+        now_ts = time.time()
+        result_meta = getattr(result, "metadata", {}) or {}
+        is_noop = bool(result_meta.get("noop", False))
+        if not is_noop:
+            self._last_execution_attempt_ts = now_ts
+            if payload["success"] and self._to_float(payload["filled_quantity"], 0.0) > 0:
+                self._last_successful_fill_ts = now_ts
+                self._last_execution_error_message = ""
+                self._execution_watchdog_alert_streak = 0
+            else:
+                self._last_execution_error_message = str(payload.get("error_message") or "")[:280]
         if self._db is None:
             return
         try:
@@ -2391,6 +2634,99 @@ class LighterBot:
             await self._db.collection("execution_verifications").document(doc_id).set(payload)
         except Exception as exc:
             logger.debug("Execution verification write error: %s", exc)
+
+    def _clear_execution_failsafe(self) -> bool:
+        """Clear active execution failsafe hold if present."""
+        if self._execution_failsafe_until_ts <= 0:
+            return False
+        self._execution_failsafe_until_ts = 0.0
+        self._execution_failsafe_reason = ""
+        self._execution_watchdog_alert_streak = 0
+        return True
+
+    def _activate_execution_failsafe(self, reason: str, *, now_ts: Optional[float] = None) -> bool:
+        """Activate (or extend) execution failsafe hold window."""
+        if not self._execution_failsafe_enabled:
+            return False
+        ts = float(now_ts if now_ts is not None else time.time())
+        until_ts = ts + self._execution_failsafe_hold_seconds
+        changed = until_ts > self._execution_failsafe_until_ts + 1e-6
+        self._execution_failsafe_until_ts = max(self._execution_failsafe_until_ts, until_ts)
+        self._execution_failsafe_reason = str(reason or self._execution_failsafe_reason or "").strip()[:280]
+        return changed
+
+    async def _maybe_send_lane_heartbeat(self, snap: Dict[str, Any], now_ts: Optional[float] = None) -> None:
+        """Periodic concise lane-status heartbeat for operators."""
+        if not self._lane_heartbeat_enabled:
+            return
+        if not self._telegram_bot_token or not self._telegram_chat_id:
+            return
+        ts = float(now_ts if now_ts is not None else time.time())
+        if self._last_lane_heartbeat_ts and (ts - self._last_lane_heartbeat_ts) < self._lane_heartbeat_seconds:
+            return
+        self._last_lane_heartbeat_ts = ts
+
+        bal_age = self._to_float(snap.get("balance_sync_age_sec"), 0.0)
+        pos_age = self._to_float(snap.get("position_check_age_sec"), 0.0)
+        balance_stale = bool(snap.get("balance_sync_stale"))
+        position_stale = bool(snap.get("position_check_stale"))
+        failsafe_remaining = max(0.0, self._execution_failsafe_until_ts - ts)
+        jurisdiction_remaining = max(0.0, self._jurisdiction_block_until_ts - ts)
+        attempt_age = (
+            ts - self._last_execution_attempt_ts
+            if self._last_execution_attempt_ts > 0
+            else 0.0
+        )
+        fill_age = (
+            ts - self._last_successful_fill_ts
+            if self._last_successful_fill_ts > 0
+            else 0.0
+        )
+        lane_ready = (
+            not balance_stale
+            and not position_stale
+            and failsafe_remaining <= 0
+            and jurisdiction_remaining <= 0
+            and not bool(self._execution_block_reason)
+            and bool(self._trading_enabled)
+            and (self._trading_mode != "live" or bool(self._allow_live_trading))
+        )
+
+        lines = [
+            f"{'🟢' if lane_ready else '🟠'} <b>LIGHTER LANE HEARTBEAT</b>",
+            (
+                f"<b>Ready</b> {'YES' if lane_ready else 'NO'} · "
+                f"<b>Mode</b> {html.escape(self._trading_mode)} · "
+                f"<b>Positions</b> {int(snap.get('positions_count', 0) or 0)}"
+            ),
+            (
+                f"<b>Equity</b> {self._to_float(snap.get('equity_estimate'), 0.0):,.4f} · "
+                f"<b>Cash</b> {self._to_float(snap.get('cash_balance'), 0.0):,.4f} · "
+                f"<b>uPnL</b> {self._to_float(snap.get('unrealized_pnl'), 0.0):+,.4f}"
+            ),
+            (
+                f"<b>Sync</b> bal={bal_age:.0f}s{'⚠️' if balance_stale else ''} · "
+                f"pos={pos_age:.0f}s{'⚠️' if position_stale else ''}"
+            ),
+            (
+                f"<b>Execution</b> last_attempt={attempt_age:.0f}s · "
+                f"last_fill={fill_age:.0f}s · watchdog_streak={self._execution_watchdog_alert_streak}"
+            ),
+        ]
+        if failsafe_remaining > 0:
+            lines.append(
+                f"<b>Failsafe</b> active {failsafe_remaining:.0f}s · "
+                f"{html.escape(self._execution_failsafe_reason or 'watchdog')}"
+            )
+        if jurisdiction_remaining > 0:
+            lines.append(
+                f"<b>Jurisdiction Block</b> {jurisdiction_remaining:.0f}s · "
+                f"{html.escape(self._jurisdiction_block_reason or 'restricted jurisdiction')}"
+            )
+        if self._execution_block_reason:
+            lines.append(f"<b>Execution Block</b> {html.escape(self._execution_block_reason[:220])}")
+
+        await self._send_telegram_message("\n".join(lines), parse_mode="HTML")
 
     async def _progress_verification_loop(self) -> None:
         """
@@ -2439,6 +2775,13 @@ class LighterBot:
                 await self._persist_equity_snapshot(snap, reason="progress_loop")
 
                 now_ts = time.time()
+                if self._execution_failsafe_until_ts > 0 and now_ts >= self._execution_failsafe_until_ts:
+                    if self._clear_execution_failsafe():
+                        await self._send_telegram_message(
+                            "🟢 <b>LIGHTER EXECUTION FAILSAFE CLEARED</b>\nHold window elapsed; entry lane re-enabled.",
+                            parse_mode="HTML",
+                        )
+
                 if bool(snap.get("balance_sync_stale")) or bool(snap.get("position_check_stale")):
                     logger.warning(
                         "Data freshness warning | balance_stale=%s age=%ss pos_stale=%s age=%ss "
@@ -2479,6 +2822,60 @@ class LighterBot:
                         )
                     )
 
+                if self._execution_watchdog_enabled and self._trading_enabled and self._allow_live_trading:
+                    no_success_since_attempt = (
+                        self._last_execution_attempt_ts > 0
+                        and (
+                            self._last_successful_fill_ts <= 0
+                            or self._last_successful_fill_ts < self._last_execution_attempt_ts
+                        )
+                    )
+                    attempt_age = (
+                        now_ts - self._last_execution_attempt_ts
+                        if self._last_execution_attempt_ts > 0
+                        else 0.0
+                    )
+                    if (
+                        no_success_since_attempt
+                        and attempt_age >= self._execution_watchdog_no_fill_seconds
+                        and (now_ts - self._last_execution_watchdog_alert_ts)
+                        >= self._execution_watchdog_cooldown_seconds
+                    ):
+                        self._last_execution_watchdog_alert_ts = now_ts
+                        self._execution_watchdog_alert_streak += 1
+                        await self._send_telegram_message(
+                            (
+                                "LIGHTER EXECUTION WATCHDOG ALERT\n"
+                                f"streak={self._execution_watchdog_alert_streak} threshold={self._execution_failsafe_alert_threshold}\n"
+                                f"no successful fill for {attempt_age:.0f}s after latest execution attempt\n"
+                                f"last_error={self._last_execution_error_message or 'unknown'}\n"
+                                f"lane_ready={bool(not snap.get('balance_sync_stale') and not snap.get('position_check_stale'))} "
+                                f"jurisdiction_block={max(0.0, self._jurisdiction_block_until_ts - now_ts):.0f}s"
+                            )
+                        )
+                        if (
+                            self._execution_failsafe_enabled
+                            and self._execution_watchdog_alert_streak >= self._execution_failsafe_alert_threshold
+                        ):
+                            reason = (
+                                f"watchdog_no_fill_{attempt_age:.0f}s "
+                                f"(streak={self._execution_watchdog_alert_streak})"
+                            )
+                            activated = self._activate_execution_failsafe(reason, now_ts=now_ts)
+                            if activated:
+                                await self._send_telegram_message(
+                                    (
+                                        "🛑 <b>LIGHTER EXECUTION FAILSAFE ACTIVATED</b>\n"
+                                        f"hold={self._execution_failsafe_hold_seconds:.0f}s · "
+                                        f"reason={html.escape(reason)}\n"
+                                        "Entry-like trades are blocked until hold expires."
+                                    ),
+                                    parse_mode="HTML",
+                                )
+                    elif not no_success_since_attempt and self._execution_watchdog_alert_streak > 0:
+                        self._execution_watchdog_alert_streak = 0
+
+                await self._maybe_send_lane_heartbeat(snap, now_ts=now_ts)
                 await self._maybe_send_portfolio_digest(snap)
                 await self._maybe_publish_assistant_brief(snap)
 
@@ -2591,6 +2988,13 @@ class LighterBot:
                     raise Exception("Trading disabled (TRADING_ENABLED=false)")
                 if self._trading_mode == "live" and not self._allow_live_trading:
                     raise Exception("Live trading disabled (ALLOW_LIVE_TRADING=0)")
+                if entry_like and not reduce_only:
+                    failsafe_remaining = max(0.0, self._execution_failsafe_until_ts - time.time())
+                    if failsafe_remaining > 0:
+                        raise Exception(
+                            f"Execution failsafe active ({failsafe_remaining:.0f}s remaining): "
+                            f"{self._execution_failsafe_reason or 'watchdog no-fill protection'}"
+                        )
                 if entry_like and not reduce_only and self._jurisdiction_block_until_ts > time.time():
                     wait_s = max(0.0, self._jurisdiction_block_until_ts - time.time())
                     raise Exception(
@@ -2612,11 +3016,17 @@ class LighterBot:
                 raise ValueError(f"No order book mapping for symbol {signal.symbol} (normalized={coin})")
 
             # Safety: require explicit quantity in inbound signal.
+            quantity: float = 0.0
             if signal.quantity is None:
-                raise ValueError("Signal quantity is required for live execution")
-
-            # Calculate quantity
-            quantity = float(signal.quantity)
+                # Allow quantity-less entry signals when target notional sizing is enabled.
+                if not (entry_like and not reduce_only and self._target_order_notional_usd > 0):
+                    raise ValueError("Signal quantity is required for live execution")
+                if signal.metadata is None:
+                    signal.metadata = {}
+                signal.metadata.setdefault("auto_quantity", "target_notional")
+            else:
+                # Calculate quantity
+                quantity = float(signal.quantity)
             signal_leverage = self._to_float(getattr(signal, "leverage", 0.0), 0.0)
             if signal_leverage > self._max_signal_leverage:
                 raise ValueError(
@@ -2838,6 +3248,29 @@ class LighterBot:
                 else:
                     projected_notional = abs(current_notional - requested_notional)
                 if projected_notional > self._max_position_notional_usd:
+                    if same_direction and current_notional >= (self._max_position_notional_usd * 0.98):
+                        logger.info(
+                            "Entry skipped at position cap for %s | current=%.4f cap=%.4f projected=%.4f",
+                            coin,
+                            current_notional,
+                            self._max_position_notional_usd,
+                            projected_notional,
+                        )
+                        return TradeResult(
+                            trade_id="noop",
+                            signal_id=signal.signal_id,
+                            platform=PLATFORM.value,
+                            symbol=signal.symbol,
+                            side=signal.side,
+                            success=True,
+                            metadata={
+                                "noop": True,
+                                "reason": "position_cap_reached",
+                                "current_notional": current_notional,
+                                "projected_notional": projected_notional,
+                                "cap_notional": self._max_position_notional_usd,
+                            },
+                        )
                     raise ValueError(
                         f"Max position notional exceeded for {coin}: "
                         f"projected={projected_notional:.4f} cap={self._max_position_notional_usd:.4f}"
@@ -3618,7 +4051,11 @@ class LighterBot:
 
             self.positions = next_positions
 
+        except asyncio.CancelledError:
+            return
         except Exception as e:
+            if self._shutdown_event.is_set():
+                return
             self._last_position_check_error = f"{type(e).__name__}: {e}"
             logger.error(f"Position check error: {e}")
 
@@ -3747,6 +4184,12 @@ class LighterBot:
                 filled_qty = self._to_float(getattr(result, "filled_quantity", 0.0), 0.0)
                 if result.success and (filled_qty > 0 or (result.metadata or {}).get("noop")):
                     summary["closed"] += 1
+                    # Clear local state immediately for successfully closed symbols so
+                    # follow-up entries are not blocked by stale local position notional.
+                    self.positions.pop(symbol, None)
+                    self._risk_exit_attempted_at.pop(symbol, None)
+                    self._last_entry_ts.pop(symbol, None)
+                    self._empty_position_snapshot_streak = 0
                 else:
                     summary["failed"] += 1
                     logger.error(
