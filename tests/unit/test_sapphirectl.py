@@ -9,6 +9,18 @@ SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "sapphirectl.py"
 sys.modules.setdefault("google", types.ModuleType("google"))
 sys.modules.setdefault("google.cloud", types.ModuleType("google.cloud"))
 sys.modules.setdefault("google.cloud.firestore", types.ModuleType("google.cloud.firestore"))
+sys.modules.setdefault("google.cloud.firestore_v1", types.ModuleType("google.cloud.firestore_v1"))
+base_query_mod = types.ModuleType("google.cloud.firestore_v1.base_query")
+
+
+class _FieldFilter:
+    def __init__(self, *_args, **_kwargs):
+        self.args = _args
+        self.kwargs = _kwargs
+
+
+setattr(base_query_mod, "FieldFilter", _FieldFilter)
+sys.modules.setdefault("google.cloud.firestore_v1.base_query", base_query_mod)
 
 SPEC = importlib.util.spec_from_file_location("sapphirectl_module", SCRIPT_PATH)
 MOD = importlib.util.module_from_spec(SPEC)
@@ -217,3 +229,46 @@ def test_rollback_no_restart_uses_historical_profile(monkeypatch):
     assert captured["profile"] == "luxalgo_sol_15m_safe"
     assert captured["no_restart"] is True
     assert captured["overrides"]["LIGHTER_ENTRY_COOLDOWN_SECONDS"] == "777"
+
+
+def test_lane_check_selects_failover_when_primary_unhealthy(monkeypatch):
+    ctl = _make_ctl()
+    monkeypatch.setenv("SAPPHIRECTL_FAILOVER_HOSTS", "rari@backup1,rari@backup2")
+    monkeypatch.setattr(
+        ctl,
+        "_lane_health",
+        lambda **_kwargs: {"healthy": False, "reasons": ["restricted-jurisdiction"]},
+    )
+    monkeypatch.setattr(
+        ctl,
+        "_fetch_runtime_status",
+        lambda **kwargs: {"ok": kwargs.get("target_host") == "rari@backup2", "http_status": "200"},
+    )
+    out = ctl.lane_check(
+        target_host="rari@primary",
+        run_test=True,
+        enforce_lane_health=True,
+        auto_failover=True,
+    )
+    assert out["selected_target_host"] == "rari@backup2"
+    assert out["failover_used"] is True
+    assert out["lane_decision"]["reason"] == "primary_lane_unhealthy_failover_selected"
+
+
+def test_lane_check_no_run_test_keeps_primary(monkeypatch):
+    ctl = _make_ctl()
+    monkeypatch.setenv("SAPPHIRECTL_FAILOVER_HOSTS", "rari@backup1")
+    monkeypatch.setattr(
+        ctl,
+        "_lane_health",
+        lambda **_kwargs: {"healthy": False, "reasons": ["restricted-jurisdiction"]},
+    )
+    out = ctl.lane_check(
+        target_host="rari@primary",
+        run_test=False,
+        enforce_lane_health=True,
+        auto_failover=True,
+    )
+    assert out["selected_target_host"] == "rari@primary"
+    assert out["failover_used"] is False
+    assert out["lane_decision"]["reason"] == "run_test_disabled"

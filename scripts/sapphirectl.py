@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 from google.cloud import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 
 PROJECT_ID = os.getenv("PROJECT_ID", "sapphire-479610")
@@ -262,6 +263,73 @@ class SapphireCtl:
             "payload": payload,
         }
 
+    @staticmethod
+    def _configured_failover_hosts() -> List[str]:
+        raw = str(os.getenv("SAPPHIRECTL_FAILOVER_HOSTS", "")).strip()
+        if not raw:
+            return []
+        hosts: List[str] = []
+        for item in raw.split(","):
+            host = item.strip()
+            if host:
+                hosts.append(host)
+        return hosts
+
+    def _select_target_host(
+        self,
+        *,
+        requested_target_host: str,
+        run_test: bool,
+        enforce_lane_health: bool,
+        auto_failover: bool,
+    ) -> Tuple[str, Dict[str, Any]]:
+        lookback = int(os.getenv("SAPPHIRECTL_LANE_LOOKBACK_MINUTES", "45"))
+        primary_lane = self._lane_health(target_host=requested_target_host, lookback_minutes=lookback)
+        failover_hosts = [h for h in self._configured_failover_hosts() if h != requested_target_host]
+        decision: Dict[str, Any] = {
+            "requested_target_host": requested_target_host,
+            "selected_target_host": requested_target_host,
+            "run_test": bool(run_test),
+            "enforce_lane_health": bool(enforce_lane_health),
+            "auto_failover": bool(auto_failover),
+            "primary_lane_health": primary_lane,
+            "failover_hosts": failover_hosts,
+            "failover_used": False,
+            "reason": "requested_host",
+            "fallback_candidates": [],
+        }
+
+        if not run_test:
+            decision["reason"] = "run_test_disabled"
+            return requested_target_host, decision
+        if not enforce_lane_health:
+            decision["reason"] = "lane_health_enforcement_disabled"
+            return requested_target_host, decision
+        if primary_lane.get("healthy", False):
+            decision["reason"] = "primary_lane_healthy"
+            return requested_target_host, decision
+        if not auto_failover:
+            decision["reason"] = "primary_lane_unhealthy_no_failover"
+            return requested_target_host, decision
+
+        for host in failover_hosts:
+            runtime = self._fetch_runtime_status(target_host=host)
+            candidate = {
+                "host": host,
+                "runtime_ok": bool(runtime.get("ok", False)),
+                "runtime_http_status": runtime.get("http_status", ""),
+                "runtime_output": runtime.get("output", ""),
+            }
+            decision["fallback_candidates"].append(candidate)
+            if runtime.get("ok", False):
+                decision["selected_target_host"] = host
+                decision["failover_used"] = True
+                decision["reason"] = "primary_lane_unhealthy_failover_selected"
+                return host, decision
+
+        decision["reason"] = "primary_lane_unhealthy_no_healthy_failover"
+        return requested_target_host, decision
+
     def _lane_health(self, *, target_host: str, lookback_minutes: int = 45) -> Dict[str, Any]:
         now = _utc_now()
         since = now - timedelta(minutes=max(1, int(lookback_minutes)))
@@ -271,7 +339,7 @@ class SapphireCtl:
         exec_rows: List[Dict[str, Any]] = []
         query = (
             self.db.collection("execution_verifications")
-            .where("recorded_at", ">=", since)
+            .where(filter=FieldFilter("recorded_at", ">=", since))
             .order_by("recorded_at", direction=firestore.Query.ASCENDING)
         )
         try:
@@ -588,6 +656,7 @@ class SapphireCtl:
         update_desired: bool = True,
         no_restart: bool = False,
         enforce_lane_health: bool = True,
+        auto_failover: bool = True,
     ) -> Dict[str, Any]:
         desired = self._build_desired_state(
             profile=profile,
@@ -608,6 +677,26 @@ class SapphireCtl:
             desired_ref.set(desired)
             self._event("desired_state_updated", {"desired_version": desired["desired_version"], **desired})
 
+        selected_target_host = target_host
+        lane_decision: Dict[str, Any] = {}
+        if not no_restart:
+            selected_target_host, lane_decision = self._select_target_host(
+                requested_target_host=target_host,
+                run_test=run_test,
+                enforce_lane_health=enforce_lane_health,
+                auto_failover=auto_failover,
+            )
+            self._event(
+                "lane_selection",
+                {
+                    "desired_version": desired["desired_version"],
+                    "requested_target_host": target_host,
+                    "selected_target_host": selected_target_host,
+                    "failover_used": bool(lane_decision.get("failover_used", False)),
+                    "reason": lane_decision.get("reason", ""),
+                },
+            )
+
         if no_restart:
             skipped = CommandResult(
                 ok=True,
@@ -620,6 +709,7 @@ class SapphireCtl:
                 "platform": PLATFORM,
                 "service": DEFAULT_SERVICE,
                 "target_host": target_host,
+                "selected_target_host": selected_target_host,
                 "profile": profile,
                 "desired_version": desired["desired_version"],
                 "applied_at": _utc_now(),
@@ -634,6 +724,7 @@ class SapphireCtl:
                 "override_apply": skipped.to_dict(),
                 "test": skipped.to_dict(),
                 "close": skipped.to_dict(),
+                "lane_decision": lane_decision,
             }
             applied_ref.set(applied_payload)
             history_id = f"{_utc_now().strftime('%Y%m%dT%H%M%SZ')}_{desired['desired_version']}"
@@ -662,13 +753,13 @@ class SapphireCtl:
             }
 
         deploy = self._run(
-            [str(DEPLOY_SCRIPT), profile, target_host],
+            [str(DEPLOY_SCRIPT), profile, selected_target_host],
             cwd=REPO_ROOT,
             env={**os.environ, "PROJECT_ID": self.project},
         )
 
         override_apply_result = self._apply_overrides_remote(
-            target_host=target_host,
+            target_host=selected_target_host,
             overrides=overrides,
         ) if deploy.ok else CommandResult(
             ok=False,
@@ -685,17 +776,18 @@ class SapphireCtl:
             stdout="skipped",
             stderr="",
         )
-        lane_health: Dict[str, Any] = {}
+        lane_health: Dict[str, Any] = lane_decision.get("primary_lane_health", {}) if lane_decision else {}
         if deploy.ok and override_apply_result.ok and run_test:
-            lane_health = self._lane_health(
-                target_host=target_host,
-                lookback_minutes=int(os.getenv("SAPPHIRECTL_LANE_LOOKBACK_MINUTES", "45")),
-            )
+            if selected_target_host != target_host:
+                lane_health = self._lane_health(
+                    target_host=selected_target_host,
+                    lookback_minutes=int(os.getenv("SAPPHIRECTL_LANE_LOOKBACK_MINUTES", "45")),
+                )
             self._event(
                 "lane_health_pretest",
                 {
                     "desired_version": desired["desired_version"],
-                    "target_host": target_host,
+                    "target_host": selected_target_host,
                     "healthy": bool(lane_health.get("healthy", False)),
                     "reasons": lane_health.get("reasons", []),
                     "warnings": lane_health.get("warnings", []),
@@ -733,7 +825,7 @@ class SapphireCtl:
             stderr="",
         )
         if deploy.ok and override_apply_result.ok and run_test and close_after_test and test_result.ok:
-            close_result = self._close_all_positions(target_host=target_host)
+            close_result = self._close_all_positions(target_host=selected_target_host)
 
         status = (
             "applied"
@@ -744,6 +836,7 @@ class SapphireCtl:
             "platform": PLATFORM,
             "service": DEFAULT_SERVICE,
             "target_host": target_host,
+            "selected_target_host": selected_target_host,
             "profile": profile,
             "desired_version": desired["desired_version"],
             "applied_at": _utc_now(),
@@ -759,6 +852,7 @@ class SapphireCtl:
             "test": test_result.to_dict(),
             "close": close_result.to_dict(),
             "lane_health_pretest": lane_health,
+            "lane_decision": lane_decision,
         }
         applied_ref.set(applied_payload)
         history_id = f"{_utc_now().strftime('%Y%m%dT%H%M%SZ')}_{desired['desired_version']}"
@@ -778,7 +872,7 @@ class SapphireCtl:
                 "desired_version": desired["desired_version"],
                 "status": status,
                 "profile": profile,
-                "target_host": target_host,
+                "target_host": selected_target_host,
                 "run_test": run_test,
             },
         )
@@ -801,6 +895,7 @@ class SapphireCtl:
         extra_overrides: Dict[str, str],
         no_restart: bool,
         enforce_lane_health: bool = True,
+        auto_failover: bool = True,
     ) -> Dict[str, Any]:
         stage_cfg = PROMOTION_STAGES.get(to_stage)
         if not stage_cfg:
@@ -830,6 +925,7 @@ class SapphireCtl:
             requested_by=requested_by,
             no_restart=no_restart,
             enforce_lane_health=enforce_lane_health,
+            auto_failover=auto_failover,
         )
         desired_ref = self.db.collection(DESIRED_COLLECTION).document(PLATFORM)
         desired_ref.set(
@@ -866,6 +962,7 @@ class SapphireCtl:
         notes: str,
         no_restart: bool,
         enforce_lane_health: bool = True,
+        auto_failover: bool = True,
     ) -> Dict[str, Any]:
         steps = max(1, int(steps))
         history = [
@@ -894,6 +991,7 @@ class SapphireCtl:
             requested_by=requested_by,
             no_restart=no_restart,
             enforce_lane_health=enforce_lane_health,
+            auto_failover=auto_failover,
         )
         self._event(
             "rollback_applied",
@@ -908,6 +1006,27 @@ class SapphireCtl:
             "rollback_steps": steps,
             "target_history_record": target,
             "result": result,
+        }
+
+    def lane_check(
+        self,
+        *,
+        target_host: str,
+        run_test: bool,
+        enforce_lane_health: bool,
+        auto_failover: bool,
+    ) -> Dict[str, Any]:
+        selected_target_host, lane_decision = self._select_target_host(
+            requested_target_host=target_host,
+            run_test=run_test,
+            enforce_lane_health=enforce_lane_health,
+            auto_failover=auto_failover,
+        )
+        return {
+            "requested_target_host": target_host,
+            "selected_target_host": selected_target_host,
+            "failover_used": bool(lane_decision.get("failover_used", False)),
+            "lane_decision": lane_decision,
         }
 
     def status(self) -> Dict[str, Any]:
@@ -950,6 +1069,7 @@ class SapphireCtl:
                 "output": _short_output(systemctl.combined_output, limit=1200),
             },
             "lane_health": lane_health,
+            "configured_failover_hosts": self._configured_failover_hosts(),
         }
 
     def reconcile(
@@ -958,6 +1078,7 @@ class SapphireCtl:
         requested_by: str,
         no_restart: bool = False,
         enforce_lane_health: bool = True,
+        auto_failover: bool = True,
     ) -> Dict[str, Any]:
         desired = self.db.collection(DESIRED_COLLECTION).document(PLATFORM).get().to_dict() or {}
         applied = self.db.collection(APPLIED_COLLECTION).document(PLATFORM).get().to_dict() or {}
@@ -997,6 +1118,7 @@ class SapphireCtl:
             update_desired=False,
             no_restart=no_restart,
             enforce_lane_health=enforce_lane_health,
+            auto_failover=auto_failover,
         )
         return {
             "reconciled": True,
@@ -1041,6 +1163,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Bypass pre-test lane health guard and run canary test anyway.",
     )
+    apply_p.add_argument(
+        "--disable-auto-failover",
+        action="store_true",
+        help="Disable host failover when the requested lane is unhealthy.",
+    )
     apply_p.add_argument("--test-quantity", default="0.005")
 
     promote_p = sub.add_parser("promote", help="Promote runtime stage (paper/canary/live)")
@@ -1080,6 +1207,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Bypass pre-test lane health guard for stage apply.",
     )
+    promote_p.add_argument(
+        "--disable-auto-failover",
+        action="store_true",
+        help="Disable host failover when selected stage lane is unhealthy.",
+    )
 
     rollback_p = sub.add_parser("rollback", help="Rollback to a previous applied state")
     rollback_p.add_argument("--steps", type=int, default=1, help="How many applied versions back")
@@ -1098,6 +1230,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Bypass pre-test lane health guard for rollback apply.",
     )
+    rollback_p.add_argument(
+        "--disable-auto-failover",
+        action="store_true",
+        help="Disable host failover during rollback apply.",
+    )
 
     sub.add_parser("status", help="Show desired/applied/live status")
     reconcile_p = sub.add_parser("reconcile", help="Apply desired state if not converged")
@@ -1110,6 +1247,29 @@ def _build_parser() -> argparse.ArgumentParser:
         "--skip-lane-health-check",
         action="store_true",
         help="Bypass pre-test lane health guard during reconcile.",
+    )
+    reconcile_p.add_argument(
+        "--disable-auto-failover",
+        action="store_true",
+        help="Disable host failover during reconcile apply.",
+    )
+
+    lane_p = sub.add_parser("lane-check", help="Evaluate lane health/failover selection without applying runtime changes")
+    lane_p.add_argument("--target-host", default=DEFAULT_HOST)
+    lane_p.add_argument(
+        "--no-run-test",
+        action="store_true",
+        help="Simulate run_test=false (disables failover host selection).",
+    )
+    lane_p.add_argument(
+        "--skip-lane-health-check",
+        action="store_true",
+        help="Disable lane-health enforcement for this check.",
+    )
+    lane_p.add_argument(
+        "--disable-auto-failover",
+        action="store_true",
+        help="Disable host failover when the requested lane is unhealthy.",
     )
     return p
 
@@ -1133,6 +1293,7 @@ def main() -> int:
             requested_by=args.requested_by,
             no_restart=bool(args.no_restart),
             enforce_lane_health=not bool(args.skip_lane_health_check),
+            auto_failover=not bool(args.disable_auto_failover),
         )
         _json_print(out)
         return 0 if out["applied"]["status"] in {"applied", "staged_no_restart"} else 2
@@ -1158,6 +1319,7 @@ def main() -> int:
             extra_overrides=_parse_overrides(args.override),
             no_restart=bool(args.no_restart),
             enforce_lane_health=not bool(args.skip_lane_health_check),
+            auto_failover=not bool(args.disable_auto_failover),
         )
         _json_print(out)
         status = (((out.get("result") or {}).get("applied") or {}).get("status") or "").lower()
@@ -1174,6 +1336,7 @@ def main() -> int:
             notes=args.notes,
             no_restart=bool(args.no_restart),
             enforce_lane_health=not bool(args.skip_lane_health_check),
+            auto_failover=not bool(args.disable_auto_failover),
         )
         _json_print(out)
         status = (((out.get("result") or {}).get("applied") or {}).get("status") or "").lower()
@@ -1183,11 +1346,22 @@ def main() -> int:
         _json_print(ctl.status())
         return 0
 
+    if args.command == "lane-check":
+        out = ctl.lane_check(
+            target_host=args.target_host,
+            run_test=not bool(args.no_run_test),
+            enforce_lane_health=not bool(args.skip_lane_health_check),
+            auto_failover=not bool(args.disable_auto_failover),
+        )
+        _json_print(out)
+        return 0
+
     if args.command == "reconcile":
         out = ctl.reconcile(
             requested_by=args.requested_by,
             no_restart=bool(args.no_restart),
             enforce_lane_health=not bool(args.skip_lane_health_check),
+            auto_failover=not bool(args.disable_auto_failover),
         )
         _json_print(out)
         if out.get("reconciled"):

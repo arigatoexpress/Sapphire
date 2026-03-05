@@ -73,3 +73,35 @@ Bypass only when intentionally forcing a test:
 ```bash
 python3 /Users/aribs/Sapphire/scripts/sapphirectl.py promote --to canary --skip-lane-health-check
 ```
+
+### Auto failover hosts
+
+Control plane can automatically fail over to a backup execution host when the requested lane is unhealthy.
+
+Set:
+
+```bash
+export SAPPHIRECTL_FAILOVER_HOSTS="rari@100.87.225.89,rari@100.120.191.1"
+```
+
+Behavior:
+- requested host stays primary;
+- if primary lane is unhealthy and `run_test=true`, `sapphirectl` probes failover hosts for runtime health (`/health` on local gateway);
+- first healthy fallback host is selected and recorded in `applied.selected_target_host` and `applied.lane_decision`.
+
+Validate failover selection without deploy/restart:
+
+```bash
+SAPPHIRECTL_FAILOVER_HOSTS="rari@100.87.225.89,rari@100.120.191.1" \
+python3 /Users/aribs/Sapphire/scripts/sapphirectl.py lane-check --target-host rari@100.87.225.89
+```
+
+Standby host requirement:
+- the standby host must run `lighter-trading` so `/health` on `127.0.0.1:8080` is reachable;
+- keep standby safe by default with `TRADING_ENABLED=0` and `ALLOW_LIVE_TRADING=0` until a failover apply explicitly promotes it.
+
+Disable failover for a command:
+
+```bash
+python3 /Users/aribs/Sapphire/scripts/sapphirectl.py promote --to canary --disable-auto-failover
+```
