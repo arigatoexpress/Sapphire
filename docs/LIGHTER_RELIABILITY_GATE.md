@@ -94,6 +94,7 @@ Behavior:
 - requested host stays primary;
 - if primary lane is unhealthy and `run_test=true`, `sapphirectl` probes failover hosts for runtime health (`/health` on local gateway);
 - first healthy fallback host with trading enabled (`TRADING_ENABLED=1` and `ALLOW_LIVE_TRADING=1`) is selected and recorded in `applied.selected_target_host` and `applied.lane_decision`.
+- when fallback is selected, primary host is automatically disarmed (`TRADING_ENABLED=0`, `ALLOW_LIVE_TRADING=0`) before deploy/test to avoid duplicate execution lanes.
 
 Validate failover selection without deploy/restart:
 

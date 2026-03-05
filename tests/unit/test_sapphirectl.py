@@ -319,3 +319,58 @@ def test_lane_check_skips_non_trading_failover_host(monkeypatch):
     assert out["selected_target_host"] == "rari@primary"
     assert out["failover_used"] is False
     assert out["lane_decision"]["reason"] == "primary_lane_unhealthy_no_test_capable_failover"
+
+
+def test_apply_disarms_primary_when_failover_selected(monkeypatch):
+    ctl = _make_ctl()
+    monkeypatch.setattr(
+        ctl,
+        "_select_target_host",
+        lambda **_kwargs: ("rari@backup", {"failover_used": True, "reason": "primary_lane_unhealthy_failover_selected"}),
+    )
+    monkeypatch.setattr(
+        ctl,
+        "_run",
+        lambda *args, **kwargs: MOD.CommandResult(
+            ok=True,
+            returncode=0,
+            cmd=["fake"],
+            stdout="ok",
+            stderr="",
+        ),
+    )
+    calls = []
+
+    def _fake_apply_overrides_remote(*, target_host, overrides):
+        calls.append((target_host, dict(overrides)))
+        return MOD.CommandResult(
+            ok=True,
+            returncode=0,
+            cmd=["fake"],
+            stdout="ok",
+            stderr="",
+        )
+
+    monkeypatch.setattr(ctl, "_apply_overrides_remote", _fake_apply_overrides_remote)
+
+    out = ctl.apply(
+        profile="luxalgo_sol_5m_active",
+        target_host="rari@primary",
+        run_test=False,
+        close_after_test=False,
+        test_quantity="0.01",
+        notes="failover_test",
+        overrides={"TRADING_ENABLED": "1"},
+        requested_by="tester",
+        no_restart=False,
+        enforce_lane_health=True,
+        auto_failover=True,
+    )
+    assert out["applied"]["status"] == "applied"
+    assert out["applied"]["selected_target_host"] == "rari@backup"
+    assert out["applied"]["primary_disarm"]["ok"] is True
+    assert len(calls) == 2
+    assert calls[0][0] == "rari@primary"
+    assert calls[0][1]["TRADING_ENABLED"] == "0"
+    assert calls[0][1]["ALLOW_LIVE_TRADING"] == "0"
+    assert calls[1][0] == "rari@backup"

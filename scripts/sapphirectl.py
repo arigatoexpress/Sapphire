@@ -798,6 +798,7 @@ class SapphireCtl:
                 "test_quantity": str(test_quantity),
                 "effective_settings": desired["effective_settings"],
                 "deploy": skipped.to_dict(),
+                "primary_disarm": skipped.to_dict(),
                 "override_apply": skipped.to_dict(),
                 "test": skipped.to_dict(),
                 "close": skipped.to_dict(),
@@ -829,6 +830,32 @@ class SapphireCtl:
                 "applied": applied_payload,
             }
 
+        primary_disarm_result = CommandResult(
+            ok=True,
+            returncode=0,
+            cmd=[],
+            stdout="skipped",
+            stderr="",
+        )
+        if selected_target_host != target_host:
+            primary_disarm_result = self._apply_overrides_remote(
+                target_host=target_host,
+                overrides={
+                    "TRADING_ENABLED": "0",
+                    "ALLOW_LIVE_TRADING": "0",
+                },
+            )
+            self._event(
+                "primary_host_disarmed_for_failover",
+                {
+                    "desired_version": desired["desired_version"],
+                    "primary_target_host": target_host,
+                    "selected_target_host": selected_target_host,
+                    "ok": primary_disarm_result.ok,
+                    "returncode": primary_disarm_result.returncode,
+                },
+            )
+
         deploy = self._run(
             [str(DEPLOY_SCRIPT), profile, selected_target_host],
             cwd=REPO_ROOT,
@@ -838,11 +865,11 @@ class SapphireCtl:
         override_apply_result = self._apply_overrides_remote(
             target_host=selected_target_host,
             overrides=overrides,
-        ) if deploy.ok else CommandResult(
+        ) if (primary_disarm_result.ok and deploy.ok) else CommandResult(
             ok=False,
             returncode=1,
             cmd=[],
-            stdout="skipped_due_to_deploy_failure",
+            stdout="skipped_due_to_primary_disarm_or_deploy_failure",
             stderr="",
         )
 
@@ -854,7 +881,7 @@ class SapphireCtl:
             stderr="",
         )
         lane_health: Dict[str, Any] = lane_decision.get("primary_lane_health", {}) if lane_decision else {}
-        if deploy.ok and override_apply_result.ok and run_test:
+        if primary_disarm_result.ok and deploy.ok and override_apply_result.ok and run_test:
             if selected_target_host != target_host:
                 lane_health = self._lane_health(
                     target_host=selected_target_host,
@@ -901,12 +928,12 @@ class SapphireCtl:
             stdout="skipped",
             stderr="",
         )
-        if deploy.ok and override_apply_result.ok and run_test and close_after_test and test_result.ok:
+        if primary_disarm_result.ok and deploy.ok and override_apply_result.ok and run_test and close_after_test and test_result.ok:
             close_result = self._close_all_positions(target_host=selected_target_host)
 
         status = (
             "applied"
-            if deploy.ok and override_apply_result.ok and test_result.ok and close_result.ok
+            if primary_disarm_result.ok and deploy.ok and override_apply_result.ok and test_result.ok and close_result.ok
             else "failed"
         )
         applied_payload: Dict[str, Any] = {
@@ -925,6 +952,7 @@ class SapphireCtl:
             "test_quantity": str(test_quantity),
             "effective_settings": desired["effective_settings"],
             "deploy": deploy.to_dict(),
+            "primary_disarm": primary_disarm_result.to_dict(),
             "override_apply": override_apply_result.to_dict(),
             "test": test_result.to_dict(),
             "close": close_result.to_dict(),
