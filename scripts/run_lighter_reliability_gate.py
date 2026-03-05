@@ -244,7 +244,7 @@ def main() -> int:
     if args.output:
         out_path = Path(args.output).expanduser()
     else:
-        out_path = Path("/Users/aribs/Sapphire/output/reliability_gates") / f"lighter_gate_{now.strftime('%Y%m%d_%H%M%S')}.json"
+        out_path = Path("output/reliability_gates") / f"lighter_gate_{now.strftime('%Y%m%d_%H%M%S')}.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
 
