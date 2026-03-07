@@ -52,6 +52,7 @@ try:
     )
     from shared.circuit_breaker import CircuitBreaker, CircuitBreakerOpen
     from shared.execution_idempotency import ExecutionIdempotency
+    from shared.risk_kernel import HardRiskKernel
 except ImportError:
     from pubsub import get_pubsub_client, publish, subscribe
     from utils import ServiceConfig, format_percent, format_price, setup_logging, utc_now
@@ -66,6 +67,7 @@ except ImportError:
     )
     from circuit_breaker import CircuitBreaker, CircuitBreakerOpen
     from execution_idempotency import ExecutionIdempotency
+    from risk_kernel import HardRiskKernel
 
 logger = logging.getLogger(__name__)
 
@@ -204,6 +206,11 @@ class LighterBot:
             "LIGHTER_SINGLE_SYMBOL_MODE",
             default=True,
         )
+        self._entry_symbol_allowlist = {
+            self._normalize_coin_symbol(s)
+            for s in str(os.getenv("LIGHTER_ENTRY_SYMBOL_ALLOWLIST", "")).split(",")
+            if str(s).strip()
+        }
         self._default_take_profit_pct = self._env_float(
             ("LIGHTER_DEFAULT_TAKE_PROFIT_PCT", "SAPPHIRE_TV_TAKE_PROFIT_PCT"),
             default=3.0,
@@ -235,10 +242,46 @@ class LighterBot:
             0.0,
             self._env_float(("LIGHTER_MIN_ENTRY_NOTIONAL_USD",), default=0.0),
         )
+        self._min_add_notional_usd = max(
+            0.0,
+            self._env_float(("LIGHTER_MIN_ADD_NOTIONAL_USD",), default=0.0),
+        )
+        self._cap_near_churn_enabled = self._env_flag(
+            "LIGHTER_CAP_NEAR_CHURN_ENABLED",
+            default=True,
+        )
+        self._cap_near_churn_ratio = self._clamp(
+            self._env_float(("LIGHTER_CAP_NEAR_CHURN_RATIO",), default=0.90),
+            0.50,
+            0.999,
+        )
+        self._cap_near_min_ev_edge_pct = max(
+            0.0,
+            self._env_float(("LIGHTER_CAP_NEAR_MIN_EV_EDGE_PCT",), default=0.20),
+        )
+        self._cap_near_min_net_ev_pct = max(
+            0.0,
+            self._env_float(("LIGHTER_CAP_NEAR_MIN_NET_EV_PCT",), default=0.10),
+        )
         self._max_signal_leverage = max(
             1.0,
             self._env_float(("LIGHTER_MAX_SIGNAL_LEVERAGE",), default=20.0),
         )
+        self._use_leverage_for_notional = self._env_flag(
+            "LIGHTER_USE_LEVERAGE_FOR_NOTIONAL",
+            default=False,
+        )
+        self._target_order_leverage = max(
+            1.0,
+            self._env_float(("LIGHTER_TARGET_ORDER_LEVERAGE",), default=self._max_signal_leverage),
+        )
+        if self._target_order_leverage > self._max_signal_leverage:
+            logger.warning(
+                "LIGHTER_TARGET_ORDER_LEVERAGE %.2f exceeds LIGHTER_MAX_SIGNAL_LEVERAGE %.2f; clamping.",
+                self._target_order_leverage,
+                self._max_signal_leverage,
+            )
+            self._target_order_leverage = self._max_signal_leverage
         self._dynamic_sizing_enabled = self._env_flag(
             "LIGHTER_DYNAMIC_SIZING_ENABLED",
             default=True,
@@ -250,6 +293,35 @@ class LighterBot:
         self._dynamic_size_max_mult = max(
             self._dynamic_size_min_mult,
             self._env_float(("LIGHTER_DYNAMIC_SIZE_MAX_MULT",), default=1.20),
+        )
+        self._ev_maker_fee_bps = max(
+            0.0,
+            self._env_float(("LIGHTER_EV_MAKER_FEE_BPS",), default=1.5),
+        )
+        self._ev_taker_fee_bps = max(
+            0.0,
+            self._env_float(("LIGHTER_EV_TAKER_FEE_BPS",), default=4.5),
+        )
+        self._ev_expected_taker_ratio = self._clamp(
+            self._env_float(("LIGHTER_EV_EXPECTED_TAKER_RATIO",), default=1.0),
+            0.0,
+            1.0,
+        )
+        self._ev_slippage_base_bps = max(
+            0.0,
+            self._env_float(("LIGHTER_EV_SLIPPAGE_BASE_BPS",), default=1.5),
+        )
+        self._ev_slippage_vol_mult_bps = max(
+            0.0,
+            self._env_float(("LIGHTER_EV_SLIPPAGE_VOL_MULT_BPS",), default=2.0),
+        )
+        self._ev_slippage_notional_ref_usd = max(
+            0.01,
+            self._env_float(("LIGHTER_EV_SLIPPAGE_NOTIONAL_REF_USD",), default=4.0),
+        )
+        self._ev_slippage_notional_mult_bps = max(
+            0.0,
+            self._env_float(("LIGHTER_EV_SLIPPAGE_NOTIONAL_MULT_BPS",), default=2.0),
         )
         self._sync_before_entry = self._env_flag(
             "LIGHTER_SYNC_BEFORE_ENTRY",
@@ -310,6 +382,73 @@ class LighterBot:
         self._strategy_perf_history: Dict[str, deque] = defaultdict(
             lambda: deque(maxlen=self._perf_guard_window)
         )
+        self._size_ramp_enabled = self._env_flag(
+            "LIGHTER_SIZE_RAMP_ENABLED",
+            default=True,
+        )
+        _base_target_margin = max(0.1, float(self._target_order_notional_usd or 0.0))
+        self._size_ramp_min_margin_usd = max(
+            0.1,
+            self._env_float(("LIGHTER_SIZE_RAMP_MIN_MARGIN_USD",), default=_base_target_margin),
+        )
+        self._size_ramp_max_margin_usd = max(
+            self._size_ramp_min_margin_usd,
+            self._env_float(("LIGHTER_SIZE_RAMP_MAX_MARGIN_USD",), default=_base_target_margin),
+        )
+        self._size_ramp_step_margin_usd = max(
+            0.1,
+            self._env_float(("LIGHTER_SIZE_RAMP_STEP_MARGIN_USD",), default=0.5),
+        )
+        self._size_ramp_min_samples = max(
+            5,
+            int(
+                self._env_float(
+                    ("LIGHTER_SIZE_RAMP_MIN_SAMPLES",),
+                    default=max(10.0, float(self._perf_guard_min_samples)),
+                )
+            ),
+        )
+        self._size_ramp_up_fill_rate = self._clamp(
+            self._env_float(
+                ("LIGHTER_SIZE_RAMP_UP_FILL_RATE",),
+                default=max(0.65, float(self._perf_guard_min_fill_rate)),
+            ),
+            0.0,
+            1.0,
+        )
+        self._size_ramp_down_fill_rate = self._clamp(
+            self._env_float(
+                ("LIGHTER_SIZE_RAMP_DOWN_FILL_RATE",),
+                default=max(0.05, float(self._perf_guard_min_fill_rate) - 0.15),
+            ),
+            0.0,
+            1.0,
+        )
+        self._size_ramp_max_hard_fail_rate = self._clamp(
+            self._env_float(
+                ("LIGHTER_SIZE_RAMP_MAX_HARD_FAIL_RATE",),
+                default=min(0.10, float(self._perf_guard_max_hard_fail_rate)),
+            ),
+            0.0,
+            1.0,
+        )
+        self._size_ramp_adjust_cooldown_seconds = max(
+            30.0,
+            self._env_float(("LIGHTER_SIZE_RAMP_ADJUST_COOLDOWN_SECONDS",), default=300.0),
+        )
+        self._size_ramp_recent_streak = max(
+            2,
+            int(self._env_float(("LIGHTER_SIZE_RAMP_RECENT_STREAK",), default=3.0)),
+        )
+        self._size_ramp_default_margin_usd = self._clamp(
+            _base_target_margin,
+            self._size_ramp_min_margin_usd,
+            self._size_ramp_max_margin_usd,
+        )
+        self._size_ramp_margin_by_key: Dict[str, float] = defaultdict(
+            lambda: self._size_ramp_default_margin_usd
+        )
+        self._size_ramp_last_adjust_ts: Dict[str, float] = {}
         self._strategy_require_metadata = self._env_flag(
             "LIGHTER_STRATEGY_REQUIRE_METADATA",
             default=False,
@@ -382,6 +521,58 @@ class LighterBot:
             60.0,
             self._env_float(("LIGHTER_DRAWDOWN_ALERT_COOLDOWN_SECONDS",), default=900.0),
         )
+        self._hard_risk_kernel_enabled = self._env_flag(
+            "LIGHTER_HARD_RISK_KERNEL_ENABLED",
+            default=True,
+        )
+        self._hard_risk_hold_seconds = max(
+            60.0,
+            self._env_float(("LIGHTER_HARD_RISK_HOLD_SECONDS",), default=1800.0),
+        )
+        self._hard_risk_max_daily_loss_pct = max(
+            0.0,
+            self._env_float(("LIGHTER_HARD_RISK_MAX_DAILY_LOSS_PCT",), default=4.0),
+        )
+        self._hard_risk_max_daily_loss_usd = max(
+            0.0,
+            self._env_float(("LIGHTER_HARD_RISK_MAX_DAILY_LOSS_USD",), default=0.0),
+        )
+        self._hard_risk_max_intraday_drawdown_pct = max(
+            0.0,
+            self._env_float(("LIGHTER_HARD_RISK_MAX_INTRADAY_DRAWDOWN_PCT",), default=3.5),
+        )
+        self._hard_risk_max_consecutive_loss_events = max(
+            0,
+            int(
+                self._env_float(
+                    ("LIGHTER_HARD_RISK_MAX_CONSECUTIVE_LOSS_EVENTS",),
+                    default=4.0,
+                )
+            ),
+        )
+        self._hard_risk_max_consecutive_hard_fails = max(
+            0,
+            int(
+                self._env_float(
+                    ("LIGHTER_HARD_RISK_MAX_CONSECUTIVE_HARD_FAILS",),
+                    default=5.0,
+                )
+            ),
+        )
+        self._hard_risk_loss_event_min_delta_usd = max(
+            0.0,
+            self._env_float(("LIGHTER_HARD_RISK_LOSS_EVENT_MIN_DELTA_USD",), default=0.15),
+        )
+        self._hard_risk_kernel = HardRiskKernel(
+            enabled=self._hard_risk_kernel_enabled,
+            hold_seconds=self._hard_risk_hold_seconds,
+            max_daily_loss_pct=self._hard_risk_max_daily_loss_pct,
+            max_daily_loss_usd=self._hard_risk_max_daily_loss_usd,
+            max_intraday_drawdown_pct=self._hard_risk_max_intraday_drawdown_pct,
+            max_consecutive_loss_events=self._hard_risk_max_consecutive_loss_events,
+            max_consecutive_hard_fails=self._hard_risk_max_consecutive_hard_fails,
+            loss_event_min_delta_usd=self._hard_risk_loss_event_min_delta_usd,
+        )
         self._sync_stale_alert_seconds = max(
             60,
             int(self._env_float(("LIGHTER_SYNC_STALE_ALERT_SECONDS",), default=300.0)),
@@ -431,6 +622,74 @@ class LighterBot:
                 )
             ),
         )
+        self._reject_tax_window_hours = max(
+            1.0,
+            self._env_float(("LIGHTER_REJECT_TAX_WINDOW_HOURS",), default=24.0),
+        )
+        self._reject_tax_cache_ttl_seconds = max(
+            10.0,
+            self._env_float(("LIGHTER_REJECT_TAX_CACHE_TTL_SECONDS",), default=45.0),
+        )
+        self._reject_tax_alert_pct = self._clamp(
+            self._env_float(("LIGHTER_REJECT_TAX_ALERT_PCT",), default=65.0),
+            0.0,
+            100.0,
+        )
+        self._go_nogo_max_reject_tax_pct = self._clamp(
+            self._env_float(("LIGHTER_GO_NOGO_MAX_REJECT_TAX_PCT",), default=75.0),
+            0.0,
+            100.0,
+        )
+        self._go_nogo_max_hard_fail_pct = self._clamp(
+            self._env_float(("LIGHTER_GO_NOGO_MAX_HARD_FAIL_PCT",), default=10.0),
+            0.0,
+            100.0,
+        )
+        self._go_nogo_min_sample_size = max(
+            1,
+            int(self._env_float(("LIGHTER_GO_NOGO_MIN_SAMPLE_SIZE",), default=20.0)),
+        )
+        self._go_nogo_gate_enabled = self._env_flag(
+            "LIGHTER_GO_NOGO_GATE_ENABLED",
+            default=True,
+        )
+        self._go_nogo_cache_ttl_seconds = max(
+            5.0,
+            self._env_float(("LIGHTER_GO_NOGO_CACHE_TTL_SECONDS",), default=20.0),
+        )
+        self._platform_decision_gate_enabled = self._env_flag(
+            "LIGHTER_PLATFORM_DECISION_GATE_ENABLED",
+            default=True,
+        )
+        self._platform_decision_url = str(
+            os.getenv(
+                "LIGHTER_PLATFORM_DECISION_URL",
+                "https://sapphirealpha.xyz/api/platform/strategy-ops?days=7",
+            )
+        ).strip()
+        self._platform_decision_cache_ttl_seconds = max(
+            10.0,
+            self._env_float(("LIGHTER_PLATFORM_DECISION_CACHE_TTL_SECONDS",), default=60.0),
+        )
+        self._platform_decision_timeout_seconds = max(
+            1.0,
+            self._env_float(("LIGHTER_PLATFORM_DECISION_TIMEOUT_SECONDS",), default=3.0),
+        )
+        self._cached_reject_tax_metrics: Dict[str, Any] = {}
+        self._last_reject_tax_fetch_ts: float = 0.0
+        self._cached_reject_tax_window_metrics: Dict[str, Dict[str, Any]] = {}
+        self._last_reject_tax_fetch_by_window: Dict[str, float] = {}
+        self._cached_go_no_go: Dict[str, Any] = {}
+        self._last_go_no_go_eval_ts: float = 0.0
+        self._cached_platform_decision: Dict[str, Any] = {}
+        self._last_platform_decision_fetch_ts: float = 0.0
+        self._equity_snapshot_cache_ttl_seconds = max(
+            3.0,
+            self._env_float(("LIGHTER_EQUITY_SNAPSHOT_CACHE_TTL_SECONDS",), default=10.0),
+        )
+        self._cached_equity_snapshot: Dict[str, Any] = {}
+        self._last_equity_snapshot_ts: float = 0.0
+        self._recent_execution_outcomes: deque = deque(maxlen=3000)
         self._last_telegram_digest_ts: float = 0.0
         self._assistant_brief_enabled = self._env_flag(
             "LIGHTER_ASSISTANT_BRIEF_ENABLED",
@@ -481,6 +740,14 @@ class LighterBot:
             self._env_float(("LIGHTER_LANE_HEARTBEAT_SECONDS",), default=900.0),
         )
         self._last_lane_heartbeat_ts: float = 0.0
+        self._order_submit_retry_attempts = max(
+            1,
+            int(self._env_float(("LIGHTER_ORDER_SUBMIT_RETRY_ATTEMPTS",), default=2.0)),
+        )
+        self._order_submit_retry_backoff_seconds = max(
+            0.1,
+            self._env_float(("LIGHTER_ORDER_SUBMIT_RETRY_BACKOFF_SECONDS",), default=0.75),
+        )
         self._price_history_limit = max(
             30,
             int(self._env_float(("LIGHTER_PRICE_HISTORY_POINTS",), default=90.0)),
@@ -495,22 +762,25 @@ class LighterBot:
         self._order_submit_lock = asyncio.Lock()
         logger.info(
             "Strategy policy | allowed_strategies=%s allowed_timeframes=%s "
-            "allowed_sources=%s "
+            "allowed_sources=%s symbol_allowlist=%s "
             "require_metadata=%s min_conf=%.2f min_edge=%.3f%% "
             "perf_guard=%s n=%d fill>=%.2f fail<=%.2f "
             "entry_cooldown=%.1fs max_order_notional=%.2f "
             "max_position_notional=%.2f max_portfolio_notional=%.2f "
-            "target_order_notional=%.2f min_entry_notional=%.2f max_signal_leverage=%.1fx "
+            "target_order_notional=%.2f min_entry_notional=%.2f min_add_notional=%.2f max_signal_leverage=%.1fx "
+            "size_ramp=%s min=%.2f max=%.2f step=%.2f n=%d up>=%.2f down<%.2f hf<=%.2f cd=%.0fs streak=%d "
             "dynamic_sizing=%s mult=[%.2f,%.2f] "
             "sync_before_entry=%s jurisdiction_block=%.0fs progress_verify=%.0fs dd_alert=%.2f%% "
             "sync_stale_alert=%.0fs risk_level_max_dev=%.1f%% empty_pos_confirm=%d "
             "max_hold=%.0fs risk_reconcile_hold=%.0fs "
+            "hard_risk=%s dd<=%.2f%% intraday<=%.2f%% cons_loss<=%d hard_fail<=%d hold=%.0fs "
             "tg_digest=%.0fs tg_charts=%s dynamic_risk=%s rotation=%s edge=%.3f%% "
             "watchdog=%s no_fill=%.0fs cooldown=%.0fs failsafe=%s threshold=%d hold=%.0fs "
-            "lane_heartbeat=%s hb_int=%.0fs",
+            "lane_heartbeat=%s hb_int=%.0fs order_submit_retry=%dx backoff=%.2fs",
             sorted(self._allowed_strategies) if self._allowed_strategies else ["*"],
             sorted(self._allowed_timeframes) if self._allowed_timeframes else ["*"],
             sorted(self._allowed_signal_sources) if self._allowed_signal_sources else ["*"],
+            sorted(self._entry_symbol_allowlist) if self._entry_symbol_allowlist else ["*"],
             self._strategy_require_metadata,
             self._entry_min_confidence,
             self._entry_min_edge_pct,
@@ -524,7 +794,18 @@ class LighterBot:
             self._max_portfolio_notional_usd,
             self._target_order_notional_usd,
             self._min_entry_notional_usd,
+            self._min_add_notional_usd,
             self._max_signal_leverage,
+            self._size_ramp_enabled,
+            self._size_ramp_min_margin_usd,
+            self._size_ramp_max_margin_usd,
+            self._size_ramp_step_margin_usd,
+            self._size_ramp_min_samples,
+            self._size_ramp_up_fill_rate,
+            self._size_ramp_down_fill_rate,
+            self._size_ramp_max_hard_fail_rate,
+            self._size_ramp_adjust_cooldown_seconds,
+            self._size_ramp_recent_streak,
             self._dynamic_sizing_enabled,
             self._dynamic_size_min_mult,
             self._dynamic_size_max_mult,
@@ -537,6 +818,12 @@ class LighterBot:
             self._empty_position_confirmations,
             self._max_position_hold_seconds,
             self._risk_exit_reconcile_hold_seconds,
+            self._hard_risk_kernel_enabled,
+            self._hard_risk_max_daily_loss_pct,
+            self._hard_risk_max_intraday_drawdown_pct,
+            self._hard_risk_max_consecutive_loss_events,
+            self._hard_risk_max_consecutive_hard_fails,
+            self._hard_risk_hold_seconds,
             self._telegram_digest_seconds,
             self._telegram_enable_charts,
             self._dynamic_risk_enabled,
@@ -550,6 +837,36 @@ class LighterBot:
             self._execution_failsafe_hold_seconds,
             self._lane_heartbeat_enabled,
             self._lane_heartbeat_seconds,
+            self._order_submit_retry_attempts,
+            self._order_submit_retry_backoff_seconds,
+        )
+        logger.info(
+            "EV policy | maker_fee=%.2fbps taker_fee=%.2fbps taker_ratio=%.2f "
+            "slippage_base=%.2fbps slippage_vol_mult=%.2fbps slippage_notional_ref=%.2f "
+            "slippage_notional_mult=%.2fbps cap_near=%s ratio=%.3f min_ev=%.3f%% min_edge=%.3f%% "
+            "reject_tax_window=%.1fh alert=%.1f%% go_no_go_gate=%s cache=%.0fs "
+            "platform_gate=%s platform_cache=%.0fs "
+            "go_no_go_reject<=%.1f%% go_no_go_hard_fail<=%.1f%% sample>=%d",
+            self._ev_maker_fee_bps,
+            self._ev_taker_fee_bps,
+            self._ev_expected_taker_ratio,
+            self._ev_slippage_base_bps,
+            self._ev_slippage_vol_mult_bps,
+            self._ev_slippage_notional_ref_usd,
+            self._ev_slippage_notional_mult_bps,
+            self._cap_near_churn_enabled,
+            self._cap_near_churn_ratio,
+            self._cap_near_min_net_ev_pct,
+            self._cap_near_min_ev_edge_pct,
+            self._reject_tax_window_hours,
+            self._reject_tax_alert_pct,
+            self._go_nogo_gate_enabled,
+            self._go_nogo_cache_ttl_seconds,
+            self._platform_decision_gate_enabled,
+            self._platform_decision_cache_ttl_seconds,
+            self._go_nogo_max_reject_tax_pct,
+            self._go_nogo_max_hard_fail_pct,
+            self._go_nogo_min_sample_size,
         )
 
     @staticmethod
@@ -810,7 +1127,11 @@ class LighterBot:
 
     async def _gateway_status_payload(self) -> Dict[str, Any]:
         now_ts = time.time()
-        snapshot = await self._estimate_equity_snapshot()
+        snapshot = await self._get_equity_snapshot_cached()
+        go_nogo = await self._evaluate_go_no_go(now_ts=now_ts)
+        reject_tax = go_nogo.get("reject_tax", {}) if isinstance(go_nogo.get("reject_tax"), dict) else {}
+        if not reject_tax:
+            reject_tax = await self._collect_reject_tax_metrics()
         balance_age = snapshot.get("balance_sync_age_sec")
         position_age = snapshot.get("position_check_age_sec")
         block_remaining = max(0.0, self._jurisdiction_block_until_ts - now_ts)
@@ -854,6 +1175,8 @@ class LighterBot:
             "position_check_age_sec": position_age,
             "last_balance_sync_error": self._last_balance_sync_error,
             "last_position_check_error": self._last_position_check_error,
+            "go_no_go": go_nogo,
+            "reject_tax": reject_tax,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -1526,16 +1849,17 @@ class LighterBot:
                 logger.info(f"Dry-run signal ignored on {PLATFORM.value}: {signal.signal_id}")
                 return
 
+            reduce_only = bool(metadata.get("reduce_only", False))
+            if signal.signal_type in {
+                SignalType.EXIT,
+                SignalType.SCALE_OUT,
+                SignalType.TAKE_PROFIT,
+                SignalType.STOP_LOSS,
+            }:
+                reduce_only = True
+            entry_like = signal.signal_type in {SignalType.ENTRY, SignalType.SCALE_IN}
+
             if signal.quantity is None:
-                reduce_only = bool(metadata.get("reduce_only", False))
-                if signal.signal_type in {
-                    SignalType.EXIT,
-                    SignalType.SCALE_OUT,
-                    SignalType.TAKE_PROFIT,
-                    SignalType.STOP_LOSS,
-                }:
-                    reduce_only = True
-                entry_like = signal.signal_type in {SignalType.ENTRY, SignalType.SCALE_IN}
                 if not (entry_like and not reduce_only and self._target_order_notional_usd > 0):
                     logger.warning(
                         f"Rejected signal without explicit quantity on {PLATFORM.value}: {signal.signal_id} {signal.symbol}"
@@ -1547,27 +1871,41 @@ class LighterBot:
 
             allowed, reason = self._is_signal_allowed_by_policy(signal)
             if not allowed:
-                logger.warning(
-                    "Policy reject on %s: signal=%s symbol=%s reason=%s",
+                logger.info(
+                    "Policy filter on %s: signal=%s symbol=%s reason=%s",
                     PLATFORM.value,
                     signal.signal_id,
                     signal.symbol,
                     reason,
                 )
-                result = TradeResult(
-                    trade_id="",
-                    signal_id=str(signal.signal_id or ""),
-                    platform=PLATFORM.value,
-                    symbol=signal.symbol,
-                    side=signal.side,
-                    success=False,
-                    error_message=f"policy_reject: {reason}",
-                    metadata={"policy_reject": True, "reason": reason},
-                )
+                result = self._policy_noop_result(signal, reason=reason, symbol=signal.symbol)
                 await self._record_execution_verification(signal, result, channel="signal")
-                await publish("trade-executed", result)
-                await self._send_trade_telegram_alert(signal, result, channel="signal")
                 return
+
+            if self._go_nogo_gate_enabled and entry_like and not reduce_only:
+                go_nogo = await self._evaluate_go_no_go()
+                if not go_nogo.get("go", False):
+                    blocker_rows = go_nogo.get("reason_details") or go_nogo.get("reasons") or []
+                    blocker_text = "; ".join(str(item) for item in blocker_rows[:2]).strip()
+                    reason = f"go_no_go_block: {blocker_text or 'operator_no_go'}"
+                    logger.warning(
+                        "GO/NO-GO gate blocked entry on %s: signal=%s symbol=%s reason=%s",
+                        PLATFORM.value,
+                        signal.signal_id,
+                        signal.symbol,
+                        reason,
+                    )
+                    result = self._policy_noop_result(signal, reason=reason, symbol=signal.symbol)
+                    if result.metadata is None:
+                        result.metadata = {}
+                    result.metadata["go_no_go"] = {
+                        "label": str(go_nogo.get("label", "NO-GO")),
+                        "source": str(go_nogo.get("source", "bot_policy")),
+                        "reasons": list(blocker_rows[:4]),
+                        "evaluated_at": go_nogo.get("evaluated_at"),
+                    }
+                    await self._record_execution_verification(signal, result, channel="signal")
+                    return
 
             signal_id = str(signal.signal_id or "").strip()
             if not signal_id:
@@ -1927,6 +2265,60 @@ class LighterBot:
     def _clamp(value: float, low: float, high: float) -> float:
         return max(low, min(high, value))
 
+    def _extract_signal_source(self, signal: TradeSignal) -> str:
+        metadata = signal.metadata if isinstance(signal.metadata, dict) else {}
+        source = str(
+            metadata.get("source")
+            or metadata.get("origin")
+            or getattr(signal, "source", "")
+            or ""
+        ).strip().lower()
+        return source or "unknown"
+
+    def _default_expected_entry_notional_usd(self) -> float:
+        margin = max(0.0, float(self._target_order_notional_usd or 0.0))
+        if margin <= 0 and self._min_entry_notional_usd > 0:
+            margin = float(self._min_entry_notional_usd)
+        if margin <= 0:
+            margin = 1.0
+        if self._use_leverage_for_notional:
+            leverage = max(1.0, float(self._target_order_leverage or 1.0))
+            margin *= leverage
+        return float(max(0.01, margin))
+
+    def _estimate_roundtrip_cost_pct(
+        self,
+        *,
+        notional_usd: float,
+        vol_pct: float,
+    ) -> Dict[str, float]:
+        taker_ratio = self._clamp(float(self._ev_expected_taker_ratio), 0.0, 1.0)
+        weighted_fee_bps = (
+            (taker_ratio * float(self._ev_taker_fee_bps))
+            + ((1.0 - taker_ratio) * float(self._ev_maker_fee_bps))
+        )
+        fee_pct = (weighted_fee_bps / 100.0) * 2.0
+
+        ref_notional = max(0.01, float(self._ev_slippage_notional_ref_usd))
+        size_ratio = max(0.0, float(notional_usd) / ref_notional)
+        # log2(size_ratio+1) keeps growth bounded while still penalizing larger clips.
+        size_penalty = math.log(size_ratio + 1.0, 2.0)
+        slippage_bps_one_way = (
+            float(self._ev_slippage_base_bps)
+            + (max(0.0, float(vol_pct)) * float(self._ev_slippage_vol_mult_bps))
+            + (size_penalty * float(self._ev_slippage_notional_mult_bps))
+        )
+        slippage_pct = (slippage_bps_one_way / 100.0) * 2.0
+        total_friction_pct = fee_pct + slippage_pct
+        return {
+            "fee_pct": round(float(fee_pct), 6),
+            "slippage_pct": round(float(slippage_pct), 6),
+            "total_friction_pct": round(float(total_friction_pct), 6),
+            "weighted_fee_bps": round(float(weighted_fee_bps), 6),
+            "slippage_bps_one_way": round(float(slippage_bps_one_way), 6),
+            "size_ratio": round(float(size_ratio), 6),
+        }
+
     def _dynamic_entry_size_multiplier(
         self,
         *,
@@ -1945,11 +2337,17 @@ class LighterBot:
         confidence = self._clamp(self._to_float(getattr(signal, "confidence", 0.0), 0.0), 0.0, 1.0)
         stats = self._market_stats_for_symbol(coin)
         vol_pct = max(0.0, self._to_float(stats.get("vol_pct"), 0.0))
+        expected_notional_usd = self._default_expected_entry_notional_usd()
         ev_pct = self._estimate_signal_ev_pct(
             signal,
             coin=coin,
             is_buy=is_buy,
             reference_price=reference_price,
+            expected_notional_usd=expected_notional_usd,
+        )
+        cost_model = self._estimate_roundtrip_cost_pct(
+            notional_usd=expected_notional_usd,
+            vol_pct=vol_pct,
         )
 
         ev_score = self._clamp((ev_pct + 1.0) / 3.0, 0.0, 1.0)
@@ -1982,6 +2380,10 @@ class LighterBot:
             "portfolio_notional_usd": round(float(portfolio_notional_usd), 6),
             "drawdown_pct": round(float(drawdown_pct), 6),
             "inventory_ratio": round(float(inventory_ratio), 6),
+            "expected_notional_usd": round(float(expected_notional_usd), 6),
+            "fee_pct": round(self._to_float(cost_model.get("fee_pct"), 0.0), 6),
+            "slippage_pct": round(self._to_float(cost_model.get("slippage_pct"), 0.0), 6),
+            "friction_pct": round(self._to_float(cost_model.get("total_friction_pct"), 0.0), 6),
             "composite": round(float(composite), 6),
             "multiplier": round(float(multiplier), 6),
         }
@@ -2029,10 +2431,13 @@ class LighterBot:
         coin: str,
         is_buy: bool,
         reference_price: float,
+        expected_notional_usd: Optional[float] = None,
     ) -> float:
         """
-        Lightweight expected-value estimate (percent) from confidence + market regime.
-        Positive EV means the signal has favorable reward/risk odds for this symbol.
+        Expected-value estimate (percent) using:
+        - confidence + regime alignment -> win probability
+        - TP/SL geometry -> payoff profile
+        - fee/slippage friction -> net EV after execution costs
         """
         confidence = self._to_float(getattr(signal, "confidence", 0.0), 0.0)
         confidence = min(1.0, max(0.0, confidence))
@@ -2058,8 +2463,20 @@ class LighterBot:
         win_prob = base_win_prob + (0.10 * alignment) - min(0.10, vol_pct / 8.0)
         win_prob = min(0.92, max(0.08, win_prob))
 
-        fee_pct = 0.10  # round-trip friction budget
-        ev_pct = (win_prob * tp_pct) - ((1.0 - win_prob) * sl_pct) - fee_pct
+        notional_usd = self._to_float(expected_notional_usd, 0.0)
+        if notional_usd <= 0 and reference_price > 0:
+            qty = self._to_float(getattr(signal, "quantity", 0.0), 0.0)
+            if qty > 0:
+                notional_usd = abs(qty * float(reference_price))
+        if notional_usd <= 0:
+            notional_usd = self._default_expected_entry_notional_usd()
+        cost = self._estimate_roundtrip_cost_pct(
+            notional_usd=notional_usd,
+            vol_pct=vol_pct,
+        )
+        friction_pct = self._to_float(cost.get("total_friction_pct"), 0.0)
+
+        ev_pct = (win_prob * tp_pct) - ((1.0 - win_prob) * sl_pct) - friction_pct
         return round(ev_pct, 4)
 
     def _estimate_position_ev_pct(self, symbol: str, position: Position) -> float:
@@ -2093,6 +2510,7 @@ class LighterBot:
             coin=symbol,
             is_buy=is_buy,
             reference_price=entry,
+            expected_notional_usd=abs(self._to_float(getattr(position, "quantity", 0.0), 0.0) * entry),
         )
 
     def _build_trade_chart_card(
@@ -2240,6 +2658,443 @@ class LighterBot:
         self._last_telegram_digest_ts = now_ts
         await self._send_portfolio_digest(snapshot)
 
+    @staticmethod
+    def _to_timestamp(value: Any) -> float:
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, datetime):
+            try:
+                return float(value.replace(tzinfo=timezone.utc).timestamp() if value.tzinfo is None else value.timestamp())
+            except Exception:
+                return 0.0
+        if isinstance(value, str):
+            text = value.strip()
+            if not text:
+                return 0.0
+            try:
+                dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                return float(dt.timestamp())
+            except Exception:
+                return 0.0
+        return 0.0
+
+    @staticmethod
+    def _rollup_reject_tax_buckets(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+        def _bucket_key(value: Any) -> str:
+            text = str(value or "").strip().lower()
+            return text or "unknown"
+
+        def _new_bucket() -> Dict[str, int]:
+            return {
+                "total": 0,
+                "reject_skip": 0,
+                "filled_success": 0,
+                "hard_failed": 0,
+            }
+
+        by_source: Dict[str, Dict[str, int]] = defaultdict(_new_bucket)
+        by_strategy: Dict[str, Dict[str, int]] = defaultdict(_new_bucket)
+        by_timeframe: Dict[str, Dict[str, int]] = defaultdict(_new_bucket)
+        reason_counter: Dict[str, int] = defaultdict(int)
+
+        total = 0
+        reject_skip = 0
+        filled_success = 0
+        hard_failed = 0
+        accepted_no_fill = 0
+        policy_reject = 0
+        policy_noop = 0
+        noop = 0
+
+        for row in rows:
+            total += 1
+            outcome = _bucket_key(row.get("outcome"))
+            source = _bucket_key(row.get("signal_source") or row.get("source") or row.get("channel"))
+            strategy = _bucket_key(row.get("strategy"))
+            timeframe = _bucket_key(row.get("timeframe"))
+            reason = str(
+                row.get("policy_reason")
+                or row.get("noop_reason")
+                or row.get("error_message")
+                or ""
+            ).strip().lower()
+            if len(reason) > 140:
+                reason = reason[:137] + "..."
+
+            reject_like = outcome in {"policy_noop", "policy_reject", "noop"}
+            hard_fail_like = outcome == "hard_failed"
+            fill_like = outcome == "filled_success"
+
+            if outcome == "policy_noop":
+                policy_noop += 1
+            elif outcome == "policy_reject":
+                policy_reject += 1
+            elif outcome == "noop":
+                noop += 1
+            elif outcome == "accepted_no_fill":
+                accepted_no_fill += 1
+
+            if reject_like:
+                reject_skip += 1
+            if hard_fail_like:
+                hard_failed += 1
+            if fill_like:
+                filled_success += 1
+
+            for bucket in (by_source[source], by_strategy[strategy], by_timeframe[timeframe]):
+                bucket["total"] += 1
+                if reject_like:
+                    bucket["reject_skip"] += 1
+                if fill_like:
+                    bucket["filled_success"] += 1
+                if hard_fail_like:
+                    bucket["hard_failed"] += 1
+
+            if reject_like and reason:
+                reason_counter[reason] += 1
+
+        def _bucket_rows(src: Dict[str, Dict[str, int]]) -> List[Dict[str, Any]]:
+            out: List[Dict[str, Any]] = []
+            for key, bucket in src.items():
+                b_total = max(1, int(bucket["total"]))
+                out.append(
+                    {
+                        "key": key,
+                        "total": int(bucket["total"]),
+                        "reject_skip": int(bucket["reject_skip"]),
+                        "filled_success": int(bucket["filled_success"]),
+                        "hard_failed": int(bucket["hard_failed"]),
+                        "reject_tax_pct": round((float(bucket["reject_skip"]) / b_total) * 100.0, 2),
+                    }
+                )
+            out.sort(key=lambda item: (item["reject_skip"], item["total"]), reverse=True)
+            return out[:6]
+
+        total_safe = max(1, total)
+        return {
+            "sample_size": int(total),
+            "reject_skip_count": int(reject_skip),
+            "reject_tax_pct": round((float(reject_skip) / total_safe) * 100.0, 2),
+            "hard_failed_count": int(hard_failed),
+            "hard_fail_pct": round((float(hard_failed) / total_safe) * 100.0, 2),
+            "filled_success_count": int(filled_success),
+            "accepted_no_fill_count": int(accepted_no_fill),
+            "policy_noop_count": int(policy_noop),
+            "policy_reject_count": int(policy_reject),
+            "noop_count": int(noop),
+            "by_source": _bucket_rows(by_source),
+            "by_strategy": _bucket_rows(by_strategy),
+            "by_timeframe": _bucket_rows(by_timeframe),
+            "top_reasons": [
+                {"reason": reason, "count": count}
+                for reason, count in sorted(
+                    reason_counter.items(),
+                    key=lambda item: item[1],
+                    reverse=True,
+                )[:6]
+            ],
+        }
+
+    async def _collect_reject_tax_metrics(
+        self,
+        *,
+        force_refresh: bool = False,
+        window_hours: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        now_ts = time.time()
+        requested_window = (
+            float(window_hours)
+            if window_hours is not None
+            else float(self._reject_tax_window_hours)
+        )
+        requested_window = max(0.25, requested_window)
+        window_key = f"{requested_window:.2f}"
+        last_fetch = float(self._last_reject_tax_fetch_by_window.get(window_key, 0.0) or 0.0)
+        cached_window = self._cached_reject_tax_window_metrics.get(window_key) or {}
+        if (
+            not force_refresh
+            and cached_window
+            and (now_ts - last_fetch) < self._reject_tax_cache_ttl_seconds
+        ):
+            return dict(cached_window)
+
+        since_ts = now_ts - (requested_window * 3600.0)
+        rows: List[Dict[str, Any]] = []
+
+        if self._db is not None:
+            try:
+                from google.cloud import firestore as _fs
+                from google.cloud.firestore_v1.base_query import FieldFilter
+
+                query = (
+                    self._db.collection("execution_verifications")
+                    .where(filter=FieldFilter("platform", "==", PLATFORM.value))
+                    .where(filter=FieldFilter("recorded_at", ">=", datetime.fromtimestamp(since_ts, tz=timezone.utc)))
+                    .order_by("recorded_at", direction=_fs.Query.DESCENDING)
+                    .limit(1500)
+                )
+                async for doc in query.stream():
+                    rows.append(doc.to_dict() or {})
+            except Exception as exc:
+                logger.debug("Reject-tax indexed query fallback: %s", exc)
+                try:
+                    from google.cloud import firestore as _fs
+
+                    query = (
+                        self._db.collection("execution_verifications")
+                        .order_by("recorded_at", direction=_fs.Query.DESCENDING)
+                        .limit(2200)
+                    )
+                    async for doc in query.stream():
+                        row = doc.to_dict() or {}
+                        if str(row.get("platform", "")).strip().lower() != PLATFORM.value:
+                            continue
+                        ts = self._to_timestamp(row.get("recorded_at") or row.get("timestamp"))
+                        if ts < since_ts:
+                            continue
+                        rows.append(row)
+                except Exception as fallback_exc:
+                    logger.debug("Reject-tax Firestore fallback failed: %s", fallback_exc)
+
+        if not rows and self._recent_execution_outcomes:
+            for row in list(self._recent_execution_outcomes):
+                ts = self._to_timestamp(row.get("recorded_at") or row.get("timestamp"))
+                if ts >= since_ts:
+                    rows.append(dict(row))
+
+        rolled = self._rollup_reject_tax_buckets(rows)
+        rolled["window_hours"] = round(requested_window, 2)
+        rolled["computed_at"] = datetime.now(timezone.utc).isoformat()
+        rolled["alert_threshold_pct"] = round(float(self._reject_tax_alert_pct), 2)
+        rolled["alert"] = (
+            bool(rolled.get("sample_size", 0) >= self._go_nogo_min_sample_size)
+            and float(rolled.get("reject_tax_pct", 0.0)) >= float(self._reject_tax_alert_pct)
+        )
+
+        self._cached_reject_tax_window_metrics[window_key] = dict(rolled)
+        self._last_reject_tax_fetch_by_window[window_key] = now_ts
+        if abs(requested_window - float(self._reject_tax_window_hours)) < 1e-6:
+            self._cached_reject_tax_metrics = dict(rolled)
+            self._last_reject_tax_fetch_ts = now_ts
+        return dict(rolled)
+
+    async def _collect_reject_tax_deltas(self, *, force_refresh: bool = False) -> Dict[str, Any]:
+        windows = [1.0, 6.0, 24.0, float(self._reject_tax_window_hours)]
+        uniq_windows: List[float] = []
+        for value in windows:
+            if value not in uniq_windows:
+                uniq_windows.append(value)
+        result: Dict[str, Any] = {}
+        for value in uniq_windows:
+            key = f"{int(value)}h" if abs(value - int(value)) < 1e-6 else f"{value:.2f}h"
+            metrics = await self._collect_reject_tax_metrics(
+                force_refresh=force_refresh,
+                window_hours=value,
+            )
+            result[key] = {
+                "window_hours": float(metrics.get("window_hours", value) or value),
+                "sample_size": int(metrics.get("sample_size", 0) or 0),
+                "reject_tax_pct": self._to_float(metrics.get("reject_tax_pct"), 0.0),
+                "hard_fail_pct": self._to_float(metrics.get("hard_fail_pct"), 0.0),
+                "filled_success_pct": self._to_float(metrics.get("filled_success_pct"), 0.0),
+                "reject_skip_count": int(metrics.get("reject_skip_count", 0) or 0),
+                "hard_failed_count": int(metrics.get("hard_failed_count", 0) or 0),
+            }
+        return result
+
+    def _build_go_no_go_assessment(
+        self,
+        *,
+        snapshot: Dict[str, Any],
+        reject_tax: Dict[str, Any],
+        now_ts: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        ts = float(now_ts if now_ts is not None else time.time())
+        reasons: List[str] = []
+        reason_details: List[str] = []
+
+        if not self._trading_enabled:
+            reasons.append("trading_disabled")
+            reason_details.append("trading_disabled")
+        if self._trading_mode == "live" and not self._allow_live_trading:
+            reasons.append("live_trading_not_allowed")
+            reason_details.append("live_trading_not_allowed")
+        if bool(snapshot.get("balance_sync_stale")):
+            reasons.append("balance_sync_stale")
+            reason_details.append(
+                f"balance_sync_stale age={self._to_float(snapshot.get('balance_sync_age_sec'), 0.0):.0f}s"
+            )
+        if bool(snapshot.get("position_check_stale")):
+            reasons.append("position_sync_stale")
+            reason_details.append(
+                f"position_sync_stale age={self._to_float(snapshot.get('position_check_age_sec'), 0.0):.0f}s"
+            )
+        if self._execution_block_reason:
+            reasons.append("execution_blocked")
+            reason_details.append(
+                f"execution_blocked: {str(self._execution_block_reason).strip()[:100]}"
+            )
+        if max(0.0, self._execution_failsafe_until_ts - ts) > 0:
+            reasons.append("execution_failsafe_active")
+            reason_details.append(
+                f"execution_failsafe_active {max(0.0, self._execution_failsafe_until_ts - ts):.0f}s"
+            )
+        if max(0.0, self._jurisdiction_block_until_ts - ts) > 0:
+            reasons.append("jurisdiction_block_active")
+            reason_details.append(
+                f"jurisdiction_block_active {max(0.0, self._jurisdiction_block_until_ts - ts):.0f}s"
+            )
+        if bool(snapshot.get("hard_risk_blocked")):
+            reasons.append("hard_risk_kernel_hold")
+            reason_details.append(
+                f"hard_risk_kernel_hold: {str(snapshot.get('hard_risk_block_reason') or 'risk limit breached')[:100]}"
+            )
+
+        sample_size = int(reject_tax.get("sample_size", 0) or 0)
+        reject_tax_pct = self._to_float(reject_tax.get("reject_tax_pct"), 0.0)
+        hard_fail_pct = self._to_float(reject_tax.get("hard_fail_pct"), 0.0)
+        if sample_size >= self._go_nogo_min_sample_size:
+            if reject_tax_pct > self._go_nogo_max_reject_tax_pct:
+                reasons.append(
+                    f"reject_tax {reject_tax_pct:.1f}% > {self._go_nogo_max_reject_tax_pct:.1f}%"
+                )
+                reason_details.append(
+                    f"reject_tax {reject_tax_pct:.1f}% > {self._go_nogo_max_reject_tax_pct:.1f}% (n={sample_size})"
+                )
+            if hard_fail_pct > self._go_nogo_max_hard_fail_pct:
+                reasons.append(
+                    f"hard_fail_pct {hard_fail_pct:.1f}% > {self._go_nogo_max_hard_fail_pct:.1f}%"
+                )
+                reason_details.append(
+                    f"hard_fail_pct {hard_fail_pct:.1f}% > {self._go_nogo_max_hard_fail_pct:.1f}% (n={sample_size})"
+                )
+
+        go = len(reasons) == 0
+        return {
+            "go": bool(go),
+            "label": "GO" if go else "NO-GO",
+            "source": "bot_policy",
+            "reasons": reasons,
+            "reason_details": reason_details,
+            "sample_size": sample_size,
+            "reject_tax_pct": round(reject_tax_pct, 2),
+            "hard_fail_pct": round(hard_fail_pct, 2),
+            "evaluated_at": datetime.now(timezone.utc).isoformat(),
+            "thresholds": {
+                "max_reject_tax_pct": round(float(self._go_nogo_max_reject_tax_pct), 2),
+                "max_hard_fail_pct": round(float(self._go_nogo_max_hard_fail_pct), 2),
+                "min_sample_size": int(self._go_nogo_min_sample_size),
+            },
+        }
+
+    async def _get_equity_snapshot_cached(self, *, force_refresh: bool = False) -> Dict[str, Any]:
+        now_ts = time.time()
+        if (
+            not force_refresh
+            and self._cached_equity_snapshot
+            and (now_ts - self._last_equity_snapshot_ts) < self._equity_snapshot_cache_ttl_seconds
+        ):
+            return dict(self._cached_equity_snapshot)
+        snapshot = await self._estimate_equity_snapshot()
+        self._cached_equity_snapshot = dict(snapshot)
+        self._last_equity_snapshot_ts = now_ts
+        return dict(snapshot)
+
+    async def _fetch_platform_decision(self, *, force_refresh: bool = False) -> Dict[str, Any]:
+        now_ts = time.time()
+        if (
+            not force_refresh
+            and self._cached_platform_decision
+            and (now_ts - self._last_platform_decision_fetch_ts) < self._platform_decision_cache_ttl_seconds
+        ):
+            return dict(self._cached_platform_decision)
+        if not self._platform_decision_url:
+            return {}
+
+        def _request() -> Dict[str, Any]:
+            resp = requests.get(
+                self._platform_decision_url,
+                timeout=float(self._platform_decision_timeout_seconds),
+            )
+            resp.raise_for_status()
+            payload = resp.json()
+            if not isinstance(payload, dict):
+                return {}
+            decision = payload.get("decision", {}) if isinstance(payload.get("decision"), dict) else {}
+            assessment = payload.get("assessment", {}) if isinstance(payload.get("assessment"), dict) else {}
+            reasons = decision.get("reasons", []) if isinstance(decision.get("reasons"), list) else []
+            if not reasons and isinstance(assessment.get("reasons"), list):
+                reasons = assessment.get("reasons", [])
+            return {
+                "go": bool(decision.get("go", assessment.get("go", False))),
+                "label": str(decision.get("label", assessment.get("label", "NO-GO"))).upper(),
+                "source": str(decision.get("source", "platform_strategy_ops")),
+                "reasons": [str(item) for item in reasons[:6] if str(item).strip()],
+                "diverged": bool(decision.get("diverged", False)),
+                "timestamp": payload.get("timestamp"),
+            }
+
+        try:
+            loop = asyncio.get_running_loop()
+            data = await loop.run_in_executor(None, _request)
+            if data:
+                self._cached_platform_decision = dict(data)
+                self._last_platform_decision_fetch_ts = now_ts
+            return dict(data)
+        except Exception as exc:
+            logger.debug("Platform decision fetch error: %s", exc)
+            return {}
+
+    async def _evaluate_go_no_go(
+        self,
+        *,
+        force_refresh: bool = False,
+        now_ts: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        ts = float(now_ts if now_ts is not None else time.time())
+        if (
+            not force_refresh
+            and self._cached_go_no_go
+            and (ts - self._last_go_no_go_eval_ts) < self._go_nogo_cache_ttl_seconds
+        ):
+            return dict(self._cached_go_no_go)
+
+        snapshot = await self._get_equity_snapshot_cached(force_refresh=force_refresh)
+        reject_tax = await self._collect_reject_tax_metrics(force_refresh=force_refresh)
+        go_nogo = self._build_go_no_go_assessment(
+            snapshot=snapshot,
+            reject_tax=reject_tax,
+            now_ts=ts,
+        )
+        if self._platform_decision_gate_enabled:
+            platform_decision = await self._fetch_platform_decision(force_refresh=force_refresh)
+            if platform_decision:
+                go_nogo["platform_decision"] = platform_decision
+                if not platform_decision.get("go", True):
+                    platform_reasons = platform_decision.get("reasons") or []
+                    if platform_reasons:
+                        reason_text = f"platform_no_go: {platform_reasons[0]}"
+                    else:
+                        reason_text = "platform_no_go"
+                    reasons = go_nogo.get("reasons", [])
+                    details = go_nogo.get("reason_details", [])
+                    if reason_text not in reasons:
+                        reasons.append(reason_text)
+                    if reason_text not in details:
+                        details.append(reason_text)
+                    go_nogo["reasons"] = reasons
+                    go_nogo["reason_details"] = details
+                    go_nogo["go"] = False
+                    go_nogo["label"] = "NO-GO"
+                    go_nogo["source"] = "bot_policy+platform_decision"
+        go_nogo["reject_tax"] = reject_tax
+        go_nogo["deltas"] = await self._collect_reject_tax_deltas(force_refresh=force_refresh)
+        self._cached_go_no_go = dict(go_nogo)
+        self._last_go_no_go_eval_ts = ts
+        return dict(go_nogo)
+
     async def _send_portfolio_digest(self, snapshot: Dict[str, Any]) -> None:
         equity = self._to_float(snapshot.get("equity_estimate"), 0.0)
         cash = self._to_float(snapshot.get("cash_balance"), 0.0)
@@ -2249,6 +3104,11 @@ class LighterBot:
         pos_notional = self._to_float(snapshot.get("position_notional_usd"), 0.0)
         pos_count = int(snapshot.get("positions_count", 0) or 0)
         stale = bool(snapshot.get("balance_sync_stale")) or bool(snapshot.get("position_check_stale"))
+        go_nogo = await self._evaluate_go_no_go()
+        reject_tax = go_nogo.get("reject_tax", {}) if isinstance(go_nogo.get("reject_tax"), dict) else {}
+        if not reject_tax:
+            reject_tax = await self._collect_reject_tax_metrics()
+        deltas = go_nogo.get("deltas", {}) if isinstance(go_nogo.get("deltas"), dict) else {}
 
         lines = [
             "📊 <b>LIGHTER Portfolio Digest</b>",
@@ -2261,7 +3121,62 @@ class LighterBot:
                 f"<b>Exposure</b> {pos_notional:,.4f}"
             ),
             f"<b>Positions</b> {pos_count} · <b>Sync</b> {'stale ⚠️' if stale else 'fresh ✅'}",
+            (
+                f"<b>Operator</b> {'🟢 GO' if go_nogo.get('go') else '🔴 NO-GO'} · "
+                f"<b>Reject Tax {reject_tax.get('window_hours', 24)}h</b> "
+                f"{self._to_float(reject_tax.get('reject_tax_pct'), 0.0):.1f}% "
+                f"({int(reject_tax.get('reject_skip_count', 0) or 0)}/"
+                f"{int(reject_tax.get('sample_size', 0) or 0)})"
+            ),
+            f"<b>Decision Source</b> {html.escape(str(go_nogo.get('source', 'bot_policy')).replace('_', ' '))}",
+            (
+                f"<b>Hard Fail</b> {self._to_float(reject_tax.get('hard_fail_pct'), 0.0):.1f}% · "
+                f"{int(reject_tax.get('hard_failed_count', 0) or 0)} events"
+            ),
         ]
+        d1 = deltas.get("1h", {}) if isinstance(deltas.get("1h"), dict) else {}
+        d6 = deltas.get("6h", {}) if isinstance(deltas.get("6h"), dict) else {}
+        d24 = deltas.get("24h", {}) if isinstance(deltas.get("24h"), dict) else {}
+        if d1 or d6 or d24:
+            rt_1h = self._to_float(d1.get("reject_tax_pct"), 0.0)
+            rt_6h = self._to_float(d6.get("reject_tax_pct"), 0.0)
+            rt_24h = self._to_float(d24.get("reject_tax_pct"), 0.0)
+            trend = "steady"
+            if rt_1h < rt_6h and rt_6h < rt_24h:
+                trend = "improving"
+            elif rt_1h > rt_6h and rt_6h > rt_24h:
+                trend = "worsening"
+            lines.append(
+                f"<b>Reject Trend</b> 1h {rt_1h:.1f}% · 6h {rt_6h:.1f}% · 24h {rt_24h:.1f}% ({trend})"
+            )
+        if not go_nogo.get("go"):
+            reasons = go_nogo.get("reason_details") or go_nogo.get("reasons") or []
+            if reasons:
+                lines.append(f"<b>Blockers</b> {html.escape('; '.join(reasons[:3]))}")
+        top_source = (reject_tax.get("by_source") or [{}])[0]
+        if top_source and top_source.get("total"):
+            lines.append(
+                f"<b>Top Reject Source</b> {html.escape(str(top_source.get('key', 'unknown')))} "
+                f"({self._to_float(top_source.get('reject_tax_pct'), 0.0):.1f}% / n={int(top_source.get('total', 0) or 0)})"
+            )
+        top_strategy = (reject_tax.get("by_strategy") or [{}])[0]
+        if top_strategy and top_strategy.get("total"):
+            lines.append(
+                f"<b>Top Reject Strategy</b> {html.escape(str(top_strategy.get('key', 'unknown')))} "
+                f"({self._to_float(top_strategy.get('reject_tax_pct'), 0.0):.1f}% / n={int(top_strategy.get('total', 0) or 0)})"
+            )
+        top_timeframe = (reject_tax.get("by_timeframe") or [{}])[0]
+        if top_timeframe and top_timeframe.get("total"):
+            lines.append(
+                f"<b>Top Reject Timeframe</b> {html.escape(str(top_timeframe.get('key', 'unknown')))} "
+                f"({self._to_float(top_timeframe.get('reject_tax_pct'), 0.0):.1f}% / n={int(top_timeframe.get('total', 0) or 0)})"
+            )
+        top_reason = (reject_tax.get("top_reasons") or [{}])[0]
+        if top_reason and top_reason.get("reason"):
+            lines.append(
+                f"<b>Top Reject Reason</b> {html.escape(str(top_reason.get('reason')))} "
+                f"(n={int(top_reason.get('count', 0) or 0)})"
+            )
 
         if self.positions:
             lines.append("<b>Open Positions</b>")
@@ -2345,6 +3260,96 @@ class LighterBot:
             or ""
         ).strip().lower()
         return strategy, timeframe
+
+    def _normalize_strategy_for_policy(self, strategy: str) -> str:
+        canonical = str(strategy or "").strip().lower()
+        if not canonical:
+            return ""
+
+        if canonical in self._allowed_strategies:
+            return canonical
+
+        if self._allowed_strategies:
+            if canonical.endswith("_lite"):
+                base = canonical[:-5].strip("_-")
+                if base and base in self._allowed_strategies:
+                    return base
+            if canonical.endswith("-lite"):
+                base = canonical[:-5].strip("_-")
+                if base and base in self._allowed_strategies:
+                    return base
+
+        return canonical
+
+    def _policy_noop_result(
+        self,
+        signal: TradeSignal,
+        *,
+        reason: str,
+        symbol: Optional[str] = None,
+    ) -> TradeResult:
+        return TradeResult(
+            trade_id="noop",
+            signal_id=str(getattr(signal, "signal_id", "") or ""),
+            platform=PLATFORM.value,
+            symbol=str(symbol or signal.symbol or ""),
+            side=signal.side,
+            success=True,
+            metadata={
+                "noop": True,
+                "policy_reject": True,
+                "reason": str(reason or "policy_filter"),
+            },
+        )
+
+    @staticmethod
+    def _should_retry_order_submit_failure(error: Any) -> bool:
+        text = str(error or "").lower()
+        if not text:
+            return False
+        retryable_markers = (
+            "timeout",
+            "timed out",
+            "temporarily unavailable",
+            "service unavailable",
+            "connection reset",
+            "connection aborted",
+            "connection closed",
+            "connection error",
+            "network",
+            "try again",
+            "rate limit",
+            "429",
+            "502",
+            "503",
+            "504",
+            "bad gateway",
+            "gateway timeout",
+        )
+        return any(marker in text for marker in retryable_markers)
+
+    @staticmethod
+    def _should_treat_as_preflight_noop(error: Any) -> bool:
+        text = str(error or "").lower()
+        if not text:
+            return False
+        preflight_markers = (
+            "entry cooldown active for ",
+            "position already at symbol cap",
+            "entry skipped at symbol cap",
+            "signal leverage ",
+            "signal quantity is required",
+            "target order notional too low",
+            "entry notional too low",
+            "quantity rounded to zero",
+            "no order book mapping for symbol",
+            "could not get current price for ",
+            "execution failsafe active",
+            "jurisdiction block active",
+            "trading disabled (trading_enabled=false)",
+            "live trading disabled (allow_live_trading=0)",
+        )
+        return any(marker in text for marker in preflight_markers)
 
     async def _close_position_for_rotation(self, symbol: str, reason: str) -> TradeResult:
         current = self.positions.get(symbol)
@@ -2467,6 +3472,95 @@ class LighterBot:
             return ""
         return f"{s}@{tf}"
 
+    def _size_ramp_key(self, strategy: str, timeframe: str) -> str:
+        key = self._strategy_perf_key(strategy, timeframe)
+        return key or "global"
+
+    def _target_margin_for_signal(self, strategy: str, timeframe: str) -> float:
+        base = max(0.0, float(self._target_order_notional_usd or 0.0))
+        if not self._size_ramp_enabled or base <= 0:
+            return base
+        key = self._size_ramp_key(strategy, timeframe)
+        margin = self._to_float(
+            self._size_ramp_margin_by_key.get(key, self._size_ramp_default_margin_usd),
+            self._size_ramp_default_margin_usd,
+        )
+        return self._clamp(
+            float(margin),
+            self._size_ramp_min_margin_usd,
+            self._size_ramp_max_margin_usd,
+        )
+
+    def _maybe_adjust_size_ramp(self, strategy: str, timeframe: str) -> None:
+        if not self._size_ramp_enabled:
+            return
+        if self._target_order_notional_usd <= 0:
+            return
+        key_perf = self._strategy_perf_key(strategy, timeframe)
+        if not key_perf:
+            return
+        history = list(self._strategy_perf_history.get(key_perf, []))
+        actionable = [o for o in history if o in {"filled_success", "accepted_no_fill", "hard_failed"}]
+        if len(actionable) < self._size_ramp_min_samples:
+            return
+
+        now_ts = time.time()
+        key = self._size_ramp_key(strategy, timeframe)
+        last_adjust_ts = float(self._size_ramp_last_adjust_ts.get(key, 0.0) or 0.0)
+        if (now_ts - last_adjust_ts) < self._size_ramp_adjust_cooldown_seconds:
+            return
+
+        current_margin = self._target_margin_for_signal(strategy, timeframe)
+        filled = sum(1 for o in actionable if o == "filled_success")
+        hard_failed = sum(1 for o in actionable if o == "hard_failed")
+        total = float(len(actionable))
+        fill_rate = (filled / total) if total > 0 else 0.0
+        hard_fail_rate = (hard_failed / total) if total > 0 else 0.0
+        tail_n = min(self._size_ramp_recent_streak, len(actionable))
+        tail = actionable[-tail_n:] if tail_n > 0 else []
+        recent_consistent = bool(tail) and all(outcome == "filled_success" for outcome in tail)
+
+        next_margin = current_margin
+        reason = ""
+        if (
+            hard_fail_rate > self._size_ramp_max_hard_fail_rate
+            or fill_rate < self._size_ramp_down_fill_rate
+        ):
+            next_margin = max(
+                self._size_ramp_min_margin_usd,
+                current_margin - self._size_ramp_step_margin_usd,
+            )
+            reason = (
+                f"decrease fill={fill_rate:.1%} hard_fail={hard_fail_rate:.1%}"
+            )
+        elif (
+            fill_rate >= self._size_ramp_up_fill_rate
+            and hard_fail_rate <= self._size_ramp_max_hard_fail_rate
+            and recent_consistent
+        ):
+            next_margin = min(
+                self._size_ramp_max_margin_usd,
+                current_margin + self._size_ramp_step_margin_usd,
+            )
+            reason = (
+                f"increase fill={fill_rate:.1%} hard_fail={hard_fail_rate:.1%} streak={tail_n}"
+            )
+
+        if abs(next_margin - current_margin) < 1e-9:
+            return
+        self._size_ramp_margin_by_key[key] = float(next_margin)
+        self._size_ramp_last_adjust_ts[key] = now_ts
+        logger.warning(
+            "Size ramp adjusted %s | %s -> %.2f USD (prev %.2f USD, n=%d, strategy=%s, timeframe=%s)",
+            key,
+            reason,
+            float(next_margin),
+            float(current_margin),
+            len(actionable),
+            strategy or "n/a",
+            timeframe or "n/a",
+        )
+
     def _strategy_perf_policy_reason(self, strategy: str, timeframe: str) -> str:
         if not self._perf_guard_enabled:
             return ""
@@ -2522,6 +3616,7 @@ class LighterBot:
         if not key:
             return
         self._strategy_perf_history[key].append(str(outcome or "").strip().lower())
+        self._maybe_adjust_size_ramp(strategy, timeframe)
 
     def _is_signal_allowed_by_policy(self, signal: TradeSignal) -> tuple[bool, str]:
         strategy, timeframe = self._signal_strategy_info(signal)
@@ -2537,6 +3632,73 @@ class LighterBot:
         entry_like = signal.signal_type in {SignalType.ENTRY, SignalType.SCALE_IN}
 
         if entry_like and not reduce_only:
+            coin = self._normalize_coin_symbol(str(signal.symbol or ""))
+            can_enter, risk_reason = self._hard_risk_kernel.can_open_entry()
+            if not can_enter:
+                return False, risk_reason
+            if self._entry_symbol_allowlist and coin not in self._entry_symbol_allowlist:
+                return (
+                    False,
+                    f"symbol '{coin}' not in entry allowlist {sorted(self._entry_symbol_allowlist)}",
+                )
+            if self._entry_cooldown_seconds > 0:
+                now_ts = time.time()
+                last_ts = float(self._last_entry_ts.get(coin, 0.0) or 0.0)
+                if last_ts and (now_ts - last_ts) < self._entry_cooldown_seconds:
+                    wait_s = self._entry_cooldown_seconds - (now_ts - last_ts)
+                    return False, f"entry cooldown active for {coin}: wait {wait_s:.1f}s"
+
+            existing = self.positions.get(coin)
+            if existing is not None and self._max_position_notional_usd > 0:
+                existing_qty = self._to_float(getattr(existing, "quantity", 0.0), 0.0)
+                if existing_qty > 0:
+                    existing_side = getattr(existing, "side", None)
+                    existing_is_buy = existing_side in (TradeSide.BUY, TradeSide.LONG, "BUY", "LONG")
+                    incoming_is_buy = signal.side in (TradeSide.BUY, TradeSide.LONG, "BUY", "LONG")
+                    if existing_is_buy == incoming_is_buy:
+                        mark_price = self._to_float(getattr(existing, "current_price", 0.0), 0.0)
+                        if mark_price <= 0:
+                            mark_price = self._to_float(getattr(existing, "entry_price", 0.0), 0.0)
+                        if mark_price > 0:
+                            current_notional = abs(existing_qty * mark_price)
+                            if (
+                                self._cap_near_churn_enabled
+                                and self._max_position_notional_usd > 0
+                                and current_notional > 0
+                            ):
+                                cap_ratio = current_notional / max(
+                                    0.0001, float(self._max_position_notional_usd)
+                                )
+                                if cap_ratio >= self._cap_near_churn_ratio:
+                                    incoming_ev = self._estimate_signal_ev_pct(
+                                        signal,
+                                        coin=coin,
+                                        is_buy=incoming_is_buy,
+                                        reference_price=float(mark_price),
+                                        expected_notional_usd=self._default_expected_entry_notional_usd(),
+                                    )
+                                    current_ev = self._estimate_position_ev_pct(coin, existing)
+                                    ev_edge = incoming_ev - current_ev
+                                    if (
+                                        incoming_ev < self._cap_near_min_net_ev_pct
+                                        or ev_edge < self._cap_near_min_ev_edge_pct
+                                    ):
+                                        return (
+                                            False,
+                                            (
+                                                f"cap_near_churn: {coin} at {cap_ratio * 100.0:.1f}% of cap; "
+                                                f"incoming_ev={incoming_ev:+.3f}% current_ev={current_ev:+.3f}% "
+                                                f"edge={ev_edge:+.3f}% (min_ev={self._cap_near_min_net_ev_pct:.3f}% "
+                                                f"min_edge={self._cap_near_min_ev_edge_pct:.3f}%)"
+                                            ),
+                                        )
+                            if current_notional >= (self._max_position_notional_usd * 0.995):
+                                return (
+                                    False,
+                                    f"position already at symbol cap for {coin} "
+                                    f"({current_notional:.4f}/{self._max_position_notional_usd:.4f})",
+                                )
+
             confidence = self._clamp(self._to_float(getattr(signal, "confidence", 0.0), 0.0), 0.0, 1.0)
             if self._entry_min_confidence > 0 and confidence < self._entry_min_confidence:
                 return (
@@ -2572,6 +3734,10 @@ class LighterBot:
 
         if self._strategy_require_metadata and (not strategy or not timeframe):
             return False, "strategy metadata required"
+
+        if self._allowed_strategies and strategy:
+            strategy = self._normalize_strategy_for_policy(strategy)
+
         if self._allowed_strategies and strategy and strategy not in self._allowed_strategies:
             return False, f"strategy '{strategy}' not allowed"
         if self._allowed_timeframes and timeframe and timeframe not in self._allowed_timeframes:
@@ -2747,6 +3913,7 @@ class LighterBot:
         position_check_stale = (
             position_check_age_sec is None or position_check_age_sec > self._sync_stale_alert_seconds
         )
+        hard_risk = self._hard_risk_kernel.status(now_ts=now_ts)
 
         return {
             "platform": PLATFORM.value,
@@ -2773,6 +3940,10 @@ class LighterBot:
             ),
             "last_balance_sync_error": self._last_balance_sync_error,
             "last_position_check_error": self._last_position_check_error,
+            "hard_risk_kernel": hard_risk,
+            "hard_risk_blocked": bool(hard_risk.get("blocked", False)),
+            "hard_risk_block_reason": str(hard_risk.get("block_reason", "")),
+            "hard_risk_block_remaining_sec": float(hard_risk.get("blocked_for_sec", 0.0) or 0.0),
         }
 
     async def _persist_equity_snapshot(self, snapshot: Dict[str, Any], reason: str) -> None:
@@ -2834,6 +4005,12 @@ class LighterBot:
             advice.append(
                 f"Top position {top.get('symbol')} EV {self._to_float(top.get('ev_score_pct'), 0.0):+.3f}%."
             )
+        go_nogo = await self._evaluate_go_no_go()
+        reject_tax = go_nogo.get("reject_tax", {}) if isinstance(go_nogo.get("reject_tax"), dict) else {}
+        if not reject_tax:
+            reject_tax = await self._collect_reject_tax_metrics()
+        if not go_nogo.get("go"):
+            advice.append(f"NO-GO: {'; '.join((go_nogo.get('reasons') or [])[:2])}")
 
         brief = {
             "service": SERVICE_NAME,
@@ -2843,6 +4020,7 @@ class LighterBot:
             "positions": positions_payload,
             "policy": {
                 "single_symbol_mode": self._single_symbol_mode,
+                "entry_symbol_allowlist": sorted(self._entry_symbol_allowlist),
                 "dynamic_risk_enabled": self._dynamic_risk_enabled,
                 "opportunity_rotation_enabled": self._opportunity_rotation_enabled,
                 "opportunity_min_edge_pct": self._opportunity_rotation_min_edge_pct,
@@ -2850,6 +4028,8 @@ class LighterBot:
                 "allowed_timeframes": sorted(self._allowed_timeframes),
                 "entry_min_confidence": self._entry_min_confidence,
                 "entry_min_edge_pct": self._entry_min_edge_pct,
+                "hard_risk_kernel_enabled": self._hard_risk_kernel_enabled,
+                "hard_risk_state": self._hard_risk_kernel.status(),
                 "perf_guard_enabled": self._perf_guard_enabled,
                 "perf_guard_window": self._perf_guard_window,
                 "perf_guard_min_samples": self._perf_guard_min_samples,
@@ -2860,6 +4040,14 @@ class LighterBot:
                 "target_order_notional_usd": self._target_order_notional_usd,
                 "min_entry_notional_usd": self._min_entry_notional_usd,
                 "max_signal_leverage": self._max_signal_leverage,
+                "size_ramp_enabled": self._size_ramp_enabled,
+                "size_ramp_min_margin_usd": self._size_ramp_min_margin_usd,
+                "size_ramp_max_margin_usd": self._size_ramp_max_margin_usd,
+                "size_ramp_step_margin_usd": self._size_ramp_step_margin_usd,
+                "size_ramp_min_samples": self._size_ramp_min_samples,
+                "size_ramp_up_fill_rate": self._size_ramp_up_fill_rate,
+                "size_ramp_down_fill_rate": self._size_ramp_down_fill_rate,
+                "size_ramp_max_hard_fail_rate": self._size_ramp_max_hard_fail_rate,
                 "entry_cooldown_seconds": self._entry_cooldown_seconds,
                 "sync_before_entry": self._sync_before_entry,
                 "jurisdiction_block_until": (
@@ -2868,6 +4056,8 @@ class LighterBot:
                     else ""
                 ),
             },
+            "reject_tax": reject_tax,
+            "go_no_go": go_nogo,
             "assistant_advice": advice,
         }
         try:
@@ -2913,6 +4103,7 @@ class LighterBot:
             "channel": channel,
             "signal_id": str(signal.signal_id or ""),
             "symbol": str(signal.symbol or ""),
+            "signal_source": self._extract_signal_source(signal),
             "side": str(signal.side),
             "signal_type": str(signal.signal_type),
             "strategy": strategy,
@@ -2932,11 +4123,31 @@ class LighterBot:
             "outcome": outcome,
             "is_noop": is_noop,
             "noop_reason": str(result_meta.get("reason", "") or ""),
+            "policy_reason": str(
+                result_meta.get("reason")
+                or getattr(result, "error_message", "")
+                or ""
+            )[:220],
             "signal_metadata": (signal.metadata or {}),
             "result_metadata": result_meta,
             "metadata": (signal.metadata or {}),
             "recorded_at": datetime.now(timezone.utc),
         }
+        risk_event = self._hard_risk_kernel.record_execution_outcome(
+            outcome=outcome,
+            equity_estimate=self._to_float(payload.get("equity_estimate"), 0.0),
+        )
+        payload["hard_risk_state"] = self._hard_risk_kernel.status()
+        if risk_event:
+            payload["hard_risk_event"] = risk_event.as_dict()
+            await self._send_telegram_message(
+                (
+                    "🛑 <b>LIGHTER HARD RISK KERNEL ACTIVATED</b>\n"
+                    f"reason={html.escape(risk_event.reason)}\n"
+                    f"hold={max(0.0, risk_event.blocked_until_ts - time.time()):.0f}s"
+                ),
+                parse_mode="HTML",
+            )
         self._record_strategy_perf_outcome(
             signal,
             strategy=strategy,
@@ -2961,6 +4172,19 @@ class LighterBot:
                 self._execution_watchdog_alert_streak = 0
             else:
                 self._last_execution_error_message = str(payload.get("error_message") or "")[:280]
+        self._recent_execution_outcomes.append(
+            {
+                "recorded_at": payload.get("recorded_at"),
+                "outcome": payload.get("outcome"),
+                "signal_source": payload.get("signal_source"),
+                "strategy": payload.get("strategy"),
+                "timeframe": payload.get("timeframe"),
+                "policy_reason": payload.get("policy_reason"),
+                "noop_reason": payload.get("noop_reason"),
+                "error_message": payload.get("error_message"),
+                "channel": payload.get("channel"),
+            }
+        )
         if self._db is None:
             return
         try:
@@ -3007,6 +4231,9 @@ class LighterBot:
         position_stale = bool(snap.get("position_check_stale"))
         failsafe_remaining = max(0.0, self._execution_failsafe_until_ts - ts)
         jurisdiction_remaining = max(0.0, self._jurisdiction_block_until_ts - ts)
+        hard_risk_remaining = self._to_float(snap.get("hard_risk_block_remaining_sec"), 0.0)
+        hard_risk_blocked = bool(snap.get("hard_risk_blocked")) or hard_risk_remaining > 0
+        hard_risk_reason = str(snap.get("hard_risk_block_reason") or "")
         attempt_age = (
             ts - self._last_execution_attempt_ts
             if self._last_execution_attempt_ts > 0
@@ -3022,10 +4249,16 @@ class LighterBot:
             and not position_stale
             and failsafe_remaining <= 0
             and jurisdiction_remaining <= 0
+            and not hard_risk_blocked
             and not bool(self._execution_block_reason)
             and bool(self._trading_enabled)
             and (self._trading_mode != "live" or bool(self._allow_live_trading))
         )
+        go_nogo = await self._evaluate_go_no_go(now_ts=ts)
+        reject_tax = go_nogo.get("reject_tax", {}) if isinstance(go_nogo.get("reject_tax"), dict) else {}
+        if not reject_tax:
+            reject_tax = dict(self._cached_reject_tax_metrics or {})
+        deltas = go_nogo.get("deltas", {}) if isinstance(go_nogo.get("deltas"), dict) else {}
 
         lines = [
             f"{'🟢' if lane_ready else '🟠'} <b>LIGHTER LANE HEARTBEAT</b>",
@@ -3034,6 +4267,11 @@ class LighterBot:
                 f"<b>Mode</b> {html.escape(self._trading_mode)} · "
                 f"<b>Positions</b> {int(snap.get('positions_count', 0) or 0)}"
             ),
+            (
+                f"<b>Operator</b> {'🟢 GO' if go_nogo.get('go') else '🔴 NO-GO'} · "
+                f"<b>Reject Tax</b> {self._to_float(reject_tax.get('reject_tax_pct'), 0.0):.1f}%"
+            ),
+            f"<b>Decision Source</b> {html.escape(str(go_nogo.get('source', 'bot_policy')).replace('_', ' '))}",
             (
                 f"<b>Equity</b> {self._to_float(snap.get('equity_estimate'), 0.0):,.4f} · "
                 f"<b>Cash</b> {self._to_float(snap.get('cash_balance'), 0.0):,.4f} · "
@@ -3058,8 +4296,32 @@ class LighterBot:
                 f"<b>Jurisdiction Block</b> {jurisdiction_remaining:.0f}s · "
                 f"{html.escape(self._jurisdiction_block_reason or 'restricted jurisdiction')}"
             )
+        if hard_risk_blocked:
+            lines.append(
+                f"<b>Hard Risk Hold</b> {hard_risk_remaining:.0f}s · "
+                f"{html.escape(hard_risk_reason or 'risk limit breached')}"
+            )
         if self._execution_block_reason:
             lines.append(f"<b>Execution Block</b> {html.escape(self._execution_block_reason[:220])}")
+        if not go_nogo.get("go"):
+            reasons = go_nogo.get("reason_details") or go_nogo.get("reasons") or []
+            if reasons:
+                lines.append(f"<b>GO/NO-GO Blockers</b> {html.escape('; '.join(reasons[:2]))}")
+        d1 = deltas.get("1h", {}) if isinstance(deltas.get("1h"), dict) else {}
+        d6 = deltas.get("6h", {}) if isinstance(deltas.get("6h"), dict) else {}
+        d24 = deltas.get("24h", {}) if isinstance(deltas.get("24h"), dict) else {}
+        if d1 or d6 or d24:
+            lines.append(
+                f"<b>Reject Δ</b> 1h {self._to_float(d1.get('reject_tax_pct'), 0.0):.1f}% · "
+                f"6h {self._to_float(d6.get('reject_tax_pct'), 0.0):.1f}% · "
+                f"24h {self._to_float(d24.get('reject_tax_pct'), 0.0):.1f}%"
+            )
+        top_timeframe = (reject_tax.get("by_timeframe") or [{}])[0]
+        if top_timeframe and top_timeframe.get("total"):
+            lines.append(
+                f"<b>Top Reject TF</b> {html.escape(str(top_timeframe.get('key', 'unknown')))} "
+                f"{self._to_float(top_timeframe.get('reject_tax_pct'), 0.0):.1f}%"
+            )
 
         await self._send_telegram_message("\n".join(lines), parse_mode="HTML")
 
@@ -3107,9 +4369,27 @@ class LighterBot:
                     snap.get("position_check_age_sec"),
                 )
 
+                now_ts = time.time()
+                hard_risk_event = self._hard_risk_kernel.ingest_equity_snapshot(snap, now_ts=now_ts)
+                hard_risk_state = self._hard_risk_kernel.status(now_ts=now_ts)
+                snap["hard_risk_kernel"] = hard_risk_state
+                snap["hard_risk_blocked"] = bool(hard_risk_state.get("blocked", False))
+                snap["hard_risk_block_reason"] = str(hard_risk_state.get("block_reason", ""))
+                snap["hard_risk_block_remaining_sec"] = float(
+                    hard_risk_state.get("blocked_for_sec", 0.0) or 0.0
+                )
+                if hard_risk_event:
+                    await self._send_telegram_message(
+                        (
+                            "🛑 <b>LIGHTER HARD RISK LIMIT BREACHED</b>\n"
+                            f"reason={html.escape(hard_risk_event.reason)}\n"
+                            f"hold={max(0.0, hard_risk_event.blocked_until_ts - now_ts):.0f}s"
+                        ),
+                        parse_mode="HTML",
+                    )
+
                 await self._persist_equity_snapshot(snap, reason="progress_loop")
 
-                now_ts = time.time()
                 if self._execution_failsafe_until_ts > 0 and now_ts >= self._execution_failsafe_until_ts:
                     if self._clear_execution_failsafe():
                         await self._send_telegram_message(
@@ -3305,6 +4585,8 @@ class LighterBot:
     ) -> TradeResult:
         """Execute trade on Lighter with L2 order book."""
         start_time = datetime.now()
+        coin = self._normalize_coin_symbol(signal.symbol)
+        order_submit_started = False
 
         try:
             is_buy = signal.side in (TradeSide.BUY, TradeSide.LONG)
@@ -3317,6 +4599,7 @@ class LighterBot:
             }:
                 reduce_only = True
             entry_like = signal.signal_type in {SignalType.ENTRY, SignalType.SCALE_IN}
+            strategy, timeframe = self._signal_strategy_info(signal)
 
             if not ignore_trading_guard:
                 if not self._trading_enabled:
@@ -3336,13 +4619,28 @@ class LighterBot:
                         f"Jurisdiction block active ({wait_s:.0f}s remaining): "
                         f"{self._jurisdiction_block_reason or 'restricted jurisdiction'}"
                     )
+                if entry_like and not reduce_only:
+                    can_enter, risk_reason = self._hard_risk_kernel.can_open_entry()
+                    if not can_enter:
+                        return self._policy_noop_result(
+                            signal,
+                            reason=risk_reason,
+                            symbol=coin,
+                        )
+                if self._go_nogo_gate_enabled and entry_like and not reduce_only:
+                    go_nogo = await self._evaluate_go_no_go()
+                    if not go_nogo.get("go", False):
+                        blocker_rows = go_nogo.get("reason_details") or go_nogo.get("reasons") or []
+                        blocker_text = "; ".join(str(item) for item in blocker_rows[:2]).strip()
+                        return self._policy_noop_result(
+                            signal,
+                            reason=f"go_no_go_block: {blocker_text or 'operator_no_go'}",
+                            symbol=coin,
+                        )
             if not self.transaction_api:
                 raise Exception("Transaction API not initialized")
             if self._execution_block_reason:
                 raise Exception(self._execution_block_reason)
-
-            # Normalize symbol
-            coin = self._normalize_coin_symbol(signal.symbol)
 
             # Get market info
             market = self._resolve_market(signal.symbol)
@@ -3372,30 +4670,87 @@ class LighterBot:
             signal.metadata.setdefault("max_signal_leverage", self._max_signal_leverage)
             if signal_leverage > 0:
                 signal.metadata.setdefault("requested_leverage", signal_leverage)
+            applied_notional_leverage = 1.0
+            if entry_like and not reduce_only and self._use_leverage_for_notional:
+                leverage_hint = signal_leverage if signal_leverage > 0 else self._target_order_leverage
+                applied_notional_leverage = self._clamp(
+                    leverage_hint,
+                    1.0,
+                    self._max_signal_leverage,
+                )
+                signal.metadata.setdefault("sizing", {})
+                signal.metadata["sizing"].setdefault("use_leverage_for_notional", True)
+                signal.metadata["sizing"].setdefault(
+                    "applied_notional_leverage",
+                    round(float(applied_notional_leverage), 6),
+                )
             current_price = 0.0
             size_decimals = self._market_size_decimals(market) or 3
 
             if self._single_symbol_mode and entry_like and not reduce_only:
                 if self._sync_before_entry:
                     await self._check_positions()
+                reversed_same_symbol = False
+                existing = self.positions.get(coin)
+                existing_qty = float(getattr(existing, "quantity", 0.0) or 0.0) if existing else 0.0
+                if existing and existing_qty > 0:
+                    existing_side = getattr(existing, "side", None)
+                    existing_is_buy = existing_side in (TradeSide.BUY, TradeSide.LONG, "BUY", "LONG")
+                    if existing_is_buy != bool(is_buy):
+                        logger.warning(
+                            "Single-symbol reversal requested for %s | flattening existing side=%s qty=%.8f first",
+                            coin,
+                            str(existing_side),
+                            existing_qty,
+                        )
+                        close_result = await self._close_position_for_rotation(
+                            coin,
+                            reason=f"reverse_{coin}_{'long_to_short' if existing_is_buy else 'short_to_long'}",
+                        )
+                        await self._check_positions()
+                        residual = self.positions.get(coin)
+                        residual_qty = (
+                            float(getattr(residual, "quantity", 0.0) or 0.0) if residual else 0.0
+                        )
+                        if residual_qty > 0:
+                            raise ValueError(
+                                f"Single-symbol reversal blocked for {coin}: "
+                                f"could not flatten existing position (remaining_qty={residual_qty:.8f})"
+                            )
+                        signal.metadata.setdefault("rotation", {})
+                        signal.metadata["rotation"].update(
+                            {
+                                "mode": "same_symbol_reverse",
+                                "reason": "close_then_open",
+                                "pre_side": str(existing_side),
+                                "pre_quantity": round(existing_qty, 8),
+                                "close_trade_id": str(getattr(close_result, "trade_id", "") or ""),
+                            }
+                        )
+                        reversed_same_symbol = True
                 active_symbols = self._active_position_symbols()
                 if active_symbols and coin not in active_symbols:
                     current_price = await self._get_ticker(coin)
                     if not current_price:
                         raise Exception(f"Could not get current price for {coin}")
-                    await self._maybe_rotate_opportunity(
-                        target_coin=coin,
-                        signal=signal,
-                        is_buy=is_buy,
-                        reference_price=float(current_price),
-                    )
-                if self._entry_cooldown_seconds > 0:
+                    try:
+                        await self._maybe_rotate_opportunity(
+                            target_coin=coin,
+                            signal=signal,
+                            is_buy=is_buy,
+                            reference_price=float(current_price),
+                        )
+                    except ValueError as exc:
+                        return self._policy_noop_result(signal, reason=str(exc), symbol=coin)
+                if self._entry_cooldown_seconds > 0 and not reversed_same_symbol:
                     now_ts = time.time()
                     last_ts = float(self._last_entry_ts.get(coin, 0.0) or 0.0)
                     if last_ts and (now_ts - last_ts) < self._entry_cooldown_seconds:
                         wait_s = self._entry_cooldown_seconds - (now_ts - last_ts)
-                        raise ValueError(
-                            f"Entry cooldown active for {coin}: wait {wait_s:.1f}s"
+                        return self._policy_noop_result(
+                            signal,
+                            reason=f"entry cooldown active for {coin}: wait {wait_s:.1f}s",
+                            symbol=coin,
                         )
 
             if reduce_only:
@@ -3495,7 +4850,8 @@ class LighterBot:
                 and self._target_order_notional_usd > 0
                 and current_price > 0
             ):
-                effective_target_notional = float(self._target_order_notional_usd)
+                base_target_margin_usd = float(self._target_margin_for_signal(strategy, timeframe))
+                effective_target_margin_usd = float(base_target_margin_usd)
                 dynamic_factors: Dict[str, float] = {}
                 if self._dynamic_sizing_enabled:
                     multiplier, dynamic_factors = self._dynamic_entry_size_multiplier(
@@ -3506,25 +4862,48 @@ class LighterBot:
                         portfolio_notional_usd=float(portfolio_notional_now),
                         drawdown_pct=float(drawdown_pct),
                     )
-                    effective_target_notional *= multiplier
+                    effective_target_margin_usd *= multiplier
                     if self._min_entry_notional_usd > 0:
-                        effective_target_notional = max(
-                            effective_target_notional,
+                        effective_target_margin_usd = max(
+                            effective_target_margin_usd,
                             float(self._min_entry_notional_usd),
                         )
-                    signal.metadata.setdefault("sizing", {})
-                    signal.metadata["sizing"].update(
-                        {
-                            "mode": "dynamic_target_notional",
-                            "base_target_notional_usd": round(float(self._target_order_notional_usd), 8),
-                            "effective_target_notional_usd": round(float(effective_target_notional), 8),
-                            **dynamic_factors,
-                        }
+                effective_target_notional = float(effective_target_margin_usd)
+                if self._use_leverage_for_notional and applied_notional_leverage > 1.0:
+                    effective_target_notional = (
+                        float(effective_target_margin_usd) * float(applied_notional_leverage)
                     )
+                signal.metadata.setdefault("sizing", {})
+                signal.metadata["sizing"].update(
+                    {
+                        "mode": (
+                            "dynamic_target_margin_x_leverage"
+                            if self._dynamic_sizing_enabled and self._use_leverage_for_notional
+                            else "dynamic_target_notional"
+                            if self._dynamic_sizing_enabled
+                            else "target_margin_x_leverage"
+                            if self._use_leverage_for_notional
+                            else "target_notional"
+                        ),
+                        "base_target_margin_usd": round(float(base_target_margin_usd), 8),
+                        "effective_target_margin_usd": round(float(effective_target_margin_usd), 8),
+                        "applied_notional_leverage": round(float(applied_notional_leverage), 8),
+                        "effective_target_notional_usd": round(float(effective_target_notional), 8),
+                        "use_leverage_for_notional": bool(self._use_leverage_for_notional),
+                        "size_ramp_enabled": bool(self._size_ramp_enabled),
+                        "size_ramp_key": self._size_ramp_key(strategy, timeframe),
+                        "size_ramp_margin_usd": round(float(base_target_margin_usd), 8),
+                        **dynamic_factors,
+                    }
+                )
+                if self._dynamic_sizing_enabled:
                     logger.info(
-                        "Dynamic sizing %s | base=%.4f target=%.4f mult=%.4f conf=%.2f ev=%.3f%% vol=%.3f%% inv=%.3f dd=%.3f%%",
+                        "Dynamic sizing %s | base_margin=%.4f eff_margin=%.4f lev=%.2f gross_target=%.4f "
+                        "mult=%.4f conf=%.2f ev=%.3f%% vol=%.3f%% inv=%.3f dd=%.3f%%",
                         coin,
-                        float(self._target_order_notional_usd),
+                        float(base_target_margin_usd),
+                        float(effective_target_margin_usd),
+                        float(applied_notional_leverage),
                         float(effective_target_notional),
                         self._to_float(dynamic_factors.get("multiplier"), 1.0),
                         self._to_float(dynamic_factors.get("confidence"), 0.0),
@@ -3544,10 +4923,13 @@ class LighterBot:
                     )
                 if abs(target_qty - float(quantity)) > 1e-12:
                     logger.info(
-                        "Target notional sizing applied for %s: qty %.8f -> %.8f (target %.2f USD)",
+                        "Target notional sizing applied for %s: qty %.8f -> %.8f "
+                        "(margin %.2f USD, leverage %.2fx, gross %.2f USD)",
                         coin,
                         float(quantity),
                         float(target_qty),
+                        float(effective_target_margin_usd),
+                        float(applied_notional_leverage),
                         float(effective_target_notional),
                     )
                 quantity = float(target_qty)
@@ -3603,11 +4985,13 @@ class LighterBot:
                     )
             if not reduce_only and current_price > 0:
                 logger.info(
-                    "Final entry sizing %s | qty=%.8f notional=%.4f usd (price=%.6f)",
+                    "Final entry sizing %s | qty=%.8f gross_notional=%.4f usd "
+                    "(price=%.6f leverage=%.2fx)",
                     coin,
                     float(quantity),
                     float(quantity) * float(current_price),
                     float(current_price),
+                    float(applied_notional_leverage),
                 )
 
             if (
@@ -3635,40 +5019,188 @@ class LighterBot:
                     self._max_position_notional_usd > 0
                     and projected_symbol_notional > self._max_position_notional_usd
                 ):
-                    logger.info(
-                        "Entry skipped at symbol cap for %s | current=%.4f cap=%.4f projected=%.4f",
-                        coin,
-                        current_symbol_notional,
-                        self._max_position_notional_usd,
-                        projected_symbol_notional,
+                    headroom = max(0.0, self._max_position_notional_usd - current_symbol_notional)
+                    capped_qty = self._quantize_qty_down(
+                        headroom / float(current_price),
+                        size_decimals,
                     )
-                    return TradeResult(
-                        trade_id="noop",
-                        signal_id=signal.signal_id,
-                        platform=PLATFORM.value,
-                        symbol=signal.symbol,
-                        side=signal.side,
-                        success=True,
-                        metadata={
-                            "noop": True,
-                            "policy_reject": True,
-                            "reason": "symbol_position_cap",
-                            "current_symbol_notional": current_symbol_notional,
-                            "projected_symbol_notional": projected_symbol_notional,
-                            "cap_notional": self._max_position_notional_usd,
-                        },
-                    )
+                    capped_notional = float(capped_qty) * float(current_price)
+                    min_floor = float(max(0.0, self._min_entry_notional_usd))
+                    if capped_qty > 0 and (min_floor <= 0 or capped_notional >= min_floor):
+                        logger.info(
+                            "Symbol cap trim for %s | requested=%.4f cap=%.4f current=%.4f "
+                            "projected=%.4f -> qty %.8f notional %.4f",
+                            coin,
+                            requested_notional,
+                            self._max_position_notional_usd,
+                            current_symbol_notional,
+                            projected_symbol_notional,
+                            capped_qty,
+                            capped_notional,
+                        )
+                        quantity = float(capped_qty)
+                        requested_notional = float(capped_notional)
+                        projected_symbol_notional = current_symbol_notional + requested_notional
+                    else:
+                        logger.info(
+                            "Entry skipped at symbol cap for %s | current=%.4f cap=%.4f projected=%.4f",
+                            coin,
+                            current_symbol_notional,
+                            self._max_position_notional_usd,
+                            projected_symbol_notional,
+                        )
+                        return TradeResult(
+                            trade_id="noop",
+                            signal_id=signal.signal_id,
+                            platform=PLATFORM.value,
+                            symbol=signal.symbol,
+                            side=signal.side,
+                            success=True,
+                            metadata={
+                                "noop": True,
+                                "policy_reject": True,
+                                "reason": "symbol_position_cap",
+                                "current_symbol_notional": current_symbol_notional,
+                                "projected_symbol_notional": projected_symbol_notional,
+                                "cap_notional": self._max_position_notional_usd,
+                                "requested_entry_notional": requested_notional,
+                                "capped_entry_notional": capped_notional,
+                                "applied_notional_leverage": applied_notional_leverage,
+                            },
+                        )
 
                 if (
                     self._max_portfolio_notional_usd > 0
                     and projected_portfolio_notional > self._max_portfolio_notional_usd
                 ):
+                    portfolio_headroom = max(
+                        0.0,
+                        self._max_portfolio_notional_usd - float(portfolio_notional_now),
+                    )
+                    capped_qty = self._quantize_qty_down(
+                        portfolio_headroom / float(current_price),
+                        size_decimals,
+                    )
+                    capped_notional = float(capped_qty) * float(current_price)
+                    min_floor = float(max(0.0, self._min_entry_notional_usd))
+                    if capped_qty > 0 and (min_floor <= 0 or capped_notional >= min_floor):
+                        logger.info(
+                            "Portfolio cap trim for %s | requested=%.4f cap=%.4f now=%.4f "
+                            "projected=%.4f -> qty %.8f notional %.4f",
+                            coin,
+                            requested_notional,
+                            self._max_portfolio_notional_usd,
+                            portfolio_notional_now,
+                            projected_portfolio_notional,
+                            capped_qty,
+                            capped_notional,
+                        )
+                        quantity = float(capped_qty)
+                        requested_notional = float(capped_notional)
+                        projected_portfolio_notional = float(portfolio_notional_now) + requested_notional
+                    else:
+                        logger.info(
+                            "Entry skipped at portfolio cap for %s | portfolio_now=%.4f cap=%.4f projected=%.4f",
+                            coin,
+                            portfolio_notional_now,
+                            self._max_portfolio_notional_usd,
+                            projected_portfolio_notional,
+                        )
+                        return TradeResult(
+                            trade_id="noop",
+                            signal_id=signal.signal_id,
+                            platform=PLATFORM.value,
+                            symbol=signal.symbol,
+                            side=signal.side,
+                            success=True,
+                            metadata={
+                                "noop": True,
+                                "policy_reject": True,
+                                "reason": "portfolio_position_cap",
+                                "portfolio_notional_now": portfolio_notional_now,
+                                "projected_portfolio_notional": projected_portfolio_notional,
+                                "cap_notional": self._max_portfolio_notional_usd,
+                                "requested_entry_notional": requested_notional,
+                                "capped_entry_notional": capped_notional,
+                                "applied_notional_leverage": applied_notional_leverage,
+                            },
+                        )
+
+                # Skip tiny additive orders on an already-open same-symbol position.
+                same_direction = bool(self._to_float(projected.get("same_direction"), 0.0) >= 0.5)
+                if (
+                    self._cap_near_churn_enabled
+                    and self._max_position_notional_usd > 0
+                    and current_symbol_notional > 0
+                    and requested_notional > 0
+                    and same_direction
+                ):
+                    cap_ratio = current_symbol_notional / max(
+                        0.0001, float(self._max_position_notional_usd)
+                    )
+                    if cap_ratio >= self._cap_near_churn_ratio:
+                        existing_position = self.positions.get(coin)
+                        incoming_ev = self._estimate_signal_ev_pct(
+                            signal,
+                            coin=coin,
+                            is_buy=is_buy,
+                            reference_price=float(current_price),
+                            expected_notional_usd=float(requested_notional),
+                        )
+                        current_ev = (
+                            self._estimate_position_ev_pct(coin, existing_position)
+                            if existing_position is not None
+                            else 0.0
+                        )
+                        ev_edge = incoming_ev - current_ev
+                        if (
+                            incoming_ev < self._cap_near_min_net_ev_pct
+                            or ev_edge < self._cap_near_min_ev_edge_pct
+                        ):
+                            logger.info(
+                                "Entry skipped near cap for %s | ratio=%.3f incoming_ev=%.3f%% current_ev=%.3f%% edge=%.3f%%",
+                                coin,
+                                cap_ratio,
+                                incoming_ev,
+                                current_ev,
+                                ev_edge,
+                            )
+                            return TradeResult(
+                                trade_id="noop",
+                                signal_id=signal.signal_id,
+                                platform=PLATFORM.value,
+                                symbol=signal.symbol,
+                                side=signal.side,
+                                success=True,
+                                metadata={
+                                    "noop": True,
+                                    "policy_reject": True,
+                                    "reason": "cap_near_churn",
+                                    "current_symbol_notional": current_symbol_notional,
+                                    "requested_entry_notional": requested_notional,
+                                    "cap_notional": self._max_position_notional_usd,
+                                    "cap_ratio": cap_ratio,
+                                    "incoming_ev_pct": incoming_ev,
+                                    "current_ev_pct": current_ev,
+                                    "ev_edge_pct": ev_edge,
+                                    "min_net_ev_pct": self._cap_near_min_net_ev_pct,
+                                    "min_ev_edge_pct": self._cap_near_min_ev_edge_pct,
+                                    "applied_notional_leverage": applied_notional_leverage,
+                                },
+                            )
+
+                if (
+                    self._min_add_notional_usd > 0
+                    and current_symbol_notional > 0
+                    and requested_notional > 0
+                    and requested_notional < self._min_add_notional_usd
+                ):
                     logger.info(
-                        "Entry skipped at portfolio cap for %s | portfolio_now=%.4f cap=%.4f projected=%.4f",
+                        "Entry skipped on %s: add-notional %.4f below min-add floor %.4f (current_symbol_notional=%.4f)",
                         coin,
-                        portfolio_notional_now,
-                        self._max_portfolio_notional_usd,
-                        projected_portfolio_notional,
+                        requested_notional,
+                        self._min_add_notional_usd,
+                        current_symbol_notional,
                     )
                     return TradeResult(
                         trade_id="noop",
@@ -3680,10 +5212,11 @@ class LighterBot:
                         metadata={
                             "noop": True,
                             "policy_reject": True,
-                            "reason": "portfolio_position_cap",
-                            "portfolio_notional_now": portfolio_notional_now,
-                            "projected_portfolio_notional": projected_portfolio_notional,
-                            "cap_notional": self._max_portfolio_notional_usd,
+                            "reason": "add_notional_below_floor",
+                            "current_symbol_notional": current_symbol_notional,
+                            "requested_entry_notional": requested_notional,
+                            "min_add_notional_usd": self._min_add_notional_usd,
+                            "applied_notional_leverage": applied_notional_leverage,
                         },
                     )
 
@@ -3699,6 +5232,33 @@ class LighterBot:
                 reference_price=float(current_price),
                 reduce_only=reduce_only,
             )
+            if entry_like and not reduce_only:
+                tp_val = self._to_float(getattr(signal, "take_profit", None), 0.0)
+                sl_val = self._to_float(getattr(signal, "stop_loss", None), 0.0)
+                if tp_val <= 0 or sl_val <= 0:
+                    return self._policy_noop_result(
+                        signal,
+                        reason="missing_tp_sl_after_risk_defaults",
+                        symbol=coin,
+                    )
+                if is_buy and not (sl_val < float(current_price) < tp_val):
+                    return self._policy_noop_result(
+                        signal,
+                        reason=(
+                            f"invalid_tp_sl_geometry long sl={sl_val:.8f} "
+                            f"mark={float(current_price):.8f} tp={tp_val:.8f}"
+                        ),
+                        symbol=coin,
+                    )
+                if (not is_buy) and not (tp_val < float(current_price) < sl_val):
+                    return self._policy_noop_result(
+                        signal,
+                        reason=(
+                            f"invalid_tp_sl_geometry short tp={tp_val:.8f} "
+                            f"mark={float(current_price):.8f} sl={sl_val:.8f}"
+                        ),
+                        symbol=coin,
+                    )
 
             # Apply slippage for market order
             limit_price = current_price * 1.05 if is_buy else current_price * 0.95
@@ -3708,35 +5268,78 @@ class LighterBot:
                     # Circuit breaker gate — raises CircuitBreakerOpen if venue is halted.
                     self._circuit_breaker.check()
 
-                    result = await self._submit_order_with_signer(
-                        order_book_id=int(order_book_id),
-                        quantity=float(quantity),
-                        limit_price=float(limit_price),
-                        is_buy=bool(is_buy),
-                        reduce_only=bool(reduce_only),
-                        signal_id=signal.signal_id,
-                        market_meta=market,
-                    )
+                    submit_attempts = max(1, int(self._order_submit_retry_attempts))
+                    result = None
+                    for submit_attempt in range(1, submit_attempts + 1):
+                        order_submit_started = True
+                        try:
+                            result = await self._submit_order_with_signer(
+                                order_book_id=int(order_book_id),
+                                quantity=float(quantity),
+                                limit_price=float(limit_price),
+                                is_buy=bool(is_buy),
+                                reduce_only=bool(reduce_only),
+                                signal_id=signal.signal_id,
+                                market_meta=market,
+                            )
 
-                    # Legacy fallback for SDKs without SignerClient support.
-                    if result is None:
-                        nonce_response = await self._fetch_next_nonce()
-                        nonce = nonce_response.nonce if hasattr(nonce_response, "nonce") else 0
-                        order_params = {
-                            "account_index": self.account_index,
-                            "order_book_id": order_book_id,
-                            "side": 0 if is_buy else 1,
-                            "price": limit_price,
-                            "quantity": quantity,
-                            "nonce": nonce,
-                            "time_in_force": 1,  # IOC
-                        }
-                        signature = self._sign_transaction(order_params)
-                        result = await self._submit_order_legacy_send_tx(
-                            order_params=order_params,
-                            signature=signature,
-                            signal_id=signal.signal_id,
-                        )
+                            # Legacy fallback for SDKs without SignerClient support.
+                            if result is None:
+                                nonce_response = await self._fetch_next_nonce()
+                                nonce = nonce_response.nonce if hasattr(nonce_response, "nonce") else 0
+                                order_params = {
+                                    "account_index": self.account_index,
+                                    "order_book_id": order_book_id,
+                                    "side": 0 if is_buy else 1,
+                                    "price": limit_price,
+                                    "quantity": quantity,
+                                    "nonce": nonce,
+                                    "time_in_force": 1,  # IOC
+                                }
+                                signature = self._sign_transaction(order_params)
+                                result = await self._submit_order_legacy_send_tx(
+                                    order_params=order_params,
+                                    signature=signature,
+                                    signal_id=signal.signal_id,
+                                )
+                        except Exception as submit_err:
+                            if (
+                                submit_attempt < submit_attempts
+                                and self._should_retry_order_submit_failure(submit_err)
+                            ):
+                                wait_s = float(self._order_submit_retry_backoff_seconds) * submit_attempt
+                                logger.warning(
+                                    "Order submit transient error on %s (attempt %d/%d): %s; retrying in %.2fs",
+                                    coin,
+                                    submit_attempt,
+                                    submit_attempts,
+                                    submit_err,
+                                    wait_s,
+                                )
+                                await self._sleep_or_stop(wait_s)
+                                continue
+                            raise
+
+                        if result and result.get("success"):
+                            break
+
+                        err_msg = str((result or {}).get("error", "") or "")
+                        if (
+                            submit_attempt < submit_attempts
+                            and self._should_retry_order_submit_failure(err_msg)
+                        ):
+                            wait_s = float(self._order_submit_retry_backoff_seconds) * submit_attempt
+                            logger.warning(
+                                "Order submit transient rejection on %s (attempt %d/%d): %s; retrying in %.2fs",
+                                coin,
+                                submit_attempt,
+                                submit_attempts,
+                                err_msg,
+                                wait_s,
+                            )
+                            await self._sleep_or_stop(wait_s)
+                            continue
+                        break
 
                 # Record outcome to circuit breaker.
                 if result and result.get("success"):
@@ -3855,10 +5458,20 @@ class LighterBot:
                 metadata={"circuit_breaker_open": True},
             )
         except Exception as e:
-            self._set_jurisdiction_block(str(e))
+            err_text = str(e or "")
+            if not order_submit_started and self._should_treat_as_preflight_noop(err_text):
+                logger.info(
+                    "Preflight policy-noop on %s: signal=%s reason=%s",
+                    PLATFORM.value,
+                    str(getattr(signal, "signal_id", "") or ""),
+                    err_text,
+                )
+                return self._policy_noop_result(signal, reason=err_text, symbol=coin)
+
+            self._set_jurisdiction_block(err_text)
             self.trades_failed += 1
             execution_time = (datetime.now() - start_time).total_seconds() * 1000
-            logger.error(f"Lighter Execution Failed: {e}")
+            logger.error(f"Lighter Execution Failed: {err_text}")
             return TradeResult(
                 trade_id="",
                 signal_id=signal.signal_id,
@@ -3866,7 +5479,7 @@ class LighterBot:
                 symbol=signal.symbol,
                 side=signal.side,
                 success=False,
-                error_message=str(e),
+                error_message=err_text,
                 execution_time_ms=execution_time,
             )
 
@@ -4533,13 +6146,18 @@ class LighterBot:
                             "reduce_only": True,
                             "risk_exit": "max_hold_timeout",
                             "origin": "max_hold_guard",
+                            "position_side": str(position.side),
+                            "exit_side": str(exit_side),
                             "hold_age_sec": round(hold_age, 3),
                             "max_hold_sec": float(self._max_position_hold_seconds),
                         },
                     )
                     logger.warning(
-                        "Risk exit trigger max_hold_timeout on %s | hold_age=%.1fs max_hold=%.1fs qty=%s",
+                        "Risk exit trigger max_hold_timeout on %s | position_side=%s exit_side=%s "
+                        "hold_age=%.1fs max_hold=%.1fs qty=%s",
                         symbol,
+                        str(position.side),
+                        str(exit_side),
                         hold_age,
                         self._max_position_hold_seconds,
                         qty,
@@ -4551,8 +6169,18 @@ class LighterBot:
                     result_meta = result.metadata or {}
                     noop_reason = str(result_meta.get("reason", "") or "")
                     if result.success and filled_qty > 0:
-                        self._risk_exit_attempted_at.pop(symbol, None)
-                        self._risk_exit_reconcile_hold_until.pop(symbol, None)
+                        hold_for = max(
+                            self._risk_exit_reconcile_hold_seconds,
+                            float(self._position_check_interval_seconds)
+                            * float(self._empty_position_confirmations),
+                        )
+                        self._risk_exit_reconcile_hold_until[symbol] = now + hold_for
+                        self._risk_exit_attempted_at[symbol] = now
+                        logger.info(
+                            "Risk exit fill on %s; pausing retries for %.1fs pending reconciliation",
+                            symbol,
+                            hold_for,
+                        )
                     elif result.success and bool(result_meta.get("noop")) and noop_reason in {
                         "reduce_only_no_position",
                         "reduce_only_quantity_zero",
@@ -4567,6 +6195,18 @@ class LighterBot:
                             "Risk exit noop on %s (%s); pausing retries for %.1fs pending reconciliation",
                             symbol,
                             noop_reason,
+                            hold_for,
+                        )
+                    elif result.success and filled_qty <= 0:
+                        hold_for = max(
+                            self._risk_exit_reconcile_hold_seconds,
+                            float(self._position_check_interval_seconds)
+                            * float(self._empty_position_confirmations),
+                        )
+                        self._risk_exit_reconcile_hold_until[symbol] = now + hold_for
+                        logger.info(
+                            "Risk exit accepted-no-fill on %s; pausing retries for %.1fs pending reconciliation",
+                            symbol,
                             hold_for,
                         )
                     continue
@@ -4622,13 +6262,18 @@ class LighterBot:
                     "risk_exit": reason,
                     "trigger_price": price,
                     "origin": "tp_sl_guard",
+                    "position_side": str(position.side),
+                    "exit_side": str(exit_side),
                 },
             )
 
             logger.warning(
-                "Risk exit trigger %s on %s | price=%s tp=%s sl=%s qty=%s",
+                "Risk exit trigger %s on %s | position_side=%s exit_side=%s "
+                "price=%s tp=%s sl=%s qty=%s",
                 reason,
                 symbol,
+                str(position.side),
+                str(exit_side),
                 price,
                 tp,
                 sl,
@@ -4641,8 +6286,19 @@ class LighterBot:
             result_meta = result.metadata or {}
             noop_reason = str(result_meta.get("reason", "") or "")
             if result.success and filled_qty > 0:
-                self._risk_exit_attempted_at.pop(symbol, None)
-                self._risk_exit_reconcile_hold_until.pop(symbol, None)
+                hold_for = max(
+                    self._risk_exit_reconcile_hold_seconds,
+                    float(self._position_check_interval_seconds)
+                    * float(self._empty_position_confirmations),
+                )
+                self._risk_exit_reconcile_hold_until[symbol] = now + hold_for
+                self._risk_exit_attempted_at[symbol] = now
+                logger.info(
+                    "Risk exit fill on %s (%s); pausing retries for %.1fs pending reconciliation",
+                    symbol,
+                    reason,
+                    hold_for,
+                )
             elif result.success and bool(result_meta.get("noop")) and noop_reason in {
                 "reduce_only_no_position",
                 "reduce_only_quantity_zero",
@@ -4657,6 +6313,18 @@ class LighterBot:
                     "Risk exit noop on %s (%s); pausing retries for %.1fs pending reconciliation",
                     symbol,
                     noop_reason,
+                    hold_for,
+                )
+            elif result.success and filled_qty <= 0:
+                hold_for = max(
+                    self._risk_exit_reconcile_hold_seconds,
+                    float(self._position_check_interval_seconds)
+                    * float(self._empty_position_confirmations),
+                )
+                self._risk_exit_reconcile_hold_until[symbol] = now + hold_for
+                logger.info(
+                    "Risk exit accepted-no-fill on %s; pausing retries for %.1fs pending reconciliation",
+                    symbol,
                     hold_for,
                 )
 
@@ -4738,9 +6406,15 @@ class LighterBot:
             "markets_loaded": len(self.market_info),
             "avg_latency_ms": self.avg_latency_ms,
             "min_entry_notional_usd": self._min_entry_notional_usd,
+            "target_order_notional_usd": self._target_order_notional_usd,
+            "size_ramp_enabled": self._size_ramp_enabled,
+            "size_ramp_min_margin_usd": self._size_ramp_min_margin_usd,
+            "size_ramp_max_margin_usd": self._size_ramp_max_margin_usd,
+            "size_ramp_step_margin_usd": self._size_ramp_step_margin_usd,
             "jurisdiction_block_remaining_sec": max(
                 0.0, self._jurisdiction_block_until_ts - time.time()
             ),
+            "hard_risk_kernel": self._hard_risk_kernel.status(),
         }
 
 

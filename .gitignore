@@ -110,6 +110,7 @@ celerybeat.pid
 .envrc
 .env.*
 .venv
+.venv-backtest
 .venv311
 env/
 venv/
@@ -151,6 +152,7 @@ cache/
 logs/
 temp/
 tmp/
+output/
 .secrets/
 .secret/
 secrets/
