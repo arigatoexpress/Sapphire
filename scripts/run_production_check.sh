@@ -7,9 +7,86 @@ DOMAIN="${DOMAIN:-https://sapphirealpha.xyz}"
 AUTH_USER="${AUTH_USER:-sapphire}"
 AUTH_PASS="${AUTH_PASS:-alpha2024}"
 AUTH="${AUTH_USER}:${AUTH_PASS}"
+STRICT_RUNTIME_GIT="${STRICT_RUNTIME_GIT:-true}"
+ALLOW_UNTRACKED="${ALLOW_UNTRACKED:-false}"
+FRONTEND_IMAGE="${FRONTEND_IMAGE:-gcr.io/${PROJECT_ID}/sapphire-unified-frontend:latest}"
+FRONTEND_RUNTIME_SERVICES="${FRONTEND_RUNTIME_SERVICES:-sapphire-unified-frontend sapphire-unified-jobs}"
 
 printf "== Sapphire Production Check ==\n"
 printf "project=%s region=%s domain=%s\n\n" "$PROJECT_ID" "$REGION" "$DOMAIN"
+
+is_truthy() {
+  local v="${1:-}"
+  v="$(printf '%s' "$v" | tr '[:upper:]' '[:lower:]')"
+  [[ "$v" == "1" || "$v" == "true" || "$v" == "yes" || "$v" == "on" ]]
+}
+
+if is_truthy "$STRICT_RUNTIME_GIT"; then
+  printf "[0/7] Runtime == git guard\n"
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo "FAIL: not inside a git repository; cannot validate runtime==git guard."
+    exit 1
+  fi
+
+  if ! git diff --quiet --ignore-submodules --; then
+    echo "FAIL: working tree has unstaged changes. Commit/stash before production check."
+    git status --short | sed -n '1,120p'
+    exit 1
+  fi
+  if ! git diff --cached --quiet --ignore-submodules --; then
+    echo "FAIL: index has staged but uncommitted changes."
+    git status --short | sed -n '1,120p'
+    exit 1
+  fi
+
+  if ! is_truthy "$ALLOW_UNTRACKED"; then
+    untracked_count="$(git ls-files --others --exclude-standard | wc -l | tr -d ' ')"
+    if [[ "${untracked_count:-0}" != "0" ]]; then
+      echo "FAIL: untracked files present (${untracked_count}). Set ALLOW_UNTRACKED=true to bypass."
+      git ls-files --others --exclude-standard | sed -n '1,80p'
+      exit 1
+    fi
+  fi
+
+  image_repo="${FRONTEND_IMAGE%:*}"
+  image_tag="${FRONTEND_IMAGE##*:}"
+  latest_digest="$(
+    gcloud container images list-tags "$image_repo" \
+      --filter="tags:${image_tag}" \
+      --limit=1 \
+      --format='value(digest)'
+  )"
+  if [[ -z "${latest_digest:-}" ]]; then
+    echo "FAIL: unable to resolve digest for ${FRONTEND_IMAGE}"
+    exit 1
+  fi
+  echo "frontend_image_digest=${latest_digest}"
+
+  for svc in $FRONTEND_RUNTIME_SERVICES; do
+    rev="$(
+      gcloud run services describe "$svc" \
+        --project "$PROJECT_ID" \
+        --region "$REGION" \
+        --format='value(status.latestReadyRevisionName)'
+    )"
+    if [[ -z "${rev:-}" ]]; then
+      echo "FAIL: unable to resolve latest revision for ${svc}"
+      exit 1
+    fi
+    rev_digest="$(
+      gcloud run revisions describe "$rev" \
+        --project "$PROJECT_ID" \
+        --region "$REGION" \
+        --format='value(status.imageDigest)'
+    )"
+    if [[ "$rev_digest" != "$latest_digest" ]]; then
+      echo "FAIL: ${svc} (${rev}) digest mismatch. runtime=${rev_digest} expected=${latest_digest}"
+      exit 1
+    fi
+    printf "runtime_match %-30s %s\n" "$svc" "$rev"
+  done
+  echo ""
+fi
 
 check_endpoint() {
   local path="$1"
