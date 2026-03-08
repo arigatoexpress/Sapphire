@@ -8,13 +8,15 @@ from datetime import datetime, timedelta, timezone
 from functools import wraps
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
+import math
 import os
+import re
 import time
 from urllib.parse import urljoin
 
 import requests
 from firebase_admin import credentials, firestore, get_app, initialize_app
-from flask import Flask, render_template, jsonify, request, Response, make_response, redirect
+from flask import Flask, render_template, jsonify, request, Response, make_response, redirect, abort
 
 app = Flask(__name__)
 
@@ -30,7 +32,7 @@ RARI2_IP = os.environ.get('RARI2_IP', '100.87.225.89')
 WINDOWS_IP = os.environ.get('WINDOWS_IP', '100.71.10.48')
 
 RARI1_HEALTH_URL = os.environ.get('RARI1_HEALTH_URL', f'http://{RARI1_IP}:8000/output/latest_hourly.json')
-RARI2_HEALTH_URL = os.environ.get('RARI2_HEALTH_URL', f'http://{RARI2_IP}:18888/status')
+RARI2_HEALTH_URL = os.environ.get('RARI2_HEALTH_URL', f'http://{RARI2_IP}:8080/health')
 WINDOWS_HEALTH_URL = os.environ.get('WINDOWS_HEALTH_URL', f'http://{WINDOWS_IP}:9090/webhook/health')
 
 CACHE_DURATION = int(os.environ.get('CACHE_DURATION', '10'))
@@ -45,6 +47,27 @@ EDGE_CAPABILITIES_COLLECTION = os.environ.get('EDGE_CAPABILITIES_COLLECTION', 'e
 LEARNING_OUTCOMES_COLLECTION = os.environ.get('LEARNING_OUTCOMES_COLLECTION', 'learning_outcomes')
 SUPERSWARM_ROLLUPS_COLLECTION = os.environ.get('SUPERSWARM_ROLLUPS_COLLECTION', 'superswarm_rollups')
 BUSINESS_BRIEFS_COLLECTION = os.environ.get('BUSINESS_BRIEFS_COLLECTION', 'platform_business_briefs')
+BOTTLENECK_DIGEST_COLLECTION = os.environ.get('BOTTLENECK_DIGEST_COLLECTION', 'platform_digest_state')
+BOTTLENECK_DIGEST_DOC_ID = os.environ.get('BOTTLENECK_DIGEST_DOC_ID', 'architecture_bottleneck')
+STRATEGY_OPS_DIGEST_DOC_ID = os.environ.get('STRATEGY_OPS_DIGEST_DOC_ID', 'strategy_ops')
+STRATEGY_OPS_SNAPSHOTS_COLLECTION = os.environ.get('STRATEGY_OPS_SNAPSHOTS_COLLECTION', 'strategy_ops_snapshots')
+LIBRARIAN_ENABLED = os.environ.get('LIBRARIAN_ENABLED', 'true').strip().lower() in {'1', 'true', 'yes', 'on'}
+LIBRARIAN_MODE = os.environ.get('LIBRARIAN_MODE', 'local').strip().lower() or 'local'
+LIBRARIAN_REMOTE_URL = os.environ.get('LIBRARIAN_REMOTE_URL', '').strip()
+LIBRARIAN_REMOTE_API_KEY = os.environ.get('LIBRARIAN_REMOTE_API_KEY', '').strip()
+LIBRARIAN_DEFAULT_QUERY = os.environ.get(
+    'LIBRARIAN_DEFAULT_QUERY',
+    'crypto perp trading context with risk, execution quality, and market catalysts',
+).strip()
+LIBRARIAN_MIN_SCORE = max(0.0, min(2.0, float(os.environ.get('LIBRARIAN_MIN_SCORE', '0.22') or 0.22)))
+LIBRARIAN_DEFAULT_LIMIT = max(3, min(24, int(os.environ.get('LIBRARIAN_DEFAULT_LIMIT', '8') or 8)))
+STRATEGY_OPS_FEE_BPS = max(0.0, float(os.environ.get('STRATEGY_OPS_FEE_BPS', '7.0') or 7.0))
+STRATEGY_OPS_SLIPPAGE_BPS = max(0.0, float(os.environ.get('STRATEGY_OPS_SLIPPAGE_BPS', '5.0') or 5.0))
+STRATEGY_OPS_DEFAULT_PAYOFF = max(0.1, float(os.environ.get('STRATEGY_OPS_DEFAULT_PAYOFF_RATIO', '1.2') or 1.2))
+STRATEGY_OPS_EV_PROMOTE_MIN = float(os.environ.get('STRATEGY_OPS_PROMOTE_MIN_EV_PCT', '0.20') or 0.20)
+STRATEGY_OPS_EV_MONITOR_MIN = float(os.environ.get('STRATEGY_OPS_MONITOR_MIN_EV_PCT', '0.05') or 0.05)
+STRATEGY_OPS_EV_DEPRIORITIZE_MAX = float(os.environ.get('STRATEGY_OPS_DEPRIORITIZE_MAX_EV_PCT', '-0.05') or -0.05)
+STRATEGY_OPS_EQUITY_BASE_USD = max(1.0, float(os.environ.get('STRATEGY_OPS_EQUITY_BASE_USD', '100.0') or 100.0))
 
 CRITICAL_EDGE_SERVICES = {
     item.strip() for item in os.environ.get(
@@ -185,6 +208,38 @@ PLATFORM_CONTRACTS = [
         'description': 'Aggregated market, trading, and operations metrics.',
     },
     {
+        'name': 'strategy_ops',
+        'path': '/api/platform/strategy-ops',
+        'method': 'GET',
+        'auth': 'basic_or_public',
+        'category': 'telemetry',
+        'description': 'Lane scorecard, reject-tax assessment, and GO/NO-GO posture.',
+    },
+    {
+        'name': 'go_no_go_brief',
+        'path': '/api/platform/go-no-go-brief',
+        'method': 'GET',
+        'auth': 'basic_or_public',
+        'category': 'telemetry',
+        'description': 'Single operator brief with final GO/NO-GO decision, blockers, and top actions.',
+    },
+    {
+        'name': 'agent_context',
+        'path': '/api/platform/agent-context',
+        'method': 'GET',
+        'auth': 'basic_or_public',
+        'category': 'telemetry',
+        'description': 'Single-call context bundle for visual agents and orchestration tools.',
+    },
+    {
+        'name': 'librarian_context',
+        'path': '/api/platform/librarian-context',
+        'method': 'GET',
+        'auth': 'basic_or_public',
+        'category': 'telemetry',
+        'description': 'Curated high-signal context pack (Librarian pattern) for agents and dashboards.',
+    },
+    {
         'name': 'autonomy',
         'path': '/api/platform/autonomy',
         'method': 'GET',
@@ -257,6 +312,22 @@ PLATFORM_CONTRACTS = [
         'description': 'Market/research intelligence feed (alpha engine + safe fallback).',
     },
     {
+        'name': 'intel_summary',
+        'path': '/api/platform/intel-summary',
+        'method': 'GET',
+        'auth': 'basic_or_public',
+        'category': 'research',
+        'description': 'AI-condensed market pulse with movers, regime, and actionable watchlist.',
+    },
+    {
+        'name': 'architecture_telemetry',
+        'path': '/api/platform/architecture-telemetry',
+        'method': 'GET',
+        'auth': 'basic_or_public',
+        'category': 'operations',
+        'description': 'Live topology, edge flow rates, and pipeline operations telemetry.',
+    },
+    {
         'name': 'superswarm',
         'path': '/api/platform/superswarm',
         'method': 'GET',
@@ -279,14 +350,6 @@ PLATFORM_CONTRACTS = [
         'auth': 'basic_or_public',
         'category': 'core',
         'description': 'Machine-readable endpoint manifest for clients and checks.',
-    },
-    {
-        'name': 'control_plane',
-        'path': '/api/platform/control-plane',
-        'method': 'GET',
-        'auth': 'operator_token_or_basic',
-        'category': 'operations',
-        'description': 'Desired/applied control-plane state, lane health, and execution policy summary.',
     },
 ]
 
@@ -765,6 +828,63 @@ def _collect_system_status():
     return result
 
 
+def _public_status_payload(status_data: dict | None = None) -> dict:
+    """Return status telemetry with sensitive infra fields redacted for public web."""
+    status_data = status_data or _collect_system_status()
+    services_raw = status_data.get('services', {}) if isinstance(status_data.get('services'), dict) else {}
+    nodes_raw = status_data.get('nodes', {}) if isinstance(status_data.get('nodes'), dict) else {}
+    by_category_raw = status_data.get('by_category', {}) if isinstance(status_data.get('by_category'), dict) else {}
+
+    services = {
+        name: {
+            'healthy': bool((row or {}).get('healthy', False)),
+            'status': str((row or {}).get('status', 'unknown')),
+            'latency_ms': (row or {}).get('latency_ms'),
+            'status_code': (row or {}).get('status_code'),
+        }
+        for name, row in services_raw.items()
+    }
+    nodes = {
+        name: {
+            'healthy': bool((row or {}).get('healthy', False)),
+            'status': str((row or {}).get('status', 'unknown')),
+            'latency_ms': (row or {}).get('latency_ms'),
+            'status_code': (row or {}).get('status_code'),
+        }
+        for name, row in nodes_raw.items()
+    }
+
+    by_category = {}
+    for category, rows in by_category_raw.items():
+        normalized = []
+        if isinstance(rows, list):
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                normalized.append(
+                    {
+                        'name': row.get('name', 'unknown'),
+                        'healthy': bool(row.get('healthy', False)),
+                        'status': str(row.get('status', 'unknown')),
+                        'response_time_ms': row.get('response_time_ms'),
+                    }
+                )
+        by_category[str(category)] = normalized
+
+    payload = {
+        'timestamp': status_data.get('timestamp', datetime.utcnow().isoformat()),
+        'services': services,
+        'nodes': nodes,
+        'by_category': by_category,
+        'summary': status_data.get('summary', {}),
+        'privacy': {
+            'mode': 'public_redacted',
+            'sensitive_fields_removed': ['ip', 'url', 'health_url', 'internal_hostnames'],
+        },
+    }
+    return payload
+
+
 def _fetch_market_prices():
     """Fetch market prices with fallback providers."""
     cached = get_cached('market_prices', PRICE_CACHE_DURATION)
@@ -928,8 +1048,11 @@ def _build_readiness_payload(host_root: str, include_business_brief_check: bool 
     contract_checks = [
         run_contract_check('/api/platform/status', _collect_system_status),
         run_contract_check('/api/platform/metrics', _platform_metrics_payload),
+        run_contract_check('/api/platform/strategy-ops', _platform_strategy_ops_payload),
+        run_contract_check('/api/platform/go-no-go-brief', _platform_go_no_go_brief_payload),
+        run_contract_check('/api/platform/agent-context', _platform_agent_context_payload),
+        run_contract_check('/api/platform/librarian-context', _platform_librarian_context_payload),
         run_contract_check('/api/platform/autonomy', _platform_autonomy_payload),
-        run_contract_check('/api/platform/control-plane', _platform_control_plane_payload),
         run_contract_check('/api/platform/home-snapshot', _platform_home_snapshot_payload),
         run_contract_check('/api/platform/logs', lambda: _fetch_logs(limit=1)),
         run_contract_check('/api/platform/trades', lambda: _fetch_trade_executions(limit=1)),
@@ -938,6 +1061,8 @@ def _build_readiness_payload(host_root: str, include_business_brief_check: bool 
         run_contract_check('/api/platform/readiness', lambda: True),
         run_contract_check('/api/platform/projects', _fetch_projects_payload),
         run_contract_check('/api/platform/intel-feed', lambda: _fetch_intel_feed_payload(limit=3)),
+        run_contract_check('/api/platform/intel-summary', lambda: _platform_intel_summary_payload(hours=6, limit=20)),
+        run_contract_check('/api/platform/architecture-telemetry', lambda: _platform_architecture_telemetry_payload(hours=2)),
         run_contract_check('/api/platform/windows-lab', _fetch_windows_lab_payload),
         run_contract_check('/api/platform/contracts', _platform_contracts_payload),
     ]
@@ -952,6 +1077,7 @@ def _build_readiness_payload(host_root: str, include_business_brief_check: bool 
     monitor = _get_monitor_snapshot()
     edge_blockers = []
     critical_rows = []
+    optional_rows = []
     if monitor.get('available'):
         by_category = monitor.get('by_category', {})
         for category in ('pi', 'windows'):
@@ -959,13 +1085,16 @@ def _build_readiness_payload(host_root: str, include_business_brief_check: bool 
                 if not isinstance(row, dict):
                     continue
                 name = row.get('name')
+                row_payload = {
+                    'name': name,
+                    'category': category,
+                    'healthy': bool(row.get('healthy', False)),
+                    'error': row.get('error'),
+                }
                 if name in CRITICAL_EDGE_SERVICES:
-                    critical_rows.append({
-                        'name': name,
-                        'category': category,
-                        'healthy': bool(row.get('healthy', False)),
-                        'error': row.get('error'),
-                    })
+                    critical_rows.append(row_payload)
+                elif category in OPTIONAL_HEALTH_CATEGORIES or name in OPTIONAL_HEALTH_NAMES:
+                    optional_rows.append(row_payload)
 
         # Fallback: if critical list was misconfigured or no matches found, use all edge rows.
         if not critical_rows:
@@ -973,8 +1102,11 @@ def _build_readiness_payload(host_root: str, include_business_brief_check: bool 
                 for row in by_category.get(category, []):
                     if not isinstance(row, dict):
                         continue
+                    name = row.get('name', 'unknown')
+                    if category in OPTIONAL_HEALTH_CATEGORIES or name in OPTIONAL_HEALTH_NAMES:
+                        continue
                     critical_rows.append({
-                        'name': row.get('name', 'unknown'),
+                        'name': name,
                         'category': category,
                         'healthy': bool(row.get('healthy', False)),
                         'error': row.get('error'),
@@ -1041,6 +1173,8 @@ def _build_readiness_payload(host_root: str, include_business_brief_check: bool 
             'total': 0 if not monitor.get('available') else len(critical_rows),
             'source': 'system_status/current',
             'critical_services': sorted(CRITICAL_EDGE_SERVICES),
+            'optional_degraded': 0 if not monitor.get('available') else sum(1 for row in optional_rows if not row.get('healthy', False)),
+            'optional_total': 0 if not monitor.get('available') else len(optional_rows),
         },
         'D_signal_ingress': {
             'ok': signal_ingress_ok,
@@ -1060,7 +1194,7 @@ def _build_readiness_payload(host_root: str, include_business_brief_check: bool 
         'gates': gates,
         'blockers': blockers,
         'contract_checks': contract_checks,
-        'cloud': status_data,
+        'cloud': _public_status_payload(status_data),
         'monitor': {
             'available': monitor.get('available', False),
             'timestamp': monitor.get('timestamp'),
@@ -1091,6 +1225,7 @@ def _normalize_trading_metrics_payload(raw=None, source='fallback', error=None):
             'total': trades_total or 0,
             'success_rate': success_rate or 0,
         },
+        'reject_tax': raw.get('reject_tax', {}),
         'positions': raw.get('positions', []),
         'raw': raw,
         'source': source,
@@ -1099,6 +1234,1367 @@ def _normalize_trading_metrics_payload(raw=None, source='fallback', error=None):
     if error:
         payload['error'] = error
     return payload
+
+
+def _fetch_reject_tax_metrics(hours: int = 24, limit: int = 1500) -> dict:
+    if db is None:
+        return {'sample_size': 0, 'reject_tax_pct': 0.0, 'error': 'firestore_unavailable'}
+
+    safe_hours = max(1, min(int(hours or 24), 24 * 14))
+    safe_limit = max(100, min(int(limit or 1500), 4000))
+    since = datetime.now(timezone.utc) - timedelta(hours=safe_hours)
+
+    try:
+        docs = list(
+            db.collection('execution_verifications')
+            .where('platform', '==', 'lighter')
+            .where('recorded_at', '>=', since)
+            .order_by('recorded_at', direction=firestore.Query.DESCENDING)
+            .limit(safe_limit)
+            .stream()
+        )
+    except Exception:
+        docs = list(
+            db.collection('execution_verifications')
+            .order_by('recorded_at', direction=firestore.Query.DESCENDING)
+            .limit(max(400, min(safe_limit * 2, 8000)))
+            .stream()
+        )
+
+    rows = []
+    for doc in docs:
+        row = doc.to_dict() or {}
+        if str(row.get('platform', '')).strip().lower() != 'lighter':
+            continue
+        ts = _coerce_datetime(row.get('recorded_at') or row.get('timestamp'))
+        if ts and ts < since:
+            continue
+        rows.append(row)
+
+    def _key(value):
+        text = str(value or '').strip().lower()
+        return text or 'unknown'
+
+    totals = {
+        'sample_size': 0,
+        'reject_skip_count': 0,
+        'hard_failed_count': 0,
+        'filled_success_count': 0,
+        'accepted_no_fill_count': 0,
+        'policy_noop_count': 0,
+        'policy_reject_count': 0,
+        'noop_count': 0,
+    }
+    by_source = {}
+    by_strategy = {}
+    by_timeframe = {}
+    reason_counts = {}
+
+    def _touch_bucket(store, key):
+        if key not in store:
+            store[key] = {'total': 0, 'reject_skip': 0, 'hard_failed': 0, 'filled_success': 0}
+        return store[key]
+
+    for row in rows:
+        totals['sample_size'] += 1
+        outcome = _key(row.get('outcome'))
+        reject_like = outcome in {'policy_noop', 'policy_reject', 'noop'}
+        hard_fail = outcome == 'hard_failed'
+        filled = outcome == 'filled_success'
+
+        if outcome == 'policy_noop':
+            totals['policy_noop_count'] += 1
+        elif outcome == 'policy_reject':
+            totals['policy_reject_count'] += 1
+        elif outcome == 'noop':
+            totals['noop_count'] += 1
+        elif outcome == 'accepted_no_fill':
+            totals['accepted_no_fill_count'] += 1
+
+        if reject_like:
+            totals['reject_skip_count'] += 1
+        if hard_fail:
+            totals['hard_failed_count'] += 1
+        if filled:
+            totals['filled_success_count'] += 1
+
+        source = _key(
+            row.get('signal_source')
+            or row.get('source')
+            or (row.get('signal_metadata', {}) or {}).get('source')
+            or row.get('channel')
+        )
+        strategy = _key(row.get('strategy'))
+        timeframe = _key(row.get('timeframe'))
+        for bucket in (
+            _touch_bucket(by_source, source),
+            _touch_bucket(by_strategy, strategy),
+            _touch_bucket(by_timeframe, timeframe),
+        ):
+            bucket['total'] += 1
+            if reject_like:
+                bucket['reject_skip'] += 1
+            if hard_fail:
+                bucket['hard_failed'] += 1
+            if filled:
+                bucket['filled_success'] += 1
+
+        if reject_like:
+            reason = str(
+                row.get('policy_reason')
+                or row.get('noop_reason')
+                or row.get('error_message')
+                or ''
+            ).strip().lower()
+            if reason:
+                if len(reason) > 140:
+                    reason = reason[:137] + '...'
+                reason_counts[reason] = reason_counts.get(reason, 0) + 1
+
+    def _to_rows(store):
+        data = []
+        for key, bucket in store.items():
+            denom = max(1, int(bucket['total']))
+            data.append(
+                {
+                    'key': key,
+                    'total': int(bucket['total']),
+                    'reject_skip': int(bucket['reject_skip']),
+                    'hard_failed': int(bucket['hard_failed']),
+                    'filled_success': int(bucket['filled_success']),
+                    'reject_tax_pct': round((float(bucket['reject_skip']) / denom) * 100.0, 2),
+                }
+            )
+        data.sort(key=lambda item: (item['reject_skip'], item['total']), reverse=True)
+        return data[:6]
+
+    denom = max(1, int(totals['sample_size']))
+    return {
+        **totals,
+        'window_hours': safe_hours,
+        'reject_tax_pct': round((float(totals['reject_skip_count']) / denom) * 100.0, 2),
+        'hard_fail_pct': round((float(totals['hard_failed_count']) / denom) * 100.0, 2),
+        'by_source': _to_rows(by_source),
+        'by_strategy': _to_rows(by_strategy),
+        'by_timeframe': _to_rows(by_timeframe),
+        'top_reasons': [
+            {'reason': reason, 'count': count}
+            for reason, count in sorted(reason_counts.items(), key=lambda item: item[1], reverse=True)[:6]
+        ],
+        'computed_at': datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _strategy_lane_info(row: dict) -> tuple[str, str]:
+    metadata = row.get('metadata', {}) if isinstance(row.get('metadata'), dict) else {}
+    strategy = str(
+        row.get('strategy')
+        or metadata.get('strategy')
+        or metadata.get('strategy_id')
+        or metadata.get('system')
+        or ''
+    ).strip().lower()
+    timeframe = str(
+        row.get('timeframe')
+        or metadata.get('timeframe')
+        or metadata.get('tf')
+        or metadata.get('interval')
+        or ''
+    ).strip().lower()
+    return (strategy or 'unknown', timeframe or 'unknown')
+
+
+def _build_strategy_scorecard(days: int = 7, platform: str = 'lighter', limit: int = 1800) -> dict:
+    if db is None:
+        return {
+            'generated_at': datetime.now(timezone.utc).isoformat(),
+            'platform': str(platform or 'lighter').strip().lower(),
+            'window': {'days': max(1, int(days or 7))},
+            'totals': {'sample_size': 0, 'lanes': 0, 'error': 'firestore_unavailable'},
+            'ranked': [],
+        }
+
+    safe_days = max(1, min(int(days or 7), 30))
+    safe_limit = max(300, min(int(limit or 1800), 4000))
+    platform_norm = str(platform or 'lighter').strip().lower()
+    now_utc = datetime.now(timezone.utc)
+    since = now_utc - timedelta(days=safe_days)
+
+    def _to_float(value, default=0.0):
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return float(default)
+
+    def _estimate_notional_usd(row: dict) -> float:
+        metadata = row.get('metadata', {}) if isinstance(row.get('metadata'), dict) else {}
+        direct = (
+            row.get('notional_usd')
+            or metadata.get('notional_usd')
+            or row.get('order_notional_usd')
+            or metadata.get('order_notional_usd')
+        )
+        direct_val = _to_float(direct, 0.0)
+        if direct_val > 0:
+            return direct_val
+        qty = _to_float(
+            row.get('filled_quantity') or row.get('quantity') or metadata.get('filled_quantity'),
+            0.0,
+        )
+        px = _to_float(
+            row.get('avg_price') or row.get('price') or metadata.get('avg_price') or metadata.get('price'),
+            0.0,
+        )
+        notional = qty * px
+        return notional if notional > 0 else 0.0
+
+    default_payoff = max(0.1, float(STRATEGY_OPS_DEFAULT_PAYOFF))
+    fee_pct = STRATEGY_OPS_FEE_BPS / 100.0
+    slippage_pct = STRATEGY_OPS_SLIPPAGE_BPS / 100.0
+    promote_min_samples = max(
+        10,
+        int(_to_float(os.getenv('STRATEGY_OPS_PROMOTE_MIN_SAMPLES', '40'), 40)),
+    )
+    hold_reject_tax_pct = _to_float(os.getenv('STRATEGY_OPS_HOLD_REJECT_TAX_PCT', '70.0'), 70.0)
+    hold_hard_fail_pct = _to_float(os.getenv('STRATEGY_OPS_HOLD_HARD_FAIL_PCT', '15.0'), 15.0)
+    min_confident_samples = max(
+        10,
+        int(_to_float(os.getenv('STRATEGY_OPS_MIN_CONFIDENT_SAMPLE', '40'), 40)),
+    )
+    bayes_alpha = max(0.1, _to_float(os.getenv('STRATEGY_OPS_BAYES_ALPHA', '2.0'), 2.0))
+    bayes_beta = max(0.1, _to_float(os.getenv('STRATEGY_OPS_BAYES_BETA', '2.0'), 2.0))
+
+    def _lane_recommendation(row: dict) -> str:
+        sample = int(row.get('sample_size', 0) or 0)
+        reject_tax = _to_float(row.get('reject_tax_pct'), 0.0)
+        hard_fail = _to_float(row.get('hard_fail_pct'), 0.0)
+        ev_adj = _to_float(row.get('ev_adjusted_pct'), 0.0)
+        pnl_net = _to_float(row.get('net_pnl_after_fees_usd'), 0.0)
+        if sample < 12:
+            return 'research'
+        if reject_tax >= hold_reject_tax_pct or hard_fail >= hold_hard_fail_pct:
+            return 'hold'
+        if ev_adj >= STRATEGY_OPS_EV_PROMOTE_MIN and sample >= promote_min_samples and pnl_net > 0:
+            return 'promote'
+        if ev_adj >= STRATEGY_OPS_EV_MONITOR_MIN:
+            return 'monitor'
+        if ev_adj <= -0.35 and sample >= 20:
+            return 'block'
+        if ev_adj <= STRATEGY_OPS_EV_DEPRIORITIZE_MAX:
+            return 'deprioritize'
+        return 'hold'
+
+    exec_rows = []
+    try:
+        docs = list(
+            db.collection('execution_verifications')
+            .where('platform', '==', platform_norm)
+            .where('recorded_at', '>=', since)
+            .order_by('recorded_at', direction=firestore.Query.DESCENDING)
+            .limit(safe_limit)
+            .stream()
+        )
+        exec_rows = [doc.to_dict() or {} for doc in docs]
+    except Exception:
+        docs = list(
+            db.collection('execution_verifications')
+            .order_by('recorded_at', direction=firestore.Query.DESCENDING)
+            .limit(safe_limit)
+            .stream()
+        )
+        for doc in docs:
+            row = doc.to_dict() or {}
+            if str(row.get('platform', '')).strip().lower() != platform_norm:
+                continue
+            ts = _coerce_datetime(row.get('recorded_at') or row.get('timestamp'))
+            if ts and ts < since:
+                continue
+            exec_rows.append(row)
+
+    pnl_rows = []
+    try:
+        docs = list(
+            db.collection('trade_executions')
+            .where('timestamp', '>=', since.isoformat())
+            .order_by('timestamp', direction=firestore.Query.DESCENDING)
+            .limit(safe_limit)
+            .stream()
+        )
+        pnl_rows = [doc.to_dict() or {} for doc in docs]
+    except Exception:
+        docs = list(
+            db.collection('trade_executions')
+            .order_by('timestamp', direction=firestore.Query.DESCENDING)
+            .limit(safe_limit)
+            .stream()
+        )
+        for doc in docs:
+            row = doc.to_dict() or {}
+            ts = _coerce_datetime(row.get('timestamp'))
+            if ts and ts < since:
+                continue
+            pnl_rows.append(row)
+
+    agg = {}
+    equity_events: list[tuple[datetime, float]] = []
+
+    def _slot(strategy: str, timeframe: str) -> dict:
+        key = f'{strategy}@{timeframe}'
+        if key not in agg:
+            agg[key] = {
+                'strategy': strategy,
+                'timeframe': timeframe,
+                'sample_size': 0,
+                'filled_success_count': 0,
+                'reject_skip_count': 0,
+                'hard_failed_count': 0,
+                'accepted_no_fill_count': 0,
+                'net_realized_pnl_usd': 0.0,
+                'net_pnl_after_fees_usd': 0.0,
+                'estimated_fees_usd': 0.0,
+                'estimated_slippage_usd': 0.0,
+                'gross_win_pnl_usd': 0.0,
+                'gross_loss_pnl_usd': 0.0,
+                'trade_wins': 0,
+                'trade_losses': 0,
+                'total_notional_usd': 0.0,
+                'trade_count': 0,
+                'signal_conf_sum': 0.0,
+                'signal_conf_count': 0,
+                'latency_ms_sum': 0.0,
+                'latency_ms_count': 0,
+            }
+        return agg[key]
+
+    for row in exec_rows:
+        strategy, timeframe = _strategy_lane_info(row)
+        slot = _slot(strategy, timeframe)
+        slot['sample_size'] += 1
+        outcome = str(row.get('outcome', '')).strip().lower()
+        if outcome == 'filled_success':
+            slot['filled_success_count'] += 1
+        elif outcome in {'policy_noop', 'policy_reject', 'noop'}:
+            slot['reject_skip_count'] += 1
+        elif outcome == 'hard_failed':
+            slot['hard_failed_count'] += 1
+        elif outcome == 'accepted_no_fill':
+            slot['accepted_no_fill_count'] += 1
+        conf_val = _to_float(
+            row.get('confidence')
+            or (row.get('signal_metadata', {}) or {}).get('confidence')
+            or (row.get('metadata', {}) or {}).get('confidence'),
+            -1.0,
+        )
+        if conf_val >= 0:
+            slot['signal_conf_sum'] += conf_val
+            slot['signal_conf_count'] += 1
+        latency_val = _to_float(
+            row.get('latency_ms')
+            or row.get('processing_latency_ms')
+            or (row.get('metadata', {}) or {}).get('latency_ms'),
+            -1.0,
+        )
+        if latency_val >= 0:
+            slot['latency_ms_sum'] += latency_val
+            slot['latency_ms_count'] += 1
+
+    for row in pnl_rows:
+        row_platform = str(row.get('platform', '') or '').strip().lower()
+        if row_platform and row_platform != platform_norm:
+            continue
+        strategy, timeframe = _strategy_lane_info(row)
+        slot = _slot(strategy, timeframe)
+        pnl = _to_float(row.get('realized_pnl'), 0.0)
+        notional = _estimate_notional_usd(row)
+        fees = max(0.0, notional * (STRATEGY_OPS_FEE_BPS / 10000.0))
+        slippage = max(0.0, notional * (STRATEGY_OPS_SLIPPAGE_BPS / 10000.0))
+        net_after_cost = pnl - fees - slippage
+
+        slot['net_realized_pnl_usd'] += pnl
+        slot['estimated_fees_usd'] += fees
+        slot['estimated_slippage_usd'] += slippage
+        slot['net_pnl_after_fees_usd'] += net_after_cost
+        slot['total_notional_usd'] += notional
+        if pnl > 0:
+            slot['gross_win_pnl_usd'] += pnl
+            slot['trade_wins'] += 1
+        elif pnl < 0:
+            slot['gross_loss_pnl_usd'] += abs(pnl)
+            slot['trade_losses'] += 1
+        slot['trade_count'] += 1
+        ts = _coerce_datetime(row.get('timestamp'))
+        if ts is not None:
+            equity_events.append((ts, net_after_cost))
+
+    ranked = []
+    for lane in agg.values():
+        sample = max(1, int(lane.get('sample_size', 0) or 0))
+        fill_pct = (float(lane.get('filled_success_count', 0)) / sample) * 100.0
+        reject_pct = (float(lane.get('reject_skip_count', 0)) / sample) * 100.0
+        hard_fail_pct = (float(lane.get('hard_failed_count', 0)) / sample) * 100.0
+        pnl = _to_float(lane.get('net_realized_pnl_usd'), 0.0)
+        trade_wins = int(lane.get('trade_wins', 0) or 0)
+        trade_losses = int(lane.get('trade_losses', 0) or 0)
+        observed_n = trade_wins + trade_losses
+        p_win_obs = (trade_wins / observed_n) if observed_n > 0 else 0.5
+        p_win_post = (trade_wins + bayes_alpha) / (observed_n + bayes_alpha + bayes_beta)
+        p_loss_post = max(0.0, 1.0 - p_win_post)
+
+        total_notional = max(0.0, _to_float(lane.get('total_notional_usd'), 0.0))
+        trade_count = max(1, int(lane.get('trade_count', 0) or 0))
+        avg_notional = total_notional / trade_count if total_notional > 0 else 4.0
+        avg_win_usd = (
+            _to_float(lane.get('gross_win_pnl_usd'), 0.0) / max(1, trade_wins)
+            if trade_wins > 0
+            else 0.0
+        )
+        avg_loss_usd = (
+            _to_float(lane.get('gross_loss_pnl_usd'), 0.0) / max(1, trade_losses)
+            if trade_losses > 0
+            else 0.0
+        )
+        if avg_loss_usd <= 0:
+            avg_loss_usd = max(avg_notional * 0.0035, 0.02)
+        if avg_win_usd <= 0:
+            avg_win_usd = avg_loss_usd * default_payoff
+
+        expected_win_pct = max(0.0, (avg_win_usd / max(avg_notional, 1e-9)) * 100.0)
+        expected_loss_pct = max(0.0, (avg_loss_usd / max(avg_notional, 1e-9)) * 100.0)
+        ev_raw_pct = (
+            (p_win_post * expected_win_pct)
+            - (p_loss_post * expected_loss_pct)
+            - fee_pct
+            - slippage_pct
+        )
+        uncertainty_std = math.sqrt(max(0.0, p_win_post * (1.0 - p_win_post) / max(1, observed_n)))
+        uncertainty_penalty_pct = uncertainty_std * max(expected_win_pct, expected_loss_pct, 0.15)
+        sample_penalty_pct = 0.0
+        if observed_n < min_confident_samples:
+            sample_penalty_pct = (
+                (min_confident_samples - observed_n) / max(1, min_confident_samples)
+            ) * 0.25
+        ev_adjusted_pct = ev_raw_pct - uncertainty_penalty_pct - sample_penalty_pct
+        payoff_ratio = avg_win_usd / max(avg_loss_usd, 1e-9)
+
+        avg_conf = (
+            _to_float(lane.get('signal_conf_sum'), 0.0) / max(1, int(lane.get('signal_conf_count', 0) or 0))
+            if int(lane.get('signal_conf_count', 0) or 0) > 0
+            else 0.5
+        )
+        confidence_calibration_error_pct = abs(avg_conf - p_win_obs) * 100.0
+
+        net_after_fees = _to_float(lane.get('net_pnl_after_fees_usd'), 0.0)
+        realized_net_return_pct = (
+            (net_after_fees / max(total_notional, 1e-9)) * 100.0 if total_notional > 0 else 0.0
+        )
+        expected_value_error_pct = abs(realized_net_return_pct - ev_adjusted_pct)
+        avg_latency_ms = (
+            _to_float(lane.get('latency_ms_sum'), 0.0) / max(1, int(lane.get('latency_ms_count', 0) or 0))
+            if int(lane.get('latency_ms_count', 0) or 0) > 0
+            else 0.0
+        )
+        score = (
+            (ev_adjusted_pct * 100.0)
+            - (confidence_calibration_error_pct * 0.12)
+            - (reject_pct * 0.05)
+            - (hard_fail_pct * 0.10)
+        )
+        row = {
+            **lane,
+            'filled_success_pct': round(fill_pct, 2),
+            'reject_tax_pct': round(reject_pct, 2),
+            'hard_fail_pct': round(hard_fail_pct, 2),
+            'net_realized_pnl_usd': round(pnl, 6),
+            'net_pnl_after_fees_usd': round(net_after_fees, 6),
+            'estimated_fees_usd': round(_to_float(lane.get('estimated_fees_usd'), 0.0), 6),
+            'estimated_slippage_usd': round(_to_float(lane.get('estimated_slippage_usd'), 0.0), 6),
+            'total_notional_usd': round(total_notional, 6),
+            'p_win_observed': round(p_win_obs, 4),
+            'p_win': round(p_win_post, 4),
+            'p_loss': round(p_loss_post, 4),
+            'payoff_ratio': round(payoff_ratio, 4),
+            'expected_win_pct': round(expected_win_pct, 5),
+            'expected_loss_pct': round(expected_loss_pct, 5),
+            'ev_raw_pct': round(ev_raw_pct, 5),
+            'ev_adjusted_pct': round(ev_adjusted_pct, 5),
+            'uncertainty_penalty_pct': round(uncertainty_penalty_pct, 5),
+            'sample_penalty_pct': round(sample_penalty_pct, 5),
+            'confidence_mean': round(avg_conf, 4),
+            'confidence_calibration_error_pct': round(confidence_calibration_error_pct, 4),
+            'expected_value_error_pct': round(expected_value_error_pct, 5),
+            'realized_net_return_pct': round(realized_net_return_pct, 5),
+            'avg_latency_ms': round(avg_latency_ms, 2),
+            'score': round(score, 4),
+        }
+        row['recommendation'] = _lane_recommendation(row)
+        ranked.append(row)
+
+    ranked.sort(
+        key=lambda item: (
+            _to_float(item.get('ev_adjusted_pct'), 0.0),
+            -_to_float(item.get('expected_value_error_pct'), 0.0),
+            _to_float(item.get('score'), 0.0),
+            int(item.get('sample_size', 0) or 0),
+        ),
+        reverse=True,
+    )
+
+    max_drawdown_pct = 0.0
+    max_drawdown_usd = 0.0
+    if equity_events:
+        equity_events.sort(key=lambda item: item[0])
+        equity = float(STRATEGY_OPS_EQUITY_BASE_USD)
+        peak = equity
+        trough = equity
+        max_dd = 0.0
+        for _, pnl_after_cost in equity_events:
+            equity += float(pnl_after_cost or 0.0)
+            peak = max(peak, equity)
+            trough = min(trough, equity)
+            drawdown = ((peak - equity) / peak) if peak > 0 else 0.0
+            max_dd = max(max_dd, drawdown)
+        max_drawdown_pct = min(100.0, max_dd * 100.0)
+        max_drawdown_usd = max(0.0, peak - trough)
+
+    totals = {
+        'lanes': len(ranked),
+        'sample_size': sum(int(item.get('sample_size', 0) or 0) for item in ranked),
+        'filled_success_count': sum(int(item.get('filled_success_count', 0) or 0) for item in ranked),
+        'reject_skip_count': sum(int(item.get('reject_skip_count', 0) or 0) for item in ranked),
+        'hard_failed_count': sum(int(item.get('hard_failed_count', 0) or 0) for item in ranked),
+        'net_realized_pnl_usd': round(
+            sum(_to_float(item.get('net_realized_pnl_usd'), 0.0) for item in ranked), 6
+        ),
+        'net_pnl_after_fees_usd': round(
+            sum(_to_float(item.get('net_pnl_after_fees_usd'), 0.0) for item in ranked), 6
+        ),
+        'estimated_fees_usd': round(
+            sum(_to_float(item.get('estimated_fees_usd'), 0.0) for item in ranked), 6
+        ),
+        'estimated_slippage_usd': round(
+            sum(_to_float(item.get('estimated_slippage_usd'), 0.0) for item in ranked), 6
+        ),
+        'total_notional_usd': round(
+            sum(_to_float(item.get('total_notional_usd'), 0.0) for item in ranked), 6
+        ),
+    }
+    denom = max(1, int(totals['sample_size']))
+    totals['filled_success_pct'] = round((float(totals['filled_success_count']) / denom) * 100.0, 2)
+    totals['fill_rate_pct'] = totals['filled_success_pct']
+    totals['reject_tax_pct'] = round((float(totals['reject_skip_count']) / denom) * 100.0, 2)
+    totals['hard_fail_pct'] = round((float(totals['hard_failed_count']) / denom) * 100.0, 2)
+    totals['max_drawdown_pct'] = round(max_drawdown_pct, 4)
+    totals['max_drawdown_usd'] = round(max_drawdown_usd, 6)
+    totals['equity_base_usd'] = round(float(STRATEGY_OPS_EQUITY_BASE_USD), 4)
+    totals['ev_adjusted_pct'] = round(
+        sum(_to_float(item.get('ev_adjusted_pct'), 0.0) for item in ranked) / max(1, len(ranked)),
+        5,
+    )
+    totals['expected_value_error_pct'] = round(
+        (
+            sum(
+                _to_float(item.get('expected_value_error_pct'), 0.0) * max(1, int(item.get('sample_size', 0) or 0))
+                for item in ranked
+            )
+            / max(
+                1,
+                sum(max(1, int(item.get('sample_size', 0) or 0)) for item in ranked),
+            )
+        ),
+        5,
+    )
+    totals['north_star'] = {
+        'net_pnl_after_fees': totals['net_pnl_after_fees_usd'],
+        'max_drawdown_pct': totals['max_drawdown_pct'],
+        'reject_tax_pct': totals['reject_tax_pct'],
+        'fill_rate_pct': totals['fill_rate_pct'],
+        'expected_value_error_pct': totals['expected_value_error_pct'],
+    }
+
+    return {
+        'generated_at': now_utc.isoformat(),
+        'platform': platform_norm,
+        'window': {
+            'days': safe_days,
+            'since': since.isoformat(),
+            'until': now_utc.isoformat(),
+        },
+        'totals': totals,
+        'ranked': ranked,
+    }
+
+
+def _build_signal_outcome_attribution(days: int = 7, platform: str = 'lighter', limit: int = 2200) -> dict:
+    now_utc = datetime.now(timezone.utc)
+    safe_days = max(1, min(int(days or 7), 30))
+    safe_limit = max(200, min(int(limit or 2200), 5000))
+    platform_norm = str(platform or 'lighter').strip().lower()
+    since = now_utc - timedelta(days=safe_days)
+
+    if db is None:
+        return {
+            'generated_at': now_utc.isoformat(),
+            'platform': platform_norm,
+            'window': {'days': safe_days, 'since': since.isoformat(), 'until': now_utc.isoformat()},
+            'schema': {'version': 'v1', 'fields': []},
+            'summary': {'sample_size': 0, 'error': 'firestore_unavailable'},
+            'windows': {},
+            'by_reason': [],
+            'by_outcome': [],
+            'by_lane': [],
+            'rows': [],
+        }
+
+    def _to_float(value, default=0.0):
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return float(default)
+
+    def _norm_symbol(value) -> str:
+        sym = str(value or '').strip().upper()
+        if not sym:
+            return 'UNKNOWN'
+        for suffix in ('/USDT', '/USD', 'USDT', 'USD', '-PERP'):
+            if sym.endswith(suffix):
+                sym = sym[: -len(suffix)]
+        return sym or 'UNKNOWN'
+
+    def _estimate_notional_usd(row: dict) -> float:
+        metadata = row.get('metadata', {}) if isinstance(row.get('metadata'), dict) else {}
+        direct = (
+            row.get('notional_usd')
+            or metadata.get('notional_usd')
+            or row.get('order_notional_usd')
+            or metadata.get('order_notional_usd')
+        )
+        direct_val = _to_float(direct, 0.0)
+        if direct_val > 0:
+            return direct_val
+        qty = _to_float(
+            row.get('filled_quantity') or row.get('quantity') or metadata.get('filled_quantity'),
+            0.0,
+        )
+        px = _to_float(
+            row.get('avg_price') or row.get('price') or metadata.get('avg_price') or metadata.get('price'),
+            0.0,
+        )
+        notional = qty * px
+        return notional if notional > 0 else 0.0
+
+    def _reason_code(outcome: str, reason_text: str) -> str:
+        outcome_norm = str(outcome or '').strip().lower()
+        text = str(reason_text or '').strip().lower()
+        if outcome_norm == 'filled_success':
+            return 'filled'
+        if outcome_norm == 'accepted_no_fill':
+            return 'accepted_no_fill'
+        if outcome_norm in {'policy_noop', 'policy_reject', 'noop'}:
+            if not text:
+                return 'policy_filtered'
+            if 'symbol' in text and 'allow' in text:
+                return 'symbol_scope_mismatch'
+            if 'timeframe' in text:
+                return 'timeframe_mismatch'
+            if 'strategy' in text:
+                return 'strategy_mismatch'
+            if 'confidence' in text:
+                return 'confidence_below_floor'
+            if 'cap' in text or 'notional' in text:
+                return 'cap_or_notional_guard'
+            if 'cooldown' in text:
+                return 'cooldown_guard'
+            if 'tp' in text or 'sl' in text:
+                return 'invalid_tp_sl_geometry'
+            return 'policy_filtered'
+        if outcome_norm == 'hard_failed':
+            if 'timeout' in text:
+                return 'exchange_timeout'
+            if 'insufficient' in text or 'margin' in text or 'balance' in text:
+                return 'insufficient_margin'
+            if 'signature' in text or 'signer' in text:
+                return 'signature_failure'
+            if 'credential' in text or 'auth' in text or 'forbidden' in text:
+                return 'auth_or_credentials'
+            if 'connection' in text or 'host' in text or 'dns' in text:
+                return 'connectivity_error'
+            return 'execution_error'
+        return outcome_norm or 'unknown'
+
+    def _bucket(label: str) -> dict:
+        return {
+            'label': label,
+            'sample_size': 0,
+            'filled_success_count': 0,
+            'reject_skip_count': 0,
+            'hard_failed_count': 0,
+            'accepted_no_fill_count': 0,
+            'net_pnl_after_fees_usd': 0.0,
+            'estimated_fees_usd': 0.0,
+            'estimated_slippage_usd': 0.0,
+        }
+
+    verification_rows = []
+    try:
+        docs = list(
+            db.collection('execution_verifications')
+            .where('platform', '==', platform_norm)
+            .where('recorded_at', '>=', since)
+            .order_by('recorded_at', direction=firestore.Query.DESCENDING)
+            .limit(safe_limit)
+            .stream()
+        )
+        verification_rows = [doc.to_dict() or {} for doc in docs]
+    except Exception:
+        docs = list(
+            db.collection('execution_verifications')
+            .order_by('recorded_at', direction=firestore.Query.DESCENDING)
+            .limit(max(500, min(safe_limit * 2, 8000)))
+            .stream()
+        )
+        for doc in docs:
+            row = doc.to_dict() or {}
+            if str(row.get('platform', '')).strip().lower() != platform_norm:
+                continue
+            ts = _coerce_datetime(row.get('recorded_at') or row.get('timestamp'))
+            if ts and ts < since:
+                continue
+            verification_rows.append(row)
+
+    trade_rows = []
+    try:
+        docs = list(
+            db.collection(TRADE_EXECUTIONS_COLLECTION)
+            .where('timestamp', '>=', since.isoformat())
+            .order_by('timestamp', direction=firestore.Query.DESCENDING)
+            .limit(safe_limit)
+            .stream()
+        )
+        trade_rows = [doc.to_dict() or {} for doc in docs]
+    except Exception:
+        docs = list(
+            db.collection(TRADE_EXECUTIONS_COLLECTION)
+            .order_by('timestamp', direction=firestore.Query.DESCENDING)
+            .limit(max(500, min(safe_limit * 2, 8000)))
+            .stream()
+        )
+        for doc in docs:
+            row = doc.to_dict() or {}
+            ts = _coerce_datetime(row.get('timestamp'))
+            if ts and ts < since:
+                continue
+            trade_rows.append(row)
+
+    trades_by_signal = {}
+    fee_rate = STRATEGY_OPS_FEE_BPS / 10000.0
+    slippage_rate = STRATEGY_OPS_SLIPPAGE_BPS / 10000.0
+    for row in trade_rows:
+        row_platform = str(row.get('platform', '') or '').strip().lower()
+        if row_platform and row_platform != platform_norm:
+            continue
+        metadata = row.get('metadata', {}) if isinstance(row.get('metadata'), dict) else {}
+        signal_id = str(
+            row.get('signal_id')
+            or metadata.get('signal_id')
+            or row.get('execution_id')
+            or ''
+        ).strip()
+        if not signal_id:
+            continue
+        pnl = _to_float(row.get('realized_pnl'), 0.0)
+        notional = _estimate_notional_usd(row)
+        fees = max(0.0, notional * fee_rate)
+        slippage = max(0.0, notional * slippage_rate)
+        slot = trades_by_signal.setdefault(
+            signal_id,
+            {
+                'trade_count': 0,
+                'realized_pnl_usd': 0.0,
+                'notional_usd': 0.0,
+                'fees_usd': 0.0,
+                'slippage_usd': 0.0,
+                'net_pnl_after_fees_usd': 0.0,
+            },
+        )
+        slot['trade_count'] += 1
+        slot['realized_pnl_usd'] += pnl
+        slot['notional_usd'] += notional
+        slot['fees_usd'] += fees
+        slot['slippage_usd'] += slippage
+        slot['net_pnl_after_fees_usd'] += pnl - fees - slippage
+
+    reason_counts = {}
+    outcome_counts = {}
+    by_lane = {}
+    windows = {'1h': _bucket('1h'), '6h': _bucket('6h'), '24h': _bucket('24h')}
+    rows = []
+    latest_signal_at = None
+
+    for idx, row in enumerate(verification_rows):
+        metadata = row.get('metadata', {}) if isinstance(row.get('metadata'), dict) else {}
+        signal_meta = row.get('signal_metadata', {}) if isinstance(row.get('signal_metadata'), dict) else {}
+        strategy, timeframe = _strategy_lane_info(row)
+        outcome = str(row.get('outcome', '')).strip().lower() or 'unknown'
+        reason_text = str(
+            row.get('policy_reason')
+            or row.get('noop_reason')
+            or row.get('error_message')
+            or ''
+        ).strip()
+        reason_code = _reason_code(outcome, reason_text)
+        ts = _coerce_datetime(row.get('recorded_at') or row.get('timestamp')) or now_utc
+        signal_id = str(
+            row.get('signal_id')
+            or signal_meta.get('signal_id')
+            or metadata.get('signal_id')
+            or ''
+        ).strip()
+        if not signal_id:
+            signal_id = f"anon-{idx}-{int(ts.timestamp())}"
+        source = str(
+            row.get('signal_source')
+            or row.get('source')
+            or signal_meta.get('source')
+            or metadata.get('source')
+            or 'unknown'
+        ).strip().lower()
+        symbol = _norm_symbol(
+            row.get('symbol')
+            or signal_meta.get('symbol')
+            or metadata.get('symbol')
+            or metadata.get('pair')
+        )
+        side = str(
+            row.get('side')
+            or signal_meta.get('side')
+            or metadata.get('side')
+            or ''
+        ).strip().lower() or 'unknown'
+        confidence = _to_float(
+            row.get('confidence')
+            or signal_meta.get('confidence')
+            or metadata.get('confidence'),
+            0.0,
+        )
+        latency_ms = _to_float(
+            row.get('latency_ms')
+            or row.get('processing_latency_ms')
+            or metadata.get('latency_ms'),
+            0.0,
+        )
+
+        trade = trades_by_signal.get(signal_id, {})
+        realized_pnl = _to_float(trade.get('realized_pnl_usd'), 0.0)
+        net_after_fees = _to_float(trade.get('net_pnl_after_fees_usd'), 0.0)
+        fees_usd = _to_float(trade.get('fees_usd'), 0.0)
+        slippage_usd = _to_float(trade.get('slippage_usd'), 0.0)
+        notional = _to_float(trade.get('notional_usd'), 0.0)
+
+        canonical = {
+            'signal_id': signal_id,
+            'timestamp': ts.isoformat(),
+            'platform': platform_norm,
+            'symbol': symbol,
+            'side': side,
+            'source': source or 'unknown',
+            'strategy': strategy,
+            'timeframe': timeframe,
+            'confidence': round(confidence, 4),
+            'latency_ms': round(latency_ms, 2),
+            'outcome': outcome,
+            'reason_code': reason_code,
+            'reason_text': reason_text[:220],
+            'trade_count': int(trade.get('trade_count', 0) or 0),
+            'notional_usd': round(notional, 6),
+            'realized_pnl_usd': round(realized_pnl, 6),
+            'fees_usd': round(fees_usd, 6),
+            'slippage_usd': round(slippage_usd, 6),
+            'net_pnl_after_fees_usd': round(net_after_fees, 6),
+            'expected_ev_pct': round(
+                _to_float(
+                    row.get('expected_ev_pct')
+                    or metadata.get('expected_ev_pct')
+                    or signal_meta.get('expected_ev_pct'),
+                    0.0,
+                ),
+                5,
+            ),
+        }
+        rows.append(canonical)
+
+        if latest_signal_at is None or ts > latest_signal_at:
+            latest_signal_at = ts
+        reason_counts[reason_code] = reason_counts.get(reason_code, 0) + 1
+        outcome_counts[outcome] = outcome_counts.get(outcome, 0) + 1
+
+        lane_key = f'{strategy}@{timeframe}'
+        lane = by_lane.setdefault(lane_key, _bucket(lane_key))
+        lane['sample_size'] += 1
+        if outcome == 'filled_success':
+            lane['filled_success_count'] += 1
+        elif outcome in {'policy_noop', 'policy_reject', 'noop'}:
+            lane['reject_skip_count'] += 1
+        elif outcome == 'hard_failed':
+            lane['hard_failed_count'] += 1
+        elif outcome == 'accepted_no_fill':
+            lane['accepted_no_fill_count'] += 1
+        lane['net_pnl_after_fees_usd'] += net_after_fees
+        lane['estimated_fees_usd'] += fees_usd
+        lane['estimated_slippage_usd'] += slippage_usd
+
+        age_h = max(0.0, (now_utc - ts).total_seconds() / 3600.0)
+        for label, threshold in (('1h', 1.0), ('6h', 6.0), ('24h', 24.0)):
+            if age_h <= threshold:
+                win = windows[label]
+                win['sample_size'] += 1
+                if outcome == 'filled_success':
+                    win['filled_success_count'] += 1
+                elif outcome in {'policy_noop', 'policy_reject', 'noop'}:
+                    win['reject_skip_count'] += 1
+                elif outcome == 'hard_failed':
+                    win['hard_failed_count'] += 1
+                elif outcome == 'accepted_no_fill':
+                    win['accepted_no_fill_count'] += 1
+                win['net_pnl_after_fees_usd'] += net_after_fees
+                win['estimated_fees_usd'] += fees_usd
+                win['estimated_slippage_usd'] += slippage_usd
+
+    for group in [*windows.values(), *by_lane.values()]:
+        denom = max(1, int(group.get('sample_size', 0) or 0))
+        group['fill_rate_pct'] = round((float(group.get('filled_success_count', 0)) / denom) * 100.0, 2)
+        group['reject_tax_pct'] = round((float(group.get('reject_skip_count', 0)) / denom) * 100.0, 2)
+        group['hard_fail_pct'] = round((float(group.get('hard_failed_count', 0)) / denom) * 100.0, 2)
+        group['net_pnl_after_fees_usd'] = round(float(group.get('net_pnl_after_fees_usd', 0.0) or 0.0), 6)
+        group['estimated_fees_usd'] = round(float(group.get('estimated_fees_usd', 0.0) or 0.0), 6)
+        group['estimated_slippage_usd'] = round(float(group.get('estimated_slippage_usd', 0.0) or 0.0), 6)
+
+    total = max(1, len(rows))
+    summary = _bucket('summary')
+    for row in rows:
+        summary['sample_size'] += 1
+        outcome = row.get('outcome')
+        if outcome == 'filled_success':
+            summary['filled_success_count'] += 1
+        elif outcome in {'policy_noop', 'policy_reject', 'noop'}:
+            summary['reject_skip_count'] += 1
+        elif outcome == 'hard_failed':
+            summary['hard_failed_count'] += 1
+        elif outcome == 'accepted_no_fill':
+            summary['accepted_no_fill_count'] += 1
+        summary['net_pnl_after_fees_usd'] += _to_float(row.get('net_pnl_after_fees_usd'), 0.0)
+        summary['estimated_fees_usd'] += _to_float(row.get('fees_usd'), 0.0)
+        summary['estimated_slippage_usd'] += _to_float(row.get('slippage_usd'), 0.0)
+    summary['fill_rate_pct'] = round((summary['filled_success_count'] / total) * 100.0, 2)
+    summary['reject_tax_pct'] = round((summary['reject_skip_count'] / total) * 100.0, 2)
+    summary['hard_fail_pct'] = round((summary['hard_failed_count'] / total) * 100.0, 2)
+    summary['net_pnl_after_fees_usd'] = round(summary['net_pnl_after_fees_usd'], 6)
+    summary['estimated_fees_usd'] = round(summary['estimated_fees_usd'], 6)
+    summary['estimated_slippage_usd'] = round(summary['estimated_slippage_usd'], 6)
+    summary['latest_signal_at'] = latest_signal_at.isoformat() if latest_signal_at else None
+
+    by_reason_rows = [
+        {'reason_code': reason, 'count': count, 'share_pct': round((count / total) * 100.0, 2)}
+        for reason, count in sorted(reason_counts.items(), key=lambda item: item[1], reverse=True)
+    ]
+    by_outcome_rows = [
+        {'outcome': outcome, 'count': count, 'share_pct': round((count / total) * 100.0, 2)}
+        for outcome, count in sorted(outcome_counts.items(), key=lambda item: item[1], reverse=True)
+    ]
+
+    lane_rows = []
+    for lane_key, lane in by_lane.items():
+        strategy, timeframe = lane_key.split('@', 1)
+        lane_rows.append({'strategy': strategy, 'timeframe': timeframe, **lane})
+    lane_rows.sort(
+        key=lambda item: (
+            _to_float(item.get('net_pnl_after_fees_usd'), 0.0),
+            _to_float(item.get('fill_rate_pct'), 0.0),
+            -_to_float(item.get('reject_tax_pct'), 0.0),
+            int(item.get('sample_size', 0) or 0),
+        ),
+        reverse=True,
+    )
+
+    rows.sort(key=lambda item: item.get('timestamp', ''), reverse=True)
+    return {
+        'generated_at': now_utc.isoformat(),
+        'platform': platform_norm,
+        'window': {'days': safe_days, 'since': since.isoformat(), 'until': now_utc.isoformat()},
+        'schema': {
+            'version': 'v1',
+            'fields': [
+                'signal_id', 'timestamp', 'platform', 'symbol', 'side', 'source', 'strategy', 'timeframe',
+                'confidence', 'latency_ms', 'outcome', 'reason_code', 'reason_text',
+                'trade_count', 'notional_usd', 'realized_pnl_usd', 'fees_usd', 'slippage_usd',
+                'net_pnl_after_fees_usd', 'expected_ev_pct',
+            ],
+        },
+        'summary': summary,
+        'windows': windows,
+        'by_reason': by_reason_rows[:12],
+        'by_outcome': by_outcome_rows,
+        'by_lane': lane_rows[:16],
+        'rows': rows[:240],
+    }
+
+
+def _build_data_quality_snapshot(attribution: dict) -> dict:
+    now_utc = datetime.now(timezone.utc)
+
+    def _age_minutes(timestamp_value) -> float | None:
+        ts = _coerce_datetime(timestamp_value)
+        if ts is None:
+            return None
+        return max(0.0, (now_utc - ts).total_seconds() / 60.0)
+
+    def _source_health(name: str, timestamp_value, missingness_pct: float, drift_pct: float, warn_min: int, crit_min: int):
+        age_min = _age_minutes(timestamp_value)
+        if age_min is None:
+            freshness = 'unknown'
+        elif age_min >= crit_min:
+            freshness = 'critical'
+        elif age_min >= warn_min:
+            freshness = 'stale'
+        else:
+            freshness = 'fresh'
+        degraded = (
+            freshness in {'stale', 'critical', 'unknown'}
+            or float(missingness_pct or 0.0) >= 20.0
+            or float(drift_pct or 0.0) >= 25.0
+        )
+        confidence_penalty = 0.0
+        if freshness == 'stale':
+            confidence_penalty += 0.08
+        elif freshness in {'critical', 'unknown'}:
+            confidence_penalty += 0.16
+        confidence_penalty += min(0.18, float(missingness_pct or 0.0) / 100.0 * 0.18)
+        confidence_penalty += min(0.14, float(drift_pct or 0.0) / 100.0 * 0.14)
+        return {
+            'source': name,
+            'timestamp': _iso_or_default(timestamp_value),
+            'age_minutes': None if age_min is None else round(age_min, 2),
+            'freshness': freshness,
+            'missingness_pct': round(float(missingness_pct or 0.0), 2),
+            'drift_pct': round(float(drift_pct or 0.0), 2),
+            'degraded': degraded,
+            'confidence_penalty': round(confidence_penalty, 4),
+        }
+
+    market = _fetch_market_prices()
+    tracked = [str(sym).upper() for sym in (market.get('tracked_symbols') or []) if str(sym).strip()]
+    tracked_count = max(1, len(tracked))
+    missing_quotes = sum(1 for sym in tracked if _safe_float((market.get(sym) or {}).get('price'), 0.0) <= 0)
+    market_missingness = (missing_quotes / tracked_count) * 100.0
+
+    intel_summary = _platform_intel_summary_payload(hours=24, limit=60, refresh=False)
+    intel_count = int(((intel_summary.get('intel') or {}).get('count', 0)) or 0)
+    intel_missingness = 100.0 if intel_count == 0 else 0.0
+
+    windows = attribution.get('windows', {}) if isinstance(attribution.get('windows'), dict) else {}
+    win_1h = windows.get('1h', {}) if isinstance(windows.get('1h'), dict) else {}
+    win_24h = windows.get('24h', {}) if isinstance(windows.get('24h'), dict) else {}
+    fill_1h = _safe_float(win_1h.get('fill_rate_pct'), 0.0)
+    fill_24h = _safe_float(win_24h.get('fill_rate_pct'), 0.0)
+    execution_drift = abs(fill_1h - fill_24h)
+    reason_rows = attribution.get('by_reason', []) if isinstance(attribution.get('by_reason'), list) else []
+    unknown_share = 0.0
+    for row in reason_rows:
+        if str(row.get('reason_code', '')).strip().lower() == 'unknown':
+            unknown_share = _safe_float(row.get('share_pct'), 0.0)
+            break
+
+    sources = [
+        _source_health(
+            'execution_outcomes',
+            (attribution.get('summary') or {}).get('latest_signal_at'),
+            unknown_share,
+            execution_drift,
+            warn_min=15,
+            crit_min=60,
+        ),
+        _source_health(
+            'market_prices',
+            market.get('timestamp') if isinstance(market, dict) else None,
+            market_missingness,
+            0.0,
+            warn_min=6,
+            crit_min=20,
+        ),
+        _source_health(
+            'intel_summary',
+            intel_summary.get('timestamp') if isinstance(intel_summary, dict) else None,
+            intel_missingness,
+            0.0,
+            warn_min=15,
+            crit_min=45,
+        ),
+    ]
+
+    total_penalty = sum(_safe_float(row.get('confidence_penalty'), 0.0) for row in sources)
+    degraded_sources = [row['source'] for row in sources if bool(row.get('degraded', False))]
+    confidence_multiplier = _clamp(1.0 - total_penalty, 0.35, 1.0)
+    return {
+        'generated_at': now_utc.isoformat(),
+        'degraded': bool(degraded_sources),
+        'degraded_sources': degraded_sources,
+        'confidence_multiplier': round(confidence_multiplier, 4),
+        'sources': sources,
+    }
+
+
+def _build_operator_decision_brief(
+    *,
+    scorecard: dict,
+    reject_tax: dict,
+    assessment: dict,
+    attribution: dict,
+    data_quality: dict,
+) -> dict:
+    totals = scorecard.get('totals', {}) if isinstance(scorecard.get('totals'), dict) else {}
+    ranked = scorecard.get('ranked', []) if isinstance(scorecard.get('ranked'), list) else []
+    north_star = totals.get('north_star', {}) if isinstance(totals.get('north_star'), dict) else {}
+    windows = attribution.get('windows', {}) if isinstance(attribution.get('windows'), dict) else {}
+    lanes = attribution.get('by_lane', []) if isinstance(attribution.get('by_lane'), list) else []
+
+    fill_rate = _safe_float(north_star.get('fill_rate_pct'), _safe_float(totals.get('fill_rate_pct'), 0.0))
+    reject_pct = _safe_float(north_star.get('reject_tax_pct'), _safe_float(reject_tax.get('reject_tax_pct'), 0.0))
+    ev_error_pct = _safe_float(north_star.get('expected_value_error_pct'), _safe_float(totals.get('expected_value_error_pct'), 0.0))
+    net_pnl_after_fees = _safe_float(north_star.get('net_pnl_after_fees'), _safe_float(totals.get('net_pnl_after_fees_usd'), 0.0))
+    drawdown_pct = _safe_float(north_star.get('max_drawdown_pct'), _safe_float(totals.get('max_drawdown_pct'), 0.0))
+    drawdown_usd = _safe_float(totals.get('max_drawdown_usd'), 0.0)
+    confidence_multiplier = _safe_float(data_quality.get('confidence_multiplier'), 1.0)
+
+    max_ev_error_pct = float(os.getenv('STRATEGY_OPS_GONOGO_MAX_EV_ERROR_PCT', '0.35') or 0.35)
+    max_drawdown_pct = float(os.getenv('STRATEGY_OPS_GONOGO_MAX_DRAWDOWN_PCT', '6.0') or 6.0)
+    blockers = list(assessment.get('reasons') or [])
+    if bool(data_quality.get('degraded', False)):
+        degraded = ', '.join(data_quality.get('degraded_sources', [])[:3]) or 'unknown sources'
+        blockers.append(f'data_quality degraded: {degraded}')
+    if ev_error_pct > max_ev_error_pct:
+        blockers.append(f'expected_value_error {ev_error_pct:.3f}% exceeds model tolerance')
+    if drawdown_pct > max_drawdown_pct:
+        blockers.append(f'max_drawdown {drawdown_pct:.2f}% exceeds threshold')
+
+    go = bool(assessment.get('go', False)) and len(blockers) == 0
+    label = 'GO' if go else 'NO-GO'
+
+    top_actions = []
+    if reject_pct >= 55.0:
+        top_actions.append({
+            'priority': 'P0',
+            'title': 'Reduce reject tax now',
+            'why': f'Reject tax is {reject_pct:.1f}% and is eroding realized edge.',
+            'action': 'Tighten source/timeframe scope and disable highest-reject lanes for next cycle.',
+        })
+    if ev_error_pct >= 0.20:
+        top_actions.append({
+            'priority': 'P1',
+            'title': 'Recalibrate EV model',
+            'why': f'Expected-value error is {ev_error_pct:.3f}% versus realized outcomes.',
+            'action': 'Increase sample penalty and update friction assumptions for active lanes.',
+        })
+    promote_lane = next((row for row in ranked if str(row.get('recommendation', '')).lower() == 'promote'), None)
+    if isinstance(promote_lane, dict):
+        lane_name = f"{promote_lane.get('strategy', 'unknown')}@{promote_lane.get('timeframe', 'unknown')}"
+        top_actions.append({
+            'priority': 'P1',
+            'title': f'Promote {lane_name} cautiously',
+            'why': (
+                f"Adjusted EV {float(promote_lane.get('ev_adjusted_pct', 0.0) or 0.0):+.3f}% "
+                f"with reject tax {float(promote_lane.get('reject_tax_pct', 0.0) or 0.0):.1f}%."
+            ),
+            'action': 'Advance lane from paper/capped live to next gate with strict notional ceiling.',
+        })
+    weak_lane = next((row for row in lanes if _safe_float(row.get('reject_tax_pct'), 0.0) >= 70.0), None)
+    if isinstance(weak_lane, dict):
+        lane_name = f"{weak_lane.get('strategy', 'unknown')}@{weak_lane.get('timeframe', 'unknown')}"
+        top_actions.append({
+            'priority': 'P0',
+            'title': f'Demote high-friction lane {lane_name}',
+            'why': f"Lane reject tax is {float(weak_lane.get('reject_tax_pct', 0.0) or 0.0):.1f}%.",
+            'action': 'Move lane back to paper and require new promotion artifact before re-entry.',
+        })
+    if bool(data_quality.get('degraded', False)):
+        top_actions.append({
+            'priority': 'P0',
+            'title': 'Stabilize data quality before scaling',
+            'why': 'Confidence is being downgraded due to stale/missing market or execution inputs.',
+            'action': 'Fix degraded feeds and hold scaling decisions until quality is green.',
+        })
+
+    dedup_actions = []
+    seen = set()
+    for item in top_actions:
+        title = str(item.get('title', '')).strip().lower()
+        if not title or title in seen:
+            continue
+        seen.add(title)
+        dedup_actions.append(item)
+    if not dedup_actions:
+        dedup_actions = [
+            {
+                'priority': 'P1',
+                'title': 'Maintain capped live posture',
+                'why': 'No critical blockers detected but lane confidence remains moderate.',
+                'action': 'Keep cap fixed and continue collecting labeled outcomes before scaling.',
+            }
+        ]
+
+    w1 = windows.get('1h', {}) if isinstance(windows.get('1h'), dict) else {}
+    w6 = windows.get('6h', {}) if isinstance(windows.get('6h'), dict) else {}
+    w24 = windows.get('24h', {}) if isinstance(windows.get('24h'), dict) else {}
+    delta = {
+        'fill_rate_pct_1h': _safe_float(w1.get('fill_rate_pct'), 0.0),
+        'fill_rate_pct_6h': _safe_float(w6.get('fill_rate_pct'), 0.0),
+        'fill_rate_pct_24h': _safe_float(w24.get('fill_rate_pct'), 0.0),
+        'reject_tax_pct_1h': _safe_float(w1.get('reject_tax_pct'), 0.0),
+        'reject_tax_pct_6h': _safe_float(w6.get('reject_tax_pct'), 0.0),
+        'reject_tax_pct_24h': _safe_float(w24.get('reject_tax_pct'), 0.0),
+        'net_pnl_after_fees_usd_1h': _safe_float(w1.get('net_pnl_after_fees_usd'), 0.0),
+        'net_pnl_after_fees_usd_6h': _safe_float(w6.get('net_pnl_after_fees_usd'), 0.0),
+        'net_pnl_after_fees_usd_24h': _safe_float(w24.get('net_pnl_after_fees_usd'), 0.0),
+    }
+
+    confidence_score = _clamp(
+        (50.0 + (fill_rate * 0.35) - (reject_pct * 0.30) - (drawdown_pct * 0.90)) * confidence_multiplier,
+        0.0,
+        100.0,
+    )
+    why_now = (
+        f"Net after-fees PnL is {net_pnl_after_fees:+.4f} with fill rate {fill_rate:.1f}% and reject tax "
+        f"{reject_pct:.1f}%. Max drawdown is ${drawdown_usd:.2f} ({drawdown_pct:.2f}%). "
+        f"Confidence is {'downgraded' if confidence_multiplier < 0.9 else 'stable'} "
+        f"({confidence_score:.1f}/100)."
+    )
+
+    return {
+        'generated_at': datetime.utcnow().isoformat(),
+        'go': go,
+        'label': label,
+        'confidence_score': round(confidence_score, 2),
+        'confidence_multiplier': round(confidence_multiplier, 4),
+        'why_this_matters_now': why_now,
+        'kpis': {
+            'net_pnl_after_fees_usd': round(net_pnl_after_fees, 6),
+            'max_drawdown_pct': round(drawdown_pct, 4),
+            'max_drawdown_usd': round(drawdown_usd, 6),
+            'reject_tax_pct': round(reject_pct, 2),
+            'fill_rate_pct': round(fill_rate, 2),
+            'expected_value_error_pct': round(ev_error_pct, 5),
+        },
+        'thresholds': {
+            'max_expected_value_error_pct': round(max_ev_error_pct, 5),
+            'max_drawdown_pct': round(max_drawdown_pct, 4),
+            'max_reject_tax_pct': float((assessment.get('thresholds') or {}).get('max_reject_tax_pct', 0.0) or 0.0),
+            'max_hard_fail_pct': float((assessment.get('thresholds') or {}).get('max_hard_fail_pct', 0.0) or 0.0),
+            'min_sample_size': int((assessment.get('thresholds') or {}).get('min_sample_size', 0) or 0),
+        },
+        'deltas': delta,
+        'hard_blockers': blockers[:8],
+        'top_actions': dedup_actions[:3],
+    }
+
+
+def _resolve_strategy_ops_decision(
+    *,
+    assessment: dict | None,
+    operator_brief: dict | None,
+    data_quality: dict | None,
+) -> dict:
+    assessment = assessment if isinstance(assessment, dict) else {}
+    operator_brief = operator_brief if isinstance(operator_brief, dict) else {}
+    data_quality = data_quality if isinstance(data_quality, dict) else {}
+
+    assessment_go = bool(assessment.get('go', False))
+    assessment_label = str(assessment.get('label', 'NO-GO')).upper()
+    assessment_reasons = assessment.get('reasons', []) if isinstance(assessment.get('reasons'), list) else []
+
+    operator_go = bool(operator_brief.get('go', assessment_go))
+    operator_label = str(operator_brief.get('label', 'GO' if operator_go else 'NO-GO')).upper()
+    operator_reasons = (
+        operator_brief.get('hard_blockers', [])
+        if isinstance(operator_brief.get('hard_blockers'), list)
+        else []
+    )
+
+    reasons = [str(r).strip() for r in (operator_reasons or assessment_reasons) if str(r).strip()]
+    degraded = bool(data_quality.get('degraded', False))
+    degraded_sources = data_quality.get('degraded_sources', []) if isinstance(data_quality.get('degraded_sources'), list) else []
+    if degraded and operator_go:
+        has_quality_reason = any('data_quality' in reason.lower() for reason in reasons)
+        if not has_quality_reason:
+            degraded_text = ', '.join(str(src) for src in degraded_sources[:3]) or 'unknown sources'
+            reasons.append(f'data_quality degraded: {degraded_text}')
+        operator_go = False
+        operator_label = 'NO-GO'
+
+    go = bool(operator_go and len(reasons) == 0)
+    label = 'GO' if go else 'NO-GO'
+    source = 'operator_brief' if operator_brief else 'assessment'
+    confidence_score = _safe_float(operator_brief.get('confidence_score'), 0.0)
+    confidence_multiplier = _safe_float(
+        operator_brief.get('confidence_multiplier'),
+        _safe_float(data_quality.get('confidence_multiplier'), 1.0),
+    )
+
+    return {
+        'go': go,
+        'label': label,
+        'source': source,
+        'diverged': bool(assessment_label != label or assessment_go != go or operator_label != label),
+        'assessment_label': assessment_label,
+        'assessment_go': assessment_go,
+        'operator_label': operator_label,
+        'operator_go': operator_go,
+        'reasons': reasons[:8],
+        'why_this_matters_now': str(operator_brief.get('why_this_matters_now', '')).strip(),
+        'confidence_score': round(confidence_score, 2),
+        'confidence_multiplier': round(confidence_multiplier, 4),
+        'data_quality_degraded': degraded,
+        'degraded_sources': degraded_sources[:5],
+    }
+
+
+def _build_strategy_ops_assessment(scorecard: dict, reject_tax: dict) -> dict:
+    totals = scorecard.get('totals', {}) if isinstance(scorecard.get('totals'), dict) else {}
+    ranked = scorecard.get('ranked', []) if isinstance(scorecard.get('ranked'), list) else []
+    sample_size = int(reject_tax.get('sample_size') or totals.get('sample_size') or 0)
+    reject_tax_pct = float(reject_tax.get('reject_tax_pct', totals.get('reject_tax_pct', 0.0)) or 0.0)
+    hard_fail_pct = float(reject_tax.get('hard_fail_pct', totals.get('hard_fail_pct', 0.0)) or 0.0)
+    min_sample = max(1, int(float(os.getenv('STRATEGY_OPS_GONOGO_MIN_SAMPLE_SIZE', '30') or 30)))
+    max_reject = max(0.0, min(100.0, float(os.getenv('STRATEGY_OPS_GONOGO_MAX_REJECT_TAX_PCT', '70') or 70.0)))
+    max_hard_fail = max(0.0, min(100.0, float(os.getenv('STRATEGY_OPS_GONOGO_MAX_HARD_FAIL_PCT', '10') or 10.0)))
+
+    reasons = []
+    if sample_size < min_sample:
+        reasons.append(f'sample_size {sample_size} < {min_sample}')
+    if reject_tax_pct > max_reject:
+        reasons.append(f'reject_tax {reject_tax_pct:.1f}% > {max_reject:.1f}%')
+    if hard_fail_pct > max_hard_fail:
+        reasons.append(f'hard_fail {hard_fail_pct:.1f}% > {max_hard_fail:.1f}%')
+
+    promote_lanes = [row for row in ranked if str(row.get('recommendation', '')).lower() == 'promote']
+    top_promote = promote_lanes[0] if promote_lanes else None
+    go = len(reasons) == 0
+    return {
+        'go': bool(go),
+        'label': 'GO' if go else 'NO-GO',
+        'reasons': reasons,
+        'sample_size': sample_size,
+        'reject_tax_pct': round(reject_tax_pct, 2),
+        'hard_fail_pct': round(hard_fail_pct, 2),
+        'promote_candidates': len(promote_lanes),
+        'top_promote_lane': (
+            f"{top_promote.get('strategy', 'unknown')}@{top_promote.get('timeframe', 'unknown')}"
+            if isinstance(top_promote, dict)
+            else ''
+        ),
+        'thresholds': {
+            'min_sample_size': min_sample,
+            'max_reject_tax_pct': round(max_reject, 2),
+            'max_hard_fail_pct': round(max_hard_fail, 2),
+        },
+    }
 
 
 def _fetch_verified_trading_metrics():
@@ -1186,10 +2682,16 @@ def _fetch_trading_metrics():
         return _normalize_trading_metrics_payload(source='firestore_unavailable', error='firestore_unavailable')
 
     verified = _fetch_verified_trading_metrics()
-    if verified is not None:
-        return verified
-
-    return _normalize_trading_metrics_payload(source='firestore_verified_empty', error='no_verified_executions')
+    metrics = (
+        verified
+        if verified is not None
+        else _normalize_trading_metrics_payload(source='firestore_verified_empty', error='no_verified_executions')
+    )
+    reject_tax = _fetch_reject_tax_metrics(hours=24, limit=1500)
+    metrics['reject_tax'] = reject_tax
+    if isinstance(metrics.get('raw'), dict):
+        metrics['raw']['reject_tax'] = reject_tax
+    return metrics
 
 
 def _derive_trading_metrics_from_logs(hours: int = 72, limit: int = 600):
@@ -2029,6 +3531,873 @@ def _fetch_intel_feed_payload(limit: int = 80, category: str = '', query: str = 
     return payload
 
 
+def _safe_float(value, default: float = 0.0) -> float:
+    try:
+        if value is None:
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _as_bool(value, default: bool = False) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return default
+    text = str(value).strip().lower()
+    if text in {'1', 'true', 'yes', 'on'}:
+        return True
+    if text in {'0', 'false', 'no', 'off'}:
+        return False
+    return default
+
+
+def _clamp(value: float, low: float, high: float) -> float:
+    return max(low, min(high, value))
+
+
+def _platform_intel_summary_payload(hours: int = 24, limit: int = 60, refresh: bool = False) -> dict:
+    safe_hours = max(4, min(int(hours or 24), 168))
+    safe_limit = max(20, min(int(limit or 60), 200))
+    cache_key = f"platform_intel_summary:{safe_hours}:{safe_limit}:{int(bool(refresh))}"
+    if not refresh:
+        cached = get_cached(cache_key, duration=20)
+        if cached:
+            return cached
+
+    market = _fetch_market_prices()
+    tracked = []
+    if isinstance(market, dict):
+        tracked = [str(sym).upper() for sym in (market.get('tracked_symbols') or []) if str(sym).strip()]
+        if not tracked:
+            tracked = sorted(
+                key for key, row in market.items()
+                if isinstance(row, dict) and 'price' in row
+            )
+
+    movers = []
+    for symbol in tracked:
+        quote = market.get(symbol, {}) if isinstance(market, dict) else {}
+        if not isinstance(quote, dict):
+            continue
+        change = _safe_float(quote.get('change_24h'), 0.0)
+        price = _safe_float(quote.get('price'), 0.0)
+        movers.append(
+            {
+                'symbol': symbol,
+                'price': price,
+                'change_24h': round(change, 4),
+                'direction': 'up' if change >= 0 else 'down',
+                'magnitude': round(abs(change), 4),
+            }
+        )
+    movers.sort(key=lambda row: abs(_safe_float(row.get('change_24h'))), reverse=True)
+
+    n = max(len(movers), 1)
+    avg_change = sum(_safe_float(row.get('change_24h')) for row in movers) / n
+    avg_abs_change = sum(abs(_safe_float(row.get('change_24h'))) for row in movers) / n
+    breadth_up = sum(1 for row in movers if _safe_float(row.get('change_24h')) > 0)
+    breadth_ratio = breadth_up / n
+
+    if avg_abs_change >= 4.0 and avg_change >= 1.0 and breadth_ratio >= 0.6:
+        regime = 'risk_on_momentum'
+        regime_label = 'Risk-On Momentum'
+    elif avg_abs_change >= 4.0 and avg_change <= -1.0 and breadth_ratio <= 0.4:
+        regime = 'risk_off_drawdown'
+        regime_label = 'Risk-Off Drawdown'
+    elif avg_abs_change <= 1.25:
+        regime = 'range_compression'
+        regime_label = 'Range / Compression'
+    elif avg_change >= 0:
+        regime = 'constructive_trend'
+        regime_label = 'Constructive Trend'
+    else:
+        regime = 'defensive_rotation'
+        regime_label = 'Defensive Rotation'
+
+    regime_score = round(_clamp(50 + (avg_change * 5.5) + ((breadth_ratio - 0.5) * 26), 0, 100), 2)
+    volatility_score = round(_clamp(avg_abs_change * 12, 0, 100), 2)
+
+    intel_payload = _fetch_intel_feed_payload(limit=safe_limit, refresh=refresh)
+    intel_items = intel_payload.get('items', []) if isinstance(intel_payload.get('items'), list) else []
+    intel_categories: dict[str, int] = {}
+    symbol_mentions = {symbol: 0.0 for symbol in tracked}
+    confidence_weight = {'high': 1.0, 'medium': 0.65, 'low': 0.35}
+
+    for item in intel_items:
+        if not isinstance(item, dict):
+            continue
+        category = str(item.get('category', 'market')).strip().lower() or 'market'
+        intel_categories[category] = intel_categories.get(category, 0) + 1
+
+        conf = str(item.get('confidence', 'medium')).strip().lower()
+        conf_w = confidence_weight.get(conf, 0.5)
+        score_w = _clamp(_safe_float(item.get('score'), 0.5), 0.0, 1.0)
+        text = " ".join(
+            [
+                str(item.get('title', '')),
+                str(item.get('summary', '')),
+                " ".join(str(tag) for tag in (item.get('tags') or [])),
+            ]
+        ).upper()
+        for symbol in tracked:
+            if symbol and symbol in text:
+                symbol_mentions[symbol] = round(symbol_mentions.get(symbol, 0.0) + (conf_w * (0.6 + score_w)), 4)
+
+    trades_payload = _fetch_trade_executions(hours=safe_hours, limit=200, include_failed=True)
+    trade_rows = trades_payload.get('trades', []) if isinstance(trades_payload.get('trades'), list) else []
+    executed_rows = [row for row in trade_rows if bool((row or {}).get('executed', False))]
+    failed_rows = [row for row in trade_rows if not bool((row or {}).get('executed', False))]
+    wins = [row for row in executed_rows if _safe_float((row or {}).get('realized_pnl')) >= 0]
+    execution_quality = (
+        round((len(executed_rows) / max(len(executed_rows) + len(failed_rows), 1)) * 100.0, 2)
+        if trade_rows
+        else 0.0
+    )
+    win_rate = round((len(wins) / max(len(executed_rows), 1)) * 100.0, 2) if executed_rows else 0.0
+
+    superswarm = _platform_superswarm_payload(hours=safe_hours)
+    superswarm_summary = superswarm.get('summary', {}) if isinstance(superswarm.get('summary'), dict) else {}
+    signals = int(superswarm_summary.get('signals', 0) or 0)
+    executions = int(superswarm_summary.get('executions', 0) or 0)
+
+    status = _collect_system_status()
+    summary = status.get('summary', {}) if isinstance(status.get('summary'), dict) else {}
+    healthy_services = int(summary.get('service_healthy', 0) or 0)
+    total_services = int(summary.get('service_total', 0) or 0)
+    service_health_pct = round((healthy_services / max(total_services, 1)) * 100.0, 2)
+
+    technicals = []
+    for row in movers[: min(len(movers), 8)]:
+        symbol = str(row.get('symbol', '')).upper()
+        chg = _safe_float(row.get('change_24h'))
+        momentum_score = _clamp(50 + (chg * 8.0), 0, 100)
+        intel_support = _clamp(symbol_mentions.get(symbol, 0.0) * 15.0, 0, 100)
+        composite = round((0.72 * momentum_score) + (0.28 * intel_support), 2)
+        if composite >= 62:
+            bias = 'bullish'
+            action = 'Momentum continuation watch'
+        elif composite <= 38:
+            bias = 'bearish'
+            action = 'Defensive / fade rallies'
+        else:
+            bias = 'neutral'
+            action = 'Range discipline / wait for expansion'
+        technicals.append(
+            {
+                'symbol': symbol,
+                'bias': bias,
+                'change_24h': round(chg, 4),
+                'momentum_score': round(momentum_score, 2),
+                'intel_support': round(intel_support, 2),
+                'composite_score': composite,
+                'action': action,
+            }
+        )
+    technicals.sort(key=lambda row: row.get('composite_score', 0), reverse=True)
+
+    top_categories = [
+        {'category': key, 'count': value}
+        for key, value in sorted(intel_categories.items(), key=lambda row: row[1], reverse=True)[:5]
+    ]
+    top_intel_items = sorted(
+        [item for item in intel_items if isinstance(item, dict)],
+        key=lambda item: (_safe_float(item.get('score'), 0.0), str(item.get('confidence', 'low')) == 'high'),
+        reverse=True,
+    )[:5]
+
+    strongest = movers[0] if movers else {'symbol': 'N/A', 'change_24h': 0.0, 'price': 0.0}
+    weakest = movers[-1] if movers else {'symbol': 'N/A', 'change_24h': 0.0, 'price': 0.0}
+    insights = [
+        {
+            'topic': 'Regime',
+            'value': regime_label,
+            'detail': f"Breadth {breadth_up}/{n} up • avg move {avg_change:+.2f}%",
+            'severity': 'high' if volatility_score >= 60 else 'medium',
+        },
+        {
+            'topic': 'Mover',
+            'value': f"{strongest.get('symbol', 'N/A')} {(_safe_float(strongest.get('change_24h'))):+.2f}%",
+            'detail': f"Trailing: {weakest.get('symbol', 'N/A')} {(_safe_float(weakest.get('change_24h'))):+.2f}%",
+            'severity': 'medium',
+        },
+        {
+            'topic': 'Execution',
+            'value': f"{execution_quality:.1f}% quality",
+            'detail': f"{len(executed_rows)} fills / {len(failed_rows)} no-fill-fail • win-rate {win_rate:.1f}%",
+            'severity': 'high' if execution_quality < 60 else 'low',
+        },
+        {
+            'topic': 'Ops',
+            'value': f"{signals} signals • {executions} executions",
+            'detail': f"Service health {service_health_pct:.1f}% ({healthy_services}/{total_services})",
+            'severity': 'high' if service_health_pct < 80 else 'low',
+        },
+    ]
+
+    watchlist = []
+    for row in technicals[:4]:
+        watchlist.append(
+            {
+                'symbol': row.get('symbol'),
+                'bias': row.get('bias'),
+                'priority': 'high' if row.get('composite_score', 0) >= 65 else 'medium',
+                'setup': row.get('action'),
+                'reason': f"24h {(_safe_float(row.get('change_24h'))):+.2f}% • score {row.get('composite_score', 0):.1f}",
+            }
+        )
+
+    payload = {
+        'timestamp': datetime.utcnow().isoformat(),
+        'window_hours': safe_hours,
+        'market': {
+            'source': market.get('source') if isinstance(market, dict) else 'unknown',
+            'tracked_symbols': tracked,
+            'movers': movers[:8],
+            'regime': regime,
+            'regime_label': regime_label,
+            'regime_score': regime_score,
+            'volatility_score': volatility_score,
+            'breadth_up': breadth_up,
+            'breadth_total': n,
+            'avg_change_24h': round(avg_change, 4),
+        },
+        'intel': {
+            'source': intel_payload.get('source'),
+            'count': int(intel_payload.get('count', 0) or len(intel_items)),
+            'top_categories': top_categories,
+            'symbol_mentions': symbol_mentions,
+            'top_items': [
+                {
+                    'title': str(item.get('title', 'Untitled')),
+                    'summary': str(item.get('summary', '')),
+                    'source': str(item.get('source', 'intel')),
+                    'category': str(item.get('category', 'market')),
+                    'confidence': str(item.get('confidence', 'medium')),
+                    'score': _safe_float(item.get('score'), 0.0),
+                    'published_at': _iso_or_default(item.get('published_at')),
+                    'url': str(item.get('url', '')),
+                }
+                for item in top_intel_items
+            ],
+        },
+        'technicals': technicals,
+        'operations': {
+            'signals': signals,
+            'executions': executions,
+            'execution_quality': execution_quality,
+            'execution_win_rate': win_rate,
+            'health_pct': service_health_pct,
+        },
+        'ai_digest': {
+            'headline': (
+                f"{regime_label}: {strongest.get('symbol', 'N/A')} leads at "
+                f"{_safe_float(strongest.get('change_24h')):+.2f}% with "
+                f"{execution_quality:.1f}% execution quality."
+            ),
+            'summary': (
+                f"Volatility score {volatility_score:.1f}/100 across {n} tracked assets; "
+                f"{signals} signal events and {executions} execution events in {safe_hours}h."
+            ),
+            'insights': insights,
+            'watchlist': watchlist,
+            'confidence': round(_clamp((regime_score * 0.55) + (execution_quality * 0.45), 0, 100), 2),
+        },
+        'sources': {
+            'market': 'api/market/prices',
+            'intel_feed': 'api/platform/intel-feed',
+            'trades': 'api/platform/trades',
+            'superswarm': 'api/platform/superswarm',
+            'status': 'api/platform/status',
+        },
+    }
+    set_cache(cache_key, payload)
+    return payload
+
+
+def _platform_architecture_telemetry_payload(hours: int = 6, refresh: bool = False) -> dict:
+    safe_hours = max(1, min(int(hours or 6), 72))
+    cache_key = f"platform_architecture_telemetry:{safe_hours}:{int(bool(refresh))}"
+    if not refresh:
+        cached = get_cached(cache_key, duration=10)
+        if cached:
+            return cached
+
+    status = _collect_system_status()
+    services = status.get('services', {}) if isinstance(status.get('services'), dict) else {}
+    nodes = status.get('nodes', {}) if isinstance(status.get('nodes'), dict) else {}
+    summary = status.get('summary', {}) if isinstance(status.get('summary'), dict) else {}
+    superswarm = _platform_superswarm_payload(hours=max(4, safe_hours))
+    superswarm_summary = superswarm.get('summary', {}) if isinstance(superswarm.get('summary'), dict) else {}
+    trades = _fetch_trade_executions(hours=safe_hours, limit=160, include_failed=True)
+    trade_rows = trades.get('trades', []) if isinstance(trades.get('trades'), list) else []
+    logs = _fetch_logs(hours=safe_hours, limit=240)
+    log_rows = logs.get('logs', []) if isinstance(logs.get('logs'), list) else []
+    intel = _fetch_intel_feed_payload(limit=40)
+
+    def service_health(name: str) -> tuple[bool | None, str, float | None]:
+        row = services.get(name)
+        if not isinstance(row, dict):
+            return None, 'unknown', None
+        healthy = bool(row.get('healthy', False))
+        return healthy, ('online' if healthy else 'offline'), _safe_float(row.get('latency_ms'), None)
+
+    def node_health(name: str) -> tuple[bool | None, str, float | None]:
+        row = nodes.get(name)
+        if not isinstance(row, dict):
+            return None, 'unknown', None
+        healthy = bool(row.get('healthy', False))
+        return healthy, ('online' if healthy else 'offline'), _safe_float(row.get('latency_ms'), None)
+
+    model = [
+        ('gateway', 'Gateway', 'cloud', 'ring1', *service_health('gateway')),
+        ('alpha', 'Alpha Engine', 'cloud', 'ring1', *service_health('alpha_engine')),
+        ('pm_hub', 'PM Hub', 'cloud', 'ring1', *service_health('pm_hub')),
+        ('telegram', 'Telegram', 'cloud', 'ring1', *service_health('telegram_bot')),
+        ('scout', 'Scout Sandbox', 'support', 'ring2', *service_health('scout_sandbox')),
+        ('tho', 'THO Agent', 'support', 'ring2', *service_health('tho_agent')),
+        ('blanga', 'Blanga BIS', 'support', 'ring2', None, 'unknown', None),
+        ('aster', 'Aster', 'support', 'ring2', None, 'unknown', None),
+        ('jobs', 'Unified Jobs', 'support', 'ring2', None, 'unknown', None),
+        ('firestore', 'Firestore', 'storage', 'ring2', True, 'online' if db is not None else 'offline', None),
+        ('rari1', 'RARI-1', 'edge', 'ring3', *node_health('rari1')),
+        ('rari2', 'RARI-2', 'edge', 'ring3', *node_health('rari2')),
+        ('windows', 'Windows Lab', 'edge', 'ring3', *node_health('windows')),
+        ('macos', 'Commander', 'operator', 'ring3', True, 'online', None),
+    ]
+
+    node_payload = []
+    for node_id, label, node_type, ring, healthy, state, latency in model:
+        node_payload.append(
+            {
+                'id': node_id,
+                'label': label,
+                'type': node_type,
+                'ring': ring,
+                'healthy': healthy,
+                'status': state,
+                'latency_ms': latency,
+            }
+        )
+    node_health_by_id = {row['id']: row.get('healthy') for row in node_payload}
+
+    signals = int(superswarm_summary.get('signals', 0) or 0)
+    executions = int(superswarm_summary.get('executions', 0) or 0)
+    if signals == 0:
+        signals = sum(
+            1 for row in log_rows
+            if str((row or {}).get('event_type', '')).strip().lower() in {'signal_received', 'signal_published'}
+        )
+    if executions == 0:
+        executions = sum(1 for row in trade_rows if bool((row or {}).get('executed', False)))
+
+    intel_count = int(intel.get('count', 0) or 0)
+    trade_failures = sum(1 for row in trade_rows if not bool((row or {}).get('executed', False)))
+    signal_rate = round(signals / max(safe_hours, 1), 2)
+    execution_rate = round(executions / max(safe_hours, 1), 2)
+    intel_rate = round(intel_count / max(safe_hours, 1), 2)
+
+    fail_rate = trade_failures / max(safe_hours, 1)
+    aster_activity = sum(
+        1 for row in trade_rows
+        if str((row or {}).get('platform', '')).strip().lower() == 'aster'
+    )
+    edge_rates = {
+        'hub_gateway': max(signal_rate * 0.45, 0.01),
+        'hub_alpha': max(signal_rate, execution_rate * 0.8, 0.01),
+        'hub_pm_hub': intel_rate * 0.35,
+        'hub_telegram': (execution_rate * 0.55) + (fail_rate * 0.2),
+        'gateway_scout': intel_rate * 0.35,
+        'gateway_tho': intel_rate * 0.22,
+        'alpha_blanga': intel_rate * 0.18,
+        'pm_hub_aster': (aster_activity / max(safe_hours, 1)) if aster_activity else 0.0,
+        'telegram_jobs': fail_rate * 0.5,
+        'gateway_firestore': (signal_rate * 0.25) + (execution_rate * 0.55),
+        'rari1_gateway': 0.0,
+        'rari2_gateway': execution_rate * 0.5,
+        'windows_gateway': signal_rate * 0.35,
+        'macos_gateway': 0.02,
+        'alpha_rari2': execution_rate,
+    }
+
+    edges = [
+        {'id': 'hub_gateway', 'source': 'gateway', 'target': 'hub', 'label': 'Gateway core bus'},
+        {'id': 'hub_alpha', 'source': 'alpha', 'target': 'hub', 'label': 'Signal processing'},
+        {'id': 'hub_pm_hub', 'source': 'pm_hub', 'target': 'hub', 'label': 'Ops governance'},
+        {'id': 'hub_telegram', 'source': 'telegram', 'target': 'hub', 'label': 'Operator updates'},
+        {'id': 'gateway_scout', 'source': 'gateway', 'target': 'scout', 'label': 'Research ingress'},
+        {'id': 'gateway_tho', 'source': 'gateway', 'target': 'tho', 'label': 'THO handoff'},
+        {'id': 'alpha_blanga', 'source': 'alpha', 'target': 'blanga', 'label': 'Intel synthesis'},
+        {'id': 'pm_hub_aster', 'source': 'pm_hub', 'target': 'aster', 'label': 'Execution/job orchestration'},
+        {'id': 'telegram_jobs', 'source': 'telegram', 'target': 'jobs', 'label': 'Alert jobs'},
+        {'id': 'gateway_firestore', 'source': 'gateway', 'target': 'firestore', 'label': 'Persistent telemetry'},
+        {'id': 'rari1_gateway', 'source': 'rari1', 'target': 'gateway', 'label': 'Failover canary lane'},
+        {'id': 'rari2_gateway', 'source': 'rari2', 'target': 'gateway', 'label': 'Primary execution lane'},
+        {'id': 'windows_gateway', 'source': 'windows', 'target': 'gateway', 'label': 'TradingView ingress'},
+        {'id': 'macos_gateway', 'source': 'macos', 'target': 'gateway', 'label': 'Operator client'},
+        {'id': 'alpha_rari2', 'source': 'alpha', 'target': 'rari2', 'label': 'Execution dispatch'},
+    ]
+
+    bottleneck_watch_tph = max(0.0, _safe_float(os.getenv('ARCH_BOTTLENECK_WATCH_TPH'), 0.50))
+    bottleneck_steady_tph = max(
+        bottleneck_watch_tph + 0.05,
+        _safe_float(os.getenv('ARCH_BOTTLENECK_STEADY_TPH'), 1.10),
+    )
+    conversion_watch_pct = max(0.0, min(100.0, _safe_float(os.getenv('ARCH_CONVERSION_WATCH_PCT'), 55.0)))
+    conversion_steady_pct = max(
+        conversion_watch_pct + 1.0,
+        min(100.0, _safe_float(os.getenv('ARCH_CONVERSION_STEADY_PCT'), 70.0)),
+    )
+
+    for edge in edges:
+        throughput = round(edge_rates.get(edge['id'], 0.0), 3)
+        source_ok = node_health_by_id.get(edge.get('source'), True) is not False
+        target_ok = node_health_by_id.get(edge.get('target'), True) is not False
+        edge['throughput'] = throughput
+        edge['active'] = throughput > 0.15 and source_ok and target_ok
+        if not edge['active']:
+            edge['severity'] = 'inactive'
+        elif throughput < bottleneck_watch_tph:
+            edge['severity'] = 'watch'
+        elif throughput < bottleneck_steady_tph:
+            edge['severity'] = 'steady'
+        else:
+            edge['severity'] = 'healthy'
+
+    active_edges = [edge for edge in edges if edge.get('active')]
+    conversion_rate_raw_pct = round((executions / max(signals, 1)) * 100.0, 2) if signals > 0 else 0.0
+    conversion_rate_pct = round(_clamp(conversion_rate_raw_pct, 0.0, 100.0), 2)
+    if conversion_rate_pct < conversion_watch_pct:
+        conversion_severity = 'watch'
+    elif conversion_rate_pct < conversion_steady_pct:
+        conversion_severity = 'steady'
+    else:
+        conversion_severity = 'healthy'
+
+    bottleneck_rows = sorted(
+        [edge for edge in active_edges if edge.get('severity') in {'watch', 'steady'}],
+        key=lambda row: row.get('throughput', 0.0),
+    )
+    if not bottleneck_rows:
+        bottleneck_rows = sorted(active_edges, key=lambda row: row.get('throughput', 0.0))[:3]
+    bottlenecks = [
+        {
+            'id': row.get('id'),
+            'source': row.get('source'),
+            'target': row.get('target'),
+            'label': row.get('label'),
+            'throughput': row.get('throughput', 0.0),
+            'severity': row.get('severity', 'steady'),
+        }
+        for row in bottleneck_rows[:6]
+    ]
+
+    topology_nodes_total = len(node_payload)
+    topology_nodes_healthy = sum(1 for row in node_payload if row.get('healthy') is True)
+    top_events = []
+    for row in trade_rows[:5]:
+        if not isinstance(row, dict):
+            continue
+        side = str(row.get('side', '')).upper()
+        symbol = str(row.get('symbol', 'UNKNOWN')).upper()
+        qty = _safe_float(row.get('filled_quantity'), 0.0)
+        price = _safe_float(row.get('avg_price'), 0.0)
+        top_events.append(
+            {
+                'timestamp': _iso_or_default(row.get('timestamp')),
+                'type': 'execution' if row.get('executed') else 'execution_reject',
+                'summary': f"{symbol} {side} qty={qty:.5f} @ {price:.4f}",
+                'status': 'ok' if row.get('executed') else 'warning',
+            }
+        )
+
+    pipelines = [
+        {
+            'id': 'signal_pipeline',
+            'name': 'Signal Pipeline',
+            'status': 'online' if execution_rate > 0 else 'degraded',
+            'throughput': execution_rate,
+            'hops': ['windows', 'gateway', 'alpha', 'rari2', 'firestore'],
+        },
+        {
+            'id': 'intel_pipeline',
+            'name': 'Intelligence Pipeline',
+            'status': 'online' if intel_rate > 0 else 'degraded',
+            'throughput': intel_rate,
+            'hops': ['scout', 'tho', 'blanga', 'alpha', 'gateway'],
+        },
+        {
+            'id': 'ops_pipeline',
+            'name': 'Operations Pipeline',
+            'status': 'online' if int(summary.get('service_unhealthy', 0) or 0) == 0 else 'degraded',
+            'throughput': round(max(signal_rate, intel_rate) * 0.5, 2),
+            'hops': ['macos', 'telegram', 'pm_hub', 'jobs', 'firestore'],
+        },
+    ]
+
+    payload = {
+        'timestamp': datetime.utcnow().isoformat(),
+        'window_hours': safe_hours,
+        'summary': {
+            'nodes_total': topology_nodes_total,
+            'nodes_healthy': topology_nodes_healthy,
+            'active_flows': len(active_edges),
+            'signals': signals,
+            'executions': executions,
+            'intel_items': intel_count,
+            'signal_rate': signal_rate,
+            'execution_rate': execution_rate,
+            'conversion_rate_raw_pct': conversion_rate_raw_pct,
+            'conversion_rate_pct': conversion_rate_pct,
+            'conversion_severity': conversion_severity,
+            'intel_rate': intel_rate,
+            'trade_failures': trade_failures,
+        },
+        'thresholds': {
+            'bottleneck_watch_tph': bottleneck_watch_tph,
+            'bottleneck_steady_tph': bottleneck_steady_tph,
+            'conversion_watch_pct': conversion_watch_pct,
+            'conversion_steady_pct': conversion_steady_pct,
+        },
+        'nodes': node_payload,
+        'edges': edges,
+        'bottlenecks': bottlenecks,
+        'pipelines': pipelines,
+        'events': top_events,
+        'sources': {
+            'status': 'api/platform/status',
+            'superswarm': 'api/platform/superswarm',
+            'trades': 'api/platform/trades',
+            'logs': 'api/platform/logs',
+            'intel': 'api/platform/intel-feed',
+        },
+    }
+    set_cache(cache_key, payload)
+    return payload
+
+
+def _load_bottleneck_digest_state() -> dict:
+    if db is None:
+        return {}
+    try:
+        snap = db.collection(BOTTLENECK_DIGEST_COLLECTION).document(BOTTLENECK_DIGEST_DOC_ID).get()
+        if not snap.exists:
+            return {}
+        data = snap.to_dict() or {}
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _save_bottleneck_digest_state(payload: dict) -> dict:
+    if db is None:
+        return {'written': False, 'error': 'db_unavailable'}
+    try:
+        db.collection(BOTTLENECK_DIGEST_COLLECTION).document(BOTTLENECK_DIGEST_DOC_ID).set(payload, merge=True)
+        return {'written': True}
+    except Exception as exc:
+        return {'written': False, 'error': str(exc)}
+
+
+def _load_strategy_ops_digest_state() -> dict:
+    if db is None:
+        return {}
+    try:
+        snap = db.collection(BOTTLENECK_DIGEST_COLLECTION).document(STRATEGY_OPS_DIGEST_DOC_ID).get()
+        if not snap.exists:
+            return {}
+        data = snap.to_dict() or {}
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _save_strategy_ops_digest_state(payload: dict) -> dict:
+    if db is None:
+        return {'written': False, 'error': 'db_unavailable'}
+    try:
+        db.collection(BOTTLENECK_DIGEST_COLLECTION).document(STRATEGY_OPS_DIGEST_DOC_ID).set(payload, merge=True)
+        return {'written': True}
+    except Exception as exc:
+        return {'written': False, 'error': str(exc)}
+
+
+def _build_strategy_ops_state_payload(
+    *,
+    days: int,
+    scorecard: dict,
+    reject_tax: dict,
+    assessment: dict,
+    operator_brief: dict,
+    decision: dict,
+    attribution: dict,
+    data_quality: dict,
+) -> dict:
+    ranked = scorecard.get('ranked', []) if isinstance(scorecard.get('ranked'), list) else []
+    top_lanes = ranked[:5] if isinstance(ranked, list) else []
+    attr_summary = attribution.get('summary', {}) if isinstance(attribution.get('summary'), dict) else {}
+    attr_windows = attribution.get('windows', {}) if isinstance(attribution.get('windows'), dict) else {}
+    return {
+        'updated_at': datetime.utcnow().isoformat(),
+        'window_days': max(1, int(days or 7)),
+        'assessment': assessment,
+        'operator_brief': operator_brief,
+        'decision': decision,
+        'scorecard_totals': scorecard.get('totals', {}),
+        'top_lanes': top_lanes,
+        'reject_tax': reject_tax,
+        'attribution_summary': {
+            'sample_size': int(attr_summary.get('sample_size', 0) or 0),
+            'fill_rate_pct': float(attr_summary.get('fill_rate_pct', 0.0) or 0.0),
+            'reject_tax_pct': float(attr_summary.get('reject_tax_pct', 0.0) or 0.0),
+            'hard_fail_pct': float(attr_summary.get('hard_fail_pct', 0.0) or 0.0),
+            'net_pnl_after_fees_usd': float(attr_summary.get('net_pnl_after_fees_usd', 0.0) or 0.0),
+            'latest_signal_at': attr_summary.get('latest_signal_at'),
+            'windows': {
+                '1h': attr_windows.get('1h', {}),
+                '6h': attr_windows.get('6h', {}),
+                '24h': attr_windows.get('24h', {}),
+            },
+        },
+        'data_quality': data_quality,
+    }
+
+
+def _save_strategy_ops_snapshot(payload: dict, keep_history: bool = True) -> dict:
+    if db is None:
+        return {'written': False, 'error': 'db_unavailable'}
+    now_utc = datetime.now(timezone.utc)
+    latest_payload = {
+        **payload,
+        'updated_at': now_utc.isoformat(),
+    }
+    written_docs = []
+    try:
+        db.collection(STRATEGY_OPS_SNAPSHOTS_COLLECTION).document('latest').set(latest_payload, merge=True)
+        written_docs.append('latest')
+        if keep_history:
+            doc_id = now_utc.strftime('%Y%m%dT%H%M%SZ')
+            db.collection(STRATEGY_OPS_SNAPSHOTS_COLLECTION).document(doc_id).set(latest_payload, merge=False)
+            written_docs.append(doc_id)
+        return {'written': True, 'documents': written_docs}
+    except Exception as exc:
+        return {'written': False, 'error': str(exc), 'documents': written_docs}
+
+
+def _tg_escape(value) -> str:
+    text = str(value or '')
+    return text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
+
+def _build_strategy_ops_digest_message(
+    scorecard: dict,
+    reject_tax: dict,
+    assessment: dict,
+    operator_brief: dict | None = None,
+    decision: dict | None = None,
+    data_quality: dict | None = None,
+) -> tuple[str, str, bool]:
+    totals = scorecard.get('totals', {}) if isinstance(scorecard.get('totals'), dict) else {}
+    ranked = scorecard.get('ranked', []) if isinstance(scorecard.get('ranked'), list) else []
+    window = scorecard.get('window', {}) if isinstance(scorecard.get('window'), dict) else {}
+    operator_brief = operator_brief if isinstance(operator_brief, dict) else {}
+    decision = decision if isinstance(decision, dict) else {}
+    data_quality = data_quality if isinstance(data_quality, dict) else {}
+    days = int(window.get('days', 7) or 7)
+    lanes = int(totals.get('lanes', 0) or 0)
+    sample_size = int(totals.get('sample_size', 0) or 0)
+    fill_pct = float(totals.get('filled_success_pct', 0.0) or 0.0)
+    reject_pct = float(reject_tax.get('reject_tax_pct', totals.get('reject_tax_pct', 0.0)) or 0.0)
+    hard_fail_pct = float(reject_tax.get('hard_fail_pct', totals.get('hard_fail_pct', 0.0)) or 0.0)
+    net_pnl = float(totals.get('net_pnl_after_fees_usd', totals.get('net_realized_pnl_usd', 0.0)) or 0.0)
+    max_drawdown = float(totals.get('max_drawdown_pct', 0.0) or 0.0)
+    max_drawdown_usd = float(totals.get('max_drawdown_usd', 0.0) or 0.0)
+    ev_error = float(totals.get('expected_value_error_pct', 0.0) or 0.0)
+    decision_label = str(decision.get('label', operator_brief.get('label', assessment.get('label', 'NO-GO')))).upper()
+    decision_go = bool(decision.get('go', operator_brief.get('go', assessment.get('go', False))))
+    blocker_rows = decision.get('reasons', []) if isinstance(decision.get('reasons'), list) else []
+    if not blocker_rows:
+        blocker_rows = operator_brief.get('hard_blockers', []) if isinstance(operator_brief.get('hard_blockers'), list) else []
+    action_rows = operator_brief.get('top_actions', []) if isinstance(operator_brief.get('top_actions'), list) else []
+    confidence_score = float(decision.get('confidence_score', operator_brief.get('confidence_score', 0.0)) or 0.0)
+    confidence_multiplier = float(
+        decision.get('confidence_multiplier', operator_brief.get('confidence_multiplier', 1.0)) or 1.0
+    )
+    degraded_sources = data_quality.get('degraded_sources', []) if isinstance(data_quality.get('degraded_sources'), list) else []
+
+    lines = [
+        '📈 <b>Sapphire Strategy Ops Digest</b>',
+        f"Window: last <b>{days}d</b> • Samples: <b>{sample_size}</b> • Lanes: <b>{lanes}</b>",
+        (
+            f"Operator: <b>{'🟢 GO' if decision_go else '🔴 NO-GO'}</b> • "
+            f"Fill {fill_pct:.1f}% • Reject {reject_pct:.1f}% • HardFail {hard_fail_pct:.1f}%"
+        ),
+        f"Net PnL (after fees): <b>{net_pnl:+.4f}</b>",
+        f"Model error {ev_error:.3f}% • Max DD ${max_drawdown_usd:.2f} ({max_drawdown:.2f}%)",
+        f"Confidence: {confidence_score:.1f}/100 (x{confidence_multiplier:.2f})",
+    ]
+    why_now = str(operator_brief.get('why_this_matters_now', '')).strip()
+    if not why_now:
+        why_now = str(decision.get('why_this_matters_now', '')).strip()
+    if why_now:
+        lines.append(f"Why now: {_tg_escape(why_now)}")
+
+    reasons = blocker_rows or (assessment.get('reasons') or [])
+    if reasons:
+        lines.append(f"Blockers: {_tg_escape('; '.join(str(r) for r in reasons[:3]))}")
+    if bool(decision.get('diverged', False)):
+        source = str(decision.get('source', 'operator_brief')).replace('_', ' ')
+        assess_label = str(decision.get('assessment_label', assessment.get('label', 'NO-GO'))).upper()
+        lines.append(f"Decision source: <b>{_tg_escape(source)}</b> (assessment={_tg_escape(assess_label)})")
+
+    top_reasons = reject_tax.get('top_reasons', []) if isinstance(reject_tax.get('top_reasons'), list) else []
+    if top_reasons:
+        top = top_reasons[0] or {}
+        if top.get('reason'):
+            lines.append(
+                f"Top Reject Reason: <b>{_tg_escape(top.get('reason'))}</b> (n={int(top.get('count', 0) or 0)})"
+            )
+    if degraded_sources:
+        lines.append(f"Data quality degraded: {_tg_escape(', '.join(degraded_sources[:3]))}")
+    if action_rows:
+        lines.append('<b>Top Actions</b>')
+        for item in action_rows[:3]:
+            prio = str(item.get('priority', 'P1')).strip().upper()
+            title = str(item.get('title', 'Action')).strip()
+            lines.append(f"• [{_tg_escape(prio)}] {_tg_escape(title)}")
+
+    focus_rows = ranked[:4]
+    if focus_rows:
+        lines.append('')
+        lines.append('<b>Top Lanes</b>')
+        for row in focus_rows:
+            lane = f"{row.get('strategy', 'unknown')}@{row.get('timeframe', 'unknown')}"
+            lines.append(
+                "• "
+                f"{_tg_escape(lane)} | score {float(row.get('score', 0.0) or 0.0):+.2f} | "
+                f"fill {float(row.get('filled_success_pct', 0.0) or 0.0):.1f}% | "
+                f"reject {float(row.get('reject_tax_pct', 0.0) or 0.0):.1f}% | "
+                f"PnL {float(row.get('net_realized_pnl_usd', 0.0) or 0.0):+.3f} | "
+                f"<b>{_tg_escape(row.get('recommendation', 'monitor').upper())}</b>"
+            )
+
+    signature_payload = {
+        'label': decision_label,
+        'go': decision_go,
+        'sample': sample_size,
+        'reject': round(reject_pct, 2),
+        'hard_fail': round(hard_fail_pct, 2),
+        'pnl_after_fees': round(net_pnl, 4),
+        'max_drawdown_pct': round(max_drawdown, 3),
+        'max_drawdown_usd': round(max_drawdown_usd, 4),
+        'expected_value_error_pct': round(ev_error, 4),
+        'top_lanes': [
+            {
+                'lane': f"{row.get('strategy', 'unknown')}@{row.get('timeframe', 'unknown')}",
+                'score': round(float(row.get('score', 0.0) or 0.0), 3),
+                'recommendation': str(row.get('recommendation', 'monitor')),
+            }
+            for row in focus_rows
+        ],
+        'blockers': [str(r) for r in reasons[:4]],
+        'actions': [str((row or {}).get('title', '')) for row in action_rows[:3]],
+        'degraded_sources': [str(src) for src in degraded_sources[:3]],
+    }
+    signature = hashlib.sha256(str(signature_payload).encode('utf-8')).hexdigest()
+
+    promote_candidates = int(assessment.get('promote_candidates', 0) or 0)
+    should_send = (
+        not decision_go
+        or promote_candidates > 0
+        or reject_pct >= float(os.getenv('STRATEGY_OPS_DIGEST_REJECT_ALERT_PCT', '65') or 65.0)
+        or hard_fail_pct >= float(os.getenv('STRATEGY_OPS_DIGEST_HARD_FAIL_ALERT_PCT', '10') or 10.0)
+    )
+    return '\n'.join(lines), signature, bool(should_send)
+
+
+def _build_bottleneck_digest_message(telemetry: dict, brief: dict) -> tuple[str, str, bool]:
+    summary = telemetry.get('summary', {}) if isinstance(telemetry.get('summary'), dict) else {}
+    thresholds = telemetry.get('thresholds', {}) if isinstance(telemetry.get('thresholds'), dict) else {}
+    bottlenecks = telemetry.get('bottlenecks', []) if isinstance(telemetry.get('bottlenecks'), list) else []
+    brief_summary = brief.get('summary', {}) if isinstance(brief.get('summary'), dict) else {}
+
+    signals = int(summary.get('signals', 0) or 0)
+    executions = int(summary.get('executions', 0) or 0)
+    conversion = _clamp(_safe_float(summary.get('conversion_rate_pct'), 0.0), 0.0, 100.0)
+    conversion_sev = str(summary.get('conversion_severity', 'steady')).lower()
+    risk_state = str(brief_summary.get('risk_state', 'stable')).upper()
+
+    watch_edges = [row for row in bottlenecks if str((row or {}).get('severity', '')).lower() == 'watch']
+    steady_edges = [row for row in bottlenecks if str((row or {}).get('severity', '')).lower() == 'steady']
+
+    lines = [
+        '⚙️ <b>Sapphire Bottleneck Digest</b>',
+        f"Time: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC",
+        f'Conversion: <b>{conversion:.1f}%</b> ({conversion_sev.upper()}) • {executions}/{signals} executions/signals',
+        f'Risk State: <b>{risk_state}</b>',
+    ]
+
+    if watch_edges:
+        lines.append('')
+        lines.append('🚨 <b>Watch Lanes</b>')
+        for row in watch_edges[:5]:
+            src = str(row.get('source', '--')).replace('_', ' ').title()
+            tgt = str(row.get('target', '--')).replace('_', ' ').title()
+            tph = _safe_float(row.get('throughput'), 0.0)
+            label = str(row.get('label', 'Flow lane'))
+            lines.append(f'• {src} → {tgt}: <b>{tph:.2f}/h</b> ({label})')
+    elif steady_edges:
+        lines.append('')
+        lines.append('🟡 <b>Steady Lanes</b>')
+        for row in steady_edges[:4]:
+            src = str(row.get('source', '--')).replace('_', ' ').title()
+            tgt = str(row.get('target', '--')).replace('_', ' ').title()
+            tph = _safe_float(row.get('throughput'), 0.0)
+            lines.append(f'• {src} → {tgt}: <b>{tph:.2f}/h</b>')
+    else:
+        lines.append('')
+        lines.append('✅ No active watch bottlenecks in current telemetry window.')
+
+    lines.append('')
+    lines.append(
+        'Thresholds: '
+        f"lane watch&lt;{_safe_float(thresholds.get('bottleneck_watch_tph'), 0.5):.2f}/h, "
+        f"lane steady&lt;{_safe_float(thresholds.get('bottleneck_steady_tph'), 1.1):.2f}/h, "
+        f"conversion watch&lt;{_safe_float(thresholds.get('conversion_watch_pct'), 55.0):.1f}%"
+    )
+
+    signature_payload = {
+        'watch': [row.get('id') for row in watch_edges[:6]],
+        'steady': [row.get('id') for row in steady_edges[:6]],
+        'conversion_sev': conversion_sev,
+        'conversion': round(conversion, 2),
+        'risk_state': risk_state,
+    }
+    signature = hashlib.sha256(
+        str(signature_payload).encode('utf-8')
+    ).hexdigest()
+    should_send = bool(watch_edges) or conversion_sev == 'watch'
+    return '\n'.join(lines), signature, should_send
+
+
+def _send_telegram_digest(token: str, chat_id: str, message: str) -> dict:
+    url = f'https://api.telegram.org/bot{token}/sendMessage'
+    payload = {
+        'chat_id': chat_id,
+        'text': message,
+        'parse_mode': 'HTML',
+        'disable_web_page_preview': True,
+    }
+    resp = requests.post(url, json=payload, timeout=15)
+    resp.raise_for_status()
+    try:
+        data = resp.json()
+        return data if isinstance(data, dict) else {'ok': True}
+    except Exception:
+        return {'ok': True}
+
+
 def _platform_health_summary(status_data=None):
     status_data = status_data or _collect_system_status()
     summary = status_data.get('summary', {})
@@ -2086,10 +4455,611 @@ def _platform_metrics_payload():
         'trading': _fetch_trading_metrics(),
         'market': _fetch_market_prices(),
         'health': _platform_health_summary(status_data),
-        'status': status_data,
+        'status': _public_status_payload(status_data),
         'windows_lab': _fetch_windows_lab_payload(),
     }
     set_cache('platform_metrics', payload)
+    return payload
+
+
+def _platform_strategy_ops_payload(days: int = 7, refresh: bool = False):
+    safe_days = max(1, min(int(days or 7), 30))
+    cache_key = f'platform_strategy_ops_{safe_days}'
+    if not refresh:
+        cached = get_cached(cache_key, duration=30)
+        if cached:
+            return cached
+
+    scorecard = _build_strategy_scorecard(days=safe_days, platform='lighter', limit=1800)
+    reject_tax = _fetch_reject_tax_metrics(hours=max(24, safe_days * 24), limit=3000)
+    assessment = _build_strategy_ops_assessment(scorecard=scorecard, reject_tax=reject_tax)
+    attribution = _build_signal_outcome_attribution(days=safe_days, platform='lighter', limit=2200)
+    data_quality = _build_data_quality_snapshot(attribution=attribution)
+    operator_brief = _build_operator_decision_brief(
+        scorecard=scorecard,
+        reject_tax=reject_tax,
+        assessment=assessment,
+        attribution=attribution,
+        data_quality=data_quality,
+    )
+    decision = _resolve_strategy_ops_decision(
+        assessment=assessment,
+        operator_brief=operator_brief,
+        data_quality=data_quality,
+    )
+
+    payload = {
+        'timestamp': datetime.utcnow().isoformat(),
+        'window_days': safe_days,
+        'scorecard': scorecard,
+        'reject_tax': reject_tax,
+        'assessment': assessment,
+        'decision': decision,
+        'attribution': attribution,
+        'data_quality': data_quality,
+        'operator_brief': operator_brief,
+    }
+    set_cache(cache_key, payload)
+    return payload
+
+
+def _platform_go_no_go_brief_payload(days: int = 7, refresh: bool = False):
+    safe_days = max(1, min(int(days or 7), 30))
+    cache_key = f'platform_go_no_go_brief_{safe_days}'
+    if not refresh:
+        cached = get_cached(cache_key, duration=20)
+        if cached:
+            return cached
+
+    ops_payload = _platform_strategy_ops_payload(days=safe_days, refresh=refresh)
+    decision = ops_payload.get('decision', {}) if isinstance(ops_payload.get('decision'), dict) else {}
+    operator_brief = (
+        ops_payload.get('operator_brief', {}) if isinstance(ops_payload.get('operator_brief'), dict) else {}
+    )
+    assessment = ops_payload.get('assessment', {}) if isinstance(ops_payload.get('assessment'), dict) else {}
+    data_quality = ops_payload.get('data_quality', {}) if isinstance(ops_payload.get('data_quality'), dict) else {}
+    reject_tax = ops_payload.get('reject_tax', {}) if isinstance(ops_payload.get('reject_tax'), dict) else {}
+    attribution = ops_payload.get('attribution', {}) if isinstance(ops_payload.get('attribution'), dict) else {}
+    scorecard = ops_payload.get('scorecard', {}) if isinstance(ops_payload.get('scorecard'), dict) else {}
+
+    blocker_rows = decision.get('reasons', []) if isinstance(decision.get('reasons'), list) else []
+    if not blocker_rows:
+        blocker_rows = (
+            operator_brief.get('hard_blockers', [])
+            if isinstance(operator_brief.get('hard_blockers'), list)
+            else []
+        )
+    action_rows = (
+        operator_brief.get('top_actions', [])
+        if isinstance(operator_brief.get('top_actions'), list)
+        else []
+    )
+
+    summary = {
+        'decision_label': str(decision.get('label', 'NO-GO')).upper(),
+        'decision_go': bool(decision.get('go', False)),
+        'decision_source': str(decision.get('source', 'assessment')),
+        'decision_diverged': bool(decision.get('diverged', False)),
+        'confidence_score': round(float(decision.get('confidence_score', 0.0) or 0.0), 4),
+        'confidence_multiplier': round(float(decision.get('confidence_multiplier', 1.0) or 1.0), 4),
+        'sample_size': int(reject_tax.get('sample_size', 0) or 0),
+        'reject_tax_pct': round(float(reject_tax.get('reject_tax_pct', 0.0) or 0.0), 2),
+        'hard_fail_pct': round(float(reject_tax.get('hard_fail_pct', 0.0) or 0.0), 2),
+        'net_pnl_after_fees': round(float(attribution.get('net_pnl_after_fees', 0.0) or 0.0), 6),
+        'fill_rate_pct': round(float(attribution.get('filled_success_pct', 0.0) or 0.0), 2),
+        'expected_value_error_pct': round(float(attribution.get('expected_value_error_pct', 0.0) or 0.0), 2),
+        'max_drawdown_pct': round(float(attribution.get('max_drawdown_pct', 0.0) or 0.0), 2),
+    }
+
+    payload = {
+        'timestamp': datetime.utcnow().isoformat(),
+        'window_days': safe_days,
+        'summary': summary,
+        'decision': decision,
+        'assessment': assessment,
+        'data_quality': data_quality,
+        'why_this_matters_now': str(operator_brief.get('why_this_matters_now', '')).strip(),
+        'hard_blockers': blocker_rows,
+        'top_actions': action_rows[:3],
+        'top_lanes': (scorecard.get('ranked', []) if isinstance(scorecard.get('ranked'), list) else [])[:3],
+        'sources': {
+            'strategy_ops': '/api/platform/strategy-ops',
+            'agent_context': '/api/platform/agent-context',
+        },
+    }
+    set_cache(cache_key, payload)
+    return payload
+
+
+def _librarian_extract_terms(query: str) -> set[str]:
+    raw = str(query or '').strip().lower()
+    if not raw:
+        return set()
+    parts = [tok.strip() for tok in re.split(r'[^a-zA-Z0-9_@.-]+', raw) if tok.strip()]
+    stop = {
+        'the', 'and', 'for', 'with', 'from', 'that', 'this', 'into', 'over',
+        'when', 'then', 'our', 'your', 'you', 'are', 'was', 'were', 'have',
+        'has', 'had', 'risk', 'trading', 'trade', 'market', 'crypto', 'agent',
+    }
+    return {p for p in parts if len(p) >= 2 and p not in stop}
+
+
+def _librarian_normalize_symbol(value: str) -> str:
+    sym = str(value or '').strip().upper()
+    if not sym:
+        return ''
+    for suffix in ('/USDT', '/USD', 'USDT', 'USD', '-PERP'):
+        if sym.endswith(suffix):
+            sym = sym[: -len(suffix)]
+    return sym.strip()
+
+
+def _librarian_build_local_candidates(hours: int) -> list[dict]:
+    candidates: list[dict] = []
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    ops_state = _load_strategy_ops_digest_state()
+    top_lanes = ops_state.get('top_lanes', []) if isinstance(ops_state.get('top_lanes'), list) else []
+    if not top_lanes:
+        days = max(1, int(round(max(24, hours) / 24.0)))
+        scorecard = _platform_strategy_ops_payload(days=min(days, 14), refresh=False).get('scorecard', {})
+        top_lanes = scorecard.get('ranked', []) if isinstance(scorecard.get('ranked'), list) else []
+    ops_ts = _iso_or_default(ops_state.get('updated_at') if isinstance(ops_state, dict) else None, now_iso)
+
+    for idx, row in enumerate(top_lanes[:10]):
+        if not isinstance(row, dict):
+            continue
+        strategy = str(row.get('strategy', 'unknown')).strip().lower() or 'unknown'
+        timeframe = str(row.get('timeframe', 'unknown')).strip().lower() or 'unknown'
+        rec = str(row.get('recommendation', 'monitor')).strip().lower() or 'monitor'
+        sample = int(row.get('sample_size', 0) or 0)
+        fill_pct = float(row.get('filled_success_pct', 0.0) or 0.0)
+        reject_pct = float(row.get('reject_tax_pct', 0.0) or 0.0)
+        pnl = float(row.get('net_realized_pnl_usd', 0.0) or 0.0)
+        score = float(row.get('score', 0.0) or 0.0)
+        summary = (
+            f"{strategy}@{timeframe} score {score:+.2f}, fill {fill_pct:.1f}%, "
+            f"reject {reject_pct:.1f}%, pnl {pnl:+.4f}, sample {sample}, rec {rec}"
+        )
+        candidates.append(
+            {
+                'id': f'lane-{idx}-{strategy}-{timeframe}',
+                'type': 'strategy_lane',
+                'title': f'Lane {strategy}@{timeframe}',
+                'summary': summary,
+                'text': summary,
+                'symbols': [],
+                'timestamp': ops_ts,
+                'metadata': {
+                    'strategy': strategy,
+                    'timeframe': timeframe,
+                    'recommendation': rec,
+                    'score': score,
+                },
+            }
+        )
+
+    reject_tax = _fetch_reject_tax_metrics(hours=max(24, hours), limit=2000)
+    top_reasons = reject_tax.get('top_reasons', []) if isinstance(reject_tax.get('top_reasons'), list) else []
+    for idx, row in enumerate(top_reasons[:6]):
+        if not isinstance(row, dict):
+            continue
+        reason = str(row.get('reason', 'unknown')).strip()
+        count = int(row.get('count', 0) or 0)
+        share = float(row.get('share_pct', 0.0) or 0.0)
+        summary = f"Reject reason {reason}: n={count}, share={share:.1f}%"
+        candidates.append(
+            {
+                'id': f'reject-{idx}',
+                'type': 'reject_reason',
+                'title': f'Reject Tax: {reason}',
+                'summary': summary,
+                'text': summary,
+                'symbols': [],
+                'timestamp': now_iso,
+                'metadata': {'reason': reason, 'count': count, 'share_pct': share},
+            }
+        )
+
+    intel_summary = _platform_intel_summary_payload(hours=max(12, hours), limit=60, refresh=False)
+    top_catalysts = (
+        intel_summary.get('top_catalysts', []) if isinstance(intel_summary.get('top_catalysts'), list) else []
+    )
+    for idx, row in enumerate(top_catalysts[:8]):
+        if not isinstance(row, dict):
+            continue
+        symbol = _librarian_normalize_symbol(row.get('symbol', ''))
+        catalyst = str(row.get('catalyst', 'market catalyst')).strip()
+        score = float(row.get('score', 0.0) or 0.0)
+        mentions = int(row.get('mentions', 0) or 0)
+        summary = f"{symbol or 'Market'} catalyst: {catalyst} (score {score:.2f}, mentions {mentions})"
+        candidates.append(
+            {
+                'id': f'catalyst-{idx}-{symbol or "market"}',
+                'type': 'catalyst',
+                'title': f'Catalyst {symbol or "Market"}',
+                'summary': summary,
+                'text': summary,
+                'symbols': [symbol] if symbol else [],
+                'timestamp': now_iso,
+                'metadata': {'score': score, 'mentions': mentions, 'catalyst': catalyst},
+            }
+        )
+
+    drivers = intel_summary.get('drivers', []) if isinstance(intel_summary.get('drivers'), list) else []
+    for idx, row in enumerate(drivers[:8]):
+        if not isinstance(row, dict):
+            continue
+        symbol = _librarian_normalize_symbol(row.get('symbol', ''))
+        sentiment = str(row.get('sentiment', 'neutral')).strip().lower() or 'neutral'
+        score = float(row.get('score', 0.0) or 0.0)
+        mentions = int(row.get('mentions', 0) or 0)
+        summary = f"Driver {symbol or 'market'} sentiment {sentiment}, score {score:.2f}, mentions {mentions}"
+        candidates.append(
+            {
+                'id': f'driver-{idx}-{symbol or "market"}',
+                'type': 'driver',
+                'title': f'Driver {symbol or "Market"}',
+                'summary': summary,
+                'text': summary,
+                'symbols': [symbol] if symbol else [],
+                'timestamp': now_iso,
+                'metadata': {'score': score, 'sentiment': sentiment, 'mentions': mentions},
+            }
+        )
+
+    trade_rows = _fetch_trade_executions(
+        hours=min(max(6, hours), 48),
+        limit=120,
+        include_simulated=False,
+        include_failed=True,
+    ).get('trades', [])
+    for idx, row in enumerate(trade_rows[:60]):
+        if not isinstance(row, dict):
+            continue
+        symbol = _librarian_normalize_symbol(row.get('symbol', ''))
+        side = str(row.get('side', 'UNKNOWN')).upper()
+        platform = str(row.get('platform', 'unknown')).lower()
+        executed = bool(row.get('executed', False))
+        status = 'executed' if executed else 'rejected'
+        qty = float(row.get('filled_quantity', 0.0) or 0.0)
+        pnl = float(row.get('realized_pnl', 0.0) or 0.0)
+        avg_price = float(row.get('avg_price', 0.0) or 0.0)
+        summary = (
+            f"{status} {symbol or 'asset'} {side} on {platform}; qty {qty:.6f}, "
+            f"avg {avg_price:.4f}, pnl {pnl:+.4f}"
+        )
+        candidates.append(
+            {
+                'id': f"trade-{idx}-{row.get('trade_id', idx)}",
+                'type': 'execution',
+                'title': f'Trade {status.upper()} {symbol or "--"}',
+                'summary': summary,
+                'text': summary,
+                'symbols': [symbol] if symbol else [],
+                'timestamp': _iso_or_default(row.get('timestamp'), now_iso),
+                'metadata': {
+                    'status': status,
+                    'platform': platform,
+                    'pnl': pnl,
+                    'qty': qty,
+                    'side': side,
+                },
+            }
+        )
+
+    return candidates
+
+
+def _librarian_score_candidate(candidate: dict, terms: set[str], now_utc: datetime) -> float:
+    doc_type = str(candidate.get('type', 'other')).strip().lower()
+    base_weight = {
+        'strategy_lane': 0.42,
+        'reject_reason': 0.38,
+        'catalyst': 0.34,
+        'driver': 0.32,
+        'execution': 0.28,
+    }.get(doc_type, 0.2)
+
+    text = ' '.join(
+        [
+            str(candidate.get('title', '')),
+            str(candidate.get('summary', '')),
+            str(candidate.get('text', '')),
+        ]
+    ).lower()
+
+    overlap_count = sum(1 for term in terms if term and term in text)
+    overlap_score = min(0.62, overlap_count * 0.14)
+
+    recency_score = 0.0
+    ts = _coerce_datetime(candidate.get('timestamp'))
+    if ts is not None:
+        age_h = max(0.0, (now_utc - ts).total_seconds() / 3600.0)
+        if age_h <= 2:
+            recency_score = 0.24
+        elif age_h <= 24:
+            recency_score = 0.16
+        elif age_h <= 72:
+            recency_score = 0.09
+        else:
+            recency_score = 0.03
+
+    symbols = [str(s).lower() for s in (candidate.get('symbols') or []) if str(s).strip()]
+    symbol_boost = 0.12 if any(sym in terms for sym in symbols) else 0.0
+
+    metadata = candidate.get('metadata') if isinstance(candidate.get('metadata'), dict) else {}
+    status = str(metadata.get('status', '')).strip().lower()
+    recommendation = str(metadata.get('recommendation', '')).strip().lower()
+    risk_boost = 0.06 if status == 'rejected' or recommendation in {'block', 'defer'} else 0.0
+
+    return round(base_weight + overlap_score + recency_score + symbol_boost + risk_boost, 4)
+
+
+def _fetch_librarian_remote_context(query: str, hours: int, limit: int) -> tuple[dict | None, str | None]:
+    if not LIBRARIAN_REMOTE_URL:
+        return None, 'remote_url_missing'
+    url = f"{LIBRARIAN_REMOTE_URL.rstrip('/')}/v1/context"
+    headers = {'Content-Type': 'application/json'}
+    if LIBRARIAN_REMOTE_API_KEY:
+        headers['Authorization'] = f'Bearer {LIBRARIAN_REMOTE_API_KEY}'
+    payload = {'query': query, 'hours': int(hours), 'limit': int(limit)}
+    try:
+        resp = requests.post(url, json=payload, headers=headers, timeout=12)
+        if resp.status_code >= 400:
+            return None, f'http_{resp.status_code}'
+        data = resp.json()
+        if not isinstance(data, dict):
+            return None, 'invalid_payload'
+        return data, None
+    except requests.RequestException as exc:
+        return None, str(exc)
+    except ValueError:
+        return None, 'invalid_json'
+
+
+def _platform_librarian_context_payload(
+    query: str = '',
+    hours: int = 24,
+    limit: int = LIBRARIAN_DEFAULT_LIMIT,
+    refresh: bool = False,
+):
+    safe_hours = max(1, min(int(hours or 24), 168))
+    safe_limit = max(3, min(int(limit or LIBRARIAN_DEFAULT_LIMIT), 24))
+    effective_query = str(query or '').strip() or LIBRARIAN_DEFAULT_QUERY
+    query_hash = hashlib.sha1(effective_query.encode('utf-8')).hexdigest()[:10]
+    cache_key = f'librarian_context:{safe_hours}:{safe_limit}:{query_hash}:{LIBRARIAN_MODE}:{int(LIBRARIAN_ENABLED)}'
+
+    if not LIBRARIAN_ENABLED:
+        return {
+            'timestamp': datetime.utcnow().isoformat(),
+            'enabled': False,
+            'mode': LIBRARIAN_MODE,
+            'query': effective_query,
+            'window_hours': safe_hours,
+            'limit': safe_limit,
+            'total_candidates': 0,
+            'selected_count': 0,
+            'selected': [],
+            'summary': {'note': 'librarian_disabled'},
+        }
+
+    if not refresh:
+        cached = get_cached(cache_key, duration=20)
+        if cached:
+            return cached
+
+    remote_error = None
+    if LIBRARIAN_MODE == 'remote':
+        remote, remote_error = _fetch_librarian_remote_context(effective_query, safe_hours, safe_limit)
+        if remote:
+            payload = {
+                'timestamp': datetime.utcnow().isoformat(),
+                'enabled': True,
+                'mode': 'remote',
+                'query': effective_query,
+                'window_hours': safe_hours,
+                'limit': safe_limit,
+                'total_candidates': int(remote.get('total_candidates', 0) or 0),
+                'selected_count': int(remote.get('selected_count', 0) or 0),
+                'selected': remote.get('selected', []) if isinstance(remote.get('selected'), list) else [],
+                'summary': remote.get('summary', {}) if isinstance(remote.get('summary'), dict) else {},
+                'sources': remote.get('sources', {}),
+            }
+            set_cache(cache_key, payload)
+            return payload
+
+    now_utc = datetime.now(timezone.utc)
+    terms = _librarian_extract_terms(effective_query)
+    candidates = _librarian_build_local_candidates(hours=safe_hours)
+
+    scored = []
+    for row in candidates:
+        if not isinstance(row, dict):
+            continue
+        score = _librarian_score_candidate(row, terms=terms, now_utc=now_utc)
+        if score < LIBRARIAN_MIN_SCORE:
+            continue
+        out = dict(row)
+        out['score'] = score
+        scored.append(out)
+
+    scored.sort(key=lambda item: item.get('score', 0.0), reverse=True)
+    selected = scored[:safe_limit]
+    source_counts: dict[str, int] = {}
+    symbol_counts: dict[str, int] = {}
+    for row in selected:
+        src = str(row.get('type', 'other')).strip().lower() or 'other'
+        source_counts[src] = source_counts.get(src, 0) + 1
+        for sym in row.get('symbols', []) if isinstance(row.get('symbols'), list) else []:
+            sym_norm = _librarian_normalize_symbol(sym)
+            if sym_norm:
+                symbol_counts[sym_norm] = symbol_counts.get(sym_norm, 0) + 1
+
+    top_types = [
+        {'type': key, 'count': value}
+        for key, value in sorted(source_counts.items(), key=lambda item: item[1], reverse=True)
+    ]
+    top_symbols = [
+        {'symbol': key, 'count': value}
+        for key, value in sorted(symbol_counts.items(), key=lambda item: item[1], reverse=True)[:6]
+    ]
+    focus = ', '.join([row['type'] for row in top_types[:3]]) if top_types else 'mixed'
+    narrative = (
+        f"Curated {len(selected)}/{len(candidates)} high-signal context blocks; "
+        f"focus on {focus} for query '{effective_query[:72]}'."
+    )
+
+    payload = {
+        'timestamp': datetime.utcnow().isoformat(),
+        'enabled': True,
+        'mode': 'local_fallback' if (LIBRARIAN_MODE == 'remote' and remote_error) else 'local',
+        'query': effective_query,
+        'window_hours': safe_hours,
+        'limit': safe_limit,
+        'min_score': LIBRARIAN_MIN_SCORE,
+        'total_candidates': len(candidates),
+        'selected_count': len(selected),
+        'selected': selected,
+        'summary': {
+            'narrative': narrative,
+            'top_types': top_types,
+            'top_symbols': top_symbols,
+            'selection_ratio': round((len(selected) / max(1, len(candidates))) * 100.0, 2),
+        },
+        'sources': {
+            'strategy_ops': '/api/platform/strategy-ops',
+            'intel_summary': '/api/platform/intel-summary',
+            'trades': '/api/platform/trades',
+            'logs': '/api/platform/logs',
+        },
+    }
+    if remote_error:
+        payload['remote_error'] = remote_error
+    set_cache(cache_key, payload)
+    return payload
+
+
+def _platform_agent_context_payload(hours: int = 24, refresh: bool = False):
+    safe_hours = max(1, min(int(hours or 24), 168))
+    cache_key = f'platform_agent_context_{safe_hours}'
+    if not refresh:
+        cached = get_cached(cache_key, duration=15)
+        if cached:
+            return cached
+
+    status = _public_status_payload()
+    market = _fetch_market_prices()
+    trading = _fetch_trading_metrics()
+    brief_hours = max(24, safe_hours)
+    if refresh:
+        intel_summary = _platform_intel_summary_payload(hours=safe_hours, limit=60, refresh=True)
+        business_brief = _platform_business_brief_payload(hours=brief_hours, force_refresh=True)
+    else:
+        intel_cache_key = f'platform_intel_summary:{safe_hours}:60'
+        brief_cache_key = f'platform_business_brief_{brief_hours}'
+        intel_summary = get_cached(intel_cache_key, duration=300) or {'summary': {}, 'top_catalysts': [], 'drivers': []}
+        business_brief = get_cached(brief_cache_key, duration=300) or {'summary': {}, 'narrative': {}}
+
+    health_summary = status.get('summary', {}) if isinstance(status.get('summary'), dict) else {}
+    intelligence_summary = intel_summary.get('summary', {}) if isinstance(intel_summary.get('summary'), dict) else {}
+    reject_tax = (trading.get('reject_tax') if isinstance(trading, dict) else {}) or {}
+    ops_state = _load_strategy_ops_digest_state()
+    strategy_assessment = ops_state.get('assessment', {}) if isinstance(ops_state.get('assessment'), dict) else {}
+    strategy_operator_brief = ops_state.get('operator_brief', {}) if isinstance(ops_state.get('operator_brief'), dict) else {}
+    strategy_data_quality = ops_state.get('data_quality', {}) if isinstance(ops_state.get('data_quality'), dict) else {}
+    strategy_decision = ops_state.get('decision', {}) if isinstance(ops_state.get('decision'), dict) else {}
+    top_lanes = ops_state.get('top_lanes', []) if isinstance(ops_state.get('top_lanes'), list) else []
+
+    if not strategy_assessment:
+        sample_size = int(reject_tax.get('sample_size', 0) or 0)
+        reject_tax_pct = float(reject_tax.get('reject_tax_pct', 0.0) or 0.0)
+        hard_fail_pct = float(reject_tax.get('hard_fail_pct', 0.0) or 0.0)
+        min_sample = max(1, int(float(os.getenv('STRATEGY_OPS_GONOGO_MIN_SAMPLE_SIZE', '30') or 30)))
+        max_reject = max(0.0, min(100.0, float(os.getenv('STRATEGY_OPS_GONOGO_MAX_REJECT_TAX_PCT', '70') or 70.0)))
+        max_hard_fail = max(0.0, min(100.0, float(os.getenv('STRATEGY_OPS_GONOGO_MAX_HARD_FAIL_PCT', '10') or 10.0)))
+        reasons = []
+        if sample_size < min_sample:
+            reasons.append(f'sample_size {sample_size} < {min_sample}')
+        if reject_tax_pct > max_reject:
+            reasons.append(f'reject_tax {reject_tax_pct:.1f}% > {max_reject:.1f}%')
+        if hard_fail_pct > max_hard_fail:
+            reasons.append(f'hard_fail {hard_fail_pct:.1f}% > {max_hard_fail:.1f}%')
+        strategy_assessment = {
+            'go': len(reasons) == 0,
+            'label': 'GO' if len(reasons) == 0 else 'NO-GO',
+            'reasons': reasons,
+            'sample_size': sample_size,
+            'reject_tax_pct': round(reject_tax_pct, 2),
+            'hard_fail_pct': round(hard_fail_pct, 2),
+            'thresholds': {
+                'min_sample_size': min_sample,
+                'max_reject_tax_pct': round(max_reject, 2),
+                'max_hard_fail_pct': round(max_hard_fail, 2),
+            },
+        }
+    if not strategy_decision:
+        strategy_decision = _resolve_strategy_ops_decision(
+            assessment=strategy_assessment,
+            operator_brief=strategy_operator_brief,
+            data_quality=strategy_data_quality,
+        )
+
+    librarian_context = _platform_librarian_context_payload(
+        query='live trading context risk execution and catalysts',
+        hours=safe_hours,
+        limit=6,
+        refresh=False,
+    )
+
+    payload = {
+        'timestamp': datetime.utcnow().isoformat(),
+        'window_hours': safe_hours,
+        'posture': {
+            'public_read_only': bool(PUBLIC_READ_ONLY),
+            'operator_controls_exposed': False,
+        },
+        'status': {
+            'service_healthy': int(health_summary.get('service_healthy', 0) or 0),
+            'service_total': int(health_summary.get('service_total', 0) or 0),
+            'overall_healthy': bool(status.get('overall_healthy', False)),
+            'optional_degraded_count': int(status.get('optional_degraded_count', 0) or 0),
+            'monitor_timestamp': status.get('timestamp'),
+        },
+        'market': market,
+        'strategy_ops': {
+            'assessment': strategy_assessment,
+            'decision': strategy_decision,
+            'top_lanes': top_lanes,
+            'operator_brief': strategy_operator_brief,
+            'data_quality': strategy_data_quality,
+            'state_updated_at': ops_state.get('updated_at') if isinstance(ops_state, dict) else None,
+        },
+        'execution': {
+            'trading_metrics': trading.get('trades', {}) if isinstance(trading, dict) else {},
+            'pnl': trading.get('pnl', {}) if isinstance(trading, dict) else {},
+            'reject_tax': reject_tax,
+        },
+        'intelligence': {
+            'summary': intelligence_summary,
+            'top_catalysts': intel_summary.get('top_catalysts', []),
+            'top_drivers': intel_summary.get('drivers', []),
+        },
+        'business_brief': {
+            'summary': business_brief.get('summary', {}) if isinstance(business_brief, dict) else {},
+            'narrative': business_brief.get('narrative', {}) if isinstance(business_brief, dict) else {},
+        },
+        'librarian': librarian_context,
+        'sources': {
+            'status': '/api/platform/status',
+            'metrics': '/api/platform/metrics',
+            'strategy_ops': '/api/platform/strategy-ops',
+            'librarian_context': '/api/platform/librarian-context',
+            'intel_summary': '/api/platform/intel-summary',
+            'business_brief': '/api/platform/business-brief',
+        },
+    }
+    set_cache(cache_key, payload)
     return payload
 
 
@@ -2135,11 +5105,16 @@ def _platform_home_snapshot_payload():
         for future, name in ((f, futures[f]) for f in futures):
             results[name] = future.result()
 
+    raw_status = results.get('status', {}).get('data') or _collect_system_status()
+    status_public = _public_status_payload(raw_status)
+    if isinstance(results.get('status'), dict):
+        results['status']['data'] = status_public
+
     payload = {
         'timestamp': datetime.utcnow().isoformat(),
         'overall_ok': all(result.get('ok', False) for result in results.values()),
         'results': results,
-        'status': results.get('status', {}).get('data') or _collect_system_status(),
+        'status': status_public,
         'metrics': results.get('metrics', {}).get('data') or _platform_metrics_payload(),
         'projects': results.get('projects', {}).get('data') or {'projects': [], 'count': 0},
         'organization': results.get('organization', {}).get('data') or {'summary': {}},
@@ -2278,7 +5253,6 @@ def _platform_business_brief_payload(hours: int = 24, force_refresh: bool = Fals
         'sources': {
             'status': 'api/platform/status',
             'metrics': 'api/platform/metrics',
-            'control_plane': 'api/platform/control-plane',
             'projects': 'api/platform/projects',
             'organization': 'api/platform/organization',
             'readiness': 'api/platform/readiness',
@@ -2977,6 +5951,8 @@ def _platform_contracts_payload():
         'aliases': {
             '/api/status': '/api/platform/status',
             '/api/trading/metrics': '/api/platform/metrics',
+            '/api/strategy/ops': '/api/platform/strategy-ops',
+            '/api/agent/context': '/api/platform/agent-context',
             '/api/business-brief': '/api/platform/business-brief',
             '/api/logs': '/api/platform/logs',
             '/api/trades': '/api/platform/trades',
@@ -2984,10 +5960,11 @@ def _platform_contracts_payload():
             '/api/production/readiness': '/api/platform/readiness',
             '/api/projects': '/api/platform/projects',
             '/api/intel/feed': '/api/platform/intel-feed',
+            '/api/intel/summary': '/api/platform/intel-summary',
+            '/api/architecture/telemetry': '/api/platform/architecture-telemetry',
             '/api/superswarm': '/api/platform/superswarm',
             '/api/windows-lab': '/api/platform/windows-lab',
             '/api/contracts': '/api/platform/contracts',
-            '/api/control-plane': '/api/platform/control-plane',
         },
         'alias_policy': {
             'deprecated': True,
@@ -2997,7 +5974,8 @@ def _platform_contracts_payload():
         'notes': [
             'Use /api/platform/* contracts for all new clients.',
             'Legacy aliases are maintained for compatibility and will be retired after migration.',
-            'Public web is read-only; control/mutation routes are disabled on this service.',
+            'Public web is strictly read-only; control and mutation routes are disabled.',
+            'Sensitive infrastructure fields (IPs, internal URLs) are redacted from public responses.',
         ],
     }
 
@@ -3027,7 +6005,7 @@ def intelligence():
 @app.route('/platform')
 @requires_auth
 def platform():
-    return render_template('pages/platform.html', current_page='platform', page_title='Platform Reliability')
+    return redirect('/architecture', code=302)
 
 
 @app.route('/activity')
@@ -3055,9 +6033,9 @@ def settings():
 
 
 @app.route('/control')
-@requires_operator_access
+@requires_auth
 def control():
-    return render_template('pages/control.html', current_page='control', page_title='Control Plane')
+    abort(404)
 
 
 # Legacy page routes -> consolidated IA
@@ -3076,19 +6054,19 @@ def feed_legacy():
 @app.route('/autonomy')
 @requires_auth
 def autonomy_legacy():
-    return redirect('/platform', code=302)
+    return redirect('/architecture', code=302)
 
 
 @app.route('/command-deck')
 @requires_auth
 def command_deck_legacy():
-    return redirect('/platform', code=302)
+    return redirect('/architecture', code=302)
 
 
 @app.route('/system-health')
 @requires_auth
 def system_health_legacy():
-    return redirect('/platform', code=302)
+    return redirect('/architecture', code=302)
 
 
 @app.route('/logs')
@@ -3106,13 +6084,13 @@ def projects_legacy():
 @app.route('/production-readiness')
 @requires_auth
 def production_readiness_legacy():
-    return redirect('/platform', code=302)
+    return redirect('/architecture', code=302)
 
 
 @app.route('/infrastructure')
 @requires_auth
 def infrastructure_legacy():
-    return redirect('/platform', code=302)
+    return redirect('/architecture', code=302)
 
 
 @app.route('/ping')
@@ -3136,7 +6114,7 @@ def health():
 @app.route('/api/status')
 @requires_auth
 def api_status():
-    return _deprecated_alias_response(jsonify(_collect_system_status()), '/api/platform/status')
+    return _deprecated_alias_response(jsonify(_public_status_payload()), '/api/platform/status')
 
 
 @app.route('/api/health/summary')
@@ -3148,13 +6126,54 @@ def api_health_summary():
 @app.route('/api/platform/status')
 @requires_auth
 def api_platform_status():
-    return jsonify(_collect_system_status())
+    return jsonify(_public_status_payload())
 
 
 @app.route('/api/platform/metrics')
 @requires_auth
 def api_platform_metrics():
     return jsonify(_platform_metrics_payload())
+
+
+@app.route('/api/platform/strategy-ops')
+@requires_auth
+def api_platform_strategy_ops():
+    days = request.args.get('days', 7, type=int)
+    refresh = request.args.get('refresh', 'false', type=str).lower() == 'true'
+    return jsonify(_platform_strategy_ops_payload(days=days, refresh=refresh))
+
+
+@app.route('/api/platform/go-no-go-brief')
+@requires_auth
+def api_platform_go_no_go_brief():
+    days = request.args.get('days', 7, type=int)
+    refresh = request.args.get('refresh', 'false', type=str).lower() == 'true'
+    return jsonify(_platform_go_no_go_brief_payload(days=days, refresh=refresh))
+
+
+@app.route('/api/platform/agent-context')
+@requires_auth
+def api_platform_agent_context():
+    hours = request.args.get('hours', 24, type=int)
+    refresh = request.args.get('refresh', 'false', type=str).lower() == 'true'
+    return jsonify(_platform_agent_context_payload(hours=hours, refresh=refresh))
+
+
+@app.route('/api/platform/librarian-context')
+@requires_auth
+def api_platform_librarian_context():
+    query = request.args.get('query', '', type=str)
+    hours = request.args.get('hours', 24, type=int)
+    limit = request.args.get('limit', LIBRARIAN_DEFAULT_LIMIT, type=int)
+    refresh = request.args.get('refresh', 'false', type=str).lower() == 'true'
+    return jsonify(
+        _platform_librarian_context_payload(
+            query=query,
+            hours=hours,
+            limit=limit,
+            refresh=refresh,
+        )
+    )
 
 
 @app.route('/api/platform/autonomy')
@@ -3242,6 +6261,23 @@ def api_platform_intel_feed():
     return jsonify(_fetch_intel_feed_payload(limit=limit, category=category, query=query, refresh=refresh))
 
 
+@app.route('/api/platform/intel-summary')
+@requires_auth
+def api_platform_intel_summary():
+    hours = request.args.get('hours', 24, type=int)
+    limit = request.args.get('limit', 60, type=int)
+    refresh = request.args.get('refresh', 'false', type=str).lower() == 'true'
+    return jsonify(_platform_intel_summary_payload(hours=hours, limit=limit, refresh=refresh))
+
+
+@app.route('/api/platform/architecture-telemetry')
+@requires_auth
+def api_platform_architecture_telemetry():
+    hours = request.args.get('hours', 6, type=int)
+    refresh = request.args.get('refresh', 'false', type=str).lower() == 'true'
+    return jsonify(_platform_architecture_telemetry_payload(hours=hours, refresh=refresh))
+
+
 @app.route('/api/platform/superswarm')
 @requires_auth
 def api_platform_superswarm():
@@ -3263,9 +6299,9 @@ def api_platform_contracts():
 
 
 @app.route('/api/platform/control-plane')
-@requires_operator_access
+@requires_auth
 def api_platform_control_plane():
-    return jsonify(_platform_control_plane_payload())
+    return jsonify({'error': 'control_plane_disabled_on_public_web'}), 404
 
 
 @app.route('/api/logs')
@@ -3320,6 +6356,27 @@ def api_trading_metrics():
     return _deprecated_alias_response(jsonify(_platform_metrics_payload().get('trading', {})), '/api/platform/metrics')
 
 
+@app.route('/api/strategy/ops')
+@requires_auth
+def api_strategy_ops():
+    return _deprecated_alias_response(api_platform_strategy_ops(), '/api/platform/strategy-ops')
+
+
+@app.route('/api/agent/context')
+@requires_auth
+def api_agent_context():
+    return _deprecated_alias_response(api_platform_agent_context(), '/api/platform/agent-context')
+
+
+@app.route('/api/librarian/context')
+@requires_auth
+def api_librarian_context():
+    return _deprecated_alias_response(
+        api_platform_librarian_context(),
+        '/api/platform/librarian-context',
+    )
+
+
 @app.route('/api/business-brief')
 @requires_auth
 def api_business_brief():
@@ -3344,6 +6401,21 @@ def api_intel_feed():
     return _deprecated_alias_response(api_platform_intel_feed(), '/api/platform/intel-feed')
 
 
+@app.route('/api/intel/summary')
+@requires_auth
+def api_intel_summary():
+    return _deprecated_alias_response(api_platform_intel_summary(), '/api/platform/intel-summary')
+
+
+@app.route('/api/architecture/telemetry')
+@requires_auth
+def api_architecture_telemetry():
+    return _deprecated_alias_response(
+        api_platform_architecture_telemetry(),
+        '/api/platform/architecture-telemetry',
+    )
+
+
 @app.route('/api/superswarm')
 @requires_auth
 def api_superswarm():
@@ -3357,9 +6429,12 @@ def api_contracts():
 
 
 @app.route('/api/control-plane')
-@requires_operator_access
+@requires_auth
 def api_control_plane():
-    return _deprecated_alias_response(api_platform_control_plane(), '/api/platform/control-plane')
+    return _deprecated_alias_response(
+        (jsonify({'error': 'control_plane_disabled_on_public_web'}), 404),
+        '/api/platform/control-plane',
+    )
 
 
 @app.route('/jobs/superswarm/hourly-rollup', methods=['POST', 'GET'])
@@ -3412,6 +6487,296 @@ def job_platform_hourly_brief():
             'brief_narrative': brief.get('narrative', {}),
         }
     ), 200 if persist.get('written', False) else 500
+
+
+@app.route('/jobs/platform/architecture-bottleneck-digest', methods=['POST', 'GET'])
+@requires_control_token
+def job_platform_architecture_bottleneck_digest():
+    payload = request.get_json(silent=True) if request.method == 'POST' else {}
+    if not isinstance(payload, dict):
+        payload = {}
+
+    hours = request.args.get('hours', payload.get('hours', 6), type=int)
+    hours = max(1, min(int(hours or 6), 72))
+    min_interval_sec = request.args.get(
+        'min_interval_sec',
+        payload.get('min_interval_sec', int(os.getenv('BOTTLENECK_DIGEST_MIN_INTERVAL_SEC', '3600'))),
+        type=int,
+    )
+    min_interval_sec = max(0, int(min_interval_sec or 0))
+    force = _as_bool(request.args.get('force', payload.get('force', False)), False)
+    dry_run = _as_bool(request.args.get('dry_run', payload.get('dry_run', False)), False)
+
+    telemetry = _platform_architecture_telemetry_payload(hours=hours, refresh=True)
+    brief = _platform_business_brief_payload(hours=max(24, hours), force_refresh=True)
+    message, signature, should_send = _build_bottleneck_digest_message(telemetry, brief)
+
+    now_ts = int(time.time())
+    state = _load_bottleneck_digest_state()
+    last_sig = str(state.get('signature', ''))
+    last_sent_at = int(state.get('sent_at', 0) or 0)
+    changed = signature != last_sig
+    cooled_down = (now_ts - last_sent_at) >= min_interval_sec
+    trigger_send = force or should_send
+
+    response_payload = {
+        'ok': True,
+        'timestamp': datetime.utcnow().isoformat(),
+        'window_hours': hours,
+        'trigger_send': trigger_send,
+        'should_send': should_send,
+        'changed': changed,
+        'cooled_down': cooled_down,
+        'dry_run': dry_run,
+        'state': {
+            'last_sent_at': last_sent_at,
+            'has_signature': bool(last_sig),
+        },
+        'telemetry_summary': telemetry.get('summary', {}),
+    }
+
+    if dry_run:
+        response_payload.update({'message': message, 'status': 'dry_run'})
+        return jsonify(response_payload), 200
+
+    if not trigger_send:
+        response_payload.update({'status': 'skipped', 'reason': 'no_watch_trigger'})
+        return jsonify(response_payload), 200
+
+    if not (changed or cooled_down):
+        response_payload.update({'status': 'skipped', 'reason': 'cooldown_unchanged'})
+        return jsonify(response_payload), 200
+
+    token = (
+        os.getenv('TELEGRAM_BOT_TOKEN', '').strip()
+        or os.getenv('SAPPHIRE_TELEGRAM_BOT_TOKEN', '').strip()
+    )
+    chat_id = (
+        os.getenv('TELEGRAM_CHAT_ID', '').strip()
+        or os.getenv('TELEGRAM_BOT_CHAT_ID', '').strip()
+        or os.getenv('TELEGRAM_OWNER_USER_ID', '').strip()
+    )
+    if not token or not chat_id:
+        response_payload.update({'ok': False, 'status': 'error', 'error': 'telegram_config_missing'})
+        return jsonify(response_payload), 503
+
+    try:
+        telegram_response = _send_telegram_digest(token=token, chat_id=chat_id, message=message)
+    except Exception as exc:
+        response_payload.update({'ok': False, 'status': 'error', 'error': str(exc)})
+        return jsonify(response_payload), 502
+
+    saved = _save_bottleneck_digest_state(
+        {
+            'sent_at': now_ts,
+            'signature': signature,
+            'updated_at': datetime.utcnow().isoformat(),
+            'conversion_severity': (telemetry.get('summary') or {}).get('conversion_severity', 'unknown'),
+        }
+    )
+    response_payload.update(
+        {
+            'status': 'sent',
+            'persist': saved,
+            'telegram_ok': bool((telegram_response or {}).get('ok', True)),
+            'telegram_message_id': (telegram_response.get('result') or {}).get('message_id')
+            if isinstance(telegram_response, dict)
+            else None,
+        }
+    )
+    return jsonify(response_payload), 200
+
+
+@app.route('/jobs/platform/strategy-ops-digest', methods=['POST', 'GET'])
+@requires_control_token
+def job_platform_strategy_ops_digest():
+    payload = request.get_json(silent=True) if request.method == 'POST' else {}
+    if not isinstance(payload, dict):
+        payload = {}
+
+    days = request.args.get('days', payload.get('days', 7), type=int)
+    days = max(1, min(int(days or 7), 30))
+    min_interval_sec = request.args.get(
+        'min_interval_sec',
+        payload.get('min_interval_sec', int(os.getenv('STRATEGY_OPS_DIGEST_MIN_INTERVAL_SEC', '21600'))),
+        type=int,
+    )
+    min_interval_sec = max(0, int(min_interval_sec or 0))
+    force = _as_bool(request.args.get('force', payload.get('force', False)), False)
+    dry_run = _as_bool(request.args.get('dry_run', payload.get('dry_run', False)), False)
+
+    ops_payload = _platform_strategy_ops_payload(days=days, refresh=True)
+    scorecard = ops_payload.get('scorecard', {}) if isinstance(ops_payload.get('scorecard'), dict) else {}
+    reject_tax = ops_payload.get('reject_tax', {}) if isinstance(ops_payload.get('reject_tax'), dict) else {}
+    assessment = ops_payload.get('assessment', {}) if isinstance(ops_payload.get('assessment'), dict) else {}
+    attribution = ops_payload.get('attribution', {}) if isinstance(ops_payload.get('attribution'), dict) else {}
+    data_quality = ops_payload.get('data_quality', {}) if isinstance(ops_payload.get('data_quality'), dict) else {}
+    operator_brief = ops_payload.get('operator_brief', {}) if isinstance(ops_payload.get('operator_brief'), dict) else {}
+    decision = ops_payload.get('decision', {}) if isinstance(ops_payload.get('decision'), dict) else {}
+    if not decision:
+        decision = _resolve_strategy_ops_decision(
+            assessment=assessment,
+            operator_brief=operator_brief,
+            data_quality=data_quality,
+        )
+    message, signature, should_send = _build_strategy_ops_digest_message(
+        scorecard,
+        reject_tax,
+        assessment,
+        operator_brief=operator_brief,
+        decision=decision,
+        data_quality=data_quality,
+    )
+
+    now_ts = int(time.time())
+    state = _load_strategy_ops_digest_state()
+    last_sig = str(state.get('signature', ''))
+    last_sent_at = int(state.get('sent_at', 0) or 0)
+    changed = signature != last_sig
+    cooled_down = (now_ts - last_sent_at) >= min_interval_sec
+    trigger_send = force or should_send
+
+    response_payload = {
+        'ok': True,
+        'response_version': 'strategy_ops_digest_v2',
+        'timestamp': datetime.utcnow().isoformat(),
+        'window_days': days,
+        'trigger_send': trigger_send,
+        'should_send': should_send,
+        'changed': changed,
+        'cooled_down': cooled_down,
+        'dry_run': dry_run,
+        'assessment': assessment,
+        'operator_brief': operator_brief,
+        'decision': decision,
+        'scorecard_totals': scorecard.get('totals', {}),
+        'state': {
+            'last_sent_at': last_sent_at,
+            'has_signature': bool(last_sig),
+        },
+    }
+
+    state_payload = _build_strategy_ops_state_payload(
+        days=days,
+        scorecard=scorecard,
+        reject_tax=reject_tax,
+        assessment=assessment,
+        operator_brief=operator_brief,
+        decision=decision,
+        attribution=attribution,
+        data_quality=data_quality,
+    )
+    state_saved = _save_strategy_ops_digest_state(state_payload)
+    response_payload['state_persist'] = state_saved
+    if _as_bool(os.getenv('STRATEGY_OPS_PERSIST_SNAPSHOT_ON_DIGEST', 'true'), True):
+        response_payload['snapshot_persist'] = _save_strategy_ops_snapshot(state_payload, keep_history=False)
+
+    if dry_run:
+        response_payload.update({'message': message, 'status': 'dry_run'})
+        return jsonify(response_payload), 200
+
+    if not trigger_send:
+        response_payload.update({'status': 'skipped', 'reason': 'no_digest_trigger'})
+        return jsonify(response_payload), 200
+
+    if not (changed or cooled_down):
+        response_payload.update({'status': 'skipped', 'reason': 'cooldown_unchanged'})
+        return jsonify(response_payload), 200
+
+    token = (
+        os.getenv('TELEGRAM_BOT_TOKEN', '').strip()
+        or os.getenv('SAPPHIRE_TELEGRAM_BOT_TOKEN', '').strip()
+    )
+    chat_id = (
+        os.getenv('TELEGRAM_CHAT_ID', '').strip()
+        or os.getenv('TELEGRAM_BOT_CHAT_ID', '').strip()
+        or os.getenv('TELEGRAM_OWNER_USER_ID', '').strip()
+    )
+    if not token or not chat_id:
+        response_payload.update({'ok': False, 'status': 'error', 'error': 'telegram_config_missing'})
+        return jsonify(response_payload), 503
+
+    try:
+        telegram_response = _send_telegram_digest(token=token, chat_id=chat_id, message=message)
+    except Exception as exc:
+        response_payload.update({'ok': False, 'status': 'error', 'error': str(exc)})
+        return jsonify(response_payload), 502
+
+    saved = _save_strategy_ops_digest_state(
+        {
+            **state_payload,
+            'sent_at': now_ts,
+            'signature': signature,
+        }
+    )
+    response_payload.update(
+        {
+            'status': 'sent',
+            'persist': saved,
+            'telegram_ok': bool((telegram_response or {}).get('ok', True)),
+            'telegram_message_id': (telegram_response.get('result') or {}).get('message_id')
+            if isinstance(telegram_response, dict)
+            else None,
+        }
+    )
+    return jsonify(response_payload), 200
+
+
+@app.route('/jobs/platform/strategy-ops-snapshot', methods=['POST', 'GET'])
+@requires_control_token
+def job_platform_strategy_ops_snapshot():
+    payload = request.get_json(silent=True) if request.method == 'POST' else {}
+    if not isinstance(payload, dict):
+        payload = {}
+
+    days = request.args.get('days', payload.get('days', 7), type=int)
+    days = max(1, min(int(days or 7), 30))
+    keep_history = _as_bool(request.args.get('keep_history', payload.get('keep_history', True)), True)
+    refresh = _as_bool(request.args.get('refresh', payload.get('refresh', True)), True)
+
+    ops_payload = _platform_strategy_ops_payload(days=days, refresh=refresh)
+    scorecard = ops_payload.get('scorecard', {}) if isinstance(ops_payload.get('scorecard'), dict) else {}
+    reject_tax = ops_payload.get('reject_tax', {}) if isinstance(ops_payload.get('reject_tax'), dict) else {}
+    assessment = ops_payload.get('assessment', {}) if isinstance(ops_payload.get('assessment'), dict) else {}
+    attribution = ops_payload.get('attribution', {}) if isinstance(ops_payload.get('attribution'), dict) else {}
+    data_quality = ops_payload.get('data_quality', {}) if isinstance(ops_payload.get('data_quality'), dict) else {}
+    operator_brief = ops_payload.get('operator_brief', {}) if isinstance(ops_payload.get('operator_brief'), dict) else {}
+    decision = ops_payload.get('decision', {}) if isinstance(ops_payload.get('decision'), dict) else {}
+    if not decision:
+        decision = _resolve_strategy_ops_decision(
+            assessment=assessment,
+            operator_brief=operator_brief,
+            data_quality=data_quality,
+        )
+
+    state_payload = _build_strategy_ops_state_payload(
+        days=days,
+        scorecard=scorecard,
+        reject_tax=reject_tax,
+        assessment=assessment,
+        operator_brief=operator_brief,
+        decision=decision,
+        attribution=attribution,
+        data_quality=data_quality,
+    )
+    saved = _save_strategy_ops_snapshot(state_payload, keep_history=keep_history)
+    state_saved = _save_strategy_ops_digest_state(state_payload)
+
+    return jsonify(
+        {
+            'ok': bool(saved.get('written', False)),
+            'timestamp': datetime.utcnow().isoformat(),
+            'window_days': days,
+            'refresh': refresh,
+            'keep_history': keep_history,
+            'persist': saved,
+            'state_persist': state_saved,
+            'assessment': assessment,
+            'operator_brief': operator_brief,
+            'decision': decision,
+            'scorecard_totals': scorecard.get('totals', {}),
+        }
+    ), (200 if saved.get('written', False) else 502)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

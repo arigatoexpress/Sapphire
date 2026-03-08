@@ -115,12 +115,138 @@
     color: var(--amber);
     background: rgba(255, 176, 0, 0.05);
 }
+
+.intel-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-sm);
+}
+
+.intel-summary-card {
+    border: 1px solid var(--border-dim);
+    background: rgba(255, 176, 0, 0.03);
+    padding: var(--space-sm);
+}
+
+.intel-summary-k {
+    color: var(--text-muted);
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.intel-summary-v {
+    margin-top: 2px;
+    color: var(--amber);
+    font-family: var(--font-header);
+    font-size: 0.9rem;
+}
+
+.intel-headline {
+    margin-bottom: var(--space-sm);
+    color: var(--amber);
+    font-family: var(--font-header);
+    font-size: 0.86rem;
+}
+
+.intel-subtext {
+    color: var(--text-secondary);
+    font-size: 0.74rem;
+    line-height: 1.45;
+}
+
+.context-stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.context-item {
+    border: 1px solid var(--border-dim);
+    background: rgba(255, 176, 0, 0.03);
+    padding: var(--space-sm);
+}
+
+.context-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: 6px;
+}
+
+.context-item-title {
+    color: var(--amber);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.context-item-score {
+    color: var(--green);
+    font-size: 0.72rem;
+}
+
+.context-item-summary {
+    color: var(--text-secondary);
+    font-size: 0.74rem;
+    line-height: 1.5;
+}
+
+.context-meta {
+    margin-top: 6px;
+    color: var(--text-muted);
+    font-size: 0.66rem;
+}
+
+@media (max-width: 992px) {
+    .intel-summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
 {% endblock %}
 
 {% block content %}
 <div class="section-header">
     <div class="section-title">Market_Intelligence_Feed</div>
     <div class="section-subtitle">Consolidated research and market intelligence - Read-only, no execution controls</div>
+</div>
+
+<div class="panel">
+    <span class="panel-corner tl"></span>
+    <span class="panel-corner tr"></span>
+    <span class="panel-corner bl"></span>
+    <span class="panel-corner br"></span>
+    <div class="panel-header">
+        <div class="panel-title">AI_Market_Pulse</div>
+        <span class="timestamp" id="intel-pulse-time">--</span>
+    </div>
+    <div class="panel-body">
+        <div class="intel-headline" id="intel-headline">Synthesizing market pulse...</div>
+        <div class="intel-subtext" id="intel-subtext">Loading cross-source intelligence context.</div>
+        <div class="ascii-divider">────────────────────────────────────────</div>
+        <div class="intel-summary-grid" id="intel-summary-grid">
+            <div class="loading">Loading summary metrics...</div>
+        </div>
+    </div>
+</div>
+
+<div class="panel">
+    <span class="panel-corner tl"></span>
+    <span class="panel-corner tr"></span>
+    <span class="panel-corner bl"></span>
+    <span class="panel-corner br"></span>
+    <div class="panel-header">
+        <div class="panel-title">Librarian_Context</div>
+        <span class="timestamp" id="librarian-time">--</span>
+    </div>
+    <div class="panel-body">
+        <div class="intel-subtext" id="librarian-summary">Curating context...</div>
+        <div class="ascii-divider">────────────────────────────────────────</div>
+        <div class="context-stack" id="librarian-context">
+            <div class="loading">Loading curated context...</div>
+        </div>
+    </div>
 </div>
 
 <div class="panel">
@@ -164,6 +290,46 @@
     let currentFilter = 'all';
     let feedData = [];
 
+    async function loadIntelSummary() {
+        try {
+            const summary = await window.platformApi.getIntelSummary({ hours: 24, limit: 80 });
+            const digest = summary?.ai_digest || {};
+            const market = summary?.market || {};
+            const operations = summary?.operations || {};
+            const movers = Array.isArray(market.movers) ? market.movers : [];
+            const strongest = movers[0] || { symbol: '--', change_24h: 0 };
+
+            document.getElementById('intel-headline').textContent =
+                digest.headline || 'Intelligence pulse is initializing.';
+            document.getElementById('intel-subtext').textContent =
+                digest.summary || 'Waiting for enough market and execution context.';
+            document.getElementById('intel-pulse-time').textContent = new Date().toLocaleTimeString('en-US', { hour12: false });
+
+            document.getElementById('intel-summary-grid').innerHTML = `
+                <div class="intel-summary-card">
+                    <div class="intel-summary-k">Regime</div>
+                    <div class="intel-summary-v">${market.regime_label || '--'}</div>
+                </div>
+                <div class="intel-summary-card">
+                    <div class="intel-summary-k">Strongest Mover</div>
+                    <div class="intel-summary-v">${strongest.symbol || '--'} ${Number(strongest.change_24h || 0) >= 0 ? '+' : ''}${Number(strongest.change_24h || 0).toFixed(2)}%</div>
+                </div>
+                <div class="intel-summary-card">
+                    <div class="intel-summary-k">Signals / Executions</div>
+                    <div class="intel-summary-v">${Number(operations.signals || 0)} / ${Number(operations.executions || 0)}</div>
+                </div>
+                <div class="intel-summary-card">
+                    <div class="intel-summary-k">Confidence</div>
+                    <div class="intel-summary-v">${Number(digest.confidence || 0).toFixed(1)} / 100</div>
+                </div>
+            `;
+        } catch (e) {
+            document.getElementById('intel-headline').textContent = 'Unable to synthesize AI market pulse';
+            document.getElementById('intel-subtext').textContent = 'Fallback mode active; feed stream still available below.';
+            document.getElementById('intel-summary-grid').innerHTML = '<div class="empty-state">Summary unavailable</div>';
+        }
+    }
+
     async function loadIntelFeed() {
         try {
             const data = await window.platformApi.getIntelFeed({ limit: 20 });
@@ -172,6 +338,52 @@
             document.getElementById('feed-count').textContent = `${feedData.length} items`;
         } catch (e) {
             document.getElementById('intel-feed').innerHTML = '<div class="empty-state">Unable to load intelligence feed</div>';
+        }
+    }
+
+    async function loadLibrarianContext() {
+        try {
+            const data = await window.platformApi.getLibrarianContext({
+                hours: 24,
+                limit: 5,
+                query: 'crypto perp execution risk catalyst context',
+            });
+            const selected = Array.isArray(data?.selected) ? data.selected : [];
+            const summary = data?.summary || {};
+            document.getElementById('librarian-time').textContent =
+                new Date().toLocaleTimeString('en-US', { hour12: false });
+            document.getElementById('librarian-summary').textContent =
+                summary.narrative || `Curated ${selected.length} context blocks.`;
+
+            if (!selected.length) {
+                document.getElementById('librarian-context').innerHTML =
+                    '<div class="empty-state">No curated context available yet.</div>';
+                return;
+            }
+
+            document.getElementById('librarian-context').innerHTML = selected.map(row => {
+                const title = row.title || row.type || 'Context';
+                const score = Number(row.score || 0).toFixed(2);
+                const text = row.summary || row.text || '';
+                const type = (row.type || 'context').toUpperCase();
+                const ts = row.timestamp
+                    ? new Date(row.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                    : '--';
+                return `
+                    <div class="context-item">
+                        <div class="context-item-header">
+                            <div class="context-item-title">${title}</div>
+                            <div class="context-item-score">SCORE ${score}</div>
+                        </div>
+                        <div class="context-item-summary">${text}</div>
+                        <div class="context-meta">${type} // ${ts}</div>
+                    </div>
+                `;
+            }).join('');
+        } catch (e) {
+            document.getElementById('librarian-summary').textContent = 'Curated context unavailable.';
+            document.getElementById('librarian-context').innerHTML =
+                '<div class="empty-state">Unable to load Librarian context</div>';
         }
     }
 
@@ -221,7 +433,11 @@
         });
     });
 
+    loadIntelSummary();
     loadIntelFeed();
+    loadLibrarianContext();
+    setInterval(loadIntelSummary, 60000);
     setInterval(loadIntelFeed, 60000);
+    setInterval(loadLibrarianContext, 60000);
 </script>
 {% endblock %}

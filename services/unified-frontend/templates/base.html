@@ -840,10 +840,8 @@
         <!-- Navigation -->
         <nav class="terminal-nav" id="terminal-nav">
             <a href="/" class="nav-item {% if current_page == 'overview' %}active{% endif %}">Overview</a>
-            <a href="/architecture" class="nav-item {% if current_page == 'architecture' %}active{% endif %}">Architecture</a>
+            <a href="/architecture" class="nav-item {% if current_page in ['architecture', 'platform'] %}active{% endif %}">Operations</a>
             <a href="/intelligence" class="nav-item {% if current_page == 'intelligence' %}active{% endif %}">Intelligence</a>
-            <a href="/platform" class="nav-item {% if current_page == 'platform' %}active{% endif %}">Platform</a>
-            <a href="/control" class="nav-item {% if current_page == 'control' %}active{% endif %}">Control</a>
             <a href="/organization" class="nav-item {% if current_page == 'organization' %}active{% endif %}">Organization</a>
             <a href="/activity" class="nav-item {% if current_page == 'activity' %}active{% endif %}">Activity</a>
             <a href="/sapphire-book" class="nav-item {% if current_page == 'sapphire-book' %}active{% endif %}">Sapphire_Book</a>
@@ -860,7 +858,7 @@
         <footer class="terminal-footer">
             <div class="footer-links">
                 <a href="/api/platform/contracts">API_CONTRACTS</a>
-                <a href="/api/status">SYSTEM_STATUS</a>
+                <a href="/architecture#security-privacy">SECURITY_PRIVACY</a>
             </div>
             <div>SAPPHIRE_INC // AUTONOMOUS_OPERATIONS_DIVISION</div>
         </footer>
