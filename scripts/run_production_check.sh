@@ -21,6 +21,13 @@ is_truthy() {
   [[ "$v" == "1" || "$v" == "true" || "$v" == "yes" || "$v" == "on" ]]
 }
 
+normalize_digest() {
+  local d="${1:-}"
+  d="${d##*@sha256:}"
+  d="${d##sha256:}"
+  printf '%s' "$d"
+}
+
 if is_truthy "$STRICT_RUNTIME_GIT"; then
   printf "[0/7] Runtime == git guard\n"
   if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -60,6 +67,7 @@ if is_truthy "$STRICT_RUNTIME_GIT"; then
     echo "FAIL: unable to resolve digest for ${FRONTEND_IMAGE}"
     exit 1
   fi
+  latest_digest="$(normalize_digest "$latest_digest")"
   echo "frontend_image_digest=${latest_digest}"
 
   for svc in $FRONTEND_RUNTIME_SERVICES; do
@@ -79,6 +87,7 @@ if is_truthy "$STRICT_RUNTIME_GIT"; then
         --region "$REGION" \
         --format='value(status.imageDigest)'
     )"
+    rev_digest="$(normalize_digest "$rev_digest")"
     if [[ "$rev_digest" != "$latest_digest" ]]; then
       echo "FAIL: ${svc} (${rev}) digest mismatch. runtime=${rev_digest} expected=${latest_digest}"
       exit 1
