@@ -17,6 +17,10 @@ from urllib.parse import urljoin
 import requests
 from firebase_admin import credentials, firestore, get_app, initialize_app
 from flask import Flask, render_template, jsonify, request, Response, make_response, redirect, abort
+from strategy_ops.runtime import (
+    build_go_no_go_brief_payload as _build_go_no_go_brief_payload,
+    resolve_strategy_ops_decision as _resolve_strategy_ops_decision_core,
+)
 
 app = Flask(__name__)
 
@@ -2501,58 +2505,11 @@ def _resolve_strategy_ops_decision(
     operator_brief: dict | None,
     data_quality: dict | None,
 ) -> dict:
-    assessment = assessment if isinstance(assessment, dict) else {}
-    operator_brief = operator_brief if isinstance(operator_brief, dict) else {}
-    data_quality = data_quality if isinstance(data_quality, dict) else {}
-
-    assessment_go = bool(assessment.get('go', False))
-    assessment_label = str(assessment.get('label', 'NO-GO')).upper()
-    assessment_reasons = assessment.get('reasons', []) if isinstance(assessment.get('reasons'), list) else []
-
-    operator_go = bool(operator_brief.get('go', assessment_go))
-    operator_label = str(operator_brief.get('label', 'GO' if operator_go else 'NO-GO')).upper()
-    operator_reasons = (
-        operator_brief.get('hard_blockers', [])
-        if isinstance(operator_brief.get('hard_blockers'), list)
-        else []
+    return _resolve_strategy_ops_decision_core(
+        assessment=assessment,
+        operator_brief=operator_brief,
+        data_quality=data_quality,
     )
-
-    reasons = [str(r).strip() for r in (operator_reasons or assessment_reasons) if str(r).strip()]
-    degraded = bool(data_quality.get('degraded', False))
-    degraded_sources = data_quality.get('degraded_sources', []) if isinstance(data_quality.get('degraded_sources'), list) else []
-    if degraded and operator_go:
-        has_quality_reason = any('data_quality' in reason.lower() for reason in reasons)
-        if not has_quality_reason:
-            degraded_text = ', '.join(str(src) for src in degraded_sources[:3]) or 'unknown sources'
-            reasons.append(f'data_quality degraded: {degraded_text}')
-        operator_go = False
-        operator_label = 'NO-GO'
-
-    go = bool(operator_go and len(reasons) == 0)
-    label = 'GO' if go else 'NO-GO'
-    source = 'operator_brief' if operator_brief else 'assessment'
-    confidence_score = _safe_float(operator_brief.get('confidence_score'), 0.0)
-    confidence_multiplier = _safe_float(
-        operator_brief.get('confidence_multiplier'),
-        _safe_float(data_quality.get('confidence_multiplier'), 1.0),
-    )
-
-    return {
-        'go': go,
-        'label': label,
-        'source': source,
-        'diverged': bool(assessment_label != label or assessment_go != go or operator_label != label),
-        'assessment_label': assessment_label,
-        'assessment_go': assessment_go,
-        'operator_label': operator_label,
-        'operator_go': operator_go,
-        'reasons': reasons[:8],
-        'why_this_matters_now': str(operator_brief.get('why_this_matters_now', '')).strip(),
-        'confidence_score': round(confidence_score, 2),
-        'confidence_multiplier': round(confidence_multiplier, 4),
-        'data_quality_degraded': degraded,
-        'degraded_sources': degraded_sources[:5],
-    }
 
 
 def _build_strategy_ops_assessment(scorecard: dict, reject_tax: dict) -> dict:
@@ -4512,61 +4469,11 @@ def _platform_go_no_go_brief_payload(days: int = 7, refresh: bool = False):
             return cached
 
     ops_payload = _platform_strategy_ops_payload(days=safe_days, refresh=refresh)
-    decision = ops_payload.get('decision', {}) if isinstance(ops_payload.get('decision'), dict) else {}
-    operator_brief = (
-        ops_payload.get('operator_brief', {}) if isinstance(ops_payload.get('operator_brief'), dict) else {}
+    payload = _build_go_no_go_brief_payload(
+        ops_payload=ops_payload,
+        window_days=safe_days,
+        timestamp=datetime.utcnow().isoformat(),
     )
-    assessment = ops_payload.get('assessment', {}) if isinstance(ops_payload.get('assessment'), dict) else {}
-    data_quality = ops_payload.get('data_quality', {}) if isinstance(ops_payload.get('data_quality'), dict) else {}
-    reject_tax = ops_payload.get('reject_tax', {}) if isinstance(ops_payload.get('reject_tax'), dict) else {}
-    attribution = ops_payload.get('attribution', {}) if isinstance(ops_payload.get('attribution'), dict) else {}
-    scorecard = ops_payload.get('scorecard', {}) if isinstance(ops_payload.get('scorecard'), dict) else {}
-
-    blocker_rows = decision.get('reasons', []) if isinstance(decision.get('reasons'), list) else []
-    if not blocker_rows:
-        blocker_rows = (
-            operator_brief.get('hard_blockers', [])
-            if isinstance(operator_brief.get('hard_blockers'), list)
-            else []
-        )
-    action_rows = (
-        operator_brief.get('top_actions', [])
-        if isinstance(operator_brief.get('top_actions'), list)
-        else []
-    )
-
-    summary = {
-        'decision_label': str(decision.get('label', 'NO-GO')).upper(),
-        'decision_go': bool(decision.get('go', False)),
-        'decision_source': str(decision.get('source', 'assessment')),
-        'decision_diverged': bool(decision.get('diverged', False)),
-        'confidence_score': round(float(decision.get('confidence_score', 0.0) or 0.0), 4),
-        'confidence_multiplier': round(float(decision.get('confidence_multiplier', 1.0) or 1.0), 4),
-        'sample_size': int(reject_tax.get('sample_size', 0) or 0),
-        'reject_tax_pct': round(float(reject_tax.get('reject_tax_pct', 0.0) or 0.0), 2),
-        'hard_fail_pct': round(float(reject_tax.get('hard_fail_pct', 0.0) or 0.0), 2),
-        'net_pnl_after_fees': round(float(attribution.get('net_pnl_after_fees', 0.0) or 0.0), 6),
-        'fill_rate_pct': round(float(attribution.get('filled_success_pct', 0.0) or 0.0), 2),
-        'expected_value_error_pct': round(float(attribution.get('expected_value_error_pct', 0.0) or 0.0), 2),
-        'max_drawdown_pct': round(float(attribution.get('max_drawdown_pct', 0.0) or 0.0), 2),
-    }
-
-    payload = {
-        'timestamp': datetime.utcnow().isoformat(),
-        'window_days': safe_days,
-        'summary': summary,
-        'decision': decision,
-        'assessment': assessment,
-        'data_quality': data_quality,
-        'why_this_matters_now': str(operator_brief.get('why_this_matters_now', '')).strip(),
-        'hard_blockers': blocker_rows,
-        'top_actions': action_rows[:3],
-        'top_lanes': (scorecard.get('ranked', []) if isinstance(scorecard.get('ranked'), list) else [])[:3],
-        'sources': {
-            'strategy_ops': '/api/platform/strategy-ops',
-            'agent_context': '/api/platform/agent-context',
-        },
-    }
     set_cache(cache_key, payload)
     return payload
 
