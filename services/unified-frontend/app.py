@@ -7,6 +7,7 @@ Multi-page dashboard with shared navigation and live status APIs.
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from concurrent.futures import ThreadPoolExecutor
+from threading import Lock
 import hashlib
 import math
 import os
@@ -17,6 +18,7 @@ from urllib.parse import urljoin
 import requests
 from firebase_admin import credentials, firestore, get_app, initialize_app
 from flask import Flask, render_template, jsonify, request, Response, make_response, redirect, abort
+from strategy_ops import build_strategy_ops_assessment as _build_strategy_ops_assessment_core
 from strategy_ops.runtime import (
     build_go_no_go_brief_payload as _build_go_no_go_brief_payload,
     resolve_strategy_ops_decision as _resolve_strategy_ops_decision_core,
@@ -55,6 +57,12 @@ BOTTLENECK_DIGEST_COLLECTION = os.environ.get('BOTTLENECK_DIGEST_COLLECTION', 'p
 BOTTLENECK_DIGEST_DOC_ID = os.environ.get('BOTTLENECK_DIGEST_DOC_ID', 'architecture_bottleneck')
 STRATEGY_OPS_DIGEST_DOC_ID = os.environ.get('STRATEGY_OPS_DIGEST_DOC_ID', 'strategy_ops')
 STRATEGY_OPS_SNAPSHOTS_COLLECTION = os.environ.get('STRATEGY_OPS_SNAPSHOTS_COLLECTION', 'strategy_ops_snapshots')
+LEGACY_ALIAS_USAGE_COLLECTION = os.environ.get('LEGACY_ALIAS_USAGE_COLLECTION', 'platform_legacy_alias_usage')
+LEGACY_ALIAS_USAGE_DOC_ID = os.environ.get('LEGACY_ALIAS_USAGE_DOC_ID', 'current')
+LEGACY_ALIAS_PERSIST_INTERVAL_SEC = max(
+    5,
+    int(float(os.environ.get('LEGACY_ALIAS_PERSIST_INTERVAL_SEC', '30') or 30)),
+)
 LIBRARIAN_ENABLED = os.environ.get('LIBRARIAN_ENABLED', 'true').strip().lower() in {'1', 'true', 'yes', 'on'}
 LIBRARIAN_MODE = os.environ.get('LIBRARIAN_MODE', 'local').strip().lower() or 'local'
 LIBRARIAN_REMOTE_URL = os.environ.get('LIBRARIAN_REMOTE_URL', '').strip()
@@ -129,6 +137,14 @@ CONTROL_API_TOKEN = os.environ.get('SAPPHIRE_CONTROL_API_TOKEN', '')
 
 # Simple in-memory cache
 cache = {}
+legacy_alias_lock = Lock()
+legacy_alias_usage = {
+    'started_at': datetime.utcnow().isoformat(),
+    'last_hit_at': None,
+    'session_total': 0,
+    'aliases': {},
+    'last_persist_at': 0.0,
+}
 
 try:
     get_app()
@@ -226,6 +242,14 @@ PLATFORM_CONTRACTS = [
         'auth': 'basic_or_public',
         'category': 'telemetry',
         'description': 'Single operator brief with final GO/NO-GO decision, blockers, and top actions.',
+    },
+    {
+        'name': 'legacy_aliases',
+        'path': '/api/platform/legacy-aliases',
+        'method': 'GET',
+        'auth': 'basic_or_public',
+        'category': 'telemetry',
+        'description': 'Legacy alias usage counters and sunset progress for migration tracking.',
     },
     {
         'name': 'agent_context',
@@ -454,7 +478,135 @@ def requires_control_token(f):
     return decorated
 
 
+def _legacy_alias_key(path: str) -> str:
+    return re.sub(r'[^a-zA-Z0-9_]+', '_', str(path or '').strip('/')).strip('_') or 'root'
+
+
+def _record_legacy_alias_hit(alias_path: str, canonical_path: str):
+    alias_path = str(alias_path or '').strip() or '/api/unknown'
+    canonical_path = str(canonical_path or '').strip() or '/api/platform/status'
+    now_iso = datetime.utcnow().isoformat()
+    alias_key = _legacy_alias_key(alias_path)
+
+    with legacy_alias_lock:
+        aliases = legacy_alias_usage.setdefault('aliases', {})
+        row = aliases.setdefault(
+            alias_key,
+            {
+                'alias_path': alias_path,
+                'canonical_path': canonical_path,
+                'hits': 0,
+                'last_hit_at': None,
+            },
+        )
+        row['alias_path'] = alias_path
+        row['canonical_path'] = canonical_path
+        row['hits'] = int(row.get('hits', 0) or 0) + 1
+        row['last_hit_at'] = now_iso
+        legacy_alias_usage['session_total'] = int(legacy_alias_usage.get('session_total', 0) or 0) + 1
+        legacy_alias_usage['last_hit_at'] = now_iso
+        last_persist_at = float(legacy_alias_usage.get('last_persist_at', 0.0) or 0.0)
+        should_persist = (time.time() - last_persist_at) >= LEGACY_ALIAS_PERSIST_INTERVAL_SEC
+        if should_persist:
+            legacy_alias_usage['last_persist_at'] = time.time()
+
+    if not should_persist or db is None:
+        return
+
+    try:
+        db.collection(LEGACY_ALIAS_USAGE_COLLECTION).document(LEGACY_ALIAS_USAGE_DOC_ID).set(
+            {
+                'updated_at': now_iso,
+                'sunset': LEGACY_ALIAS_SUNSET,
+                'total_hits': firestore.Increment(1),
+                f'aliases.{alias_key}.hits': firestore.Increment(1),
+                f'aliases.{alias_key}.alias_path': alias_path,
+                f'aliases.{alias_key}.canonical_path': canonical_path,
+                f'aliases.{alias_key}.last_hit_at': now_iso,
+            },
+            merge=True,
+        )
+    except Exception:
+        # Non-blocking telemetry path.
+        pass
+
+
+def _legacy_alias_usage_payload() -> dict:
+    now_iso = datetime.utcnow().isoformat()
+    with legacy_alias_lock:
+        session_aliases = list((legacy_alias_usage.get('aliases') or {}).values())
+        session = {
+            'started_at': legacy_alias_usage.get('started_at'),
+            'last_hit_at': legacy_alias_usage.get('last_hit_at'),
+            'total_hits': int(legacy_alias_usage.get('session_total', 0) or 0),
+            'aliases': sorted(
+                [
+                    {
+                        'alias_path': str(row.get('alias_path', '')),
+                        'canonical_path': str(row.get('canonical_path', '')),
+                        'hits': int(row.get('hits', 0) or 0),
+                        'last_hit_at': row.get('last_hit_at'),
+                    }
+                    for row in session_aliases
+                ],
+                key=lambda row: row.get('hits', 0),
+                reverse=True,
+            ),
+        }
+
+    cumulative = {
+        'total_hits': 0,
+        'updated_at': None,
+        'aliases': [],
+        'source': 'memory',
+    }
+    if db is not None:
+        try:
+            snap = db.collection(LEGACY_ALIAS_USAGE_COLLECTION).document(LEGACY_ALIAS_USAGE_DOC_ID).get()
+            if snap.exists:
+                row = snap.to_dict() or {}
+                aliases = row.get('aliases', {}) if isinstance(row.get('aliases'), dict) else {}
+                cumulative = {
+                    'total_hits': int(row.get('total_hits', 0) or 0),
+                    'updated_at': row.get('updated_at'),
+                    'aliases': sorted(
+                        [
+                            {
+                                'alias_path': str(item.get('alias_path', key)),
+                                'canonical_path': str(item.get('canonical_path', '')),
+                                'hits': int(item.get('hits', 0) or 0),
+                                'last_hit_at': item.get('last_hit_at'),
+                            }
+                            for key, item in aliases.items()
+                            if isinstance(item, dict)
+                        ],
+                        key=lambda item: item.get('hits', 0),
+                        reverse=True,
+                    ),
+                    'source': 'firestore',
+                }
+        except Exception:
+            pass
+
+    return {
+        'timestamp': now_iso,
+        'sunset': LEGACY_ALIAS_SUNSET,
+        'session': {
+            **session,
+            'alias_count': len(session.get('aliases', [])),
+            'top_aliases': session.get('aliases', [])[:8],
+        },
+        'cumulative': {
+            **cumulative,
+            'alias_count': len(cumulative.get('aliases', [])),
+            'top_aliases': cumulative.get('aliases', [])[:8],
+        },
+    }
+
+
 def _deprecated_alias_response(payload, canonical_path: str):
+    alias_path = request.path or '/api/unknown'
+    _record_legacy_alias_hit(alias_path, canonical_path)
     response = make_response(payload)
     canonical_url = canonical_path
     if canonical_path.startswith('/'):
@@ -465,6 +617,7 @@ def _deprecated_alias_response(payload, canonical_path: str):
     response.headers['Link'] = f'<{canonical_url}>; rel=\"successor-version\"'
     response.headers['X-Sapphire-API-Tier'] = 'legacy-alias'
     response.headers['X-Sapphire-Contract-Version'] = PLATFORM_CONTRACT_VERSION
+    response.headers['X-Sapphire-Legacy-Alias'] = alias_path
     return response
 
 
@@ -875,12 +1028,23 @@ def _public_status_payload(status_data: dict | None = None) -> dict:
                 )
         by_category[str(category)] = normalized
 
+    legacy_alias = _legacy_alias_usage_payload()
+
     payload = {
         'timestamp': status_data.get('timestamp', datetime.utcnow().isoformat()),
         'services': services,
         'nodes': nodes,
         'by_category': by_category,
         'summary': status_data.get('summary', {}),
+        'legacy_alias': {
+            'sunset': legacy_alias.get('sunset'),
+            'session_hits': int(((legacy_alias.get('session') or {}).get('total_hits', 0) or 0)),
+            'cumulative_hits': int(((legacy_alias.get('cumulative') or {}).get('total_hits', 0) or 0)),
+            'last_seen': (
+                ((legacy_alias.get('cumulative') or {}).get('updated_at'))
+                or ((legacy_alias.get('session') or {}).get('last_hit_at'))
+            ),
+        },
         'privacy': {
             'mode': 'public_redacted',
             'sensitive_fields_removed': ['ip', 'url', 'health_url', 'internal_hostnames'],
@@ -1054,6 +1218,7 @@ def _build_readiness_payload(host_root: str, include_business_brief_check: bool 
         run_contract_check('/api/platform/metrics', _platform_metrics_payload),
         run_contract_check('/api/platform/strategy-ops', _platform_strategy_ops_payload),
         run_contract_check('/api/platform/go-no-go-brief', _platform_go_no_go_brief_payload),
+        run_contract_check('/api/platform/legacy-aliases', _legacy_alias_usage_payload),
         run_contract_check('/api/platform/agent-context', _platform_agent_context_payload),
         run_contract_check('/api/platform/librarian-context', _platform_librarian_context_payload),
         run_contract_check('/api/platform/autonomy', _platform_autonomy_payload),
@@ -1209,28 +1374,29 @@ def _build_readiness_payload(host_root: str, include_business_brief_check: bool 
 
 def _normalize_trading_metrics_payload(raw=None, source='fallback', error=None):
     raw = raw or {}
-    pnl_daily = raw.get('pnl', {}).get('daily') if isinstance(raw.get('pnl'), dict) else raw.get('pnl_24h', 0)
-    pnl_weekly = raw.get('pnl', {}).get('weekly') if isinstance(raw.get('pnl'), dict) else raw.get('pnl_7d', 0)
-    pnl_monthly = raw.get('pnl', {}).get('monthly') if isinstance(raw.get('pnl'), dict) else raw.get('pnl_30d', 0)
-    total_pnl = raw.get('pnl', {}).get('total') if isinstance(raw.get('pnl'), dict) else raw.get('pnl_24h', 0)
-    trades_today = raw.get('trades', {}).get('today') if isinstance(raw.get('trades'), dict) else raw.get('trades_today', 0)
-    trades_total = raw.get('trades', {}).get('total') if isinstance(raw.get('trades'), dict) else raw.get('trades_limit', 0)
-    success_rate = raw.get('trades', {}).get('success_rate') if isinstance(raw.get('trades'), dict) else raw.get('win_rate', 0)
+    pnl_daily = _safe_float(raw.get('pnl', {}).get('daily') if isinstance(raw.get('pnl'), dict) else raw.get('pnl_24h', 0), 0.0)
+    pnl_weekly = _safe_float(raw.get('pnl', {}).get('weekly') if isinstance(raw.get('pnl'), dict) else raw.get('pnl_7d', 0), 0.0)
+    pnl_monthly = _safe_float(raw.get('pnl', {}).get('monthly') if isinstance(raw.get('pnl'), dict) else raw.get('pnl_30d', 0), 0.0)
+    total_pnl = _safe_float(raw.get('pnl', {}).get('total') if isinstance(raw.get('pnl'), dict) else raw.get('pnl_24h', 0), 0.0)
+    trades_today = int(raw.get('trades', {}).get('today') if isinstance(raw.get('trades'), dict) else raw.get('trades_today', 0) or 0)
+    trades_total = int(raw.get('trades', {}).get('total') if isinstance(raw.get('trades'), dict) else raw.get('trades_limit', 0) or 0)
+    success_rate = _safe_float(raw.get('trades', {}).get('success_rate') if isinstance(raw.get('trades'), dict) else raw.get('win_rate', 0), 0.0)
 
     payload = {
         'pnl': {
-            'daily': pnl_daily or 0,
-            'weekly': pnl_weekly or 0,
-            'monthly': pnl_monthly or 0,
-            'total': total_pnl or 0,
+            'daily': round(pnl_daily, 6),
+            'weekly': round(pnl_weekly, 6),
+            'monthly': round(pnl_monthly, 6),
+            'total': round(total_pnl, 6),
         },
         'trades': {
-            'today': trades_today or 0,
-            'total': trades_total or 0,
-            'success_rate': success_rate or 0,
+            'today': trades_today,
+            'total': trades_total,
+            'success_rate': round(success_rate, 2),
         },
         'reject_tax': raw.get('reject_tax', {}),
         'positions': raw.get('positions', []),
+        'pnl_source': raw.get('pnl_source', source),
         'raw': raw,
         'source': source,
         'timestamp': raw.get('timestamp', datetime.utcnow().isoformat()),
@@ -2030,7 +2196,13 @@ def _build_signal_outcome_attribution(days: int = 7, platform: str = 'lighter', 
     reason_counts = {}
     outcome_counts = {}
     by_lane = {}
-    windows = {'1h': _bucket('1h'), '6h': _bucket('6h'), '24h': _bucket('24h')}
+    windows = {
+        '1h': _bucket('1h'),
+        '6h': _bucket('6h'),
+        '24h': _bucket('24h'),
+        '7d': _bucket('7d'),
+        '30d': _bucket('30d'),
+    }
     rows = []
     latest_signal_at = None
 
@@ -2147,7 +2319,7 @@ def _build_signal_outcome_attribution(days: int = 7, platform: str = 'lighter', 
         lane['estimated_slippage_usd'] += slippage_usd
 
         age_h = max(0.0, (now_utc - ts).total_seconds() / 3600.0)
-        for label, threshold in (('1h', 1.0), ('6h', 6.0), ('24h', 24.0)):
+        for label, threshold in (('1h', 1.0), ('6h', 6.0), ('24h', 24.0), ('7d', 24.0 * 7.0), ('30d', 24.0 * 30.0)):
             if age_h <= threshold:
                 win = windows[label]
                 win['sample_size'] += 1
@@ -2513,45 +2685,63 @@ def _resolve_strategy_ops_decision(
 
 
 def _build_strategy_ops_assessment(scorecard: dict, reject_tax: dict) -> dict:
-    totals = scorecard.get('totals', {}) if isinstance(scorecard.get('totals'), dict) else {}
-    ranked = scorecard.get('ranked', []) if isinstance(scorecard.get('ranked'), list) else []
-    sample_size = int(reject_tax.get('sample_size') or totals.get('sample_size') or 0)
-    reject_tax_pct = float(reject_tax.get('reject_tax_pct', totals.get('reject_tax_pct', 0.0)) or 0.0)
-    hard_fail_pct = float(reject_tax.get('hard_fail_pct', totals.get('hard_fail_pct', 0.0)) or 0.0)
-    min_sample = max(1, int(float(os.getenv('STRATEGY_OPS_GONOGO_MIN_SAMPLE_SIZE', '30') or 30)))
-    max_reject = max(0.0, min(100.0, float(os.getenv('STRATEGY_OPS_GONOGO_MAX_REJECT_TAX_PCT', '70') or 70.0)))
-    max_hard_fail = max(0.0, min(100.0, float(os.getenv('STRATEGY_OPS_GONOGO_MAX_HARD_FAIL_PCT', '10') or 10.0)))
+    return _build_strategy_ops_assessment_core(scorecard=scorecard, reject_tax=reject_tax)
 
-    reasons = []
-    if sample_size < min_sample:
-        reasons.append(f'sample_size {sample_size} < {min_sample}')
-    if reject_tax_pct > max_reject:
-        reasons.append(f'reject_tax {reject_tax_pct:.1f}% > {max_reject:.1f}%')
-    if hard_fail_pct > max_hard_fail:
-        reasons.append(f'hard_fail {hard_fail_pct:.1f}% > {max_hard_fail:.1f}%')
 
-    promote_lanes = [row for row in ranked if str(row.get('recommendation', '')).lower() == 'promote']
-    top_promote = promote_lanes[0] if promote_lanes else None
-    go = len(reasons) == 0
-    return {
-        'go': bool(go),
-        'label': 'GO' if go else 'NO-GO',
-        'reasons': reasons,
-        'sample_size': sample_size,
-        'reject_tax_pct': round(reject_tax_pct, 2),
-        'hard_fail_pct': round(hard_fail_pct, 2),
-        'promote_candidates': len(promote_lanes),
-        'top_promote_lane': (
-            f"{top_promote.get('strategy', 'unknown')}@{top_promote.get('timeframe', 'unknown')}"
-            if isinstance(top_promote, dict)
-            else ''
-        ),
-        'thresholds': {
-            'min_sample_size': min_sample,
-            'max_reject_tax_pct': round(max_reject, 2),
-            'max_hard_fail_pct': round(max_hard_fail, 2),
+def _build_trading_pnl_truth(days: int = 30, platform: str = 'lighter') -> dict:
+    safe_days = max(1, min(int(days or 30), 30))
+    platform_norm = str(platform or 'lighter').strip().lower() or 'lighter'
+    cache_key = f'trading_pnl_truth_{platform_norm}_{safe_days}'
+    cached = get_cached(cache_key, duration=20)
+    if cached:
+        return cached
+
+    attribution = _build_signal_outcome_attribution(days=safe_days, platform=platform_norm, limit=3200)
+    summary = attribution.get('summary', {}) if isinstance(attribution.get('summary'), dict) else {}
+    windows = attribution.get('windows', {}) if isinstance(attribution.get('windows'), dict) else {}
+    w24 = windows.get('24h', {}) if isinstance(windows.get('24h'), dict) else {}
+    w7 = windows.get('7d', {}) if isinstance(windows.get('7d'), dict) else {}
+    w30 = windows.get('30d', {}) if isinstance(windows.get('30d'), dict) else {}
+
+    by_outcome = attribution.get('by_outcome', []) if isinstance(attribution.get('by_outcome'), list) else []
+    wins = losses = 0
+    for row in by_outcome:
+        outcome = str((row or {}).get('outcome', '')).strip().lower()
+        count = int((row or {}).get('count', 0) or 0)
+        if outcome == 'filled_success':
+            wins += count
+        elif outcome == 'hard_failed':
+            losses += count
+
+    closed = wins + losses
+    success_rate = round((wins / closed) * 100.0, 2) if closed > 0 else 0.0
+    payload = {
+        'source': 'signal_outcome_attribution_net_after_fees',
+        'sample_size': int(summary.get('sample_size', 0) or 0),
+        'pnl': {
+            'daily': round(_safe_float(w24.get('net_pnl_after_fees_usd'), 0.0), 6),
+            'weekly': round(_safe_float(w7.get('net_pnl_after_fees_usd'), 0.0), 6),
+            'monthly': round(_safe_float(w30.get('net_pnl_after_fees_usd'), _safe_float(summary.get('net_pnl_after_fees_usd'), 0.0)), 6),
+            'total': round(_safe_float(summary.get('net_pnl_after_fees_usd'), 0.0), 6),
+        },
+        'trades': {
+            'today': int(w24.get('filled_success_count', 0) or 0),
+            'week': int(w7.get('filled_success_count', 0) or 0),
+            'month': int(w30.get('filled_success_count', 0) or 0),
+            'total': int(summary.get('filled_success_count', 0) or 0),
+            'wins': wins,
+            'losses': losses,
+            'success_rate': success_rate,
+        },
+        'attribution': {
+            'fill_rate_pct': round(_safe_float(summary.get('fill_rate_pct'), 0.0), 2),
+            'reject_tax_pct': round(_safe_float(summary.get('reject_tax_pct'), 0.0), 2),
+            'hard_fail_pct': round(_safe_float(summary.get('hard_fail_pct'), 0.0), 2),
+            'latest_signal_at': summary.get('latest_signal_at'),
         },
     }
+    set_cache(cache_key, payload)
+    return payload
 
 
 def _fetch_verified_trading_metrics():
@@ -2609,27 +2799,51 @@ def _fetch_verified_trading_metrics():
         else:
             losses += 1
 
-    if monthly_count == 0:
+    outcome_truth = _build_trading_pnl_truth(days=30, platform='lighter')
+    truth_sample_size = int(outcome_truth.get('sample_size', 0) or 0)
+    if monthly_count == 0 and truth_sample_size == 0:
         return None
 
-    success_rate = round((wins / monthly_count) * 100.0, 2) if monthly_count > 0 else 0.0
+    truth_trades = outcome_truth.get('trades', {}) if isinstance(outcome_truth.get('trades'), dict) else {}
+    truth_pnl = outcome_truth.get('pnl', {}) if isinstance(outcome_truth.get('pnl'), dict) else {}
+
+    daily_total = max(daily_count, int(truth_trades.get('today', 0) or 0))
+    monthly_total = max(monthly_count, int(truth_trades.get('total', 0) or 0))
+    wins_total = max(wins, int(truth_trades.get('wins', 0) or 0))
+    losses_total = max(losses, int(truth_trades.get('losses', 0) or 0))
+    success_rate = (
+        round((wins_total / max(1, wins_total + losses_total)) * 100.0, 2)
+        if (wins_total + losses_total) > 0
+        else round(float(truth_trades.get('success_rate', 0.0) or 0.0), 2)
+    )
+
+    pnl_payload = {
+        'daily': round(_safe_float(truth_pnl.get('daily'), daily_pnl), 6),
+        'weekly': round(_safe_float(truth_pnl.get('weekly'), weekly_pnl), 6),
+        'monthly': round(_safe_float(truth_pnl.get('monthly'), monthly_pnl), 6),
+        'total': round(_safe_float(truth_pnl.get('total'), monthly_pnl), 6),
+    }
+
     raw = {
         'timestamp': now_utc.isoformat(),
-        'pnl': {
+        'pnl': pnl_payload,
+        'pnl_realized': {
             'daily': round(daily_pnl, 6),
             'weekly': round(weekly_pnl, 6),
             'monthly': round(monthly_pnl, 6),
             'total': round(monthly_pnl, 6),
         },
+        'pnl_source': str(outcome_truth.get('source', 'trade_executions_realized')),
         'trades': {
-            'today': daily_count,
-            'total': monthly_count,
+            'today': daily_total,
+            'total': monthly_total,
             'success_rate': success_rate,
-            'wins': wins,
-            'losses': losses,
+            'wins': wins_total,
+            'losses': losses_total,
         },
         'positions': [],
-        'verified_execution_source': 'trade_executions',
+        'verified_execution_source': 'trade_executions+signal_outcome_attribution',
+        'attribution': outcome_truth.get('attribution', {}),
     }
     return _normalize_trading_metrics_payload(raw, source='firestore_verified_executions')
 
@@ -2639,11 +2853,30 @@ def _fetch_trading_metrics():
         return _normalize_trading_metrics_payload(source='firestore_unavailable', error='firestore_unavailable')
 
     verified = _fetch_verified_trading_metrics()
-    metrics = (
-        verified
-        if verified is not None
-        else _normalize_trading_metrics_payload(source='firestore_verified_empty', error='no_verified_executions')
-    )
+    if verified is not None:
+        metrics = verified
+    else:
+        truth = _build_trading_pnl_truth(days=30, platform='lighter')
+        truth_sample_size = int(truth.get('sample_size', 0) or 0)
+        if truth_sample_size > 0:
+            raw = {
+                'timestamp': datetime.utcnow().isoformat(),
+                'pnl': truth.get('pnl', {}),
+                'pnl_source': truth.get('source', 'signal_outcome_attribution_net_after_fees'),
+                'trades': {
+                    'today': int(((truth.get('trades') or {}).get('today', 0) or 0)),
+                    'total': int(((truth.get('trades') or {}).get('total', 0) or 0)),
+                    'success_rate': float(((truth.get('trades') or {}).get('success_rate', 0.0) or 0.0)),
+                    'wins': int(((truth.get('trades') or {}).get('wins', 0) or 0)),
+                    'losses': int(((truth.get('trades') or {}).get('losses', 0) or 0)),
+                },
+                'positions': [],
+                'verified_execution_source': 'signal_outcome_attribution',
+                'attribution': truth.get('attribution', {}),
+            }
+            metrics = _normalize_trading_metrics_payload(raw, source='firestore_verified_from_attribution')
+        else:
+            metrics = _normalize_trading_metrics_payload(source='firestore_verified_empty', error='no_verified_executions')
     reject_tax = _fetch_reject_tax_metrics(hours=24, limit=1500)
     metrics['reject_tax'] = reject_tax
     if isinstance(metrics.get('raw'), dict):
@@ -4879,32 +5112,7 @@ def _platform_agent_context_payload(hours: int = 24, refresh: bool = False):
     top_lanes = ops_state.get('top_lanes', []) if isinstance(ops_state.get('top_lanes'), list) else []
 
     if not strategy_assessment:
-        sample_size = int(reject_tax.get('sample_size', 0) or 0)
-        reject_tax_pct = float(reject_tax.get('reject_tax_pct', 0.0) or 0.0)
-        hard_fail_pct = float(reject_tax.get('hard_fail_pct', 0.0) or 0.0)
-        min_sample = max(1, int(float(os.getenv('STRATEGY_OPS_GONOGO_MIN_SAMPLE_SIZE', '30') or 30)))
-        max_reject = max(0.0, min(100.0, float(os.getenv('STRATEGY_OPS_GONOGO_MAX_REJECT_TAX_PCT', '70') or 70.0)))
-        max_hard_fail = max(0.0, min(100.0, float(os.getenv('STRATEGY_OPS_GONOGO_MAX_HARD_FAIL_PCT', '10') or 10.0)))
-        reasons = []
-        if sample_size < min_sample:
-            reasons.append(f'sample_size {sample_size} < {min_sample}')
-        if reject_tax_pct > max_reject:
-            reasons.append(f'reject_tax {reject_tax_pct:.1f}% > {max_reject:.1f}%')
-        if hard_fail_pct > max_hard_fail:
-            reasons.append(f'hard_fail {hard_fail_pct:.1f}% > {max_hard_fail:.1f}%')
-        strategy_assessment = {
-            'go': len(reasons) == 0,
-            'label': 'GO' if len(reasons) == 0 else 'NO-GO',
-            'reasons': reasons,
-            'sample_size': sample_size,
-            'reject_tax_pct': round(reject_tax_pct, 2),
-            'hard_fail_pct': round(hard_fail_pct, 2),
-            'thresholds': {
-                'min_sample_size': min_sample,
-                'max_reject_tax_pct': round(max_reject, 2),
-                'max_hard_fail_pct': round(max_hard_fail, 2),
-            },
-        }
+        strategy_assessment = _build_strategy_ops_assessment(scorecard={'totals': {}, 'ranked': []}, reject_tax=reject_tax)
     if not strategy_decision:
         strategy_decision = _resolve_strategy_ops_decision(
             assessment=strategy_assessment,
@@ -5826,6 +6034,7 @@ def _platform_organization_payload(refresh: bool = False):
 def _platform_contracts_payload():
     host_root = (request.url_root or '').rstrip('/')
     revision = os.environ.get('K_REVISION', '')
+    legacy_alias = _legacy_alias_usage_payload()
 
     endpoints = []
     for row in PLATFORM_CONTRACTS:
@@ -5859,6 +6068,7 @@ def _platform_contracts_payload():
             '/api/status': '/api/platform/status',
             '/api/trading/metrics': '/api/platform/metrics',
             '/api/strategy/ops': '/api/platform/strategy-ops',
+            '/api/legacy-aliases': '/api/platform/legacy-aliases',
             '/api/agent/context': '/api/platform/agent-context',
             '/api/business-brief': '/api/platform/business-brief',
             '/api/logs': '/api/platform/logs',
@@ -5877,6 +6087,14 @@ def _platform_contracts_payload():
             'deprecated': True,
             'sunset': LEGACY_ALIAS_SUNSET,
             'successor_prefix': '/api/platform/',
+            'usage': {
+                'session_hits': int(((legacy_alias.get('session') or {}).get('total_hits', 0) or 0)),
+                'cumulative_hits': int(((legacy_alias.get('cumulative') or {}).get('total_hits', 0) or 0)),
+                'top_aliases': (
+                    ((legacy_alias.get('cumulative') or {}).get('top_aliases') or [])
+                    or ((legacy_alias.get('session') or {}).get('top_aliases') or [])
+                )[:5],
+            },
         },
         'notes': [
             'Use /api/platform/* contracts for all new clients.',
@@ -6056,6 +6274,12 @@ def api_platform_go_no_go_brief():
     days = request.args.get('days', 7, type=int)
     refresh = request.args.get('refresh', 'false', type=str).lower() == 'true'
     return jsonify(_platform_go_no_go_brief_payload(days=days, refresh=refresh))
+
+
+@app.route('/api/platform/legacy-aliases')
+@requires_auth
+def api_platform_legacy_aliases():
+    return jsonify(_legacy_alias_usage_payload())
 
 
 @app.route('/api/platform/agent-context')
@@ -6267,6 +6491,12 @@ def api_trading_metrics():
 @requires_auth
 def api_strategy_ops():
     return _deprecated_alias_response(api_platform_strategy_ops(), '/api/platform/strategy-ops')
+
+
+@app.route('/api/legacy-aliases')
+@requires_auth
+def api_legacy_aliases():
+    return _deprecated_alias_response(api_platform_legacy_aliases(), '/api/platform/legacy-aliases')
 
 
 @app.route('/api/agent/context')
