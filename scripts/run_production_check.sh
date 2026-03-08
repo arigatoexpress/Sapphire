@@ -61,7 +61,11 @@ if is_truthy "$STRICT_RUNTIME_GIT"; then
     gcloud container images list-tags "$image_repo" \
       --filter="tags:${image_tag}" \
       --limit=1 \
-      --format='value(digest)'
+      --format='json' | python3 -c '
+import json,sys
+rows=json.load(sys.stdin)
+print((rows[0].get("digest","") if rows else "").strip())
+'
   )"
   if [[ -z "${latest_digest:-}" ]]; then
     echo "FAIL: unable to resolve digest for ${FRONTEND_IMAGE}"
