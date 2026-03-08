@@ -1,36 +1,36 @@
 # Sapphire Docs Index
 
 ## Start Here
-- `README.md` (what Sapphire is, scope lock, control channels)
-- `OPERATIONS_RUNBOOK.md` (day-2 ops, deploy, incident response)
-- `MASTERPLAN.md` (system goals + constraints)
-- `docs/SAPPHIRE_STACK_ASCII.md` (architecture map)
-- `docs/CLOUD_ENVIRONMENT.md` (live cloud map + source-of-truth commands)
+- `../README.md` (project scope and canonical surfaces)
+- `../OPERATIONS_RUNBOOK.md` (day-2 operations and incident response)
+- `../MASTERPLAN.md` (system goals and constraints)
+- `SOURCE_OF_TRUTH.md` (canonical runtime source-of-truth and guardrails)
+- `CLOUD_ENVIRONMENT.md` (live cloud map and commands)
+- `SAPPHIRE_STACK_ASCII.md` (topology map)
 
-## Core System Docs
-- `docs/SAPPHIRE_AUTONOMY_MASTER_PLAN.md`
-- `docs/SAPPHIRE_ORGANIZATION.md`
-- `docs/TRADINGVIEW_QUANT_WORKBENCH.md`
-- `docs/AUTONOMY_LAB_CONTRACT_2026-03-01.md`
-- `docs/SCOUT_SANDBOX_SCRAPLING_GTM_INTEGRATION.md`
-- `docs/STRATEGY_PROMOTION_PIPELINE.md`
-- `docs/SYSTEM_STATUS_SUMMARY_2026-03-07.md`
-- `docs/FLOWISE_VISUAL_AGENT_INTEGRATION_2026-03-07.md`
-- `docs/LIBRARIAN_CONTEXT_INTEGRATION_2026-03-07.md`
-- `docs/LUMO_OPERATIONS_WORKFLOW_2026-03-07.md`
+## Current Operations
+- `SYSTEM_STATUS_SUMMARY_2026-03-07.md`
+- `OPERATIONAL_STATUS.md`
+- `LIGHTER_RELIABILITY_GATE.md`
+- `STRATEGY_PROMOTION_PIPELINE.md`
+- `PLATFORM_ENDPOINT_POLICY.md`
 
-## Audits
-- `docs/FIRST_PRINCIPLES_AUDIT_2026-02-12.md`
-- `docs/FRONTEND_DELIVERY_AUDIT_2026-02-12.md`
+## Architecture and Platform
+- `SAPPHIRE_AUTONOMY_MASTER_PLAN.md`
+- `SAPPHIRE_ORGANIZATION.md`
+- `TRADINGVIEW_QUANT_WORKBENCH.md`
+- `AUTONOMY_LAB_CONTRACT_2026-03-01.md`
+- `SCOUT_SANDBOX_SCRAPLING_GTM_INTEGRATION.md`
+- `FLOWISE_VISUAL_AGENT_INTEGRATION_2026-03-07.md`
+- `LIBRARIAN_CONTEXT_INTEGRATION_2026-03-07.md`
+- `LUMO_OPERATIONS_WORKFLOW_2026-03-07.md`
 
-## Working Notes
-- `ROADMAP.md`
-- `LEARNINGS.md`
-- `HANDOFF.md`
+## Audits and Debt
+- `FULL_SYSTEM_EFFICIENCY_AUDIT_2026-03-07.md`
+- `FIRST_PRINCIPLES_AUDIT_2026-02-12.md`
+- `FRONTEND_DELIVERY_AUDIT_2026-02-12.md`
+- `REPO_CONSOLIDATION.md`
 
-## Repo Hygiene
-- `docs/REPO_CONSOLIDATION.md`
-
-## Archived
-- `docs/archive/README.md`
-- `archive/legacy/README.md`
+## Archive
+- `archive/README.md`
+- `../archive/legacy/README.md`
