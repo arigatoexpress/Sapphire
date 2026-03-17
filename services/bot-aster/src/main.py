@@ -31,6 +31,8 @@ from models import (
     TradeSide,
     TradeSignal,
 )
+from circuit_breaker import CircuitBreaker, CircuitBreakerOpen
+from execution_idempotency import ExecutionIdempotency
 
 logger = logging.getLogger(__name__)
 
@@ -78,10 +80,20 @@ class AsterBot:
         self.trades_failed = 0
         self.total_fees = 0.0
 
-        # Signal idempotency guard: prevent duplicate execution on Pub/Sub redelivery.
-        self._processed_signal_ids: Dict[str, float] = {}
+        # Firestore client shared by idempotency guard + position persistence.
+        self._db = None
+        # Signal idempotency guard: Firestore-backed (durable across restarts) with
+        # in-memory fast path.
+        self._idempotency: Optional[ExecutionIdempotency] = None
         self._signal_dedupe_ttl_seconds = max(
             60, int(os.getenv("SIGNAL_DEDUPE_TTL_SECONDS", "900"))
+        )
+
+        # Circuit breaker: open after 5 consecutive venue API failures, reset after 120s.
+        self._circuit_breaker = CircuitBreaker(
+            "aster",
+            fail_max=int(os.getenv("ASTER_CIRCUIT_BREAKER_FAIL_MAX", "5")),
+            reset_timeout=float(os.getenv("ASTER_CIRCUIT_BREAKER_RESET_SECONDS", "120")),
         )
 
         # Paper trading mode (disabled by default for production)
@@ -162,9 +174,34 @@ class AsterBot:
             # Initialize Pub/Sub
             pubsub = get_pubsub_client()
             await pubsub.initialize()
+            subscribe_signals = str(
+                os.getenv("ASTER_SUBSCRIBE_SIGNALS", "true")
+            ).strip().lower() in {"1", "true", "yes", "on"}
+            if subscribe_signals:
+                await subscribe("trading-signals", self._handle_signal)
+                await subscribe("risk-alerts", self._handle_risk_alert)
+            else:
+                logger.warning("ASTER_SUBSCRIBE_SIGNALS=false -> skipping signal subscriptions")
 
-            await subscribe("trading-signals", self._handle_signal)
-            await subscribe("risk-alerts", self._handle_risk_alert)
+            # Initialize Firestore-backed idempotency guard and warm from recent history.
+            try:
+                from google.cloud import firestore as _fs
+                _fs_client = _fs.AsyncClient(project=os.getenv("GCP_PROJECT_ID", "sapphire-479610"))
+                self._db = _fs_client
+                self._idempotency = ExecutionIdempotency(
+                    platform=PLATFORM.value,
+                    firestore_client=_fs_client,
+                    ttl_seconds=self._signal_dedupe_ttl_seconds,
+                )
+                warmed = await self._idempotency.warm_from_firestore()
+                logger.info("✅ Idempotency guard ready (warmed %d recent IDs from Firestore)", warmed)
+            except Exception as _idem_err:
+                logger.warning("⚠️ Idempotency guard degraded to memory-only: %s", _idem_err)
+                self._idempotency = ExecutionIdempotency(
+                    platform=PLATFORM.value,
+                    firestore_client=None,
+                    ttl_seconds=self._signal_dedupe_ttl_seconds,
+                )
 
             logger.info(f"✅ {SERVICE_NAME} initialized successfully")
             return True
@@ -403,6 +440,7 @@ class AsterBot:
     async def _position_publish_loop(self):
         """Periodically publish a snapshot of positions for the realtime dashboard."""
         from dataclasses import asdict
+        from datetime import datetime, timezone
 
         while self.running:
             try:
@@ -420,6 +458,22 @@ class AsterBot:
                         "positions": positions_payload,
                     },
                 )
+
+                # Persist snapshot to Firestore for position reconciliation.
+                if self._db is not None:
+                    try:
+                        doc_ref = self._db.collection("live_positions").document(PLATFORM.value)
+                        await doc_ref.set(
+                            {
+                                "platform": PLATFORM.value,
+                                "position_count": len(positions_payload),
+                                "positions": positions_payload,
+                                "updated_at": datetime.now(timezone.utc),
+                            }
+                        )
+                    except Exception as _fs_err:
+                        logger.debug("Position Firestore write error: %s", _fs_err)
+
             except Exception as e:
                 logger.error(f"Position publish error: {e}")
             await asyncio.sleep(self._position_publish_interval_seconds)
@@ -526,13 +580,28 @@ class AsterBot:
                 logger.warning(f"🧯 Rejected signal without signal_id on {PLATFORM}: {signal.symbol}")
                 return
 
-            if self._is_duplicate_signal(signal_id):
-                logger.warning(f"🧯 Duplicate signal ignored on {PLATFORM}: {signal_id}")
-                return
-            self._mark_signal_processed(signal_id)
+            # Durable idempotency check (memory-first, Firestore-backed).
+            idempotency = self._idempotency
+            if idempotency is not None:
+                claimed = await idempotency.claim(signal_id, signal.symbol)
+                if not claimed:
+                    return
+            else:
+                if self._is_duplicate_signal(signal_id):
+                    logger.warning(f"🧯 Duplicate signal ignored on {PLATFORM}: {signal_id}")
+                    return
+                self._mark_signal_processed(signal_id)
 
             logger.info(f"📥 Received signal: {signal.side} {signal.symbol}")
             result = await self._execute_trade(signal)
+
+            # Persist outcome to idempotency store.
+            if idempotency is not None:
+                if result.success:
+                    await idempotency.mark_executed(signal_id, result.order_id or "")
+                else:
+                    await idempotency.mark_failed(signal_id, result.error_message or "")
+
             # Don't emit trade events for explicit no-op signals (ex: reduce-only without exposure).
             if not (result.metadata or {}).get("noop"):
                 await publish("trade-executed", result)
@@ -826,18 +895,25 @@ class AsterBot:
                 }  # Mock
                 logger.info("📝 Paper trade executed")
             else:
-                # Real execution
-                # Use market order for immediate fill
-                from aster_client import OrderType
+                # Real execution — circuit breaker gates the venue API call.
+                self._circuit_breaker.check()
+                try:
+                    from aster_client import OrderType
 
-                order_result = await self.client.place_order(
-                    symbol=symbol,
-                    side=side,
-                    order_type=OrderType.MARKET,
-                    quantity=quantity,
-                    reduce_only=reduce_only,
-                )
-                logger.info(f"✅ Aster Order Result: {order_result}")
+                    order_result = await self.client.place_order(
+                        symbol=symbol,
+                        side=side,
+                        order_type=OrderType.MARKET,
+                        quantity=quantity,
+                        reduce_only=reduce_only,
+                    )
+                    logger.info(f"✅ Aster Order Result: {order_result}")
+                    self._circuit_breaker.record_success()
+                except CircuitBreakerOpen:
+                    raise
+                except Exception as _venue_err:
+                    self._circuit_breaker.record_failure(_venue_err)
+                    raise
 
                 # Market orders can return NEW before exchange matching finishes.
                 # Poll briefly for terminal status so telemetry reflects real fills.
@@ -941,6 +1017,20 @@ class AsterBot:
                     execution_time_ms=execution_time,
                 )
 
+        except CircuitBreakerOpen as _cb_err:
+            execution_time = (datetime.now() - start_time).total_seconds() * 1000
+            logger.warning("Trade blocked by circuit breaker: %s", _cb_err)
+            return TradeResult(
+                trade_id="",
+                signal_id=signal.signal_id,
+                platform=PLATFORM,
+                symbol=str(signal.symbol or "").strip().upper() or "SOLUSDT",
+                side=signal.side,
+                success=False,
+                error_message=str(_cb_err),
+                execution_time_ms=execution_time,
+                metadata={"circuit_breaker_open": True},
+            )
         except Exception as e:
             self.trades_failed += 1
             execution_time = (datetime.now() - start_time).total_seconds() * 1000
@@ -1187,6 +1277,22 @@ class AsterBot:
 async def main():
     """Main entry point."""
     setup_logging(os.getenv("LOG_LEVEL", "INFO"))
+
+    # Validate required config at startup — fail fast with a clear error.
+    from startup_validator import validate_config
+    validate_config(
+        service=SERVICE_NAME,
+        required=["ASTER_API_KEY"],
+        warn_if_missing=["ASTER_PASSPHRASE", "GCP_PROJECT_ID", "SIGNAL_DEDUPE_TTL_SECONDS"],
+    )
+    # Secret key: accepts ASTER_SECRET_KEY (Cloud Run) or ASTER_API_SECRET (Pi .env)
+    if not ASTER_API_SECRET:
+        import sys
+        logger.critical(
+            "❌ [%s] STARTUP FAILED — neither ASTER_SECRET_KEY nor ASTER_API_SECRET is set.",
+            SERVICE_NAME,
+        )
+        sys.exit(f"FATAL [{SERVICE_NAME}]: ASTER_SECRET_KEY or ASTER_API_SECRET must be set")
 
     logger.info("=" * 50)
     logger.info(f"⭐ ASTER BOT SERVICE")

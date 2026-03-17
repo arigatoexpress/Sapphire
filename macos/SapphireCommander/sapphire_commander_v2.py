@@ -1,380 +1,358 @@
 #!/usr/bin/env python3
-"""
-Sapphire Commander v2.0 - macOS Menu Bar App with Notifications
-Enhanced version with native macOS notifications and alerts
+"""Sapphire Operator Companion (macOS menu bar).
+
+Focused, read-only operator companion aligned to canonical platform contracts.
 """
 
-import rumps
-import requests
+from __future__ import annotations
+
 import threading
-import time
+from dataclasses import dataclass, field
 from datetime import datetime
-import json
-import os
 import subprocess
 import webbrowser
-# macOS native notifications via osascript
-def show_mac_notification(title, message, sound=True):
-    """Show native macOS notification using AppleScript"""
-    import subprocess
-    sound_cmd = 'sound name "Default"' if sound else ''
-    script = f'''
-    display notification "{message}" with title "{title}" {sound_cmd}
-    '''
-    try:
-        subprocess.run(['osascript', '-e', script], check=False)
-        return True
-    except Exception as e:
-        print(f"Notification error: {e}")
-        return False
+import os
 
-# Fallback for plyer if available
-try:
-    from plyer import notification
-    HAS_PLYER = True
-except ImportError:
-    HAS_PLYER = False
+import requests
+import rumps
 
-# Configuration
 CONFIG = {
-    'sapphire_url': 'https://sapphirealpha.xyz',
-    'gateway_url': 'https://sapphire-gateway-267358751314.us-central1.run.app',
-    'pm_hub_url': 'https://agentic-pm-hub-267358751314.us-central1.run.app',
-    'rari1_ip': '100.120.191.1',
-    'rari2_ip': '100.87.225.89',
-    'windows_ip': '100.71.10.48',
-    'refresh_interval': 30,  # seconds
-    'alert_threshold': 0.7,  # Alert if <70% healthy
+    "base_url": "https://sapphirealpha.xyz",
+    "operator_paths": {
+        "home": "/",
+        "organization": "/organization",
+        "intelligence": "/intelligence",
+        "activity": "/activity",
+        "readiness": "/production-readiness",
+        "status_json": "/api/platform/status",
+        "contracts_json": "/api/platform/contracts",
+    },
+    "internal_urls": {
+        "pm_hub_org": "https://agentic-pm-hub-267358751314.us-central1.run.app/organization",
+        "pm_manager": "https://agentic-pm-hub-267358751314.us-central1.run.app/organization",
+        "scout_status": "https://sapphire-alpha-267358751314.us-central1.run.app/forum/scout/status",
+        "scout_control": "https://sapphire-openclaw-cloud-s77j6bxyra-uc.a.run.app",
+        "scout_sandbox_health": "https://sapphire-scout-sandbox-s77j6bxyra-uc.a.run.app/health",
+    },
+    "refresh_interval": 30,
+    "timeout_seconds": 12,
+    "rari1_ip": "100.120.191.1",
+    "rari2_ip": "100.87.225.89",
+    "windows_ip": "100.71.10.48",
+    "operator_user": os.getenv("SAPPHIRE_OPERATOR_USER", "").strip(),
+    "operator_password": os.getenv("SAPPHIRE_OPERATOR_PASSWORD", "").strip(),
 }
 
-class SapphireCommander(rumps.App):
+
+def notify(title: str, message: str, sound: bool = False) -> None:
+    sound_cmd = 'sound name "Default"' if sound else ""
+    script = f'display notification "{message}" with title "{title}" {sound_cmd}'
+    try:
+        subprocess.run(["osascript", "-e", script], check=False)
+    except Exception:
+        pass
+
+
+@dataclass
+class Snapshot:
+    service_healthy: int = 0
+    service_total: int = 0
+    readiness_ok: bool = False
+    projects_count: int = 0
+    workspaces: int = 0
+    agents_online: int = 0
+    agents_total: int = 0
+    signals_count: int = 0
+    trades_count: int = 0
+    pnl_total: float = 0.0
+    btc_price: float = 0.0
+    latest_log: str = "No activity yet"
+    latest_log_ts: str = ""
+    scout_dispatch_mode: str = "unknown"
+    scout_registered: bool = False
+    scout_fallback_ready: bool = False
+    scout_sandbox_ready: bool = False
+    scout_items: int = 0
+    scout_hint: str = ""
+    updated_at: str = "Never"
+    error: str = ""
+
+    @property
+    def service_ratio(self) -> float:
+        if self.service_total <= 0:
+            return 0.0
+        return self.service_healthy / max(1, self.service_total)
+
+
+class SapphireOperatorCompanion(rumps.App):
     def __init__(self):
-        super(SapphireCommander, self).__init__(
-            name="SapphireCommander",
-            title="💎",
-            icon=None,
-            quit_button="Quit"
-        )
-        
-        # Status tracking
-        self.system_status = {"healthy": 0, "total": 0, "last_healthy_ratio": 1.0}
-        self.pm_projects = 0
-        self.active_signals = 0
-        self.prices = {"BTC": 0, "ETH": 0, "SOL": 0}
-        self.last_update = None
-        self.alert_sent = False
-        
-        # Build menu
-        self._build_menu()
-        
-        # Start background updates
-        self.update_status(None)
-        self.timer = rumps.Timer(self.update_status, CONFIG['refresh_interval'])
-        self.timer.start()
-        
-        # Show startup notification
-        self.show_notification(
-            "Sapphire Commander",
-            "Menu bar app started. Monitoring your infrastructure.",
-            sound=False
-        )
-    
-    def show_notification(self, title, message, sound=True):
-        """Show native macOS notification"""
-        # Try native AppleScript first (most reliable on macOS)
-        if show_mac_notification(title, message, sound):
-            return
-        
-        # Fallback to plyer if available
-        if HAS_PLYER:
-            try:
-                notification.notify(
-                    title=title,
-                    message=message,
-                    app_name="Sapphire Commander",
-                    timeout=5
-                )
-                return
-            except Exception as e:
-                print(f"Plyer notification error: {e}")
-        
-        # Last resort: print to console
-        print(f"[NOTIFICATION] {title}: {message}")
-    
-    def _build_menu(self):
-        """Build the menu bar menu"""
-        # Status section
-        self.status_item = rumps.MenuItem("⏳ Loading...")
-        self.pm_item = rumps.MenuItem("📊 PM: Loading...")
-        self.signals_item = rumps.MenuItem("📡 Signals: Loading...")
-        self.prices_item = rumps.MenuItem("💰 Prices: Loading...")
-        self.last_update_item = rumps.MenuItem("🕐 Updated: Never")
-        
-        # Quick actions
-        open_dashboard = rumps.MenuItem("🌐 Open Dashboard", callback=self.open_dashboard)
-        open_pm = rumps.MenuItem("📋 Open PM Hub", callback=self.open_pm_hub)
-        
-        # SSH submenu
-        ssh_rari1 = rumps.MenuItem("🔧 SSH to RARI1", callback=lambda _: self.ssh_to('rari1'))
-        ssh_rari2 = rumps.MenuItem("⚡ SSH to RARI2", callback=lambda _: self.ssh_to('rari2'))
-        
-        # Actions submenu
-        refresh = rumps.MenuItem("🔄 Refresh Now", callback=self.update_status)
-        check_logs = rumps.MenuItem("📄 Check Logs", callback=self.check_logs)
-        test_alert = rumps.MenuItem("🔔 Test Notification", callback=self.test_notification)
-        
-        # Settings
-        self.notifications_item = rumps.MenuItem("🔔 Notifications: ON", callback=self.toggle_notifications)
+        super().__init__(name="SapphireOperatorCompanion", title="💎", icon=None, quit_button="Quit")
+
+        self.state = Snapshot()
         self.notifications_enabled = True
-        
-        # Separator and quit
-        separator = rumps.separator
-        
-        # Build menu
+        self.last_health_notified = None
+
+        self._build_menu()
+        self.update_status(None)
+        self.timer = rumps.Timer(self.update_status, CONFIG["refresh_interval"])
+        self.timer.start()
+
+    def _build_menu(self):
+        self.status_item = rumps.MenuItem("Status: loading...")
+        self.pm_item = rumps.MenuItem("PM: loading...")
+        self.trading_item = rumps.MenuItem("Trading: loading...")
+        self.scout_item = rumps.MenuItem("Scout: loading...")
+        self.activity_item = rumps.MenuItem("Activity: loading...")
+        self.updated_item = rumps.MenuItem("Updated: never")
+
+        open_home = rumps.MenuItem("🌐 Open Platform (Public)", callback=lambda _: self._open_public("home"))
+        open_org = rumps.MenuItem("🏢 Open Organization (Public)", callback=lambda _: self._open_public("organization"))
+        open_intel = rumps.MenuItem("🧠 Open Intelligence (Public)", callback=lambda _: self._open_public("intelligence"))
+        open_activity = rumps.MenuItem("📡 Open Activity (Public)", callback=lambda _: self._open_public("activity"))
+        open_readiness = rumps.MenuItem("✅ Open Readiness (Public)", callback=lambda _: self._open_public("readiness"))
+        open_scout_control = rumps.MenuItem("🛰️ Open Scout Control (Internal)", callback=lambda _: self._open_internal("scout_control"))
+        open_scout_status = rumps.MenuItem("📡 Open Scout Status (Internal)", callback=lambda _: self._open_internal("scout_status"))
+        open_scout_sandbox = rumps.MenuItem("🔬 Open Scout Sandbox (Internal)", callback=lambda _: self._open_internal("scout_sandbox_health"))
+        open_pm_hub = rumps.MenuItem("📋 Open PM Hub (Internal)", callback=lambda _: self._open_internal("pm_hub_org"))
+        open_pm_manager = rumps.MenuItem("🗂️ Open AI PM Manager (Internal)", callback=lambda _: self._open_internal("pm_manager"))
+
+        refresh_now = rumps.MenuItem("🔄 Refresh now", callback=self.update_status)
+        self.toggle_notifications_item = rumps.MenuItem("🔔 Notifications: ON", callback=self.toggle_notifications)
+        view_status_json = rumps.MenuItem("🧾 Open Status JSON", callback=lambda _: self._open_public("status_json"))
+        view_contracts_json = rumps.MenuItem("📜 Open Contracts JSON", callback=lambda _: self._open_public("contracts_json"))
+
+        ssh_rari1 = rumps.MenuItem("SSH RARI1", callback=lambda _: self.ssh_to("rari1"))
+        ssh_rari2 = rumps.MenuItem("SSH RARI2", callback=lambda _: self.ssh_to("rari2"))
+        ssh_windows = rumps.MenuItem("SSH Windows", callback=lambda _: self.ssh_to("windows"))
+
         self.menu = [
             self.status_item,
             self.pm_item,
-            self.signals_item,
-            self.prices_item,
-            self.last_update_item,
-            separator,
-            open_dashboard,
-            open_pm,
-            separator,
-            ("SSH", [ssh_rari1, ssh_rari2]),
-            ("Actions", [refresh, check_logs, test_alert]),
-            separator,
-            self.notifications_item,
-            separator,
+            self.trading_item,
+            self.scout_item,
+            self.activity_item,
+            self.updated_item,
+            rumps.separator,
+            open_home,
+            open_org,
+            open_intel,
+            open_scout_control,
+            open_scout_status,
+            open_scout_sandbox,
+            open_activity,
+            open_readiness,
+            open_pm_hub,
+            open_pm_manager,
+            rumps.separator,
+            ("Infra", [ssh_rari1, ssh_rari2, ssh_windows]),
+            ("Actions", [refresh_now, self.toggle_notifications_item, view_status_json, view_contracts_json]),
+            rumps.separator,
         ]
-    
+
     def toggle_notifications(self, _):
-        """Toggle notifications on/off"""
         self.notifications_enabled = not self.notifications_enabled
-        status = "ON" if self.notifications_enabled else "OFF"
-        self.notifications_item.title = f"🔔 Notifications: {status}"
-        self.show_notification("Sapphire Commander", f"Notifications {status}", sound=False)
-    
-    def test_notification(self, _):
-        """Test notification system"""
-        self.show_notification(
-            "Sapphire Commander Test",
-            "Notifications are working! 🎉",
-            sound=True
-        )
-    
-    def update_status(self, _):
-        """Update system status in background"""
-        def fetch():
-            try:
-                # Fetch status from sapphire
-                resp = requests.get(f"{CONFIG['sapphire_url']}/api/status", timeout=5)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    by_cat = data.get('by_category', {})
-                    
-                    # Count healthy services
-                    healthy = 0
-                    total = 0
-                    for cat in by_cat.values():
-                        for svc in cat:
-                            total += 1
-                            if svc.get('healthy'):
-                                healthy += 1
-                    
-                    # Check for health degradation
-                    previous_ratio = self.system_status.get('last_healthy_ratio', 1.0)
-                    current_ratio = healthy / total if total > 0 else 0
-                    
-                    # Alert if health drops below threshold
-                    if current_ratio < CONFIG['alert_threshold'] and not self.alert_sent:
-                        if self.notifications_enabled:
-                            self.show_notification(
-                                "⚠️ Sapphire Alert",
-                                f"Service health degraded: {healthy}/{total} healthy",
-                                sound=True
-                            )
-                        self.alert_sent = True
-                    elif current_ratio >= CONFIG['alert_threshold']:
-                        self.alert_sent = False  # Reset alert when recovered
-                    
-                    # Alert if health improved significantly
-                    if previous_ratio < CONFIG['alert_threshold'] and current_ratio >= CONFIG['alert_threshold']:
-                        if self.notifications_enabled:
-                            self.show_notification(
-                                "✅ Sapphire Recovered",
-                                f"All services healthy: {healthy}/{total}",
-                                sound=False
-                            )
-                    
-                    self.system_status = {
-                        "healthy": healthy, 
-                        "total": total,
-                        "last_healthy_ratio": current_ratio
-                    }
-                    
-                    # Update menu bar icon based on health
-                    if healthy == total:
-                        self.title = "💎"
-                    elif current_ratio > CONFIG['alert_threshold']:
-                        self.title = "💠"
-                    else:
-                        self.title = "⚠️"
-                else:
-                    # API error
-                    self.title = "❌"
-                    if not self.alert_sent and self.notifications_enabled:
-                        self.show_notification(
-                            "❌ Sapphire Error",
-                            f"Cannot reach sapphirealpha.xyz (HTTP {resp.status_code})",
-                            sound=True
-                        )
-                        self.alert_sent = True
-                
-                # Fetch PM projects
-                resp = requests.get(f"{CONFIG['sapphire_url']}/api/projects", timeout=5)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    new_count = data.get('count', 0)
-                    
-                    # Notify if project count changed significantly
-                    if self.pm_projects > 0 and new_count != self.pm_projects:
-                        if self.notifications_enabled:
-                            self.show_notification(
-                                "📊 Sapphire PM",
-                                f"Projects updated: {new_count} total",
-                                sound=False
-                            )
-                    
-                    self.pm_projects = new_count
-                
-                # Fetch trading metrics
-                resp = requests.get(f"{CONFIG['sapphire_url']}/api/trading/metrics", timeout=5)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    self.active_signals = data.get('active_signals', 0)
-                
-                # Fetch prices
-                resp = requests.get(f"{CONFIG['sapphire_url']}/api/market/prices", timeout=5)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    old_btc = self.prices.get('BTC', 0)
-                    new_btc = data.get('BTC', {}).get('price', 0)
-                    
-                    # Alert on significant BTC price move (>5%)
-                    if old_btc > 0 and abs(new_btc - old_btc) / old_btc > 0.05:
-                        change = ((new_btc - old_btc) / old_btc) * 100
-                        if self.notifications_enabled:
-                            self.show_notification(
-                                "💰 BTC Price Alert",
-                                f"BTC moved {change:+.1f}% to ${new_btc:,.0f}",
-                                sound=False
-                            )
-                    
-                    self.prices = {
-                        'BTC': new_btc,
-                        'ETH': data.get('ETH', {}).get('price', 0),
-                        'SOL': data.get('SOL', {}).get('price', 0),
-                    }
-                
-                self.last_update = datetime.now()
-                self._update_menu_items()
-                
-            except requests.exceptions.Timeout:
-                print("Timeout fetching status")
-                self.title = "⏱"
-            except requests.exceptions.ConnectionError:
-                print("Connection error")
-                self.title = "❌"
-                if not self.alert_sent and self.notifications_enabled:
-                    self.show_notification(
-                        "❌ Sapphire Offline",
-                        "Cannot connect to sapphirealpha.xyz",
-                        sound=True
-                    )
-                    self.alert_sent = True
-            except Exception as e:
-                print(f"Error updating status: {e}")
-                self.title = "❌"
-        
-        # Run in background thread
-        thread = threading.Thread(target=fetch)
-        thread.daemon = True
-        thread.start()
-    
-    def _update_menu_items(self):
-        """Update menu items with current data"""
-        healthy = self.system_status['healthy']
-        total = self.system_status['total']
-        
-        self.status_item.title = f"Status: {healthy}/{total} healthy"
-        self.pm_item.title = f"📊 PM: {self.pm_projects} projects"
-        self.signals_item.title = f"📡 Signals: {self.active_signals} active"
-        self.prices_item.title = f"💰 BTC: ${self.prices['BTC']:,.0f} | ETH: ${self.prices['ETH']:,.0f}"
-        
-        if self.last_update:
-            time_str = self.last_update.strftime('%H:%M:%S')
-            self.last_update_item.title = f"🕐 Updated: {time_str}"
-    
-    def open_dashboard(self, _):
-        """Open sapphirealpha.xyz in browser"""
-        webbrowser.open(CONFIG['sapphire_url'])
-    
-    def open_pm_hub(self, _):
-        """Open PM Hub in browser"""
-        webbrowser.open(CONFIG['pm_hub_url'])
-    
-    def ssh_to(self, node):
-        """Open terminal with SSH to Pi node"""
-        ip = CONFIG.get(f'{node}_ip', '')
+        self.toggle_notifications_item.title = f"🔔 Notifications: {'ON' if self.notifications_enabled else 'OFF'}"
+
+    def ssh_to(self, node: str):
+        ip = CONFIG.get(f"{node}_ip", "").strip()
         if not ip:
-            self.show_notification("Sapphire Commander", f"No IP configured for {node}", sound=False)
+            notify("Sapphire Operator", f"No IP configured for {node}")
             return
-        
-        # Open Terminal.app with SSH
         script = f'''
         tell application "Terminal"
             activate
             do script "ssh rari@{ip}"
         end tell
         '''
-        subprocess.run(['osascript', '-e', script])
-    
-    def check_logs(self, _):
-        """Open logs in browser"""
-        webbrowser.open(f"{CONFIG['sapphire_url']}/api/logs?limit=50")
-    
-    @rumps.clicked("About")
-    def about(self, _):
-        rumps.alert(
-            title="Sapphire Commander v2.0",
-            message="macOS Menu Bar App for Sapphire Trading Infrastructure\n\n"
-                   f"URL: {CONFIG['sapphire_url']}\n"
-                   f"Refresh: {CONFIG['refresh_interval']}s\n"
-                   f"Alert Threshold: {CONFIG['alert_threshold']*100:.0f}%\n\n"
-                   "Features:\n"
-                   "• Real-time health monitoring\n"
-                   "• Native macOS notifications\n"
-                   "• Price alerts\n"
-                   "• One-click SSH\n\n"
-                   "© 2026 Sapphire Inc."
+        subprocess.run(["osascript", "-e", script], check=False)
+
+    def update_status(self, _):
+        t = threading.Thread(target=self._fetch_snapshot, daemon=True)
+        t.start()
+
+    def _open_public(self, key: str):
+        path = str((CONFIG.get("operator_paths") or {}).get(key, "") or "").strip()
+        if not path:
+            notify("Sapphire Operator", f"Missing public route mapping: {key}")
+            return
+        base = str(CONFIG.get("base_url", "")).rstrip("/")
+        if not base:
+            notify("Sapphire Operator", "Missing base_url configuration")
+            return
+        webbrowser.open(f"{base}{path}")
+
+    def _open_internal(self, key: str):
+        url = str((CONFIG.get("internal_urls") or {}).get(key, "") or "").strip()
+        if not url:
+            notify("Sapphire Operator", f"Missing internal URL mapping: {key}")
+            return
+        webbrowser.open(url)
+
+    def _fetch_snapshot(self):
+        try:
+            auth = None
+            if CONFIG["operator_user"] and CONFIG["operator_password"]:
+                auth = (CONFIG["operator_user"], CONFIG["operator_password"])
+            try:
+                data = self._get_json("/api/platform/home-snapshot", auth=auth, timeout=CONFIG["timeout_seconds"])
+            except requests.exceptions.Timeout:
+                # Fallback to smaller endpoints when home-snapshot is slow.
+                data = {
+                    "status": self._get_json("/api/platform/status", auth=auth, timeout=6),
+                    "organization": self._get_json("/api/platform/organization", auth=auth, timeout=6),
+                    "projects": self._get_json("/api/platform/projects", auth=auth, timeout=6),
+                    "metrics": self._get_json("/api/platform/metrics", auth=auth, timeout=8),
+                    "logs": self._get_json("/api/platform/logs?hours=24&limit=5", auth=auth, timeout=8),
+                    "readiness": self._get_json("/api/platform/readiness", auth=auth, timeout=6),
+                }
+
+            scout_status_url = str((CONFIG.get("internal_urls") or {}).get("scout_status", "") or "").strip()
+            scout_status = self._get_direct_json(scout_status_url, timeout=4) if scout_status_url else {}
+            scout_bridge = (scout_status or {}).get("external_bridge") or {}
+            scout_registration = (scout_status or {}).get("registration") or {}
+
+            scout_intel_count = 0
+            try:
+                scout_sandbox_url = str((CONFIG.get("internal_urls") or {}).get("scout_sandbox_health", "") or "").strip()
+                scout_sandbox = self._get_direct_json(scout_sandbox_url, timeout=4) if scout_sandbox_url else {}
+                scout_sandbox_ready = bool((scout_sandbox or {}).get("sandbox_token_configured", False))
+            except Exception:
+                scout_sandbox_ready = False
+
+            status_summary = (data.get("status") or {}).get("summary") or {}
+            org_summary = (data.get("organization") or {}).get("summary") or {}
+            trading = (data.get("metrics") or {}).get("trading") or {}
+            logs = ((data.get("logs") or {}).get("logs") or [])
+            autonomy = (data.get("autonomy") or {})
+            if isinstance(autonomy, dict):
+                scout_intel_count = int((((autonomy.get("scout") or {}).get("external_bridge") or {}).get("item_count", 0) or 0))
+
+            latest_log = logs[0] if logs else {}
+            latest_msg = str(latest_log.get("message") or "No activity yet").strip()
+            latest_sym = str(latest_log.get("symbol") or "").strip()
+            latest_evt = str(latest_log.get("event_type") or "").strip()
+            latest = latest_msg
+            if latest_sym:
+                latest += f" [{latest_sym}]"
+            if latest_evt:
+                latest += f" ({latest_evt})"
+
+            pnl_total = 0.0
+            pnl = trading.get("pnl")
+            if isinstance(pnl, dict):
+                pnl_total = float(pnl.get("total", 0.0) or 0.0)
+
+            btc_price = 0.0
+            market = (data.get("metrics") or {}).get("market") or {}
+            if isinstance(market, dict):
+                btc = market.get("BTC") or market.get("btc") or {}
+                if isinstance(btc, dict):
+                    btc_price = float(btc.get("price", 0.0) or 0.0)
+
+            self.state = Snapshot(
+                service_healthy=int(status_summary.get("service_healthy", 0) or 0),
+                service_total=int(status_summary.get("service_total", 0) or 0),
+                readiness_ok=bool((data.get("readiness") or {}).get("overall_ok", False)),
+                projects_count=int((data.get("projects") or {}).get("count", 0) or 0),
+                workspaces=int(org_summary.get("workspaces", 0) or 0),
+                agents_online=int(org_summary.get("agents_online", 0) or 0),
+                agents_total=int(org_summary.get("agents_total", 0) or 0),
+                signals_count=int(trading.get("signals_total", 0) or trading.get("active_signals", 0) or 0),
+                trades_count=int(trading.get("trades_count", 0) or 0),
+                pnl_total=pnl_total,
+                btc_price=btc_price,
+                latest_log=latest[:88],
+                latest_log_ts=str(latest_log.get("timestamp") or ""),
+                scout_dispatch_mode=str(scout_bridge.get("dispatch_mode", "unknown") or "unknown"),
+                scout_registered=bool(scout_registration.get("registered", False)),
+                scout_fallback_ready=bool(scout_bridge.get("fallback_ready", False)),
+                scout_sandbox_ready=bool(scout_bridge.get("sandbox_ready", False) and scout_sandbox_ready),
+                scout_items=scout_intel_count,
+                scout_hint=str(scout_bridge.get("operator_hint", "") or ""),
+                updated_at=datetime.now().strftime("%H:%M:%S"),
+            )
+
+            self._update_ui()
+        except Exception as exc:
+            self.state.error = str(exc)
+            self.state.updated_at = datetime.now().strftime("%H:%M:%S")
+            self._update_ui(error_mode=True)
+
+    def _get_json(self, path: str, auth=None, timeout: int | None = None):
+        r = requests.get(
+            f"{CONFIG['base_url']}{path}",
+            timeout=timeout or CONFIG["timeout_seconds"],
+            auth=auth,
+            headers={"Accept": "application/json"},
         )
+        if r.status_code == 401:
+            raise RuntimeError("Unauthorized (set SAPPHIRE_OPERATOR_USER / SAPPHIRE_OPERATOR_PASSWORD)")
+        r.raise_for_status()
+        return r.json()
+
+    def _get_direct_json(self, url: str, timeout: int | None = None):
+        r = requests.get(
+            url,
+            timeout=timeout or CONFIG["timeout_seconds"],
+            headers={"Accept": "application/json"},
+        )
+        r.raise_for_status()
+        return r.json()
+
+    def _update_ui(self, error_mode: bool = False):
+        st = self.state
+        if error_mode:
+            self.title = "❌"
+            self.status_item.title = "Status: offline"
+            self.pm_item.title = "PM: unavailable"
+            self.trading_item.title = "Trading: unavailable"
+            self.activity_item.title = f"Activity: {st.error[:72]}"
+            self.updated_item.title = f"Updated: {st.updated_at}"
+            return
+
+        if st.service_total > 0 and st.service_healthy == st.service_total and st.readiness_ok:
+            icon = "💎"
+            health_label = "GREEN"
+        elif st.service_ratio >= 0.7:
+            icon = "💠"
+            health_label = "WATCH"
+        else:
+            icon = "⚠️"
+            health_label = "DEGRADED"
+
+        self.title = icon
+        self.status_item.title = (
+            f"Status: {st.service_healthy}/{st.service_total} services | Readiness: {health_label}"
+        )
+        self.pm_item.title = (
+            f"PM: {st.projects_count} projects | {st.workspaces} workspaces | agents {st.agents_online}/{st.agents_total}"
+        )
+        self.trading_item.title = (
+            f"Trading: signals {st.signals_count} | trades {st.trades_count} | PnL ${st.pnl_total:,.2f} | BTC ${st.btc_price:,.0f}"
+        )
+        scout_external = "registered" if st.scout_registered else "pending"
+        scout_lane = []
+        if st.scout_sandbox_ready:
+            scout_lane.append("sandbox")
+        if st.scout_fallback_ready:
+            scout_lane.append("hook")
+        if not scout_lane:
+            scout_lane.append("offline")
+        self.scout_item.title = (
+            f"Scout: {'+'.join(scout_lane)} | {scout_external} | mode {st.scout_dispatch_mode} | items {st.scout_items}"
+        )
+        self.activity_item.title = f"Activity: {st.latest_log}"
+        self.updated_item.title = f"Updated: {st.updated_at}"
+
+        if self.notifications_enabled:
+            # Notify once when transitioning into degraded mode.
+            current_health = "degraded" if icon in {"⚠️", "❌"} else "ok"
+            if self.last_health_notified != current_health:
+                if current_health == "degraded":
+                    notify("Sapphire Operator", "Platform health is degraded", sound=True)
+                self.last_health_notified = current_health
+
 
 if __name__ == "__main__":
-    # Check dependencies
-    try:
-        import rumps
-        import requests
-        import plyer
-    except ImportError as e:
-        print(f"Missing dependency: {e}")
-        print("Installing requirements...")
-        import subprocess
-        import sys
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
-        import rumps
-        import requests
-        import plyer
-    
-    app = SapphireCommander()
+    app = SapphireOperatorCompanion()
     app.run()

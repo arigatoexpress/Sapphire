@@ -291,6 +291,55 @@ def test_publish_scout_comment_maps_payload_for_moltbook(monkeypatch, tmp_path):
     assert outbound["content"] == "Scout comment for an external post"
 
 
+def test_publish_scout_note_maps_payload_for_gtm_channel(monkeypatch, tmp_path):
+    module = _load_forum_module()
+    monkeypatch.setenv("SAPPHIRE_FORUM_STORE_PATH", str(tmp_path / "forum.json"))
+    monkeypatch.setenv(
+        "SAPPHIRE_SCOUT_GTM_OUTBOUND_URL",
+        "https://app.clawgtm.com/api/v1/agents/dispatch",
+    )
+    monkeypatch.setenv("SAPPHIRE_SCOUT_GTM_API_TOKEN", "gtm_token_123")
+
+    service = module.SapphireForumService()
+    topic = service.create_topic(
+        {
+            "title": "GTM thread",
+            "body": "Track outbound campaign drafts.",
+            "lane": "external",
+        }
+    )
+
+    captured = {}
+
+    async def fake_dispatch(**kwargs):
+        captured.update(kwargs)
+        return {"dispatched": True, "reason": "ok", "mode": "scout_sandbox"}
+
+    monkeypatch.setattr(service, "_dispatch_scout_bridge", fake_dispatch)
+
+    result = asyncio.run(
+        service.publish_scout_note(
+            {
+                "topic_id": topic["topic_id"],
+                "body": "Outbound angle for product-led growth",
+                "author": "SAPPHIRE_SCOUT",
+                "channel": "gtm",
+                "gtm_payload": {"segment": "founders", "campaign": "alpha_launch"},
+            }
+        )
+    )
+
+    assert result["ok"] is True
+    assert result["dispatch_action"] == "gtm_outbound"
+    assert captured["action"] == "gtm_outbound"
+    assert captured["external_url"] == "https://app.clawgtm.com/api/v1/agents/dispatch"
+    assert captured["external_token"] == "gtm_token_123"
+    outbound = captured["outbound_payload"]
+    assert outbound["message"] == "Outbound angle for product-led growth"
+    assert outbound["segment"] == "founders"
+    assert outbound["campaign"] == "alpha_launch"
+
+
 def _fake_client_session_factory(status_code: int, payload: dict):
     class _FakeResponse:
         def __init__(self):
@@ -356,6 +405,61 @@ def _fake_client_session_factory_sequence(sequence):
             return _FakeResponse(status_code, payload)
 
     return _FakeClientSession
+
+
+def test_dispatch_scout_sandbox_routes_gtm_action_to_gtm_endpoint(monkeypatch, tmp_path):
+    module = _load_forum_module()
+    monkeypatch.setenv("SAPPHIRE_FORUM_STORE_PATH", str(tmp_path / "forum.json"))
+    monkeypatch.setenv("SAPPHIRE_SCOUT_SANDBOX_URL", "https://sandbox.example")
+    monkeypatch.setenv("SAPPHIRE_SCOUT_SANDBOX_TOKEN", "sandbox_token")
+
+    captured = {}
+
+    class _FakeResponse:
+        status = 200
+
+        async def text(self):
+            return json.dumps({"ok": True, "dispatch": {"dispatched": True, "reason": "ok", "status": 200}})
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    class _FakeClientSession:
+        def __init__(self, timeout=None):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def post(self, url, json=None, headers=None):
+            captured["url"] = url
+            captured["payload"] = dict(json or {})
+            captured["headers"] = dict(headers or {})
+            return _FakeResponse()
+
+    monkeypatch.setattr(module.aiohttp, "ClientSession", _FakeClientSession)
+
+    service = module.SapphireForumService()
+    result = asyncio.run(
+        service._dispatch_scout_sandbox(
+            action="gtm_outbound",
+            outbound_payload={"company_url": "https://example.com"},
+            external_url="https://app.clawgtm.com/api/v1/agents/dispatch",
+            note="dispatch gtm",
+        )
+    )
+
+    assert result["dispatched"] is True
+    assert captured["url"] == "https://sandbox.example/v1/gtm/outbound"
+    assert captured["payload"]["external_url_hint"] == "https://app.clawgtm.com/api/v1/agents/dispatch"
+    assert captured["payload"]["outbound_payload"]["company_url"] == "https://example.com"
+    assert "action" not in captured["payload"]
 
 
 def test_dispatch_external_detects_moltbook_rate_limit(monkeypatch, tmp_path):

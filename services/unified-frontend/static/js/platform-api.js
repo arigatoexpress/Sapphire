@@ -44,6 +44,12 @@
     getMetrics() {
       return request('/api/platform/metrics');
     },
+    getStrategyOps(params) {
+      return request(withParams('/api/platform/strategy-ops', params));
+    },
+    getGoNoGoBrief(params) {
+      return request(withParams('/api/platform/go-no-go-brief', params));
+    },
     getAutonomy() {
       return request('/api/platform/autonomy');
     },
@@ -74,14 +80,26 @@
     getIntelFeed(params) {
       return request(withParams('/api/platform/intel-feed', params));
     },
+    getIntelSummary(params) {
+      return request(withParams('/api/platform/intel-summary', params));
+    },
+    getZeitgeistUniverse(params) {
+      return request(withParams('/api/platform/zeitgeist-universe', params));
+    },
+    getLibrarianContext(params) {
+      return request(withParams('/api/platform/librarian-context', params));
+    },
+    getArchitectureTelemetry(params) {
+      return request(withParams('/api/platform/architecture-telemetry', params));
+    },
+    getArchitectureLive(params) {
+      return request(withParams('/api/platform/architecture-live', params));
+    },
     getSuperswarm(params) {
       return request(withParams('/api/platform/superswarm', params));
     },
     getContracts() {
       return request('/api/platform/contracts');
-    },
-    getControlPlane() {
-      return request('/api/platform/control-plane');
     },
   };
 })();

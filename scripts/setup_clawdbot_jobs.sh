@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Configure OpenClaw employee jobs (SAPPHIRE, OBSIDIAN, EMERALD) for Sapphire-only operation.
+# Configure single-agent Sapphire scheduler jobs.
 #
 # This script is idempotent: existing jobs are updated, missing jobs are created.
 
@@ -11,15 +11,17 @@ ALPHA_URL="${ALPHA_URL:-$(gcloud run services describe sapphire-alpha --project 
 ENABLE_TRADINGVIEW_JOB_WIRING="${ENABLE_TRADINGVIEW_JOB_WIRING:-false}"
 JOB_NAMES=(
   "sapphire-heartbeat-30m"
-  "obsidian-heartbeat-30m"
-  "emerald-heartbeat-30m"
   "sapphire-dep-audit-daily"
   "sapphire-security-scan-weekly"
+)
+LEGACY_JOB_NAMES=(
+  "obsidian-heartbeat-30m"
+  "emerald-heartbeat-30m"
 )
 
 if [[ "${ENABLE_TRADINGVIEW_JOB_WIRING,,}" != "true" ]]; then
   echo "TradingView integration is disabled by default. Pausing TradingView webhook scheduler jobs."
-  for job in "${JOB_NAMES[@]}"; do
+  for job in "${JOB_NAMES[@]}" "${LEGACY_JOB_NAMES[@]}"; do
     if gcloud scheduler jobs describe "${job}" --project "${PROJECT_ID}" --location "${LOCATION}" >/dev/null 2>&1; then
       gcloud scheduler jobs pause "${job}" --project "${PROJECT_ID}" --location "${LOCATION}" >/dev/null || true
       echo "paused ${job}"
@@ -50,32 +52,10 @@ SAPPHIRE_HEARTBEAT_BODY="$(cat <<JSON
 JSON
 )"
 
-OBSIDIAN_HEARTBEAT_BODY="$(cat <<JSON
-{
-  "action": "tv_custom",
-  "agent_id": "obsidian",
-  "instruction": "OBSIDIAN role heartbeat for arigatoexpress/Sapphire only. Act as CI/CD and Deployment Ops lead: report pipeline failures, runtime incidents, deploy blockers, and rollback-safe remediation steps. Ask owner for direction only when trade-offs block progress.",
-  "source": "scheduler",
-  "task": "obsidian_heartbeat_30m"
-}
-JSON
-)"
-
-EMERALD_HEARTBEAT_BODY="$(cat <<JSON
-{
-  "action": "tv_custom",
-  "agent_id": "emerald",
-  "instruction": "EMERALD role heartbeat for arigatoexpress/Sapphire only. Act as Innovation and Self-Improvement Architect: surface repetitive failure patterns, highest-ROI improvements, and execution priorities aligned to MASTERPLAN.md.",
-  "source": "scheduler",
-  "task": "emerald_heartbeat_30m"
-}
-JSON
-)"
-
 DEP_AUDIT_BODY="$(cat <<JSON
 {
   "action": "tv_custom",
-  "agent_id": "obsidian",
+  "agent_id": "sapphire",
   "instruction": "Run dependency audit for arigatoexpress/Sapphire only. Provide severity-ranked findings, safe upgrade sequence, and clearly call out any breaking change risk.",
   "source": "scheduler",
   "task": "dep_audit_daily"
@@ -131,27 +111,25 @@ upsert_hook_job \
   "${JOB_NAMES[0]}" \
   "*/30 * * * *" \
   "${SAPPHIRE_HEARTBEAT_BODY}" \
-  "SAPPHIRE (Security & Code Quality) heartbeat for Sapphire-only operations."
+  "SAPPHIRE operations heartbeat for Sapphire-only operations."
 upsert_hook_job \
   "${JOB_NAMES[1]}" \
-  "5,35 * * * *" \
-  "${OBSIDIAN_HEARTBEAT_BODY}" \
-  "OBSIDIAN (CI/CD & Deployment Ops) heartbeat for Sapphire-only operations."
-upsert_hook_job \
-  "${JOB_NAMES[2]}" \
-  "10,40 * * * *" \
-  "${EMERALD_HEARTBEAT_BODY}" \
-  "EMERALD (Innovation & Self-Improvement) heartbeat for Sapphire-only operations."
-upsert_hook_job \
-  "${JOB_NAMES[3]}" \
   "0 14 * * *" \
   "${DEP_AUDIT_BODY}" \
   "Daily Sapphire dependency audit with owner delivery."
 upsert_hook_job \
-  "${JOB_NAMES[4]}" \
+  "${JOB_NAMES[2]}" \
   "0 15 * * 1" \
   "${SECURITY_SWEEP_BODY}" \
   "Weekly Sapphire security sweep with owner delivery."
+
+# Legacy deprecated jobs are paused to avoid noisy references.
+for legacy_job in "${LEGACY_JOB_NAMES[@]}"; do
+  if gcloud scheduler jobs describe "${legacy_job}" --project "${PROJECT_ID}" --location "${LOCATION}" >/dev/null 2>&1; then
+    gcloud scheduler jobs pause "${legacy_job}" --project "${PROJECT_ID}" --location "${LOCATION}" >/dev/null || true
+    echo "paused deprecated job ${legacy_job}"
+  fi
+done
 
 echo
 echo "OpenClaw employee scheduler jobs in ${PROJECT_ID}/${LOCATION}:"
@@ -159,4 +137,4 @@ gcloud scheduler jobs list \
   --project "${PROJECT_ID}" \
   --location "${LOCATION}" \
   --format="table(name.basename(),schedule,httpTarget.uri,state)" \
-  --filter="name:(sapphire-heartbeat-30m OR obsidian-heartbeat-30m OR emerald-heartbeat-30m OR sapphire-dep-audit-daily OR sapphire-security-scan-weekly)"
+  --filter="name:(sapphire-heartbeat-30m OR sapphire-dep-audit-daily OR sapphire-security-scan-weekly OR obsidian-heartbeat-30m OR emerald-heartbeat-30m)"

@@ -30,29 +30,31 @@ while [[ $# -gt 0 ]]; do
 done
 
 ALLOWED_SERVICES=(
-  "openclaw-gateway"
+  "agentic-pm-hub"
+  "blanga-bis-beta"
   "sapphire-alpha"
   "sapphire-aster"
-  "sapphire-lighter"
-  "sapphire-control"
   "sapphire-gateway"
-  "sapphire-github-webhook-relay"
-  "sapphirebook-web"
+  "sapphire-lighter"
+  "sapphire-openclaw-cloud"
+  "sapphire-scout-sandbox"
+  "sapphire-telegram-bot"
+  "sapphire-unified-frontend"
+  "sapphire-unified-jobs"
+  "tho-agent"
 )
 
 ALLOWED_JOBS=(
-  "sapphire-alpha-health-6h"
-  "sapphire-aster-health-6h"
-  "sapphire-lighter-health-6h"
+  "agentic-pm-hub-assistant-checkin-30m"
+  "agentic-pm-hub-autonomy-15m"
+  "bis-automation-job"
+  "sapphire-architecture-bottleneck-digest-hourly"
   "sapphire-gateway-health-6h"
-  "sapphire-alpha-heartbeat-30m"
-  "sapphire-alpha-status-daily"
-  "sapphire-alpha-strategy-gate-daily"
-  "sapphire-heartbeat-30m"
-  "obsidian-heartbeat-30m"
-  "emerald-heartbeat-30m"
-  "sapphire-dep-audit-daily"
-  "sapphire-security-scan-weekly"
+  "sapphire-platform-brief-hourly"
+  "sapphire-strategy-ops-digest-6h"
+  "sapphire-strategy-ops-snapshot-hourly"
+  "sapphire-superswarm-rollup-hourly"
+  "weekly-self-improvement"
 )
 
 contains() {

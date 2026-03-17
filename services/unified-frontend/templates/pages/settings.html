@@ -215,10 +215,12 @@
         { name: '/api/platform/status', purpose: 'Live system health + service map' },
         { name: '/api/platform/metrics', purpose: 'Aggregated metrics + market snapshot' },
         { name: '/api/platform/logs', purpose: 'Operational event feed' },
+        { name: '/api/platform/intel-summary', purpose: 'AI market pulse and key movers' },
+        { name: '/api/platform/architecture-telemetry', purpose: 'Live topology and flow telemetry' },
+        { name: '/api/platform/architecture-live', purpose: 'Digital twin blueprint with delegation + sequence map' },
         { name: '/api/platform/organization', purpose: 'Organization and department model' },
         { name: '/api/platform/projects', purpose: 'Portfolio snapshot' },
         { name: '/api/platform/readiness', purpose: 'Launch gate status' },
-        { name: '/api/platform/control-plane', purpose: 'Control-plane desired/applied lane and policy state' },
     ];
 
     function statusBadge(ok) {

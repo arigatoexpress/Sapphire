@@ -296,3 +296,4 @@ Dockerfile.local
 prometheus_data/
 grafana_data/
 !trading-dashboard/public/manifest.json
+configs/pi/shared/trading.env

@@ -93,6 +93,7 @@ verification_code=""
 existing_token=""
 last_register_error=""
 last_register_response=""
+register_conflict=0
 
 if gcloud secrets describe "$TOKEN_SECRET" --project "$PROJECT_ID" >/dev/null 2>&1; then
   existing_token="$(gcloud secrets versions access latest --secret="$TOKEN_SECRET" --project "$PROJECT_ID" 2>/dev/null || true)"
@@ -142,6 +143,9 @@ else
     fi
 
     auth_token=""
+    if [[ "${http_status:-}" == "409" ]]; then
+      register_conflict=1
+    fi
     last_register_error="attempt ${attempt}/${retries}: status=${http_status:-unknown} error=${api_error:-unknown}"
     last_register_response="$sanitized_response"
     echo "WARN: registration failed (${last_register_error})."
@@ -158,6 +162,9 @@ else
       auth_token="$existing_token"
     elif [[ "$ALLOW_URL_ONLY_ON_REGISTER_FAILURE" == "true" ]]; then
       echo "WARN: Moltbook registration unavailable and no token fallback. Proceeding with URL-only bridge wiring."
+      if [[ "$register_conflict" == "1" ]]; then
+        echo "HINT: Moltbook reported the scout agent name already exists upstream. Recover the existing agent token or retry with a unique AGENT_NAME."
+      fi
       auth_token=""
     else
       echo "ERROR: Moltbook registration failed and no fallback token is available."

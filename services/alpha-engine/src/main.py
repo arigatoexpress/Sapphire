@@ -141,6 +141,17 @@ class AlphaEngine:
         self.strategy = AlphaStrategyEngine(self.market_data)
         self.portfolio = PortfolioTracker()
 
+        # Position reconciliation cron — detects drift between what bots believe
+        # they hold and what Firestore last recorded.  Firestore client is
+        # initialized lazily in start() to keep __init__ side-effect-free.
+        try:
+            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
+            from shared.position_reconciler import PositionReconciler
+        except ImportError:
+            PositionReconciler = None  # type: ignore[assignment]
+        self._PositionReconciler = PositionReconciler
+        self._reconciler = None  # set in start()
+
         # Cognitive systems — episodic memory and dual-speed cognition
         self.memory = EnhancedMemoryBank()
         self.cognition = DualSpeedCognition()
@@ -1027,6 +1038,45 @@ class AlphaEngine:
             if key in payload and key not in metadata:
                 metadata[key] = payload.get(key)
 
+        # ─── TP / SL ───────────────────────────────────────────────────────────
+        # Honor explicit values from the payload first; fall back to env-var
+        # percentage defaults if neither the payload nor the caller specified them.
+        _tp_price: Optional[float] = self._as_float(payload.get("take_profit"))
+        _sl_price: Optional[float] = self._as_float(payload.get("stop_loss"))
+
+        if _tp_price is None or _sl_price is None:
+            _tp_pct = self._as_float(os.getenv("SAPPHIRE_TV_TAKE_PROFIT_PCT"))
+            _sl_pct = self._as_float(os.getenv("SAPPHIRE_TV_STOP_LOSS_PCT"))
+            if _tp_pct or _sl_pct:
+                _entry_price = self._as_float(payload.get("price"))
+                if not _entry_price or _entry_price <= 0:
+                    _snap = self.market_data.get_market_snapshot(symbol=symbol)
+                    for _vd in _snap.values():
+                        _ep = self._as_float(_vd.get("price") or _vd.get("last_price"))
+                        if _ep and _ep > 0:
+                            _entry_price = _ep
+                            break
+                if _entry_price and _entry_price > 0:
+                    _is_buy = raw_action == "BUY"
+                    if _tp_price is None and _tp_pct and _tp_pct > 0:
+                        _tp_price = round(
+                            _entry_price * (1 + _tp_pct / 100) if _is_buy else _entry_price * (1 - _tp_pct / 100),
+                            8,
+                        )
+                    if _sl_price is None and _sl_pct and _sl_pct > 0:
+                        _sl_price = round(
+                            _entry_price * (1 - _sl_pct / 100) if _is_buy else _entry_price * (1 + _sl_pct / 100),
+                            8,
+                        )
+
+        # Trailing stop — stored in metadata so venue bots can pick it up.
+        if self._env_flag("SAPPHIRE_TV_TRAILING_STOP"):
+            _tsl_pct = self._as_float(os.getenv("SAPPHIRE_TV_TRAILING_STOP_PCT"))
+            metadata.setdefault("trailing_stop", True)
+            if _tsl_pct and _tsl_pct > 0:
+                metadata.setdefault("trailing_stop_pct", _tsl_pct)
+        # ───────────────────────────────────────────────────────────────────────
+
         signal = TradeSignal(
             signal_id=signal_key,
             symbol=symbol,
@@ -1037,12 +1087,16 @@ class AlphaEngine:
             target_platforms=targets,
             quantity=float(round(guarded_quantity, 8)),
             leverage=float(leverage) if leverage is not None else None,
+            stop_loss=_sl_price,
+            take_profit=_tp_price,
             metadata=metadata,
         )
 
         await publish("trading-signals", signal)
         self._record_system_log(
-            f"Signal published: {raw_action} {symbol} qty={signal.quantity} targets={','.join(targets)}",
+            f"Signal published: {raw_action} {symbol} qty={signal.quantity} targets={','.join(targets)}"
+            + (f" tp={signal.take_profit}" if signal.take_profit else "")
+            + (f" sl={signal.stop_loss}" if signal.stop_loss else ""),
             level="info",
             tags=["signals", "dispatch"],
             metadata={
@@ -1051,6 +1105,8 @@ class AlphaEngine:
                 "action": raw_action,
                 "targets": targets,
                 "quantity": signal.quantity,
+                "take_profit": signal.take_profit,
+                "stop_loss": signal.stop_loss,
                 "stage": stage,
                 "multiplier": multiplier,
                 "guard": guard_notes,
@@ -1065,6 +1121,8 @@ class AlphaEngine:
             "quantity": signal.quantity,
             "confidence": confidence,
             "source": source,
+            "take_profit": signal.take_profit,
+            "stop_loss": signal.stop_loss,
         }
 
     async def _publish_risk_alert(
@@ -2635,6 +2693,19 @@ class AlphaEngine:
                 f"Auto-deallocated **{venue}** after {failures} failures. Cooldown: {cooldown_seconds}s.",
             )
 
+    async def _on_position_drift(self, message: str) -> None:
+        """Callback fired by PositionReconciler when drift is detected."""
+        logger.warning("🔴 Position drift: %s", message)
+        self._record_system_log(
+            message,
+            level="error",
+            tags=["risk", "position_reconciliation"],
+        )
+        await self.telegram.send_message(
+            f"🔴 **Position Drift Detected**\n{message}",
+            priority="high",
+        )
+
     async def _heartbeat_loop(self) -> None:
         while self.running:
             try:
@@ -3035,6 +3106,34 @@ class AlphaEngine:
 
         # 2. Start Pub/Sub Listener for Trade Results
         asyncio.create_task(self._listen_for_trades())
+
+        # 2b. Position reconciliation cron
+        if self._PositionReconciler is not None:
+            try:
+                from google.cloud import firestore as _fs
+                _recon_db = _fs.AsyncClient(
+                    project=os.getenv("GCP_PROJECT_ID", "sapphire-479610")
+                )
+            except Exception:
+                _recon_db = None
+            self._reconciler = self._PositionReconciler(
+                firestore_client=_recon_db,
+                stale_threshold_seconds=int(
+                    os.getenv("POSITION_STALE_THRESHOLD_SECONDS", "120")
+                ),
+                reconcile_interval=int(
+                    os.getenv("POSITION_RECONCILE_INTERVAL_SECONDS", "900")
+                ),
+            )
+            # Subscribe to position-updates so the reconciler tracks live state.
+            from pubsub.client import subscribe as _ps_subscribe
+            await _ps_subscribe("position-updates", self._reconciler.handle_position_update)
+            asyncio.create_task(
+                self._reconciler.run_forever(self._on_position_drift)
+            )
+            logger.info("✅ Position reconciler started")
+        else:
+            logger.warning("PositionReconciler not available — skipping")
 
         # 3. Start Gemini Guard
         asyncio.create_task(self.ai.start())

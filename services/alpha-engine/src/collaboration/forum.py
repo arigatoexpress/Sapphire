@@ -1626,15 +1626,25 @@ class SapphireForumService:
         if not sandbox_token:
             return {"dispatched": False, "reason": "sandbox_token_missing", "mode": "scout_sandbox"}
 
-        endpoint = f"{sandbox_url.rstrip('/')}/v1/scout/dispatch"
-        payload = {
-            "action": action,
-            "outbound_payload": outbound_payload,
-            "external_url_hint": str(external_url or "").strip(),
-            "note": note,
-            "source": "alpha-engine",
-            "request_id": f"scout-{action}-{int(time.time() * 1000)}",
-        }
+        if action == "gtm_outbound":
+            endpoint = f"{sandbox_url.rstrip('/')}/v1/gtm/outbound"
+            payload = {
+                "outbound_payload": outbound_payload,
+                "external_url_hint": str(external_url or "").strip(),
+                "note": note,
+                "source": "alpha-engine",
+                "request_id": f"scout-{action}-{int(time.time() * 1000)}",
+            }
+        else:
+            endpoint = f"{sandbox_url.rstrip('/')}/v1/scout/dispatch"
+            payload = {
+                "action": action,
+                "outbound_payload": outbound_payload,
+                "external_url_hint": str(external_url or "").strip(),
+                "note": note,
+                "source": "alpha-engine",
+                "request_id": f"scout-{action}-{int(time.time() * 1000)}",
+            }
         headers = {
             "Content-Type": "application/json",
             "X-Scout-Sandbox-Token": sandbox_token,
@@ -2058,9 +2068,33 @@ class SapphireForumService:
 
         post_url = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_POST_URL", "")).strip()
         token = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN", "")).strip()
+        gtm_outbound_url = str(os.getenv("SAPPHIRE_SCOUT_GTM_OUTBOUND_URL", "")).strip()
+        gtm_api_token = str(os.getenv("SAPPHIRE_SCOUT_GTM_API_TOKEN", "")).strip()
+        dispatch_channel = str(
+            payload.get("dispatch_channel", payload.get("channel", ""))
+        ).strip().lower()
         dispatch_action = "publish"
         dispatch_url = post_url
-        if self._is_moltbook_api_url(post_url):
+        if dispatch_channel == "gtm":
+            token = gtm_api_token
+            dispatch_action = "gtm_outbound"
+            dispatch_url = str(payload.get("external_url_hint", "")).strip() or gtm_outbound_url
+            outbound_payload = {
+                "topic_id": topic_id,
+                "title": title_safe["text"] or f"Sapphire Scout Update ({topic_id})",
+                "message": body_safe["text"],
+                "author": str(payload.get("author", "SAPPHIRE_SCOUT")).strip() or "SAPPHIRE_SCOUT",
+                "tags": self._normalize_tags(payload.get("tags", [])),
+                "source": "sapphire_scout",
+                "timestamp": self._now(),
+            }
+            gtm_payload = payload.get("gtm_payload", {})
+            if isinstance(gtm_payload, dict):
+                for key, value in gtm_payload.items():
+                    if not str(key).strip():
+                        continue
+                    outbound_payload[str(key)] = value
+        elif self._is_moltbook_api_url(post_url):
             if external_post_id:
                 configured_comment_url = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_COMMENT_URL", "")).strip()
                 if configured_comment_url:
@@ -2093,7 +2127,11 @@ class SapphireForumService:
             + (
                 f"External action: comment on post {external_post_id}."
                 if dispatch_action == "comment"
-                else "External action: create post."
+                else (
+                    "External action: GTM outbound dispatch."
+                    if dispatch_action == "gtm_outbound"
+                    else "External action: create post."
+                )
             )
         )
         dispatch_result = await self._dispatch_scout_bridge(

@@ -133,7 +133,7 @@ ALPHA_URL="$(gcloud run services describe "$SERVICE_NAME" --project "$PROJECT_ID
 echo "Alpha URL: ${ALPHA_URL}"
 
 STATUS_JSON=""
-if STATUS_JSON="$(curl -fsSL "${ALPHA_URL}/api/v2/forum/scout/status" 2>/tmp/sapphire_scout_status_err.txt)"; then
+if STATUS_JSON="$(curl -fsSL "${ALPHA_URL}/forum/scout/status" 2>/tmp/sapphire_scout_status_err.txt)"; then
   DISPATCH_MODE="$(echo "$STATUS_JSON" | jq -r '.external_bridge.dispatch_mode // "unknown"')"
   echo "Scout dispatch mode: ${DISPATCH_MODE}"
 else
@@ -154,7 +154,7 @@ if [[ "$RUN_SMOKE_TESTS" == "true" ]]; then
 
   if [[ "$RUN_REGISTER_SMOKE" == "true" ]]; then
     REGISTER_PAYLOAD="$(jq -nc --arg u "$TEST_SCOUT_USERNAME" --arg d "$TEST_SCOUT_DISPLAY_NAME" '{username:$u,display_name:$d,bio:"Least-privilege external scout account."}')"
-    if REGISTER_RESPONSE="$(curl -fsSL -X POST "${ALPHA_URL}/api/v2/forum/scout/register" "${control_headers[@]}" -H 'Content-Type: application/json' -d "$REGISTER_PAYLOAD" 2>/tmp/sapphire_scout_register_smoke_err.txt)"; then
+    if REGISTER_RESPONSE="$(curl -fsSL -X POST "${ALPHA_URL}/forum/scout/register" "${control_headers[@]}" -H 'Content-Type: application/json' -d "$REGISTER_PAYLOAD" 2>/tmp/sapphire_scout_register_smoke_err.txt)"; then
       echo "Register response: $(echo "$REGISTER_RESPONSE" | jq -c '{ok,dispatch:(.dispatch|{dispatched,reason,mode,status}),registration:.registration}')"
     else
       echo "WARN: register smoke test failed."
@@ -167,12 +167,12 @@ if [[ "$RUN_SMOKE_TESTS" == "true" ]]; then
     echo "Register smoke test skipped (RUN_REGISTER_SMOKE=false)."
   fi
 
-  TOPIC_ID="$(curl -fsSL "${ALPHA_URL}/api/v2/forum/topics?lane=external&limit=1" 2>/tmp/sapphire_scout_topics_smoke_err.txt | jq -r '.topics[0].topic_id // ""' || true)"
+  TOPIC_ID="$(curl -fsSL "${ALPHA_URL}/forum/topics?lane=external&limit=1" 2>/tmp/sapphire_scout_topics_smoke_err.txt | jq -r '.topics[0].topic_id // ""' || true)"
   if [[ -z "$TOPIC_ID" ]]; then
     TOPIC_ID="TOPIC-00003"
   fi
   PUBLISH_PAYLOAD="$(jq -nc --arg t "$TOPIC_ID" '{topic_id:$t,body:"Scout smoke test note via true external bridge.",author:"SAPPHIRE_SCOUT",kind:"note"}')"
-  if PUBLISH_RESPONSE="$(curl -fsSL -X POST "${ALPHA_URL}/api/v2/forum/scout/publish" "${control_headers[@]}" -H 'Content-Type: application/json' -d "$PUBLISH_PAYLOAD" 2>/tmp/sapphire_scout_publish_smoke_err.txt)"; then
+  if PUBLISH_RESPONSE="$(curl -fsSL -X POST "${ALPHA_URL}/forum/scout/publish" "${control_headers[@]}" -H 'Content-Type: application/json' -d "$PUBLISH_PAYLOAD" 2>/tmp/sapphire_scout_publish_smoke_err.txt)"; then
     echo "Publish response: $(echo "$PUBLISH_RESPONSE" | jq -c '{ok,topic_id,dispatch:(.dispatch|{dispatched,reason,mode,status})}')"
   else
     echo "WARN: publish smoke test failed."

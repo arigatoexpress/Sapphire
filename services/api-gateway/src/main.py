@@ -17,7 +17,7 @@ import uuid
 import sys
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -73,6 +73,47 @@ TRADINGVIEW_IDEMPOTENCY_WINDOW_SECONDS = max(
 TRADINGVIEW_IDEMPOTENCY_MAX_KEYS = max(
     50, int(os.getenv("SAPPHIRE_TRADINGVIEW_IDEMPOTENCY_MAX_KEYS", "1000"))
 )
+
+
+def _parse_scope_csv(raw: str, *, lower: bool = False, symbol: bool = False) -> set[str]:
+    out: set[str] = set()
+    for item in str(raw or "").split(","):
+        text = str(item or "").strip()
+        if not text:
+            continue
+        if symbol:
+            text = text.upper().replace("/", "").replace("-", "").replace("_", "")
+        elif lower:
+            text = text.lower()
+        out.add(text)
+    return out
+
+
+def _normalize_timeframe_token(raw: str) -> str:
+    text = str(raw or "").strip().lower()
+    if not text:
+        return ""
+    alias = {
+        "1": "1m",
+        "3": "3m",
+        "5": "5m",
+        "15": "15m",
+        "30": "30m",
+        "45": "45m",
+        "60": "1h",
+        "120": "2h",
+        "240": "4h",
+        "d": "1d",
+        "1d": "1d",
+        "w": "1w",
+        "1w": "1w",
+        "m": "1mo",
+        "1mth": "1mo",
+        "1mo": "1mo",
+    }
+    return alias.get(text, text)
+
+
 # TP/SL defaults applied to all TradingView signals when not set by payload
 TV_TAKE_PROFIT_PCT: Optional[float] = None
 _tp_raw = os.getenv("SAPPHIRE_TV_TAKE_PROFIT_PCT", "").strip()
@@ -99,10 +140,35 @@ if _tsl_raw:
     except ValueError:
         pass
 
+TV_LIVE_SYMBOL_SCOPE = _parse_scope_csv(
+    os.getenv("SAPPHIRE_TV_LIVE_SYMBOLS", ""),
+    symbol=True,
+)
+TV_LIVE_TIMEFRAME_SCOPE = _parse_scope_csv(
+    os.getenv("SAPPHIRE_TV_LIVE_TIMEFRAMES", ""),
+    lower=True,
+)
+TV_LIVE_STRATEGY_SCOPE = _parse_scope_csv(
+    os.getenv("SAPPHIRE_TV_LIVE_STRATEGIES", ""),
+    lower=True,
+)
+_tv_prefilter_raw = os.getenv("SAPPHIRE_TV_EXECUTION_PREFILTER", "true").strip().lower()
+TV_EXECUTION_PREFILTER = _tv_prefilter_raw in {"1", "true", "yes", "on"}
+try:
+    TV_EXECUTION_MIN_CONFIDENCE = max(
+        0.0,
+        min(1.0, float(os.getenv("SAPPHIRE_TV_EXECUTION_MIN_CONFIDENCE", "0.70") or 0.70)),
+    )
+except (TypeError, ValueError):
+    TV_EXECUTION_MIN_CONFIDENCE = 0.70
+TV_RESEARCH_TOPIC = os.getenv("SAPPHIRE_TV_RESEARCH_TOPIC", "").strip()
+
 SYSTEM_LOGS_COLLECTION = os.getenv("SYSTEM_LOGS_COLLECTION", "system_logs")
 TRADE_EXECUTIONS_COLLECTION = os.getenv("TRADE_EXECUTIONS_COLLECTION", "trade_executions")
 TRADING_METRICS_COLLECTION = os.getenv("TRADING_METRICS_COLLECTION", "trading_metrics")
 TRADING_METRICS_DOC_ID = os.getenv("TRADING_METRICS_DOC_ID", "current")
+TV_INGRESS_STATS_COLLECTION = os.getenv("TV_INGRESS_STATS_COLLECTION", "gateway_stats")
+TV_INGRESS_STATS_DOC_ID = os.getenv("TV_INGRESS_STATS_DOC_ID", "tradingview_ingress")
 
 VALID_TV_ACTIONS = {
     "buy",
@@ -146,6 +212,17 @@ class ServiceState:
         self.tradingview_ingress_stats: Dict[str, int] = {
             "total": 0,
             "published": 0,
+            "filtered": 0,
+            "research_published": 0,
+            "duplicates": 0,
+            "failed": 0,
+            "rejected": 0,
+        }
+        self.tradingview_ingress_stats_cumulative: Dict[str, int] = {
+            "total": 0,
+            "published": 0,
+            "filtered": 0,
+            "research_published": 0,
             "duplicates": 0,
             "failed": 0,
             "rejected": 0,
@@ -153,6 +230,7 @@ class ServiceState:
         self.tradingview_recent: List[Dict[str, Any]] = []
         self.tradingview_signal_seen_at: Dict[str, float] = {}
         self.tradingview_last_signal_at: Optional[str] = None
+        self.tradingview_session_started_at: str = datetime.now(timezone.utc).isoformat()
 
     def get_total_balance(self) -> float:
         """Get aggregated balance across all platforms."""
@@ -311,6 +389,55 @@ def _get_firestore_client():
             logger.warning("Firestore client init failed: %s", exc)
             _firestore_client = None
     return _firestore_client
+
+
+def _coerce_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return int(default)
+
+
+def _load_ingress_stats_cumulative() -> None:
+    """Load cumulative TradingView ingress counters from Firestore."""
+    client = _get_firestore_client()
+    if client is None:
+        return
+    try:
+        doc = client.collection(TV_INGRESS_STATS_COLLECTION).document(TV_INGRESS_STATS_DOC_ID).get()
+        if not doc.exists:
+            return
+        row = doc.to_dict() or {}
+        for key in list(state.tradingview_ingress_stats_cumulative.keys()):
+            state.tradingview_ingress_stats_cumulative[key] = max(
+                0, _coerce_int(row.get(key), 0)
+            )
+    except Exception as exc:
+        logger.debug("Ingress cumulative stats load failed: %s", exc)
+
+
+def _ingress_stats_increment(key: str, amount: int = 1) -> None:
+    if key not in state.tradingview_ingress_stats:
+        return
+    delta = max(0, int(amount))
+    state.tradingview_ingress_stats[key] += delta
+    state.tradingview_ingress_stats_cumulative[key] += delta
+
+    client = _get_firestore_client()
+    if client is None or g_firestore is None:
+        return
+    try:
+        payload = {
+            key: g_firestore.Increment(delta),
+            "updated_at": _utc_now_iso(),
+            "service": SERVICE_NAME,
+        }
+        client.collection(TV_INGRESS_STATS_COLLECTION).document(TV_INGRESS_STATS_DOC_ID).set(
+            payload,
+            merge=True,
+        )
+    except Exception as exc:
+        logger.debug("Ingress cumulative stats write failed: %s", exc)
 
 
 def _write_system_log(
@@ -650,6 +777,7 @@ async def lifespan(app: FastAPI):
     """Initialize and cleanup on startup/shutdown."""
     _validate_gateway_config()
     logger.info("🚀 Starting API Gateway...")
+    _load_ingress_stats_cumulative()
 
     # Initialize Pub/Sub subscriptions (Non-blocking / Robust)
     try:
@@ -1041,7 +1169,7 @@ def _validate_tradingview_secret(payload: Dict[str, Any], header_secret: Optiona
     body_secret = _extract_text(payload, ["passphrase", "secret", "token"])
     if _ct_compare(header_secret) or _ct_compare(body_secret):
         return
-    state.tradingview_ingress_stats["rejected"] += 1
+    _ingress_stats_increment("rejected")
     raise HTTPException(status_code=401, detail="Invalid webhook secret")
 
 
@@ -1088,7 +1216,7 @@ def _build_trade_signal_from_tv_payload(payload: Dict[str, Any]) -> Dict[str, An
         price=price,
     )
     if _is_duplicate_signal(signal_key):
-        state.tradingview_ingress_stats["duplicates"] += 1
+        _ingress_stats_increment("duplicates")
         _write_system_log(
             level="WARN",
             message=f"Duplicate TradingView signal ignored {action.upper()} {symbol}",
@@ -1114,9 +1242,52 @@ def _build_trade_signal_from_tv_payload(payload: Dict[str, Any]) -> Dict[str, An
         except (TypeError, ValueError):
             return None
 
+    def _coerce_opt_bool(v: Any) -> Optional[bool]:
+        if isinstance(v, bool):
+            return v
+        if v is None:
+            return None
+        text = str(v).strip().lower()
+        if text in {"1", "true", "yes", "on"}:
+            return True
+        if text in {"0", "false", "no", "off"}:
+            return False
+        return None
+
     _tp_price: Optional[float] = _coerce_opt(merged.get("take_profit"))
     _sl_price: Optional[float] = _coerce_opt(merged.get("stop_loss"))
     _is_buy = action in {"buy", "long"}
+    strategy_raw = (
+        _extract_text(merged, ["strategy", "strategy_name", "system"], default="").strip()
+        or str(incoming_metadata.get("strategy", "")).strip()
+    )
+    timeframe_raw = (
+        _extract_text(merged, ["timeframe", "tf", "interval"], default="").strip()
+        or str(incoming_metadata.get("timeframe", "")).strip()
+        or str(incoming_metadata.get("tf", "")).strip()
+    )
+    strategy_norm = strategy_raw.lower()
+    timeframe_norm = _normalize_timeframe_token(timeframe_raw)
+    scope_mismatch: List[str] = []
+    if TV_LIVE_SYMBOL_SCOPE and symbol not in TV_LIVE_SYMBOL_SCOPE:
+        scope_mismatch.append(f"symbol:{symbol}")
+    if TV_LIVE_TIMEFRAME_SCOPE:
+        if not timeframe_norm:
+            scope_mismatch.append("timeframe:missing")
+        elif timeframe_norm not in TV_LIVE_TIMEFRAME_SCOPE:
+            scope_mismatch.append(f"timeframe:{timeframe_norm}")
+    if TV_LIVE_STRATEGY_SCOPE:
+        if not strategy_norm:
+            scope_mismatch.append("strategy:missing")
+        elif strategy_norm not in TV_LIVE_STRATEGY_SCOPE:
+            scope_mismatch.append(f"strategy:{strategy_norm}")
+
+    explicit_dry_run = _coerce_opt_bool(merged.get("dry_run"))
+    if explicit_dry_run is None:
+        explicit_dry_run = _coerce_opt_bool(incoming_metadata.get("dry_run"))
+    resolved_dry_run = bool(confidence < 0.7) if explicit_dry_run is None else bool(explicit_dry_run)
+    if scope_mismatch:
+        resolved_dry_run = True
     if price and price > 0:
         if _tp_price is None and TV_TAKE_PROFIT_PCT and TV_TAKE_PROFIT_PCT > 0:
             _tp_price = round(
@@ -1149,18 +1320,24 @@ def _build_trade_signal_from_tv_payload(payload: Dict[str, Any]) -> Dict[str, An
         "source": source_hint,
         "signal_key": signal_key,
         "raw_action": action,
-        "strategy": _extract_text(merged, ["strategy", "strategy_name", "system"], default="").strip()
-        or str(incoming_metadata.get("strategy", "")).strip(),
-        "timeframe": _extract_text(merged, ["timeframe", "tf", "interval"], default="").strip()
-        or str(incoming_metadata.get("timeframe", "")).strip()
-        or str(incoming_metadata.get("tf", "")).strip(),
+        "strategy": strategy_raw,
+        "timeframe": timeframe_raw,
         "exchange": _extract_text(merged, ["exchange"]),
         "interval": _extract_text(merged, ["interval", "timeframe"]),
         "z_score": z_score,
         "regime_score": regime_score,
         "message": _extract_text(merged, ["message"]),
-        "dry_run": confidence < 0.7,
+        "dry_run": resolved_dry_run,
+        "scope_symbol": symbol,
+        "scope_timeframe": timeframe_norm,
+        "scope_strategy": strategy_norm,
+        "scope_enforced": bool(TV_LIVE_SYMBOL_SCOPE or TV_LIVE_TIMEFRAME_SCOPE or TV_LIVE_STRATEGY_SCOPE),
     }
+    if scope_mismatch:
+        _metadata["dry_run_reason"] = "forced_by_live_scope"
+        _metadata["scope_mismatch"] = scope_mismatch
+    elif explicit_dry_run is None and confidence < 0.7:
+        _metadata["dry_run_reason"] = "low_confidence"
     if incoming_metadata:
         for key in ("strategy_id", "model", "regime", "tag", "source"):
             if key in incoming_metadata and key not in _metadata:
@@ -1181,6 +1358,31 @@ def _build_trade_signal_from_tv_payload(payload: Dict[str, Any]) -> Dict[str, An
     }
 
 
+def _classify_execution_route(signal: TradeSignal) -> Tuple[str, Optional[str]]:
+    """
+    Decide whether a TradingView signal is eligible for execution publish.
+
+    Returns:
+      - ("execution", None): publish to trading-signals
+      - ("research", "<reason>"): block execution lane; optionally publish to research topic
+    """
+    if not TV_EXECUTION_PREFILTER:
+        return "execution", None
+
+    metadata = signal.metadata if isinstance(signal.metadata, dict) else {}
+    if metadata.get("scope_mismatch"):
+        return "research", "scope_mismatch"
+
+    confidence = _coerce_float(getattr(signal, "confidence", None), default=0.0) or 0.0
+    if confidence < TV_EXECUTION_MIN_CONFIDENCE:
+        return "research", f"confidence_below_{TV_EXECUTION_MIN_CONFIDENCE:.2f}"
+
+    if bool(metadata.get("dry_run", False)):
+        return "research", str(metadata.get("dry_run_reason") or "dry_run")
+
+    return "execution", None
+
+
 @app.get("/webhook/health")
 async def tradingview_webhook_health():
     """Health endpoint for cloud failover TradingView ingress."""
@@ -1190,7 +1392,9 @@ async def tradingview_webhook_health():
         "tradingview_ingress": {
             "enabled": bool(TRADINGVIEW_WEBHOOK_SECRET),
             "idempotency_window_seconds": TRADINGVIEW_IDEMPOTENCY_WINDOW_SECONDS,
-            "stats": state.tradingview_ingress_stats,
+            "stats": state.tradingview_ingress_stats_cumulative,
+            "stats_session": state.tradingview_ingress_stats,
+            "session_started_at": state.tradingview_session_started_at,
             "last_signal_at": state.tradingview_last_signal_at,
             "recent_count": len(state.tradingview_recent),
         },
@@ -1205,7 +1409,14 @@ async def tradingview_webhook_status(limit: int = 20):
     return {
         "status": "active",
         "service": SERVICE_NAME,
-        "stats": state.tradingview_ingress_stats,
+        "stats": state.tradingview_ingress_stats_cumulative,
+        "stats_session": state.tradingview_ingress_stats,
+        "session_started_at": state.tradingview_session_started_at,
+        "prefilter": {
+            "enabled": TV_EXECUTION_PREFILTER,
+            "min_confidence": TV_EXECUTION_MIN_CONFIDENCE,
+            "research_topic": TV_RESEARCH_TOPIC or None,
+        },
         "last_signal_at": state.tradingview_last_signal_at,
         "recent": state.tradingview_recent[-safe_limit:],
         "timestamp": _utc_now_iso(),
@@ -1224,7 +1435,7 @@ async def tradingview_webhook_ingress(
     """
     _validate_tradingview_secret(payload, x_sapphire_webhook_secret)
 
-    state.tradingview_ingress_stats["total"] += 1
+    _ingress_stats_increment("total")
     parsed = _build_trade_signal_from_tv_payload(payload)
     if parsed.get("duplicate"):
         event = {
@@ -1243,9 +1454,67 @@ async def tradingview_webhook_ingress(
         }
 
     signal: TradeSignal = parsed["signal"]
+    route, route_reason = _classify_execution_route(signal)
+    if route != "execution":
+        _ingress_stats_increment("filtered")
+        research_message_id = None
+        if TV_RESEARCH_TOPIC:
+            research_message_id = await publish(TV_RESEARCH_TOPIC, signal)
+            if research_message_id:
+                _ingress_stats_increment("research_published")
+
+        _write_system_log(
+            level="WARN",
+            message=f"Signal filtered before execution publish {signal.symbol}",
+            event_type="signal_filtered",
+            signal_id=signal.signal_id,
+            symbol=signal.symbol,
+            action=parsed.get("action"),
+            metadata={
+                "signal_key": parsed.get("signal_key"),
+                "route_reason": route_reason,
+                "confidence": signal.confidence,
+                "dry_run": bool((signal.metadata or {}).get("dry_run", False)),
+                "scope_mismatch": (signal.metadata or {}).get("scope_mismatch"),
+                "research_topic": TV_RESEARCH_TOPIC or None,
+                "research_message_id": research_message_id,
+            },
+        )
+        event = {
+            "timestamp": _utc_now_iso(),
+            "duplicate": False,
+            "signal_id": signal.signal_id,
+            "symbol": signal.symbol,
+            "action": parsed.get("action"),
+            "signal_type": signal.signal_type.value,
+            "confidence": signal.confidence,
+            "filtered": True,
+            "filter_reason": route_reason,
+            "research_topic": TV_RESEARCH_TOPIC or None,
+            "message_id": research_message_id,
+            "source_ip": request.client.host if request.client else None,
+            "dry_run": (signal.metadata or {}).get("dry_run", False),
+            "dry_run_reason": (signal.metadata or {}).get("dry_run_reason"),
+            "scope_mismatch": (signal.metadata or {}).get("scope_mismatch"),
+        }
+        _append_tradingview_event(event)
+        return {
+            "status": "filtered_no_execute",
+            "signal_id": signal.signal_id,
+            "symbol": signal.symbol,
+            "action": parsed.get("action"),
+            "signal_type": signal.signal_type.value,
+            "filter_reason": route_reason,
+            "research_topic": TV_RESEARCH_TOPIC or None,
+            "message_id": research_message_id,
+            "dry_run": (signal.metadata or {}).get("dry_run", False),
+            "dry_run_reason": (signal.metadata or {}).get("dry_run_reason"),
+            "scope_mismatch": (signal.metadata or {}).get("scope_mismatch"),
+        }
+
     message_id = await publish("trading-signals", signal)
     if not message_id:
-        state.tradingview_ingress_stats["failed"] += 1
+        _ingress_stats_increment("failed")
         _write_system_log(
             level="ERROR",
             message=f"TradingView signal publish failed {signal.symbol}",
@@ -1257,7 +1526,7 @@ async def tradingview_webhook_ingress(
         )
         raise HTTPException(status_code=502, detail="Failed to publish TradingView signal")
 
-    state.tradingview_ingress_stats["published"] += 1
+    _ingress_stats_increment("published")
     state.tradingview_last_signal_at = _utc_now_iso()
 
     _write_system_log(
@@ -1272,6 +1541,8 @@ async def tradingview_webhook_ingress(
             "message_id": message_id,
             "confidence": signal.confidence,
             "dry_run": signal.metadata.get("dry_run", False),
+            "dry_run_reason": signal.metadata.get("dry_run_reason"),
+            "scope_mismatch": signal.metadata.get("scope_mismatch"),
         },
     )
 
@@ -1286,6 +1557,8 @@ async def tradingview_webhook_ingress(
         "message_id": message_id,
         "source_ip": request.client.host if request.client else None,
         "dry_run": signal.metadata.get("dry_run", False),
+        "dry_run_reason": signal.metadata.get("dry_run_reason"),
+        "scope_mismatch": signal.metadata.get("scope_mismatch"),
     }
     _append_tradingview_event(event)
 
@@ -1297,6 +1570,8 @@ async def tradingview_webhook_ingress(
         "signal_type": signal.signal_type.value,
         "message_id": message_id,
         "dry_run": signal.metadata.get("dry_run", False),
+        "dry_run_reason": signal.metadata.get("dry_run_reason"),
+        "scope_mismatch": signal.metadata.get("scope_mismatch"),
     }
 
 

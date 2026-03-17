@@ -23,68 +23,189 @@
     }
 }
 
-/* Radar Display */
-.radar-container {
+/* Radar Display — canvas phosphor CRT */
+.radar-wrap {
     position: relative;
-    height: 300px;
-    border: 1px solid var(--border-dim);
-    background: 
-        radial-gradient(circle at center, transparent 0%, rgba(0,0,0,0.8) 100%),
-        repeating-radial-gradient(circle at center, var(--grid-line) 0px, transparent 1px, transparent 40px, var(--grid-line) 41px);
     overflow: hidden;
+    background: radial-gradient(circle at 50% 38%, rgba(16, 26, 10, 0.95), rgba(4, 8, 4, 0.98));
+    border: 1px solid rgba(98, 255, 64, 0.26);
+    box-shadow: 0 0 30px rgba(98, 255, 64, 0.10), inset 0 0 40px rgba(4, 8, 4, 0.86);
 }
 
-.radar-sweep {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 150%;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, var(--green), transparent);
-    transform-origin: left center;
-    animation: radar-sweep 4s linear infinite;
-    opacity: 0.6;
+.radar-canvas {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1 / 1;
 }
 
-@keyframes radar-sweep {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+.radar-scanlines {
+    display: none;
 }
 
-.radar-blip {
-    position: absolute;
-    width: 8px;
-    height: 8px;
-    background: var(--green);
-    border-radius: 50%;
-    box-shadow: var(--glow-green);
-    animation: blip-pulse 2s ease-in-out infinite;
+.radar-caption {
+    margin-top: 6px;
+    color: var(--text-muted);
+    font-size: 0.62rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
 }
 
-@keyframes blip-pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.5; transform: scale(1.2); }
-}
-
-/* Mini Chart */
-.mini-chart {
-    height: 60px;
+.radar-meta-row {
+    margin-top: 6px;
     display: flex;
-    align-items: flex-end;
-    gap: 2px;
-    padding: var(--space-sm) 0;
+    justify-content: flex-end;
 }
 
-.mini-chart-bar {
-    flex: 1;
-    background: linear-gradient(180deg, var(--amber), var(--amber-dim));
-    min-height: 4px;
-    transition: height 0.3s ease;
+.radar-quality-badge {
+    font-family: var(--font-terminal);
+    font-size: 0.58rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: 1px solid var(--border-dim);
+    padding: 2px 8px;
+    background: rgba(0, 0, 0, 0.34);
+    color: var(--text-muted);
 }
 
-.mini-chart-bar:hover {
-    background: var(--amber);
-    box-shadow: var(--glow-amber);
+.radar-quality-badge.nominal {
+    border-color: rgba(98, 255, 64, 0.34);
+    color: var(--amber);
+}
+
+.radar-quality-badge.degraded {
+    border-color: rgba(255, 51, 51, 0.46);
+    color: var(--red);
+    background: rgba(255, 51, 51, 0.10);
+}
+
+.chain-velocity-strip {
+    margin-top: 8px;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.chain-velocity-card {
+    border: 1px solid var(--border-dim);
+    background: rgba(0, 0, 0, 0.26);
+    padding: 6px 7px;
+}
+
+.chain-velocity-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 3px;
+}
+
+.chain-velocity-symbol {
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+}
+
+.chain-velocity-tag {
+    font-size: 0.52rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: 1px solid var(--border-dim);
+    color: var(--text-muted);
+    padding: 0 4px;
+}
+
+.chain-velocity-kpi {
+    display: grid;
+    gap: 1px;
+}
+
+.chain-velocity-kpi .line {
+    font-size: 0.58rem;
+    color: var(--text-muted);
+    font-family: var(--font-terminal);
+    letter-spacing: 0.03em;
+}
+
+.chain-velocity-kpi .line strong {
+    color: var(--amber);
+    font-weight: 400;
+}
+
+.chain-velocity-card.degraded {
+    border-color: rgba(255, 51, 51, 0.36);
+    background: rgba(255, 51, 51, 0.08);
+}
+
+@media (max-width: 1100px) {
+    .chain-velocity-strip {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 640px) {
+    .chain-velocity-strip {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* TradingView-style mini charts */
+.chart-label {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
+}
+
+.tv-chart-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+    gap: 6px;
+}
+
+.tv-card {
+    background: rgba(0, 0, 0, 0.30);
+    border: 1px solid rgba(98, 255, 64, 0.09);
+    padding: 7px 8px 4px;
+}
+
+.tv-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1px;
+}
+
+.tv-sym {
+    font-size: 0.65rem;
+    font-family: var(--font-terminal);
+    color: var(--text-muted);
+    letter-spacing: 0.04em;
+}
+
+.tv-card-price {
+    font-family: var(--font-header);
+    font-size: 0.88rem;
+    color: var(--amber);
+    margin-bottom: 5px;
+    line-height: 1;
+}
+
+.tv-canvas {
+    display: block;
+    width: 100%;
+    height: 58px;
+}
+
+.tv-time-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.55rem;
+    font-family: var(--font-terminal);
+    color: var(--text-muted);
+    opacity: 0.45;
+    margin-top: 2px;
 }
 
 /* Service List */
@@ -101,11 +222,11 @@
     align-items: center;
     padding: var(--space-sm) var(--space-md);
     border: 1px solid var(--border-dim);
-    background: rgba(255, 176, 0, 0.02);
+    background: rgba(98, 255, 64, 0.02);
 }
 
 .service-item:hover {
-    background: rgba(255, 176, 0, 0.05);
+    background: rgba(98, 255, 64, 0.05);
     border-color: var(--border-color);
 }
 
@@ -146,7 +267,7 @@
 
 .action-card:hover {
     border-color: var(--amber);
-    background: rgba(255, 176, 0, 0.05);
+    background: rgba(98, 255, 64, 0.05);
 }
 
 .action-icon {
@@ -181,7 +302,7 @@
     gap: var(--space-sm);
     padding: var(--space-sm) var(--space-md);
     border: 1px solid var(--border-dim);
-    background: rgba(255, 176, 0, 0.02);
+    background: rgba(98, 255, 64, 0.02);
     white-space: nowrap;
 }
 
@@ -210,6 +331,620 @@
 .price-change.down {
     color: var(--red);
     background: rgba(255, 51, 51, 0.1);
+}
+
+/* AI intelligence pulse */
+.intel-pulse {
+    display: grid;
+    gap: var(--space-sm);
+}
+
+.pulse-headline {
+    font-family: var(--font-header);
+    color: var(--amber);
+    font-size: 0.82rem;
+    letter-spacing: 0.03em;
+}
+
+.pulse-summary {
+    color: var(--text-secondary);
+    font-size: 0.74rem;
+    line-height: 1.5;
+}
+
+.pulse-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.pulse-metric {
+    border: 1px solid var(--border-dim);
+    background: rgba(0, 0, 0, 0.22);
+    padding: 6px;
+}
+
+.pulse-metric .k {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.pulse-metric .v {
+    margin-top: 2px;
+    font-family: var(--font-header);
+    font-size: 0.84rem;
+    color: var(--amber);
+}
+
+.pulse-metric .v.up { color: var(--green); }
+.pulse-metric .v.down { color: var(--red); }
+
+.pulse-insights,
+.pulse-watchlist {
+    display: grid;
+    gap: 6px;
+}
+
+.pulse-item {
+    border: 1px solid var(--border-dim);
+    background: rgba(98, 255, 64, 0.03);
+    padding: 7px 8px;
+}
+
+.pulse-item-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.pulse-topic {
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.6rem;
+}
+
+.pulse-value {
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+}
+
+.pulse-detail {
+    margin-top: 3px;
+    color: var(--text-muted);
+    font-size: 0.66rem;
+    line-height: 1.45;
+}
+
+.pulse-bias {
+    font-size: 0.62rem;
+    padding: 1px 6px;
+    border: 1px solid var(--border-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.pulse-bias.bullish {
+    border-color: rgba(51, 255, 0, 0.4);
+    color: var(--green);
+}
+
+.pulse-bias.bearish {
+    border-color: rgba(255, 51, 51, 0.4);
+    color: var(--red);
+}
+
+.pulse-bias.neutral {
+    border-color: rgba(98, 255, 64, 0.45);
+    color: var(--amber);
+}
+
+@media (max-width: 992px) {
+    .pulse-metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+.drivers-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.driver-card {
+    border: 1px solid var(--border-dim);
+    background: rgba(0, 0, 0, 0.24);
+    padding: 7px 8px;
+}
+
+.driver-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.driver-symbol {
+    color: var(--text-secondary);
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.driver-score {
+    color: var(--amber);
+    font-family: var(--font-header);
+    font-size: 0.76rem;
+}
+
+.driver-detail {
+    margin-top: 2px;
+    color: var(--text-muted);
+    font-size: 0.66rem;
+    line-height: 1.45;
+}
+
+@media (max-width: 640px) {
+    .drivers-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Execution intelligence */
+.execution-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.execution-kpi {
+    border: 1px solid var(--border-dim);
+    background: rgba(0, 0, 0, 0.24);
+    padding: 7px 8px;
+}
+
+.execution-kpi .k {
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-size: 0.58rem;
+    letter-spacing: 0.09em;
+}
+
+.execution-kpi .v {
+    margin-top: 2px;
+    color: var(--amber);
+    font-family: var(--font-header);
+    font-size: 0.9rem;
+}
+
+.execution-kpi .v.up { color: var(--green); }
+.execution-kpi .v.down { color: var(--red); }
+
+.execution-kpi .d {
+    margin-top: 1px;
+    color: var(--text-muted);
+    font-size: 0.61rem;
+}
+
+.narrative-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.narrative-item {
+    border: 1px solid var(--border-dim);
+    background: rgba(98, 255, 64, 0.03);
+    padding: 7px 8px;
+}
+
+.narrative-item .n-title {
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.6rem;
+}
+
+.narrative-item .n-value {
+    margin-top: 2px;
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+}
+
+.context-strip {
+    border: 1px solid var(--border-dim);
+    background: rgba(0, 0, 0, 0.24);
+    padding: 7px 8px;
+    font-size: 0.68rem;
+    line-height: 1.45;
+    color: var(--text-secondary);
+}
+
+.context-strip strong {
+    color: var(--amber);
+    font-weight: 400;
+}
+
+.execution-feed-list {
+    display: grid;
+    gap: 6px;
+}
+
+.execution-feed-item {
+    border: 1px solid var(--border-dim);
+    background: rgba(0, 0, 0, 0.26);
+    padding: 7px 8px;
+}
+
+.execution-feed-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.execution-feed-title {
+    color: var(--text-secondary);
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.execution-feed-meta {
+    color: var(--text-muted);
+    font-size: 0.6rem;
+}
+
+.execution-feed-desc {
+    margin-top: 2px;
+    color: var(--text-muted);
+    font-size: 0.66rem;
+    line-height: 1.45;
+}
+
+.operator-brief {
+    display: grid;
+    gap: 6px;
+}
+
+.operator-brief-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--border-dim);
+    background: rgba(0, 0, 0, 0.24);
+    padding: 7px 8px;
+}
+
+.operator-pill {
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    padding: 1px 8px;
+    border: 1px solid var(--border-dim);
+}
+
+.operator-pill.go {
+    color: var(--green);
+    border-color: rgba(51, 255, 0, 0.45);
+    background: rgba(51, 255, 0, 0.08);
+}
+
+.operator-pill.nogo {
+    color: var(--red);
+    border-color: rgba(255, 51, 51, 0.45);
+    background: rgba(255, 51, 51, 0.08);
+}
+
+.operator-why {
+    border: 1px solid var(--border-dim);
+    background: rgba(98, 255, 64, 0.03);
+    padding: 7px 8px;
+    font-size: 0.67rem;
+    line-height: 1.45;
+    color: var(--text-secondary);
+}
+
+.operator-list {
+    border: 1px solid var(--border-dim);
+    background: rgba(0, 0, 0, 0.24);
+    padding: 7px 8px;
+    font-size: 0.64rem;
+    line-height: 1.45;
+    color: var(--text-muted);
+}
+
+.operator-list .line + .line {
+    margin-top: 4px;
+}
+
+.lane-drilldown {
+    display: grid;
+    gap: 6px;
+}
+
+.lane-row {
+    border: 1px solid var(--border-dim);
+    background: rgba(0, 0, 0, 0.26);
+    padding: 6px 8px;
+}
+
+.lane-row-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.lane-row-name {
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.63rem;
+}
+
+.lane-row-kpi {
+    color: var(--amber);
+    font-size: 0.64rem;
+}
+
+.lane-row-detail {
+    margin-top: 3px;
+    color: var(--text-muted);
+    font-size: 0.62rem;
+    line-height: 1.4;
+}
+
+.scout-grid {
+    display: grid;
+    gap: 6px;
+}
+
+.scout-card {
+    border: 1px solid var(--border-dim);
+    background: rgba(0, 0, 0, 0.26);
+    padding: 7px 8px;
+}
+
+.scout-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.scout-role {
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.63rem;
+}
+
+.scout-pills {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.scout-pill {
+    font-size: 0.56rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: 1px solid var(--border-dim);
+    color: var(--text-muted);
+    padding: 1px 6px;
+}
+
+.scout-pill.live {
+    color: var(--green);
+    border-color: rgba(65, 255, 181, 0.40);
+    background: rgba(65, 255, 181, 0.08);
+}
+
+.scout-pill.warn {
+    color: var(--amber);
+    border-color: rgba(98, 255, 64, 0.40);
+    background: rgba(98, 255, 64, 0.08);
+}
+
+.scout-pill.block {
+    color: var(--red);
+    border-color: rgba(255, 111, 158, 0.45);
+    background: rgba(255, 111, 158, 0.08);
+}
+
+.scout-copy {
+    color: var(--text-muted);
+    font-size: 0.64rem;
+    line-height: 1.45;
+}
+
+.scout-copy strong {
+    color: var(--text-secondary);
+    font-weight: 400;
+}
+
+.scout-rules {
+    display: grid;
+    gap: 4px;
+    margin-top: 5px;
+}
+
+.scout-rule {
+    color: var(--text-muted);
+    font-size: 0.6rem;
+    line-height: 1.35;
+}
+
+.asset-terminal-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.asset-terminal-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.horizon-toggle {
+    display: inline-flex;
+    gap: 4px;
+}
+
+.horizon-btn {
+    font-size: 0.58rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: 1px solid var(--border-dim);
+    color: var(--text-muted);
+    background: rgba(0, 0, 0, 0.24);
+    padding: 2px 6px;
+    cursor: pointer;
+}
+
+.horizon-btn:hover,
+.horizon-btn.active {
+    border-color: var(--amber);
+    color: var(--amber);
+    background: rgba(98, 255, 64, 0.12);
+}
+
+.asset-card {
+    border: 1px solid var(--border-dim);
+    background: rgba(0, 0, 0, 0.26);
+    padding: 8px;
+}
+
+.asset-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.asset-symbol {
+    font-size: 0.68rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.asset-bias {
+    font-size: 0.6rem;
+    padding: 1px 7px;
+    border: 1px solid var(--border-dim);
+    text-transform: uppercase;
+}
+
+.asset-bias.bullish {
+    color: var(--green);
+    border-color: rgba(65, 255, 181, 0.45);
+    background: rgba(65, 255, 181, 0.08);
+}
+
+.asset-bias.bearish {
+    color: var(--red);
+    border-color: rgba(255, 111, 158, 0.45);
+    background: rgba(255, 111, 158, 0.08);
+}
+
+.asset-bias.neutral {
+    color: var(--amber);
+    border-color: rgba(98, 255, 64, 0.45);
+    background: rgba(98, 255, 64, 0.08);
+}
+
+.asset-metrics {
+    margin-top: 5px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+}
+
+.asset-metric {
+    border: 1px solid var(--border-dim);
+    background: rgba(98, 255, 64, 0.05);
+    padding: 4px 5px;
+}
+
+.asset-metric .k {
+    font-size: 0.54rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.asset-metric .v {
+    margin-top: 2px;
+    font-family: var(--font-header);
+    font-size: 0.78rem;
+    color: var(--amber);
+}
+
+.asset-hist {
+    margin-top: 7px;
+    height: 58px;
+    border: 1px solid var(--border-dim);
+    background: rgba(0, 0, 0, 0.34);
+    display: grid;
+    grid-template-columns: repeat(24, minmax(0, 1fr));
+    align-items: end;
+    gap: 2px;
+    padding: 5px;
+}
+
+.hist-bar {
+    width: 100%;
+    border-radius: 2px;
+    min-height: 2px;
+}
+
+.hist-bar.pos {
+    background: linear-gradient(180deg, rgba(65, 255, 181, 0.95), rgba(65, 255, 181, 0.35));
+}
+
+.hist-bar.neg {
+    background: linear-gradient(180deg, rgba(255, 111, 158, 0.95), rgba(255, 111, 158, 0.35));
+}
+
+.asset-analysis {
+    margin-top: 6px;
+    color: var(--text-muted);
+    font-size: 0.62rem;
+    line-height: 1.45;
+}
+
+.asset-analysis strong {
+    color: var(--text-secondary);
+    font-weight: 400;
+}
+
+.panel-body .ascii-divider {
+    display: none;
+}
+
+@media (max-width: 992px) {
+    .execution-kpi-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .asset-terminal-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    .narrative-grid {
+        grid-template-columns: 1fr;
+    }
 }
 {% endblock %}
 
@@ -257,8 +992,70 @@
                     <div class="loading">Initializing market feed...</div>
                 </div>
                 <div class="ascii-divider">────────────────────────────────────────</div>
-                <div class="mini-chart" id="price-chart">
-                    <!-- Bars injected by JS -->
+                <div class="chart-label">24H_TREND</div>
+                <div id="price-chart">
+                    <!-- TV charts injected by JS -->
+                </div>
+                <div class="ascii-divider">────────────────────────────────────────</div>
+                <div class="chart-label">AI_MARKET_PULSE</div>
+                <div class="intel-pulse" id="intel-pulse">
+                    <div class="loading">Synthesizing market intelligence...</div>
+                </div>
+                <div class="ascii-divider">────────────────────────────────────────</div>
+                <div class="chart-label">MARKET_DRIVERS</div>
+                <div class="drivers-grid" id="market-drivers">
+                    <div class="loading">Ranking top technical and catalyst drivers...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Execution Intelligence -->
+        <div class="panel">
+            <span class="panel-corner tl"></span>
+            <span class="panel-corner tr"></span>
+            <span class="panel-corner bl"></span>
+            <span class="panel-corner br"></span>
+            <div class="panel-header">
+                <div class="panel-title">Execution_Intelligence</div>
+                <span class="timestamp" id="execution-updated">--:--:--</span>
+            </div>
+            <div class="panel-body">
+                <div class="execution-kpi-grid" id="execution-kpis">
+                    <div class="loading">Building execution snapshot...</div>
+                </div>
+                <div class="ascii-divider">────────────────────────────────────────</div>
+                <div class="asset-terminal-head">
+                    <div class="chart-label">AUTONOMOUS_ASSET_TERMINAL</div>
+                    <div class="horizon-toggle" id="asset-horizon-toggle">
+                        <button class="horizon-btn" data-hours="1">1H</button>
+                        <button class="horizon-btn" data-hours="6">6H</button>
+                        <button class="horizon-btn active" data-hours="24">24H</button>
+                    </div>
+                </div>
+                <div class="asset-terminal-grid" id="asset-terminal">
+                    <div class="loading">Composing macro/micro structure analysis...</div>
+                </div>
+                <div class="ascii-divider">────────────────────────────────────────</div>
+                <div class="chart-label">OPERATOR_DECISION_BRIEF</div>
+                <div class="operator-brief" id="operator-brief">
+                    <div class="loading">Computing GO/NO-GO decision brief...</div>
+                </div>
+                <div class="ascii-divider">────────────────────────────────────────</div>
+                <div class="chart-label">LANE_DRILLDOWN</div>
+                <div class="lane-drilldown" id="lane-drilldown">
+                    <div class="loading">Building lane-level attribution...</div>
+                </div>
+                <div class="ascii-divider">────────────────────────────────────────</div>
+                <div class="narrative-grid" id="market-narrative">
+                    <div class="loading">Compiling market context...</div>
+                </div>
+                <div class="ascii-divider">────────────────────────────────────────</div>
+                <div class="execution-feed-list" id="execution-intel-feed">
+                    <div class="loading">Loading prioritized intelligence feed...</div>
+                </div>
+                <div class="ascii-divider">────────────────────────────────────────</div>
+                <div class="context-strip" id="execution-context">
+                    Waiting for signal quality and market regime telemetry...
                 </div>
             </div>
         </div>
@@ -271,11 +1068,27 @@
             <span class="panel-corner br"></span>
             <div class="panel-header">
                 <div class="panel-title">Service_Status</div>
-                <a href="/platform" class="btn small">View_All</a>
+                <a href="/architecture" class="btn small">View_All</a>
             </div>
             <div class="panel-body">
                 <div class="service-list" id="service-list">
                     <div class="loading">Scanning services...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <span class="panel-corner tl"></span>
+            <span class="panel-corner tr"></span>
+            <span class="panel-corner bl"></span>
+            <span class="panel-corner br"></span>
+            <div class="panel-header">
+                <div class="panel-title">Scout_Mission</div>
+                <span class="timestamp" id="scout-updated">--:--:--</span>
+            </div>
+            <div class="panel-body">
+                <div class="scout-grid" id="scout-status-panel">
+                    <div class="loading">Loading scout posture...</div>
                 </div>
             </div>
         </div>
@@ -294,39 +1107,16 @@
                 <span class="timestamp" id="radar-timestamp">SCANNING...</span>
             </div>
             <div class="panel-body" style="padding: 0;">
-                <div class="radar-container" id="radar">
-                    <div class="radar-sweep"></div>
-                    <!-- Blips injected by JS -->
+                <div class="radar-wrap" id="radar">
+                    <canvas id="radar-canvas" class="radar-canvas"></canvas>
+                    <div class="radar-scanlines"></div>
                 </div>
-            </div>
-        </div>
-
-        <!-- Quick Actions -->
-        <div class="panel">
-            <span class="panel-corner tl"></span>
-            <span class="panel-corner tr"></span>
-            <span class="panel-corner bl"></span>
-            <span class="panel-corner br"></span>
-            <div class="panel-header">
-                <div class="panel-title">Quick_Access</div>
-            </div>
-            <div class="panel-body">
-                <div class="action-grid">
-                    <a href="/architecture" class="action-card">
-                        <div class="action-icon">◈</div>
-                        <div class="action-title">Architecture</div>
-                        <div class="action-desc">System topology</div>
-                    </a>
-                    <a href="/intelligence" class="action-card">
-                        <div class="action-icon">◉</div>
-                        <div class="action-title">Intelligence</div>
-                        <div class="action-desc">Market analysis</div>
-                    </a>
-                    <a href="/organization" class="action-card">
-                        <div class="action-icon">◎</div>
-                        <div class="action-title">Organization</div>
-                        <div class="action-desc">Programs & lanes</div>
-                    </a>
+                <div class="radar-caption">Live tactical radar: market movement, chain speed, and active execution telemetry.</div>
+                <div class="radar-meta-row">
+                    <span id="radar-quality-badge" class="radar-quality-badge nominal">DATA_NOMINAL</span>
+                </div>
+                <div id="chain-velocity-strip" class="chain-velocity-strip">
+                    <div class="loading">Loading chain velocity streams...</div>
                 </div>
             </div>
         </div>
@@ -350,68 +1140,488 @@
     </div>
 </div>
 
-<!-- ASCII Art Footer -->
-<div class="ascii-divider" style="text-align: center; margin-top: var(--space-xl);">
-╔══════════════════════════════════════════════════════════════════╗<br>
-║  SAPPHIRE AUTONOMOUS SYSTEMS - AUTHORIZED PERSONNEL ONLY         ║<br>
-╚══════════════════════════════════════════════════════════════════╝
-</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+    let _dashboardDataCache = null;
+    let _assetTerminalHorizonHours = 24;
+
+    function _setAssetHorizonUi(hours) {
+        document.querySelectorAll('#asset-horizon-toggle .horizon-btn').forEach((btn) => {
+            const isActive = Number(btn.dataset.hours) === Number(hours);
+            btn.classList.toggle('active', isActive);
+        });
+    }
+
+    function _renderAssetTerminalFromCache() {
+        if (!_dashboardDataCache) return;
+        updateAssetTerminal(
+            _dashboardDataCache.intelSummary,
+            _dashboardDataCache.strategyOps,
+            _dashboardDataCache.tradesPayload,
+            _dashboardDataCache.marketData,
+            _assetTerminalHorizonHours
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  SapphireRadar — Canvas phosphor military radar
+    //  Tracks configurable major/favorite symbols + service health
+    // ═══════════════════════════════════════════════════════════
+    class SapphireRadar {
+        constructor(canvasId) {
+            this.canvas = document.getElementById(canvasId);
+            if (!this.canvas || !this.canvas.getContext) return;
+            this.ctx = this.canvas.getContext('2d');
+            this.angle      = -Math.PI / 2;           // Start pointing North
+            this.sweepSpeed = (Math.PI * 2) / 260;    // ~4.3 s / revolution at 60 fps
+            this.market     = {};
+            this.services   = {};
+            this.superswarm = {};
+            this.intel      = {};
+            this.universe   = {};
+            this.frameCount = 0;
+            this.locks      = {};  // Active trade locks: { 'BTC': { side, timestamp } }
+            this.reducedMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+            this.symbolLayout = [];
+            this.symbolState = {};
+            this.symbolTrails = {};
+            this.lastDrawTs = Date.now();
+            this.setTrackedSymbols(['BTC', 'ETH', 'SOL']);
+
+            // Defer first draw to next frame so CSS width is applied
+            requestAnimationFrame(() => {
+                this._resize();
+                window.addEventListener('resize', () => this._resize());
+                this._loop();
+            });
+        }
+
+        _resize() {
+            const size = Math.max(this.canvas.offsetWidth || 0, 260);
+            this.canvas.width  = size;
+            this.canvas.height = size;
+            this.cx = size / 2;
+            this.cy = size / 2;
+            this.R  = size * 0.41;
+        }
+
+        setMarket(data)   { this.market   = data || {}; }
+        setServices(svcs) { this.services = svcs  || {}; }
+        setSuperswarm(data) { this.superswarm = data || {}; }
+        setIntel(data) { this.intel = data || {}; }
+        setUniverse(data) { this.universe = data || {}; }
+
+        _hash01(input) {
+            let h = 2166136261;
+            const s = String(input || '');
+            for (let i = 0; i < s.length; i++) {
+                h ^= s.charCodeAt(i);
+                h = Math.imul(h, 16777619);
+            }
+            return (h >>> 0) / 4294967295;
+        }
+
+        _angleNorm(a) {
+            let out = a;
+            while (out <= -Math.PI) out += Math.PI * 2;
+            while (out > Math.PI) out -= Math.PI * 2;
+            return out;
+        }
+
+        _angleDiff(target, current) {
+            return this._angleNorm(target - current);
+        }
+
+        _normalizeSymbol(raw) {
+            return String(raw || '')
+                .replace(/\/USDT$/i, '').replace(/USDT$/i, '')
+                .replace(/\/USD$/i, '').replace(/USD$/i, '')
+                .replace(/-PERP$/i, '').split('/')[0].toUpperCase();
+        }
+
+        _buildSymbolLayout(symbols) {
+            const clean = symbols.map(s => this._normalizeSymbol(s)).filter(Boolean);
+            const n = Math.max(clean.length, 1);
+            const start = -Math.PI / 2;      // North
+            const step  = (Math.PI * 2) / n;
+            return clean.map((id, i) => {
+                const jitterA = (this._hash01(`${id}-a`) - 0.5) * 0.24;
+                const jitterR = (this._hash01(`${id}-r`) - 0.5) * 0.08;
+                const baseR   = 0.42 + (i % 4) * 0.09;
+                return {
+                    id,
+                    angle: start + i * step + jitterA,
+                    r: Math.min(0.82, Math.max(0.32, baseR + jitterR)),
+                };
+            });
+        }
+
+        setTrackedSymbols(symbols) {
+            const deduped = [];
+            const seen = new Set();
+            (symbols || []).forEach(sym => {
+                const normalized = this._normalizeSymbol(sym);
+                if (!normalized || seen.has(normalized)) return;
+                seen.add(normalized);
+                deduped.push(normalized);
+            });
+            if (!deduped.length) return;
+            this.symbolLayout = this._buildSymbolLayout(deduped);
+            const allowed = new Set(deduped);
+            Object.keys(this.symbolState).forEach((sym) => {
+                if (!allowed.has(sym)) delete this.symbolState[sym];
+            });
+            Object.keys(this.symbolTrails).forEach((sym) => {
+                if (!allowed.has(sym)) delete this.symbolTrails[sym];
+            });
+        }
+
+        // Called by loadActiveTrades() every 10 s with current open positions
+        setActiveTrades(trades) {
+            const NOW = Date.now();
+            const TTL = 120000; // 2-min grace window after trade closes
+            const next = {};
+            (trades || []).forEach(t => {
+                const sym = this._normalizeSymbol(t.symbol || t.pair || '');
+                if (!sym) return;
+                // Preserve existing lock (keeps original timestamp → animation state)
+                next[sym] = this.locks[sym] || { side: t.side || t.action || 'buy', timestamp: NOW };
+            });
+            // Grace window: carry forward locks not yet in the new response
+            Object.entries(this.locks).forEach(([sym, lock]) => {
+                if (!next[sym] && NOW - lock.timestamp < TTL) next[sym] = lock;
+            });
+            this.locks = next;
+        }
+
+        // Force-lock a specific symbol (for manual testing / future UI hooks)
+        forceLock(sym, side) {
+            this.locks[sym.toUpperCase()] = { side: side || 'buy', timestamp: Date.now() };
+        }
+
+        _draw() {
+            const { ctx, cx, cy, R } = this;
+            const W = this.canvas.width, H = this.canvas.height;
+            if (!ctx || !W || !H) return;
+            const now = Date.now();
+            const t = now * 0.001;
+            const dt = Math.max(0.016, Math.min(0.12, (now - this.lastDrawTs) / 1000));
+            this.lastDrawTs = now;
+            const statusSummary = Object.values(this.services || {});
+            const healthyServices = statusSummary.filter((s) => s?.healthy).length;
+            const totalServices = statusSummary.length || 1;
+            const superswarmSummary = this.superswarm?.summary || {};
+            const superswarmAnalysis = this.superswarm?.analysis || {};
+            const executionSeries = Array.isArray(this.superswarm?.series?.execution_flow)
+                ? this.superswarm.series.execution_flow
+                : [];
+            const signals = Number(superswarmSummary.signals || this.intel?.operations?.signals || 0);
+            const executions = Number(superswarmSummary.executions || this.intel?.operations?.executions || 0);
+            const activeAgents = Math.max(healthyServices, 1);
+            const growthTotal = Number(superswarmAnalysis?.learning_summary?.total || 0);
+            const chainRows = Array.isArray(this.universe?.chain_streams) ? this.universe.chain_streams : [];
+            const chainBySymbol = {};
+            chainRows.forEach((row) => {
+                if (!row || typeof row !== 'object') return;
+                let key = String(row.symbol || '').toUpperCase();
+                if (!key) return;
+                if (key === 'SOL-FD') key = 'SOL';
+                if (!chainBySymbol[key] || Number(row.tps || 0) > Number(chainBySymbol[key].tps || 0)) {
+                    chainBySymbol[key] = row;
+                }
+            });
+
+            // Radar background + subtle persistence.
+            ctx.fillStyle = 'rgba(2, 8, 3, 0.22)';
+            ctx.fillRect(0, 0, W, H);
+            const vignette = ctx.createRadialGradient(cx, cy, R * 0.1, cx, cy, R * 1.35);
+            vignette.addColorStop(0, 'rgba(98,255,64,0.06)');
+            vignette.addColorStop(1, 'rgba(0,0,0,0.72)');
+            ctx.fillStyle = vignette;
+            ctx.fillRect(0, 0, W, H);
+
+            // Rings + crosshair grid.
+            for (let i = 1; i <= 4; i++) {
+                const r = (R * i) / 4;
+                ctx.beginPath();
+                ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                ctx.strokeStyle = i === 4 ? 'rgba(98,255,64,0.28)' : 'rgba(98,255,64,0.14)';
+                ctx.lineWidth = i === 4 ? 1.0 : 0.7;
+                ctx.stroke();
+            }
+            ctx.setLineDash([4, 6]);
+            ['v', 'h', 'd1', 'd2'].forEach((kind) => {
+                ctx.beginPath();
+                if (kind === 'v') { ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R); }
+                if (kind === 'h') { ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy); }
+                if (kind === 'd1') { ctx.moveTo(cx - R * 0.72, cy - R * 0.72); ctx.lineTo(cx + R * 0.72, cy + R * 0.72); }
+                if (kind === 'd2') { ctx.moveTo(cx - R * 0.72, cy + R * 0.72); ctx.lineTo(cx + R * 0.72, cy - R * 0.72); }
+                ctx.strokeStyle = 'rgba(98,255,64,0.10)';
+                ctx.lineWidth = 0.7;
+                ctx.stroke();
+            });
+            ctx.setLineDash([]);
+
+            // Sweep beam with trailing decay.
+            const segments = 18;
+            for (let i = 0; i < segments; i++) {
+                const a1 = this.angle - i * 0.05;
+                const a2 = a1 - 0.04;
+                const alpha = Math.pow(1 - i / segments, 2.1) * 0.22;
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+                ctx.arc(cx, cy, R, a2, a1);
+                ctx.closePath();
+                ctx.fillStyle = `rgba(98,255,64,${alpha.toFixed(4)})`;
+                ctx.fill();
+            }
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + Math.cos(this.angle) * R, cy + Math.sin(this.angle) * R);
+            ctx.strokeStyle = 'rgba(155,255,122,0.95)';
+            ctx.lineWidth = 1.9;
+            ctx.stroke();
+
+            // Center pulse.
+            const pulse = 3.6 + Math.sin(t * 5.2) * 0.9;
+            ctx.beginPath();
+            ctx.arc(cx, cy, pulse, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(98,255,64,0.88)';
+            ctx.fill();
+
+            const symbols = this.symbolLayout.slice(0, 6);
+            symbols.forEach((sym, idx) => {
+                const md = this.market[sym.id] || {};
+                const tech = Array.isArray(this.intel?.technicals)
+                    ? this.intel.technicals.find((r) => String(r?.symbol || '').toUpperCase() === sym.id)
+                    : null;
+                const chain = chainBySymbol[sym.id] || {};
+                const change = Number(md.change_24h ?? tech?.change_24h ?? chain?.market_change_24h ?? 0);
+                const momentum = Number(tech?.momentum_score || 0);
+                const tps = Number(chain?.tps || 0);
+                const speedScore = Number(chain?.speed_score || Math.min(100, Math.log10(Math.max(1, tps) + 1) * 32));
+                const activityIndex = Number(chain?.activity_index || Math.min(100, Math.abs(change) * 10 + (speedScore * 0.55)));
+                const volatility = Math.min(1, Math.abs(change) / 6);
+                const activity = Math.min(1, (activityIndex / 100) * 0.68 + volatility * 0.32);
+
+                const drift = (0.05 + (speedScore / 100) * 0.18) * (change >= 0 ? 1 : -1);
+                const targetAngle = this._angleNorm(sym.angle + Math.sin(t * 0.85 + idx * 1.74) * 0.16 + drift * (t * 0.36));
+                const targetRadius = Math.min(0.9, Math.max(0.25, 0.30 + activity * 0.55));
+
+                const state = this.symbolState[sym.id] || {
+                    angle: targetAngle,
+                    radius: targetRadius,
+                    x: cx + Math.cos(targetAngle) * R * targetRadius,
+                    y: cy + Math.sin(targetAngle) * R * targetRadius,
+                };
+                const lerpA = Math.min(1, dt * 3.4);
+                const lerpR = Math.min(1, dt * 2.9);
+                state.angle = this._angleNorm(state.angle + this._angleDiff(targetAngle, state.angle) * lerpA);
+                state.radius += (targetRadius - state.radius) * lerpR;
+                state.x = cx + Math.cos(state.angle) * R * state.radius;
+                state.y = cy + Math.sin(state.angle) * R * state.radius;
+                this.symbolState[sym.id] = state;
+
+                const trail = this.symbolTrails[sym.id] || [];
+                trail.push({ x: state.x, y: state.y, ts: now });
+                while (trail.length > 18) trail.shift();
+                this.symbolTrails[sym.id] = trail;
+                for (let j = 1; j < trail.length; j++) {
+                    const prev = trail[j - 1];
+                    const curr = trail[j];
+                    const alpha = (j / trail.length) * 0.30;
+                    ctx.beginPath();
+                    ctx.moveTo(prev.x, prev.y);
+                    ctx.lineTo(curr.x, curr.y);
+                    ctx.strokeStyle = `rgba(98,255,64,${alpha.toFixed(4)})`;
+                    ctx.lineWidth = 0.8;
+                    ctx.stroke();
+                }
+
+                const diff = Math.abs(this._angleDiff(this.angle, state.angle));
+                const swept = diff < 0.12;
+                const up = change >= 0;
+                const color = up ? '#9aff78' : '#ff6f9e';
+                const size = 3.0 + activity * 4.2 + (swept ? 1.8 : 0);
+
+                ctx.beginPath();
+                ctx.arc(state.x, state.y, size + 7, 0, Math.PI * 2);
+                const glow = ctx.createRadialGradient(state.x, state.y, 0, state.x, state.y, size + 8);
+                glow.addColorStop(0, up ? 'rgba(154,255,120,0.36)' : 'rgba(255,111,158,0.34)');
+                glow.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = glow;
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.arc(state.x, state.y, size, 0, Math.PI * 2);
+                ctx.fillStyle = color;
+                ctx.fill();
+
+                if (swept) {
+                    ctx.beginPath();
+                    ctx.arc(state.x, state.y, size + 8 + Math.sin(t * 12 + idx) * 1.2, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(154,255,120,0.50)';
+                    ctx.lineWidth = 1.0;
+                    ctx.stroke();
+                }
+
+                const lock = this.locks[sym.id];
+                if (lock) {
+                    const reticle = size + 10;
+                    ctx.strokeStyle = 'rgba(154,255,120,0.82)';
+                    ctx.lineWidth = 1.1;
+                    const arm = 5;
+                    ctx.beginPath();
+                    ctx.moveTo(state.x - reticle, state.y - reticle + arm); ctx.lineTo(state.x - reticle, state.y - reticle); ctx.lineTo(state.x - reticle + arm, state.y - reticle);
+                    ctx.moveTo(state.x + reticle - arm, state.y - reticle); ctx.lineTo(state.x + reticle, state.y - reticle); ctx.lineTo(state.x + reticle, state.y - reticle + arm);
+                    ctx.moveTo(state.x - reticle, state.y + reticle - arm); ctx.lineTo(state.x - reticle, state.y + reticle); ctx.lineTo(state.x - reticle + arm, state.y + reticle);
+                    ctx.moveTo(state.x + reticle - arm, state.y + reticle); ctx.lineTo(state.x + reticle, state.y + reticle); ctx.lineTo(state.x + reticle, state.y + reticle - arm);
+                    ctx.stroke();
+                }
+
+                const sign = change >= 0 ? '+' : '';
+                const tpsStr = tps > 0 ? `${tps >= 100 ? tps.toFixed(0) : tps.toFixed(1)}tps` : 'n/a';
+                const label = `${sym.id} ${sign}${change.toFixed(2)}% · ${tpsStr}`;
+                ctx.font = '9px "Courier New", monospace';
+                const lw = ctx.measureText(label).width;
+                const lx = state.x > cx ? state.x + size + 6 : state.x - size - lw - 6;
+                const ly = state.y - size - 2;
+                ctx.fillStyle = 'rgba(3,8,3,0.84)';
+                ctx.fillRect(lx - 2, ly - 9, lw + 4, 12);
+                ctx.fillStyle = color;
+                ctx.fillText(label, lx, ly);
+            });
+
+            // Service health orbit.
+            const svcEntries = Object.entries(this.services || {});
+            const svcN = Math.max(1, svcEntries.length);
+            svcEntries.forEach(([_, row], i) => {
+                const a = -Math.PI / 2 + (i / svcN) * Math.PI * 2;
+                const x = cx + Math.cos(a) * R * 1.03;
+                const y = cy + Math.sin(a) * R * 1.03;
+                ctx.beginPath();
+                ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+                ctx.fillStyle = row?.healthy ? 'rgba(154,255,120,0.85)' : 'rgba(255,84,84,0.85)';
+                ctx.fill();
+            });
+
+            // HUD and operational metrics.
+            const sourceCount = Array.isArray(superswarmAnalysis?.source_efficacy)
+                ? superswarmAnalysis.source_efficacy.length
+                : 0;
+            ctx.font = '10px "Courier New", monospace';
+            ctx.fillStyle = 'rgba(98,255,64,0.72)';
+            ctx.fillText(`AI_AGENTS ${activeAgents}/${totalServices}`, 8, 14);
+            ctx.fillText(`SIGNALS ${signals}  EXEC ${executions}`, 8, 28);
+            const lockCount = Object.keys(this.locks || {}).length;
+            ctx.fillText(`SOURCE_STREAMS ${sourceCount}  LOCKS ${lockCount}`, 8, 42);
+            ctx.fillStyle = 'rgba(98,255,64,0.42)';
+            ctx.textAlign = 'right';
+            ctx.fillText('SAPPHIRE RADAR // LIVE', W - 8, H - 8);
+            ctx.textAlign = 'left';
+
+            const quality = (this.universe && typeof this.universe === 'object') ? (this.universe.quality || {}) : {};
+            const dataDegraded = Boolean(quality.degraded);
+            const issueCount = Number(quality.issue_count || 0);
+            const qualityLabel = dataDegraded
+                ? `DATA DEGRADED${issueCount > 0 ? ` (${issueCount})` : ''}`
+                : 'DATA NOMINAL';
+            const qw = ctx.measureText(qualityLabel).width;
+            const qx = W - qw - 16;
+            const qy = 28;
+            ctx.fillStyle = dataDegraded ? 'rgba(34,0,0,0.72)' : 'rgba(3,8,3,0.72)';
+            ctx.fillRect(qx - 4, qy - 10, qw + 8, 13);
+            ctx.fillStyle = dataDegraded ? 'rgba(255,90,90,0.92)' : 'rgba(98,255,64,0.70)';
+            ctx.fillText(qualityLabel, qx, qy);
+
+            // Timestamp.
+            ctx.fillStyle = 'rgba(98,255,64,0.38)';
+            ctx.fillText(new Date(now).toLocaleTimeString('en-US', { hour12: false }), W - 90, 14);
+            if (!this.reducedMotion) {
+                this.angle = (this.angle + this.sweepSpeed + Math.PI * 2) % (Math.PI * 2);
+            }
+        }
+
+        _loop() {
+            this.frameCount++;
+            this._draw();
+            if (this.reducedMotion) {
+                setTimeout(() => this._loop(), 220);
+            } else {
+                requestAnimationFrame(() => this._loop());
+            }
+        }
+    }
+
+    // ── Radar singleton ──────────────────────────────────────────────────
+    let _radarInstance = null;
+    function initRadar() {
+        _radarInstance = new SapphireRadar('radar-canvas');
+        window.radarInstance = _radarInstance;
+    }
+
     // Load dashboard data
     async function loadDashboard() {
         try {
             console.log('Loading dashboard...');
-            
-            // Load data sequentially to better catch errors
-            let status, metrics, projects, logs, superswarm;
-            
-            try {
-                status = await window.platformApi.getStatus();
-                console.log('Status loaded:', status);
-            } catch (e) {
-                console.error('Status load failed:', e);
-                status = { services: {}, summary: {} };
-            }
-            
-            try {
-                metrics = await window.platformApi.getMetrics();
-                console.log('Metrics loaded:', metrics);
-            } catch (e) {
-                console.error('Metrics load failed:', e);
-                metrics = {};
-            }
-            
-            try {
-                projects = await window.platformApi.getProjects();
-                console.log('Projects loaded:', projects);
-            } catch (e) {
-                console.error('Projects load failed:', e);
-                projects = { projects: [] };
-            }
-            
-            try {
-                logs = await window.platformApi.getLogs({ limit: 5, hours: 24 });
-                console.log('Logs loaded:', logs);
-            } catch (e) {
-                console.error('Logs load failed:', e);
-                logs = { logs: [] };
-            }
-            
-            try {
-                superswarm = await window.platformApi.getSuperswarm({ hours: 24 });
-                console.log('Superswarm loaded:', superswarm);
-            } catch (e) {
-                console.error('Superswarm load failed:', e);
-                superswarm = { summary: {} };
-            }
+
+            const [snapshot, intelSummary, intelFeed, strategyOps, tradesPayload, zeitgeistUniverse, autonomy] = await Promise.all([
+                window.platformApi.getHomeSnapshot().catch((e) => {
+                    console.error('Home snapshot load failed:', e);
+                    return {};
+                }),
+                window.platformApi.getIntelSummary({ hours: 24, limit: 60 }).catch((e) => {
+                    console.error('Intel summary load failed:', e);
+                    return { ai_digest: {}, technicals: [], market: {}, operations: {} };
+                }),
+                window.platformApi.getIntelFeed({ limit: 12 }).catch((e) => {
+                    console.error('Intel feed load failed:', e);
+                    return { items: [], count: 0 };
+                }),
+                window.platformApi.getStrategyOps({ days: 7 }).catch((e) => {
+                    console.error('Strategy ops load failed:', e);
+                    return { scorecard: { totals: {}, ranked: [] }, assessment: {}, operator_brief: {}, attribution: {} };
+                }),
+                window.platformApi.getTrades({ hours: 72, limit: 280, include_failed: true }).catch((e) => {
+                    console.error('Trades load failed:', e);
+                    return { trades: [] };
+                }),
+                window.platformApi.getZeitgeistUniverse({ refresh: false }).catch((e) => {
+                    console.error('Zeitgeist universe load failed:', e);
+                    return {};
+                }),
+                window.platformApi.getAutonomy().catch((e) => {
+                    console.error('Autonomy load failed:', e);
+                    return {};
+                }),
+            ]);
+
+            const status = snapshot?.status || { services: {}, summary: {} };
+            const metrics = snapshot?.metrics || {};
+            const projects = snapshot?.projects || { projects: [] };
+            const logs = snapshot?.logs || { logs: [] };
+            const superswarm = snapshot?.superswarm || { summary: {} };
+            const businessBrief = snapshot?.business_brief || { summary: {}, narrative: {} };
 
             updateMissionStatus(status, metrics, projects, superswarm);
             updateServiceList(status);
             updateActivityLog(logs);
-            updateRadar(status);
+            updateRadar(status, superswarm, intelSummary, zeitgeistUniverse);
+            updateChainVelocity(zeitgeistUniverse);
+            updateScoutStatus(autonomy);
+            updateIntelPulse(intelSummary);
+            updateMarketDrivers(intelSummary);
+            updateExecutionInsights(metrics, superswarm, intelSummary, intelFeed, businessBrief, strategyOps);
+            _dashboardDataCache = {
+                intelSummary,
+                strategyOps,
+                tradesPayload,
+                marketData: metrics?.market || {},
+            };
+            _renderAssetTerminalFromCache();
+            loadMarketPrices(metrics?.market || {});
             
             console.log('Dashboard updated successfully');
         } catch (e) {
@@ -466,6 +1676,17 @@
         container.innerHTML = items || '<div class="empty-state">No services found</div>';
     }
 
+    function sanitizeTradeSensitive(text) {
+        let safe = String(text || '');
+        safe = safe.replace(/\$-?\d[\d,]*(\.\d+)?/g, '$[hidden]');
+        safe = safe.replace(/\b(?:qty|quantity|size|notional|filled_quantity|effective_qty|position_size)\s*[:=]?\s*-?\d+(\.\d+)?/gi, (m) => {
+            const k = m.split(/[:=]/)[0];
+            return `${k}=[hidden]`;
+        });
+        safe = safe.replace(/\b-?\d+(\.\d+)?\s*(SOL|ETH|BTC|USDT|USD)\b/gi, '[hidden size]');
+        return safe;
+    }
+
     function updateActivityLog(logsData) {
         const logs = logsData.logs || [];
         const container = document.getElementById('activity-log');
@@ -478,7 +1699,7 @@
         const lines = logs.slice(0, 5).map(log => {
             const timestamp = log.timestamp ? new Date(log.timestamp).toLocaleTimeString('en-US', { hour12: false }) : '--:--:--';
             const level = (log.level || 'info').toLowerCase();
-            const message = log.message || 'No message';
+            const message = sanitizeTradeSensitive(log.message || 'No message');
             
             return `
                 <div class="line">
@@ -492,82 +1713,866 @@
         container.innerHTML = lines;
     }
 
-    function updateRadar(status) {
-        const radar = document.getElementById('radar');
-        const services = Object.entries(status.services || {});
-        
-        // Clear existing blips
-        radar.querySelectorAll('.radar-blip').forEach(b => b.remove());
-        
-        // Add service blips
-        services.forEach(([name, data], i) => {
-            const blip = document.createElement('div');
-            blip.className = 'radar-blip';
-            
-            // Position in a circle pattern
-            const angle = (i / Math.max(services.length, 1)) * Math.PI * 2;
-            const radius = 30 + Math.random() * 40;
-            const x = 50 + Math.cos(angle) * radius;
-            const y = 50 + Math.sin(angle) * radius;
-            
-            blip.style.left = `${x}%`;
-            blip.style.top = `${y}%`;
-            blip.style.animationDelay = `${i * 0.2}s`;
-            blip.style.background = data.healthy ? 'var(--green)' : 'var(--red)';
-            blip.style.boxShadow = data.healthy ? 'var(--glow-green)' : '0 0 10px rgba(255,51,51,0.4)';
-            
-            radar.appendChild(blip);
-        });
+    function updateScoutStatus(autonomyPayload) {
+        const container = document.getElementById('scout-status-panel');
+        const updated = document.getElementById('scout-updated');
+        if (!container || !updated) return;
 
-        document.getElementById('radar-timestamp').textContent = new Date().toLocaleTimeString('en-US', { hour12: false });
+        const scout = autonomyPayload?.scout || {};
+        const bridge = scout?.external_bridge || {};
+        const registration = scout?.registration || {};
+        const profile = scout?.profile || {};
+        const sourceStatus = autonomyPayload?.sources?.scout || {};
+
+        const dispatchMode = String(bridge?.dispatch_mode || 'unknown').replace(/_/g, ' ');
+        const providerState = String(bridge?.provider_state || 'unknown').replace(/_/g, ' ');
+        const registered = Boolean(registration?.registered);
+        const fallbackReady = Boolean(bridge?.fallback_ready);
+        const sandboxReady = Boolean(bridge?.sandbox_ready);
+        const externalReady = Boolean(bridge?.external_ready);
+        const sourceOk = Boolean(sourceStatus?.ok);
+        const role = String(profile?.role || 'external collaboration scout').replace(/_/g, ' ');
+        const username = registration?.username ? `@${registration.username}` : 'unbound';
+        const provider = String(bridge?.provider || 'moltbook').toUpperCase();
+        const blocked = Array.isArray(profile?.blocked_actions) ? profile.blocked_actions.slice(0, 4) : [];
+        const allowed = Array.isArray(profile?.allowed_actions) ? profile.allowed_actions.slice(0, 4) : [];
+
+        const pills = [
+            `<span class="scout-pill ${registered ? 'live' : 'block'}">${registered ? 'REGISTERED' : 'UNBOUND'}</span>`,
+            `<span class="scout-pill ${sandboxReady ? 'live' : 'warn'}">${sandboxReady ? 'SANDBOX READY' : 'SANDBOX DEGRADED'}</span>`,
+            `<span class="scout-pill ${fallbackReady ? 'live' : 'warn'}">${fallbackReady ? 'FALLBACK READY' : 'FALLBACK HOLD'}</span>`,
+            `<span class="scout-pill ${externalReady ? 'live' : 'warn'}">${externalReady ? 'EXTERNAL READY' : 'EXTERNAL HOLD'}</span>`,
+            `<span class="scout-pill ${sourceOk ? 'live' : 'warn'}">${sourceOk ? 'STATUS LIVE' : 'STATUS DEGRADED'}</span>`,
+        ].join('');
+
+        container.innerHTML = `
+            <div class="scout-card">
+                <div class="scout-head">
+                    <span class="scout-role">${role.toUpperCase()}</span>
+                    <div class="scout-pills">${pills}</div>
+                </div>
+                <div class="scout-copy">
+                    <strong>Identity:</strong> ${username} on ${provider}.<br>
+                    <strong>Dispatch:</strong> ${dispatchMode.toUpperCase()} with ${providerState.toUpperCase()} posture.<br>
+                    <strong>Role:</strong> Sanitized external research, signal collection, and outward-facing context synthesis only.
+                </div>
+            </div>
+            <div class="scout-card">
+                <div class="scout-copy">
+                    <strong>Allowed:</strong> ${(allowed.length ? allowed.join(', ') : 'none').replace(/_/g, ' ')}.<br>
+                    <strong>Blocked:</strong> ${(blocked.length ? blocked.join(', ') : 'none').replace(/_/g, ' ')}.
+                </div>
+                <div class="scout-rules">
+                    <div class="scout-rule">Policy: no secrets, no trades, no cloud mutations, no private repo disclosure.</div>
+                    <div class="scout-rule">${bridge?.operator_hint || 'Scout should route through sandbox controls until an operator explicitly expands scope.'}</div>
+                </div>
+            </div>
+        `;
+
+        updated.textContent = new Date().toLocaleTimeString('en-US', { hour12: false });
     }
 
-    // Load market prices
-    async function loadMarketPrices() {
-        try {
-            const response = await fetch('/api/market/prices');
-            const data = await response.json();
-            
-            const container = document.getElementById('price-ticker');
-            const prices = ['BTC', 'ETH', 'SOL'];
-            
-            const items = prices.map(symbol => {
-                const priceData = data[symbol] || {};
-                const price = priceData.price ? `$${priceData.price.toLocaleString()}` : '--';
-                const change = priceData.change_24h || 0;
-                const changeClass = change >= 0 ? 'up' : 'down';
-                const changeSign = change >= 0 ? '+' : '';
-                
+    function updateIntelPulse(summary) {
+        const container = document.getElementById('intel-pulse');
+        if (!container) return;
+
+        const digest = summary?.ai_digest || {};
+        const market = summary?.market || {};
+        const movers = Array.isArray(market.movers) ? market.movers : [];
+        const strongest = movers[0] || { symbol: '--', change_24h: 0 };
+        const weakest = movers[movers.length - 1] || { symbol: '--', change_24h: 0 };
+        const insights = Array.isArray(digest.insights) ? digest.insights.slice(0, 3) : [];
+        const watchlist = Array.isArray(digest.watchlist) ? digest.watchlist.slice(0, 3) : [];
+
+        const signals = Number(summary?.operations?.signals || 0);
+        const executions = Number(summary?.operations?.executions || 0);
+        const quality = Number(summary?.operations?.execution_quality || 0);
+        const confidence = Number(digest?.confidence || 0);
+
+        const strongestChange = Number(strongest.change_24h || 0);
+        const weakestChange = Number(weakest.change_24h || 0);
+        const strongClass = strongestChange >= 0 ? 'up' : 'down';
+        const weakClass = weakestChange >= 0 ? 'up' : 'down';
+
+        container.innerHTML = `
+            <div class="pulse-headline">${digest.headline || 'Intelligence pulse is warming up.'}</div>
+            <div class="pulse-summary">${digest.summary || 'Awaiting sufficient market and execution context for a full synthesis.'}</div>
+            <div class="pulse-metrics">
+                <div class="pulse-metric">
+                    <div class="k">Regime</div>
+                    <div class="v">${market.regime_label || '--'}</div>
+                </div>
+                <div class="pulse-metric">
+                    <div class="k">Strongest</div>
+                    <div class="v ${strongClass}">${strongest.symbol || '--'} ${strongestChange >= 0 ? '+' : ''}${strongestChange.toFixed(2)}%</div>
+                </div>
+                <div class="pulse-metric">
+                    <div class="k">Weakest</div>
+                    <div class="v ${weakClass}">${weakest.symbol || '--'} ${weakestChange >= 0 ? '+' : ''}${weakestChange.toFixed(2)}%</div>
+                </div>
+                <div class="pulse-metric">
+                    <div class="k">Confidence</div>
+                    <div class="v">${confidence.toFixed(1)} / 100</div>
+                </div>
+            </div>
+            <div class="pulse-insights">
+                ${insights.map(item => `
+                    <div class="pulse-item">
+                        <div class="pulse-item-top">
+                            <span class="pulse-topic">${item.topic || 'Insight'}</span>
+                            <span class="pulse-value">${item.value || '--'}</span>
+                        </div>
+                        <div class="pulse-detail">${item.detail || ''}</div>
+                    </div>
+                `).join('')}
+            </div>
+            <div class="pulse-watchlist">
+                ${watchlist.map(item => `
+                    <div class="pulse-item">
+                        <div class="pulse-item-top">
+                            <span class="pulse-topic">${item.symbol || '--'} • ${item.priority || 'medium'} priority</span>
+                            <span class="pulse-bias ${(item.bias || 'neutral').toLowerCase()}">${item.bias || 'neutral'}</span>
+                        </div>
+                        <div class="pulse-detail">${item.setup || ''} — ${item.reason || ''}</div>
+                    </div>
+                `).join('')}
+            </div>
+            <div class="pulse-summary">Signal flow: ${signals} signals / ${executions} executions • Quality ${quality.toFixed(1)}%</div>
+        `;
+    }
+
+    function updateMarketDrivers(summary) {
+        const container = document.getElementById('market-drivers');
+        if (!container) return;
+
+        const technicals = Array.isArray(summary?.technicals) ? summary.technicals.slice(0, 4) : [];
+        const symbolMentions = (summary?.intel?.symbol_mentions && typeof summary.intel.symbol_mentions === 'object')
+            ? summary.intel.symbol_mentions
+            : {};
+        const topIntel = Array.isArray(summary?.intel?.top_items) ? summary.intel.top_items.slice(0, 2) : [];
+        const ops = summary?.operations || {};
+        const signals = Number(ops?.signals || 0);
+        const executions = Number(ops?.executions || 0);
+        const conversionPct = signals > 0 ? ((executions / signals) * 100) : 0;
+
+        if (!technicals.length && !topIntel.length) {
+            container.innerHTML = '<div class="empty-state">No ranked drivers available in this window</div>';
+            return;
+        }
+
+        const technicalCards = technicals.map((t) => {
+            const symbol = String(t?.symbol || '--').toUpperCase();
+            const technicalScore = Number(t?.composite_score || 0);
+            const bias = String(t?.bias || 'neutral').toUpperCase();
+            const change = Number(t?.change_24h || 0);
+            const sign = change >= 0 ? '+' : '';
+            const rawMention = Number(symbolMentions?.[symbol] || 0);
+            const catalystScore = Math.min(100, rawMention * 15);
+            const driverConfidence = Math.min(
+                100,
+                (technicalScore * 0.60) + (catalystScore * 0.25) + (conversionPct * 0.15)
+            );
+            return `
+                <div class="driver-card">
+                    <div class="driver-head">
+                        <span class="driver-symbol">${symbol} • ${bias}</span>
+                        <span class="driver-score">${driverConfidence.toFixed(1)}</span>
+                    </div>
+                    <div class="driver-detail">${String(t?.action || 'Awaiting setup')}. 24H ${sign}${change.toFixed(2)}% • tech ${technicalScore.toFixed(1)} • catalyst ${catalystScore.toFixed(1)}.</div>
+                </div>
+            `;
+        });
+
+        const catalystCards = topIntel.map((item) => {
+            const src = String(item?.source || 'intel').toUpperCase();
+            const conf = String(item?.confidence || 'medium').toUpperCase();
+            const title = String(item?.title || 'Catalyst signal').slice(0, 72);
+            return `
+                <div class="driver-card">
+                    <div class="driver-head">
+                        <span class="driver-symbol">${src} CATALYST</span>
+                        <span class="driver-score">${conf}</span>
+                    </div>
+                    <div class="driver-detail">${title}</div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = [...technicalCards, ...catalystCards].join('');
+    }
+
+    function normalizeAssetSymbol(raw) {
+        return String(raw || '')
+            .replace(/\/USDT$/i, '').replace(/USDT$/i, '')
+            .replace(/\/USD$/i, '').replace(/USD$/i, '')
+            .replace(/-PERP$/i, '')
+            .split('/')[0]
+            .toUpperCase();
+    }
+
+    function pctString(value, digits = 2) {
+        const n = Number(value || 0);
+        const sign = n >= 0 ? '+' : '';
+        return `${sign}${n.toFixed(digits)}%`;
+    }
+
+    function tradePnlPct(trade) {
+        const pnl = Number(trade?.realized_pnl || 0);
+        const qty = Math.abs(Number(trade?.filled_quantity || 0));
+        const px = Math.abs(Number(trade?.avg_price || 0));
+        const notional = qty * px;
+        if (!(notional > 0)) return 0;
+        const pct = (pnl / notional) * 100;
+        return Math.max(-25, Math.min(25, pct));
+    }
+
+    function updateAssetTerminal(intelSummary, strategyOps, tradesPayload, marketData, horizonHours = 24) {
+        const container = document.getElementById('asset-terminal');
+        if (!container) return;
+
+        const techRows = Array.isArray(intelSummary?.technicals) ? intelSummary.technicals : [];
+        const allTrades = Array.isArray(tradesPayload?.trades) ? tradesPayload.trades : [];
+        const nowMs = Date.now();
+        const horizonMs = Math.max(1, Number(horizonHours || 24)) * 60 * 60 * 1000;
+        const trades = allTrades.filter((t) => {
+            const ts = Date.parse(t?.timestamp || t?.created_at || t?.updated_at || '');
+            return Number.isFinite(ts) && ts >= (nowMs - horizonMs);
+        });
+        const tracked = Array.isArray(marketData?.tracked_symbols) ? marketData.tracked_symbols : [];
+        const moverSymbols = Array.isArray(intelSummary?.market?.movers)
+            ? intelSummary.market.movers.map((m) => m?.symbol)
+            : [];
+
+        const prioritized = ['BTC', 'ETH', 'SOL'];
+        const seen = new Set();
+        const chosen = [];
+        [...prioritized, ...tracked, ...moverSymbols].forEach((sym) => {
+            const n = normalizeAssetSymbol(sym);
+            if (!n || seen.has(n)) return;
+            seen.add(n);
+            chosen.push(n);
+        });
+        const symbols = chosen.slice(0, 3);
+
+        if (!symbols.length) {
+            container.innerHTML = '<div class="empty-state">No tracked assets available for terminal view</div>';
+            return;
+        }
+
+        const regime = String(intelSummary?.market?.regime_label || 'Neutral');
+        const regimeScore = Number(intelSummary?.market?.regime_score || 0);
+        const breadthUp = Number(intelSummary?.market?.breadth_up || 0);
+        const breadthTotal = Number(intelSummary?.market?.breadth_total || 0);
+        const scoreRows = Array.isArray(strategyOps?.scorecard?.ranked) ? strategyOps.scorecard.ranked : [];
+        const barCount = horizonHours <= 1 ? 12 : (horizonHours <= 6 ? 18 : 24);
+
+        container.innerHTML = symbols.map((symbol) => {
+            const tech = techRows.find((row) => String(row?.symbol || '').toUpperCase() === symbol) || {};
+            const symbolTrades = trades
+                .filter((t) => normalizeAssetSymbol(t?.symbol || t?.pair || '') === symbol && Boolean(t?.executed))
+                .slice(0, barCount)
+                .reverse();
+            const pnlSeries = symbolTrades.map(tradePnlPct);
+            const paddedSeries = [...Array(Math.max(0, barCount - pnlSeries.length)).fill(0), ...pnlSeries].slice(-barCount);
+            const maxAbs = Math.max(0.15, ...paddedSeries.map((v) => Math.abs(v)));
+            const wins = paddedSeries.filter((v) => v > 0).length;
+            const losses = paddedSeries.filter((v) => v < 0).length;
+            const closed = wins + losses;
+            const winRate = closed > 0 ? (wins / closed) * 100 : 0;
+            const avgPnlPct = paddedSeries.length
+                ? (paddedSeries.reduce((acc, n) => acc + n, 0) / paddedSeries.length)
+                : 0;
+            const marketChange = Number((marketData?.[symbol] || {}).change_24h || tech?.change_24h || 0);
+            const bias = String(tech?.bias || 'neutral').toLowerCase();
+            const score = Number(tech?.composite_score || 0);
+            const momentumScore = Number(tech?.momentum_score || 0);
+            const intelSupport = Number(tech?.intel_support || 0);
+            const suggestedAction = String(tech?.action || 'Monitor structure for confirmation');
+            const lane = scoreRows.find((row) => String(row?.strategy || '').toLowerCase().includes('overnight')) || scoreRows[0] || {};
+
+            const bars = paddedSeries.map((value) => {
+                const barClass = value >= 0 ? 'pos' : 'neg';
+                const h = Math.max(4, Math.round((Math.abs(value) / maxAbs) * 42));
+                return `<div class="hist-bar ${barClass}" style="height:${h}px" title="${pctString(value)}"></div>`;
+            }).join('');
+
+            return `
+                <div class="asset-card">
+                    <div class="asset-card-head">
+                        <span class="asset-symbol">${symbol} // AUTONOMOUS</span>
+                        <span class="asset-bias ${bias}">${bias.toUpperCase()}</span>
+                    </div>
+                    <div class="asset-metrics">
+                        <div class="asset-metric">
+                            <div class="k">24h Move</div>
+                            <div class="v">${pctString(marketChange)}</div>
+                        </div>
+                        <div class="asset-metric">
+                            <div class="k">Avg Fill PnL</div>
+                            <div class="v">${pctString(avgPnlPct)}</div>
+                        </div>
+                        <div class="asset-metric">
+                            <div class="k">Win Rate</div>
+                            <div class="v">${winRate.toFixed(1)}%</div>
+                        </div>
+                    </div>
+                    <div class="asset-hist" style="grid-template-columns: repeat(${barCount}, minmax(0, 1fr));">${bars}</div>
+                    <div class="asset-analysis">
+                        <strong>Macro:</strong> ${regime} (${regimeScore.toFixed(1)}/100) with breadth ${breadthUp}/${breadthTotal || 3} up and ${bias} structure.
+                        <br><strong>Micro (${horizonHours}h):</strong> Momentum ${momentumScore.toFixed(1)}/100, intel support ${intelSupport.toFixed(1)}/100, autonomous fill avg ${pctString(avgPnlPct)}. Bias action: ${suggestedAction}. Lane posture ${String(lane?.recommendation || 'monitor').toUpperCase()}.
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function updateExecutionInsights(metrics, superswarm, intelSummary, intelFeed, businessBrief, strategyOps) {
+        const container = document.getElementById('execution-kpis');
+        const narrative = document.getElementById('market-narrative');
+        const context = document.getElementById('execution-context');
+        const feed = document.getElementById('execution-intel-feed');
+        const operatorBrief = document.getElementById('operator-brief');
+        const laneDrilldown = document.getElementById('lane-drilldown');
+        const updated = document.getElementById('execution-updated');
+        if (!container || !narrative || !context || !feed || !operatorBrief || !laneDrilldown) return;
+
+        const trading = metrics?.trading || {};
+        const tradeStats = trading?.trades || {};
+        const signalStats = trading?.signals || {};
+        const superswarmSummary = superswarm?.summary || {};
+        const ops = intelSummary?.operations || {};
+        const market = intelSummary?.market || {};
+        const movers = Array.isArray(market?.movers) ? market.movers : [];
+        const best = movers[0] || { symbol: '--', change_24h: 0 };
+        const worst = movers[movers.length - 1] || { symbol: '--', change_24h: 0 };
+        const feedItems = Array.isArray(intelFeed?.items) ? intelFeed.items.slice(0, 4) : [];
+        const briefSummary = businessBrief?.summary || {};
+        const briefNarrative = businessBrief?.narrative || {};
+        const scorecard = strategyOps?.scorecard || {};
+        const scoreTotals = scorecard?.totals || {};
+        const northStar = scoreTotals?.north_star || {};
+        const assessment = strategyOps?.assessment || {};
+        const decision = strategyOps?.decision || {};
+        const operator = strategyOps?.operator_brief || {};
+        const attribution = strategyOps?.attribution || {};
+        const dataQuality = strategyOps?.data_quality || {};
+        const windows = attribution?.windows || {};
+        const deltas = operator?.deltas || {};
+        const laneRows = Array.isArray(attribution?.by_lane) ? attribution.by_lane.slice(0, 6) : [];
+
+        const qualityMultiplier = Number(dataQuality?.confidence_multiplier || 1);
+        const execQualityRaw = Number(ops?.execution_quality || 0);
+        const execQuality = Math.max(0, Math.min(100, execQualityRaw * qualityMultiplier));
+        const signals = Number(superswarmSummary?.signals || ops?.signals || signalStats?.published || 0);
+        const executions = Number(superswarmSummary?.executions || ops?.executions || tradeStats?.today || 0);
+        const regime = market?.regime_label || 'Undetermined';
+        const vol = Number(market?.volatility_score || 0);
+        const equityBase = Number(scoreTotals?.equity_base_usd || 100);
+        const netAfterFees = Number(
+            operator?.kpis?.net_pnl_after_fees_usd
+            ?? northStar?.net_pnl_after_fees
+            ?? scoreTotals?.net_pnl_after_fees_usd
+            ?? 0
+        );
+        const netAfterFeesPct = equityBase > 0 ? (netAfterFees / equityBase) * 100 : 0;
+        const drawdown = Number(operator?.kpis?.max_drawdown_pct ?? northStar?.max_drawdown_pct ?? scoreTotals?.max_drawdown_pct ?? 0);
+        const rejectTax = Number(operator?.kpis?.reject_tax_pct ?? northStar?.reject_tax_pct ?? scoreTotals?.reject_tax_pct ?? 0);
+        const fillRate = Number(operator?.kpis?.fill_rate_pct ?? northStar?.fill_rate_pct ?? scoreTotals?.fill_rate_pct ?? 0);
+        const evError = Number(operator?.kpis?.expected_value_error_pct ?? northStar?.expected_value_error_pct ?? scoreTotals?.expected_value_error_pct ?? 0);
+        const goNoGo = String(decision?.label || operator?.label || assessment?.label || 'NO-GO').toUpperCase();
+        const confidenceScore = Number(decision?.confidence_score ?? operator?.confidence_score ?? 0);
+        const blockers = Array.isArray(decision?.reasons)
+            ? decision.reasons
+            : Array.isArray(operator?.hard_blockers)
+            ? operator.hard_blockers
+            : (Array.isArray(assessment?.reasons) ? assessment.reasons : []);
+        const actions = Array.isArray(operator?.top_actions) ? operator.top_actions : [];
+        const decisionSource = String(decision?.source || 'operator_brief').replace(/_/g, ' ');
+        const assessmentLabel = String(decision?.assessment_label || assessment?.label || '').toUpperCase();
+        const decisionDiverged = Boolean(decision?.diverged);
+
+        const dayClass = netAfterFeesPct >= 0 ? 'up' : 'down';
+        const signBest = Number(best?.change_24h || 0) >= 0 ? '+' : '';
+        const signWorst = Number(worst?.change_24h || 0) >= 0 ? '+' : '';
+        const safeWhy = sanitizeTradeSensitive(operator?.why_this_matters_now || 'Operator brief pending sufficient attribution data.');
+        const laneScoreMap = {};
+        (Array.isArray(scorecard?.ranked) ? scorecard.ranked : []).forEach((row) => {
+            const key = `${String(row?.strategy || '').toLowerCase()}@${String(row?.timeframe || '').toLowerCase()}`;
+            laneScoreMap[key] = row;
+        });
+
+        container.innerHTML = `
+            <div class="execution-kpi">
+                <div class="k">Net PnL (After Fees)</div>
+                <div class="v ${dayClass}">${pctString(netAfterFeesPct)}</div>
+                <div class="d">Action: ${netAfterFees >= 0 ? 'maintain capped scale' : 'reduce exposure'}</div>
+            </div>
+            <div class="execution-kpi">
+                <div class="k">Max Drawdown</div>
+                <div class="v ${drawdown <= 4 ? 'up' : 'down'}">${drawdown.toFixed(2)}%</div>
+                <div class="d">Action: ${drawdown <= 4 ? 'lane promotion allowed' : 'hold scaling'}</div>
+            </div>
+            <div class="execution-kpi">
+                <div class="k">Reject Tax</div>
+                <div class="v ${rejectTax <= 40 ? 'up' : 'down'}">${rejectTax.toFixed(1)}%</div>
+                <div class="d">Action: ${rejectTax <= 40 ? 'keep lane set' : 'tighten filters'}</div>
+            </div>
+            <div class="execution-kpi">
+                <div class="k">Fill Rate</div>
+                <div class="v ${fillRate >= 35 ? 'up' : 'down'}">${fillRate.toFixed(1)}%</div>
+                <div class="d">EV error ${evError.toFixed(3)}% • ${goNoGo}</div>
+            </div>
+        `;
+
+        const briefPillClass = goNoGo === 'GO' ? 'go' : 'nogo';
+        const degradedSources = Array.isArray(dataQuality?.degraded_sources) ? dataQuality.degraded_sources : [];
+        operatorBrief.innerHTML = `
+            <div class="operator-brief-head">
+                <span class="operator-pill ${briefPillClass}">${goNoGo}</span>
+                <span class="execution-feed-meta">Confidence ${confidenceScore.toFixed(1)}/100 • Δ1h fill ${Number(deltas?.fill_rate_pct_1h || windows?.['1h']?.fill_rate_pct || 0).toFixed(1)}%</span>
+            </div>
+            <div class="operator-why">${safeWhy}</div>
+            <div class="operator-list">
+                <div class="line"><strong>Decision Source:</strong> ${decisionSource}${decisionDiverged && assessmentLabel ? ` (assessment=${assessmentLabel})` : ''}</div>
+                <div class="line"><strong>Hard Blockers:</strong> ${blockers.length ? blockers.slice(0, 4).join(' | ') : 'none'}</div>
+                <div class="line"><strong>Top Actions:</strong> ${
+                    actions.length
+                        ? actions.slice(0, 3).map((a) => `[${a.priority}] ${a.title}`).join(' | ')
+                        : 'maintain capped posture'
+                }</div>
+                <div class="line"><strong>Data Quality:</strong> ${
+                    degradedSources.length ? `degraded: ${degradedSources.join(', ')}` : 'healthy'
+                }</div>
+            </div>
+        `;
+
+        laneDrilldown.innerHTML = laneRows.length
+            ? laneRows.map((row) => {
+                const laneStrategy = String(row?.strategy || 'unknown');
+                const laneTimeframe = String(row?.timeframe || 'unknown');
+                const laneName = `${laneStrategy.toUpperCase()} @ ${laneTimeframe.toUpperCase()}`;
+                const laneKey = `${laneStrategy.toLowerCase()}@${laneTimeframe.toLowerCase()}`;
+                const laneScore = laneScoreMap[laneKey] || {};
+                const laneNetPct = Number(
+                    laneScore?.realized_net_return_pct
+                    ?? laneScore?.ev_adjusted_pct
+                    ?? 0
+                );
                 return `
-                    <div class="price-item">
-                        <span class="price-symbol">${symbol}/USD</span>
-                        <span class="price-value">${price}</span>
-                        <span class="price-change ${changeClass}">${changeSign}${change.toFixed(2)}%</span>
+                    <div class="lane-row">
+                        <div class="lane-row-head">
+                            <span class="lane-row-name">${laneName}</span>
+                            <span class="lane-row-kpi">${pctString(laneNetPct)}</span>
+                        </div>
+                        <div class="lane-row-detail">
+                            fill ${Number(row?.fill_rate_pct || 0).toFixed(1)}% • reject ${Number(row?.reject_tax_pct || 0).toFixed(1)}% • hard fail ${Number(row?.hard_fail_pct || 0).toFixed(1)}% • samples ${Number(row?.sample_size || 0)}
+                        </div>
                     </div>
                 `;
-            }).join('');
-            
-            container.innerHTML = items;
-            
-            // Generate mini chart bars
-            const chartContainer = document.getElementById('price-chart');
-            const bars = Array(20).fill(0).map(() => {
-                const height = 20 + Math.random() * 80;
-                return `<div class="mini-chart-bar" style="height: ${height}%"></div>`;
-            }).join('');
-            chartContainer.innerHTML = bars;
-            
+            }).join('')
+            : '<div class="empty-state">Lane attribution unavailable for current window</div>';
+
+        narrative.innerHTML = `
+            <div class="narrative-item">
+                <div class="n-title">Market Regime</div>
+                <div class="n-value">${regime} • Volatility ${vol.toFixed(1)}/100</div>
+            </div>
+            <div class="narrative-item">
+                <div class="n-title">Strongest Mover</div>
+                <div class="n-value">${best?.symbol || '--'} ${signBest}${Number(best?.change_24h || 0).toFixed(2)}%</div>
+            </div>
+            <div class="narrative-item">
+                <div class="n-title">Weakest Mover</div>
+                <div class="n-value">${worst?.symbol || '--'} ${signWorst}${Number(worst?.change_24h || 0).toFixed(2)}%</div>
+            </div>
+            <div class="narrative-item">
+                <div class="n-title">Signal Efficiency</div>
+                <div class="n-value">${fillRate.toFixed(1)}% lane fill rate • ${signals > 0 ? ((executions / signals) * 100).toFixed(1) : '0.0'}% global conversion</div>
+            </div>
+        `;
+
+        feed.innerHTML = feedItems.length ? feedItems.map((item) => {
+            const source = String(item?.source || 'intel').toUpperCase();
+            const category = String(item?.category || 'market').toUpperCase();
+            const confidence = String(item?.confidence || 'medium').toUpperCase();
+            const title = String(item?.title || 'Intel signal').slice(0, 96);
+            const summary = String(item?.summary || '').slice(0, 140);
+            return `
+                <div class="execution-feed-item">
+                    <div class="execution-feed-top">
+                        <span class="execution-feed-title">${category} • ${source}</span>
+                        <span class="execution-feed-meta">${confidence}</span>
+                    </div>
+                    <div class="execution-feed-desc">${title}</div>
+                    <div class="execution-feed-desc">${summary}</div>
+                </div>
+            `;
+        }).join('') : '<div class="empty-state">No high-priority intelligence items in current window</div>';
+
+        const riskState = String(briefSummary?.risk_state || 'stable').toUpperCase();
+        const readiness = briefSummary?.readiness_ok === true ? 'PASS' : 'WATCH';
+        const briefOps = sanitizeTradeSensitive(briefNarrative?.operations || '');
+        const qualityNarrative = execQuality >= 70 ? 'execution lane is stable' : 'execution quality needs optimization';
+        context.innerHTML = `
+            <strong>Operational context:</strong>
+            Current regime is <strong>${regime}</strong> with execution quality at <strong>${execQuality.toFixed(1)}%</strong>.
+            GO/NO-GO is <strong>${goNoGo}</strong>; lane fill is <strong>${fillRate.toFixed(1)}%</strong> with reject tax
+            <strong>${rejectTax.toFixed(1)}%</strong>. Net after-fees PnL is
+            <strong class="${dayClass}">${pctString(netAfterFeesPct)}</strong>.
+            Readiness <strong>${readiness}</strong>, risk posture <strong>${riskState}</strong>, and ${qualityNarrative}.
+            ${briefOps ? `<br>${briefOps}` : ''}
+        `;
+
+        if (updated) {
+            updated.textContent = new Date().toLocaleTimeString('en-US', { hour12: false });
+        }
+    }
+
+    function _abbrNum(value) {
+        const n = Number(value || 0);
+        if (!Number.isFinite(n)) return '--';
+        const abs = Math.abs(n);
+        if (abs >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}B`;
+        if (abs >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+        if (abs >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+        return n.toFixed(0);
+    }
+
+    function _formatFreshness(seconds) {
+        const s = Number(seconds);
+        if (!Number.isFinite(s) || s < 0) return 'stale';
+        if (s < 60) return `${Math.round(s)}s ago`;
+        if (s < 3600) return `${Math.round(s / 60)}m ago`;
+        return `${Math.round(s / 3600)}h ago`;
+    }
+
+    function updateChainVelocity(zeitgeistUniverse) {
+        const strip = document.getElementById('chain-velocity-strip');
+        const badge = document.getElementById('radar-quality-badge');
+        if (!strip) return;
+
+        const rows = Array.isArray(zeitgeistUniverse?.chain_streams) ? zeitgeistUniverse.chain_streams : [];
+        const quality = (zeitgeistUniverse && typeof zeitgeistUniverse === 'object') ? (zeitgeistUniverse.quality || {}) : {};
+        const freshness = (quality && typeof quality === 'object' && quality.freshness_seconds) ? quality.freshness_seconds : {};
+        const degraded = Boolean(quality?.degraded);
+        const issueCount = Number(quality?.issue_count || 0);
+
+        if (badge) {
+            badge.className = `radar-quality-badge ${degraded ? 'degraded' : 'nominal'}`;
+            badge.textContent = degraded ? `DATA_DEGRADED_${Math.max(issueCount, 1)}` : 'DATA_NOMINAL';
+            const issues = Array.isArray(quality?.issues) ? quality.issues : [];
+            badge.title = issues.length ? issues.join(' | ') : 'Universe data quality nominal';
+        }
+
+        if (!rows.length) {
+            strip.innerHTML = '<div class="empty-state">No chain velocity streams available</div>';
+            return;
+        }
+
+        strip.innerHTML = rows.slice(0, 4).map((row) => {
+            const symbol = String(row?.symbol || 'UNK').toUpperCase();
+            const source = String(row?.source || 'unknown');
+            const available = Boolean(row?.available);
+            const isFiredancer = symbol === 'SOL-FD' || source.includes('firedancer');
+            const tps = Number(row?.tps || 0);
+            const tx24h = Number(row?.tx_24h || 0);
+            const blockS = Number(row?.avg_block_time_s || 0);
+            const marketChange = Number(row?.market_change_24h || 0);
+            const sign = marketChange >= 0 ? '+' : '';
+            const age = freshness ? freshness[symbol] : null;
+            if (!available) {
+                return `
+                    <div class="chain-velocity-card degraded">
+                        <div class="chain-velocity-head">
+                            <span class="chain-velocity-symbol">${symbol}</span>
+                            <span class="chain-velocity-tag">${isFiredancer ? 'FD' : 'RPC'}</span>
+                        </div>
+                        <div class="chain-velocity-kpi">
+                            <div class="line">stream <strong>offline</strong></div>
+                            <div class="line">${String(row?.error || 'unavailable').slice(0, 56)}</div>
+                        </div>
+                    </div>
+                `;
+            }
+            return `
+                <div class="chain-velocity-card">
+                    <div class="chain-velocity-head">
+                        <span class="chain-velocity-symbol">${symbol}</span>
+                        <span class="chain-velocity-tag">${isFiredancer ? 'FD' : 'RPC'}</span>
+                    </div>
+                    <div class="chain-velocity-kpi">
+                        <div class="line">tps <strong>${tps >= 100 ? tps.toFixed(0) : tps.toFixed(2)}</strong></div>
+                        <div class="line">24h tx <strong>${_abbrNum(tx24h)}</strong> • blk <strong>${blockS > 0 ? blockS.toFixed(blockS < 1 ? 3 : 2) : '--'}s</strong></div>
+                        <div class="line">mkt <strong>${sign}${marketChange.toFixed(2)}%</strong> • ${_formatFreshness(age)}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function updateRadar(status, superswarm, intelSummary, zeitgeistUniverse) {
+        if (window.radarInstance) {
+            window.radarInstance.setServices(status.services || {});
+            window.radarInstance.setSuperswarm(superswarm || {});
+            window.radarInstance.setIntel(intelSummary || {});
+            window.radarInstance.setUniverse(zeitgeistUniverse || {});
+        }
+        document.getElementById('radar-timestamp').textContent =
+            new Date().toLocaleTimeString('en-US', { hour12: false });
+    }
+
+    // ── Active trade lock-on feed (polls every 10 s) ──────────────────────
+    async function loadActiveTrades() {
+        if (!window.radarInstance) return;
+        try {
+            const data = await window.platformApi.getTrades({ limit: 20 });
+            // Normalize response — handle {trades:[...]}, {executions:[...]}, or raw array
+            const raw    = Array.isArray(data) ? data : (data.trades || data.executions || []);
+            const trades = raw.map(t => ({
+                symbol: String(t.symbol || t.pair || '').split('/')[0],
+                side:   t.action || t.side || 'buy',
+            })).filter(t => t.symbol);
+            window.radarInstance.setActiveTrades(trades);
+        } catch (_) { /* lock-on is cosmetic — silently ignore API errors */ }
+    }
+
+    // ── TradingView-style mini charts ─────────────────────────────────────
+
+    function buildTVCharts(prices, symbols) {
+        const syms = (symbols || []).slice(0, 3);
+        if (!syms.length) {
+            return '<div class="empty-state">No tracked symbols available</div>';
+        }
+        const cards = syms.map(sym => {
+            const d     = prices[sym] || {};
+            const price = d.price || 0;
+            const chg   = d.change_24h || 0;
+            const isUp  = chg >= 0;
+            const sign  = isUp ? '+' : '';
+            const fmtP  = !price ? '--'
+                : price >= 1000 ? '$' + Math.round(price).toLocaleString('en-US')
+                : '$' + price.toFixed(3);
+            return `
+                <div class="tv-card">
+                    <div class="tv-card-header">
+                        <span class="tv-sym">${sym}/USD</span>
+                        <span class="price-change ${isUp ? 'up' : 'down'}">${sign}${chg.toFixed(2)}%</span>
+                    </div>
+                    <div class="tv-card-price">${fmtP}</div>
+                    <canvas class="tv-canvas" id="tvc-${sym}"
+                            data-price="${price}" data-chg="${chg}" data-sym="${sym}"></canvas>
+                    <div class="tv-time-row"><span>24H AGO</span><span>NOW</span></div>
+                </div>`;
+        }).join('');
+        return `<div class="tv-chart-grid">${cards}</div>`;
+    }
+
+    // Draw a single TV mini-chart canvas
+    function drawTVCanvas(canvas) {
+        const price = parseFloat(canvas.dataset.price) || 0;
+        const chg   = parseFloat(canvas.dataset.chg)   || 0;
+        const sym   = canvas.dataset.sym || 'X';
+        if (!price) return;
+
+        const dpr = window.devicePixelRatio || 1;
+        const CW  = canvas.offsetWidth  || 120;
+        const CH  = canvas.offsetHeight || 58;
+        canvas.width  = CW * dpr;
+        canvas.height = CH * dpr;
+        const ctx = canvas.getContext('2d');
+        ctx.scale(dpr, dpr);
+
+        const POINTS = 36;
+        const P = { t: 8, r: 3, b: 6, l: 3 };
+        const plotW = CW - P.l - P.r;
+        const plotH = CH - P.t - P.b;
+
+        // Reconstruct 24h curve: linear trend + damped harmonic noise
+        const start = price / (1 + chg / 100);
+        const seed  = sym.charCodeAt(0) * 7 + (sym.charCodeAt(1) || 0) * 13;
+        const pts   = Array.from({ length: POINTS }, (_, i) => {
+            const t      = i / (POINTS - 1);
+            const linear = start + (price - start) * t;
+            const amp    = Math.abs(price - start) * 0.22;
+            return linear + amp * Math.sin(t * Math.PI * 3.6 + seed) * (1 - t * 0.45);
+        });
+
+        const minV  = Math.min(...pts);
+        const maxV  = Math.max(...pts);
+        const range = maxV - minV || Math.abs(price) * 0.001 || 1;
+        const toX   = i => P.l + (i / (POINTS - 1)) * plotW;
+        const toY   = v => P.t + plotH - ((v - minV) / range) * plotH;
+
+        const isUp   = chg >= 0;
+        const lColor = isUp ? '#00ff41' : '#ff4444';
+        const fTop   = isUp ? 'rgba(0,255,65,0.20)' : 'rgba(255,68,68,0.20)';
+
+        // Baseline
+        ctx.beginPath();
+        ctx.moveTo(P.l, P.t + plotH);
+        ctx.lineTo(P.l + plotW, P.t + plotH);
+        ctx.strokeStyle = 'rgba(98, 255, 64, 0.12)';
+        ctx.lineWidth   = 0.5;
+        ctx.stroke();
+
+        // Mid grid line
+        ctx.beginPath();
+        ctx.moveTo(P.l, P.t + plotH * 0.5);
+        ctx.lineTo(P.l + plotW, P.t + plotH * 0.5);
+        ctx.strokeStyle = 'rgba(98, 255, 64, 0.06)';
+        ctx.stroke();
+
+        // Smooth Bezier path points
+        const pts2d = pts.map((v, i) => ({ x: toX(i), y: toY(v) }));
+
+        // Filled area with gradient
+        const grad = ctx.createLinearGradient(0, P.t, 0, P.t + plotH);
+        grad.addColorStop(0, fTop);
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.beginPath();
+        ctx.moveTo(pts2d[0].x, pts2d[0].y);
+        for (let i = 1; i < pts2d.length; i++) {
+            const p = pts2d[i - 1], c = pts2d[i], mx = (p.x + c.x) / 2;
+            ctx.bezierCurveTo(mx, p.y, mx, c.y, c.x, c.y);
+        }
+        ctx.lineTo(pts2d[pts2d.length - 1].x, P.t + plotH);
+        ctx.lineTo(pts2d[0].x, P.t + plotH);
+        ctx.closePath();
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        // Line
+        ctx.beginPath();
+        ctx.moveTo(pts2d[0].x, pts2d[0].y);
+        for (let i = 1; i < pts2d.length; i++) {
+            const p = pts2d[i - 1], c = pts2d[i], mx = (p.x + c.x) / 2;
+            ctx.bezierCurveTo(mx, p.y, mx, c.y, c.x, c.y);
+        }
+        ctx.strokeStyle = lColor;
+        ctx.lineWidth   = 1.5;
+        ctx.lineJoin    = 'round';
+        ctx.stroke();
+
+        // End-point glow + dot
+        const last     = pts2d[pts2d.length - 1];
+        const glowCol  = isUp ? 'rgba(0,255,65,0.55)' : 'rgba(255,68,68,0.55)';
+        const grdDot   = ctx.createRadialGradient(last.x, last.y, 0, last.x, last.y, 7);
+        grdDot.addColorStop(0, glowCol);
+        grdDot.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.beginPath();
+        ctx.arc(last.x, last.y, 7, 0, Math.PI * 2);
+        ctx.fillStyle = grdDot;
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(last.x, last.y, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = lColor;
+        ctx.fill();
+
+        // Price range labels — top-right (high) and bottom-right (low)
+        const fmtN = n => n >= 1000 ? '$' + Math.round(n).toLocaleString() : '$' + n.toFixed(2);
+        ctx.font      = '7px "Courier New", monospace';
+        ctx.fillStyle = 'rgba(98, 255, 64, 0.50)';
+        ctx.textAlign = 'right';
+        ctx.fillText(fmtN(maxV), CW - P.r, P.t + 7);
+        ctx.fillText(fmtN(minV), CW - P.r, P.t + plotH - 1);
+        ctx.textAlign = 'left';
+    }
+
+    // Draw all three canvases (call after DOM is updated)
+    function drawAllTVCanvases() {
+        document.querySelectorAll('canvas.tv-canvas').forEach(drawTVCanvas);
+    }
+
+    function extractTrackedSymbols(data) {
+        const mainAssets = ['BTC', 'ETH', 'SOL'];
+        const fromPayload = Array.isArray(data?.tracked_symbols) ? data.tracked_symbols : [];
+        if (fromPayload.length) {
+            const normalized = fromPayload
+                .map(s => String(s || '').toUpperCase())
+                .filter(Boolean);
+            const ordered = mainAssets.filter((sym) => normalized.includes(sym));
+            return ordered.length ? ordered : normalized.slice(0, 3);
+        }
+        const keys = Object.keys(data || {})
+            .filter(k => data[k] && typeof data[k] === 'object' && 'price' in data[k]);
+        const ordered = mainAssets.filter((sym) => keys.includes(sym));
+        return ordered.length ? ordered : keys.slice(0, 3);
+    }
+
+    function renderMarketPanels(data) {
+        const container = document.getElementById('price-ticker');
+        const symbols = extractTrackedSymbols(data);
+        const marketData = {};
+        symbols.forEach(sym => { marketData[sym] = data[sym] || {}; });
+
+        const items = symbols.map(symbol => {
+            const priceData = marketData[symbol] || {};
+            const price = priceData.price ? `$${priceData.price.toLocaleString()}` : '--';
+            const change = priceData.change_24h || 0;
+            const changeClass = change >= 0 ? 'up' : 'down';
+            const changeSign = change >= 0 ? '+' : '';
+
+            return `
+                <div class="price-item">
+                    <span class="price-symbol">${symbol}/USD</span>
+                    <span class="price-value">${price}</span>
+                    <span class="price-change ${changeClass}">${changeSign}${change.toFixed(2)}%</span>
+                </div>
+            `;
+        }).join('');
+
+        container.innerHTML = items || '<div class="empty-state">No tracked symbols configured</div>';
+
+        // Inject TV-style chart cards and draw canvases on next frame
+        document.getElementById('price-chart').innerHTML = buildTVCharts(marketData, symbols);
+        requestAnimationFrame(drawAllTVCanvases);
+
+        // Feed live prices into the radar
+        if (window.radarInstance) {
+            window.radarInstance.setTrackedSymbols(symbols);
+            window.radarInstance.setMarket(marketData);
+        }
+    }
+
+    // Load market prices from canonical contracts
+    async function loadMarketPrices(preloadedMarketData = null) {
+        try {
+            let market = preloadedMarketData;
+            if (!market || typeof market !== 'object' || !Object.keys(market).length) {
+                if (_dashboardDataCache?.marketData && Object.keys(_dashboardDataCache.marketData).length) {
+                    market = _dashboardDataCache.marketData;
+                } else {
+                    const metrics = await window.platformApi.getMetrics();
+                    market = metrics?.market || {};
+                }
+            }
+            renderMarketPanels(market || {});
         } catch (e) {
             document.getElementById('price-ticker').innerHTML = '<div class="empty-state">Market feed offline</div>';
         }
     }
 
     // Initial load
+    initRadar();        // Start canvas radar immediately
     loadDashboard();
     loadMarketPrices();
-    
+    loadActiveTrades(); // Seed lock-on state on first paint
+    _setAssetHorizonUi(_assetTerminalHorizonHours);
+
+    document.querySelectorAll('#asset-horizon-toggle .horizon-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            _assetTerminalHorizonHours = Number(btn.dataset.hours || 24);
+            _setAssetHorizonUi(_assetTerminalHorizonHours);
+            _renderAssetTerminalFromCache();
+        });
+    });
+
     // Refresh every 30 seconds
-    setInterval(loadDashboard, 30000);
+    setInterval(loadDashboard,    30000);
     setInterval(loadMarketPrices, 60000);
+    setInterval(loadActiveTrades, 10000); // Poll active trades every 10 s
+
+    // Dev helper: window.radarInstance.forceLock('BTC', 'buy') in console to test
+
 </script>
 {% endblock %}

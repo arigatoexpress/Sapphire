@@ -8,5 +8,6 @@ python-dotenv==1.0.1
 orjson==3.10.12
 loguru==0.7.3
 google-cloud-pubsub==2.27.1
+google-cloud-firestore>=2.14.0
 google-generativeai==0.8.4
 tweepy==4.14.0

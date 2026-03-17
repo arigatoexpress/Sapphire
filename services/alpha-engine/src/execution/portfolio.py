@@ -98,6 +98,8 @@ class PortfolioTracker:
         venue = str(fill.get("platform") or fill.get("venue") or "").strip().upper()
         symbol = self._normalize_symbol(venue, str(fill.get("symbol") or ""))
         raw_side = str(fill.get("side") or "").strip().upper()
+        metadata = fill.get("metadata") or {}
+        is_reduce_only = bool(fill.get("reduce_only") or (isinstance(metadata, dict) and metadata.get("reduce_only")))
         qty = float(fill.get("filled_quantity") or fill.get("quantity") or 0)
         price = float(fill.get("avg_price") or fill.get("price") or 0)
 
@@ -123,6 +125,12 @@ class PortfolioTracker:
         existing = self._positions.get(key)
 
         if existing is None:
+            if is_reduce_only:
+                logger.info(
+                    f"Ignoring reduce-only fill with no tracked position: "
+                    f"{venue} {raw_side} {qty} {symbol} @ {price}"
+                )
+                return None
             # New position
             self._positions[key] = Position(
                 venue=venue,
@@ -136,6 +144,13 @@ class PortfolioTracker:
                 fill_count=1,
             )
             logger.info(f"📈 New position: {venue} {fill_side} {qty} {symbol} @ {price}")
+            return None
+
+        if is_reduce_only and existing.side == fill_side:
+            logger.info(
+                f"Ignoring reduce-only same-side fill: {venue} {raw_side} {qty} {symbol} "
+                f"(tracked side={existing.side})"
+            )
             return None
 
         if existing.side == fill_side:

@@ -107,6 +107,49 @@ class IntelFeedAggregator:
         self._glint_sandbox_timeout_seconds = max(
             5, min(int(os.getenv("SAPPHIRE_GLINT_SANDBOX_TIMEOUT_SECONDS", "14")), 30)
         )
+        self._scrapling_intel_enabled = _env_flag(
+            "SAPPHIRE_SCRAPLING_INTEL_ENABLED", default=False
+        )
+        self._scrapling_source_url = str(
+            os.getenv("SAPPHIRE_SCRAPLING_INTEL_SOURCE_URL", "https://news.ycombinator.com/")
+        ).strip()
+        raw_selectors = str(
+            os.getenv("SAPPHIRE_SCRAPLING_INTEL_SELECTORS", "title;h1;h2;a")
+        ).strip()
+        self._scrapling_selectors = [
+            selector.strip() for selector in raw_selectors.split(";") if selector.strip()
+        ] or ["title", "h1", "h2", "a"]
+        self._scrapling_limit_per_selector = max(
+            1, min(int(os.getenv("SAPPHIRE_SCRAPLING_INTEL_LIMIT_PER_SELECTOR", "4")), 20)
+        )
+        self._scrapling_include_links = _env_flag(
+            "SAPPHIRE_SCRAPLING_INTEL_INCLUDE_LINKS", default=True
+        )
+        self._scrapling_max_links = max(
+            1, min(int(os.getenv("SAPPHIRE_SCRAPLING_INTEL_MAX_LINKS", "20")), 50)
+        )
+        self._scrapling_query = str(os.getenv("SAPPHIRE_SCRAPLING_INTEL_QUERY", "")).strip()
+        self._scrapling_timeout_seconds = max(
+            5, min(int(os.getenv("SAPPHIRE_SCRAPLING_INTEL_TIMEOUT_SECONDS", "20")), 30)
+        )
+        self._coingecko_trending_enabled = _env_flag(
+            "SAPPHIRE_INTEL_COINGECKO_TRENDING_ENABLED", default=True
+        )
+        self._coingecko_trending_limit = max(
+            3, min(int(os.getenv("SAPPHIRE_INTEL_COINGECKO_TRENDING_LIMIT", "10")), 20)
+        )
+        self._coingecko_api_base = str(
+            os.getenv("SAPPHIRE_INTEL_COINGECKO_API_BASE", "https://api.coingecko.com/api/v3")
+        ).strip().rstrip("/")
+        self._fear_greed_enabled = _env_flag(
+            "SAPPHIRE_INTEL_FEAR_GREED_ENABLED", default=True
+        )
+        self._fear_greed_api = str(
+            os.getenv("SAPPHIRE_INTEL_FEAR_GREED_API", "https://api.alternative.me/fng/")
+        ).strip()
+        self._fear_greed_items = max(
+            1, min(int(os.getenv("SAPPHIRE_INTEL_FEAR_GREED_ITEMS", "3")), 10)
+        )
         self._runtime_env = str(
             os.getenv("SAPPHIRE_ENV", os.getenv("ENVIRONMENT", "production"))
         ).strip().lower()
@@ -123,6 +166,9 @@ class IntelFeedAggregator:
             "hn_ai": self._blank_source_status("hn_ai"),
             "github_ai_repos": self._blank_source_status("github_ai_repos"),
             "glint_feed_scrape": self._blank_source_status("glint_feed_scrape"),
+            "scrapling_web_intel": self._blank_source_status("scrapling_web_intel"),
+            "coingecko_trending": self._blank_source_status("coingecko_trending"),
+            "fear_greed_index": self._blank_source_status("fear_greed_index"),
         }
         self._lock = asyncio.Lock()
 
@@ -203,6 +249,9 @@ class IntelFeedAggregator:
             ("hn_ai", lambda: self._pull_hn("llm OR ai model OR open source ai", "ai")),
             ("github_ai_repos", self._pull_github_ai_repos),
             ("glint_feed_scrape", self._pull_glint_feed_optional),
+            ("scrapling_web_intel", self._pull_scrapling_intel_optional),
+            ("coingecko_trending", self._pull_coingecko_trending_optional),
+            ("fear_greed_index", self._pull_fear_greed_optional),
         ]
 
         merged: List[Dict[str, Any]] = []
@@ -533,6 +582,211 @@ class IntelFeedAggregator:
             )
         return items
 
+    async def _pull_scrapling_intel_optional(self) -> List[Dict[str, Any]]:
+        status = self._source_status["scrapling_web_intel"]
+        if not self._scrapling_intel_enabled:
+            status["healthy"] = True
+            status["status"] = "disabled_by_policy"
+            status["items"] = 0
+            status["last_refresh"] = _now_utc().isoformat()
+            status["last_error"] = None
+            status["consecutive_errors"] = 0
+            return []
+
+        if not self._session:
+            raise RuntimeError("session_unavailable")
+        if not self._scout_sandbox_url:
+            raise RuntimeError("sandbox_url_missing")
+        if not self._scout_sandbox_token:
+            raise RuntimeError("sandbox_token_missing")
+
+        endpoint = f"{self._scout_sandbox_url}/v1/intel/scrapling_collect"
+        payload = {
+            "source_url": self._scrapling_source_url,
+            "selectors": self._scrapling_selectors,
+            "limit_per_selector": self._scrapling_limit_per_selector,
+            "include_links": self._scrapling_include_links,
+            "max_links": self._scrapling_max_links,
+            "query": self._scrapling_query,
+        }
+        headers = {
+            "Content-Type": "application/json",
+            "X-Scout-Sandbox-Token": self._scout_sandbox_token,
+        }
+        timeout = aiohttp.ClientTimeout(total=self._scrapling_timeout_seconds)
+        async with self._session.post(
+            endpoint,
+            json=payload,
+            headers=headers,
+            timeout=timeout,
+        ) as resp:
+            if resp.status >= 400:
+                raise RuntimeError(f"sandbox_http_{resp.status}")
+            data = await resp.json(content_type=None)
+
+        if not isinstance(data, dict):
+            raise RuntimeError("sandbox_response_invalid")
+        if not bool(data.get("ok", False)):
+            reason = str(data.get("reason", "collect_failed")).strip()[:120]
+            raise RuntimeError(f"sandbox_collect_failed:{reason}")
+
+        rows = data.get("items", [])
+        if not isinstance(rows, list):
+            return []
+
+        limit = max(1, min(self._scrapling_limit_per_selector * len(self._scrapling_selectors), 80))
+        items: List[Dict[str, Any]] = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            title = _clean_text(row.get("title", ""), limit=220)
+            if not title:
+                continue
+            summary = row.get("summary") or "Collected by SCOUT sandbox Scrapling collector."
+            try:
+                score = float(row.get("score", 0.56))
+            except (TypeError, ValueError):
+                score = 0.56
+            tags = row.get("tags", [])
+            if not isinstance(tags, list):
+                tags = []
+            items.append(
+                self._build_item(
+                    source=str(row.get("source") or "scrapling_fetch"),
+                    category=str(row.get("category") or "research"),
+                    title=title,
+                    summary=summary,
+                    url=str(row.get("url") or self._scrapling_source_url),
+                    published_at=_parse_ts(row.get("published_at")) or _now_utc(),
+                    tags=[*tags, "scout_sandbox", "scrapling"],
+                    confidence=str(row.get("confidence") or "low"),
+                    score=score,
+                )
+            )
+            if len(items) >= limit:
+                break
+        return items
+
+    async def _pull_coingecko_trending_optional(self) -> List[Dict[str, Any]]:
+        status = self._source_status["coingecko_trending"]
+        if not self._coingecko_trending_enabled:
+            status["healthy"] = True
+            status["status"] = "disabled_by_policy"
+            status["items"] = 0
+            status["last_refresh"] = _now_utc().isoformat()
+            status["last_error"] = None
+            status["consecutive_errors"] = 0
+            return []
+
+        url = f"{self._coingecko_api_base}/search/trending"
+        payload = await self._fetch_json(url, timeout=12.0)
+        rows = payload.get("coins", []) if isinstance(payload, dict) else []
+        if not isinstance(rows, list):
+            return []
+
+        out: List[Dict[str, Any]] = []
+        for idx, row in enumerate(rows):
+            item = row.get("item", row) if isinstance(row, dict) else {}
+            if not isinstance(item, dict):
+                continue
+            name = _clean_text(item.get("name", ""), limit=96)
+            symbol = _clean_text(item.get("symbol", ""), limit=24).upper()
+            coin_id = _clean_text(item.get("id", ""), limit=80)
+            rank = item.get("market_cap_rank")
+            score_index = item.get("score")
+            if not name or not symbol:
+                continue
+            try:
+                score_hint = float(score_index) if score_index is not None else float(idx)
+            except (TypeError, ValueError):
+                score_hint = float(idx)
+            confidence = "high" if idx < 3 else "medium"
+            source_score = max(0.45, 0.85 - min(0.35, score_hint * 0.05))
+            rank_text = f" · rank #{rank}" if rank not in (None, "", "None") else ""
+            out.append(
+                self._build_item(
+                    source="coingecko_trending",
+                    category="market",
+                    title=f"{symbol} trending on CoinGecko",
+                    summary=f"{name}{rank_text} · trending index {idx + 1}",
+                    url=f"https://www.coingecko.com/en/coins/{coin_id}" if coin_id else "https://www.coingecko.com/",
+                    published_at=_now_utc(),
+                    tags=["market", "trending", "coingecko", symbol.lower()],
+                    confidence=confidence,
+                    score=source_score,
+                )
+            )
+            if len(out) >= self._coingecko_trending_limit:
+                break
+        return out
+
+    async def _pull_fear_greed_optional(self) -> List[Dict[str, Any]]:
+        status = self._source_status["fear_greed_index"]
+        if not self._fear_greed_enabled:
+            status["healthy"] = True
+            status["status"] = "disabled_by_policy"
+            status["items"] = 0
+            status["last_refresh"] = _now_utc().isoformat()
+            status["last_error"] = None
+            status["consecutive_errors"] = 0
+            return []
+
+        url = f"{self._fear_greed_api}?limit={self._fear_greed_items}&format=json"
+        payload = await self._fetch_json(url, timeout=10.0)
+        rows = payload.get("data", []) if isinstance(payload, dict) else []
+        if not isinstance(rows, list):
+            return []
+
+        out: List[Dict[str, Any]] = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            raw_value = row.get("value", "")
+            try:
+                value = float(raw_value)
+            except (TypeError, ValueError):
+                continue
+            mood = _clean_text(row.get("value_classification", "Unknown"), limit=40)
+            ts_value = row.get("timestamp")
+            published_at = _parse_ts(ts_value) if ts_value is not None else _now_utc()
+            if isinstance(ts_value, str) and ts_value.isdigit():
+                try:
+                    published_at = datetime.fromtimestamp(float(ts_value), tz=timezone.utc)
+                except Exception:
+                    published_at = _now_utc()
+            if isinstance(ts_value, (int, float)):
+                try:
+                    published_at = datetime.fromtimestamp(float(ts_value), tz=timezone.utc)
+                except Exception:
+                    published_at = _now_utc()
+
+            if value <= 25:
+                mood_tag = "extreme_fear"
+            elif value <= 45:
+                mood_tag = "fear"
+            elif value <= 55:
+                mood_tag = "neutral"
+            elif value <= 75:
+                mood_tag = "greed"
+            else:
+                mood_tag = "extreme_greed"
+
+            score = max(0.45, min(0.92, 0.55 + (abs(value - 50.0) / 120.0)))
+            out.append(
+                self._build_item(
+                    source="fear_greed_index",
+                    category="market",
+                    title=f"Crypto sentiment: {mood}",
+                    summary=f"Fear & Greed index at {value:.0f}/100 ({mood}).",
+                    url="https://alternative.me/crypto/fear-and-greed-index/",
+                    published_at=published_at,
+                    tags=["market", "sentiment", "fear-greed", mood_tag],
+                    confidence="medium",
+                    score=score,
+                )
+            )
+        return out
+
     def get_feed(
         self,
         *,
@@ -618,5 +872,12 @@ class IntelFeedAggregator:
             "glint_use_scout_sandbox": self._glint_use_scout_sandbox,
             "glint_scout_configured": bool(self._scout_sandbox_url and self._scout_sandbox_token),
             "glint_source_url": self._glint_source_url,
+            "scrapling_intel_enabled": self._scrapling_intel_enabled,
+            "scrapling_scout_configured": bool(self._scout_sandbox_url and self._scout_sandbox_token),
+            "scrapling_source_url": self._scrapling_source_url,
+            "coingecko_trending_enabled": self._coingecko_trending_enabled,
+            "coingecko_trending_limit": self._coingecko_trending_limit,
+            "fear_greed_enabled": self._fear_greed_enabled,
+            "fear_greed_items": self._fear_greed_items,
             "runtime_env": self._runtime_env,
         }

@@ -15,49 +15,49 @@
            ============================================ */
         
         :root {
-            /* Phosphor Colors */
-            --amber: #ffb000;
-            --amber-dim: #996900;
-            --amber-glow: rgba(255, 176, 0, 0.4);
-            --green: #33ff00;
-            --green-dim: #1a8000;
-            --green-glow: rgba(51, 255, 0, 0.4);
-            --cyan: #00ffff;
-            --cyan-dim: #008080;
-            --red: #ff3333;
-            --red-dim: #801a1a;
-            
+            /* High-vis green Fallout terminal theme */
+            --amber: #62ff40;
+            --amber-dim: #2d9f1c;
+            --amber-glow: rgba(98, 255, 64, 0.35);
+            --green: #9aff78;
+            --green-dim: #4b9e38;
+            --green-glow: rgba(154, 255, 120, 0.35);
+            --cyan: #69d6ff;
+            --cyan-dim: #2b6f8c;
+            --red: #ff6f9e;
+            --red-dim: #7f3350;
+
             /* Background */
-            --bg-terminal: #0a0a0a;
-            --bg-screen: #0d0d0d;
-            --bg-grid: rgba(255, 176, 0, 0.03);
-            
+            --bg-terminal: #070711;
+            --bg-screen: #0b0b1a;
+            --bg-grid: rgba(98, 255, 64, 0.03);
+
             /* Text */
-            --text-primary: #ffb000;
-            --text-secondary: #cc8c00;
-            --text-muted: #805600;
-            --text-green: #33ff00;
-            
+            --text-primary: #c9ffbe;
+            --text-secondary: #9fd89c;
+            --text-muted: #6a8e67;
+            --text-green: #9aff78;
+
             /* Borders & Lines */
-            --border-color: rgba(255, 176, 0, 0.3);
-            --border-dim: rgba(255, 176, 0, 0.15);
-            --grid-line: rgba(255, 176, 0, 0.08);
-            
+            --border-color: rgba(98, 255, 64, 0.32);
+            --border-dim: rgba(98, 255, 64, 0.16);
+            --grid-line: rgba(98, 255, 64, 0.07);
+
             /* Typography */
             --font-terminal: 'Share Tech Mono', 'VT323', 'Courier New', monospace;
             --font-header: 'VT323', 'Share Tech Mono', monospace;
-            
+
             /* Spacing */
             --space-xs: 0.25rem;
             --space-sm: 0.5rem;
             --space-md: 1rem;
             --space-lg: 1.5rem;
             --space-xl: 2rem;
-            
+
             /* Effects */
-            --glow-amber: 0 0 10px var(--amber-glow), 0 0 20px var(--amber-glow);
-            --glow-green: 0 0 10px var(--green-glow), 0 0 20px var(--green-glow);
-            --scanline-opacity: 0.03;
+            --glow-amber: 0 0 8px var(--amber-glow), 0 0 16px var(--amber-glow);
+            --glow-green: 0 0 8px var(--green-glow), 0 0 16px var(--green-glow);
+            --scanline-opacity: 0.015;
         }
 
         * {
@@ -81,40 +81,13 @@
             position: relative;
         }
 
-        /* CRT Screen Effect */
+        /* CRT effects disabled for cleaner minimal view */
         body::before {
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: 
-                repeating-linear-gradient(
-                    0deg,
-                    rgba(0, 0, 0, var(--scanline-opacity)),
-                    rgba(0, 0, 0, var(--scanline-opacity)) 1px,
-                    transparent 1px,
-                    transparent 2px
-                );
-            pointer-events: none;
-            z-index: 1000;
-            animation: scanline 8s linear infinite;
+            display: none;
         }
 
-        /* Screen Flicker */
         body::after {
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(255, 176, 0, 0.01);
-            opacity: 0;
-            pointer-events: none;
-            z-index: 999;
-            animation: flicker 4s infinite;
+            display: none;
         }
 
         @keyframes scanline {
@@ -153,6 +126,7 @@
             background: 
                 linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
                 linear-gradient(var(--grid-line) 1px, transparent 1px),
+                radial-gradient(1400px 600px at 80% -10%, rgba(98, 255, 64, 0.10), transparent 52%),
                 var(--bg-screen);
             background-size: 50px 50px, 50px 50px, 100% 100%;
             position: relative;
@@ -296,7 +270,7 @@
         .nav-item:hover {
             color: var(--amber);
             border-color: var(--border-dim);
-            background: rgba(255, 176, 0, 0.05);
+            background: rgba(98, 255, 64, 0.05);
         }
 
         .nav-item:hover::before {
@@ -306,7 +280,7 @@
         .nav-item.active {
             color: var(--amber);
             border-color: var(--amber);
-            background: rgba(255, 176, 0, 0.1);
+            background: rgba(98, 255, 64, 0.1);
             text-shadow: var(--glow-amber);
         }
 
@@ -329,6 +303,7 @@
             color: var(--green);
             margin-bottom: var(--space-lg);
             font-size: 0.9rem;
+            display: none;
         }
 
         .terminal-prompt::before {
@@ -344,9 +319,11 @@
         /* Cards / Panels */
         .panel {
             border: 1px solid var(--border-color);
-            background: rgba(10, 10, 10, 0.8);
+            background: rgba(11, 11, 26, 0.82);
             margin-bottom: var(--space-lg);
             position: relative;
+            border-radius: 12px;
+            overflow: hidden;
         }
 
         .panel::before {
@@ -366,7 +343,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: rgba(255, 176, 0, 0.03);
+            background: rgba(98, 255, 64, 0.03);
         }
 
         .panel-title {
@@ -399,6 +376,7 @@
             width: 8px;
             height: 8px;
             border: 1px solid var(--amber);
+            display: none;
         }
 
         .panel-corner.tl { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
@@ -430,7 +408,7 @@
         .stat-block {
             border: 1px solid var(--border-dim);
             padding: var(--space-md);
-            background: rgba(255, 176, 0, 0.02);
+            background: rgba(98, 255, 64, 0.02);
             position: relative;
         }
 
@@ -499,7 +477,7 @@
 
         .progress-track {
             height: 4px;
-            background: rgba(255, 176, 0, 0.1);
+            background: rgba(98, 255, 64, 0.1);
             position: relative;
             overflow: hidden;
         }
@@ -536,12 +514,12 @@
 
         .data-table td {
             padding: var(--space-sm) var(--space-md);
-            border-bottom: 1px solid rgba(255, 176, 0, 0.05);
+            border-bottom: 1px solid rgba(98, 255, 64, 0.05);
             color: var(--text-secondary);
         }
 
         .data-table tr:hover td {
-            background: rgba(255, 176, 0, 0.05);
+            background: rgba(98, 255, 64, 0.05);
             color: var(--amber);
         }
 
@@ -578,7 +556,7 @@
         .badge.warning {
             border-color: var(--amber);
             color: var(--amber);
-            background: rgba(255, 176, 0, 0.1);
+            background: rgba(98, 255, 64, 0.1);
         }
 
         .badge.warning::before {
@@ -625,18 +603,18 @@
         }
 
         .btn:hover {
-            background: rgba(255, 176, 0, 0.1);
+            background: rgba(98, 255, 64, 0.1);
             border-color: var(--amber);
             text-shadow: var(--glow-amber);
         }
 
         .btn.primary {
-            background: rgba(255, 176, 0, 0.15);
+            background: rgba(98, 255, 64, 0.15);
             border-color: var(--amber);
         }
 
         .btn.primary:hover {
-            background: rgba(255, 176, 0, 0.25);
+            background: rgba(98, 255, 64, 0.25);
         }
 
         .btn.small {
@@ -652,6 +630,7 @@
             margin: var(--space-lg) 0;
             overflow: hidden;
             white-space: nowrap;
+            opacity: 0.4;
         }
 
         /* Terminal Output */
@@ -720,7 +699,7 @@
             align-items: center;
             font-size: 0.7rem;
             color: var(--text-muted);
-            background: rgba(10, 10, 10, 0.95);
+            background: rgba(7, 7, 17, 0.92);
         }
 
         .footer-links {
@@ -840,10 +819,8 @@
         <!-- Navigation -->
         <nav class="terminal-nav" id="terminal-nav">
             <a href="/" class="nav-item {% if current_page == 'overview' %}active{% endif %}">Overview</a>
-            <a href="/architecture" class="nav-item {% if current_page == 'architecture' %}active{% endif %}">Architecture</a>
+            <a href="/architecture" class="nav-item {% if current_page in ['architecture', 'platform'] %}active{% endif %}">Operations</a>
             <a href="/intelligence" class="nav-item {% if current_page == 'intelligence' %}active{% endif %}">Intelligence</a>
-            <a href="/platform" class="nav-item {% if current_page == 'platform' %}active{% endif %}">Platform</a>
-            <a href="/control" class="nav-item {% if current_page == 'control' %}active{% endif %}">Control</a>
             <a href="/organization" class="nav-item {% if current_page == 'organization' %}active{% endif %}">Organization</a>
             <a href="/activity" class="nav-item {% if current_page == 'activity' %}active{% endif %}">Activity</a>
             <a href="/sapphire-book" class="nav-item {% if current_page == 'sapphire-book' %}active{% endif %}">Sapphire_Book</a>
@@ -860,7 +837,7 @@
         <footer class="terminal-footer">
             <div class="footer-links">
                 <a href="/api/platform/contracts">API_CONTRACTS</a>
-                <a href="/api/status">SYSTEM_STATUS</a>
+                <a href="/architecture#security-privacy">SECURITY_PRIVACY</a>
             </div>
             <div>SAPPHIRE_INC // AUTONOMOUS_OPERATIONS_DIVISION</div>
         </footer>

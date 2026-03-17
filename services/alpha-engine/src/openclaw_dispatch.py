@@ -32,7 +32,7 @@ except ImportError:  # pragma: no cover — aiohttp is always installed in alpha
     aiohttp = None  # type: ignore[assignment]
 
 # Default Cloud Run gateway URL; falls back to localhost for local dev.
-_DEFAULT_GATEWAY_URL = "https://openclaw-gateway-267358751314.us-central1.run.app"
+_DEFAULT_GATEWAY_URL = "https://sapphire-openclaw-cloud-267358751314.us-central1.run.app"
 
 
 class OpenClawDispatcher:

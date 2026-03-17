@@ -35,6 +35,9 @@ class GeminiGuard:
         )
         self._last_flash_signature = ""
         self._last_flash_sent_at = 0.0
+        self.trade_history: list = []
+        self.last_hourly_recap = datetime.now()
+        self.last_daily_recap = datetime.now()
 
         if self.api_key:
             try:
@@ -112,10 +115,6 @@ class GeminiGuard:
             self._flash_model_name or "disabled",
             self._pro_model_name or "disabled",
         )
-
-        self.trade_history = []
-        self.last_hourly_recap = datetime.now()
-        self.last_daily_recap = datetime.now()
 
         while self.running:
             try:

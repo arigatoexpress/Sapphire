@@ -1,22 +1,29 @@
-# Sapphire Commander - macOS Menu Bar App
+# Sapphire Operator Companion - macOS Menu Bar App
 
-A native macOS menu bar app for monitoring and controlling your Sapphire trading infrastructure.
+A native macOS menu bar app for monitoring your Sapphire platform using canonical `/api/platform/*` contracts.
 
 ## Features
 
 ### Menu Bar Integration
-- 💎 Live status icon in menu bar (changes based on system health)
-- 📊 Real-time PM project count
-- 📡 Active trading signals
-- 💰 Live BTC/ETH prices
+- 💎/💠/⚠️ health icon based on platform + readiness
+- 📊 PM/organization summary (projects, workspaces, agents)
+- 📡 Trading summary (signals, trades, PnL, BTC)
+- 🛰️ Scout status (sandbox/hook readiness, registration state, dispatch mode)
+- 🧾 Latest activity line from platform logs
 - 🔄 Auto-refresh every 30 seconds
 
 ### Quick Actions
-- 🌐 Open sapphirealpha.xyz dashboard
-- 📋 Open PM Hub
-- 🔧 SSH to RARI1 (opens Terminal)
-- ⚡ SSH to RARI2 (opens Terminal)
-- 📄 View system logs
+- 🌐 Open Platform (Public)
+- 🏢 Open Organization (Public)
+- 🧠 Open Intelligence (Public)
+- 📡 Open Activity (Public)
+- ✅ Open Readiness (Public)
+- 🛰️ Open Scout Control (Internal)
+- 📡 Open Scout Status (Internal)
+- 🔬 Open Scout Sandbox (Internal)
+- 📋 Open PM Hub (Internal)
+- 🗂️ Open AI PM Manager (Internal)
+- 🔧 Infra SSH helpers (RARI1/RARI2/Windows)
 
 ## Two Versions
 
@@ -29,7 +36,7 @@ pip install -r requirements.txt
 python3 sapphire_commander.py
 ```
 
-The app will appear in your menu bar as 💎
+`sapphire_commander.py` now launches the updated `sapphire_commander_v2.py` implementation.
 
 ### 2. Swift Version (Native)
 **Best for:** Production use, native macOS experience
@@ -43,32 +50,57 @@ Build and run in Xcode. Requires macOS 14.0+
 
 ## Configuration
 
-Edit the URLs in the source to match your setup:
+Edit URLs in source if needed, then set optional auth credentials (required when platform APIs are protected by Basic Auth):
 
 ```python
-# Python version - sapphire_commander.py
+# Python version - sapphire_commander_v2.py
 CONFIG = {
-    'sapphire_url': 'https://sapphirealpha.xyz',
-    'gateway_url': 'https://sapphire-gateway-...',
-    'pm_hub_url': 'https://agentic-pm-hub-...',
-    'rari1_ip': '100.120.191.1',
-    'rari2_ip': '100.87.225.89',
+    "base_url": "https://sapphirealpha.xyz",
+    "operator_paths": {
+        "home": "/",
+        "organization": "/organization",
+        "intelligence": "/intelligence",
+        "activity": "/activity",
+        "readiness": "/production-readiness",
+        "status_json": "/api/platform/status",
+        "contracts_json": "/api/platform/contracts",
+    },
+    "internal_urls": {
+        "pm_hub_org": "https://agentic-pm-hub-267358751314.us-central1.run.app/organization",
+        "pm_manager": "https://agentic-pm-hub-267358751314.us-central1.run.app/organization",
+        "scout_status": "https://sapphire-alpha-267358751314.us-central1.run.app/forum/scout/status",
+        "scout_control": "https://sapphire-openclaw-cloud-s77j6bxyra-uc.a.run.app",
+        "scout_sandbox_health": "https://sapphire-scout-sandbox-s77j6bxyra-uc.a.run.app/health",
+    },
+    "rari1_ip": "100.120.191.1",
+    "rari2_ip": "100.87.225.89",
+    "windows_ip": "100.71.10.48",
 }
 ```
 
 ```swift
 // Swift version - StatusBarController.swift
-let sapphireURL = "https://sapphirealpha.xyz"
+private let baseURL = "https://sapphirealpha.xyz"
 ```
+
+```bash
+# Optional (Python + Swift runtime support)
+export SAPPHIRE_OPERATOR_USER="sapphire"
+export SAPPHIRE_OPERATOR_PASSWORD="your-password"
+```
+
+Swift app also supports credentials in `UserDefaults`:
+- `SapphireOperatorUser`
+- `SapphireOperatorPassword`
 
 ## Status Icons
 
 | Icon | Meaning |
 |------|---------|
-| 💎 | All systems healthy |
-| 💠 | Some services degraded (>70% healthy) |
-| ⚠️ | Major issues (<70% healthy) |
-| ❌ | Cannot connect to sapphirealpha.xyz |
+| 💎 | Services healthy and readiness green |
+| 💠 | Partial degradation / watch state |
+| ⚠️ | Degraded health |
+| ❌ | Cannot connect to platform API |
 
 ## Auto-Start on Login (Python Version)
 
@@ -104,8 +136,10 @@ launchctl load ~/Library/LaunchAgents/com.sapphire.commander.plist
 
 - `⌘D` - Open Dashboard
 - `⌘P` - Open PM Hub
-- `⌘R` - Refresh Now
-- `⌘L` - View Logs
+- `⌘M` - Open AI PM Manager
+- `⌘R` - Open Readiness
+- `⌘A` - Open Activity
+- `⌘I` - Open Intelligence
 - `⌘Q` - Quit
 
 ## Requirements
@@ -148,7 +182,7 @@ pip3 install rumps
 
 1. **Always visible** - Menu bar is always accessible
 2. **No browser needed** - Quick actions without opening browser
-3. **Native SSH** - One-click SSH to Pi cluster
+3. **Native SSH** - One-click SSH to infra nodes
 4. **System notifications** - Can add native macOS notifications
 5. **Offline detection** - Shows ❌ when disconnected
 6. **Lower resource usage** - No full browser engine
