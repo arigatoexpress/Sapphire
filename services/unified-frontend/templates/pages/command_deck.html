@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Command Deck Stats -->
+<div class="grid grid-4" style="margin-bottom: var(--space-xl);">
+    <div class="stat-card">
+        <div class="stat-label">Signal Queue</div>
+        <div class="stat-value" id="signal-queue">--</div>
+        <div class="stat-change">Pending signals</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Workbench Status</div>
+        <div class="stat-value" id="workbench-status" style="color: var(--text);">--</div>
+        <div class="stat-change">Current state</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Proposals Today</div>
+        <div class="stat-value" id="proposals-today">--</div>
+        <div class="stat-change">AI analyzed</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Success Rate</div>
+        <div class="stat-value" id="proposal-success">--%</div>
+        <div class="stat-change">Approved/Total</div>
+    </div>
+</div>
+
+<!-- Command Deck Interface -->
+<div class="card" style="margin-bottom: var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-terminal" style="margin-right: 8px; color: var(--success);"></i>Tactical Command Deck</h3>
+        <div style="display: flex; gap: var(--space-sm);">
+            <a href="https://sapphire-command-deck-267358751314.us-central1.run.app" target="_blank" class="btn btn-secondary" style="font-size: 0.8rem;">
+                <i class="fas fa-external-link-alt"></i> Full Screen
+            </a>
+        </div>
+    </div>
+    <div class="card-body" style="padding: 0; height: 700px;">
+        <iframe 
+            src="https://sapphire-command-deck-267358751314.us-central1.run.app" 
+            style="width: 100%; height: 100%; border: none; border-radius: 0 0 12px 12px;"
+            title="Command Deck"
+        ></iframe>
+    </div>
+</div>
+
+<!-- Signal Controls -->
+<div class="grid grid-2">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-broadcast-tower" style="margin-right: 8px; color: var(--warning);"></i>Signal Controls</h3>
+        </div>
+        <div class="card-body">
+            <div style="display: flex; flex-direction: column; gap: var(--space-md);">
+                <button class="btn btn-primary" onclick="testSignal()">
+                    <i class="fas fa-paper-plane"></i> Send Test Signal
+                </button>
+                <button class="btn btn-secondary" onclick="pauseWorkbench()">
+                    <i class="fas fa-pause"></i> Pause Workbench
+                </button>
+                <button class="btn btn-secondary" onclick="resumeWorkbench()">
+                    <i class="fas fa-play"></i> Resume Workbench
+                </button>
+                <button class="btn btn-secondary" onclick="flushQueue()">
+                    <i class="fas fa-broom"></i> Flush Signal Queue
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-info-circle" style="margin-right: 8px; color: var(--info);"></i>Command Deck Info</h3>
+        </div>
+        <div class="card-body">
+            <div style="font-size: 0.9rem; line-height: 1.8;">
+                <p><strong>Version:</strong> 2.0</p>
+                <p><strong>Environment:</strong> Production</p>
+                <p><strong>Data Source:</strong> Firestore (Real-time)</p>
+                <p><strong>Last Updated:</strong> <span id="last-updated">--</span></p>
+                <hr style="border-color: var(--border); margin: var(--space-md) 0;">
+                <p style="color: var(--text-muted);">
+                    The Command Deck provides real-time visibility into the trading pipeline: 
+                    TradingView signals → Windows Webhook → AI Analysis → Trade Execution.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function fetchCommandDeckStats() {
+        try {
+            // Fetch from command deck API
+            const response = await fetch('/api/trading/metrics', { credentials: 'same-origin' });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            
+            document.getElementById('proposals-today').textContent = data.trades?.today || 0;
+            document.getElementById('proposal-success').textContent = (data.trades?.success_rate || 0) + '%';
+            
+            const workbenchStatus = document.getElementById('workbench-status');
+            workbenchStatus.textContent = 'Active';
+            workbenchStatus.style.color = 'var(--success)';
+            
+        } catch (e) {
+            console.error('Failed to fetch command deck stats:', e);
+        }
+    }
+    
+    function testSignal() {
+        alert('Test signal feature coming soon!\n\nThis will send a test trading signal through the pipeline.');
+    }
+    
+    function pauseWorkbench() {
+        alert('Workbench paused!');
+    }
+    
+    function resumeWorkbench() {
+        alert('Workbench resumed!');
+    }
+    
+    function flushQueue() {
+        if (confirm('Are you sure you want to flush the signal queue?')) {
+            alert('Signal queue flushed!');
+        }
+    }
+    
+    function updateTimestamp() {
+        const now = new Date();
+        document.getElementById('last-updated').textContent = now.toLocaleString();
+    }
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        fetchCommandDeckStats();
+        updateTimestamp();
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Infrastructure Overview -->
+<div class="grid grid-3" style="margin-bottom: var(--space-xl);">
+    <div class="stat-card">
+        <div class="stat-label">Cloud Run Services</div>
+        <div class="stat-value" style="color: var(--primary);">10</div>
+        <div class="stat-change">GCP us-central1</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Raspberry Pi Nodes</div>
+        <div class="stat-value" style="color: var(--secondary);">2</div>
+        <div class="stat-change">rari1 + rari2</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Windows Workstation</div>
+        <div class="stat-value" style="color: var(--accent);">1</div>
+        <div class="stat-change">Webhook + Trading</div>
+    </div>
+</div>
+
+<!-- Architecture Diagram -->
+<div class="card" style="margin-bottom: var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-sitemap" style="margin-right: 8px; color: var(--primary);"></i>System Architecture</h3>
+    </div>
+    <div class="card-body">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-lg);">
+            <!-- Cloud Section -->
+            <div class="card" style="background: var(--bg-glass);">
+                <div class="card-header" style="border-bottom: 1px solid var(--border);">
+                    <h4 style="color: var(--primary);"><i class="fas fa-cloud"></i> Google Cloud Platform</h4>
+                </div>
+                <div class="card-body" style="font-size: 0.9rem;">
+                    <ul style="list-style: none; line-height: 2;">
+                        <li>☁️ <a href="https://sapphire-dashboard-267358751314.us-central1.run.app" target="_blank">sapphire-dashboard</a></li>
+                        <li>☁️ <a href="https://sapphire-command-deck-267358751314.us-central1.run.app" target="_blank">sapphire-command-deck</a></li>
+                        <li>☁️ <a href="https://sapphire-gateway-267358751314.us-central1.run.app" target="_blank">sapphire-gateway</a></li>
+                        <li>☁️ <a href="https://sapphire-log-viewer-267358751314.us-central1.run.app" target="_blank">sapphire-log-viewer</a></li>
+                        <li>☁️ <a href="https://sapphire-telegram-bot-267358751314.us-central1.run.app" target="_blank">sapphire-telegram-bot</a></li>
+                        <li>☁️ <a href="https://sapphire-health-dashboard-s77j6bxyra-uc.a.run.app" target="_blank">sapphire-health-dashboard</a></li>
+                        <li>☁️ <a href="https://agentic-pm-hub-267358751314.us-central1.run.app" target="_blank">agentic-pm-hub</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Pi Cluster Section -->
+            <div class="card" style="background: var(--bg-glass);">
+                <div class="card-header" style="border-bottom: 1px solid var(--border);">
+                    <h4 style="color: var(--secondary);"><i class="fas fa-server"></i> Raspberry Pi Cluster</h4>
+                </div>
+                <div class="card-body" style="font-size: 0.9rem;">
+                    <div style="margin-bottom: var(--space-md);">
+                        <strong>rari1 (192.168.1.23)</strong>
+                        <ul style="list-style: none; padding-left: var(--space-md); line-height: 1.8; color: var(--text-muted);">
+                            <li>• Controller + Dashboard</li>
+                            <li>• Webhook Port 18890</li>
+                            <li>• Telegram Bot</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong>rari2 (192.168.1.173)</strong>
+                        <ul style="list-style: none; padding-left: var(--space-md); line-height: 1.8; color: var(--text-muted);">
+                            <li>• Trading Engine (Lighter)</li>
+                            <li>• Trading API Port 18888</li>
+                            <li>• ProtonVPN (Switzerland)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Windows Section -->
+            <div class="card" style="background: var(--bg-glass);">
+                <div class="card-header" style="border-bottom: 1px solid var(--border);">
+                    <h4 style="color: var(--accent);"><i class="fas fa-desktop"></i> Windows Workstation</h4>
+                </div>
+                <div class="card-body" style="font-size: 0.9rem;">
+                    <div style="margin-bottom: var(--space-md);">
+                        <strong>IP: 100.71.10.48</strong>
+                        <ul style="list-style: none; padding-left: var(--space-md); line-height: 1.8; color: var(--text-muted);">
+                            <li>• Webhook Receiver (Port 9090)</li>
+                            <li>• TradingView Integration</li>
+                            <li>• Firestore Logging</li>
+                            <li>• AI Trading Scripts</li>
+                        </ul>
+                    </div>
+                    <div style="padding: var(--space-md); background: var(--bg-dark); border-radius: 6px; font-size: 0.8rem;">
+                        <strong>Directories:</strong><br>
+                        D:/AsterAI<br>
+                        D:/tradingview-webhook<br>
+                        D:/SapphireAlpha
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Data Flow -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-project-diagram" style="margin-right: 8px; color: var(--success);"></i>Data Flow</h3>
+    </div>
+    <div class="card-body">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-md); padding: var(--space-lg); background: var(--bg-glass); border-radius: 8px;">
+            <div style="text-align: center;">
+                <div style="width: 80px; height: 80px; background: linear-gradient(135deg, var(--primary), var(--secondary)); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-sm);">
+                    <i class="fas fa-chart-line" style="font-size: 1.5rem; color: white;"></i>
+                </div>
+                <strong>TradingView</strong>
+                <div style="font-size: 0.8rem; color: var(--text-muted);">Alerts</div>
+            </div>
+            <i class="fas fa-arrow-right" style="font-size: 1.5rem; color: var(--text-muted);"></i>
+            <div style="text-align: center;">
+                <div style="width: 80px; height: 80px; background: linear-gradient(135deg, var(--accent), var(--warning)); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-sm);">
+                    <i class="fas fa-desktop" style="font-size: 1.5rem; color: white;"></i>
+                </div>
+                <strong>Windows</strong>
+                <div style="font-size: 0.8rem; color: var(--text-muted);">Webhook</div>
+            </div>
+            <i class="fas fa-arrow-right" style="font-size: 1.5rem; color: var(--text-muted);"></i>
+            <div style="text-align: center;">
+                <div style="width: 80px; height: 80px; background: linear-gradient(135deg, var(--secondary), var(--primary)); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-sm);">
+                    <i class="fas fa-database" style="font-size: 1.5rem; color: white;"></i>
+                </div>
+                <strong>Firestore</strong>
+                <div style="font-size: 0.8rem; color: var(--text-muted);">Logs + Metrics</div>
+            </div>
+            <i class="fas fa-arrow-right" style="font-size: 1.5rem; color: var(--text-muted);"></i>
+            <div style="text-align: center;">
+                <div style="width: 80px; height: 80px; background: linear-gradient(135deg, var(--success), var(--info)); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-sm);">
+                    <i class="fas fa-terminal" style="font-size: 1.5rem; color: white;"></i>
+                </div>
+                <strong>Command Deck</strong>
+                <div style="font-size: 0.8rem; color: var(--text-muted);">Dashboard</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Configuration Reference -->
+<div class="card" style="margin-top: var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-cog" style="margin-right: 8px; color: var(--info);"></i>Configuration Reference</h3>
+    </div>
+    <div class="card-body">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Service</th>
+                        <th>URL / IP</th>
+                        <th>Purpose</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><i class="fas fa-globe" style="margin-right: 8px; color: var(--primary);"></i>sapphirealpha.xyz</td>
+                        <td>Custom Domain</td>
+                        <td>Main Dashboard</td>
+                        <td><span class="badge badge-success">Active</span></td>
+                    </tr>
+                    <tr>
+                        <td><i class="fas fa-cloud" style="margin-right: 8px; color: var(--primary);"></i>Gateway</td>
+                        <td>Cloud Run</td>
+                        <td>API Gateway</td>
+                        <td><span class="badge badge-success">Active</span></td>
+                    </tr>
+                    <tr>
+                        <td><i class="fas fa-server" style="margin-right: 8px; color: var(--secondary);"></i>rari1</td>
+                        <td>192.168.1.23</td>
+                        <td>Controller Node</td>
+                        <td><span class="badge badge-warning">Check</span></td>
+                    </tr>
+                    <tr>
+                        <td><i class="fas fa-server" style="margin-right: 8px; color: var(--secondary);"></i>rari2</td>
+                        <td>192.168.1.173</td>
+                        <td>Trading Engine</td>
+                        <td><span class="badge badge-success">Active</span></td>
+                    </tr>
+                    <tr>
+                        <td><i class="fas fa-desktop" style="margin-right: 8px; color: var(--accent);"></i>Windows</td>
+                        <td>100.71.10.48</td>
+                        <td>Webhook + Trading</td>
+                        <td><span class="badge badge-success">Active</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

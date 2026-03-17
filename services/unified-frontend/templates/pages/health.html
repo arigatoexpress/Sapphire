@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Health Summary -->
+<div class="grid grid-4" style="margin-bottom: var(--space-xl);">
+    <div class="stat-card">
+        <div class="stat-label">Overall Status</div>
+        <div class="stat-value" id="overall-status" style="color: var(--text);">Checking...</div>
+        <div class="stat-change" id="status-detail">--</div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-label">Healthy Services</div>
+        <div class="stat-value" id="healthy-count" style="color: var(--success);">--</div>
+        <div class="stat-change">Operational</div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-label">Unhealthy Services</div>
+        <div class="stat-value" id="unhealthy-count" style="color: var(--danger);">--</div>
+        <div class="stat-change">Need attention</div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-label">Last Check</div>
+        <div class="stat-value" id="last-check" style="font-size: 1.5rem;">--</div>
+        <div class="stat-change">Minutes ago</div>
+    </div>
+</div>
+
+<!-- Health Dashboard Embed -->
+<div class="card" style="margin-bottom: var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-heartbeat" style="margin-right: 8px; color: var(--danger);"></i>Live Health Dashboard</h3>
+        <a href="https://sapphire-health-dashboard-s77j6bxyra-uc.a.run.app" target="_blank" class="btn btn-secondary" style="font-size: 0.8rem;">
+            <i class="fas fa-external-link-alt"></i> Open Full Dashboard
+        </a>
+    </div>
+    <div class="card-body" style="padding: 0; height: 600px;">
+        <iframe 
+            src="https://sapphire-health-dashboard-s77j6bxyra-uc.a.run.app" 
+            style="width: 100%; height: 100%; border: none; border-radius: 0 0 12px 12px;"
+            title="Health Dashboard"
+        ></iframe>
+    </div>
+</div>
+
+<!-- Service Categories -->
+<div class="grid grid-2">
+    <!-- Cloud Services -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-cloud" style="margin-right: 8px; color: var(--primary);"></i>Cloud Services</h3>
+            <span class="badge badge-info">GCP us-central1</span>
+        </div>
+        <div class="card-body">
+            <div id="cloud-services">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Loading...
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Pi Cluster -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-server" style="margin-right: 8px; color: var(--secondary);"></i>Pi Cluster</h3>
+            <span class="badge badge-info">Local Network</span>
+        </div>
+        <div class="card-body">
+            <div id="pi-services">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Loading...
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Windows Workstation -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-desktop" style="margin-right: 8px; color: var(--accent);"></i>Windows Workstation</h3>
+            <span class="badge badge-info">Tailscale</span>
+        </div>
+        <div class="card-body">
+            <div id="windows-services">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Loading...
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Firestore -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-database" style="margin-right: 8px; color: var(--warning);"></i>Firestore Database</h3>
+            <span class="badge badge-info">GCP</span>
+        </div>
+        <div class="card-body">
+            <div id="firestore-status">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Loading...
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="card" style="margin-top: var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-tools" style="margin-right: 8px; color: var(--info);"></i>Health Check Actions</h3>
+    </div>
+    <div class="card-body">
+        <div style="display: flex; gap: var(--space-md); flex-wrap: wrap;">
+            <button class="btn btn-primary" onclick="runHealthCheck()">
+                <i class="fas fa-sync-alt"></i> Run Health Check
+            </button>
+            <a href="https://sapphire-log-viewer-267358751314.us-central1.run.app" target="_blank" class="btn btn-secondary">
+                <i class="fas fa-list-alt"></i> View Logs
+            </a>
+            <button class="btn btn-secondary" onclick="exportHealthReport()">
+                <i class="fas fa-download"></i> Export Report
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function fetchHealthStatus() {
+        try {
+            const response = await fetch('/api/health/summary', { credentials: 'same-origin' });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            
+            // Update summary
+            const overallStatus = document.getElementById('overall-status');
+            const statusDetail = document.getElementById('status-detail');
+            
+            if (data.healthy) {
+                overallStatus.textContent = 'Healthy';
+                overallStatus.style.color = 'var(--success)';
+                statusDetail.textContent = 'All systems operational';
+            } else {
+                overallStatus.textContent = 'Issues Detected';
+                overallStatus.style.color = 'var(--danger)';
+                statusDetail.textContent = `${data.unhealthy_count || 0} services need attention`;
+            }
+            
+            document.getElementById('healthy-count').textContent = data.healthy_count || 0;
+            document.getElementById('unhealthy-count').textContent = data.unhealthy_count || 0;
+            
+            if (data.timestamp) {
+                const checkTime = new Date(data.timestamp);
+                const minutesAgo = Math.floor((new Date() - checkTime) / 60000);
+                document.getElementById('last-check').textContent = minutesAgo < 1 ? 'Just now' : `${minutesAgo}m`;
+            }
+        } catch (e) {
+            console.error('Failed to fetch health status:', e);
+        }
+    }
+    
+    async function fetchDetailedHealth() {
+        // Fetch from health dashboard API via our proxy
+        try {
+            const response = await fetch('/api/health/summary', { credentials: 'same-origin' });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            
+            // Organize by category
+            const categories = {
+                cloud: document.getElementById('cloud-services'),
+                pi: document.getElementById('pi-services'),
+                windows: document.getElementById('windows-services'),
+                firestore: document.getElementById('firestore-status')
+            };
+            
+            Object.keys(categories).forEach(cat => {
+                const services = data.by_category?.[cat] || [];
+                const container = categories[cat];
+                
+                if (services.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><p>No services found</p></div>';
+                    return;
+                }
+                
+                container.innerHTML = services.map(s => `
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-md); border-bottom: 1px solid var(--border);">
+                        <div style="display: flex; align-items: center; gap: var(--space-sm);">
+                            <span style="color: ${s.healthy ? 'var(--success)' : 'var(--danger)'};">
+                                <i class="fas fa-${s.healthy ? 'check-circle' : 'times-circle'}"></i>
+                            </span>
+                            <span style="font-weight: 500;">${s.name}</span>
+                        </div>
+                        <div style="text-align: right;">
+                            <span class="badge badge-${s.healthy ? 'success' : 'danger'}">${s.healthy ? 'Healthy' : 'Error'}</span>
+                            ${s.response_time_ms ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">${s.response_time_ms}ms</div>` : ''}
+                        </div>
+                    </div>
+                `).join('');
+            });
+        } catch (e) {
+            console.error('Failed to fetch detailed health:', e);
+            Object.values(categories).forEach(el => {
+                el.innerHTML = '<div class="empty-state"><p>Failed to load health data</p></div>';
+            });
+        }
+    }
+    
+    function runHealthCheck() {
+        // Refresh all health data
+        fetchHealthStatus();
+        fetchDetailedHealth();
+        
+        // Show notification
+        const btn = document.querySelector('button[onclick="runHealthCheck()"]');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i> Check Complete';
+        btn.disabled = true;
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }, 2000);
+    }
+    
+    function exportHealthReport() {
+        alert('Export feature coming soon!');
+    }
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        fetchHealthStatus();
+        fetchDetailedHealth();
+        
+        // Refresh every 30 seconds
+        setInterval(() => {
+            fetchHealthStatus();
+            fetchDetailedHealth();
+        }, 30000);
+    });
+</script>
+{% endblock %}

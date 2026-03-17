@@ -1,0 +1,18 @@
+[Unit]
+Description=Sapphire Unified Health Monitor
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/sapphire_trading_monitor
+Environment=PYTHONUNBUFFERED=1
+Environment=TELEGRAM_BOT_TOKEN=%TELEGRAM_BOT_TOKEN%
+Environment=TELEGRAM_CHAT_ID=6826484357
+Environment=GCP_PROJECT=sapphire-479610
+ExecStart=/home/pi/sapphire_trading_monitor/venv/bin/python unified_health_monitor.py --watch --interval 300
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
