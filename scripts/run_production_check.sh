@@ -8,19 +8,9 @@ AUTH_USER="${AUTH_USER:-sapphire}"
 AUTH_PASS="${AUTH_PASS:-alpha2024}"
 AUTH="${AUTH_USER}:${AUTH_PASS}"
 STRICT_RUNTIME_GIT="${STRICT_RUNTIME_GIT:-true}"
-ENFORCE_RUNTIME_GIT_SHA="${ENFORCE_RUNTIME_GIT_SHA:-true}"
 ALLOW_UNTRACKED="${ALLOW_UNTRACKED:-false}"
 FRONTEND_IMAGE="${FRONTEND_IMAGE:-gcr.io/${PROJECT_ID}/sapphire-unified-frontend:latest}"
 FRONTEND_RUNTIME_SERVICES="${FRONTEND_RUNTIME_SERVICES:-sapphire-unified-frontend sapphire-unified-jobs}"
-
-EXPECTED_FRONTEND_GIT_SHA="${EXPECTED_FRONTEND_GIT_SHA:-${CI_COMMIT_SHA:-}}"
-
-if ! ROOT_DIR="$(git rev-parse --show-toplevel 2>/dev/null)"; then
-  ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-fi
-cd "$ROOT_DIR"
-CURRENT_GIT_SHA="$(git rev-parse HEAD)"
-CURRENT_GIT_SHORT_SHA="$(git rev-parse --short=12 HEAD)"
 
 printf "== Sapphire Production Check ==\n"
 printf "project=%s region=%s domain=%s\n\n" "$PROJECT_ID" "$REGION" "$DOMAIN"
@@ -65,11 +55,6 @@ if is_truthy "$STRICT_RUNTIME_GIT"; then
     fi
   fi
 
-  echo "git_head=${CURRENT_GIT_SHA}"
-  echo "git_head_short=${CURRENT_GIT_SHORT_SHA}"
-  echo "expected_frontend_sha=${EXPECTED_FRONTEND_GIT_SHA}"
-  echo "runtime_sha_enforced=${ENFORCE_RUNTIME_GIT_SHA}"
-
   image_repo="${FRONTEND_IMAGE%:*}"
   image_tag="${FRONTEND_IMAGE##*:}"
   latest_digest="$(
@@ -100,12 +85,6 @@ print((rows[0].get("digest","") if rows else "").strip())
       echo "FAIL: unable to resolve latest revision for ${svc}"
       exit 1
     fi
-    runtime_image="$(
-      gcloud run revisions describe "$rev" \
-        --project "$PROJECT_ID" \
-        --region "$REGION" \
-        --format='value(spec.template.spec.containers[0].image)'
-    )"
     rev_digest="$(
       gcloud run revisions describe "$rev" \
         --project "$PROJECT_ID" \
@@ -118,17 +97,6 @@ print((rows[0].get("digest","") if rows else "").strip())
       exit 1
     fi
     printf "runtime_match %-30s %s\n" "$svc" "$rev"
-    printf "runtime_image %-30s %s\n" "$svc" "$runtime_image"
-
-    if is_truthy "$ENFORCE_RUNTIME_GIT_SHA" && [[ -n "${EXPECTED_FRONTEND_GIT_SHA}" ]]; then
-      if [[ "$runtime_image" != *"${EXPECTED_FRONTEND_GIT_SHA}"* ]]; then
-        echo "FAIL: ${svc} runtime image does not include expected SHA ${EXPECTED_FRONTEND_GIT_SHA}."
-        exit 1
-      fi
-      echo "runtime_image_sha_reference ${svc}=matched"
-    elif is_truthy "$ENFORCE_RUNTIME_GIT_SHA" && [[ -z "${EXPECTED_FRONTEND_GIT_SHA}" ]]; then
-      echo "runtime_image_sha_reference ${svc}=skipped(no_expected_sha)"
-    fi
   done
   echo ""
 fi

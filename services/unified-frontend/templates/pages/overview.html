@@ -27,9 +27,9 @@
 .radar-wrap {
     position: relative;
     overflow: hidden;
-    background: radial-gradient(circle at 50% 38%, rgba(16, 26, 10, 0.95), rgba(4, 8, 4, 0.98));
-    border: 1px solid rgba(98, 255, 64, 0.26);
-    box-shadow: 0 0 30px rgba(98, 255, 64, 0.10), inset 0 0 40px rgba(4, 8, 4, 0.86);
+    background: #000602;
+    border: 1px solid rgba(0, 255, 65, 0.22);
+    box-shadow: 0 0 28px rgba(0, 255, 65, 0.07), inset 0 0 40px rgba(0, 6, 2, 0.85);
 }
 
 .radar-canvas {
@@ -39,114 +39,17 @@
 }
 
 .radar-scanlines {
-    display: none;
-}
-
-.radar-caption {
-    margin-top: 6px;
-    color: var(--text-muted);
-    font-size: 0.62rem;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-}
-
-.radar-meta-row {
-    margin-top: 6px;
-    display: flex;
-    justify-content: flex-end;
-}
-
-.radar-quality-badge {
-    font-family: var(--font-terminal);
-    font-size: 0.58rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    border: 1px solid var(--border-dim);
-    padding: 2px 8px;
-    background: rgba(0, 0, 0, 0.34);
-    color: var(--text-muted);
-}
-
-.radar-quality-badge.nominal {
-    border-color: rgba(98, 255, 64, 0.34);
-    color: var(--amber);
-}
-
-.radar-quality-badge.degraded {
-    border-color: rgba(255, 51, 51, 0.46);
-    color: var(--red);
-    background: rgba(255, 51, 51, 0.10);
-}
-
-.chain-velocity-strip {
-    margin-top: 8px;
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 6px;
-}
-
-.chain-velocity-card {
-    border: 1px solid var(--border-dim);
-    background: rgba(0, 0, 0, 0.26);
-    padding: 6px 7px;
-}
-
-.chain-velocity-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 3px;
-}
-
-.chain-velocity-symbol {
-    font-size: 0.62rem;
-    letter-spacing: 0.08em;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-}
-
-.chain-velocity-tag {
-    font-size: 0.52rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    border: 1px solid var(--border-dim);
-    color: var(--text-muted);
-    padding: 0 4px;
-}
-
-.chain-velocity-kpi {
-    display: grid;
-    gap: 1px;
-}
-
-.chain-velocity-kpi .line {
-    font-size: 0.58rem;
-    color: var(--text-muted);
-    font-family: var(--font-terminal);
-    letter-spacing: 0.03em;
-}
-
-.chain-velocity-kpi .line strong {
-    color: var(--amber);
-    font-weight: 400;
-}
-
-.chain-velocity-card.degraded {
-    border-color: rgba(255, 51, 51, 0.36);
-    background: rgba(255, 51, 51, 0.08);
-}
-
-@media (max-width: 1100px) {
-    .chain-velocity-strip {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-}
-
-@media (max-width: 640px) {
-    .chain-velocity-strip {
-        grid-template-columns: 1fr;
-    }
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+        to bottom,
+        transparent 0px,
+        transparent 2px,
+        rgba(0, 0, 0, 0.07) 2px,
+        rgba(0, 0, 0, 0.07) 4px
+    );
+    pointer-events: none;
+    z-index: 1;
 }
 
 /* TradingView-style mini charts */
@@ -166,7 +69,7 @@
 
 .tv-card {
     background: rgba(0, 0, 0, 0.30);
-    border: 1px solid rgba(98, 255, 64, 0.09);
+    border: 1px solid rgba(255, 176, 0, 0.09);
     padding: 7px 8px 4px;
 }
 
@@ -222,11 +125,11 @@
     align-items: center;
     padding: var(--space-sm) var(--space-md);
     border: 1px solid var(--border-dim);
-    background: rgba(98, 255, 64, 0.02);
+    background: rgba(255, 176, 0, 0.02);
 }
 
 .service-item:hover {
-    background: rgba(98, 255, 64, 0.05);
+    background: rgba(255, 176, 0, 0.05);
     border-color: var(--border-color);
 }
 
@@ -267,7 +170,7 @@
 
 .action-card:hover {
     border-color: var(--amber);
-    background: rgba(98, 255, 64, 0.05);
+    background: rgba(255, 176, 0, 0.05);
 }
 
 .action-icon {
@@ -302,7 +205,7 @@
     gap: var(--space-sm);
     padding: var(--space-sm) var(--space-md);
     border: 1px solid var(--border-dim);
-    background: rgba(98, 255, 64, 0.02);
+    background: rgba(255, 176, 0, 0.02);
     white-space: nowrap;
 }
 
@@ -389,7 +292,7 @@
 
 .pulse-item {
     border: 1px solid var(--border-dim);
-    background: rgba(98, 255, 64, 0.03);
+    background: rgba(255, 176, 0, 0.03);
     padding: 7px 8px;
 }
 
@@ -438,7 +341,7 @@
 }
 
 .pulse-bias.neutral {
-    border-color: rgba(98, 255, 64, 0.45);
+    border-color: rgba(255, 176, 0, 0.45);
     color: var(--amber);
 }
 
@@ -537,7 +440,7 @@
 
 .narrative-item {
     border: 1px solid var(--border-dim);
-    background: rgba(98, 255, 64, 0.03);
+    background: rgba(255, 176, 0, 0.03);
     padding: 7px 8px;
 }
 
@@ -642,7 +545,7 @@
 
 .operator-why {
     border: 1px solid var(--border-dim);
-    background: rgba(98, 255, 64, 0.03);
+    background: rgba(255, 176, 0, 0.03);
     padding: 7px 8px;
     font-size: 0.67rem;
     line-height: 1.45;
@@ -699,245 +602,9 @@
     line-height: 1.4;
 }
 
-.scout-grid {
-    display: grid;
-    gap: 6px;
-}
-
-.scout-card {
-    border: 1px solid var(--border-dim);
-    background: rgba(0, 0, 0, 0.26);
-    padding: 7px 8px;
-}
-
-.scout-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 4px;
-}
-
-.scout-role {
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    font-size: 0.63rem;
-}
-
-.scout-pills {
-    display: flex;
-    gap: 5px;
-    flex-wrap: wrap;
-}
-
-.scout-pill {
-    font-size: 0.56rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    border: 1px solid var(--border-dim);
-    color: var(--text-muted);
-    padding: 1px 6px;
-}
-
-.scout-pill.live {
-    color: var(--green);
-    border-color: rgba(65, 255, 181, 0.40);
-    background: rgba(65, 255, 181, 0.08);
-}
-
-.scout-pill.warn {
-    color: var(--amber);
-    border-color: rgba(98, 255, 64, 0.40);
-    background: rgba(98, 255, 64, 0.08);
-}
-
-.scout-pill.block {
-    color: var(--red);
-    border-color: rgba(255, 111, 158, 0.45);
-    background: rgba(255, 111, 158, 0.08);
-}
-
-.scout-copy {
-    color: var(--text-muted);
-    font-size: 0.64rem;
-    line-height: 1.45;
-}
-
-.scout-copy strong {
-    color: var(--text-secondary);
-    font-weight: 400;
-}
-
-.scout-rules {
-    display: grid;
-    gap: 4px;
-    margin-top: 5px;
-}
-
-.scout-rule {
-    color: var(--text-muted);
-    font-size: 0.6rem;
-    line-height: 1.35;
-}
-
-.asset-terminal-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
-}
-
-.asset-terminal-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 6px;
-}
-
-.horizon-toggle {
-    display: inline-flex;
-    gap: 4px;
-}
-
-.horizon-btn {
-    font-size: 0.58rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    border: 1px solid var(--border-dim);
-    color: var(--text-muted);
-    background: rgba(0, 0, 0, 0.24);
-    padding: 2px 6px;
-    cursor: pointer;
-}
-
-.horizon-btn:hover,
-.horizon-btn.active {
-    border-color: var(--amber);
-    color: var(--amber);
-    background: rgba(98, 255, 64, 0.12);
-}
-
-.asset-card {
-    border: 1px solid var(--border-dim);
-    background: rgba(0, 0, 0, 0.26);
-    padding: 8px;
-}
-
-.asset-card-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 8px;
-}
-
-.asset-symbol {
-    font-size: 0.68rem;
-    color: var(--text-secondary);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-}
-
-.asset-bias {
-    font-size: 0.6rem;
-    padding: 1px 7px;
-    border: 1px solid var(--border-dim);
-    text-transform: uppercase;
-}
-
-.asset-bias.bullish {
-    color: var(--green);
-    border-color: rgba(65, 255, 181, 0.45);
-    background: rgba(65, 255, 181, 0.08);
-}
-
-.asset-bias.bearish {
-    color: var(--red);
-    border-color: rgba(255, 111, 158, 0.45);
-    background: rgba(255, 111, 158, 0.08);
-}
-
-.asset-bias.neutral {
-    color: var(--amber);
-    border-color: rgba(98, 255, 64, 0.45);
-    background: rgba(98, 255, 64, 0.08);
-}
-
-.asset-metrics {
-    margin-top: 5px;
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 4px;
-}
-
-.asset-metric {
-    border: 1px solid var(--border-dim);
-    background: rgba(98, 255, 64, 0.05);
-    padding: 4px 5px;
-}
-
-.asset-metric .k {
-    font-size: 0.54rem;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-}
-
-.asset-metric .v {
-    margin-top: 2px;
-    font-family: var(--font-header);
-    font-size: 0.78rem;
-    color: var(--amber);
-}
-
-.asset-hist {
-    margin-top: 7px;
-    height: 58px;
-    border: 1px solid var(--border-dim);
-    background: rgba(0, 0, 0, 0.34);
-    display: grid;
-    grid-template-columns: repeat(24, minmax(0, 1fr));
-    align-items: end;
-    gap: 2px;
-    padding: 5px;
-}
-
-.hist-bar {
-    width: 100%;
-    border-radius: 2px;
-    min-height: 2px;
-}
-
-.hist-bar.pos {
-    background: linear-gradient(180deg, rgba(65, 255, 181, 0.95), rgba(65, 255, 181, 0.35));
-}
-
-.hist-bar.neg {
-    background: linear-gradient(180deg, rgba(255, 111, 158, 0.95), rgba(255, 111, 158, 0.35));
-}
-
-.asset-analysis {
-    margin-top: 6px;
-    color: var(--text-muted);
-    font-size: 0.62rem;
-    line-height: 1.45;
-}
-
-.asset-analysis strong {
-    color: var(--text-secondary);
-    font-weight: 400;
-}
-
-.panel-body .ascii-divider {
-    display: none;
-}
-
 @media (max-width: 992px) {
     .execution-kpi-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-    .asset-terminal-grid {
-        grid-template-columns: 1fr;
     }
 }
 
@@ -1024,18 +691,6 @@
                     <div class="loading">Building execution snapshot...</div>
                 </div>
                 <div class="ascii-divider">────────────────────────────────────────</div>
-                <div class="asset-terminal-head">
-                    <div class="chart-label">AUTONOMOUS_ASSET_TERMINAL</div>
-                    <div class="horizon-toggle" id="asset-horizon-toggle">
-                        <button class="horizon-btn" data-hours="1">1H</button>
-                        <button class="horizon-btn" data-hours="6">6H</button>
-                        <button class="horizon-btn active" data-hours="24">24H</button>
-                    </div>
-                </div>
-                <div class="asset-terminal-grid" id="asset-terminal">
-                    <div class="loading">Composing macro/micro structure analysis...</div>
-                </div>
-                <div class="ascii-divider">────────────────────────────────────────</div>
                 <div class="chart-label">OPERATOR_DECISION_BRIEF</div>
                 <div class="operator-brief" id="operator-brief">
                     <div class="loading">Computing GO/NO-GO decision brief...</div>
@@ -1076,22 +731,6 @@
                 </div>
             </div>
         </div>
-
-        <div class="panel">
-            <span class="panel-corner tl"></span>
-            <span class="panel-corner tr"></span>
-            <span class="panel-corner bl"></span>
-            <span class="panel-corner br"></span>
-            <div class="panel-header">
-                <div class="panel-title">Scout_Mission</div>
-                <span class="timestamp" id="scout-updated">--:--:--</span>
-            </div>
-            <div class="panel-body">
-                <div class="scout-grid" id="scout-status-panel">
-                    <div class="loading">Loading scout posture...</div>
-                </div>
-            </div>
-        </div>
     </div>
 
     <!-- Right Column -->
@@ -1111,12 +750,35 @@
                     <canvas id="radar-canvas" class="radar-canvas"></canvas>
                     <div class="radar-scanlines"></div>
                 </div>
-                <div class="radar-caption">Live tactical radar: market movement, chain speed, and active execution telemetry.</div>
-                <div class="radar-meta-row">
-                    <span id="radar-quality-badge" class="radar-quality-badge nominal">DATA_NOMINAL</span>
-                </div>
-                <div id="chain-velocity-strip" class="chain-velocity-strip">
-                    <div class="loading">Loading chain velocity streams...</div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="panel">
+            <span class="panel-corner tl"></span>
+            <span class="panel-corner tr"></span>
+            <span class="panel-corner bl"></span>
+            <span class="panel-corner br"></span>
+            <div class="panel-header">
+                <div class="panel-title">Quick_Access</div>
+            </div>
+            <div class="panel-body">
+                <div class="action-grid">
+                    <a href="/architecture" class="action-card">
+                        <div class="action-icon">◈</div>
+                        <div class="action-title">Architecture</div>
+                        <div class="action-desc">System topology</div>
+                    </a>
+                    <a href="/intelligence" class="action-card">
+                        <div class="action-icon">◉</div>
+                        <div class="action-title">Intelligence</div>
+                        <div class="action-desc">Market analysis</div>
+                    </a>
+                    <a href="/organization" class="action-card">
+                        <div class="action-icon">◎</div>
+                        <div class="action-title">Organization</div>
+                        <div class="action-desc">Programs & lanes</div>
+                    </a>
                 </div>
             </div>
         </div>
@@ -1140,31 +802,16 @@
     </div>
 </div>
 
+<!-- ASCII Art Footer -->
+<div class="ascii-divider" style="text-align: center; margin-top: var(--space-xl);">
+╔══════════════════════════════════════════════════════════════════╗<br>
+║  SAPPHIRE AUTONOMOUS SYSTEMS - AUTHORIZED PERSONNEL ONLY         ║<br>
+╚══════════════════════════════════════════════════════════════════╝
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    let _dashboardDataCache = null;
-    let _assetTerminalHorizonHours = 24;
-
-    function _setAssetHorizonUi(hours) {
-        document.querySelectorAll('#asset-horizon-toggle .horizon-btn').forEach((btn) => {
-            const isActive = Number(btn.dataset.hours) === Number(hours);
-            btn.classList.toggle('active', isActive);
-        });
-    }
-
-    function _renderAssetTerminalFromCache() {
-        if (!_dashboardDataCache) return;
-        updateAssetTerminal(
-            _dashboardDataCache.intelSummary,
-            _dashboardDataCache.strategyOps,
-            _dashboardDataCache.tradesPayload,
-            _dashboardDataCache.marketData,
-            _assetTerminalHorizonHours
-        );
-    }
-
     // ═══════════════════════════════════════════════════════════
     //  SapphireRadar — Canvas phosphor military radar
     //  Tracks configurable major/favorite symbols + service health
@@ -1175,20 +822,14 @@
             if (!this.canvas || !this.canvas.getContext) return;
             this.ctx = this.canvas.getContext('2d');
             this.angle      = -Math.PI / 2;           // Start pointing North
-            this.sweepSpeed = (Math.PI * 2) / 260;    // ~4.3 s / revolution at 60 fps
+            this.sweepSpeed = (Math.PI * 2) / 240;    // ~4 s / revolution at 60 fps
             this.market     = {};
             this.services   = {};
-            this.superswarm = {};
-            this.intel      = {};
-            this.universe   = {};
             this.frameCount = 0;
             this.locks      = {};  // Active trade locks: { 'BTC': { side, timestamp } }
             this.reducedMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
             this.symbolLayout = [];
-            this.symbolState = {};
-            this.symbolTrails = {};
-            this.lastDrawTs = Date.now();
-            this.setTrackedSymbols(['BTC', 'ETH', 'SOL']);
+            this.setTrackedSymbols(['BTC', 'ETH', 'SOL', 'HYPE', 'DOGE', 'AVAX']);
 
             // Defer first draw to next frame so CSS width is applied
             requestAnimationFrame(() => {
@@ -1209,9 +850,6 @@
 
         setMarket(data)   { this.market   = data || {}; }
         setServices(svcs) { this.services = svcs  || {}; }
-        setSuperswarm(data) { this.superswarm = data || {}; }
-        setIntel(data) { this.intel = data || {}; }
-        setUniverse(data) { this.universe = data || {}; }
 
         _hash01(input) {
             let h = 2166136261;
@@ -1221,17 +859,6 @@
                 h = Math.imul(h, 16777619);
             }
             return (h >>> 0) / 4294967295;
-        }
-
-        _angleNorm(a) {
-            let out = a;
-            while (out <= -Math.PI) out += Math.PI * 2;
-            while (out > Math.PI) out -= Math.PI * 2;
-            return out;
-        }
-
-        _angleDiff(target, current) {
-            return this._angleNorm(target - current);
         }
 
         _normalizeSymbol(raw) {
@@ -1269,13 +896,6 @@
             });
             if (!deduped.length) return;
             this.symbolLayout = this._buildSymbolLayout(deduped);
-            const allowed = new Set(deduped);
-            Object.keys(this.symbolState).forEach((sym) => {
-                if (!allowed.has(sym)) delete this.symbolState[sym];
-            });
-            Object.keys(this.symbolTrails).forEach((sym) => {
-                if (!allowed.has(sym)) delete this.symbolTrails[sym];
-            });
         }
 
         // Called by loadActiveTrades() every 10 s with current open positions
@@ -1302,249 +922,231 @@
         }
 
         _draw() {
-            const { ctx, cx, cy, R } = this;
+            const { ctx, cx, cy, R, angle } = this;
             const W = this.canvas.width, H = this.canvas.height;
-            if (!ctx || !W || !H) return;
-            const now = Date.now();
-            const t = now * 0.001;
-            const dt = Math.max(0.016, Math.min(0.12, (now - this.lastDrawTs) / 1000));
-            this.lastDrawTs = now;
-            const statusSummary = Object.values(this.services || {});
-            const healthyServices = statusSummary.filter((s) => s?.healthy).length;
-            const totalServices = statusSummary.length || 1;
-            const superswarmSummary = this.superswarm?.summary || {};
-            const superswarmAnalysis = this.superswarm?.analysis || {};
-            const executionSeries = Array.isArray(this.superswarm?.series?.execution_flow)
-                ? this.superswarm.series.execution_flow
-                : [];
-            const signals = Number(superswarmSummary.signals || this.intel?.operations?.signals || 0);
-            const executions = Number(superswarmSummary.executions || this.intel?.operations?.executions || 0);
-            const activeAgents = Math.max(healthyServices, 1);
-            const growthTotal = Number(superswarmAnalysis?.learning_summary?.total || 0);
-            const chainRows = Array.isArray(this.universe?.chain_streams) ? this.universe.chain_streams : [];
-            const chainBySymbol = {};
-            chainRows.forEach((row) => {
-                if (!row || typeof row !== 'object') return;
-                let key = String(row.symbol || '').toUpperCase();
-                if (!key) return;
-                if (key === 'SOL-FD') key = 'SOL';
-                if (!chainBySymbol[key] || Number(row.tps || 0) > Number(chainBySymbol[key].tps || 0)) {
-                    chainBySymbol[key] = row;
-                }
-            });
 
-            // Radar background + subtle persistence.
-            ctx.fillStyle = 'rgba(2, 8, 3, 0.22)';
-            ctx.fillRect(0, 0, W, H);
-            const vignette = ctx.createRadialGradient(cx, cy, R * 0.1, cx, cy, R * 1.35);
-            vignette.addColorStop(0, 'rgba(98,255,64,0.06)');
-            vignette.addColorStop(1, 'rgba(0,0,0,0.72)');
-            ctx.fillStyle = vignette;
+            // ── Phosphor fade — semi-transparent dark-green overlay dims prior frames
+            ctx.fillStyle = 'rgba(0, 6, 2, 0.07)';
             ctx.fillRect(0, 0, W, H);
 
-            // Rings + crosshair grid.
-            for (let i = 1; i <= 4; i++) {
-                const r = (R * i) / 4;
+            // ── Range rings ──────────────────────────────────────────────
+            [0.25, 0.5, 0.75, 1.0].forEach((frac, i) => {
                 ctx.beginPath();
-                ctx.arc(cx, cy, r, 0, Math.PI * 2);
-                ctx.strokeStyle = i === 4 ? 'rgba(98,255,64,0.28)' : 'rgba(98,255,64,0.14)';
-                ctx.lineWidth = i === 4 ? 1.0 : 0.7;
-                ctx.stroke();
-            }
-            ctx.setLineDash([4, 6]);
-            ['v', 'h', 'd1', 'd2'].forEach((kind) => {
-                ctx.beginPath();
-                if (kind === 'v') { ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R); }
-                if (kind === 'h') { ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy); }
-                if (kind === 'd1') { ctx.moveTo(cx - R * 0.72, cy - R * 0.72); ctx.lineTo(cx + R * 0.72, cy + R * 0.72); }
-                if (kind === 'd2') { ctx.moveTo(cx - R * 0.72, cy + R * 0.72); ctx.lineTo(cx + R * 0.72, cy - R * 0.72); }
-                ctx.strokeStyle = 'rgba(98,255,64,0.10)';
-                ctx.lineWidth = 0.7;
+                ctx.arc(cx, cy, R * frac, 0, Math.PI * 2);
+                ctx.strokeStyle = i === 3 ? 'rgba(0,255,65,0.50)' : 'rgba(0,255,65,0.13)';
+                ctx.lineWidth   = i === 3 ? 1.2 : 0.7;
                 ctx.stroke();
             });
+
+            // ── Cross hairs ──────────────────────────────────────────────
+            ctx.save();
+            ctx.setLineDash([2, 10]);
+            ctx.strokeStyle = 'rgba(0,255,65,0.10)';
+            ctx.lineWidth   = 0.5;
+            ctx.beginPath(); ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy); ctx.stroke();
             ctx.setLineDash([]);
+            ctx.restore();
 
-            // Sweep beam with trailing decay.
-            const segments = 18;
-            for (let i = 0; i < segments; i++) {
-                const a1 = this.angle - i * 0.05;
-                const a2 = a1 - 0.04;
-                const alpha = Math.pow(1 - i / segments, 2.1) * 0.22;
-                ctx.beginPath();
-                ctx.moveTo(cx, cy);
-                ctx.arc(cx, cy, R, a2, a1);
-                ctx.closePath();
-                ctx.fillStyle = `rgba(98,255,64,${alpha.toFixed(4)})`;
-                ctx.fill();
-            }
+            // ── Sweep cone (filled arc sector + radial gradient) ─────────
+            const coneArc    = Math.PI * 0.40; // ~72° cone
+            const sectorGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
+            sectorGrad.addColorStop(0.0, 'rgba(0,255,65,0.00)');
+            sectorGrad.addColorStop(0.5, 'rgba(0,255,65,0.05)');
+            sectorGrad.addColorStop(1.0, 'rgba(0,255,65,0.22)');
+
             ctx.beginPath();
             ctx.moveTo(cx, cy);
-            ctx.lineTo(cx + Math.cos(this.angle) * R, cy + Math.sin(this.angle) * R);
-            ctx.strokeStyle = 'rgba(155,255,122,0.95)';
-            ctx.lineWidth = 1.9;
-            ctx.stroke();
-
-            // Center pulse.
-            const pulse = 3.6 + Math.sin(t * 5.2) * 0.9;
-            ctx.beginPath();
-            ctx.arc(cx, cy, pulse, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(98,255,64,0.88)';
+            ctx.arc(cx, cy, R, angle - coneArc, angle, false);
+            ctx.closePath();
+            ctx.fillStyle = sectorGrad;
             ctx.fill();
 
-            const symbols = this.symbolLayout.slice(0, 6);
-            symbols.forEach((sym, idx) => {
-                const md = this.market[sym.id] || {};
-                const tech = Array.isArray(this.intel?.technicals)
-                    ? this.intel.technicals.find((r) => String(r?.symbol || '').toUpperCase() === sym.id)
-                    : null;
-                const chain = chainBySymbol[sym.id] || {};
-                const change = Number(md.change_24h ?? tech?.change_24h ?? chain?.market_change_24h ?? 0);
-                const momentum = Number(tech?.momentum_score || 0);
-                const tps = Number(chain?.tps || 0);
-                const speedScore = Number(chain?.speed_score || Math.min(100, Math.log10(Math.max(1, tps) + 1) * 32));
-                const activityIndex = Number(chain?.activity_index || Math.min(100, Math.abs(change) * 10 + (speedScore * 0.55)));
-                const volatility = Math.min(1, Math.abs(change) / 6);
-                const activity = Math.min(1, (activityIndex / 100) * 0.68 + volatility * 0.32);
+            // Leading edge — bright line
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + Math.cos(angle) * R, cy + Math.sin(angle) * R);
+            ctx.strokeStyle = 'rgba(0,255,65,0.95)';
+            ctx.lineWidth   = 1.8;
+            ctx.stroke();
 
-                const drift = (0.05 + (speedScore / 100) * 0.18) * (change >= 0 ? 1 : -1);
-                const targetAngle = this._angleNorm(sym.angle + Math.sin(t * 0.85 + idx * 1.74) * 0.16 + drift * (t * 0.36));
-                const targetRadius = Math.min(0.9, Math.max(0.25, 0.30 + activity * 0.55));
+            // ── Center dot ───────────────────────────────────────────────
+            ctx.beginPath();
+            ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+            ctx.fillStyle = '#00ff41';
+            ctx.fill();
 
-                const state = this.symbolState[sym.id] || {
-                    angle: targetAngle,
-                    radius: targetRadius,
-                    x: cx + Math.cos(targetAngle) * R * targetRadius,
-                    y: cy + Math.sin(targetAngle) * R * targetRadius,
-                };
-                const lerpA = Math.min(1, dt * 3.4);
-                const lerpR = Math.min(1, dt * 2.9);
-                state.angle = this._angleNorm(state.angle + this._angleDiff(targetAngle, state.angle) * lerpA);
-                state.radius += (targetRadius - state.radius) * lerpR;
-                state.x = cx + Math.cos(state.angle) * R * state.radius;
-                state.y = cy + Math.sin(state.angle) * R * state.radius;
-                this.symbolState[sym.id] = state;
+            // ── Trading symbol blips ─────────────────────────────────────
+            ctx.font = '11px "Courier New", monospace';
+            this.symbolLayout.forEach(sym => {
+                const md  = this.market[sym.id] || {};
+                const chg = md.change_24h || 0;
+                // Volatility bonus: higher |chg| pushes blip slightly outward
+                const vb  = Math.min(Math.abs(chg) * 0.004, 0.12);
+                const r   = (sym.r + vb) * R;
+                const bx  = cx + Math.cos(sym.angle) * r;
+                const by  = cy + Math.sin(sym.angle) * r;
 
-                const trail = this.symbolTrails[sym.id] || [];
-                trail.push({ x: state.x, y: state.y, ts: now });
-                while (trail.length > 18) trail.shift();
-                this.symbolTrails[sym.id] = trail;
-                for (let j = 1; j < trail.length; j++) {
-                    const prev = trail[j - 1];
-                    const curr = trail[j];
-                    const alpha = (j / trail.length) * 0.30;
-                    ctx.beginPath();
-                    ctx.moveTo(prev.x, prev.y);
-                    ctx.lineTo(curr.x, curr.y);
-                    ctx.strokeStyle = `rgba(98,255,64,${alpha.toFixed(4)})`;
-                    ctx.lineWidth = 0.8;
-                    ctx.stroke();
-                }
+                // Was this blip just swept? (within ~20° behind leading edge)
+                const dAngle = ((angle - sym.angle) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+                const swept  = dAngle < 0.35;
 
-                const diff = Math.abs(this._angleDiff(this.angle, state.angle));
-                const swept = diff < 0.12;
-                const up = change >= 0;
-                const color = up ? '#9aff78' : '#ff6f9e';
-                const size = 3.0 + activity * 4.2 + (swept ? 1.8 : 0);
+                const isUp   = chg >= 0;
+                const bColor = isUp ? '#00ff41' : '#ff4444';
+                const glowA  = swept ? 0.85 : 0.40;
+                const glowR  = swept ? 22 : 13;
+                const blipR  = swept ? 8  : 5;
 
+                // Glow halo
+                const grd = ctx.createRadialGradient(bx, by, 0, bx, by, glowR);
+                grd.addColorStop(0, isUp ? `rgba(0,255,65,${glowA})` : `rgba(255,68,68,${glowA})`);
+                grd.addColorStop(1, 'rgba(0,0,0,0)');
                 ctx.beginPath();
-                ctx.arc(state.x, state.y, size + 7, 0, Math.PI * 2);
-                const glow = ctx.createRadialGradient(state.x, state.y, 0, state.x, state.y, size + 8);
-                glow.addColorStop(0, up ? 'rgba(154,255,120,0.36)' : 'rgba(255,111,158,0.34)');
-                glow.addColorStop(1, 'rgba(0,0,0,0)');
-                ctx.fillStyle = glow;
+                ctx.arc(bx, by, glowR, 0, Math.PI * 2);
+                ctx.fillStyle = grd;
                 ctx.fill();
 
+                // Core dot
                 ctx.beginPath();
-                ctx.arc(state.x, state.y, size, 0, Math.PI * 2);
-                ctx.fillStyle = color;
+                ctx.arc(bx, by, blipR, 0, Math.PI * 2);
+                ctx.fillStyle = bColor;
                 ctx.fill();
 
-                if (swept) {
-                    ctx.beginPath();
-                    ctx.arc(state.x, state.y, size + 8 + Math.sin(t * 12 + idx) * 1.2, 0, Math.PI * 2);
-                    ctx.strokeStyle = 'rgba(154,255,120,0.50)';
-                    ctx.lineWidth = 1.0;
-                    ctx.stroke();
-                }
-
-                const lock = this.locks[sym.id];
-                if (lock) {
-                    const reticle = size + 10;
-                    ctx.strokeStyle = 'rgba(154,255,120,0.82)';
-                    ctx.lineWidth = 1.1;
-                    const arm = 5;
-                    ctx.beginPath();
-                    ctx.moveTo(state.x - reticle, state.y - reticle + arm); ctx.lineTo(state.x - reticle, state.y - reticle); ctx.lineTo(state.x - reticle + arm, state.y - reticle);
-                    ctx.moveTo(state.x + reticle - arm, state.y - reticle); ctx.lineTo(state.x + reticle, state.y - reticle); ctx.lineTo(state.x + reticle, state.y - reticle + arm);
-                    ctx.moveTo(state.x - reticle, state.y + reticle - arm); ctx.lineTo(state.x - reticle, state.y + reticle); ctx.lineTo(state.x - reticle + arm, state.y + reticle);
-                    ctx.moveTo(state.x + reticle - arm, state.y + reticle); ctx.lineTo(state.x + reticle, state.y + reticle); ctx.lineTo(state.x + reticle, state.y + reticle - arm);
-                    ctx.stroke();
-                }
-
-                const sign = change >= 0 ? '+' : '';
-                const tpsStr = tps > 0 ? `${tps >= 100 ? tps.toFixed(0) : tps.toFixed(1)}tps` : 'n/a';
-                const label = `${sym.id} ${sign}${change.toFixed(2)}% · ${tpsStr}`;
-                ctx.font = '9px "Courier New", monospace';
-                const lw = ctx.measureText(label).width;
-                const lx = state.x > cx ? state.x + size + 6 : state.x - size - lw - 6;
-                const ly = state.y - size - 2;
-                ctx.fillStyle = 'rgba(3,8,3,0.84)';
-                ctx.fillRect(lx - 2, ly - 9, lw + 4, 12);
-                ctx.fillStyle = color;
-                ctx.fillText(label, lx, ly);
+                // Label: SYMBOL +chg% with dark background pill for readability
+                const sign = chg >= 0 ? '+' : '';
+                const lbl  = `${sym.id} ${sign}${chg.toFixed(1)}%`;
+                const lw   = ctx.measureText(lbl).width;
+                const lx   = bx > cx ? bx + blipR + 4 : bx - blipR - lw - 4;
+                const ly   = by + 4;
+                // Background pill
+                ctx.fillStyle = 'rgba(0, 6, 2, 0.80)';
+                ctx.fillRect(lx - 3, ly - 11, lw + 6, 14);
+                // Text
+                ctx.fillStyle = bColor;
+                ctx.fillText(lbl, lx, ly);
             });
 
-            // Service health orbit.
-            const svcEntries = Object.entries(this.services || {});
-            const svcN = Math.max(1, svcEntries.length);
-            svcEntries.forEach(([_, row], i) => {
-                const a = -Math.PI / 2 + (i / svcN) * Math.PI * 2;
-                const x = cx + Math.cos(a) * R * 1.03;
-                const y = cy + Math.sin(a) * R * 1.03;
+            // ── Service health blips (outer ring) ────────────────────────
+            const svcList = Object.entries(this.services);
+            svcList.forEach(([, data], i) => {
+                const sa = (i / Math.max(svcList.length, 1)) * Math.PI * 2 - Math.PI * 0.5;
+                const sx = cx + Math.cos(sa) * R * 0.91;
+                const sy = cy + Math.sin(sa) * R * 0.91;
                 ctx.beginPath();
-                ctx.arc(x, y, 2.5, 0, Math.PI * 2);
-                ctx.fillStyle = row?.healthy ? 'rgba(154,255,120,0.85)' : 'rgba(255,84,84,0.85)';
+                ctx.arc(sx, sy, 2.2, 0, Math.PI * 2);
+                ctx.fillStyle = data.healthy ? 'rgba(0,255,65,0.80)' : 'rgba(255,68,68,0.90)';
                 ctx.fill();
             });
 
-            // HUD and operational metrics.
-            const sourceCount = Array.isArray(superswarmAnalysis?.source_efficacy)
-                ? superswarmAnalysis.source_efficacy.length
-                : 0;
-            ctx.font = '10px "Courier New", monospace';
-            ctx.fillStyle = 'rgba(98,255,64,0.72)';
-            ctx.fillText(`AI_AGENTS ${activeAgents}/${totalServices}`, 8, 14);
-            ctx.fillText(`SIGNALS ${signals}  EXEC ${executions}`, 8, 28);
-            const lockCount = Object.keys(this.locks || {}).length;
-            ctx.fillText(`SOURCE_STREAMS ${sourceCount}  LOCKS ${lockCount}`, 8, 42);
-            ctx.fillStyle = 'rgba(98,255,64,0.42)';
+            // ── Compass labels ───────────────────────────────────────────
+            ctx.font         = '12px "Courier New", monospace';
+            ctx.fillStyle    = 'rgba(0,255,65,0.55)';
+            ctx.textAlign    = 'center';
+            ctx.textBaseline = 'middle';
+            [['N', -Math.PI / 2], ['E', 0], ['S', Math.PI / 2], ['W', Math.PI]].forEach(([l, a]) => {
+                ctx.fillText(l, cx + Math.cos(a) * (R + 16), cy + Math.sin(a) * (R + 16));
+            });
+            ctx.textAlign    = 'left';
+            ctx.textBaseline = 'alphabetic';
+
+            // ── HUD: bearing + SAPPHIRE-OS watermark ─────────────────────
+            const brg = Math.round(((angle + Math.PI / 2) / (Math.PI * 2) * 360 + 360) % 360);
+            ctx.font      = '9px "Courier New", monospace';
+            ctx.fillStyle = 'rgba(0,255,65,0.35)';
+            ctx.fillText(`BRG ${String(brg).padStart(3, '0')}°`, 6, H - 6);
             ctx.textAlign = 'right';
-            ctx.fillText('SAPPHIRE RADAR // LIVE', W - 8, H - 8);
+            ctx.fillText('SAPPHIRE-OS', W - 6, H - 6);
             ctx.textAlign = 'left';
 
-            const quality = (this.universe && typeof this.universe === 'object') ? (this.universe.quality || {}) : {};
-            const dataDegraded = Boolean(quality.degraded);
-            const issueCount = Number(quality.issue_count || 0);
-            const qualityLabel = dataDegraded
-                ? `DATA DEGRADED${issueCount > 0 ? ` (${issueCount})` : ''}`
-                : 'DATA NOMINAL';
-            const qw = ctx.measureText(qualityLabel).width;
-            const qx = W - qw - 16;
-            const qy = 28;
-            ctx.fillStyle = dataDegraded ? 'rgba(34,0,0,0.72)' : 'rgba(3,8,3,0.72)';
-            ctx.fillRect(qx - 4, qy - 10, qw + 8, 13);
-            ctx.fillStyle = dataDegraded ? 'rgba(255,90,90,0.92)' : 'rgba(98,255,64,0.70)';
-            ctx.fillText(qualityLabel, qx, qy);
+            // ── Fighter-jet lock-on reticles ──────────────────────────────
+            if (Object.keys(this.locks).length) {
+                const _now = Date.now();
+                ctx.save();
+                this.symbolLayout.forEach(sym => {
+                    const lock = this.locks[sym.id];
+                    if (!lock) return;
 
-            // Timestamp.
-            ctx.fillStyle = 'rgba(98,255,64,0.38)';
-            ctx.fillText(new Date(now).toLocaleTimeString('en-US', { hour12: false }), W - 90, 14);
-            if (!this.reducedMotion) {
-                this.angle = (this.angle + this.sweepSpeed + Math.PI * 2) % (Math.PI * 2);
+                    // Recalculate blip position (identical formula to symbol blips above)
+                    const _md  = this.market[sym.id] || {};
+                    const _chg = _md.change_24h || 0;
+                    const _vb  = Math.min(Math.abs(_chg) * 0.004, 0.12);
+                    const _r   = (sym.r + _vb) * R;
+                    const bx   = cx + Math.cos(sym.angle) * _r;
+                    const by   = cy + Math.sin(sym.angle) * _r;
+
+                    const elapsed   = _now - lock.timestamp;
+                    const acquiring = elapsed < 1500;                // ACQUIRING for 1.5 s
+                    const isLong    = lock.side === 'buy' || lock.side === 'long';
+                    const lockColor = isLong ? '#00ff41' : '#ff4444';
+
+                    // 3 Hz flicker during ACQUIRING → solid when LOCKED
+                    const flashOn   = acquiring ? (Math.floor(elapsed / 167) % 2 === 0) : true;
+                    ctx.globalAlpha = flashOn ? 0.95 : 0.12;
+
+                    // Bracket size: sweeps inward from R*0.20 → 13 px over 1.5 s
+                    const progress = acquiring ? elapsed / 1500 : 1.0;
+                    const szFar    = R * 0.20;
+                    const szNear   = 13;
+                    const sz  = szFar + (szNear - szFar) * progress;
+                    const arm = sz * 0.50;   // arm length of each L-bracket
+
+                    // ── 4 corner L-brackets ────────────────────────────────
+                    ctx.strokeStyle = lockColor;
+                    ctx.lineWidth   = 1.8;
+                    ctx.lineCap     = 'square';
+                    [
+                        [bx-sz+arm, by-sz,  bx-sz, by-sz,  bx-sz, by-sz+arm],  // TL
+                        [bx+sz-arm, by-sz,  bx+sz, by-sz,  bx+sz, by-sz+arm],  // TR
+                        [bx-sz+arm, by+sz,  bx-sz, by+sz,  bx-sz, by+sz-arm],  // BL
+                        [bx+sz-arm, by+sz,  bx+sz, by+sz,  bx+sz, by+sz-arm],  // BR
+                    ].forEach(([x1,y1,x2,y2,x3,y3]) => {
+                        ctx.beginPath();
+                        ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.lineTo(x3, y3);
+                        ctx.stroke();
+                    });
+
+                    if (!acquiring) {
+                        // LOCKED: spinning partial arc orbiting the blip
+                        const arcStart = (_now / 700) % (Math.PI * 2);
+                        ctx.globalAlpha = 0.60;
+                        ctx.lineWidth   = 1.2;
+                        ctx.beginPath();
+                        ctx.arc(bx, by, sz + 6, arcStart, arcStart + Math.PI * 1.2);
+                        ctx.stroke();
+
+                        // Dashed targeting line from radar origin to blip
+                        ctx.globalAlpha  = 0.22;
+                        ctx.lineWidth    = 0.8;
+                        ctx.setLineDash([3, 7]);
+                        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(bx, by); ctx.stroke();
+                        ctx.setLineDash([]);
+                    }
+
+                    // ── Status text label ──────────────────────────────────
+                    ctx.globalAlpha = flashOn ? 0.95 : 0.12;
+                    const arrow = isLong ? '▲' : '▼';
+                    const label = acquiring
+                        ? 'ACQUIRING...'
+                        : `LOCKED ${arrow} ${isLong ? 'LONG' : 'SHORT'}`;
+                    ctx.font = '9px "Courier New", monospace';
+                    const lw = ctx.measureText(label).width;
+                    // Position: right of blip when blip is in left half, else left
+                    const tx = bx > cx ? bx + sz + 5 : bx - sz - lw - 5;
+                    const ty = by - sz + 2;
+                    ctx.fillStyle = 'rgba(0,6,2,0.88)';
+                    ctx.fillRect(tx - 2, ty - 10, lw + 4, 13);
+                    ctx.fillStyle    = lockColor;
+                    ctx.textAlign    = 'left';
+                    ctx.textBaseline = 'alphabetic';
+                    ctx.fillText(label, tx, ty);
+                });
+                ctx.globalAlpha = 1.0;
+                ctx.restore();
             }
         }
 
         _loop() {
+            this.angle = (this.angle + this.sweepSpeed + Math.PI * 2) % (Math.PI * 2);
             this.frameCount++;
             this._draw();
             if (this.reducedMotion) {
@@ -1567,7 +1169,7 @@
         try {
             console.log('Loading dashboard...');
 
-            const [snapshot, intelSummary, intelFeed, strategyOps, tradesPayload, zeitgeistUniverse, autonomy] = await Promise.all([
+            const [snapshot, intelSummary, intelFeed, strategyOps] = await Promise.all([
                 window.platformApi.getHomeSnapshot().catch((e) => {
                     console.error('Home snapshot load failed:', e);
                     return {};
@@ -1584,18 +1186,6 @@
                     console.error('Strategy ops load failed:', e);
                     return { scorecard: { totals: {}, ranked: [] }, assessment: {}, operator_brief: {}, attribution: {} };
                 }),
-                window.platformApi.getTrades({ hours: 72, limit: 280, include_failed: true }).catch((e) => {
-                    console.error('Trades load failed:', e);
-                    return { trades: [] };
-                }),
-                window.platformApi.getZeitgeistUniverse({ refresh: false }).catch((e) => {
-                    console.error('Zeitgeist universe load failed:', e);
-                    return {};
-                }),
-                window.platformApi.getAutonomy().catch((e) => {
-                    console.error('Autonomy load failed:', e);
-                    return {};
-                }),
             ]);
 
             const status = snapshot?.status || { services: {}, summary: {} };
@@ -1608,20 +1198,10 @@
             updateMissionStatus(status, metrics, projects, superswarm);
             updateServiceList(status);
             updateActivityLog(logs);
-            updateRadar(status, superswarm, intelSummary, zeitgeistUniverse);
-            updateChainVelocity(zeitgeistUniverse);
-            updateScoutStatus(autonomy);
+            updateRadar(status);
             updateIntelPulse(intelSummary);
             updateMarketDrivers(intelSummary);
             updateExecutionInsights(metrics, superswarm, intelSummary, intelFeed, businessBrief, strategyOps);
-            _dashboardDataCache = {
-                intelSummary,
-                strategyOps,
-                tradesPayload,
-                marketData: metrics?.market || {},
-            };
-            _renderAssetTerminalFromCache();
-            loadMarketPrices(metrics?.market || {});
             
             console.log('Dashboard updated successfully');
         } catch (e) {
@@ -1676,17 +1256,6 @@
         container.innerHTML = items || '<div class="empty-state">No services found</div>';
     }
 
-    function sanitizeTradeSensitive(text) {
-        let safe = String(text || '');
-        safe = safe.replace(/\$-?\d[\d,]*(\.\d+)?/g, '$[hidden]');
-        safe = safe.replace(/\b(?:qty|quantity|size|notional|filled_quantity|effective_qty|position_size)\s*[:=]?\s*-?\d+(\.\d+)?/gi, (m) => {
-            const k = m.split(/[:=]/)[0];
-            return `${k}=[hidden]`;
-        });
-        safe = safe.replace(/\b-?\d+(\.\d+)?\s*(SOL|ETH|BTC|USDT|USD)\b/gi, '[hidden size]');
-        return safe;
-    }
-
     function updateActivityLog(logsData) {
         const logs = logsData.logs || [];
         const container = document.getElementById('activity-log');
@@ -1699,7 +1268,7 @@
         const lines = logs.slice(0, 5).map(log => {
             const timestamp = log.timestamp ? new Date(log.timestamp).toLocaleTimeString('en-US', { hour12: false }) : '--:--:--';
             const level = (log.level || 'info').toLowerCase();
-            const message = sanitizeTradeSensitive(log.message || 'No message');
+            const message = log.message || 'No message';
             
             return `
                 <div class="line">
@@ -1711,65 +1280,6 @@
         }).join('');
         
         container.innerHTML = lines;
-    }
-
-    function updateScoutStatus(autonomyPayload) {
-        const container = document.getElementById('scout-status-panel');
-        const updated = document.getElementById('scout-updated');
-        if (!container || !updated) return;
-
-        const scout = autonomyPayload?.scout || {};
-        const bridge = scout?.external_bridge || {};
-        const registration = scout?.registration || {};
-        const profile = scout?.profile || {};
-        const sourceStatus = autonomyPayload?.sources?.scout || {};
-
-        const dispatchMode = String(bridge?.dispatch_mode || 'unknown').replace(/_/g, ' ');
-        const providerState = String(bridge?.provider_state || 'unknown').replace(/_/g, ' ');
-        const registered = Boolean(registration?.registered);
-        const fallbackReady = Boolean(bridge?.fallback_ready);
-        const sandboxReady = Boolean(bridge?.sandbox_ready);
-        const externalReady = Boolean(bridge?.external_ready);
-        const sourceOk = Boolean(sourceStatus?.ok);
-        const role = String(profile?.role || 'external collaboration scout').replace(/_/g, ' ');
-        const username = registration?.username ? `@${registration.username}` : 'unbound';
-        const provider = String(bridge?.provider || 'moltbook').toUpperCase();
-        const blocked = Array.isArray(profile?.blocked_actions) ? profile.blocked_actions.slice(0, 4) : [];
-        const allowed = Array.isArray(profile?.allowed_actions) ? profile.allowed_actions.slice(0, 4) : [];
-
-        const pills = [
-            `<span class="scout-pill ${registered ? 'live' : 'block'}">${registered ? 'REGISTERED' : 'UNBOUND'}</span>`,
-            `<span class="scout-pill ${sandboxReady ? 'live' : 'warn'}">${sandboxReady ? 'SANDBOX READY' : 'SANDBOX DEGRADED'}</span>`,
-            `<span class="scout-pill ${fallbackReady ? 'live' : 'warn'}">${fallbackReady ? 'FALLBACK READY' : 'FALLBACK HOLD'}</span>`,
-            `<span class="scout-pill ${externalReady ? 'live' : 'warn'}">${externalReady ? 'EXTERNAL READY' : 'EXTERNAL HOLD'}</span>`,
-            `<span class="scout-pill ${sourceOk ? 'live' : 'warn'}">${sourceOk ? 'STATUS LIVE' : 'STATUS DEGRADED'}</span>`,
-        ].join('');
-
-        container.innerHTML = `
-            <div class="scout-card">
-                <div class="scout-head">
-                    <span class="scout-role">${role.toUpperCase()}</span>
-                    <div class="scout-pills">${pills}</div>
-                </div>
-                <div class="scout-copy">
-                    <strong>Identity:</strong> ${username} on ${provider}.<br>
-                    <strong>Dispatch:</strong> ${dispatchMode.toUpperCase()} with ${providerState.toUpperCase()} posture.<br>
-                    <strong>Role:</strong> Sanitized external research, signal collection, and outward-facing context synthesis only.
-                </div>
-            </div>
-            <div class="scout-card">
-                <div class="scout-copy">
-                    <strong>Allowed:</strong> ${(allowed.length ? allowed.join(', ') : 'none').replace(/_/g, ' ')}.<br>
-                    <strong>Blocked:</strong> ${(blocked.length ? blocked.join(', ') : 'none').replace(/_/g, ' ')}.
-                </div>
-                <div class="scout-rules">
-                    <div class="scout-rule">Policy: no secrets, no trades, no cloud mutations, no private repo disclosure.</div>
-                    <div class="scout-rule">${bridge?.operator_hint || 'Scout should route through sandbox controls until an operator explicitly expands scope.'}</div>
-                </div>
-            </div>
-        `;
-
-        updated.textContent = new Date().toLocaleTimeString('en-US', { hour12: false });
     }
 
     function updateIntelPulse(summary) {
@@ -1901,131 +1411,6 @@
         container.innerHTML = [...technicalCards, ...catalystCards].join('');
     }
 
-    function normalizeAssetSymbol(raw) {
-        return String(raw || '')
-            .replace(/\/USDT$/i, '').replace(/USDT$/i, '')
-            .replace(/\/USD$/i, '').replace(/USD$/i, '')
-            .replace(/-PERP$/i, '')
-            .split('/')[0]
-            .toUpperCase();
-    }
-
-    function pctString(value, digits = 2) {
-        const n = Number(value || 0);
-        const sign = n >= 0 ? '+' : '';
-        return `${sign}${n.toFixed(digits)}%`;
-    }
-
-    function tradePnlPct(trade) {
-        const pnl = Number(trade?.realized_pnl || 0);
-        const qty = Math.abs(Number(trade?.filled_quantity || 0));
-        const px = Math.abs(Number(trade?.avg_price || 0));
-        const notional = qty * px;
-        if (!(notional > 0)) return 0;
-        const pct = (pnl / notional) * 100;
-        return Math.max(-25, Math.min(25, pct));
-    }
-
-    function updateAssetTerminal(intelSummary, strategyOps, tradesPayload, marketData, horizonHours = 24) {
-        const container = document.getElementById('asset-terminal');
-        if (!container) return;
-
-        const techRows = Array.isArray(intelSummary?.technicals) ? intelSummary.technicals : [];
-        const allTrades = Array.isArray(tradesPayload?.trades) ? tradesPayload.trades : [];
-        const nowMs = Date.now();
-        const horizonMs = Math.max(1, Number(horizonHours || 24)) * 60 * 60 * 1000;
-        const trades = allTrades.filter((t) => {
-            const ts = Date.parse(t?.timestamp || t?.created_at || t?.updated_at || '');
-            return Number.isFinite(ts) && ts >= (nowMs - horizonMs);
-        });
-        const tracked = Array.isArray(marketData?.tracked_symbols) ? marketData.tracked_symbols : [];
-        const moverSymbols = Array.isArray(intelSummary?.market?.movers)
-            ? intelSummary.market.movers.map((m) => m?.symbol)
-            : [];
-
-        const prioritized = ['BTC', 'ETH', 'SOL'];
-        const seen = new Set();
-        const chosen = [];
-        [...prioritized, ...tracked, ...moverSymbols].forEach((sym) => {
-            const n = normalizeAssetSymbol(sym);
-            if (!n || seen.has(n)) return;
-            seen.add(n);
-            chosen.push(n);
-        });
-        const symbols = chosen.slice(0, 3);
-
-        if (!symbols.length) {
-            container.innerHTML = '<div class="empty-state">No tracked assets available for terminal view</div>';
-            return;
-        }
-
-        const regime = String(intelSummary?.market?.regime_label || 'Neutral');
-        const regimeScore = Number(intelSummary?.market?.regime_score || 0);
-        const breadthUp = Number(intelSummary?.market?.breadth_up || 0);
-        const breadthTotal = Number(intelSummary?.market?.breadth_total || 0);
-        const scoreRows = Array.isArray(strategyOps?.scorecard?.ranked) ? strategyOps.scorecard.ranked : [];
-        const barCount = horizonHours <= 1 ? 12 : (horizonHours <= 6 ? 18 : 24);
-
-        container.innerHTML = symbols.map((symbol) => {
-            const tech = techRows.find((row) => String(row?.symbol || '').toUpperCase() === symbol) || {};
-            const symbolTrades = trades
-                .filter((t) => normalizeAssetSymbol(t?.symbol || t?.pair || '') === symbol && Boolean(t?.executed))
-                .slice(0, barCount)
-                .reverse();
-            const pnlSeries = symbolTrades.map(tradePnlPct);
-            const paddedSeries = [...Array(Math.max(0, barCount - pnlSeries.length)).fill(0), ...pnlSeries].slice(-barCount);
-            const maxAbs = Math.max(0.15, ...paddedSeries.map((v) => Math.abs(v)));
-            const wins = paddedSeries.filter((v) => v > 0).length;
-            const losses = paddedSeries.filter((v) => v < 0).length;
-            const closed = wins + losses;
-            const winRate = closed > 0 ? (wins / closed) * 100 : 0;
-            const avgPnlPct = paddedSeries.length
-                ? (paddedSeries.reduce((acc, n) => acc + n, 0) / paddedSeries.length)
-                : 0;
-            const marketChange = Number((marketData?.[symbol] || {}).change_24h || tech?.change_24h || 0);
-            const bias = String(tech?.bias || 'neutral').toLowerCase();
-            const score = Number(tech?.composite_score || 0);
-            const momentumScore = Number(tech?.momentum_score || 0);
-            const intelSupport = Number(tech?.intel_support || 0);
-            const suggestedAction = String(tech?.action || 'Monitor structure for confirmation');
-            const lane = scoreRows.find((row) => String(row?.strategy || '').toLowerCase().includes('overnight')) || scoreRows[0] || {};
-
-            const bars = paddedSeries.map((value) => {
-                const barClass = value >= 0 ? 'pos' : 'neg';
-                const h = Math.max(4, Math.round((Math.abs(value) / maxAbs) * 42));
-                return `<div class="hist-bar ${barClass}" style="height:${h}px" title="${pctString(value)}"></div>`;
-            }).join('');
-
-            return `
-                <div class="asset-card">
-                    <div class="asset-card-head">
-                        <span class="asset-symbol">${symbol} // AUTONOMOUS</span>
-                        <span class="asset-bias ${bias}">${bias.toUpperCase()}</span>
-                    </div>
-                    <div class="asset-metrics">
-                        <div class="asset-metric">
-                            <div class="k">24h Move</div>
-                            <div class="v">${pctString(marketChange)}</div>
-                        </div>
-                        <div class="asset-metric">
-                            <div class="k">Avg Fill PnL</div>
-                            <div class="v">${pctString(avgPnlPct)}</div>
-                        </div>
-                        <div class="asset-metric">
-                            <div class="k">Win Rate</div>
-                            <div class="v">${winRate.toFixed(1)}%</div>
-                        </div>
-                    </div>
-                    <div class="asset-hist" style="grid-template-columns: repeat(${barCount}, minmax(0, 1fr));">${bars}</div>
-                    <div class="asset-analysis">
-                        <strong>Macro:</strong> ${regime} (${regimeScore.toFixed(1)}/100) with breadth ${breadthUp}/${breadthTotal || 3} up and ${bias} structure.
-                        <br><strong>Micro (${horizonHours}h):</strong> Momentum ${momentumScore.toFixed(1)}/100, intel support ${intelSupport.toFixed(1)}/100, autonomous fill avg ${pctString(avgPnlPct)}. Bias action: ${suggestedAction}. Lane posture ${String(lane?.recommendation || 'monitor').toUpperCase()}.
-                    </div>
-                </div>
-            `;
-        }).join('');
-    }
-
     function updateExecutionInsights(metrics, superswarm, intelSummary, intelFeed, businessBrief, strategyOps) {
         const container = document.getElementById('execution-kpis');
         const narrative = document.getElementById('market-narrative');
@@ -2067,14 +1452,12 @@
         const executions = Number(superswarmSummary?.executions || ops?.executions || tradeStats?.today || 0);
         const regime = market?.regime_label || 'Undetermined';
         const vol = Number(market?.volatility_score || 0);
-        const equityBase = Number(scoreTotals?.equity_base_usd || 100);
         const netAfterFees = Number(
             operator?.kpis?.net_pnl_after_fees_usd
             ?? northStar?.net_pnl_after_fees
             ?? scoreTotals?.net_pnl_after_fees_usd
             ?? 0
         );
-        const netAfterFeesPct = equityBase > 0 ? (netAfterFees / equityBase) * 100 : 0;
         const drawdown = Number(operator?.kpis?.max_drawdown_pct ?? northStar?.max_drawdown_pct ?? scoreTotals?.max_drawdown_pct ?? 0);
         const rejectTax = Number(operator?.kpis?.reject_tax_pct ?? northStar?.reject_tax_pct ?? scoreTotals?.reject_tax_pct ?? 0);
         const fillRate = Number(operator?.kpis?.fill_rate_pct ?? northStar?.fill_rate_pct ?? scoreTotals?.fill_rate_pct ?? 0);
@@ -2091,20 +1474,15 @@
         const assessmentLabel = String(decision?.assessment_label || assessment?.label || '').toUpperCase();
         const decisionDiverged = Boolean(decision?.diverged);
 
-        const dayClass = netAfterFeesPct >= 0 ? 'up' : 'down';
+        const dayClass = netAfterFees >= 0 ? 'up' : 'down';
+        const signDay = netAfterFees >= 0 ? '+' : '';
         const signBest = Number(best?.change_24h || 0) >= 0 ? '+' : '';
         const signWorst = Number(worst?.change_24h || 0) >= 0 ? '+' : '';
-        const safeWhy = sanitizeTradeSensitive(operator?.why_this_matters_now || 'Operator brief pending sufficient attribution data.');
-        const laneScoreMap = {};
-        (Array.isArray(scorecard?.ranked) ? scorecard.ranked : []).forEach((row) => {
-            const key = `${String(row?.strategy || '').toLowerCase()}@${String(row?.timeframe || '').toLowerCase()}`;
-            laneScoreMap[key] = row;
-        });
 
         container.innerHTML = `
             <div class="execution-kpi">
                 <div class="k">Net PnL (After Fees)</div>
-                <div class="v ${dayClass}">${pctString(netAfterFeesPct)}</div>
+                <div class="v ${dayClass}">${signDay}$${Math.abs(netAfterFees).toFixed(2)}</div>
                 <div class="d">Action: ${netAfterFees >= 0 ? 'maintain capped scale' : 'reduce exposure'}</div>
             </div>
             <div class="execution-kpi">
@@ -2131,7 +1509,7 @@
                 <span class="operator-pill ${briefPillClass}">${goNoGo}</span>
                 <span class="execution-feed-meta">Confidence ${confidenceScore.toFixed(1)}/100 • Δ1h fill ${Number(deltas?.fill_rate_pct_1h || windows?.['1h']?.fill_rate_pct || 0).toFixed(1)}%</span>
             </div>
-            <div class="operator-why">${safeWhy}</div>
+            <div class="operator-why">${operator?.why_this_matters_now || 'Operator brief pending sufficient attribution data.'}</div>
             <div class="operator-list">
                 <div class="line"><strong>Decision Source:</strong> ${decisionSource}${decisionDiverged && assessmentLabel ? ` (assessment=${assessmentLabel})` : ''}</div>
                 <div class="line"><strong>Hard Blockers:</strong> ${blockers.length ? blockers.slice(0, 4).join(' | ') : 'none'}</div>
@@ -2148,21 +1526,14 @@
 
         laneDrilldown.innerHTML = laneRows.length
             ? laneRows.map((row) => {
-                const laneStrategy = String(row?.strategy || 'unknown');
-                const laneTimeframe = String(row?.timeframe || 'unknown');
-                const laneName = `${laneStrategy.toUpperCase()} @ ${laneTimeframe.toUpperCase()}`;
-                const laneKey = `${laneStrategy.toLowerCase()}@${laneTimeframe.toLowerCase()}`;
-                const laneScore = laneScoreMap[laneKey] || {};
-                const laneNetPct = Number(
-                    laneScore?.realized_net_return_pct
-                    ?? laneScore?.ev_adjusted_pct
-                    ?? 0
-                );
+                const laneName = `${String(row?.strategy || 'unknown').toUpperCase()} @ ${String(row?.timeframe || 'unknown').toUpperCase()}`;
+                const laneNet = Number(row?.net_pnl_after_fees_usd || 0);
+                const laneSign = laneNet >= 0 ? '+' : '';
                 return `
                     <div class="lane-row">
                         <div class="lane-row-head">
                             <span class="lane-row-name">${laneName}</span>
-                            <span class="lane-row-kpi">${pctString(laneNetPct)}</span>
+                            <span class="lane-row-kpi">${laneSign}$${Math.abs(laneNet).toFixed(3)}</span>
                         </div>
                         <div class="lane-row-detail">
                             fill ${Number(row?.fill_rate_pct || 0).toFixed(1)}% • reject ${Number(row?.reject_tax_pct || 0).toFixed(1)}% • hard fail ${Number(row?.hard_fail_pct || 0).toFixed(1)}% • samples ${Number(row?.sample_size || 0)}
@@ -2211,14 +1582,14 @@
 
         const riskState = String(briefSummary?.risk_state || 'stable').toUpperCase();
         const readiness = briefSummary?.readiness_ok === true ? 'PASS' : 'WATCH';
-        const briefOps = sanitizeTradeSensitive(briefNarrative?.operations || '');
+        const briefOps = briefNarrative?.operations || '';
         const qualityNarrative = execQuality >= 70 ? 'execution lane is stable' : 'execution quality needs optimization';
         context.innerHTML = `
             <strong>Operational context:</strong>
             Current regime is <strong>${regime}</strong> with execution quality at <strong>${execQuality.toFixed(1)}%</strong>.
             GO/NO-GO is <strong>${goNoGo}</strong>; lane fill is <strong>${fillRate.toFixed(1)}%</strong> with reject tax
             <strong>${rejectTax.toFixed(1)}%</strong>. Net after-fees PnL is
-            <strong class="${dayClass}">${pctString(netAfterFeesPct)}</strong>.
+            <strong class="${dayClass}">${signDay}$${Math.abs(netAfterFees).toFixed(2)}</strong>.
             Readiness <strong>${readiness}</strong>, risk posture <strong>${riskState}</strong>, and ${qualityNarrative}.
             ${briefOps ? `<br>${briefOps}` : ''}
         `;
@@ -2228,94 +1599,9 @@
         }
     }
 
-    function _abbrNum(value) {
-        const n = Number(value || 0);
-        if (!Number.isFinite(n)) return '--';
-        const abs = Math.abs(n);
-        if (abs >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}B`;
-        if (abs >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
-        if (abs >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-        return n.toFixed(0);
-    }
-
-    function _formatFreshness(seconds) {
-        const s = Number(seconds);
-        if (!Number.isFinite(s) || s < 0) return 'stale';
-        if (s < 60) return `${Math.round(s)}s ago`;
-        if (s < 3600) return `${Math.round(s / 60)}m ago`;
-        return `${Math.round(s / 3600)}h ago`;
-    }
-
-    function updateChainVelocity(zeitgeistUniverse) {
-        const strip = document.getElementById('chain-velocity-strip');
-        const badge = document.getElementById('radar-quality-badge');
-        if (!strip) return;
-
-        const rows = Array.isArray(zeitgeistUniverse?.chain_streams) ? zeitgeistUniverse.chain_streams : [];
-        const quality = (zeitgeistUniverse && typeof zeitgeistUniverse === 'object') ? (zeitgeistUniverse.quality || {}) : {};
-        const freshness = (quality && typeof quality === 'object' && quality.freshness_seconds) ? quality.freshness_seconds : {};
-        const degraded = Boolean(quality?.degraded);
-        const issueCount = Number(quality?.issue_count || 0);
-
-        if (badge) {
-            badge.className = `radar-quality-badge ${degraded ? 'degraded' : 'nominal'}`;
-            badge.textContent = degraded ? `DATA_DEGRADED_${Math.max(issueCount, 1)}` : 'DATA_NOMINAL';
-            const issues = Array.isArray(quality?.issues) ? quality.issues : [];
-            badge.title = issues.length ? issues.join(' | ') : 'Universe data quality nominal';
-        }
-
-        if (!rows.length) {
-            strip.innerHTML = '<div class="empty-state">No chain velocity streams available</div>';
-            return;
-        }
-
-        strip.innerHTML = rows.slice(0, 4).map((row) => {
-            const symbol = String(row?.symbol || 'UNK').toUpperCase();
-            const source = String(row?.source || 'unknown');
-            const available = Boolean(row?.available);
-            const isFiredancer = symbol === 'SOL-FD' || source.includes('firedancer');
-            const tps = Number(row?.tps || 0);
-            const tx24h = Number(row?.tx_24h || 0);
-            const blockS = Number(row?.avg_block_time_s || 0);
-            const marketChange = Number(row?.market_change_24h || 0);
-            const sign = marketChange >= 0 ? '+' : '';
-            const age = freshness ? freshness[symbol] : null;
-            if (!available) {
-                return `
-                    <div class="chain-velocity-card degraded">
-                        <div class="chain-velocity-head">
-                            <span class="chain-velocity-symbol">${symbol}</span>
-                            <span class="chain-velocity-tag">${isFiredancer ? 'FD' : 'RPC'}</span>
-                        </div>
-                        <div class="chain-velocity-kpi">
-                            <div class="line">stream <strong>offline</strong></div>
-                            <div class="line">${String(row?.error || 'unavailable').slice(0, 56)}</div>
-                        </div>
-                    </div>
-                `;
-            }
-            return `
-                <div class="chain-velocity-card">
-                    <div class="chain-velocity-head">
-                        <span class="chain-velocity-symbol">${symbol}</span>
-                        <span class="chain-velocity-tag">${isFiredancer ? 'FD' : 'RPC'}</span>
-                    </div>
-                    <div class="chain-velocity-kpi">
-                        <div class="line">tps <strong>${tps >= 100 ? tps.toFixed(0) : tps.toFixed(2)}</strong></div>
-                        <div class="line">24h tx <strong>${_abbrNum(tx24h)}</strong> • blk <strong>${blockS > 0 ? blockS.toFixed(blockS < 1 ? 3 : 2) : '--'}s</strong></div>
-                        <div class="line">mkt <strong>${sign}${marketChange.toFixed(2)}%</strong> • ${_formatFreshness(age)}</div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-    }
-
-    function updateRadar(status, superswarm, intelSummary, zeitgeistUniverse) {
+    function updateRadar(status) {
         if (window.radarInstance) {
             window.radarInstance.setServices(status.services || {});
-            window.radarInstance.setSuperswarm(superswarm || {});
-            window.radarInstance.setIntel(intelSummary || {});
-            window.radarInstance.setUniverse(zeitgeistUniverse || {});
         }
         document.getElementById('radar-timestamp').textContent =
             new Date().toLocaleTimeString('en-US', { hour12: false });
@@ -2325,7 +1611,9 @@
     async function loadActiveTrades() {
         if (!window.radarInstance) return;
         try {
-            const data = await window.platformApi.getTrades({ limit: 20 });
+            const resp = await fetch('/api/platform/trades?limit=20');
+            if (!resp.ok) return;
+            const data   = await resp.json();
             // Normalize response — handle {trades:[...]}, {executions:[...]}, or raw array
             const raw    = Array.isArray(data) ? data : (data.trades || data.executions || []);
             const trades = raw.map(t => ({
@@ -2339,7 +1627,7 @@
     // ── TradingView-style mini charts ─────────────────────────────────────
 
     function buildTVCharts(prices, symbols) {
-        const syms = (symbols || []).slice(0, 3);
+        const syms = (symbols || []).slice(0, 6);
         if (!syms.length) {
             return '<div class="empty-state">No tracked symbols available</div>';
         }
@@ -2411,7 +1699,7 @@
         ctx.beginPath();
         ctx.moveTo(P.l, P.t + plotH);
         ctx.lineTo(P.l + plotW, P.t + plotH);
-        ctx.strokeStyle = 'rgba(98, 255, 64, 0.12)';
+        ctx.strokeStyle = 'rgba(255,176,0,0.12)';
         ctx.lineWidth   = 0.5;
         ctx.stroke();
 
@@ -2419,7 +1707,7 @@
         ctx.beginPath();
         ctx.moveTo(P.l, P.t + plotH * 0.5);
         ctx.lineTo(P.l + plotW, P.t + plotH * 0.5);
-        ctx.strokeStyle = 'rgba(98, 255, 64, 0.06)';
+        ctx.strokeStyle = 'rgba(255,176,0,0.06)';
         ctx.stroke();
 
         // Smooth Bezier path points
@@ -2471,7 +1759,7 @@
         // Price range labels — top-right (high) and bottom-right (low)
         const fmtN = n => n >= 1000 ? '$' + Math.round(n).toLocaleString() : '$' + n.toFixed(2);
         ctx.font      = '7px "Courier New", monospace';
-        ctx.fillStyle = 'rgba(98, 255, 64, 0.50)';
+        ctx.fillStyle = 'rgba(255,176,0,0.50)';
         ctx.textAlign = 'right';
         ctx.fillText(fmtN(maxV), CW - P.r, P.t + 7);
         ctx.fillText(fmtN(minV), CW - P.r, P.t + plotH - 1);
@@ -2484,69 +1772,55 @@
     }
 
     function extractTrackedSymbols(data) {
-        const mainAssets = ['BTC', 'ETH', 'SOL'];
         const fromPayload = Array.isArray(data?.tracked_symbols) ? data.tracked_symbols : [];
         if (fromPayload.length) {
-            const normalized = fromPayload
+            return fromPayload
                 .map(s => String(s || '').toUpperCase())
                 .filter(Boolean);
-            const ordered = mainAssets.filter((sym) => normalized.includes(sym));
-            return ordered.length ? ordered : normalized.slice(0, 3);
         }
-        const keys = Object.keys(data || {})
+        return Object.keys(data || {})
             .filter(k => data[k] && typeof data[k] === 'object' && 'price' in data[k]);
-        const ordered = mainAssets.filter((sym) => keys.includes(sym));
-        return ordered.length ? ordered : keys.slice(0, 3);
     }
 
-    function renderMarketPanels(data) {
-        const container = document.getElementById('price-ticker');
-        const symbols = extractTrackedSymbols(data);
-        const marketData = {};
-        symbols.forEach(sym => { marketData[sym] = data[sym] || {}; });
-
-        const items = symbols.map(symbol => {
-            const priceData = marketData[symbol] || {};
-            const price = priceData.price ? `$${priceData.price.toLocaleString()}` : '--';
-            const change = priceData.change_24h || 0;
-            const changeClass = change >= 0 ? 'up' : 'down';
-            const changeSign = change >= 0 ? '+' : '';
-
-            return `
-                <div class="price-item">
-                    <span class="price-symbol">${symbol}/USD</span>
-                    <span class="price-value">${price}</span>
-                    <span class="price-change ${changeClass}">${changeSign}${change.toFixed(2)}%</span>
-                </div>
-            `;
-        }).join('');
-
-        container.innerHTML = items || '<div class="empty-state">No tracked symbols configured</div>';
-
-        // Inject TV-style chart cards and draw canvases on next frame
-        document.getElementById('price-chart').innerHTML = buildTVCharts(marketData, symbols);
-        requestAnimationFrame(drawAllTVCanvases);
-
-        // Feed live prices into the radar
-        if (window.radarInstance) {
-            window.radarInstance.setTrackedSymbols(symbols);
-            window.radarInstance.setMarket(marketData);
-        }
-    }
-
-    // Load market prices from canonical contracts
-    async function loadMarketPrices(preloadedMarketData = null) {
+    // Load market prices
+    async function loadMarketPrices() {
         try {
-            let market = preloadedMarketData;
-            if (!market || typeof market !== 'object' || !Object.keys(market).length) {
-                if (_dashboardDataCache?.marketData && Object.keys(_dashboardDataCache.marketData).length) {
-                    market = _dashboardDataCache.marketData;
-                } else {
-                    const metrics = await window.platformApi.getMetrics();
-                    market = metrics?.market || {};
-                }
+            const response = await fetch('/api/market/prices');
+            const data = await response.json();
+
+            const container = document.getElementById('price-ticker');
+            const symbols = extractTrackedSymbols(data);
+            const marketData = {};
+            symbols.forEach(sym => { marketData[sym] = data[sym] || {}; });
+
+            const items = symbols.map(symbol => {
+                const priceData = marketData[symbol] || {};
+                const price = priceData.price ? `$${priceData.price.toLocaleString()}` : '--';
+                const change = priceData.change_24h || 0;
+                const changeClass = change >= 0 ? 'up' : 'down';
+                const changeSign = change >= 0 ? '+' : '';
+                
+                return `
+                    <div class="price-item">
+                        <span class="price-symbol">${symbol}/USD</span>
+                        <span class="price-value">${price}</span>
+                        <span class="price-change ${changeClass}">${changeSign}${change.toFixed(2)}%</span>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = items || '<div class="empty-state">No tracked symbols configured</div>';
+
+            // Inject TV-style chart cards and draw canvases on next frame
+            document.getElementById('price-chart').innerHTML = buildTVCharts(marketData, symbols);
+            requestAnimationFrame(drawAllTVCanvases);
+
+            // Feed live prices into the radar
+            if (window.radarInstance) {
+                window.radarInstance.setTrackedSymbols(symbols);
+                window.radarInstance.setMarket(marketData);
             }
-            renderMarketPanels(market || {});
+
         } catch (e) {
             document.getElementById('price-ticker').innerHTML = '<div class="empty-state">Market feed offline</div>';
         }
@@ -2557,15 +1831,6 @@
     loadDashboard();
     loadMarketPrices();
     loadActiveTrades(); // Seed lock-on state on first paint
-    _setAssetHorizonUi(_assetTerminalHorizonHours);
-
-    document.querySelectorAll('#asset-horizon-toggle .horizon-btn').forEach((btn) => {
-        btn.addEventListener('click', () => {
-            _assetTerminalHorizonHours = Number(btn.dataset.hours || 24);
-            _setAssetHorizonUi(_assetTerminalHorizonHours);
-            _renderAssetTerminalFromCache();
-        });
-    });
 
     // Refresh every 30 seconds
     setInterval(loadDashboard,    30000);

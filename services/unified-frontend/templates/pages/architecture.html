@@ -320,88 +320,6 @@
     line-height: 1.45;
 }
 
-.blueprint-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--space-sm);
-}
-
-.sequence-card {
-    border: 1px solid var(--border-dim);
-    background: rgba(0, 0, 0, 0.28);
-    padding: 8px;
-}
-
-.sequence-name {
-    color: var(--amber);
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-}
-
-.sequence-purpose {
-    margin-top: 2px;
-    color: var(--text-muted);
-    font-size: 0.65rem;
-    line-height: 1.4;
-}
-
-.sequence-steps {
-    margin-top: 6px;
-    color: var(--text-secondary);
-    font-size: 0.66rem;
-    line-height: 1.45;
-}
-
-.dept-card {
-    border: 1px solid var(--border-dim);
-    background: rgba(255, 176, 0, 0.03);
-    padding: 8px;
-}
-
-.dept-name {
-    color: var(--text-primary);
-    font-family: var(--font-header);
-    font-size: 0.73rem;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-}
-
-.dept-meta {
-    margin-top: 4px;
-    color: var(--text-muted);
-    font-size: 0.65rem;
-    line-height: 1.45;
-}
-
-.gap-card {
-    border: 1px solid var(--border-dim);
-    background: rgba(0, 0, 0, 0.28);
-    padding: 8px;
-}
-
-.gap-card.high {
-    border-color: rgba(255, 86, 56, 0.6);
-}
-
-.gap-card.medium {
-    border-color: rgba(255, 176, 0, 0.45);
-}
-
-.gap-title {
-    color: var(--text-primary);
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-}
-
-.gap-detail {
-    margin-top: 3px;
-    color: var(--text-muted);
-    font-size: 0.65rem;
-    line-height: 1.45;
-}
-
 @media (max-width: 1200px) {
     .arch-kpis {
         grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -416,7 +334,6 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
     .lane-grid,
-    .blueprint-grid,
     .security-grid {
         grid-template-columns: 1fr;
     }
@@ -529,39 +446,6 @@
             <div class="side-title">Operational Brief</div>
             <div class="feed-list" id="brief-list">
                 <div class="loading">Synthesizing operational brief...</div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="panel" style="margin-top: var(--space-lg);">
-    <span class="panel-corner tl"></span>
-    <span class="panel-corner tr"></span>
-    <span class="panel-corner bl"></span>
-    <span class="panel-corner br"></span>
-    <div class="panel-header">
-        <div class="panel-title">Architecture_Blueprint_Live</div>
-        <span class="badge" id="blueprint-state">loading</span>
-    </div>
-    <div class="panel-body">
-        <div class="blueprint-grid">
-            <div class="side-panel">
-                <div class="side-title">Order_Of_Operations</div>
-                <div class="feed-list" id="sequence-list">
-                    <div class="loading">Building sequence model...</div>
-                </div>
-            </div>
-            <div class="side-panel">
-                <div class="side-title">Delegation_Map</div>
-                <div class="feed-list" id="delegation-list">
-                    <div class="loading">Loading duty ownership...</div>
-                </div>
-            </div>
-            <div class="side-panel">
-                <div class="side-title">Working_vs_Gaps</div>
-                <div class="feed-list" id="gaps-list">
-                    <div class="loading">Analyzing live gaps...</div>
-                </div>
             </div>
         </div>
     </div>
@@ -960,93 +844,6 @@
         `;
     }
 
-    function badgeClassForStatus(status) {
-        const s = String(status || '').toLowerCase();
-        if (s === 'healthy' || s === 'online' || s === 'ok') return 'ok';
-        if (s === 'degraded' || s === 'watch' || s === 'warning') return 'warn';
-        return '';
-    }
-
-    function updateLiveBlueprint(blueprint) {
-        const seqList = document.getElementById('sequence-list');
-        const delegationList = document.getElementById('delegation-list');
-        const gapsList = document.getElementById('gaps-list');
-        const stateBadge = document.getElementById('blueprint-state');
-        if (!seqList || !delegationList || !gapsList || !stateBadge) return;
-
-        if (!blueprint || typeof blueprint !== 'object') {
-            stateBadge.textContent = 'unavailable';
-            seqList.innerHTML = '<div class="empty-state">Blueprint model unavailable</div>';
-            delegationList.innerHTML = '<div class="empty-state">Delegation data unavailable</div>';
-            gapsList.innerHTML = '<div class="empty-state">Gap analysis unavailable</div>';
-            return;
-        }
-
-        const counts = blueprint.counts || {};
-        const health = blueprint.health || {};
-        const gaps = Array.isArray(blueprint.gaps) ? blueprint.gaps : [];
-        const hasGaps = gaps.length > 0;
-
-        stateBadge.classList.remove('online', 'warning');
-        stateBadge.classList.add(hasGaps ? 'warning' : 'online');
-        stateBadge.textContent = hasGaps
-            ? `watch • ${gaps.length} gaps`
-            : `healthy • ${Number(counts.nodes || 0)} nodes`;
-
-        const sequences = Array.isArray(blueprint.sequences) ? blueprint.sequences : [];
-        seqList.innerHTML = sequences.length ? sequences.map((seq) => {
-            const seqStatus = String(seq?.status || 'unknown').toUpperCase();
-            const steps = Array.isArray(seq?.steps) ? seq.steps : [];
-            const renderedSteps = steps.map((step) => {
-                const c = badgeClassForStatus(step?.status || (step?.healthy === false ? 'degraded' : 'healthy'));
-                return `<span class="${c}">${Number(step?.order || 0)}.${step?.node_label || step?.node_id || '--'}</span>`;
-            }).join(' → ');
-            return `
-                <div class="sequence-card">
-                    <div class="sequence-name">${seq?.name || seq?.id || 'Sequence'} • ${seqStatus}</div>
-                    <div class="sequence-purpose">${seq?.purpose || 'No purpose provided.'}</div>
-                    <div class="sequence-steps">${renderedSteps || 'No steps'}</div>
-                </div>
-            `;
-        }).join('') : '<div class="empty-state">No sequence model available</div>';
-
-        const delegation = Array.isArray(blueprint.delegation) ? blueprint.delegation : [];
-        delegationList.innerHTML = delegation.length ? delegation.map((dept) => `
-            <div class="dept-card">
-                <div class="dept-name">${dept?.department_name || dept?.department_id || 'Department'}</div>
-                <div class="dept-meta">${dept?.focus || '--'}</div>
-                <div class="dept-meta">Owned nodes: ${Number(dept?.healthy_nodes || 0)}/${Math.max(1, Number(dept?.total_nodes || 0))} healthy</div>
-                <div class="dept-meta">Systems: ${Array.isArray(dept?.systems) ? dept.systems.slice(0, 3).join(' • ') : '--'}</div>
-            </div>
-        `).join('') : '<div class="empty-state">No delegation model available</div>';
-
-        const working = Array.isArray(health.working_nodes) ? health.working_nodes : [];
-        const degraded = Array.isArray(health.degraded_nodes) ? health.degraded_nodes : [];
-        const gapCards = gaps.slice(0, 8).map((gap) => `
-            <div class="gap-card ${String(gap?.severity || '').toLowerCase()}">
-                <div class="gap-title">${String(gap?.type || 'gap').replace(/_/g, ' ').toUpperCase()}</div>
-                <div class="gap-detail">${gap?.message || 'No details available.'}</div>
-            </div>
-        `).join('');
-        gapsList.innerHTML = `
-            <div class="feed-item">
-                <div class="feed-top">
-                    <span class="feed-name">Working Nodes</span>
-                    <span class="feed-rate">${working.length}</span>
-                </div>
-                <div class="feed-detail">${working.map(publicLabel).slice(0, 6).join(' • ') || '--'}</div>
-            </div>
-            <div class="feed-item">
-                <div class="feed-top">
-                    <span class="feed-name">Degraded Nodes</span>
-                    <span class="feed-rate">${degraded.length}</span>
-                </div>
-                <div class="feed-detail">${degraded.map(publicLabel).slice(0, 6).join(' • ') || 'None'}</div>
-            </div>
-            ${gapCards || '<div class="empty-state">No active architecture gaps</div>'}
-        `;
-    }
-
     function renderNodePanel() {
         const blueprint = TOPOLOGY_BLUEPRINT[selectedNodeId];
         const runtime = (latestTelemetry?.nodes || []).find((n) => n.id === selectedNodeId) || {};
@@ -1078,10 +875,9 @@
 
     async function loadArchitecture() {
         try {
-            const [telemetry, brief, blueprint] = await Promise.all([
+            const [telemetry, brief] = await Promise.all([
                 window.platformApi.getArchitectureTelemetry({ hours: 6 }),
                 window.platformApi.getBusinessBrief({ hours: 24 }).catch(() => ({ summary: {}, narrative: {} })),
-                window.platformApi.getArchitectureLive({ hours: 24 }).catch(() => null),
             ]);
             latestTelemetry = telemetry;
             updateKpis(telemetry);
@@ -1089,7 +885,6 @@
             updatePipelines(telemetry);
             updateBottlenecks(telemetry);
             updateOperationalBrief(telemetry, brief);
-            updateLiveBlueprint(blueprint);
             drawEdges(telemetry);
 
             const nodeMap = {};

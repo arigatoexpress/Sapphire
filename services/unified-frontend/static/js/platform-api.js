@@ -83,17 +83,11 @@
     getIntelSummary(params) {
       return request(withParams('/api/platform/intel-summary', params));
     },
-    getZeitgeistUniverse(params) {
-      return request(withParams('/api/platform/zeitgeist-universe', params));
-    },
     getLibrarianContext(params) {
       return request(withParams('/api/platform/librarian-context', params));
     },
     getArchitectureTelemetry(params) {
       return request(withParams('/api/platform/architecture-telemetry', params));
-    },
-    getArchitectureLive(params) {
-      return request(withParams('/api/platform/architecture-live', params));
     },
     getSuperswarm(params) {
       return request(withParams('/api/platform/superswarm', params));
