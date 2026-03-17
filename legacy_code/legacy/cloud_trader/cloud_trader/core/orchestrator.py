@@ -1,0 +1,546 @@
+"""
+Sapphire V2 Trading Orchestrator
+Central coordinator for all trading operations.
+Replaces the monolithic TradingService with clean separation of concerns.
+"""
+
+import asyncio
+import logging
+import os
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
+
+from ..config import Settings
+from ..platform_router import ExecutionResult, PlatformRouter
+from .event_handler import EventHandler, MarketEventTypes, create_market_event
+from .state_manager import StateManager
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class OrchestratorConfig:
+    """Configuration for the trading orchestrator."""
+
+    enable_aster: bool = True
+    enable_lighter: bool = True
+    enable_jupiter: bool = False
+    sapphire_focused_mode: bool = True
+
+    max_concurrent_trades: int = 5
+    loop_interval_seconds: float = 60.0
+    paper_trading: bool = False
+    event_driven: bool = False  # CRITICAL: Must be False to run trading_loop.run_cycle()
+    market_event_subscription: str = "sapphire-market-events-sub"
+    signal_topic: str = "sapphire-signals"
+
+
+class TradingOrchestrator:
+    """
+    Central coordinator for the Sapphire trading system.
+
+    Responsibilities:
+    - Lifecycle management (start/stop)
+    - Component injection and coordination
+    - Event bus management
+    - Health monitoring
+
+    Does NOT contain:
+    - Trading logic (delegated to TradingLoop)
+    - Position management (delegated to PositionTracker)
+    - AI analysis (delegated to AgentOrchestrator)
+    """
+
+    def __init__(self, settings: Optional[Settings] = None):
+        self.settings = settings or Settings()
+        self.config = OrchestratorConfig(
+            enable_aster=self.settings.enable_aster,
+            enable_lighter=self.settings.enable_lighter,
+            enable_jupiter=(
+                False
+                if getattr(self.settings, "sapphire_focused_mode", True)
+                else getattr(self.settings, "enable_jupiter", True)
+            ),
+            sapphire_focused_mode=getattr(self.settings, "sapphire_focused_mode", True),
+            paper_trading=getattr(self.settings, "paper_trading", False),
+        )
+
+        # Core components (injected)
+        self.trading_loop = None
+        self.agent_orchestrator = None
+        self.position_tracker = None
+        self.platform_router = None
+        self.telegram_listener = None
+        self.news_monitor = None  # Telegram news/alpha monitor
+
+        # Platform Clients
+        self._exchange_client = None  # Aster
+        self.aster = None
+        self.hl_client = None  # Lighter
+        self.lighter_client = None  # Lighter
+        self.jupiter_client = None  # Jupiter
+
+        # Trade Verification
+        self.trade_verification = None
+
+        # State
+        self._running = False
+        self._task: Optional[asyncio.Task] = None
+        self._start_time: Optional[float] = None
+
+        # Event-Driven Components
+        self.state_manager = StateManager(namespace="sapphire")
+        self.event_handler = EventHandler()
+
+        logger.info("🚀 TradingOrchestrator initialized")
+
+    def _normalize_for_aster(self, symbol: str) -> str:
+        """Utility for platform router."""
+        if not self._exchange_client:
+            return symbol
+        return self._exchange_client._normalize_symbol(symbol)
+
+    async def start(self):
+        """Start the trading system."""
+        if self._running:
+            logger.warning("Orchestrator already running")
+            return
+
+        logger.info("🔥 Starting Sapphire V2 Trading System...")
+        self._running = True
+        self._start_time = asyncio.get_event_loop().time()
+
+        # Initialize components
+        await self._initialize_components()
+
+        # Start main loop or event listener
+        if self.config.event_driven:
+            await self._setup_event_handlers()
+            self._task = asyncio.create_task(self._run_event_driven())
+            logger.info("✅ Sapphire V2 Trading System ONLINE (Event-Driven Mode)")
+        else:
+            self._task = asyncio.create_task(self._run())
+            logger.info("✅ Sapphire V2 Trading System ONLINE (Polling Mode)")
+
+    async def stop(self):
+        """Gracefully stop the trading system."""
+        if not self._running:
+            return
+
+        logger.info("🛑 Stopping Sapphire V2...")
+        self._running = False
+
+        if self._task:
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+
+        # Cleanup components
+        await self._cleanup_components()
+
+        # Stop event handler
+        await self.event_handler.stop_listening()
+
+        # Stop Telegram listener
+        if self.telegram_listener:
+            await self.telegram_listener.stop()
+
+        # Stop News Monitor
+        if self.news_monitor:
+            await self.news_monitor.stop()
+
+        logger.info("✅ Sapphire V2 stopped gracefully")
+
+    async def _initialize_components(self):
+        """Initialize all trading components."""
+        import time
+
+        start_time = time.time()
+        logger.info("⏱️ [INIT] Starting component initialization...")
+
+        # 0. API Credentials & Platform Clients
+        from ..credentials import load_credentials
+        from ..aster_client import AsterClient
+        from ..exchange import AsterClient
+        from ..aster_client import AsterClient
+
+        step_start = time.time()
+        creds = load_credentials()
+        logger.info(f"⏱️ [INIT] Credentials loaded in {time.time() - step_start:.2f}s")
+
+        # Inject ALL secrets into settings for global reuse
+        if creds.telegram_bot_token:
+            self.settings.telegram_bot_token = creds.telegram_bot_token
+        if creds.telegram_chat_id:
+            self.settings.telegram_chat_id = creds.telegram_chat_id
+        if creds.solana_private_key:
+            self.settings.solana_private_key = creds.solana_private_key
+        # Use Vertex AI API key (Gemini API) - prioritize vertex_api_key, fallback to gemini_api_key
+        if creds.vertex_api_key:
+            self.settings.gemini_api_key = creds.vertex_api_key
+            logger.info("🤖 Using Vertex AI API key for Gemini models")
+        elif creds.gemini_api_key:
+            self.settings.gemini_api_key = creds.gemini_api_key
+            logger.info("🤖 Using Gemini API key")
+        if creds.aster_api_key:
+            self.settings.aster_api_key = creds.aster_api_key
+
+        logger.info("🔑 All API credentials loaded from GCP Secret Manager")
+
+        # Initialize Aster (only if enabled)
+        step_start = time.time()
+        if self.config.enable_aster:
+            self._exchange_client = AsterClient(credentials=creds, base_url=self.settings.rest_base_url)
+            logger.info(f"🔌 Aster Client Initialized in {time.time() - step_start:.2f}s")
+        else:
+            logger.info("ℹ️ Aster disabled, skipping initialization")
+
+        # Initialize Aster
+        step_start = time.time()
+        if self.config.enable_aster:
+            self.aster = AsterClient(rpc_url=self.settings.solana_rpc_url)
+            await self.aster.initialize()
+            logger.info(f"🔌 Aster Client Initialized in {time.time() - step_start:.2f}s")
+        else:
+            logger.info("ℹ️ Aster disabled, skipping initialization")
+
+        # Initialize Aster
+        step_start = time.time()
+        if self.config.enable_aster:
+            self.aster = AsterClient()
+            logger.info(f"🔌 Aster Client Initialized in {time.time() - step_start:.2f}s")
+            # Ensure agents are registered on Aster (skip during startup - do lazy)
+            # This can be slow, so we'll do it on first trade attempt instead
+            logger.info("ℹ️ Aster agent registration deferred to first trade (lazy init)")
+        else:
+            logger.info("ℹ️ Aster disabled, skipping initialization")
+
+        # Initialize Lighter (only if enabled AND credentials exist)
+        step_start = time.time()
+        if self.config.enable_lighter and creds.hl_private_key and creds.hl_account_address:
+            try:
+                from ..v2.lighter_client import LighterClient
+                self.hl_client = LighterClient(
+                    private_key=creds.hl_private_key,
+                    wallet_address=creds.hl_account_address,
+                )
+                await self.hl_client.initialize()
+                logger.info(f"🔌 Lighter Client Initialized in {time.time() - step_start:.2f}s")
+            except Exception as e:
+                logger.warning(f"⚠️ Lighter initialization failed in {time.time() - step_start:.2f}s: {e}")
+                self.hl_client = None
+        else:
+            if not self.config.enable_lighter:
+                logger.info("ℹ️ Lighter disabled, skipping initialization")
+            else:
+                logger.info("ℹ️ Lighter credentials not found, skipping initialization")
+
+        # Initialize Lighter (only if enabled AND credentials exist)
+        step_start = time.time()
+        if self.config.enable_lighter and creds.lighter_pub_key and creds.lighter_priv_key:
+            try:
+                from ..v2.lighter_client import LighterClient
+                self.lighter_client = LighterClient(
+                    pub_key=creds.lighter_pub_key,
+                    priv_key=creds.lighter_priv_key,
+                )
+                await self.lighter_client.initialize()
+                logger.info(f"🔌 Lighter Client Initialized in {time.time() - step_start:.2f}s")
+            except Exception as e:
+                logger.warning(f"⚠️ Lighter initialization failed in {time.time() - step_start:.2f}s: {e}")
+                self.lighter_client = None
+        else:
+            if not self.config.enable_lighter:
+                logger.info("ℹ️ Lighter disabled, skipping initialization")
+            else:
+                logger.info("ℹ️ Lighter credentials not found, skipping initialization")
+
+        # Initialize Jupiter (disabled by default in Sapphire focused mode)
+        step_start = time.time()
+        if self.config.sapphire_focused_mode:
+            logger.info("ℹ️ Sapphire focused mode active: Jupiter initialization disabled")
+        elif self.config.enable_jupiter and creds.jupiter_api_key and creds.solana_private_key:
+            try:
+                from ..jupiter_trader_unified import JupiterTraderUnified
+                logger.info("⏱️ [INIT] Starting Jupiter client initialization...")
+                self.jupiter_client = JupiterTraderUnified(
+                    api_key=creds.jupiter_api_key,
+                    private_key_b58=creds.solana_private_key,
+                    telegram_bot_token=creds.telegram_bot_token,
+                    telegram_chat_id=creds.telegram_chat_id,
+                    capital_usd=self.settings.total_capital_usd if hasattr(self.settings, 'total_capital_usd') else 50.0,
+                    enable_hft_strategy=False,  # Enable later when ready
+                )
+                await self.jupiter_client.start()
+                logger.info(f"🔌 Jupiter Client Initialized in {time.time() - step_start:.2f}s")
+            except Exception as e:
+                logger.warning(f"⚠️ Jupiter initialization failed in {time.time() - step_start:.2f}s: {e}")
+                self.jupiter_client = None
+        else:
+            if not self.config.enable_jupiter:
+                logger.info("ℹ️ Jupiter disabled, skipping initialization")
+            else:
+                logger.info("ℹ️ Jupiter credentials not found, skipping initialization")
+
+        # Initialize Trade Verification Service (for blockchain trades)
+        step_start = time.time()
+        try:
+            from ..trade_verification import TradeVerificationService
+            self.trade_verification = TradeVerificationService(
+                solana_rpc_url=self.settings.solana_rpc_url,
+                verification_timeout=30,
+            )
+            logger.info(f"🔌 Trade Verification Service Initialized in {time.time() - step_start:.2f}s")
+        except Exception as e:
+            logger.warning(f"⚠️ Trade Verification initialization failed in {time.time() - step_start:.2f}s: {e}")
+            self.trade_verification = None
+
+        # 1. Monitoring Service (First modular service)
+        step_start = time.time()
+        from ..agents.agent_orchestrator import AgentOrchestrator
+        from ..execution.position_tracker import PositionTracker
+        from .monitoring import MonitoringService
+        from .trading_loop import TradingLoop
+
+        self.monitoring = MonitoringService(self.settings)
+        await self.monitoring.start()
+        logger.info(f"⏱️ [INIT] Monitoring Service started in {time.time() - step_start:.2f}s")
+
+        # 2. Telegram Listener (DISABLED - Using MonitoringService for notifications only)
+        # Prevents HTTP 409 conflict with Telegram Bot API (can't have multiple polling instances)
+        logger.info("ℹ️ Telegram Listener disabled - using MonitoringService for notifications only")
+
+        # 2a. Platform Router
+        step_start = time.time()
+        self.platform_router = PlatformRouter(self)
+        logger.info(f"⏱️ [INIT] Platform Router created in {time.time() - step_start:.2f}s")
+
+        # 3. Position Tracker
+        step_start = time.time()
+        self.position_tracker = PositionTracker(self.platform_router)
+        self.monitoring.set_position_tracker(self.position_tracker)
+        logger.info(f"⏱️ [INIT] Position Tracker created in {time.time() - step_start:.2f}s")
+
+        # 4. Agent Orchestrator (manages all AI agents)
+        step_start = time.time()
+        self.agent_orchestrator = AgentOrchestrator(monitoring=self.monitoring)
+        logger.info(f"⏱️ [INIT] Agent Orchestrator created in {time.time() - step_start:.2f}s")
+
+        # 5. Trading Loop
+        step_start = time.time()
+        self.trading_loop = TradingLoop(
+            orchestrator=self,
+            agents=self.agent_orchestrator,
+            positions=self.position_tracker,
+            router=self.platform_router,
+            monitoring=self.monitoring,
+        )
+        logger.info(f"⏱️ [INIT] Trading Loop created in {time.time() - step_start:.2f}s")
+
+        # 6. Telegram News Monitor (optional - only if configured)
+        step_start = time.time()
+        enable_news_monitor = os.getenv("ENABLE_NEWS_MONITOR", "false").lower() == "true"
+        if enable_news_monitor:
+            try:
+                from ..news_trading_integration import create_news_trading_integration
+
+                # Create callback to forward news insights to trading agents
+                async def on_news_insight(insight):
+                    """Forward news insight to trading agents"""
+                    logger.info(
+                        f"📰 NEWS ALERT: {insight.affected_tokens} | "
+                        f"{insight.sentiment} | {insight.suggested_action} | "
+                        f"urgency={insight.urgency} | confidence={insight.confidence:.0%}"
+                    )
+                    # TODO: Forward to agent_orchestrator for trading decisions
+                    # For now, just log the insight
+
+                self.news_monitor = create_news_trading_integration(trading_callback=on_news_insight)
+                await self.news_monitor.start()
+                logger.info(f"⏱️ [INIT] News Monitor started in {time.time() - step_start:.2f}s")
+            except Exception as e:
+                logger.warning(f"⚠️ News Monitor initialization failed: {e}")
+                self.news_monitor = None
+        else:
+            logger.info("ℹ️ News Monitor disabled (set ENABLE_NEWS_MONITOR=true to enable)")
+
+        total_time = time.time() - start_time
+        logger.info(f"✅ All components initialized in {total_time:.2f}s total")
+
+        # Warm up precision cache for all platforms (prevents runtime errors)
+        try:
+            from ..precision_normalizer import get_precision_normalizer
+            normalizer = get_precision_normalizer()
+
+            # Get all symbols being traded
+            symbols_to_warm = set(self.settings.symbols)  # Default symbols
+
+            # Warm cache for all platforms
+            logger.info(f"🔥 Warming precision cache for {len(symbols_to_warm)} symbols...")
+            await normalizer.warm_cache(list(symbols_to_warm), "aster")
+            if self.config.enable_lighter and self.hl_client:
+                await normalizer.warm_cache(list(symbols_to_warm), "lighter")
+            logger.info("✅ Precision cache warmed")
+        except Exception as e:
+            logger.warning(f"⚠️ Precision cache warmup failed (non-critical): {e}")
+
+        # Restore state from Redis
+        saved_state = self.state_manager.load_orchestrator_state()
+        if saved_state:
+            logger.info(f"🔄 Restored state from Redis: {len(saved_state)} keys")
+            # Rehydrate positions if available
+            if self.position_tracker and "positions" in saved_state:
+                for symbol, pos in saved_state.get("positions", {}).items():
+                    self.position_tracker._positions[symbol] = pos
+
+    async def _cleanup_components(self):
+        """Cleanup all components."""
+        if self.trading_loop:
+            await self.trading_loop.stop()
+        if self.agent_orchestrator:
+            await self.agent_orchestrator.stop()
+
+    async def _run(self):
+        """Main orchestration loop."""
+        logger.info(f"🔄 [ORCHESTRATOR] Starting main loop (interval={self.config.loop_interval_seconds}s)")
+        cycle_count = 0
+        while self._running:
+            try:
+                cycle_count += 1
+                logger.info(f"🔄 [ORCHESTRATOR] Cycle {cycle_count} starting...")
+
+                # Delegate to trading loop
+                await self.trading_loop.run_cycle()
+
+                logger.info(f"✅ [ORCHESTRATOR] Cycle {cycle_count} complete, sleeping {self.config.loop_interval_seconds}s")
+                # Wait for next cycle
+                await asyncio.sleep(self.config.loop_interval_seconds)
+
+            except asyncio.CancelledError:
+                logger.warning(f"⚠️ [ORCHESTRATOR] Loop cancelled")
+                break
+            except Exception as e:
+                logger.error(f"❌ Orchestrator error: {e}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                await asyncio.sleep(5)  # Brief pause before retry
+
+    async def _setup_event_handlers(self):
+        """Register event handlers for Pub/Sub."""
+        # Register market event handler
+        self.event_handler.subscribe(
+            self.config.market_event_subscription, self._handle_market_event
+        )
+
+        # Start listening
+        await self.event_handler.start_listening()
+        logger.info("📡 Event handlers registered")
+
+    async def _run_event_driven(self):
+        """Event-driven main loop (replaces polling)."""
+        logger.info("🎯 Running in event-driven mode (no polling)")
+
+        while self._running:
+            try:
+                # Periodic state persistence (every 30s)
+                await asyncio.sleep(30)
+                await self._persist_state()
+
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"❌ Event-driven loop error: {e}")
+                await asyncio.sleep(5)
+
+    async def _handle_market_event(self, event: Dict[str, Any]):
+        """
+        Handle incoming market events from Pub/Sub.
+        This replaces the polling loop with reactive execution.
+        """
+        event_type = event.get("type")
+        symbol = event.get("symbol")
+        data = event.get("data", {})
+
+        logger.info(f"⚡ Received event: {event_type} for {symbol}")
+
+        try:
+            if event_type == MarketEventTypes.PRICE_UPDATE:
+                # Price update -> Check for trading signals
+                if self.trading_loop:
+                    await self.trading_loop.handle_price_update(symbol, data)
+
+            elif event_type == MarketEventTypes.SIGNAL_GENERATED:
+                # AI signal -> Execute trade
+                if self.trading_loop:
+                    await self.trading_loop.execute_signal(symbol, data)
+
+            elif event_type == MarketEventTypes.ORDER_FILL:
+                # Order filled -> Update positions
+                if self.position_tracker:
+                    await self.position_tracker.handle_fill(data)
+
+            elif event_type == MarketEventTypes.LIQUIDATION_RISK:
+                # Risk alert -> Emergency action
+                logger.warning(f"🚨 Liquidation risk for {symbol}!")
+                # TODO: Implement emergency close
+
+            # Persist state after handling event
+            await self._persist_state()
+
+        except Exception as e:
+            logger.error(f"❌ Event handler error for {event_type}: {e}")
+
+    async def _persist_state(self):
+        """Persist current state to Redis."""
+        try:
+            state = {
+                "running": self._running,
+                "timestamp": asyncio.get_event_loop().time(),
+            }
+
+            # Include positions if available
+            if self.position_tracker:
+                state["positions"] = {
+                    k: v.__dict__ if hasattr(v, "__dict__") else v
+                    for k, v in self.position_tracker._positions.items()
+                }
+
+            self.state_manager.save_orchestrator_state(state)
+            logger.debug("💾 State persisted to Redis")
+
+        except Exception as e:
+            logger.warning(f"⚠️ State persistence failed: {e}")
+
+    async def publish_signal(self, symbol: str, signal: str, confidence: float):
+        """Publish a trading signal to Pub/Sub."""
+        event = create_market_event(
+            MarketEventTypes.SIGNAL_GENERATED, symbol, {"signal": signal, "confidence": confidence}
+        )
+        await self.event_handler.publish(self.config.signal_topic, event)
+
+    def get_status(self) -> Dict[str, Any]:
+        """Get current system status."""
+        uptime = 0
+        if self._start_time:
+            uptime = asyncio.get_event_loop().time() - self._start_time
+
+        return {
+            "running": self._running,
+            "uptime_seconds": uptime,
+            "config": {
+                "enable_aster": self.config.enable_aster,
+                "enable_aster": self.config.enable_aster,
+                "enable_aster": self.config.enable_aster,
+                "enable_lighter": self.config.enable_lighter,
+                "enable_lighter": self.config.enable_lighter,
+                "paper_trading": self.config.paper_trading,
+            },
+            "components": {
+                "trading_loop": self.trading_loop is not None,
+                "agent_orchestrator": self.agent_orchestrator is not None,
+                "position_tracker": self.position_tracker is not None,
+                "platform_router": self.platform_router is not None,
+            },
+        }

@@ -1,0 +1,46 @@
+# Jupiter Bot Dependencies (Solana)
+# Clean REST API integration - no SDK dependency hell!
+
+# Official Jupiter Python SDK (latest)
+jup-python-sdk>=0.1.0
+
+# Solana libraries (compatible versions)
+solana==0.34.2
+solders==0.21.0
+base58>=2.1.0
+
+# HTTP client
+httpx>=0.23.0
+aiohttp>=3.9.0
+
+# Google Cloud for Sapphire integration
+google-cloud-pubsub>=2.18.0
+google-cloud-firestore>=2.14.0
+
+# Utilities
+python-dotenv>=1.0.0
+loguru>=0.7.0
+
+# Data handling
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Technical Analysis - COMPREHENSIVE SUITE
+ta-lib>=0.4.0  # Technical Analysis Library (needs system install: brew install ta-lib)
+pandas-ta>=0.3.14b  # Pandas Technical Analysis
+finta>=1.3  # Financial Technical Analysis
+tulipy>=0.4.0  # Tulip Indicators
+stockstats>=0.6.2  # Stock Statistics
+btalib>=1.0.0  # BackTrader Technical Analysis Library
+
+# Machine Learning for HFT
+scikit-learn>=1.3.0
+xgboost>=2.0.0
+lightgbm>=4.0.0
+
+# Statistical Analysis
+scipy>=1.11.0
+statsmodels>=0.14.0
+
+# Performance
+numba>=0.58.0  # JIT compilation for speed

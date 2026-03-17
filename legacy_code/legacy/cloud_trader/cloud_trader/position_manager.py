@@ -1,0 +1,410 @@
+import asyncio
+import logging
+import time
+from decimal import ROUND_DOWN, Decimal
+from typing import Any, Dict, List, Optional, Tuple
+
+from .definitions import SYMBOL_CONFIG, MinimalAgentState
+from .exchange import OrderType
+
+logger = logging.getLogger(__name__)
+
+
+class PositionManager:
+    """
+    Manages open positions, including syncing with exchange,
+    monitoring for TP/SL, and tracking state.
+    """
+
+    def __init__(self, exchange_client, agent_states: Dict[str, MinimalAgentState]):
+        self.exchange_client = exchange_client
+        self.agent_states = agent_states
+        self.open_positions: Dict[str, Dict[str, Any]] = {}
+        self._tpsl_placed: set = set()  # Track which symbols have TP/SL already placed
+        self._symbol_precision_cache: Dict[str, int] = {}  # Cache price precision
+
+    async def _round_price(self, symbol: str, price: float) -> str:
+        """Round price to tickSize and return formatted string."""
+        try:
+            filters = await self.exchange_client.get_symbol_filters(symbol)
+            tick_size = filters.get("tick_size", Decimal("0.01"))
+            price_precision = filters.get("price_precision", 2)
+
+            price_dec = Decimal(str(price))
+            rounded = (price_dec / tick_size).quantize(
+                Decimal("1"), rounding=ROUND_DOWN
+            ) * tick_size
+
+            # Format with exact decimal places
+            format_str = f"{{:.{price_precision}f}}"
+            return format_str.format(float(rounded))
+        except Exception as e:
+            logger.warning(f"Price rounding failed for {symbol}: {e}")
+            return f"{price:.2f}"
+
+    async def _round_quantity(self, symbol: str, quantity: float) -> str:
+        """Round quantity to stepSize and return formatted string."""
+        try:
+            filters = await self.exchange_client.get_symbol_filters(symbol)
+            step_size = filters.get("step_size", Decimal("0.001"))
+            min_qty = filters.get("min_qty", Decimal("0.001"))
+            quantity_precision = filters.get("quantity_precision", 3)
+
+            qty_dec = Decimal(str(quantity))
+
+            # Floor to step_size
+            rounded = (qty_dec / step_size).quantize(Decimal("1"), rounding=ROUND_DOWN) * step_size
+
+            # Ensure at least min_qty
+            if rounded < min_qty and quantity > 0:
+                rounded = min_qty
+
+            # Format with exact decimal places
+            format_str = f"{{:.{quantity_precision}f}}"
+            result = format_str.format(float(rounded))
+            return result
+        except Exception as e:
+            logger.warning(f"Quantity rounding failed for {symbol}: {e}")
+            return f"{quantity:.3f}"
+
+    async def sync_from_exchange(self):
+        """Sync positions from exchange to inherit existing positions on startup."""
+        try:
+            logger.info("🔍 Scanning exchange for existing positions to takeover...")
+            # Try to get open positions from the exchange
+            response = await self.exchange_client.get_position_risk()
+
+            if not response:
+                logger.info("✅ No existing positions found on exchange")
+                return
+
+            # Parse and load positions
+            for pos in response:
+                symbol = pos.get("symbol")
+                if not symbol:
+                    continue
+
+                # Skip empty positions (Ghost positions)
+                amt = float(pos.get("positionAmt", 0))
+                if amt == 0:
+                    continue
+
+                # Store position in our tracking
+                # Assign to default agent if not tracked
+                # Use Strategy Optimization Agent or first available
+                agent = (
+                    self.agent_states.get("strategy-optimization-agent")
+                    or list(self.agent_states.values())[0]
+                )
+
+                # Store position in our tracking
+                # Compute actual side from quantity sign (Aster hedge mode)
+                raw_quantity = float(pos.get("positionAmt", 0))
+                actual_side = "BUY" if raw_quantity > 0 else "SELL"
+
+                # Store position in our tracking
+                # Compute actual side from quantity sign (Aster hedge mode)
+                raw_quantity = float(pos.get("positionAmt", 0))
+                actual_side = "BUY" if raw_quantity > 0 else "SELL"
+
+                # Round prices for inherited sync
+                entry_price = float(pos.get("entryPrice", 0))
+                tp_price = await self._round_price(symbol, entry_price * 1.05)
+                sl_price = await self._round_price(symbol, entry_price * 0.95)
+
+                self.open_positions[symbol] = {
+                    "symbol": symbol,
+                    "side": actual_side,  # Use computed side, not 'BOTH'
+                    "quantity": abs(raw_quantity),  # Always store positive quantity
+                    "entry_price": entry_price,
+                    "unrealized_pnl": float(pos.get("unrealizedProfit", 0)),
+                    "leverage": int(pos.get("leverage", 1)),
+                    "agent": agent,
+                    "agent_id": agent.id,
+                    "tp_price": tp_price,
+                    "sl_price": sl_price,
+                    "actual_side": actual_side,  # Explicit tracking
+                }
+                logger.info(
+                    f"   ✅ Inheriting {symbol}: {actual_side} {abs(raw_quantity)} @ {entry_price} (TP={tp_price}, SL={sl_price})"
+                )
+
+            logger.info(f"✅ Sync complete: Inherited {len(self.open_positions)} positions")
+
+            # NATIVE TP/SL: Place orders for ALL inherited positions
+            # This ensures risk is managed even if bot goes offline
+            if self.open_positions:
+                logger.info(
+                    f"🛡️ Placing native TP/SL for {len(self.open_positions)} inherited positions..."
+                )
+                for symbol, pos in self.open_positions.items():
+                    try:
+                        entry_price = pos["entry_price"]
+                        side = pos["side"]
+                        quantity = abs(pos["quantity"])
+
+                        # Determine side from quantity sign if side is ambiguous
+                        if side == "BOTH":
+                            side = "BUY" if pos["quantity"] > 0 else "SELL"
+
+                        if entry_price > 0 and quantity > 0:
+                            # Only place TP/SL if not already placed for this symbol
+                            if symbol not in self._tpsl_placed:
+                                await self.place_tpsl_orders(
+                                    symbol=symbol,
+                                    entry_price=entry_price,
+                                    side=side,
+                                    quantity=quantity,
+                                    tp_pct=0.05,  # 5% TP
+                                    sl_pct=0.03,  # 3% SL
+                                )
+                    except Exception as tpsl_err:
+                        logger.warning(f"⚠️ Failed to place native TP/SL for inherited {symbol}: {tpsl_err}")
+
+                logger.info(f"✅ Native TP/SL setup complete for inherited positions")
+
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to sync open positions from exchange: {e}")
+
+    async def monitor_positions(self) -> Dict[str, Any]:
+        """Monitor open positions for TP/SL hits and return current ticker map."""
+        ticker_map = {}
+        try:
+            # Always fetch all tickers in SYMBOL_CONFIG to support both monitoring AND new trade analysis
+            # This acts as a cache for this tick
+            symbols_to_fetch = list(SYMBOL_CONFIG.keys())
+            tasks = [self.exchange_client.get_ticker(sym) for sym in symbols_to_fetch]
+            tickers = await asyncio.gather(*tasks, return_exceptions=True)
+
+            for sym, res in zip(symbols_to_fetch, tickers):
+                if isinstance(res, dict):
+                    ticker_map[sym] = res
+                else:
+                    # print(f"⚠️ Failed to fetch ticker for {sym}: {res}")
+                    pass
+
+        except Exception as e:
+            logger.warning(f"⚠️ Error fetching batched tickers: {e}")
+            return {}
+
+        if not self.open_positions:
+            return ticker_map
+
+        symbols_to_check = list(self.open_positions.keys())
+        for symbol in symbols_to_check:
+            if symbol not in ticker_map:
+                continue
+
+            pos = self.open_positions[symbol]
+            agent = pos["agent"]
+            ticker = ticker_map[symbol]
+
+            try:
+                current_price = float(ticker.get("lastPrice", 0))
+
+                if current_price <= 0:
+                    continue
+
+                # Update current price in position for dashboard
+                pos["current_price"] = current_price
+
+                # Check TP/SL logic is handled by the caller or we can return signals here
+                # For now, we just return the ticker map and let the service handle the actual closing logic
+                # using check_profit_taking helper.
+
+                # Ideally, we should move the trailing stop logic here too.
+                self._update_trailing_stop(symbol, pos, current_price, agent)
+
+            except Exception as e:
+                logger.warning(f"⚠️ Error monitoring position {symbol}: {e}")
+
+        return ticker_map
+
+    def _update_trailing_stop(
+        self, symbol: str, pos: Dict[str, Any], current_price: float, agent: MinimalAgentState
+    ):
+        """Internal helper to update trailing stops."""
+        try:
+            if pos["side"] == "BUY":
+                pnl_pct = (current_price - pos["entry_price"]) / pos["entry_price"]
+
+                # 1. Move to Break Even if > 1.5% profit
+                if pnl_pct > 0.015 and pos["sl_price"] < pos["entry_price"]:
+                    pos["sl_price"] = pos["entry_price"] * 1.002  # BE + small profit
+                    logger.info(f"🛡️ Trailing Stop Updated for {symbol} (Long): Moved to Break Even")
+
+                # 2. Lock in Profit if > 3% profit
+                elif pnl_pct > 0.03 and pos["sl_price"] < (pos["entry_price"] * 1.015):
+                    pos["sl_price"] = pos["entry_price"] * 1.015  # Lock 1.5%
+                    logger.info(f"🔒 Trailing Stop Updated for {symbol} (Long): Locked 1.5% Profit")
+
+            elif pos["side"] == "SELL":
+                pnl_pct = (pos["entry_price"] - current_price) / pos["entry_price"]
+
+                # 1. Move to Break Even if > 1.5% profit
+                if pnl_pct > 0.015 and pos["sl_price"] > pos["entry_price"]:
+                    pos["sl_price"] = pos["entry_price"] * 0.998  # BE + small profit
+                    logger.info(f"🛡️ Trailing Stop Updated for {symbol} (Short): Moved to Break Even")
+
+                # 2. Lock in Profit if > 3% profit
+                elif pnl_pct > 0.03 and pos["sl_price"] > (pos["entry_price"] * 0.985):
+                    pos["sl_price"] = pos["entry_price"] * 0.985  # Lock 1.5%
+                    logger.info(f"🔒 Trailing Stop Updated for {symbol} (Short): Locked 1.5% Profit")
+        except Exception as e:
+            logger.warning(f"⚠️ Error updating trailing stop for {symbol}: {e}")
+
+    async def update_sl_on_exchange(self, symbol: str, sl_price: float, side: str, quantity: float):
+        """
+        Syncs the internal Stop Loss price with the exchange by placing/updating a STOP_MARKET order.
+        This ensures risk is managed even if the bot goes offline.
+        """
+        try:
+            # Round price to symbol's precision to avoid -1111 error
+            rounded_sl = await self._round_price(symbol, sl_price)
+
+            # Determine order side (Closing logic)
+            order_side = "SELL" if side == "BUY" else "BUY"
+
+            # Round quantity to symbol's step size
+            rounded_qty = await self._round_quantity(symbol, abs(quantity))
+
+            # Place STOP_MARKET order
+            logger.info(f"🛡️ Syncing Hard Stop for {symbol}: {order_side} {rounded_qty} @ {rounded_sl}")
+            await self.exchange_client.place_order(
+                symbol=symbol,
+                side=order_side,
+                order_type=OrderType.STOP_MARKET,
+                quantity=rounded_qty,
+                stop_price=rounded_sl,
+                reduce_only=True,
+            )
+            logger.info(f"✅ NATIVE SL ORDER PLACED: {symbol} @ {rounded_sl}")
+
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to sync SL to exchange for {symbol}: {e}")
+
+    async def update_tp_on_exchange(self, symbol: str, tp_price: float, side: str, quantity: float):
+        """
+        Places a TAKE_PROFIT_MARKET order on the exchange.
+        This ensures profits are captured even if the bot goes offline.
+        """
+        try:
+            # Round price to symbol's precision to avoid -1111 error
+            rounded_tp = await self._round_price(symbol, tp_price)
+
+            # Determine order side (Closing logic)
+            order_side = "SELL" if side == "BUY" else "BUY"
+
+            # Round quantity to symbol's step size
+            rounded_qty = await self._round_quantity(symbol, abs(quantity))
+
+            # Place TAKE_PROFIT_MARKET order
+            logger.info(f"💰 Syncing Take Profit for {symbol}: {order_side} {rounded_qty} @ {rounded_tp}")
+            await self.exchange_client.place_order(
+                symbol=symbol,
+                side=order_side,
+                order_type=OrderType.TAKE_PROFIT_MARKET,
+                quantity=rounded_qty,
+                stop_price=rounded_tp,
+                reduce_only=True,
+            )
+            logger.info(f"✅ NATIVE TP ORDER PLACED: {symbol} @ {rounded_tp}")
+
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to sync TP to exchange for {symbol}: {e}")
+
+    async def place_tpsl_orders(
+        self,
+        symbol: str,
+        entry_price: float,
+        side: str,
+        quantity: float,
+        tp_pct: float = 0.05,  # Default 5% TP
+        sl_pct: float = 0.03,  # Default 3% SL
+    ):
+        """
+        Place both TP and SL orders on the exchange after position entry.
+        This is the main method to call after opening a new position.
+        """
+        try:
+            # Cancel any existing orders for this symbol first
+            await self.exchange_client.cancel_all_orders(symbol)
+
+            # Calculate TP/SL prices based on side
+            if side == "BUY":  # Long position
+                tp_price = entry_price * (1 + tp_pct)
+                sl_price = entry_price * (1 - sl_pct)
+            else:  # Short position
+                tp_price = entry_price * (1 - tp_pct)
+                sl_price = entry_price * (1 + sl_pct)
+
+            logger.info(
+                f"📊 Placing native TP/SL for {symbol}: Entry={entry_price:.6f}, TP={tp_price:.6f} ({tp_pct*100}%), SL={sl_price:.6f} ({sl_pct*100}%)"
+            )
+
+            # Place both orders concurrently
+            await asyncio.gather(
+                self.update_tp_on_exchange(symbol, tp_price, side, quantity),
+                self.update_sl_on_exchange(symbol, sl_price, side, quantity),
+                return_exceptions=True,
+            )
+
+            # Update internal tracking
+            if symbol in self.open_positions:
+                self.open_positions[symbol]["tp_price"] = tp_price
+                self.open_positions[symbol]["sl_price"] = sl_price
+
+            # Mark as TP/SL placed to avoid repeated cancellation/placement
+            self._tpsl_placed.add(symbol)
+
+            logger.info(f"✅ NATIVE TP/SL ACTIVE for {symbol}")
+            return True
+
+        except Exception as e:
+            logger.error(f"❌ Failed to place TP/SL orders for {symbol}: {e}")
+            return False
+
+    async def check_profit_taking(
+        self, symbol: str, position: Dict[str, Any], current_price: float
+    ) -> Tuple[bool, str]:
+        """Check if a position should be closed for profit or stop loss."""
+        try:
+            entry_price = position["entry_price"]
+            side = position["side"]
+
+            if side == "BUY":
+                pnl_pct = (current_price - entry_price) / entry_price
+            else:
+                pnl_pct = (entry_price - current_price) / entry_price
+
+            # Dynamic TP/SL based on agent settings if available
+            agent = position.get("agent")
+
+            # Defaults
+            tp_target = 0.02
+            sl_target = -0.05
+
+            if hasattr(agent, "profit_target"):
+                tp_target = agent.profit_target
+
+            # Hard Profit Target
+            if pnl_pct > tp_target:
+                return True, f"Hard Profit Target Hit (+{pnl_pct*100:.2f}%)"
+
+            # Hard Stop Loss (Internal check, backup to exchange SL)
+            # We use a slightly tighter internal stop to trigger before liquidation
+            if pnl_pct < sl_target:
+                return True, f"Hard Stop Loss Hit ({pnl_pct*100:.2f}%)"
+
+            # Trailing Stop Logic
+            # If we are up > 1%, ensure we don't lose it all
+            if pnl_pct > 0.012 and pnl_pct < 0.005:
+                return True, f"Trailing Stop Hit (Locked in {pnl_pct*100:.2f}%)"
+
+            # "Panic Button" / Volatility check (Future expansion)
+            # If price moves against us > 2% in 1 minute -> Close
+
+            return False, ""
+        except Exception as e:
+            logger.warning(f"⚠️ Error in profit taking check: {e}")
+            return False, ""

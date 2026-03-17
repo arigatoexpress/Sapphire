@@ -1,0 +1,422 @@
+import asyncio
+import logging
+import math
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
+
+from .eliza_agent import AgentConfig, ElizaAgent, ModelProvider, Thesis
+
+logger = logging.getLogger(__name__)
+
+# Lazy import for RL agent
+_rl_agent = None
+
+
+def _get_rl_agent():
+    global _rl_agent
+    if _rl_agent is None:
+        try:
+            from ..rl.rl_agent import RLTradingAgent
+
+            _rl_agent = RLTradingAgent()
+        except Exception as e:
+            logger.warning(f"RL agent not available: {e}")
+    return _rl_agent
+
+
+@dataclass
+class ConsensusResult:
+    """Result of multi-agent consensus."""
+
+    symbol: str
+    signal: str  # BUY, SELL, HOLD
+    confidence: float
+    reasoning: str
+    agent_votes: List[Dict]
+    agreement_level: float  # 0.0-1.0
+
+    # Compatibility attributes for platform_router (expects agent-like object)
+    name: str = "AI Swarm"
+    id: str = "swarm-consensus"
+    emoji: str = "🤖"
+    agent_id: str = "swarm-consensus"
+    agent_name: str = "AI Swarm"
+    system: str = "aster"  # Aggregated system preference
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "symbol": self.symbol,
+            "signal": self.signal,
+            "confidence": self.confidence,
+            "reasoning": self.reasoning,
+            "agent_votes": self.agent_votes,
+            "agreement_level": self.agreement_level,
+            "name": self.name,
+            "agent_id": self.agent_id,
+        }
+
+
+class AgentOrchestrator:
+    """
+    Manages a swarm of ElizaAgents and produces consensus decisions.
+
+    Features:
+    - Multiple specialized agents with different personalities
+    - Weighted voting based on agent performance (Sigmoid)
+    - Conflict resolution
+    - Automated Debrief Cycles
+    """
+
+    def __init__(self, monitoring: Optional[Any] = None):
+        self.agents: Dict[str, ElizaAgent] = {}
+        self.monitoring = monitoring
+        self.rl_weight = 0.3  # Weight for RL agent in consensus
+        self._initialize_default_agents()
+        logger.info(f"🎭 AgentOrchestrator initialized with {len(self.agents)} agents")
+
+    def _initialize_default_agents(self):
+        """Create the default agent roster from AGENT_DEFINITIONS."""
+        from ..definitions import AGENT_DEFINITIONS
+        from .eliza_agent import ModelProvider
+
+        for raw_agent in AGENT_DEFINITIONS:
+            # Map raw config to AgentConfig
+            try:
+                # Handle model string to enum mapping
+                model_str = raw_agent.get("model", "gemini")
+                model_enum = ModelProvider.GEMINI
+                if "openai" in model_str.lower():
+                    model_enum = ModelProvider.OPENAI
+
+                config = AgentConfig(
+                    agent_id=raw_agent["id"],
+                    name=raw_agent["name"],
+                    personality=raw_agent.get("personality", "analytical"),
+                    specialization=raw_agent.get("specialization", "hybrid"),
+                    confidence_threshold=raw_agent.get("adaptive_params", {}).get(
+                        "confidence_threshold", 0.35
+                    ),
+                    primary_model=model_enum,
+                    system=raw_agent.get("system", "aster"),
+                )
+
+                self.agents[config.agent_id] = ElizaAgent(config)
+                if self.monitoring:
+                    self.monitoring.register_agent(config.agent_id, config.name)
+
+                logger.info(f"✅ Loaded agent: {config.name} ({config.system})")
+            except Exception as e:
+                logger.error(f"Failed to load agent {raw_agent.get('name')}: {e}")
+
+    async def get_consensus(
+        self, symbol: str, context: str = "entry", market_data: Optional[Dict] = None
+    ) -> Optional[ConsensusResult]:
+        """
+        Get consensus decision from all agents.
+
+        Args:
+            symbol: Trading pair to analyze
+            context: "entry" or "exit_check"
+            market_data: Optional market data to share with agents
+        """
+        if not self.agents:
+            return None
+
+        # Gather all agent analyses concurrently
+        tasks = []
+        for agent in self.agents.values():
+            tasks.append(agent.analyze(symbol, market_data))
+
+        theses = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Filter out errors
+        valid_theses: List[Thesis] = []
+        for thesis in theses:
+            if isinstance(thesis, Thesis):
+                valid_theses.append(thesis)
+            elif isinstance(thesis, Exception):
+                logger.warning(f"Agent analysis failed: {thesis}")
+
+        if not valid_theses:
+            return None
+
+        # Get RL agent prediction and add as weighted vote
+        rl_signal = await self._get_rl_prediction(symbol, market_data)
+
+        # Calculate weighted votes
+        return self._calculate_consensus(symbol, valid_theses, rl_signal)
+
+    async def _get_rl_prediction(self, symbol: str, market_data: Optional[Dict]) -> Optional[Dict]:
+        """Get prediction from RL agent."""
+        rl_agent = _get_rl_agent()
+        if not rl_agent:
+            return None
+
+        try:
+            # Build observation from market data
+            import numpy as np
+
+            if market_data and "prices" in market_data:
+                prices = market_data["prices"][-30:]
+                obs = np.array(prices, dtype=np.float32)
+                # Pad if needed
+                if len(obs) < 63:  # Env observation size
+                    obs = np.pad(obs, (0, 63 - len(obs)))
+            else:
+                obs = np.zeros(63, dtype=np.float32)
+
+            action = rl_agent.predict(obs)
+            signal = rl_agent.action_to_signal(action)
+
+            return {
+                "signal": signal,
+                "confidence": 0.7,  # RL confidence (can be trained)
+                "source": "rl_ppo",
+            }
+        except Exception as e:
+            logger.warning(f"RL prediction failed: {e}")
+            return None
+
+    def _calculate_consensus(
+        self, symbol: str, theses: List[Thesis], rl_signal: Optional[Dict] = None
+    ) -> ConsensusResult:
+        """Calculate consensus from multiple agent theses using Sigmoid weighting."""
+        signal_scores = {"BUY": 0.0, "SELL": 0.0, "HOLD": 0.0}
+        agent_votes = []
+
+        # Sigmoid parameters - RELAXED for more trading activity
+        k = 3  # Reduced from 5 - gentler sigmoid curve
+        threshold = 0.35  # Lowered from 0.5 - more signals pass
+
+        for thesis in theses:
+            agent = self.agents.get(thesis.agent_id)
+            win_rate = agent.get_win_rate() if agent else 0.5
+
+            # Sigmoid Weighting: 1 / (1 + exp(-k * (confidence * win_rate - threshold)))
+            # This pushes weights towards 0 or 1 based on performance x confidence
+            try:
+                x = thesis.confidence * win_rate
+                weight = 1 / (1 + math.exp(-k * (x - threshold)))
+            except OverflowError:
+                weight = 0.0 if (thesis.confidence * win_rate) < threshold else 1.0
+
+            signal_scores[thesis.signal] += weight
+
+            agent_votes.append(
+                {
+                    "agent_id": thesis.agent_id,
+                    "agent_name": agent.name if agent else "Unknown",
+                    "signal": thesis.signal,
+                    "confidence": thesis.confidence,
+                    "weight": weight,
+                    "reasoning": thesis.reasoning,
+                    "system": thesis.system,
+                }
+            )
+
+        # Add RL agent vote
+        if rl_signal:
+            rl_weight = self.rl_weight
+            signal_scores[rl_signal["signal"]] += rl_weight
+            agent_votes.append(
+                {
+                    "agent_id": "rl-ppo",
+                    "agent_name": "RL PPO Agent",
+                    "signal": rl_signal["signal"],
+                    "confidence": rl_signal["confidence"],
+                    "weight": rl_weight,
+                    "reasoning": "PPO model prediction",
+                    "system": "aster",  # RL usually trades Aster symbols
+                }
+            )
+
+        # Determine winning signal
+        total_score = sum(signal_scores.values())
+        if total_score == 0:
+            return ConsensusResult(
+                symbol=symbol,
+                signal="HOLD",
+                confidence=0.0,
+                reasoning="No valid agent votes",
+                agent_votes=agent_votes,
+                agreement_level=0.0,
+                system="aster",
+            )
+
+        winning_signal = max(signal_scores.keys(), key=lambda s: signal_scores[s])
+        winning_score = signal_scores[winning_signal]
+
+        # Calculate agreement level
+        agreement = winning_score / total_score
+
+        # Determine dominant system for the winning signal
+        system_votes = {}
+        for v in agent_votes:
+            if v["signal"] == winning_signal:
+                sys = v.get("system", "aster")
+                system_votes[sys] = system_votes.get(sys, 0.0) + v["weight"]
+
+        dominant_system = "aster"
+        if system_votes:
+            dominant_system = max(system_votes.keys(), key=lambda k: system_votes[k])
+
+        # Consensus confidence (weighted average of confidence of supporters)
+        supporters = [v for v in agent_votes if v["signal"] == winning_signal]
+        if supporters:
+            avg_conf = sum(v["confidence"] for v in supporters) / len(supporters)
+        else:
+            avg_conf = 0.0
+
+        # Build reasoning
+        reasoning = (
+            f"{len(supporters)}/{len(theses)} agents agree (Score: {winning_score:.2f}): "
+            + "; ".join(v["reasoning"][:50] for v in supporters)[:200]
+        )
+
+        result = ConsensusResult(
+            symbol=symbol,
+            signal=winning_signal,
+            confidence=avg_conf,
+            reasoning=reasoning,
+            agent_votes=agent_votes,
+            agreement_level=agreement,
+            system=dominant_system,
+        )
+
+        # Log consensus for debugging zero-trade issues
+        logger.info(
+            f"🎯 Consensus for {symbol}: {winning_signal} "
+            f"(conf={avg_conf:.2f}, agree={agreement:.2f}, score={winning_score:.2f})"
+        )
+
+        return result
+
+    async def get_independent_decision(
+        self,
+        platform: str,
+        symbol: str,
+        context: str = "entry",
+        market_data: Optional[Dict] = None
+    ) -> Optional[ConsensusResult]:
+        """
+        Get decision from platform-specific agent WITHOUT consensus (Phase 4 optimization).
+
+        This bypasses the slow consensus mechanism for single-platform trades,
+        enabling sub-second decision latency for HFT strategies.
+
+        Args:
+            platform: Platform name (aster, aster, jupiter, etc.)
+            symbol: Trading pair to analyze
+            context: "entry" or "exit_check"
+            market_data: Optional market data
+
+        Returns:
+            ConsensusResult-compatible decision from single agent
+        """
+        # Find agents specialized for this platform
+        platform_agents = [
+            agent for agent in self.agents.values()
+            if agent.config.system.lower() == platform.lower()
+        ]
+
+        if not platform_agents:
+            logger.warning(f"No agents found for platform: {platform}, falling back to consensus")
+            return await self.get_consensus(symbol, context, market_data)
+
+        # Use first platform-specific agent (or could use best performing)
+        agent = platform_agents[0]
+
+        logger.debug(f"⚡ [INDEPENDENT] Using {agent.name} for {platform}/{symbol} (bypassing consensus)")
+
+        try:
+            # Get single agent decision (fast path)
+            thesis = await agent.analyze(symbol, market_data)
+
+            if not thesis:
+                return None
+
+            # Convert thesis to ConsensusResult format for compatibility
+            result = ConsensusResult(
+                symbol=symbol,
+                signal=thesis.signal,
+                confidence=thesis.confidence,
+                reasoning=f"[Independent {platform}] {thesis.reasoning}",
+                agent_votes=[{
+                    "agent": agent.name,
+                    "signal": thesis.signal,
+                    "confidence": thesis.confidence,
+                    "reasoning": thesis.reasoning,
+                    "weight": 1.0,
+                    "system": platform
+                }],
+                agreement_level=1.0,  # Single agent = 100% agreement
+                system=platform,
+            )
+
+            logger.info(
+                f"⚡ [INDEPENDENT] {platform}/{symbol}: {thesis.signal} "
+                f"(conf={thesis.confidence:.2f}, agent={agent.name})"
+            )
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Independent decision failed for {platform}/{symbol}: {e}")
+            return None
+
+    async def learn_from_trade(self, symbol: str, signal: str, pnl_pct: float):
+        """Update all agents and run debrief cycle."""
+
+        # 1. Debrief: Generate a lesson from the trade
+        lesson = "N/A"
+        try:
+            # Use Quant Alpha (or first available) to generate a critique
+            critique_agent = self.agents.get("quant-alpha") or next(iter(self.agents.values()))
+            if critique_agent:
+                prompt = f"""
+                Analyze this trade outcome for {symbol}.
+                Signal: {signal}
+                PnL: {pnl_pct:.2%}
+
+                Provide a concise, 1-sentence strategic lesson to improve future decisions.
+                Format: "LESSON: [Your lesson here]"
+                """
+                response = await critique_agent.models.query(
+                    prompt=prompt, primary=critique_agent.config.primary_model
+                )
+                text = response.get("text", "")
+                if "LESSON:" in text:
+                    lesson = text.split("LESSON:")[1].strip()
+                elif text:
+                    lesson = text.strip()
+
+        except Exception as e:
+            logger.warning(f"Debrief failed: {e}")
+
+        # 2. Update agents with the lesson
+        for agent in self.agents.values():
+            # Create a dummy thesis for learning
+            thesis = Thesis(
+                symbol=symbol,
+                signal=signal,
+                confidence=0.5,
+                reasoning=f"Trace outcome. Lesson: {lesson}",
+                agent_id=agent.id,
+            )
+            # We inject the lesson into the memory via the thesis reasoning or a separate field
+            # ElizaAgent.learn_from_trade calls memory.store which saves the thesis reasoning and a hardcoded "lesson".
+            # I should hack ElizaAgent's learn_from_trade or pass it here.
+            # ElizaAgent.learn_from_trade logic:
+            # lesson = "Successful strategy" if pnl_pct > 0 else "Review entry criteria"
+            # It ignores the passed thesis reasoning for the 'lesson' field in memory, but stores 'reasoning'.
+            # I'll rely on the 'reasoning' field of the thesis which now contains the lesson.
+
+            await agent.learn_from_trade(thesis, pnl_pct)
+
+    def get_agent_stats(self) -> List[Dict]:
+        """Get statistics for all agents."""
+        return [agent.get_stats() for agent in self.agents.values()]
+
+    async def stop(self):
+        """Stop all agents."""
+        logger.info("🎭 AgentOrchestrator stopped")
