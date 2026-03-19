@@ -1,0 +1,172 @@
+{
+  "version": 1,
+  "updated": "2026-03-18",
+  "connectors": [
+    {
+      "id": "openclaw-gateway",
+      "name": "OpenClaw Gateway",
+      "type": "api",
+      "protocol": "http",
+      "endpoint": "http://localhost:18789",
+      "device": "mac",
+      "launchagent": "ai.openclaw.gateway",
+      "status": "active",
+      "tags": ["agent:openclaw", "device:mac"],
+      "description": "Local AI gateway routing requests to NemoClaw, Kimi, Claude, Codex workers"
+    },
+    {
+      "id": "nemoclaw",
+      "name": "NemoClaw (NVIDIA)",
+      "type": "inference",
+      "protocol": "openclaw",
+      "endpoint": "http://100.71.10.48:18789",
+      "device": "windows-pc",
+      "status": "planned",
+      "tags": ["agent:nemoclaw", "device:windows-pc"],
+      "description": "Sandboxed NVIDIA NemoClaw runtime on RTX 5070 Ti — GPU compute, backtesting, inference"
+    },
+    {
+      "id": "kimi-claw",
+      "name": "Kimi Claw",
+      "type": "agent",
+      "protocol": "telegram",
+      "endpoint": "rari1:telegram",
+      "device": "rari1",
+      "status": "active",
+      "tags": ["agent:kimi", "device:rari1"],
+      "description": "Kimi agent on rari1 — Telegram ops, monitoring, quick tasks"
+    },
+    {
+      "id": "asana-mcp",
+      "name": "Asana MCP",
+      "type": "mcp",
+      "protocol": "mcp",
+      "mcp_id": "3d0ce0f5-c112-4db8-8c10-19fea2625fc9",
+      "device": "mac",
+      "status": "active",
+      "tags": ["type:pm", "device:mac"],
+      "description": "Asana project management — get/create/update tasks, portfolios, projects"
+    },
+    {
+      "id": "tradingview-mcp",
+      "name": "TradingView MCP",
+      "type": "mcp",
+      "protocol": "mcp",
+      "mcp_id": "tradingview-mcp",
+      "device": "mac",
+      "status": "active",
+      "tags": ["type:trading", "device:mac"],
+      "description": "TradingView — charts, alerts, Pine script editor, symbol data, screeners"
+    },
+    {
+      "id": "figma-mcp",
+      "name": "Figma MCP",
+      "type": "mcp",
+      "protocol": "mcp",
+      "device": "mac",
+      "status": "active",
+      "tags": ["type:design", "device:mac"],
+      "description": "Figma design context — get metadata, screenshots, variable defs, code connect maps"
+    },
+    {
+      "id": "huggingface-mcp",
+      "name": "HuggingFace MCP",
+      "type": "mcp",
+      "protocol": "mcp",
+      "mcp_id": "144a4e0e-c7f9-42d0-9205-b1d54f2f1a2a",
+      "device": "mac",
+      "status": "active",
+      "tags": ["type:ml", "device:mac"],
+      "description": "HuggingFace Hub — search models/datasets/spaces, fetch docs, paper search"
+    },
+    {
+      "id": "google-drive-mcp",
+      "name": "Google Drive MCP",
+      "type": "mcp",
+      "protocol": "mcp",
+      "mcp_id": "c1fc4002-5f49-5f9d-a4e5-93c4ef5d6a75",
+      "device": "mac",
+      "status": "active",
+      "tags": ["type:storage", "device:mac"],
+      "description": "Google Drive — search and fetch documents"
+    },
+    {
+      "id": "claude-in-chrome",
+      "name": "Claude in Chrome",
+      "type": "browser-extension",
+      "protocol": "chrome-devtools",
+      "device": "mac",
+      "status": "active",
+      "tags": ["type:browser", "device:mac"],
+      "description": "Chrome extension — navigate, screenshot, form fill, JS execution, network inspection"
+    },
+    {
+      "id": "claude-analytics-mcp",
+      "name": "Claude Analytics MCP",
+      "type": "mcp",
+      "protocol": "mcp",
+      "path": "tools/claude-analytics/",
+      "device": "mac",
+      "status": "built",
+      "tags": ["type:analytics", "device:mac", "agent:claude"],
+      "description": "Claude Code usage metrics — token spend, session cost, model breakdown"
+    },
+    {
+      "id": "tailscale",
+      "name": "Tailscale Mesh",
+      "type": "network",
+      "protocol": "wireguard",
+      "device": "all",
+      "status": "active",
+      "tags": ["type:network"],
+      "nodes": {
+        "mac": "100.67.171.79",
+        "windows-pc": "100.71.10.48",
+        "rari1": "100.120.191.1",
+        "rari2": "100.87.225.89"
+      },
+      "description": "WireGuard mesh VPN connecting all 4 devices"
+    },
+    {
+      "id": "lighter-protocol",
+      "name": "Lighter Protocol",
+      "type": "exchange",
+      "protocol": "rest",
+      "device": "rari2",
+      "status": "production",
+      "tags": ["type:trading", "device:rari2"],
+      "description": "Onchain perpetuals exchange — live pair trading via rari2 + ProtonVPN Switzerland"
+    },
+    {
+      "id": "gcp-firestore",
+      "name": "GCP Firestore",
+      "type": "database",
+      "protocol": "grpc",
+      "project": "sapphire-479610",
+      "device": "cloud",
+      "status": "active",
+      "tags": ["type:storage", "device:cloud"],
+      "description": "Firestore: event log, project state, task queue (sapphire-479610)"
+    },
+    {
+      "id": "telegram-bot",
+      "name": "Telegram Bot",
+      "type": "messaging",
+      "protocol": "telegram-api",
+      "device": "rari1",
+      "status": "active",
+      "tags": ["type:messaging", "device:rari1"],
+      "description": "Primary human-agent interface — Telegram-first command and status channel"
+    }
+  ],
+  "launchagents": [
+    {"id": "ai.openclaw.gateway", "description": "OpenClaw gateway port 18789", "status": "active"},
+    {"id": "com.aribs.agentic.control-api", "description": "Control plane API server", "status": "active"},
+    {"id": "com.aribs.agentic.worker.claude", "description": "Claude worker", "status": "active"},
+    {"id": "com.aribs.agentic.worker.codex", "description": "Codex worker", "status": "active"},
+    {"id": "com.aribs.agentic.worker.kimi", "description": "Kimi worker", "status": "active"},
+    {"id": "com.aribs.agentic.worker.antigravity", "description": "Antigravity worker", "status": "active"},
+    {"id": "com.aribs.agentic.worker.openclaw-main", "description": "OpenClaw main worker", "status": "active"},
+    {"id": "com.sapphire.sync-eu-proxy-firewall", "description": "EU proxy firewall sync", "status": "active"}
+  ]
+}
