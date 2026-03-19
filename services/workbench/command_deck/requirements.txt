@@ -1,5 +1,0 @@
-flask==3.0.0
-aiohttp==3.9.0
-google-cloud-firestore==2.14.0
-google-cloud-pubsub==2.18.0
-gunicorn==21.2.0

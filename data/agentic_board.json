@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "cards": [
+    {
+      "id": "card-consolidation-complete",
+      "title": "Consolidate deprecated repos into dated archive",
+      "project": "Workspace Consolidation",
+      "status": "done",
+      "priority": "high",
+      "owner": "Codex",
+      "notes": "Completed prune run and generated cleanup manifest.",
+      "updated_at": "2026-02-20T13:10:00+00:00"
+    },
+    {
+      "id": "card-validate-legacy-diffs",
+      "title": "Review archived dirty clones for salvage commits",
+      "project": "Workspace Consolidation",
+      "status": "done",
+      "priority": "high",
+      "owner": "Aribs",
+      "notes": "Completed review. Legacy dirty clones were archived with no required salvage commits.",
+      "updated_at": "2026-02-23T09:58:00+00:00"
+    },
+    {
+      "id": "card-weekly-prune",
+      "title": "Run weekly stale-asset prune",
+      "project": "Ops Hygiene",
+      "status": "backlog",
+      "priority": "medium",
+      "owner": "Codex",
+      "notes": "Focus on browser recordings and superseded extension versions.",
+      "updated_at": "2026-02-20T13:10:00+00:00"
+    },
+    {
+      "id": "card-github-triage",
+      "title": "Triage active GitHub repos into Keep/Merge/Archive",
+      "project": "GitHub Portfolio",
+      "status": "backlog",
+      "priority": "high",
+      "owner": "Aribs",
+      "notes": "Use repo-level objectives and commit velocity to reduce portfolio sprawl.",
+      "updated_at": "2026-02-20T13:10:00+00:00"
+    },
+    {
+      "id": "card-automation",
+      "title": "Automate board sync from repo telemetry",
+      "project": "Agentic PM",
+      "status": "done",
+      "priority": "medium",
+      "owner": "Codex",
+      "notes": "Implemented sync engine, next-actions artifacts, and /api/projects/sync endpoint.",
+      "updated_at": "2026-02-20T20:23:02.574985+00:00"
+    },
+    {
+      "id": "card-control-plane-agent-registry",
+      "title": "Implement agent registry + heartbeat APIs",
+      "project": "Agentic Control Plane",
+      "status": "done",
+      "priority": "urgent",
+      "owner": "Codex",
+      "notes": "Implemented /api/control/agents/register, /heartbeat, /agents, and /overview with SQLite persistence.",
+      "updated_at": "2026-02-20T20:55:50.024380+00:00"
+    },
+    {
+      "id": "card-control-plane-task-lease",
+      "title": "Implement leased task queue endpoints",
+      "project": "Agentic Control Plane",
+      "status": "done",
+      "priority": "urgent",
+      "owner": "Codex",
+      "notes": "Implemented task create/list/lease/heartbeat/complete/fail endpoints with retry + audit events.",
+      "updated_at": "2026-02-20T20:55:50.024380+00:00"
+    },
+    {
+      "id": "card-openclaw-governor-connector",
+      "title": "Build OpenClaw governor connector",
+      "project": "OpenClaw Orchestration",
+      "status": "done",
+      "priority": "high",
+      "owner": "Codex",
+      "notes": "Completed. OpenClaw task bridge and control-plane lease/execute wiring are operational.",
+      "updated_at": "2026-02-23T09:58:00+00:00"
+    },
+    {
+      "id": "card-cloud-deploy-control-plane",
+      "title": "Deploy control plane to Cloud Run with managed DB/queue",
+      "project": "Infrastructure",
+      "status": "backlog",
+      "priority": "high",
+      "owner": "Codex",
+      "notes": "Promote from local state to Cloud SQL + Redis/Memorystore for 24/7 reliability.",
+      "updated_at": "2026-02-20T20:46:58.988102+00:00"
+    },
+    {
+      "id": "card-worker-daemon-multi-device",
+      "title": "Create worker daemon for multi-device registration",
+      "project": "Agent Runtime",
+      "status": "done",
+      "priority": "high",
+      "owner": "Codex",
+      "notes": "Completed. Multi-device workers use observe/dry-run/command modes with launchd/systemd integration.",
+      "updated_at": "2026-02-23T09:58:00+00:00"
+    },
+    {
+      "id": "card-unified-state-event-telemetry",
+      "title": "Implement unified system state + event telemetry",
+      "project": "AI PM System",
+      "status": "done",
+      "priority": "high",
+      "owner": "Codex",
+      "notes": "Added event stream schema, /api/state endpoint, Kimi state action, Telegram /state command, and roadmap snapshots.",
+      "updated_at": "2026-02-21T01:25:49.598114+00:00"
+    },
+    {
+      "id": "card-pm-commander-autonomy-logging",
+      "title": "Implement PM Commander autonomous decision logging",
+      "project": "AI PM System",
+      "status": "done",
+      "priority": "high",
+      "owner": "Codex",
+      "notes": "Added autonomy engine, proactive debug task creation, decision proposals, and cron-triggered autonomy cycles.",
+      "updated_at": "2026-02-21T04:10:43.121026+00:00"
+    }
+  ]
+}

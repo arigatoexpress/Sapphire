@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  flowise:
+    image: flowiseai/flowise:3.0.6
+    container_name: sapphire-flowise
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - PORT=3000
+      - FLOWISE_USERNAME=${FLOWISE_USERNAME}
+      - FLOWISE_PASSWORD=${FLOWISE_PASSWORD}
+      - FLOWISE_SECRETKEY_OVERWRITE=${FLOWISE_SECRETKEY_OVERWRITE}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - DEBUG=${DEBUG:-false}
+    ports:
+      - "3001:3000"
+    volumes:
+      - flowise_data:/root/.flowise
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ > /dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+
+volumes:
+  flowise_data:
+    driver: local

@@ -1,0 +1,15 @@
+{
+  "slaves": [
+    {
+      "node_id": "pi-dock-slave",
+      "host": "PI_IP_ADDRESS_HERE",
+      "ssh_user": "pi",
+      "max_tasks": 2
+    }
+  ],
+  "master": {
+    "local_task_threshold": 0.7,
+    "heartbeat_interval": 30,
+    "task_timeout": 300
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "layout_name": "aribs-main",
+  "created_at": "2026-02-24T11:39:22+00:00",
+  "updated_at": "2026-02-24T11:39:22+00:00",
+  "shortcuts": {
+    "symbol_search": "cmd+k",
+    "indicator_search": "/"
+  },
+  "watchlist": {
+    "search_field_point": "watchlist_search_field",
+    "add_button_point": "watchlist_add_button",
+    "remove_menu_item_point": "watchlist_context_remove_item",
+    "default_from_row_point": "watchlist_row_1",
+    "default_to_row_point": "watchlist_row_2",
+    "row_points": [
+      "watchlist_row_1",
+      "watchlist_row_2",
+      "watchlist_row_3"
+    ],
+    "clear_strategy": "cmd-a-backspace",
+    "confirm_key": "return",
+    "add_confirm_times": 1,
+    "add_confirm_delay": 0.1
+  },
+  "points": {}
+}

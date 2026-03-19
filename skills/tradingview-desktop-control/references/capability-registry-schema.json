@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.codex/tradingview/capability-registry.schema.json",
+  "title": "TradingView Capability Registry",
+  "type": "object",
+  "required": ["schema_version", "generated_at", "capabilities"],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "generated_at": { "type": "string" },
+    "generator": { "type": "string" },
+    "workspace": { "type": "string" },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "surface", "source", "risk_level"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "label": { "type": "string", "minLength": 1 },
+          "surface": {
+            "type": "string",
+            "enum": [
+              "desktop",
+              "desktop_menu",
+              "desktop_shortcut",
+              "web",
+              "web_snapshot",
+              "canvas"
+            ]
+          },
+          "source": { "type": "string" },
+          "risk_level": { "type": "string", "enum": ["low", "medium", "high"] },
+          "enabled": { "type": ["boolean", "null"] },
+          "tags": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "preconditions": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "action_recipe": {
+            "type": "object",
+            "properties": {
+              "runner": { "type": "string" },
+              "subcommand": { "type": "string" },
+              "args": { "type": "array", "items": { "type": ["string", "number", "boolean", "object", "array", "null"] } },
+              "args_template": { "type": "array", "items": { "type": ["string", "number", "boolean", "object", "array", "null"] } }
+            },
+            "additionalProperties": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

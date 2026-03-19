@@ -1,0 +1,18 @@
+[
+  {
+    "action": "config-watchlist-open",
+    "config": "config/layouts/aribs-main.json",
+    "symbol": "BTCUSDT"
+  },
+  {
+    "action": "config-watchlist-add",
+    "config": "config/layouts/aribs-main.json",
+    "symbol": "SOLUSDT"
+  },
+  {
+    "action": "config-watchlist-reorder",
+    "config": "config/layouts/aribs-main.json",
+    "from_point_name": "watchlist_row_1",
+    "to_point_name": "watchlist_row_3"
+  }
+]

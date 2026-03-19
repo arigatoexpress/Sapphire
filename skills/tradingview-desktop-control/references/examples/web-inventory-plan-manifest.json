@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "description": "Curated action plans for opening TradingView Web contexts before running tv_web_inventory.py final capture.",
+  "plans": [
+    {
+      "id": "web.context.symbol-search",
+      "label": "Symbol Search / Compare",
+      "capture_label": "symbol-search-dialog",
+      "actions_file": "references/examples/web-inventory-plans/open-symbol-search.json"
+    },
+    {
+      "id": "web.context.indicators-dialog",
+      "label": "Indicators Dialog",
+      "capture_label": "indicators-dialog",
+      "actions_file": "references/examples/web-inventory-plans/open-indicators-dialog.json"
+    },
+    {
+      "id": "web.context.create-alert",
+      "label": "Create Alert Dialog",
+      "capture_label": "create-alert-dialog",
+      "actions_file": "references/examples/web-inventory-plans/open-create-alert.json"
+    },
+    {
+      "id": "web.context.layout-setup",
+      "label": "Layout Setup Menu",
+      "capture_label": "layout-setup-menu",
+      "actions_file": "references/examples/web-inventory-plans/open-layout-setup.json"
+    },
+    {
+      "id": "web.context.settings",
+      "label": "Chart Settings/Dialog",
+      "capture_label": "settings-dialog",
+      "actions_file": "references/examples/web-inventory-plans/open-settings.json"
+    },
+    {
+      "id": "web.context.quick-search",
+      "label": "Quick Search",
+      "capture_label": "quick-search",
+      "actions_file": "references/examples/web-inventory-plans/open-quick-search.json"
+    },
+    {
+      "id": "web.context.bar-replay",
+      "label": "Bar Replay",
+      "capture_label": "bar-replay",
+      "actions_file": "references/examples/web-inventory-plans/open-bar-replay.json"
+    }
+  ]
+}

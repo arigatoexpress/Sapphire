@@ -1,0 +1,9 @@
+[
+  {
+    "action": "snapshot-click-one-of",
+    "labels": ["Quick Search", "Quick search"],
+    "role": "button",
+    "match": "contains",
+    "wait_after": 0.8
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "updated_at": "2026-02-23T03:07:48.403343+00:00",
+  "mode": "rari_pair",
+  "description": "Dual Pi mode",
+  "allowed_executor_agent_ids": [
+    "claude-main",
+    "kimi-main"
+  ],
+  "allowed_executor_membership_ids": [
+    "claude_code",
+    "kimi"
+  ],
+  "updated_by": "test-suite"
+}

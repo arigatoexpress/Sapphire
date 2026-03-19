@@ -1,0 +1,2283 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-02-25T12:44:57+00:00",
+  "generator": "tv_inventory.py",
+  "workspace": "/Users/aribs/Documents/Organized/Codex Projects/skills/tradingview-desktop-control",
+  "capabilities": [
+    {
+      "id": "chart.set_symbol",
+      "label": "Set chart symbol",
+      "surface": "desktop",
+      "source": "tvctl",
+      "risk_level": "low",
+      "tags": [
+        "chart",
+        "search"
+      ],
+      "preconditions": [
+        "chart visible"
+      ],
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "set-symbol",
+        "args_template": [
+          "{{symbol}}"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 45
+        },
+        "parameters": [
+          {
+            "name": "symbol",
+            "required": true,
+            "description": "Ticker/symbol to open"
+          }
+        ]
+      }
+    },
+    {
+      "id": "chart.add_indicator",
+      "label": "Add indicator",
+      "surface": "desktop",
+      "source": "tvctl",
+      "risk_level": "low",
+      "tags": [
+        "chart",
+        "indicator"
+      ],
+      "preconditions": [
+        "chart visible"
+      ],
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "add-indicator",
+        "args_template": [
+          "{{query}}"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 60
+        },
+        "parameters": [
+          {
+            "name": "query",
+            "required": true,
+            "description": "Indicator search query"
+          }
+        ]
+      }
+    },
+    {
+      "id": "watchlist.open_symbol",
+      "label": "Open symbol via watchlist",
+      "surface": "desktop",
+      "source": "tvctl",
+      "risk_level": "low",
+      "tags": [
+        "watchlist"
+      ],
+      "preconditions": [
+        "watchlist calibrated"
+      ]
+    },
+    {
+      "id": "watchlist.add_symbol",
+      "label": "Add symbol to watchlist",
+      "surface": "desktop",
+      "source": "tvctl",
+      "risk_level": "low",
+      "tags": [
+        "watchlist"
+      ],
+      "preconditions": [
+        "watchlist calibrated"
+      ]
+    },
+    {
+      "id": "watchlist.remove_row",
+      "label": "Remove watchlist row",
+      "surface": "desktop",
+      "source": "tvctl",
+      "risk_level": "medium",
+      "tags": [
+        "watchlist"
+      ],
+      "preconditions": [
+        "watchlist calibrated"
+      ]
+    },
+    {
+      "id": "watchlist.reorder_rows",
+      "label": "Reorder watchlist rows",
+      "surface": "desktop",
+      "source": "tvctl",
+      "risk_level": "low",
+      "tags": [
+        "watchlist"
+      ],
+      "preconditions": [
+        "watchlist calibrated"
+      ]
+    },
+    {
+      "id": "desktop.menu.tradingview-settings",
+      "label": "TradingView > Settings\u2026",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "TradingView > Settings\u2026"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "TradingView",
+          "Settings\u2026"
+        ],
+        "shortcut": {
+          "cmd_char": ",",
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.tradingview-zoom-100-zoom",
+      "label": "TradingView > Zoom 100% > Zoom +",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "TradingView > Zoom 100% > Zoom +"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "TradingView",
+          "Zoom 100%",
+          "Zoom +"
+        ],
+        "shortcut": {
+          "cmd_char": "+",
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.tradingview-zoom-100-reset-to-100",
+      "label": "TradingView > Zoom 100% > Reset to 100%",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "medium",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "TradingView > Zoom 100% > Reset to 100%"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "TradingView",
+          "Zoom 100%",
+          "Reset to 100%"
+        ],
+        "shortcut": {
+          "cmd_char": "0",
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.tradingview-new-tab",
+      "label": "TradingView > New tab",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "TradingView > New tab"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "TradingView",
+          "New tab"
+        ],
+        "shortcut": {
+          "cmd_char": "T",
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.tradingview-new-window",
+      "label": "TradingView > New window",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "TradingView > New window"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "TradingView",
+          "New window"
+        ],
+        "shortcut": {
+          "cmd_char": "N",
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.tradingview-reopen-closed-tab",
+      "label": "TradingView > Reopen closed tab",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "medium",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "TradingView > Reopen closed tab"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "TradingView",
+          "Reopen closed tab"
+        ],
+        "shortcut": {
+          "cmd_char": "T",
+          "cmd_modifiers_raw": "1",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.tradingview-open-link-from-clipboard",
+      "label": "TradingView > Open link from clipboard",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "TradingView > Open link from clipboard"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "TradingView",
+          "Open link from clipboard"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.tradingview-color-theme-system",
+      "label": "TradingView > Color theme > System",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "TradingView > Color theme > System"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "TradingView",
+          "Color theme",
+          "System"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.tradingview-color-theme-dark",
+      "label": "TradingView > Color theme > Dark",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "TradingView > Color theme > Dark"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "TradingView",
+          "Color theme",
+          "Dark"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": "\u2713"
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.tradingview-color-theme-light",
+      "label": "TradingView > Color theme > Light",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "TradingView > Color theme > Light"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "TradingView",
+          "Color theme",
+          "Light"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.tradingview-quit",
+      "label": "TradingView > Quit",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "TradingView > Quit"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "TradingView",
+          "Quit"
+        ],
+        "shortcut": {
+          "cmd_char": "Q",
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.tradingview-quit-and-keep-windows",
+      "label": "TradingView > Quit and Keep Windows",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "TradingView > Quit and Keep Windows"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "TradingView",
+          "Quit and Keep Windows"
+        ],
+        "shortcut": {
+          "cmd_char": "Q",
+          "cmd_modifiers_raw": "2",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.edit-undo",
+      "label": "Edit > Undo",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Edit > Undo"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Edit",
+          "Undo"
+        ],
+        "shortcut": {
+          "cmd_char": "Z",
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.edit-redo",
+      "label": "Edit > Redo",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Edit > Redo"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Edit",
+          "Redo"
+        ],
+        "shortcut": {
+          "cmd_char": "Z",
+          "cmd_modifiers_raw": "1",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.edit-cut",
+      "label": "Edit > Cut",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Edit > Cut"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Edit",
+          "Cut"
+        ],
+        "shortcut": {
+          "cmd_char": "X",
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.edit-copy",
+      "label": "Edit > Copy",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Edit > Copy"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Edit",
+          "Copy"
+        ],
+        "shortcut": {
+          "cmd_char": "C",
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.edit-paste",
+      "label": "Edit > Paste",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Edit > Paste"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Edit",
+          "Paste"
+        ],
+        "shortcut": {
+          "cmd_char": "V",
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.edit-select-all",
+      "label": "Edit > Select all",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Edit > Select all"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Edit",
+          "Select all"
+        ],
+        "shortcut": {
+          "cmd_char": "A",
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.edit-writing-tools-show-writing-tools",
+      "label": "Edit > Writing Tools > Show Writing Tools",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": false,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Edit > Writing Tools > Show Writing Tools"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Edit",
+          "Writing Tools",
+          "Show Writing Tools"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.edit-writing-tools-proofread",
+      "label": "Edit > Writing Tools > Proofread",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": false,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Edit > Writing Tools > Proofread"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Edit",
+          "Writing Tools",
+          "Proofread"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.edit-writing-tools-rewrite",
+      "label": "Edit > Writing Tools > Rewrite",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": false,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Edit > Writing Tools > Rewrite"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Edit",
+          "Writing Tools",
+          "Rewrite"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.edit-writing-tools-make-friendly",
+      "label": "Edit > Writing Tools > Make Friendly",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": false,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Edit > Writing Tools > Make Friendly"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Edit",
+          "Writing Tools",
+          "Make Friendly"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.edit-writing-tools-make-professional",
+      "label": "Edit > Writing Tools > Make Professional",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": false,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Edit > Writing Tools > Make Professional"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Edit",
+          "Writing Tools",
+          "Make Professional"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.edit-writing-tools-make-concise",
+      "label": "Edit > Writing Tools > Make Concise",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": false,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Edit > Writing Tools > Make Concise"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Edit",
+          "Writing Tools",
+          "Make Concise"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.edit-writing-tools-summarize",
+      "label": "Edit > Writing Tools > Summarize",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": false,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Edit > Writing Tools > Summarize"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Edit",
+          "Writing Tools",
+          "Summarize"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.edit-writing-tools-create-key-points",
+      "label": "Edit > Writing Tools > Create Key Points",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": false,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Edit > Writing Tools > Create Key Points"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Edit",
+          "Writing Tools",
+          "Create Key Points"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.edit-writing-tools-make-list",
+      "label": "Edit > Writing Tools > Make List",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": false,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Edit > Writing Tools > Make List"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Edit",
+          "Writing Tools",
+          "Make List"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.edit-writing-tools-make-table",
+      "label": "Edit > Writing Tools > Make Table",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": false,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Edit > Writing Tools > Make Table"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Edit",
+          "Writing Tools",
+          "Make Table"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.edit-writing-tools-compose",
+      "label": "Edit > Writing Tools > Compose\u2026",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": false,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Edit > Writing Tools > Compose\u2026"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Edit",
+          "Writing Tools",
+          "Compose\u2026"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.edit-autofill-contact",
+      "label": "Edit > AutoFill > Contact\u2026",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": false,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Edit > AutoFill > Contact\u2026"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Edit",
+          "AutoFill",
+          "Contact\u2026"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.edit-autofill-passwords",
+      "label": "Edit > AutoFill > Passwords\u2026",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": false,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Edit > AutoFill > Passwords\u2026"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Edit",
+          "AutoFill",
+          "Passwords\u2026"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.edit-autofill-credit-card",
+      "label": "Edit > AutoFill > Credit Card\u2026",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": false,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Edit > AutoFill > Credit Card\u2026"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Edit",
+          "AutoFill",
+          "Credit Card\u2026"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.edit-start-dictation",
+      "label": "Edit > Start Dictation\u2026",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Edit > Start Dictation\u2026"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Edit",
+          "Start Dictation\u2026"
+        ],
+        "shortcut": {
+          "cmd_char": "\ud83c\udfa4",
+          "cmd_modifiers_raw": "8",
+          "cmd_glyph": "150",
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.edit-emoji-symbols",
+      "label": "Edit > Emoji & Symbols",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Edit > Emoji & Symbols"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Edit",
+          "Emoji & Symbols"
+        ],
+        "shortcut": {
+          "cmd_char": "E",
+          "cmd_modifiers_raw": "24",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-fill",
+      "label": "Window > Fill",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > Fill"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "Fill"
+        ],
+        "shortcut": {
+          "cmd_char": "F",
+          "cmd_modifiers_raw": "28",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-center",
+      "label": "Window > Center",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > Center"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "Center"
+        ],
+        "shortcut": {
+          "cmd_char": "C",
+          "cmd_modifiers_raw": "28",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-move-resize-halves",
+      "label": "Window > Move & Resize > Halves",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": false,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > Move & Resize > Halves"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "Move & Resize",
+          "Halves"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-move-resize-left",
+      "label": "Window > Move & Resize > Left",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > Move & Resize > Left"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "Move & Resize",
+          "Left"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "28",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-move-resize-right",
+      "label": "Window > Move & Resize > Right",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > Move & Resize > Right"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "Move & Resize",
+          "Right"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "28",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-move-resize-top",
+      "label": "Window > Move & Resize > Top",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > Move & Resize > Top"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "Move & Resize",
+          "Top"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "28",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-move-resize-bottom",
+      "label": "Window > Move & Resize > Bottom",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > Move & Resize > Bottom"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "Move & Resize",
+          "Bottom"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "28",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-move-resize-quarters",
+      "label": "Window > Move & Resize > Quarters",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": false,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > Move & Resize > Quarters"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "Move & Resize",
+          "Quarters"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-move-resize-top-left",
+      "label": "Window > Move & Resize > Top Left",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > Move & Resize > Top Left"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "Move & Resize",
+          "Top Left"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-move-resize-top-right",
+      "label": "Window > Move & Resize > Top Right",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > Move & Resize > Top Right"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "Move & Resize",
+          "Top Right"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-move-resize-bottom-left",
+      "label": "Window > Move & Resize > Bottom Left",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > Move & Resize > Bottom Left"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "Move & Resize",
+          "Bottom Left"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-move-resize-bottom-right",
+      "label": "Window > Move & Resize > Bottom Right",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > Move & Resize > Bottom Right"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "Move & Resize",
+          "Bottom Right"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-move-resize-arrange",
+      "label": "Window > Move & Resize > Arrange",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": false,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > Move & Resize > Arrange"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "Move & Resize",
+          "Arrange"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-move-resize-left-right",
+      "label": "Window > Move & Resize > Left & Right",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > Move & Resize > Left & Right"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "Move & Resize",
+          "Left & Right"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "29",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-move-resize-left-quarters",
+      "label": "Window > Move & Resize > Left & Quarters",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > Move & Resize > Left & Quarters"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "Move & Resize",
+          "Left & Quarters"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "31",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-move-resize-right-left",
+      "label": "Window > Move & Resize > Right & Left",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > Move & Resize > Right & Left"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "Move & Resize",
+          "Right & Left"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "29",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-move-resize-right-quarters",
+      "label": "Window > Move & Resize > Right & Quarters",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > Move & Resize > Right & Quarters"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "Move & Resize",
+          "Right & Quarters"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "31",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-move-resize-top-bottom",
+      "label": "Window > Move & Resize > Top & Bottom",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > Move & Resize > Top & Bottom"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "Move & Resize",
+          "Top & Bottom"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "29",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-move-resize-top-quarters",
+      "label": "Window > Move & Resize > Top & Quarters",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > Move & Resize > Top & Quarters"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "Move & Resize",
+          "Top & Quarters"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "31",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-move-resize-bottom-top",
+      "label": "Window > Move & Resize > Bottom & Top",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > Move & Resize > Bottom & Top"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "Move & Resize",
+          "Bottom & Top"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "29",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-move-resize-bottom-quarters",
+      "label": "Window > Move & Resize > Bottom & Quarters",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > Move & Resize > Bottom & Quarters"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "Move & Resize",
+          "Bottom & Quarters"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "31",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-move-resize-return-to-previous-size",
+      "label": "Window > Move & Resize > Return to Previous Size",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": false,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > Move & Resize > Return to Previous Size"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "Move & Resize",
+          "Return to Previous Size"
+        ],
+        "shortcut": {
+          "cmd_char": "R",
+          "cmd_modifiers_raw": "28",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-full-screen-tile-left-of-screen",
+      "label": "Window > Full Screen Tile > Left of Screen",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > Full Screen Tile > Left of Screen"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "Full Screen Tile",
+          "Left of Screen"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-full-screen-tile-right-of-screen",
+      "label": "Window > Full Screen Tile > Right of Screen",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > Full Screen Tile > Right of Screen"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "Full Screen Tile",
+          "Right of Screen"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-remove-window-from-set",
+      "label": "Window > Remove Window from Set",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "medium",
+      "enabled": false,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > Remove Window from Set"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "Remove Window from Set"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-hide-tradingview",
+      "label": "Window > Hide TradingView",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > Hide TradingView"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "Hide TradingView"
+        ],
+        "shortcut": {
+          "cmd_char": "H",
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-hide-others",
+      "label": "Window > Hide others",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > Hide others"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "Hide others"
+        ],
+        "shortcut": {
+          "cmd_char": "H",
+          "cmd_modifiers_raw": "2",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-minimize",
+      "label": "Window > Minimize",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > Minimize"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "Minimize"
+        ],
+        "shortcut": {
+          "cmd_char": "M",
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-minimize-all",
+      "label": "Window > Minimize All",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > Minimize All"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "Minimize All"
+        ],
+        "shortcut": {
+          "cmd_char": "M",
+          "cmd_modifiers_raw": "2",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.window-zamausdt-community-scripts",
+      "label": "Window > ZAMAUSDT / Community Scripts",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "Window > ZAMAUSDT / Community Scripts"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "Window",
+          "ZAMAUSDT / Community Scripts"
+        ],
+        "shortcut": {
+          "cmd_char": null,
+          "cmd_modifiers_raw": "0",
+          "cmd_glyph": null,
+          "mark_char": "\u2713"
+        }
+      }
+    },
+    {
+      "id": "desktop.menu.view-toggle-full-screen",
+      "label": "View > Toggle full screen",
+      "surface": "desktop_menu",
+      "source": "macos-ax-menu",
+      "risk_level": "low",
+      "enabled": true,
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "click-menu",
+        "args": [
+          "View > Toggle full screen"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 30
+        }
+      },
+      "metadata": {
+        "menu_path": [
+          "View",
+          "Toggle full screen"
+        ],
+        "shortcut": {
+          "cmd_char": "F",
+          "cmd_modifiers_raw": "24",
+          "cmd_glyph": null,
+          "mark_char": null
+        }
+      }
+    },
+    {
+      "id": "desktop.shortcut.symbol_search",
+      "label": "Symbol search shortcut",
+      "surface": "desktop_shortcut",
+      "source": "layout-config",
+      "risk_level": "low",
+      "metadata": {
+        "combo": "cmd+k"
+      }
+    },
+    {
+      "id": "desktop.shortcut.indicator_search",
+      "label": "Indicator search shortcut",
+      "surface": "desktop_shortcut",
+      "source": "layout-config",
+      "risk_level": "low",
+      "metadata": {
+        "combo": "/"
+      }
+    },
+    {
+      "id": "watchlist.open_symbol.config",
+      "label": "Open symbol via calibrated watchlist",
+      "surface": "desktop",
+      "source": "layout-config",
+      "risk_level": "low",
+      "preconditions": [
+        "TradingView desktop app running",
+        "watchlist points calibrated"
+      ],
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "watchlist-open-config",
+        "args_template": [
+          "/Users/aribs/Documents/Organized/Codex Projects/skills/tradingview-desktop-control/config/layouts/aribs-main.json",
+          "{{symbol}}"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 45
+        },
+        "parameters": [
+          {
+            "name": "symbol",
+            "required": true,
+            "description": "Symbol to open/add in the watchlist"
+          }
+        ]
+      },
+      "metadata": {
+        "watchlist_bindings": {
+          "search_field_point": "watchlist_search_field",
+          "add_button_point": "watchlist_add_button",
+          "remove_menu_item_point": "watchlist_context_remove_item",
+          "row_points": [
+            "watchlist_row_1",
+            "watchlist_row_2",
+            "watchlist_row_3"
+          ]
+        }
+      }
+    },
+    {
+      "id": "watchlist.add_symbol.config",
+      "label": "Add symbol via calibrated watchlist",
+      "surface": "desktop",
+      "source": "layout-config",
+      "risk_level": "low",
+      "preconditions": [
+        "TradingView desktop app running",
+        "watchlist points calibrated"
+      ],
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "watchlist-add-config",
+        "args_template": [
+          "/Users/aribs/Documents/Organized/Codex Projects/skills/tradingview-desktop-control/config/layouts/aribs-main.json",
+          "{{symbol}}"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 45
+        },
+        "parameters": [
+          {
+            "name": "symbol",
+            "required": true,
+            "description": "Symbol to open/add in the watchlist"
+          }
+        ]
+      },
+      "metadata": {
+        "watchlist_bindings": {
+          "search_field_point": "watchlist_search_field",
+          "add_button_point": "watchlist_add_button",
+          "remove_menu_item_point": "watchlist_context_remove_item",
+          "row_points": [
+            "watchlist_row_1",
+            "watchlist_row_2",
+            "watchlist_row_3"
+          ]
+        }
+      }
+    },
+    {
+      "id": "watchlist.remove_row.config",
+      "label": "Remove watchlist row via calibrated points",
+      "surface": "desktop",
+      "source": "layout-config",
+      "risk_level": "medium",
+      "preconditions": [
+        "TradingView desktop app running",
+        "watchlist points calibrated"
+      ],
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "watchlist-remove-config",
+        "args_template": [
+          "/Users/aribs/Documents/Organized/Codex Projects/skills/tradingview-desktop-control/config/layouts/aribs-main.json"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 60
+        },
+        "parameters": []
+      },
+      "metadata": {
+        "watchlist_bindings": {
+          "search_field_point": "watchlist_search_field",
+          "add_button_point": "watchlist_add_button",
+          "remove_menu_item_point": "watchlist_context_remove_item",
+          "row_points": [
+            "watchlist_row_1",
+            "watchlist_row_2",
+            "watchlist_row_3"
+          ]
+        }
+      }
+    },
+    {
+      "id": "watchlist.reorder_rows.config",
+      "label": "Reorder watchlist rows via calibrated points",
+      "surface": "desktop",
+      "source": "layout-config",
+      "risk_level": "low",
+      "preconditions": [
+        "TradingView desktop app running",
+        "watchlist points calibrated"
+      ],
+      "action_recipe": {
+        "runner": "tvctl.py",
+        "subcommand": "watchlist-reorder-config",
+        "args_template": [
+          "/Users/aribs/Documents/Organized/Codex Projects/skills/tradingview-desktop-control/config/layouts/aribs-main.json"
+        ],
+        "timeouts": {
+          "command_timeout_seconds": 60
+        },
+        "parameters": []
+      },
+      "metadata": {
+        "watchlist_bindings": {
+          "search_field_point": "watchlist_search_field",
+          "add_button_point": "watchlist_add_button",
+          "remove_menu_item_point": "watchlist_context_remove_item",
+          "row_points": [
+            "watchlist_row_1",
+            "watchlist_row_2",
+            "watchlist_row_3"
+          ]
+        }
+      }
+    }
+  ]
+}

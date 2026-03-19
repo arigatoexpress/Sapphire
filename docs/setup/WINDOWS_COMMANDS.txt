@@ -1,0 +1,113 @@
+=== WINDOWS KIMI-CLAW SETUP COMMANDS ===
+Copy these one at a time into PowerShell (Run as Administrator)
+
+
+1. INSTALL KIMI CLI
+-------------------
+pip install kimi-cli
+
+
+2. LOGIN TO KIMI
+----------------
+kimi login
+
+
+3. VERIFY INSTALLATION
+----------------------
+kimi info
+
+
+4. CREATE DIRECTORIES
+---------------------
+mkdir $env:USERPROFILE\.kimi\distributed\master -Force
+mkdir $env:USERPROFILE\.kimi\distributed\slave -Force
+
+
+5. FIND PI IP ADDRESS
+---------------------
+arp -a | findstr "192.168."
+
+
+6. TEST PI CONNECTION (replace IP)
+-----------------------------------
+ping 192.168.1.100
+
+
+7. CREATE NODES CONFIG (edit IP first)
+---------------------------------------
+$piIP = "192.168.1.100"  # CHANGE THIS TO YOUR PI IP
+
+$nodes = @"
+{
+  "slaves": [
+    {
+      "node_id": "pi-slave",
+      "host": "$piIP",
+      "ssh_user": "pi",
+      "max_tasks": 2
+    }
+  ]
+}
+"@
+
+$nodes | Out-File -FilePath "$env:USERPROFILE\.kimi\distributed\master\nodes.json" -Encoding UTF8
+
+
+8. CREATE KIMI CONFIG
+---------------------
+$config = @"
+default_model = "kimi-code/kimi-for-coding"
+default_thinking = true
+default_yolo = false
+
+[models."kimi-code/kimi-for-coding"]
+provider = "managed:kimi-code"
+model = "kimi-for-coding"
+max_context_size = 262144
+capabilities = ["thinking", "image_in", "video_in"]
+
+[providers."managed:kimi-code"]
+type = "kimi"
+base_url = "https://api.kimi.com/coding/v1"
+api_key = ""
+
+[providers."managed:kimi-code".oauth]
+storage = "file"
+key = "oauth/kimi-code"
+
+[agent]
+name = "Kimi-Claw"
+identity = """
+You are Kimi-Claw, the unified AI agent.
+"""
+
+[agent.distributed]
+enabled = true
+config_path = "~/.kimi/distributed/master/nodes.json"
+auto_offload = true
+"@
+
+$config | Out-File -FilePath "$env:USERPROFILE\.kimi\kimi-claw.toml" -Encoding UTF8
+
+
+9. TEST KIMI
+------------
+kimi --config-file "$env:USERPROFILE\.kimi\kimi-claw.toml" --yes --prompt "Hello"
+
+
+10. CREATE DESKTOP SHORTCUT
+---------------------------
+$shortcut = @'
+@echo off
+set CONFIG=%USERPROFILE%\.kimi\kimi-claw.toml
+kimi --config-file %CONFIG% %*
+'@
+
+$shortcut | Out-File -FilePath "$env:USERPROFILE\Desktop\kimi-claw.bat" -Encoding ASCII
+
+
+=== TO USE ===
+1. Find your Pi IP first: arp -a | findstr "192.168."
+2. Edit step 7 with the correct IP
+3. Run commands in order
+4. Use: kimi-claw.bat "your prompt here"

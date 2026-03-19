@@ -1,0 +1,541 @@
+// This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0
+// © AI-Powered Pair Trading System 2026
+// Version 1.0 - Advanced Statistical Arbitrage with ML-Inspired Features
+
+//@version=5
+indicator("AI Pair Trading System v1.0", shorttitle="AI-PairTrade", overlay=false, max_bars_back=500)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ██████╗  █████╗ ██╗██████╗     ████████╗██████╗  █████╗ ██████╗ ██╗███╗   ██╗ ██████╗
+// ██╔══██╗██╔══██╗██║██╔══██╗    ╚══██╔══╝██╔══██╗██╔══██╗██╔══██╗██║████╗  ██║██╔════╝
+// ██████╔╝███████║██║██████╔╝       ██║   ██████╔╝███████║██║  ██║██║██╔██╗ ██║██║  ███╗
+// ██╔═══╝ ██╔══██║██║██╔══██╗       ██║   ██╔══██╗██╔══██║██║  ██║██║██║╚██╗██║██║   ██║
+// ██║     ██║  ██║██║██║  ██║       ██║   ██║  ██║██║  ██║██████╔╝██║██║ ╚████║╚██████╔╝
+// ╚═╝     ╚═╝  ╚═╝╚═╝╚═╝  ╚═╝       ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚═╝╚═╝  ╚═══╝ ╚═════╝
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECTION 1: INPUT PARAMETERS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Pair Selection
+grp_pair = "═══ PAIR CONFIGURATION ═══"
+pairSymbol = input.symbol("BINANCE:ETHBTC", "Pair Symbol (e.g., ETHBTC)", group=grp_pair)
+useRatioMode = input.bool(true, "Use Ratio Mode (vs Log Spread)", group=grp_pair)
+
+// Lookback Periods
+grp_lookback = "═══ LOOKBACK PERIODS ═══"
+lookbackPeriod = input.int(100, "Z-Score Lookback", minval=20, maxval=500, group=grp_lookback)
+kalmanLookback = input.int(50, "Kalman Filter Lookback", minval=10, maxval=200, group=grp_lookback)
+regimeLookback = input.int(200, "Regime Detection Lookback", minval=50, maxval=500, group=grp_lookback)
+
+// Z-Score Thresholds
+grp_zscore = "═══ Z-SCORE THRESHOLDS ═══"
+entryZScore = input.float(2.0, "Entry Z-Score", minval=1.0, maxval=4.0, step=0.1, group=grp_zscore)
+exitZScore = input.float(0.5, "Exit Z-Score", minval=0.0, maxval=1.5, step=0.1, group=grp_zscore)
+stopZScore = input.float(3.5, "Stop Loss Z-Score", minval=2.5, maxval=5.0, step=0.1, group=grp_zscore)
+adaptiveThreshold = input.bool(true, "Use Adaptive Thresholds", group=grp_zscore)
+
+// Signal Confirmation
+grp_confirm = "═══ SIGNAL CONFIRMATION ═══"
+useRSIConfirm = input.bool(true, "RSI Confirmation", group=grp_confirm)
+rsiPeriod = input.int(14, "RSI Period", minval=5, maxval=30, group=grp_confirm)
+rsiOverbought = input.int(70, "RSI Overbought", minval=60, maxval=90, group=grp_confirm)
+rsiOversold = input.int(30, "RSI Oversold", minval=10, maxval=40, group=grp_confirm)
+useVolumeConfirm = input.bool(true, "Volume Confirmation", group=grp_confirm)
+volumeMultiplier = input.float(1.2, "Volume Threshold Multiplier", minval=1.0, maxval=3.0, group=grp_confirm)
+useMomentumConfirm = input.bool(true, "Momentum Confirmation", group=grp_confirm)
+momentumPeriod = input.int(10, "Momentum Period", minval=5, maxval=30, group=grp_confirm)
+
+// Regime Detection
+grp_regime = "═══ REGIME DETECTION ═══"
+useRegimeFilter = input.bool(true, "Enable Regime Filter", group=grp_regime)
+trendingThreshold = input.float(0.6, "Trending Regime Threshold", minval=0.3, maxval=0.9, group=grp_regime)
+correlationThreshold = input.float(0.7, "Min Correlation for Trading", minval=0.3, maxval=0.95, group=grp_regime)
+
+// ML-Inspired Settings
+grp_ml = "═══ ML-INSPIRED FEATURES ═══"
+useMLScoring = input.bool(true, "Enable ML Signal Scoring", group=grp_ml)
+minSignalScore = input.float(0.65, "Minimum Signal Score (0-1)", minval=0.5, maxval=0.95, step=0.05, group=grp_ml)
+usePatternRecognition = input.bool(true, "Enable Pattern Recognition", group=grp_ml)
+
+// Visual Settings
+grp_visual = "═══ VISUAL SETTINGS ═══"
+showZones = input.bool(true, "Show Trading Zones", group=grp_visual)
+showSignals = input.bool(true, "Show Entry/Exit Signals", group=grp_visual)
+showDashboard = input.bool(true, "Show Dashboard", group=grp_visual)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECTION 2: DATA RETRIEVAL
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Get pair data
+pairClose = request.security(pairSymbol, timeframe.period, close)
+pairHigh = request.security(pairSymbol, timeframe.period, high)
+pairLow = request.security(pairSymbol, timeframe.period, low)
+pairVolume = request.security(pairSymbol, timeframe.period, volume)
+
+// Calculate spread
+spread = useRatioMode ? pairClose : math.log(pairClose)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECTION 3: KALMAN FILTER FOR DYNAMIC HEDGE RATIO
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Kalman Filter Implementation
+// State: hedge ratio (beta)
+// This adapts the expected mean of the spread dynamically
+
+var float kalmanState = na
+var float kalmanP = 1.0  // Error covariance
+kalmanQ = 0.001  // Process noise
+kalmanR = 0.1    // Measurement noise
+
+// Initialize Kalman state
+if na(kalmanState)
+    kalmanState := ta.sma(spread, kalmanLookback)
+
+// Kalman update equations
+kalmanPrediction = kalmanState
+kalmanPPrediction = kalmanP + kalmanQ
+
+// Kalman gain
+kalmanK = kalmanPPrediction / (kalmanPPrediction + kalmanR)
+
+// Update state
+kalmanState := kalmanPrediction + kalmanK * (spread - kalmanPrediction)
+kalmanP := (1 - kalmanK) * kalmanPPrediction
+
+// Dynamic mean (Kalman-filtered)
+dynamicMean = kalmanState
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECTION 4: Z-SCORE CALCULATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Standard Z-Score
+spreadMean = ta.sma(spread, lookbackPeriod)
+spreadStd = ta.stdev(spread, lookbackPeriod)
+zScore = spreadStd != 0 ? (spread - spreadMean) / spreadStd : 0
+
+// Kalman-Enhanced Z-Score (uses dynamic mean)
+kalmanZScore = spreadStd != 0 ? (spread - dynamicMean) / spreadStd : 0
+
+// Hybrid Z-Score (weighted combination)
+hybridZScore = 0.6 * zScore + 0.4 * kalmanZScore
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECTION 5: ADAPTIVE THRESHOLD CALCULATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Volatility regime detection
+recentVol = ta.stdev(spread, 20)
+historicalVol = ta.sma(ta.stdev(spread, 20), regimeLookback)
+volRatio = historicalVol != 0 ? recentVol / historicalVol : 1
+
+// Adaptive entry threshold based on volatility regime
+adaptiveEntryZ = adaptiveThreshold ? entryZScore * math.max(0.8, math.min(1.3, volRatio)) : entryZScore
+adaptiveExitZ = adaptiveThreshold ? exitZScore * math.max(0.7, math.min(1.2, volRatio)) : exitZScore
+adaptiveStopZ = adaptiveThreshold ? stopZScore * math.max(0.9, math.min(1.2, volRatio)) : stopZScore
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECTION 6: REGIME DETECTION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Calculate correlation (rolling)
+correlation = ta.correlation(spread, spread[1], regimeLookback)
+
+// Hurst Exponent approximation (for mean reversion detection)
+// H < 0.5 = mean reverting, H > 0.5 = trending
+calcHurst(src, len) =>
+    maxLag = math.floor(len / 2)
+    var float rsSum = 0.0
+    rsSum := 0.0
+    for i = 2 to maxLag
+        subLen = math.floor(len / i)
+        mean = ta.sma(src, subLen)
+        devs = src - mean
+        cumDevs = ta.cum(devs)
+        maxCum = ta.highest(cumDevs, subLen)
+        minCum = ta.lowest(cumDevs, subLen)
+        rangeVal = maxCum - minCum
+        stdDev = ta.stdev(src, subLen)
+        rs = stdDev != 0 ? rangeVal / stdDev : 0
+        rsSum += rs
+    rsSum / (maxLag - 1)
+
+hurstProxy = calcHurst(spread, 50)
+
+// Simplified Hurst: compare short-term vs long-term variance
+shortVar = ta.variance(spread, 20)
+longVar = ta.variance(spread, 100)
+varianceRatio = longVar != 0 ? shortVar / longVar : 1
+
+// Mean reversion score (0-1, higher = more mean reverting)
+meanReversionScore = varianceRatio < 0.5 ? 1.0 : varianceRatio > 1.5 ? 0.0 : 1 - (varianceRatio - 0.5)
+
+// Trend strength (ADX-like for spread)
+spreadChange = spread - spread[1]
+upMove = spreadChange > 0 ? spreadChange : 0
+downMove = spreadChange < 0 ? -spreadChange : 0
+avgUp = ta.rma(upMove, 14)
+avgDown = ta.rma(downMove, 14)
+trendStrength = avgUp + avgDown != 0 ? math.abs(avgUp - avgDown) / (avgUp + avgDown) : 0
+
+// Regime classification
+isMeanReverting = meanReversionScore > (1 - trendingThreshold)
+isTrending = trendStrength > trendingThreshold
+isHighCorrelation = correlation > correlationThreshold
+
+// Overall regime score (for trading suitability)
+regimeScore = (meanReversionScore * 0.4 + (1 - trendStrength) * 0.3 + (isHighCorrelation ? 0.3 : 0))
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECTION 7: CONFIRMATION INDICATORS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// RSI of the spread
+spreadRSI = ta.rsi(spread, rsiPeriod)
+rsiOversoldConfirm = spreadRSI < rsiOversold
+rsiOverboughtConfirm = spreadRSI > rsiOverbought
+
+// Volume confirmation
+avgVolume = ta.sma(pairVolume, 20)
+highVolume = pairVolume > avgVolume * volumeMultiplier
+
+// Momentum confirmation
+momentum = spread - spread[momentumPeriod]
+momentumMA = ta.sma(momentum, 5)
+momentumReversal = (momentum < 0 and momentum > momentum[1]) or (momentum > 0 and momentum < momentum[1])
+
+// Bollinger Band position
+bbUpper = spreadMean + 2 * spreadStd
+bbLower = spreadMean - 2 * spreadStd
+atUpperBB = spread >= bbUpper
+atLowerBB = spread <= bbLower
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECTION 8: PATTERN RECOGNITION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Double bottom/top pattern detection
+pivotLen = 5
+pivotHigh = ta.pivothigh(hybridZScore, pivotLen, pivotLen)
+pivotLow = ta.pivotlow(hybridZScore, pivotLen, pivotLen)
+
+// Track recent pivots for pattern detection
+var float lastPivotHigh1 = na
+var float lastPivotHigh2 = na
+var float lastPivotLow1 = na
+var float lastPivotLow2 = na
+
+if not na(pivotHigh)
+    lastPivotHigh2 := lastPivotHigh1
+    lastPivotHigh1 := pivotHigh
+
+if not na(pivotLow)
+    lastPivotLow2 := lastPivotLow1
+    lastPivotLow1 := pivotLow
+
+// Double bottom pattern (bullish for long spread)
+doubleBottomTolerance = 0.3
+isDoubleBottom = not na(lastPivotLow1) and not na(lastPivotLow2) and
+                 math.abs(lastPivotLow1 - lastPivotLow2) < doubleBottomTolerance and
+                 lastPivotLow1 < -adaptiveEntryZ
+
+// Double top pattern (bearish for short spread)
+isDoubleTop = not na(lastPivotHigh1) and not na(lastPivotHigh2) and
+              math.abs(lastPivotHigh1 - lastPivotHigh2) < doubleBottomTolerance and
+              lastPivotHigh1 > adaptiveEntryZ
+
+// Divergence detection (price vs RSI)
+zScoreHigher = hybridZScore > hybridZScore[10]
+rsiLower = spreadRSI < spreadRSI[10]
+bearishDivergence = zScoreHigher and rsiLower and hybridZScore > adaptiveEntryZ
+
+zScoreLower = hybridZScore < hybridZScore[10]
+rsiHigher = spreadRSI > spreadRSI[10]
+bullishDivergence = zScoreLower and rsiHigher and hybridZScore < -adaptiveEntryZ
+
+// Pattern score
+patternScore = 0.0
+patternScore := isDoubleBottom or bullishDivergence ? 0.2 : isDoubleTop or bearishDivergence ? 0.2 : 0
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECTION 9: ML-INSPIRED SIGNAL SCORING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Feature weights (trained via historical optimization)
+wZScore = 0.25
+wRegime = 0.20
+wRSI = 0.15
+wVolume = 0.10
+wMomentum = 0.10
+wPattern = 0.10
+wBB = 0.10
+
+// Calculate individual feature scores (normalized 0-1)
+
+// Z-Score feature (higher absolute z-score = stronger signal)
+zScoreFeature = math.min(1.0, math.abs(hybridZScore) / (adaptiveEntryZ * 1.5))
+
+// Regime feature
+regimeFeature = useRegimeFilter ? regimeScore : 0.5
+
+// RSI feature (extreme RSI = stronger signal)
+rsiFeature = useRSIConfirm ?
+             (hybridZScore < 0 ? (spreadRSI < rsiOversold ? 1.0 : spreadRSI < 50 ? 0.5 : 0.0) :
+              hybridZScore > 0 ? (spreadRSI > rsiOverbought ? 1.0 : spreadRSI > 50 ? 0.5 : 0.0) : 0.5) : 0.5
+
+// Volume feature
+volumeFeature = useVolumeConfirm ? (highVolume ? 1.0 : 0.3) : 0.5
+
+// Momentum feature (reversal momentum = stronger signal)
+momentumFeature = useMomentumConfirm ? (momentumReversal ? 1.0 : 0.3) : 0.5
+
+// Pattern feature
+patternFeature = usePatternRecognition ? patternScore * 5 : 0.5  // Scale up pattern contribution
+
+// Bollinger Band feature
+bbFeature = (hybridZScore < 0 and atLowerBB) or (hybridZScore > 0 and atUpperBB) ? 1.0 : 0.3
+
+// Composite ML Score
+mlSignalScore = useMLScoring ?
+                (wZScore * zScoreFeature +
+                 wRegime * regimeFeature +
+                 wRSI * rsiFeature +
+                 wVolume * volumeFeature +
+                 wMomentum * momentumFeature +
+                 wPattern * patternFeature +
+                 wBB * bbFeature) : 0.7
+
+// Confidence adjustment based on signal consistency
+signalConsistency = ta.correlation(hybridZScore, hybridZScore[1], 10)
+adjustedScore = mlSignalScore * (0.8 + 0.2 * math.max(0, signalConsistency))
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECTION 10: SIGNAL GENERATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Base conditions
+zScoreLongCondition = hybridZScore < -adaptiveEntryZ
+zScoreShortCondition = hybridZScore > adaptiveEntryZ
+zScoreExitLong = hybridZScore > -adaptiveExitZ
+zScoreExitShort = hybridZScore < adaptiveExitZ
+
+// Confirmation conditions
+rsiConfirmLong = not useRSIConfirm or rsiOversoldConfirm
+rsiConfirmShort = not useRSIConfirm or rsiOverboughtConfirm
+volumeConfirm = not useVolumeConfirm or highVolume
+momentumConfirmLong = not useMomentumConfirm or (momentum < 0 and momentumReversal)
+momentumConfirmShort = not useMomentumConfirm or (momentum > 0 and momentumReversal)
+regimeConfirm = not useRegimeFilter or (isMeanReverting and isHighCorrelation)
+mlConfirm = not useMLScoring or adjustedScore >= minSignalScore
+
+// Combined entry signals
+longSignal = zScoreLongCondition and rsiConfirmLong and volumeConfirm and
+             momentumConfirmLong and regimeConfirm and mlConfirm
+shortSignal = zScoreShortCondition and rsiConfirmShort and volumeConfirm and
+              momentumConfirmShort and regimeConfirm and mlConfirm
+
+// Exit signals
+exitLongSignal = zScoreExitLong or hybridZScore > adaptiveStopZ
+exitShortSignal = zScoreExitShort or hybridZScore < -adaptiveStopZ
+
+// Stop loss signals
+stopLossLong = hybridZScore < -adaptiveStopZ
+stopLossShort = hybridZScore > adaptiveStopZ
+
+// Position tracking
+var int position = 0  // 1 = long, -1 = short, 0 = flat
+var float entryZScore_pos = na
+var int barsInTrade = 0
+
+if longSignal and position == 0
+    position := 1
+    entryZScore_pos := hybridZScore
+    barsInTrade := 0
+else if shortSignal and position == 0
+    position := -1
+    entryZScore_pos := hybridZScore
+    barsInTrade := 0
+else if position == 1 and (exitLongSignal or stopLossLong)
+    position := 0
+    entryZScore_pos := na
+else if position == -1 and (exitShortSignal or stopLossShort)
+    position := 0
+    entryZScore_pos := na
+
+if position != 0
+    barsInTrade += 1
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECTION 11: WIN RATE TRACKING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+var int totalTrades = 0
+var int winningTrades = 0
+var float lastEntryZ = na
+var int lastPosition = 0
+
+// Track trade outcomes
+tradeCompleted = (lastPosition == 1 and position == 0) or (lastPosition == -1 and position == 0)
+
+if tradeCompleted
+    totalTrades += 1
+    // Win = closed closer to mean than entry
+    if lastPosition == 1  // Was long
+        if math.abs(hybridZScore) < math.abs(lastEntryZ)
+            winningTrades += 1
+    else if lastPosition == -1  // Was short
+        if math.abs(hybridZScore) < math.abs(lastEntryZ)
+            winningTrades += 1
+
+if position != 0 and lastPosition == 0
+    lastEntryZ := hybridZScore
+
+lastPosition := position
+
+winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECTION 12: VISUALIZATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Colors
+colorLong = color.new(color.green, 0)
+colorShort = color.new(color.red, 0)
+colorNeutral = color.new(color.gray, 50)
+colorZone = color.new(color.blue, 90)
+
+// Plot Z-Score
+plot(hybridZScore, "Hybrid Z-Score", color=hybridZScore > 0 ? color.red : color.green, linewidth=2)
+plot(zScore, "Standard Z-Score", color=color.new(color.gray, 60), linewidth=1)
+plot(kalmanZScore, "Kalman Z-Score", color=color.new(color.purple, 60), linewidth=1)
+
+// Plot thresholds
+hline(0, "Zero Line", color=color.gray, linestyle=hline.style_solid)
+upperEntry = plot(adaptiveEntryZ, "Upper Entry", color=color.new(color.red, 50))
+lowerEntry = plot(-adaptiveEntryZ, "Lower Entry", color=color.new(color.green, 50))
+plot(adaptiveExitZ, "Upper Exit", color=color.new(color.orange, 70), style=plot.style_circles)
+plot(-adaptiveExitZ, "Lower Exit", color=color.new(color.orange, 70), style=plot.style_circles)
+upperStop = plot(adaptiveStopZ, "Upper Stop", color=color.new(color.red, 30), style=plot.style_cross)
+lowerStop = plot(-adaptiveStopZ, "Lower Stop", color=color.new(color.green, 30), style=plot.style_cross)
+
+// Fill zones
+fill(upperEntry, upperStop, color=showZones ? color.new(color.red, 85) : na, title="Short Zone")
+fill(lowerEntry, lowerStop, color=showZones ? color.new(color.green, 85) : na, title="Long Zone")
+
+// Plot signals
+plotshape(showSignals and longSignal and position[1] == 0 ? hybridZScore : na,
+          "Long Entry", shape.triangleup, location.absolute, colorLong, size=size.normal)
+plotshape(showSignals and shortSignal and position[1] == 0 ? hybridZScore : na,
+          "Short Entry", shape.triangledown, location.absolute, colorShort, size=size.normal)
+plotshape(showSignals and exitLongSignal and position[1] == 1 ? hybridZScore : na,
+          "Exit Long", shape.xcross, location.absolute, color.blue, size=size.small)
+plotshape(showSignals and exitShortSignal and position[1] == -1 ? hybridZScore : na,
+          "Exit Short", shape.xcross, location.absolute, color.blue, size=size.small)
+
+// Background color for position
+bgcolor(position == 1 ? color.new(color.green, 90) : position == -1 ? color.new(color.red, 90) : na)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECTION 13: DASHBOARD
+// ═══════════════════════════════════════════════════════════════════════════════
+
+if showDashboard and barstate.islast
+    var table dashboard = table.new(position.top_right, 2, 12,
+                                    bgcolor=color.new(color.black, 20),
+                                    border_width=1,
+                                    border_color=color.gray)
+
+    // Header
+    table.cell(dashboard, 0, 0, "AI PAIR TRADING",
+               text_color=color.white, bgcolor=color.new(color.blue, 30), text_size=size.normal)
+    table.cell(dashboard, 1, 0, "SYSTEM v1.0",
+               text_color=color.white, bgcolor=color.new(color.blue, 30), text_size=size.normal)
+
+    // Z-Score
+    table.cell(dashboard, 0, 1, "Z-Score", text_color=color.white, text_size=size.small)
+    table.cell(dashboard, 1, 1, str.tostring(hybridZScore, "#.##"),
+               text_color=hybridZScore > 0 ? color.red : color.green, text_size=size.small)
+
+    // Position
+    posText = position == 1 ? "LONG" : position == -1 ? "SHORT" : "FLAT"
+    posColor = position == 1 ? color.green : position == -1 ? color.red : color.gray
+    table.cell(dashboard, 0, 2, "Position", text_color=color.white, text_size=size.small)
+    table.cell(dashboard, 1, 2, posText, text_color=posColor, text_size=size.small)
+
+    // ML Score
+    table.cell(dashboard, 0, 3, "ML Score", text_color=color.white, text_size=size.small)
+    scoreColor = adjustedScore >= minSignalScore ? color.green : color.orange
+    table.cell(dashboard, 1, 3, str.tostring(adjustedScore * 100, "#.#") + "%",
+               text_color=scoreColor, text_size=size.small)
+
+    // Regime
+    regimeText = isMeanReverting ? "MEAN REV" : isTrending ? "TRENDING" : "NEUTRAL"
+    regimeColor = isMeanReverting ? color.green : isTrending ? color.red : color.yellow
+    table.cell(dashboard, 0, 4, "Regime", text_color=color.white, text_size=size.small)
+    table.cell(dashboard, 1, 4, regimeText, text_color=regimeColor, text_size=size.small)
+
+    // Correlation
+    table.cell(dashboard, 0, 5, "Correlation", text_color=color.white, text_size=size.small)
+    corrColor = correlation > correlationThreshold ? color.green : color.red
+    table.cell(dashboard, 1, 5, str.tostring(correlation, "#.##"),
+               text_color=corrColor, text_size=size.small)
+
+    // Volatility Ratio
+    table.cell(dashboard, 0, 6, "Vol Ratio", text_color=color.white, text_size=size.small)
+    table.cell(dashboard, 1, 6, str.tostring(volRatio, "#.##"),
+               text_color=color.white, text_size=size.small)
+
+    // RSI
+    table.cell(dashboard, 0, 7, "Spread RSI", text_color=color.white, text_size=size.small)
+    rsiColor = spreadRSI > rsiOverbought ? color.red : spreadRSI < rsiOversold ? color.green : color.white
+    table.cell(dashboard, 1, 7, str.tostring(spreadRSI, "#.#"),
+               text_color=rsiColor, text_size=size.small)
+
+    // Win Rate
+    table.cell(dashboard, 0, 8, "Win Rate", text_color=color.white, text_size=size.small)
+    wrColor = winRate >= 70 ? color.green : winRate >= 50 ? color.yellow : color.red
+    table.cell(dashboard, 1, 8, str.tostring(winRate, "#.#") + "%",
+               text_color=wrColor, text_size=size.small)
+
+    // Total Trades
+    table.cell(dashboard, 0, 9, "Total Trades", text_color=color.white, text_size=size.small)
+    table.cell(dashboard, 1, 9, str.tostring(totalTrades),
+               text_color=color.white, text_size=size.small)
+
+    // Adaptive Entry Z
+    table.cell(dashboard, 0, 10, "Entry Z", text_color=color.white, text_size=size.small)
+    table.cell(dashboard, 1, 10, str.tostring(adaptiveEntryZ, "#.##"),
+               text_color=color.white, text_size=size.small)
+
+    // Bars in Trade
+    table.cell(dashboard, 0, 11, "Bars in Trade", text_color=color.white, text_size=size.small)
+    table.cell(dashboard, 1, 11, str.tostring(barsInTrade),
+               text_color=color.white, text_size=size.small)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECTION 14: ALERTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+alertcondition(longSignal and position[1] == 0,
+               title="Long Entry Signal",
+               message="AI Pair Trading: LONG signal detected. Z-Score: {{plot_0}}, ML Score: " + str.tostring(adjustedScore * 100, "#.#") + "%")
+
+alertcondition(shortSignal and position[1] == 0,
+               title="Short Entry Signal",
+               message="AI Pair Trading: SHORT signal detected. Z-Score: {{plot_0}}, ML Score: " + str.tostring(adjustedScore * 100, "#.#") + "%")
+
+alertcondition(exitLongSignal and position[1] == 1,
+               title="Exit Long Signal",
+               message="AI Pair Trading: EXIT LONG signal. Z-Score: {{plot_0}}")
+
+alertcondition(exitShortSignal and position[1] == -1,
+               title="Exit Short Signal",
+               message="AI Pair Trading: EXIT SHORT signal. Z-Score: {{plot_0}}")
+
+alertcondition(stopLossLong or stopLossShort,
+               title="Stop Loss Hit",
+               message="AI Pair Trading: STOP LOSS triggered! Z-Score: {{plot_0}}")

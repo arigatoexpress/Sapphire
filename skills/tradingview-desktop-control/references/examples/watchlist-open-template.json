@@ -1,0 +1,11 @@
+[
+  { "action": "activate", "launch": true },
+  { "action": "wait", "seconds": 0.2 },
+  {
+    "action": "watchlist-open",
+    "symbol": "BTCUSDT",
+    "x": 0.90,
+    "y": 0.10,
+    "normalized_window": true
+  }
+]

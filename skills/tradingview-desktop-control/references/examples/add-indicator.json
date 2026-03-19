@@ -1,0 +1,5 @@
+[
+  { "action": "activate", "launch": true },
+  { "action": "wait", "seconds": 0.25 },
+  { "action": "add-indicator", "query": "RSI", "open_combo": "/" }
+]

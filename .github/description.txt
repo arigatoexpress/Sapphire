@@ -1,1 +1,0 @@
-Autonomous trading control plane (ASTER/LIGHTER) with Telegram governance, Cloud Run services, and read-only dashboards.
