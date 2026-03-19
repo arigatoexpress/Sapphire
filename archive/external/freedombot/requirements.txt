@@ -1,6 +1,0 @@
-Flask
-mysql-connector-python
-gunicorn # You'll need this for production deployment
-
-boto3
-requests

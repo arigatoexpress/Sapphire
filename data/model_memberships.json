@@ -1,0 +1,123 @@
+{
+  "version": 1,
+  "updated_at": "2026-03-04T18:03:38.998085+00:00",
+  "memberships": [
+    {
+      "id": "claude_code",
+      "name": "Claude Code",
+      "enabled": true,
+      "provider": "anthropic",
+      "kind": "cli",
+      "command": "/Users/aribs/.local/bin/claude",
+      "version_args": [
+        "--version"
+      ],
+      "refresh_interval_minutes": 30,
+      "quota": {
+        "remaining": 0.0,
+        "unit": "tokens",
+        "next_reset_at": "2026-04-01T00:00:00+00:00",
+        "source": "auto:claude_stats",
+        "last_updated_at": "2026-03-04T18:03:38.998070+00:00",
+        "used": 0.0,
+        "usage_period": "monthly"
+      },
+      "routing_weights": {
+        "coding": 96,
+        "architecture": 92,
+        "research": 78,
+        "browser_automation": 38,
+        "operations": 88,
+        "project_management": 74,
+        "qa": 86
+      },
+      "notes": "Primary deep-coding and architecture model.",
+      "quota_note": "Marked exhausted from task fail task-36b27b8cbafc4d038cc5df6905d8ebe8"
+    },
+    {
+      "id": "codex",
+      "name": "Codex",
+      "enabled": true,
+      "provider": "openai",
+      "kind": "cli",
+      "command": "/Applications/Codex.app/Contents/Resources/codex",
+      "version_args": [
+        "--version"
+      ],
+      "refresh_interval_minutes": 30,
+      "quota": {
+        "remaining": null,
+        "unit": "tokens",
+        "next_reset_at": "",
+        "source": "manual",
+        "last_updated_at": "2026-02-20T22:21:04.539769+00:00"
+      },
+      "routing_weights": {
+        "coding": 94,
+        "architecture": 85,
+        "research": 79,
+        "browser_automation": 42,
+        "operations": 82,
+        "project_management": 83,
+        "qa": 90
+      },
+      "notes": "High-throughput coding and repo automation.",
+      "quota_note": "Marked exhausted from task fail task-907c697d088547caa330e2876ac98ef6"
+    },
+    {
+      "id": "kimi",
+      "name": "Kimi",
+      "enabled": true,
+      "provider": "moonshot",
+      "kind": "cli",
+      "command": "/Users/aribs/.local/bin/kimi",
+      "version_args": [
+        "--version"
+      ],
+      "refresh_interval_minutes": 30,
+      "quota": {
+        "remaining": null,
+        "unit": "tokens",
+        "next_reset_at": "",
+        "source": "manual",
+        "last_updated_at": ""
+      },
+      "routing_weights": {
+        "coding": 90,
+        "architecture": 89,
+        "research": 86,
+        "browser_automation": 60,
+        "operations": 84,
+        "project_management": 76,
+        "qa": 85
+      },
+      "notes": "Long-context strategy and autonomy workflows."
+    },
+    {
+      "id": "google_antigravity",
+      "name": "Google Antigravity",
+      "enabled": true,
+      "provider": "google",
+      "kind": "workspace",
+      "path": "/Users/aribs/.gemini/antigravity",
+      "refresh_interval_minutes": 30,
+      "quota": {
+        "remaining": null,
+        "unit": "requests",
+        "next_reset_at": "",
+        "source": "manual",
+        "last_updated_at": ""
+      },
+      "routing_weights": {
+        "coding": 52,
+        "architecture": 70,
+        "research": 84,
+        "browser_automation": 97,
+        "operations": 64,
+        "project_management": 71,
+        "qa": 66
+      },
+      "notes": "Best for browser-heavy and UI-interactive tasks."
+    }
+  ]
+}

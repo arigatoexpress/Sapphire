@@ -1,0 +1,4 @@
+interface:
+  display_name: "TradingView Desktop Control"
+  short_description: "Control TradingView Desktop via macOS UI automation"
+  default_prompt: "Control the running TradingView Desktop app on this Mac using safe UI automation primitives (focus, hotkeys, menus, typing) against the existing logged-in session. Use visible UI only, confirm before any live trading or broker actions."

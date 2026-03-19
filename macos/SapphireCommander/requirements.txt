@@ -1,5 +1,0 @@
-rumps>=0.4.0
-requests>=2.31.0
-pyobjc>=10.0
-plyer>=2.1.0
-py2app>=0.28.0

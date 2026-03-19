@@ -1,0 +1,6 @@
+[
+  { "action": "wait", "seconds": 2.0 },
+  { "action": "press", "key": "Slash" },
+  { "action": "wait", "seconds": 0.5 },
+  { "action": "snapshot", "label": "after-slash" }
+]

@@ -1,0 +1,8 @@
+[
+  { "action": "activate", "launch": true },
+  { "action": "wait", "seconds": 0.4 },
+  { "action": "hotkey", "combo": "cmd+k" },
+  { "action": "wait", "seconds": 0.2 },
+  { "action": "type", "text": "AAPL" },
+  { "action": "press", "key": "return" }
+]

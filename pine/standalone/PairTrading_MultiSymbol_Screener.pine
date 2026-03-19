@@ -1,0 +1,407 @@
+// This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0
+// © AI-Powered Pair Trading System 2026
+// MULTI-SYMBOL SCREENER - Scan ZEC, ETH, SOL, HYPE vs BTC + BTC/USD
+
+//@version=5
+indicator("AI Pair Screener - Multi Symbol",
+          shorttitle="AI-Screener",
+          overlay=false,
+          max_bars_back=500)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ███████╗ ██████╗██████╗ ███████╗███████╗███╗   ██╗███████╗██████╗
+// ██╔════╝██╔════╝██╔══██╗██╔════╝██╔════╝████╗  ██║██╔════╝██╔══██╗
+// ███████╗██║     ██████╔╝█████╗  █████╗  ██╔██╗ ██║█████╗  ██████╔╝
+// ╚════██║██║     ██╔══██╗██╔══╝  ██╔══╝  ██║╚██╗██║██╔══╝  ██╔══██╗
+// ███████║╚██████╗██║  ██║███████╗███████╗██║ ╚████║███████╗██║  ██║
+// ╚══════╝ ╚═════╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝
+// SCAN MULTIPLE CRYPTO PAIRS FOR BEST OPPORTUNITIES
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECTION 1: SYMBOL CONFIGURATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+grp_sym = "═══ 🔗 SYMBOLS ═══"
+sym1 = input.symbol("BINANCE:ETHBTC", "Symbol 1 (ETH/BTC)", group=grp_sym)
+sym2 = input.symbol("BINANCE:SOLBTC", "Symbol 2 (SOL/BTC)", group=grp_sym)
+sym3 = input.symbol("BINANCE:ZECBTC", "Symbol 3 (ZEC/BTC)", group=grp_sym)
+sym4 = input.symbol("BINANCE:BTCUSDT", "Symbol 4 (BTC/USDT)", group=grp_sym)
+sym5 = input.symbol("BYBIT:HYPEUSDT", "Symbol 5 (HYPE/USDT)", group=grp_sym)
+sym6 = input.symbol("BINANCE:AVAXBTC", "Symbol 6 (Custom)", group=grp_sym)
+
+// Labels for display
+lab1 = input.string("ETH/BTC", "Label 1", group=grp_sym)
+lab2 = input.string("SOL/BTC", "Label 2", group=grp_sym)
+lab3 = input.string("ZEC/BTC", "Label 3", group=grp_sym)
+lab4 = input.string("BTC/USDT", "Label 4", group=grp_sym)
+lab5 = input.string("HYPE/USDT", "Label 5", group=grp_sym)
+lab6 = input.string("AVAX/BTC", "Label 6", group=grp_sym)
+
+// === PARAMETERS ===
+grp_params = "═══ 📊 PARAMETERS ═══"
+zLookback = input.int(100, "Z-Score Lookback", minval=30, maxval=300, group=grp_params)
+entryZ = input.float(2.0, "Entry Z-Score", minval=1.0, maxval=4.0, step=0.1, group=grp_params)
+extremeZ = input.float(2.5, "Extreme Z-Score", minval=1.5, maxval=4.5, step=0.1, group=grp_params)
+minConfidence = input.float(0.65, "Min Confidence", minval=0.5, maxval=0.95, step=0.05, group=grp_params)
+
+// === VISUAL ===
+grp_vis = "═══ 🎨 DISPLAY ═══"
+showTable = input.bool(true, "Show Screener Table", group=grp_vis)
+showBest = input.bool(true, "Highlight Best Opportunity", group=grp_vis)
+sortBy = input.string("Z-Score", "Sort By", options=["Z-Score", "Confidence", "Signal"], group=grp_vis)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECTION 2: DATA RETRIEVAL FUNCTION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Get all symbol data
+c1 = request.security(sym1, timeframe.period, close)
+c2 = request.security(sym2, timeframe.period, close)
+c3 = request.security(sym3, timeframe.period, close)
+c4 = request.security(sym4, timeframe.period, close)
+c5 = request.security(sym5, timeframe.period, close)
+c6 = request.security(sym6, timeframe.period, close)
+
+v1 = request.security(sym1, timeframe.period, volume)
+v2 = request.security(sym2, timeframe.period, volume)
+v3 = request.security(sym3, timeframe.period, volume)
+v4 = request.security(sym4, timeframe.period, volume)
+v5 = request.security(sym5, timeframe.period, volume)
+v6 = request.security(sym6, timeframe.period, volume)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECTION 3: ANALYSIS FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Calculate Z-Score for a series
+calcZScore(src) =>
+    mean = ta.sma(src, zLookback)
+    std = ta.stdev(src, zLookback)
+    std != 0 ? (src - mean) / std : 0
+
+// Calculate RSI
+calcRSI(src) =>
+    ta.rsi(src, 14)
+
+// Calculate Mean Reversion Score
+calcMeanRev(src) =>
+    shortVar = ta.variance(src, 20)
+    longVar = ta.variance(src, 100)
+    varRatio = longVar != 0 ? (shortVar * 5) / longVar : 1
+    varRatio < 0.5 ? 1.0 : varRatio < 0.8 ? 0.75 : varRatio < 1.0 ? 0.5 : varRatio < 1.3 ? 0.25 : 0.0
+
+// Calculate trend strength
+calcTrend(src) =>
+    up = src > src[1] ? src - src[1] : 0
+    dn = src < src[1] ? src[1] - src : 0
+    avgUp = ta.rma(up, 14)
+    avgDn = ta.rma(dn, 14)
+    sum = avgUp + avgDn
+    sum != 0 ? math.abs(avgUp - avgDn) / sum : 0
+
+// Calculate half-life (cointegration proxy)
+calcHalfLife(src) =>
+    ar1 = ta.correlation(src, src[1], zLookback)
+    ar1 < 1 and ar1 > 0 ? -math.log(2) / math.log(ar1) : 999
+
+// Calculate volume ratio
+calcVolRatio(vol) =>
+    avgVol = ta.sma(vol, 20)
+    avgVol != 0 ? vol / avgVol : 1
+
+// Momentum reversal
+calcMomReversal(src, zs) =>
+    mom = src - src[10]
+    bullRev = mom < 0 and mom > mom[1] and mom[1] < mom[2] and zs < 0
+    bearRev = mom > 0 and mom < mom[1] and mom[1] > mom[2] and zs > 0
+    bullRev or bearRev
+
+// Calculate confidence score
+calcConfidence(zs, rsi, meanRev, trend, volRatio, momRev) =>
+    f_z = math.min(1.0, math.abs(zs) / (extremeZ * 1.2))
+    f_rsi = (zs < 0 and rsi < 30) or (zs > 0 and rsi > 70) ? 1.0 : 0.4
+    f_regime = meanRev * 0.5 + (1 - trend) * 0.5
+    f_vol = volRatio > 1.3 ? 1.0 : volRatio > 1.0 ? 0.6 : 0.3
+    f_mom = momRev ? 1.0 : 0.3
+
+    conf = f_z * 0.30 + f_rsi * 0.15 + f_regime * 0.25 + f_vol * 0.15 + f_mom * 0.15
+    math.min(1.0, conf)
+
+// Determine signal
+getSignal(zs, conf) =>
+    if zs < -extremeZ and conf >= minConfidence
+        2  // Strong Long
+    else if zs < -entryZ and conf >= minConfidence
+        1  // Long
+    else if zs > extremeZ and conf >= minConfidence
+        -2  // Strong Short
+    else if zs > entryZ and conf >= minConfidence
+        -1  // Short
+    else
+        0  // No signal
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECTION 4: CALCULATE ALL METRICS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Symbol 1 (ETH/BTC)
+z1 = calcZScore(c1)
+rsi1 = calcRSI(c1)
+mr1 = calcMeanRev(c1)
+tr1 = calcTrend(c1)
+hl1 = calcHalfLife(c1)
+vr1 = calcVolRatio(v1)
+mom1 = calcMomReversal(c1, z1)
+conf1 = calcConfidence(z1, rsi1, mr1, tr1, vr1, mom1)
+sig1 = getSignal(z1, conf1)
+
+// Symbol 2 (SOL/BTC)
+z2 = calcZScore(c2)
+rsi2 = calcRSI(c2)
+mr2 = calcMeanRev(c2)
+tr2 = calcTrend(c2)
+hl2 = calcHalfLife(c2)
+vr2 = calcVolRatio(v2)
+mom2 = calcMomReversal(c2, z2)
+conf2 = calcConfidence(z2, rsi2, mr2, tr2, vr2, mom2)
+sig2 = getSignal(z2, conf2)
+
+// Symbol 3 (ZEC/BTC)
+z3 = calcZScore(c3)
+rsi3 = calcRSI(c3)
+mr3 = calcMeanRev(c3)
+tr3 = calcTrend(c3)
+hl3 = calcHalfLife(c3)
+vr3 = calcVolRatio(v3)
+mom3 = calcMomReversal(c3, z3)
+conf3 = calcConfidence(z3, rsi3, mr3, tr3, vr3, mom3)
+sig3 = getSignal(z3, conf3)
+
+// Symbol 4 (BTC/USDT)
+z4 = calcZScore(c4)
+rsi4 = calcRSI(c4)
+mr4 = calcMeanRev(c4)
+tr4 = calcTrend(c4)
+hl4 = calcHalfLife(c4)
+vr4 = calcVolRatio(v4)
+mom4 = calcMomReversal(c4, z4)
+conf4 = calcConfidence(z4, rsi4, mr4, tr4, vr4, mom4)
+sig4 = getSignal(z4, conf4)
+
+// Symbol 5 (HYPE/USDT)
+z5 = calcZScore(c5)
+rsi5 = calcRSI(c5)
+mr5 = calcMeanRev(c5)
+tr5 = calcTrend(c5)
+hl5 = calcHalfLife(c5)
+vr5 = calcVolRatio(v5)
+mom5 = calcMomReversal(c5, z5)
+conf5 = calcConfidence(z5, rsi5, mr5, tr5, vr5, mom5)
+sig5 = getSignal(z5, conf5)
+
+// Symbol 6 (Custom)
+z6 = calcZScore(c6)
+rsi6 = calcRSI(c6)
+mr6 = calcMeanRev(c6)
+tr6 = calcTrend(c6)
+hl6 = calcHalfLife(c6)
+vr6 = calcVolRatio(v6)
+mom6 = calcMomReversal(c6, z6)
+conf6 = calcConfidence(z6, rsi6, mr6, tr6, vr6, mom6)
+sig6 = getSignal(z6, conf6)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECTION 5: FIND BEST OPPORTUNITY
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Score each opportunity (higher is better)
+score1 = math.abs(sig1) > 0 ? math.abs(z1) * conf1 : 0
+score2 = math.abs(sig2) > 0 ? math.abs(z2) * conf2 : 0
+score3 = math.abs(sig3) > 0 ? math.abs(z3) * conf3 : 0
+score4 = math.abs(sig4) > 0 ? math.abs(z4) * conf4 : 0
+score5 = math.abs(sig5) > 0 ? math.abs(z5) * conf5 : 0
+score6 = math.abs(sig6) > 0 ? math.abs(z6) * conf6 : 0
+
+// Find maximum
+maxScore = math.max(score1, math.max(score2, math.max(score3, math.max(score4, math.max(score5, score6)))))
+bestSymbol = maxScore == score1 and score1 > 0 ? 1 :
+             maxScore == score2 and score2 > 0 ? 2 :
+             maxScore == score3 and score3 > 0 ? 3 :
+             maxScore == score4 and score4 > 0 ? 4 :
+             maxScore == score5 and score5 > 0 ? 5 :
+             maxScore == score6 and score6 > 0 ? 6 : 0
+
+// Count active signals
+activeSignals = (math.abs(sig1) > 0 ? 1 : 0) + (math.abs(sig2) > 0 ? 1 : 0) +
+                (math.abs(sig3) > 0 ? 1 : 0) + (math.abs(sig4) > 0 ? 1 : 0) +
+                (math.abs(sig5) > 0 ? 1 : 0) + (math.abs(sig6) > 0 ? 1 : 0)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECTION 6: VISUALIZATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Plot best symbol's Z-score as reference
+bestZ = bestSymbol == 1 ? z1 : bestSymbol == 2 ? z2 : bestSymbol == 3 ? z3 :
+        bestSymbol == 4 ? z4 : bestSymbol == 5 ? z5 : bestSymbol == 6 ? z6 : 0
+
+plot(bestZ, "Best Opportunity Z", color=color.new(color.yellow, 0), linewidth=2)
+plot(z1, "ETH/BTC Z", color=color.new(color.blue, 60), linewidth=1)
+plot(z2, "SOL/BTC Z", color=color.new(color.purple, 60), linewidth=1)
+plot(z3, "ZEC/BTC Z", color=color.new(color.orange, 60), linewidth=1)
+plot(z4, "BTC Z", color=color.new(color.green, 60), linewidth=1)
+
+// Thresholds
+hline(0, "Zero", color=color.gray)
+hline(entryZ, "Entry+", color=color.new(color.red, 50))
+hline(-entryZ, "Entry-", color=color.new(color.green, 50))
+hline(extremeZ, "Extreme+", color=color.new(color.red, 30))
+hline(-extremeZ, "Extreme-", color=color.new(color.green, 30))
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECTION 7: SCREENER TABLE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+if showTable and barstate.islast
+    var table scr = table.new(position.top_right, 9, 8,
+                              bgcolor=color.new(#0a0a1a, 5),
+                              border_width=1,
+                              border_color=color.new(#333366, 0))
+
+    // Header
+    table.cell(scr, 0, 0, "🔍", text_color=#00ffff, bgcolor=color.new(#1a1a3a, 0), text_size=size.small)
+    table.cell(scr, 1, 0, "SYMBOL", text_color=#00ffff, bgcolor=color.new(#1a1a3a, 0), text_size=size.tiny)
+    table.cell(scr, 2, 0, "Z-SCORE", text_color=#00ffff, bgcolor=color.new(#1a1a3a, 0), text_size=size.tiny)
+    table.cell(scr, 3, 0, "RSI", text_color=#00ffff, bgcolor=color.new(#1a1a3a, 0), text_size=size.tiny)
+    table.cell(scr, 4, 0, "MEAN REV", text_color=#00ffff, bgcolor=color.new(#1a1a3a, 0), text_size=size.tiny)
+    table.cell(scr, 5, 0, "HALF-LIFE", text_color=#00ffff, bgcolor=color.new(#1a1a3a, 0), text_size=size.tiny)
+    table.cell(scr, 6, 0, "CONF", text_color=#00ffff, bgcolor=color.new(#1a1a3a, 0), text_size=size.tiny)
+    table.cell(scr, 7, 0, "SIGNAL", text_color=#00ffff, bgcolor=color.new(#1a1a3a, 0), text_size=size.tiny)
+    table.cell(scr, 8, 0, "SCORE", text_color=#00ffff, bgcolor=color.new(#1a1a3a, 0), text_size=size.tiny)
+
+    // Helper function to get signal text
+    getSigText(sig) =>
+        sig == 2 ? "🟢 STRONG LONG" : sig == 1 ? "🟢 LONG" :
+        sig == -2 ? "🔴 STRONG SHORT" : sig == -1 ? "🔴 SHORT" : "⚪ WAIT"
+
+    getSigColor(sig) =>
+        sig >= 1 ? color.green : sig <= -1 ? color.red : color.gray
+
+    getZColor(z) =>
+        z < -extremeZ ? color.lime : z < -entryZ ? color.green :
+        z > extremeZ ? color.red : z > entryZ ? color.maroon : color.gray
+
+    // Row 1 - ETH/BTC
+    isBest1 = bestSymbol == 1
+    rowBg1 = isBest1 and showBest ? color.new(color.yellow, 85) : na
+    table.cell(scr, 0, 1, isBest1 ? "⭐" : "", text_color=color.yellow, bgcolor=rowBg1, text_size=size.tiny)
+    table.cell(scr, 1, 1, lab1, text_color=color.white, bgcolor=rowBg1, text_size=size.tiny)
+    table.cell(scr, 2, 1, str.tostring(z1, "#.##"), text_color=getZColor(z1), bgcolor=rowBg1, text_size=size.tiny)
+    table.cell(scr, 3, 1, str.tostring(rsi1, "#.#"), text_color=rsi1 < 30 ? color.green : rsi1 > 70 ? color.red : color.gray, bgcolor=rowBg1, text_size=size.tiny)
+    table.cell(scr, 4, 1, str.tostring(mr1 * 100, "#") + "%", text_color=mr1 >= 0.6 ? color.green : color.red, bgcolor=rowBg1, text_size=size.tiny)
+    table.cell(scr, 5, 1, str.tostring(hl1, "#.#"), text_color=hl1 < 20 ? color.green : color.red, bgcolor=rowBg1, text_size=size.tiny)
+    table.cell(scr, 6, 1, str.tostring(conf1 * 100, "#") + "%", text_color=conf1 >= minConfidence ? color.green : color.gray, bgcolor=rowBg1, text_size=size.tiny)
+    table.cell(scr, 7, 1, getSigText(sig1), text_color=getSigColor(sig1), bgcolor=rowBg1, text_size=size.tiny)
+    table.cell(scr, 8, 1, str.tostring(score1, "#.##"), text_color=score1 > 0 ? color.yellow : color.gray, bgcolor=rowBg1, text_size=size.tiny)
+
+    // Row 2 - SOL/BTC
+    isBest2 = bestSymbol == 2
+    rowBg2 = isBest2 and showBest ? color.new(color.yellow, 85) : na
+    table.cell(scr, 0, 2, isBest2 ? "⭐" : "", text_color=color.yellow, bgcolor=rowBg2, text_size=size.tiny)
+    table.cell(scr, 1, 2, lab2, text_color=color.white, bgcolor=rowBg2, text_size=size.tiny)
+    table.cell(scr, 2, 2, str.tostring(z2, "#.##"), text_color=getZColor(z2), bgcolor=rowBg2, text_size=size.tiny)
+    table.cell(scr, 3, 2, str.tostring(rsi2, "#.#"), text_color=rsi2 < 30 ? color.green : rsi2 > 70 ? color.red : color.gray, bgcolor=rowBg2, text_size=size.tiny)
+    table.cell(scr, 4, 2, str.tostring(mr2 * 100, "#") + "%", text_color=mr2 >= 0.6 ? color.green : color.red, bgcolor=rowBg2, text_size=size.tiny)
+    table.cell(scr, 5, 2, str.tostring(hl2, "#.#"), text_color=hl2 < 20 ? color.green : color.red, bgcolor=rowBg2, text_size=size.tiny)
+    table.cell(scr, 6, 2, str.tostring(conf2 * 100, "#") + "%", text_color=conf2 >= minConfidence ? color.green : color.gray, bgcolor=rowBg2, text_size=size.tiny)
+    table.cell(scr, 7, 2, getSigText(sig2), text_color=getSigColor(sig2), bgcolor=rowBg2, text_size=size.tiny)
+    table.cell(scr, 8, 2, str.tostring(score2, "#.##"), text_color=score2 > 0 ? color.yellow : color.gray, bgcolor=rowBg2, text_size=size.tiny)
+
+    // Row 3 - ZEC/BTC
+    isBest3 = bestSymbol == 3
+    rowBg3 = isBest3 and showBest ? color.new(color.yellow, 85) : na
+    table.cell(scr, 0, 3, isBest3 ? "⭐" : "", text_color=color.yellow, bgcolor=rowBg3, text_size=size.tiny)
+    table.cell(scr, 1, 3, lab3, text_color=color.white, bgcolor=rowBg3, text_size=size.tiny)
+    table.cell(scr, 2, 3, str.tostring(z3, "#.##"), text_color=getZColor(z3), bgcolor=rowBg3, text_size=size.tiny)
+    table.cell(scr, 3, 3, str.tostring(rsi3, "#.#"), text_color=rsi3 < 30 ? color.green : rsi3 > 70 ? color.red : color.gray, bgcolor=rowBg3, text_size=size.tiny)
+    table.cell(scr, 4, 3, str.tostring(mr3 * 100, "#") + "%", text_color=mr3 >= 0.6 ? color.green : color.red, bgcolor=rowBg3, text_size=size.tiny)
+    table.cell(scr, 5, 3, str.tostring(hl3, "#.#"), text_color=hl3 < 20 ? color.green : color.red, bgcolor=rowBg3, text_size=size.tiny)
+    table.cell(scr, 6, 3, str.tostring(conf3 * 100, "#") + "%", text_color=conf3 >= minConfidence ? color.green : color.gray, bgcolor=rowBg3, text_size=size.tiny)
+    table.cell(scr, 7, 3, getSigText(sig3), text_color=getSigColor(sig3), bgcolor=rowBg3, text_size=size.tiny)
+    table.cell(scr, 8, 3, str.tostring(score3, "#.##"), text_color=score3 > 0 ? color.yellow : color.gray, bgcolor=rowBg3, text_size=size.tiny)
+
+    // Row 4 - BTC/USDT
+    isBest4 = bestSymbol == 4
+    rowBg4 = isBest4 and showBest ? color.new(color.yellow, 85) : na
+    table.cell(scr, 0, 4, isBest4 ? "⭐" : "", text_color=color.yellow, bgcolor=rowBg4, text_size=size.tiny)
+    table.cell(scr, 1, 4, lab4, text_color=color.white, bgcolor=rowBg4, text_size=size.tiny)
+    table.cell(scr, 2, 4, str.tostring(z4, "#.##"), text_color=getZColor(z4), bgcolor=rowBg4, text_size=size.tiny)
+    table.cell(scr, 3, 4, str.tostring(rsi4, "#.#"), text_color=rsi4 < 30 ? color.green : rsi4 > 70 ? color.red : color.gray, bgcolor=rowBg4, text_size=size.tiny)
+    table.cell(scr, 4, 4, str.tostring(mr4 * 100, "#") + "%", text_color=mr4 >= 0.6 ? color.green : color.red, bgcolor=rowBg4, text_size=size.tiny)
+    table.cell(scr, 5, 4, str.tostring(hl4, "#.#"), text_color=hl4 < 20 ? color.green : color.red, bgcolor=rowBg4, text_size=size.tiny)
+    table.cell(scr, 6, 4, str.tostring(conf4 * 100, "#") + "%", text_color=conf4 >= minConfidence ? color.green : color.gray, bgcolor=rowBg4, text_size=size.tiny)
+    table.cell(scr, 7, 4, getSigText(sig4), text_color=getSigColor(sig4), bgcolor=rowBg4, text_size=size.tiny)
+    table.cell(scr, 8, 4, str.tostring(score4, "#.##"), text_color=score4 > 0 ? color.yellow : color.gray, bgcolor=rowBg4, text_size=size.tiny)
+
+    // Row 5 - HYPE/USDT
+    isBest5 = bestSymbol == 5
+    rowBg5 = isBest5 and showBest ? color.new(color.yellow, 85) : na
+    table.cell(scr, 0, 5, isBest5 ? "⭐" : "", text_color=color.yellow, bgcolor=rowBg5, text_size=size.tiny)
+    table.cell(scr, 1, 5, lab5, text_color=color.white, bgcolor=rowBg5, text_size=size.tiny)
+    table.cell(scr, 2, 5, str.tostring(z5, "#.##"), text_color=getZColor(z5), bgcolor=rowBg5, text_size=size.tiny)
+    table.cell(scr, 3, 5, str.tostring(rsi5, "#.#"), text_color=rsi5 < 30 ? color.green : rsi5 > 70 ? color.red : color.gray, bgcolor=rowBg5, text_size=size.tiny)
+    table.cell(scr, 4, 5, str.tostring(mr5 * 100, "#") + "%", text_color=mr5 >= 0.6 ? color.green : color.red, bgcolor=rowBg5, text_size=size.tiny)
+    table.cell(scr, 5, 5, str.tostring(hl5, "#.#"), text_color=hl5 < 20 ? color.green : color.red, bgcolor=rowBg5, text_size=size.tiny)
+    table.cell(scr, 6, 5, str.tostring(conf5 * 100, "#") + "%", text_color=conf5 >= minConfidence ? color.green : color.gray, bgcolor=rowBg5, text_size=size.tiny)
+    table.cell(scr, 7, 5, getSigText(sig5), text_color=getSigColor(sig5), bgcolor=rowBg5, text_size=size.tiny)
+    table.cell(scr, 8, 5, str.tostring(score5, "#.##"), text_color=score5 > 0 ? color.yellow : color.gray, bgcolor=rowBg5, text_size=size.tiny)
+
+    // Row 6 - Custom
+    isBest6 = bestSymbol == 6
+    rowBg6 = isBest6 and showBest ? color.new(color.yellow, 85) : na
+    table.cell(scr, 0, 6, isBest6 ? "⭐" : "", text_color=color.yellow, bgcolor=rowBg6, text_size=size.tiny)
+    table.cell(scr, 1, 6, lab6, text_color=color.white, bgcolor=rowBg6, text_size=size.tiny)
+    table.cell(scr, 2, 6, str.tostring(z6, "#.##"), text_color=getZColor(z6), bgcolor=rowBg6, text_size=size.tiny)
+    table.cell(scr, 3, 6, str.tostring(rsi6, "#.#"), text_color=rsi6 < 30 ? color.green : rsi6 > 70 ? color.red : color.gray, bgcolor=rowBg6, text_size=size.tiny)
+    table.cell(scr, 4, 6, str.tostring(mr6 * 100, "#") + "%", text_color=mr6 >= 0.6 ? color.green : color.red, bgcolor=rowBg6, text_size=size.tiny)
+    table.cell(scr, 5, 6, str.tostring(hl6, "#.#"), text_color=hl6 < 20 ? color.green : color.red, bgcolor=rowBg6, text_size=size.tiny)
+    table.cell(scr, 6, 6, str.tostring(conf6 * 100, "#") + "%", text_color=conf6 >= minConfidence ? color.green : color.gray, bgcolor=rowBg6, text_size=size.tiny)
+    table.cell(scr, 7, 6, getSigText(sig6), text_color=getSigColor(sig6), bgcolor=rowBg6, text_size=size.tiny)
+    table.cell(scr, 8, 6, str.tostring(score6, "#.##"), text_color=score6 > 0 ? color.yellow : color.gray, bgcolor=rowBg6, text_size=size.tiny)
+
+    // Summary row
+    table.cell(scr, 0, 7, "", bgcolor=color.new(#1a1a3a, 0), text_size=size.tiny)
+    table.cell(scr, 1, 7, "SUMMARY", text_color=#00ffff, bgcolor=color.new(#1a1a3a, 0), text_size=size.tiny)
+    table.cell(scr, 2, 7, "", bgcolor=color.new(#1a1a3a, 0), text_size=size.tiny)
+    table.cell(scr, 3, 7, "", bgcolor=color.new(#1a1a3a, 0), text_size=size.tiny)
+    table.cell(scr, 4, 7, "", bgcolor=color.new(#1a1a3a, 0), text_size=size.tiny)
+    table.cell(scr, 5, 7, "", bgcolor=color.new(#1a1a3a, 0), text_size=size.tiny)
+    table.cell(scr, 6, 7, "", bgcolor=color.new(#1a1a3a, 0), text_size=size.tiny)
+    sigCountText = str.tostring(activeSignals) + " Active"
+    table.cell(scr, 7, 7, sigCountText, text_color=activeSignals > 0 ? color.green : color.gray,
+               bgcolor=color.new(#1a1a3a, 0), text_size=size.tiny)
+    bestLabel = bestSymbol == 1 ? lab1 : bestSymbol == 2 ? lab2 : bestSymbol == 3 ? lab3 :
+                bestSymbol == 4 ? lab4 : bestSymbol == 5 ? lab5 : bestSymbol == 6 ? lab6 : "None"
+    table.cell(scr, 8, 7, "Best: " + bestLabel, text_color=color.yellow,
+               bgcolor=color.new(#1a1a3a, 0), text_size=size.tiny)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECTION 8: ALERTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+alertcondition(math.abs(sig1) == 2, "Strong Signal ETH/BTC",
+               "AI Screener: STRONG signal on ETH/BTC! Z: " + str.tostring(z1, "#.##"))
+alertcondition(math.abs(sig2) == 2, "Strong Signal SOL/BTC",
+               "AI Screener: STRONG signal on SOL/BTC! Z: " + str.tostring(z2, "#.##"))
+alertcondition(math.abs(sig3) == 2, "Strong Signal ZEC/BTC",
+               "AI Screener: STRONG signal on ZEC/BTC! Z: " + str.tostring(z3, "#.##"))
+alertcondition(math.abs(sig4) == 2, "Strong Signal BTC/USDT",
+               "AI Screener: STRONG signal on BTC/USDT! Z: " + str.tostring(z4, "#.##"))
+alertcondition(math.abs(sig5) == 2, "Strong Signal HYPE",
+               "AI Screener: STRONG signal on HYPE! Z: " + str.tostring(z5, "#.##"))
+
+alertcondition(activeSignals >= 3, "Multiple Opportunities",
+               "AI Screener: " + str.tostring(activeSignals) + " pairs showing signals!")
+
+alertcondition(maxScore > 3.0, "High Score Opportunity",
+               "AI Screener: High score opportunity detected! Score: " + str.tostring(maxScore, "#.##"))

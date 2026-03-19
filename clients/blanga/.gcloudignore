@@ -1,0 +1,13 @@
+#!include:.gitignore
+
+# Exclude local caches and compiled files
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Exclude local environments and secrets
+.venv/
+.env
+
+# Optional docs/tests from deploy context
+tests/

@@ -1,0 +1,9 @@
+[
+  {
+    "action": "snapshot-click-one-of",
+    "labels": ["Create Alert", "Alert"],
+    "role": "button",
+    "match": "contains",
+    "wait_after": 1.0
+  }
+]

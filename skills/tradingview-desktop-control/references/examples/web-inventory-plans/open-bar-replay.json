@@ -1,0 +1,9 @@
+[
+  {
+    "action": "snapshot-click-one-of",
+    "labels": ["Bar Replay", "Replay"],
+    "role": "button",
+    "match": "contains",
+    "wait_after": 1.0
+  }
+]

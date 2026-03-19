@@ -1,0 +1,115 @@
+// ═══════════════════════════════════════════════════════════════
+// SAPPHIRE AI - Mac Autonomous Trading Strategy
+// Webhook to Mac Bridge → Windows → Pi Bots
+// ═══════════════════════════════════════════════════════════════
+
+//@version=5
+strategy("Sapphire AI Mac", overlay=true, 
+     initial_capital=1000, 
+     default_qty_type=strategy.percent_of_equity, 
+     default_qty_value=10,
+     commission_type=strategy.commission.percent,
+     commission_value=0.05)
+
+// ═══════════════════════════════════════════════════════════════
+// INPUTS
+// ═══════════════════════════════════════════════════════════════
+group_main = "Strategy Settings"
+fast_len = input.int(12, "Fast EMA", group=group_main)
+slow_len = input.int(26, "Slow EMA", group=group_main)
+rsi_len = input.int(14, "RSI Length", group=group_main)
+rsi_ob = input.int(70, "RSI Overbought", group=group_main)
+rsi_os = input.int(30, "RSI Oversold", group=group_main)
+
+// ═══════════════════════════════════════════════════════════════
+// INDICATORS
+// ═══════════════════════════════════════════════════════════════
+fast_ema = ta.ema(close, fast_len)
+slow_ema = ta.ema(close, slow_len)
+rsi = ta.rsi(close, rsi_len)
+[macd_line, signal_line, _] = ta.macd(close, 12, 26, 9)
+
+// Plot EMAs
+plot(fast_ema, "Fast EMA", color.new(color.blue, 0), 2)
+plot(slow_ema, "Slow EMA", color.new(color.orange, 0), 2)
+
+// ═══════════════════════════════════════════════════════════════
+// SIGNAL LOGIC
+// ═══════════════════════════════════════════════════════════════
+// Long: EMA cross up + MACD bullish + RSI not overbought
+long_cond = ta.crossover(fast_ema, slow_ema) and macd_line > signal_line and rsi < rsi_ob
+
+// Short: EMA cross down + MACD bearish + RSI not oversold
+short_cond = ta.crossunder(fast_ema, slow_ema) and macd_line < signal_line and rsi > rsi_os
+
+// Exit conditions
+exit_long = ta.crossunder(fast_ema, slow_ema) or rsi > 80
+exit_short = ta.crossover(fast_ema, slow_ema) or rsi < 20
+
+// ═══════════════════════════════════════════════════════════════
+// EXECUTION WITH WEBHOOK ALERTS
+// ═══════════════════════════════════════════════════════════════
+// IMPORTANT: Update this URL to your Mac's IP!
+// Mac Bridge webhook endpoint
+webhook_url = "http://192.168.1.28:8083/webhook"
+
+// Entry Long
+if long_cond
+    strategy.entry("Long", strategy.long, comment="Entry Long")
+    alert_message = '{"symbol": "' + syminfo.ticker + '", "action": "entry_long", "price": ' + str.tostring(close) + ', "size": 0.01, "strategy": "SapphireAI"}'
+    alert(alert_message, alert.freq_once_per_bar_close)
+
+// Entry Short  
+if short_cond
+    strategy.entry("Short", strategy.short, comment="Entry Short")
+    alert_message = '{"symbol": "' + syminfo.ticker + '", "action": "entry_short", "price": ' + str.tostring(close) + ', "size": 0.01, "strategy": "SapphireAI"}'
+    alert(alert_message, alert.freq_once_per_bar_close)
+
+// Exit Long
+if exit_long and strategy.position_size > 0
+    strategy.close("Long", comment="Exit Long")
+    alert_message = '{"symbol": "' + syminfo.ticker + '", "action": "exit_long", "price": ' + str.tostring(close) + ', "strategy": "SapphireAI"}'
+    alert(alert_message, alert.freq_once_per_bar_close)
+
+// Exit Short
+if exit_short and strategy.position_size < 0
+    strategy.close("Short", comment="Exit Short")
+    alert_message = '{"symbol": "' + syminfo.ticker + '", "action": "exit_short", "price": ' + str.tostring(close) + ', "strategy": "SapphireAI"}'
+    alert(alert_message, alert.freq_once_per_bar_close)
+
+// ═══════════════════════════════════════════════════════════════
+// INFO PANEL
+// ═══════════════════════════════════════════════════════════════
+var table info = table.new(position.top_right, 2, 7, 
+    bgcolor=color.new(color.black, 80), 
+    frame_width=1,
+    frame_color=color.gray)
+
+if barstate.islast
+    table.cell(info, 0, 0, "SAPPHIRE AI", text_color=color.aqua, text_size=size.normal)
+    table.cell(info, 1, 0, "Mac Bridge", text_color=color.gray, text_size=size.small)
+    table.cell(info, 0, 1, "Symbol", text_color=color.gray)
+    table.cell(info, 1, 1, syminfo.ticker, text_color=color.white)
+    table.cell(info, 0, 2, "Price", text_color=color.gray)
+    table.cell(info, 1, 2, str.tostring(close, format.mintick), text_color=color.yellow)
+    table.cell(info, 0, 3, "RSI", text_color=color.gray)
+    table.cell(info, 1, 3, str.tostring(rsi, "#."), 
+       text_color=rsi > 70 ? color.red : rsi < 30 ? color.green : color.white)
+    table.cell(info, 0, 4, "MACD", text_color=color.gray)
+    table.cell(info, 1, 4, str.tostring(macd_line, "#.##"), 
+       text_color=macd_line > 0 ? color.green : color.red)
+    table.cell(info, 0, 5, "Position", text_color=color.gray)
+    pos_text = strategy.position_size > 0 ? "LONG 🟢" : strategy.position_size < 0 ? "SHORT 🔴" : "FLAT ⚪"
+    pos_color = strategy.position_size > 0 ? color.green : strategy.position_size < 0 ? color.red : color.gray
+    table.cell(info, 1, 5, pos_text, text_color=pos_color)
+    table.cell(info, 0, 6, "PnL", text_color=color.gray)
+    pnl = strategy.openprofit
+    table.cell(info, 1, 6, str.tostring(pnl, "#.##"), 
+       text_color=pnl > 0 ? color.green : pnl < 0 ? color.red : color.white)
+
+// Background color for signals
+bgcolor(long_cond ? color.new(color.green, 90) : short_cond ? color.new(color.red, 90) : na)
+
+// Plot buy/sell signals
+plotshape(long_cond, "Long Entry", shape.triangleup, location.belowbar, color.green, size=size.small)
+plotshape(short_cond, "Short Entry", shape.triangledown, location.abovebar, color.red, size=size.small)

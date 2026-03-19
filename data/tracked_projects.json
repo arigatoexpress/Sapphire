@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "updated_at": "2026-02-21T00:29:00Z",
+  "projects": [
+    {
+      "id": "ai-project-management-system",
+      "name": "AI Project Management System",
+      "slug": "ai-project-management-system",
+      "canonical_local_path": "/Users/aribs/Documents/Organized/Codex Projects",
+      "local_paths": [
+        "/Users/aribs/Documents/Organized/Codex Projects"
+      ],
+      "github_urls": [
+        "https://github.com/arigatoexpress/agentic-project-manager-hub"
+      ],
+      "notes": "Primary command deck, control plane, and Asana-style dashboard workspace."
+    },
+    {
+      "id": "tho-project-go-forward",
+      "name": "THO (Project Go Forward)",
+      "slug": "tho-project-go-forward",
+      "canonical_local_path": "/Users/aribs/Documents/Organized/Codex Projects/github/Project-Go-Forward",
+      "local_paths": [
+        "/Users/aribs/Documents/Organized/Codex Projects/github/Project-Go-Forward",
+        "/Users/aribs/Documents/Business/Kadima Digital Strategies 2026/THO_MASTER/project-go-forward"
+      ],
+      "github_urls": [
+        "https://github.com/arigatoexpress/Project-Go-Forward"
+      ],
+      "notes": "Legacy business clone contains unmerged local changes and should be merged before archival."
+    },
+    {
+      "id": "blanga-intelligence-system",
+      "name": "Blanga Intelligence System",
+      "slug": "blanga-intelligence-system",
+      "canonical_local_path": "/Users/aribs/Documents/Organized/Codex Projects/blanga-bis-beta",
+      "local_paths": [
+        "/Users/aribs/Documents/Organized/Codex Projects/blanga-bis-beta",
+        "/Users/aribs/Documents/Organized/Codex Projects/app/bis"
+      ],
+      "github_urls": [
+        "https://github.com/arigatoexpress/blanga-bis-beta"
+      ],
+      "notes": "Standalone BIS beta repo is live on Cloud Run and tracked alongside the embedded module."
+    },
+    {
+      "id": "sapphire",
+      "name": "Sapphire",
+      "slug": "sapphire",
+      "canonical_local_path": "/Users/aribs/Documents/Organized/Codex Projects/github/Sapphire",
+      "local_paths": [
+        "/Users/aribs/Documents/Organized/Codex Projects/github/Sapphire",
+        "/Users/aribs/Documents/Organized/Codex Projects/github/sapphire-control",
+        "/Users/aribs/Documents/Organized/Codex Projects/github/sapphire-inc",
+        "/Users/aribs/AIAster"
+      ],
+      "github_urls": [
+        "https://github.com/arigatoexpress/Sapphire",
+        "https://github.com/arigatoexpress/sapphire-control",
+        "https://github.com/arigatoexpress/sapphire-inc"
+      ],
+      "notes": "Includes core trading repo plus control-plane and ops companion repositories."
+    },
+    {
+      "id": "blackjackal",
+      "name": "Blackjackal",
+      "slug": "blackjackal",
+      "canonical_local_path": "/Users/aribs/.blackjackal-chrome",
+      "local_paths": [
+        "/Users/aribs/.blackjackal-chrome"
+      ],
+      "github_urls": [
+        "https://github.com/arigatoexpress/blackjackal"
+      ],
+      "notes": "Tracked project repo created for Blackjackal; local Chrome workspace remains the canonical runtime data source."
+    },
+    {
+      "id": "crypto-tax-tracker",
+      "name": "Crypto Tax Tracker",
+      "slug": "crypto-tax-tracker",
+      "canonical_local_path": "/Users/aribs/Documents/Projects/Cointracker",
+      "local_paths": [
+        "/Users/aribs/Documents/Projects/Cointracker"
+      ],
+      "github_urls": [
+        "https://github.com/arigatoexpress/crypto-tax-tracker"
+      ],
+      "notes": "Tracked project repo created for Crypto Tax Tracker; local Cointracker directory remains canonical for active files."
+    }
+  ]
+}
