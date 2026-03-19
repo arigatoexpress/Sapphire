@@ -1,0 +1,37 @@
+[project]
+name = "sapphire-os"
+version = "0.1.0"
+description = "Sapphire OS — autonomous trading + PM + intelligence system"
+requires-python = ">=3.11"
+
+# uv workspace: each member manages its own deps
+[tool.uv.workspace]
+members = [
+    "lib/core",
+    "lib/telegram",
+    "lib/agents",
+    "services/lighter",
+    "services/aster",
+    "services/hyperliquid",
+    "services/alpha",
+    "services/dashboard",
+    "services/control-plane",
+    "services/webhook",
+    "clients/blanga",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501", "B008"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
