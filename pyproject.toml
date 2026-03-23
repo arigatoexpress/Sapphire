@@ -10,7 +10,6 @@ members = [
     "lib/core",
     "lib/telegram",
     "lib/agents",
-    "services/lighter",
     "services/aster",
     "services/hyperliquid",
     "services/alpha",
