@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "cards": [
+    {
+      "id": "card-consolidation-complete",
+      "title": "Consolidate deprecated repos into dated archive",
+      "project": "Workspace Consolidation",
+      "status": "done",
+      "priority": "high",
+      "owner": "Codex",
+      "notes": "Completed prune run and generated cleanup manifest.",
+      "updated_at": "2026-03-24T22:53:00.893769+00:00"
+    },
+    {
+      "id": "card-validate-legacy-diffs",
+      "title": "Review archived dirty clones for salvage commits",
+      "project": "Workspace Consolidation",
+      "status": "in_progress",
+      "priority": "high",
+      "owner": "Aribs",
+      "notes": "Dirty branches were archived to preserve local work; cherry-pick anything important.",
+      "updated_at": "2026-03-24T22:53:00.893769+00:00"
+    },
+    {
+      "id": "card-weekly-prune",
+      "title": "Run weekly stale-asset prune",
+      "project": "Ops Hygiene",
+      "status": "backlog",
+      "priority": "medium",
+      "owner": "Codex",
+      "notes": "Focus on browser recordings and superseded extension versions.",
+      "updated_at": "2026-03-24T22:53:00.893769+00:00"
+    },
+    {
+      "id": "card-github-triage",
+      "title": "Triage active GitHub repos into Keep/Merge/Archive",
+      "project": "GitHub Portfolio",
+      "status": "backlog",
+      "priority": "high",
+      "owner": "Aribs",
+      "notes": "Use repo-level objectives and commit velocity to reduce portfolio sprawl.",
+      "updated_at": "2026-03-24T22:53:00.893769+00:00"
+    },
+    {
+      "id": "card-automation",
+      "title": "Automate board sync from repo telemetry",
+      "project": "Agentic PM",
+      "status": "done",
+      "priority": "medium",
+      "owner": "Codex",
+      "notes": "Implemented sync engine, next-actions artifacts, and /api/projects/sync endpoint.",
+      "updated_at": "2026-03-24T22:53:00.893769+00:00"
+    }
+  ]
+}

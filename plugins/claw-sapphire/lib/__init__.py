@@ -1,0 +1,1 @@
+"""Sapphire plugin core library."""

@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "updated_at": "2026-03-24T22:53:03.392851+00:00",
+  "projects": [
+    {
+      "id": "sapphire-platform",
+      "name": "Sapphire Platform",
+      "slug": "sapphire-platform",
+      "canonical_local_path": "/Users/aribs/Code/Sapphire",
+      "local_paths": [
+        "/Users/aribs/Code/Sapphire",
+        "/Users/aribs/Code/Sapphire/services/control-plane"
+      ],
+      "github_urls": [
+        "https://github.com/arigatoexpress/Sapphire"
+      ],
+      "notes": "Canonical local-first platform repo. Control plane, alpha services, webhook, and Pi infrastructure now live here."
+    },
+    {
+      "id": "sapphire-ai-pm-manager",
+      "name": "Sapphire AI PM Manager",
+      "slug": "sapphire-ai-pm-manager",
+      "canonical_local_path": "/Users/aribs/Code/Sapphire/services/control-plane",
+      "local_paths": [
+        "/Users/aribs/Code/Sapphire/services/control-plane",
+        "/Users/aribs/Documents/Organized/Codex Projects"
+      ],
+      "github_urls": [
+        "https://github.com/arigatoexpress/Sapphire"
+      ],
+      "github_required": false,
+      "notes": "The PM hub is embedded in Sapphire. The Codex workspace is the operator-side scratchpad and memory surface that feeds it."
+    },
+    {
+      "id": "project-go-forward",
+      "name": "THO (Project Go Forward)",
+      "slug": "project-go-forward",
+      "canonical_local_path": "/Users/aribs/Code/Project-Go-Forward",
+      "local_paths": [
+        "/Users/aribs/Code/Project-Go-Forward"
+      ],
+      "github_urls": [
+        "https://github.com/arigatoexpress/Project-Go-Forward"
+      ],
+      "notes": "Client delivery repo and active local source of truth for the THO build."
+    },
+    {
+      "id": "ve-vote-monitor",
+      "name": "Codex Workspace Monitor",
+      "slug": "ve-vote-monitor",
+      "canonical_local_path": "/Users/aribs/Documents/Organized/Codex Projects",
+      "local_paths": [
+        "/Users/aribs/Documents/Organized/Codex Projects"
+      ],
+      "github_urls": [
+        "https://github.com/arigatoexpress/ve-vote-monitor"
+      ],
+      "github_required": false,
+      "notes": "Local Codex workspace repo. Contains operator tooling, memory, and exploratory automation tied into the PM loop."
+    },
+    {
+      "id": "cointracker",
+      "name": "Cointracker / Tax Ops",
+      "slug": "cointracker",
+      "canonical_local_path": "/Users/aribs/Code/Cointracker",
+      "local_paths": [
+        "/Users/aribs/Code/Cointracker"
+      ],
+      "github_urls": [
+        "https://github.com/arigatoexpress/crypto-tax-tracker"
+      ],
+      "notes": "Finance and bookkeeping repo used for local operational tracking."
+    },
+    {
+      "id": "kimi-openclaw-runtime",
+      "name": "Kimi / OpenClaw Runtime",
+      "slug": "kimi-openclaw-runtime",
+      "canonical_local_path": "/Users/aribs/.openclaw",
+      "local_paths": [
+        "/Users/aribs/.openclaw",
+        "/Users/aribs/.codex/skills/kimi-claw"
+      ],
+      "github_urls": [],
+      "github_required": false,
+      "notes": "Local-only agent runtime and recovery surface for the Pi-hosted Kimi/OpenClaw stack."
+    }
+  ]
+}

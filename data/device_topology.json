@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "updated": "2026-04-01",
+  "description": "Sapphire OS device mesh topology — canonical source of truth for all devices",
+
+  "devices": {
+    "mac": {
+      "hostname": "macbook-pro-8",
+      "tailscaleIp": "100.67.171.79",
+      "os": "macOS",
+      "role": "Commander — architecture, refactors, planning, git, all MCPs",
+      "status": "online",
+      "clawProfile": "mac-commander",
+      "agents": ["claude-code", "claw-code", "openclaw-workers"],
+      "tools": {
+        "brew": "5.1.0", "tailscale": "1.96.2", "node": "24.4.0",
+        "uv": "0.10.4", "gh": "2.86.0", "ollama": "0.19.0",
+        "docker": "29.1.2", "cargo": "1.94.1", "python3": "3.12.8"
+      },
+      "ollamaModels": ["llama3.2:3b", "llama3.3:70b", "abspec999/new1:latest"],
+      "services": [],
+      "launchAgents": [
+        "ai.openclaw.gateway",
+        "com.aribs.agentic.control-api",
+        "com.aribs.agentic.worker.claude",
+        "com.aribs.agentic.worker.codex",
+        "com.aribs.agentic.worker.kimi",
+        "com.aribs.agentic.worker.antigravity",
+        "com.aribs.agentic.worker.openclaw-main",
+        "com.sapphire.sync-eu-proxy-firewall"
+      ]
+    },
+
+    "windows-pc": {
+      "hostname": "DESKTOP-HFCK6U9",
+      "tailscaleIp": "100.71.10.48",
+      "os": "Windows",
+      "role": "GPU Workbench — RTX 5070 Ti, inference, TradingView webhook relay",
+      "status": "online",
+      "clawProfile": "windows-workbench",
+      "agents": ["claw-code"],
+      "gpu": "NVIDIA RTX 5070 Ti",
+      "tools": {
+        "python": "3.13", "docker": true, "git": true, "node": true,
+        "gcloud": true, "ollama": "pending-setup"
+      },
+      "ollamaModels": [],
+      "services": [
+        {"name": "webhook", "port": 9090, "status": "planned"}
+      ],
+      "notes": "Chronos forecasting, TradingView Pine scripts, Nosana GPU compute registration"
+    },
+
+    "rari1": {
+      "hostname": "rari1",
+      "tailscaleIp": "100.120.191.1",
+      "os": "Linux (Raspberry Pi OS)",
+      "role": "Controller Pi — Telegram bot, Kimi agent, control-plane, dashboard",
+      "status": "offline",
+      "lastSeen": "2026-03-28T04:39:59Z",
+      "clawProfile": "rari1-controller",
+      "agents": ["kimi-claw", "claw-code"],
+      "services": [
+        {"name": "control-plane", "port": 8082, "status": "offline"},
+        {"name": "dashboard", "port": 8080, "status": "offline"},
+        {"name": "openclaw-gateway", "port": 18789, "status": "offline"},
+        {"name": "redis", "port": 6379, "bind": "127.0.0.1", "status": "offline"},
+        {"name": "telegram-bot", "status": "offline"}
+      ],
+      "storage": "/mnt/ssd/sapphire/"
+    },
+
+    "rari2": {
+      "hostname": "rari2",
+      "tailscaleIp": "100.87.225.89",
+      "os": "Linux (Raspberry Pi OS)",
+      "role": "Trading Pi — Aster DEX, Hyperliquid, Alpha engine, ProtonVPN",
+      "status": "offline",
+      "lastSeen": "2026-03-28T04:39:57Z",
+      "clawProfile": "rari2-trader",
+      "agents": ["claw-code"],
+      "services": [
+        {"name": "aster", "port": 18081, "status": "offline"},
+        {"name": "hyperliquid", "port": 18082, "status": "offline"},
+        {"name": "alpha-engine", "port": 18081, "status": "offline"}
+      ],
+      "vpn": {"provider": "ProtonVPN", "location": "Switzerland", "protocol": "WireGuard"},
+      "security": "Strictest permissions — trading-only, no general access"
+    }
+  }
+}

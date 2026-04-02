@@ -1,0 +1,68 @@
+{
+  "name": "sapphire",
+  "version": "0.3.0",
+  "description": "Sapphire OS — multi-agent dispatch, token governance, verification, factory automation",
+  "defaultEnabled": true,
+  "permissions": ["read", "write", "execute"],
+
+  "hooks": {
+    "PreToolUse": ["python3 plugins/claw-sapphire/hooks/pre_tool_use.py"],
+    "PostToolUse": ["python3 plugins/claw-sapphire/hooks/post_tool_use.py"]
+  },
+
+  "lifecycle": {
+    "Init": ["python3 -c \"print('Sapphire plugin initialized')\""]
+  },
+
+  "tools": [
+    {
+      "name": "sapphire_dispatch",
+      "description": "Route a development task to the optimal inference tier (T0=Nemotron free, T1=Kimi subscription, T3=Claude expensive). Classifies task complexity via Nemotron, checks token budget, executes on cheapest capable tier.",
+      "command": "python3",
+      "args": ["plugins/claw-sapphire/tools/dispatch.py"],
+      "requiredPermission": "workspace-write"
+    },
+    {
+      "name": "sapphire_verify",
+      "description": "Run lint (ruff) and tests (pytest) on a repo. Returns pass/fail status and whether it's safe to commit. Use after making code changes.",
+      "command": "python3",
+      "args": ["plugins/claw-sapphire/tools/verify.py"],
+      "requiredPermission": "read-only"
+    },
+    {
+      "name": "sapphire_budget",
+      "description": "Show token usage per inference tier for today. Shows T0 (Nemotron/free), T1 (Kimi), T3 (Claude) with budget bars and call counts.",
+      "command": "python3",
+      "args": ["plugins/claw-sapphire/tools/budget.py"],
+      "requiredPermission": "read-only"
+    },
+    {
+      "name": "sapphire_state",
+      "description": "Read/write persistent factory state. Tracks known issues, fix attempts, backoff timers. Prevents re-attempting failed fixes.",
+      "command": "python3",
+      "args": ["plugins/claw-sapphire/tools/state.py"],
+      "requiredPermission": "workspace-write"
+    },
+    {
+      "name": "sapphire_status",
+      "description": "Query Sapphire mesh status — Tailscale devices, Ollama models on GPU and local.",
+      "command": "python3",
+      "args": ["plugins/claw-sapphire/tools/status.py"],
+      "requiredPermission": "read-only"
+    },
+    {
+      "name": "sapphire_notify",
+      "description": "Send a Telegram notification via NemotronRariBot. Priority: p0=urgent, p1=normal, p2=low.",
+      "command": "python3",
+      "args": ["plugins/claw-sapphire/tools/notify.py"],
+      "requiredPermission": "read-only"
+    },
+    {
+      "name": "sapphire_market",
+      "description": "Unified market data — equity quotes, crypto OHLCV, FRED macro, news via OpenBB (32 providers) + TradingView live chart data, Pine Script CI. Actions: quote, crypto, historical, fred, news, snapshot, tv_quote, tv_ohlcv, tv_levels, tv_strategy, pine_ci.",
+      "command": "python3",
+      "args": ["plugins/claw-sapphire/tools/market.py"],
+      "requiredPermission": "read-only"
+    }
+  ]
+}

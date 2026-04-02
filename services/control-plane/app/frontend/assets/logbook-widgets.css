@@ -1,0 +1,121 @@
+.lw-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.lw-card {
+  background: rgba(255, 255, 255, 0.015);
+  border: 1px solid rgba(143, 176, 214, 0.1);
+  border-radius: 14px;
+  padding: 0.75rem;
+}
+
+.lw-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.lw-card-top h4 {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.2;
+}
+
+.lw-card-copy {
+  margin: 0.35rem 0 0;
+  color: var(--muted, #9db4cd);
+  font-size: 0.82rem;
+  line-height: 1.3;
+}
+
+.lw-card-foot {
+  margin-top: 0.55rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.lw-meta {
+  color: var(--muted, #9db4cd);
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+
+.lw-chip {
+  border-radius: 999px;
+  padding: 0.18rem 0.45rem;
+  border: 1px solid rgba(143, 176, 214, 0.14);
+  background: rgba(255, 255, 255, 0.03);
+  color: #cfe0f5;
+  font-size: 0.72rem;
+}
+
+.lw-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(143, 176, 214, 0.18);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0.16rem 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #dbeaf8;
+}
+
+.lw-badge.info,
+.lw-badge.progress { border-color: rgba(73, 214, 255, 0.25); color: #caf6ff; }
+.lw-badge.ok,
+.lw-badge.verification { border-color: rgba(113, 242, 183, 0.28); color: #d6ffef; }
+.lw-badge.warn,
+.lw-badge.decision { border-color: rgba(255, 183, 74, 0.28); color: #ffe7bc; }
+.lw-badge.error,
+.lw-badge.incident { border-color: rgba(255, 111, 143, 0.28); color: #ffd7e1; }
+.lw-badge.handoff { border-color: rgba(255, 217, 120, 0.28); color: #fff0c4; }
+
+.lw-ledger-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.lw-ledger-grid h4,
+.lw-ledger-stack h4 {
+  margin: 0 0 0.4rem;
+  font-size: 0.9rem;
+}
+
+.lw-timeline-stack {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.lw-timeline-item {
+  border-radius: 12px;
+  border: 1px solid rgba(143, 176, 214, 0.1);
+  background: rgba(255, 255, 255, 0.015);
+  padding: 0.65rem;
+}
+
+.lw-timeline-row {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.35rem;
+}
+
+.lw-timeline-head {
+  margin: 0;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+@media (max-width: 900px) {
+  .lw-grid,
+  .lw-ledger-grid {
+    grid-template-columns: 1fr;
+  }
+}

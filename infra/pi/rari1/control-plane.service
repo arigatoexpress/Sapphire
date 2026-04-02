@@ -1,0 +1,23 @@
+[Unit]
+Description=Sapphire Control Plane (PM hub — on-prem rari1)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=rari
+WorkingDirectory=/mnt/ssd/sapphire/control-plane
+EnvironmentFile=/mnt/ssd/sapphire/control-plane/.env
+ExecStart=/mnt/ssd/sapphire/control-plane/venv/bin/uvicorn app.main:app \
+    --host 0.0.0.0 \
+    --port 8082 \
+    --log-level info
+Restart=always
+RestartSec=10
+
+# Logs
+StandardOutput=append:/mnt/ssd/sapphire/logs/control-plane.log
+StandardError=append:/mnt/ssd/sapphire/logs/control-plane.err
+
+[Install]
+WantedBy=multi-user.target

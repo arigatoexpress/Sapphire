@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sapphire Inc Organization OS</title>
+    <meta
+      name="description"
+      content="Unified operating model for Sapphire Inc projects, autonomous agents, and local-first execution operations."
+    />
+    <meta name="asset-version" content="__ASSET_VERSION__" />
+    <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=__ASSET_VERSION__" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/assets/logbook-widgets.css?v=__ASSET_VERSION__" />
+    <link rel="stylesheet" href="/assets/organization.css?v=__ASSET_VERSION__" />
+    <link rel="stylesheet" href="/assets/unified-ops-theme.css?v=__ASSET_VERSION__" />
+    <link rel="stylesheet" href="/assets/dark-theme.css?v=__ASSET_VERSION__" />
+    <script defer src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script defer src="/assets/logbook-widgets.js?v=__ASSET_VERSION__"></script>
+    <script defer src="/assets/frontend-logbook-client.js?v=__ASSET_VERSION__"></script>
+    <script defer src="/assets/organization.js?v=__ASSET_VERSION__"></script>
+  </head>
+  <body class="theme-organization">
+    <div class="texture" aria-hidden="true"></div>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Sapphire Inc</p>
+        <h1>Organization OS</h1>
+        <p class="subhead">One operating model across products, agents, local orchestration, and edge execution.</p>
+      </div>
+      <div class="actions">
+        <a href="/" class="btn ghost">Sapphire Deck</a>
+        <a href="/projects" class="btn ghost">Projects Board</a>
+        <a href="/logbook" class="btn ghost">Logbook</a>
+        <a href="/secops" class="btn ghost">Sec Ops</a>
+        <a href="/architecture" class="btn ghost">Architecture Map</a>
+        <a href="/organization" class="btn ghost" aria-current="page">Organization OS</a>
+        <button id="refresh-org" class="btn solid" type="button">Refresh</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="summary-grid">
+        <article class="summary-card">
+          <p>Generated</p>
+          <h2 id="org-generated">--</h2>
+        </article>
+        <article class="summary-card">
+          <p>Workspaces</p>
+          <h2 id="metric-workspaces">--</h2>
+        </article>
+        <article class="summary-card">
+          <p>Tracked Projects</p>
+          <h2 id="metric-projects">--</h2>
+        </article>
+        <article class="summary-card">
+          <p>Agents Online</p>
+          <h2 id="metric-agents">--</h2>
+        </article>
+        <article class="summary-card accent">
+          <p>Trading Model</p>
+          <h2 id="metric-model">--</h2>
+        </article>
+      </section>
+
+      <section class="panel split">
+        <article>
+          <div class="panel-head">
+            <h3>Operating Model</h3>
+            <p id="model-subtitle">Local control + edge execution</p>
+          </div>
+          <ul id="org-model" class="simple-list">
+            <li>Loading organization model...</li>
+          </ul>
+        </article>
+        <article>
+          <div class="panel-head">
+            <h3>Blockers</h3>
+            <p>Issues preventing full autonomous flow</p>
+          </div>
+          <ul id="org-blockers" class="simple-list">
+            <li>Loading blockers...</li>
+          </ul>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h3>Operating Units</h3>
+          <p>Core Sapphire lanes and the surfaces each one owns.</p>
+        </div>
+        <div id="operating-units-grid" class="workspace-grid">
+          <p class="muted">Loading operating units...</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h3>Workspace Alignment</h3>
+          <p>Differentiate project lanes while sharing one control plane.</p>
+        </div>
+        <div id="workspace-grid" class="workspace-grid">
+          <p class="muted">Loading workspaces...</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h3>Trading Rail Readiness</h3>
+          <p>Aster and Lighter execution ownership and deployment status.</p>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Rail</th>
+                <th>Preferred Node</th>
+                <th>Agent</th>
+                <th>Membership</th>
+                <th>Readiness</th>
+              </tr>
+            </thead>
+            <tbody id="rails-table">
+              <tr><td colspan="5">Loading rails...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel split">
+        <article>
+          <div class="panel-head">
+            <h3>Autonomous Org Architecture</h3>
+            <p>Local control plane + Telegram + Pi execution topology.</p>
+          </div>
+          <div id="org-architecture-mermaid" class="mermaid-shell">
+            <p class="muted">Loading architecture map...</p>
+          </div>
+        </article>
+        <article>
+          <div class="panel-head">
+            <h3>Execution Telemetry</h3>
+            <p>Control plane and trading-rail utilization in real time.</p>
+          </div>
+          <div id="org-telemetry-bars" class="telemetry-grid">
+            <p class="muted">Loading telemetry...</p>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel split">
+        <article>
+          <div class="panel-head">
+            <h3>Kimi Executor Trust</h3>
+            <p>Pi attestation and core tool readiness for the active autonomous executor.</p>
+          </div>
+          <div id="executor-tool-grid" class="status-chip-grid">
+            <p class="muted">Loading executor trust...</p>
+          </div>
+          <ul id="executor-attestation-list" class="simple-list">
+            <li>Loading executor attestation...</li>
+          </ul>
+        </article>
+        <article>
+          <div class="panel-head">
+            <h3>Primary Executor</h3>
+            <p>Current kimi-main host metadata and workspace location.</p>
+          </div>
+          <ul id="executor-primary-details" class="simple-list">
+            <li>Loading primary executor...</li>
+          </ul>
+          <ul id="executor-readiness-recommendations" class="simple-list compact">
+            <li>Loading executor recommendations...</li>
+          </ul>
+        </article>
+      </section>
+
+      <section class="panel split">
+        <article>
+          <div class="panel-head">
+            <h3>Coordination Logbook</h3>
+            <p>Shared communication lanes for autonomous progress, incidents, decisions, and handoffs.</p>
+          </div>
+          <ul id="org-logbook-summary" class="simple-list">
+            <li>Loading logbook summary...</li>
+          </ul>
+          <div id="org-comm-cards" class="lw-grid">
+            <p class="muted">Loading communication lanes...</p>
+          </div>
+        </article>
+        <article>
+          <div class="panel-head">
+            <h3>Decision / Handoff / Incident Feed</h3>
+            <p>Cross-agent coordination excerpts from the unified logbook.</p>
+          </div>
+          <div class="lw-ledger-grid">
+            <div>
+              <h4>Decisions</h4>
+              <ul id="org-decision-ledger" class="simple-list compact"><li>Loading decisions...</li></ul>
+            </div>
+            <div>
+              <h4>Handoffs</h4>
+              <ul id="org-handoff-ledger" class="simple-list compact"><li>Loading handoffs...</li></ul>
+            </div>
+          </div>
+          <div class="lw-ledger-stack">
+            <h4>Incidents / Verifications</h4>
+            <ul id="org-incident-ledger" class="simple-list compact"><li>Loading incidents...</li></ul>
+            <ul id="org-verification-ledger" class="simple-list compact"><li>Loading verifications...</li></ul>
+          </div>
+          <div id="org-logbook-timeline" class="lw-timeline-stack">
+            <p class="muted">Loading logbook timeline...</p>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel split">
+        <article>
+          <div class="panel-head">
+            <h3>Executor Policy</h3>
+            <p>Current lease restrictions and control boundaries.</p>
+          </div>
+          <ul id="policy-list" class="simple-list">
+            <li>Loading policy...</li>
+          </ul>
+        </article>
+        <article>
+          <div class="panel-head">
+            <h3>Recommendations</h3>
+            <p>What keeps the organization cohesive and autonomous.</p>
+          </div>
+          <ul id="org-recommendations" class="simple-list">
+            <li>Loading recommendations...</li>
+          </ul>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

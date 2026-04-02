@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "tradingview": {
+      "command": "node",
+      "args": ["/Users/aribs/Code/tradingview-mcp-v2/src/server.js"]
+    },
+    "openbb": {
+      "command": "python3",
+      "args": ["/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/openbb_mcp_server/app/app.py"]
+    }
+  }
+}

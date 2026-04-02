@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Agentic Architecture Map</title>
+    <meta
+      name="description"
+      content="Live architecture and network topology for the local-first control plane, Raspberry Pi agents, and project repos."
+    />
+    <meta name="asset-version" content="__ASSET_VERSION__" />
+    <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=__ASSET_VERSION__" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Sora:wght@500;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/assets/logbook-widgets.css?v=__ASSET_VERSION__" />
+    <link rel="stylesheet" href="/assets/architecture.css?v=__ASSET_VERSION__" />
+    <link rel="stylesheet" href="/assets/unified-ops-theme.css?v=__ASSET_VERSION__" />
+    <link rel="stylesheet" href="/assets/dark-theme.css?v=__ASSET_VERSION__" />
+    <script defer src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script defer src="/assets/logbook-widgets.js?v=__ASSET_VERSION__"></script>
+    <script defer src="/assets/frontend-logbook-client.js?v=__ASSET_VERSION__"></script>
+    <script defer src="/assets/architecture.js?v=__ASSET_VERSION__"></script>
+  </head>
+  <body class="theme-architecture">
+    <div class="grid-noise" aria-hidden="true"></div>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">System Cartography</p>
+        <h1>Agentic Architecture Map</h1>
+        <p class="subhead">Real-time topology for the local control plane, Pi agents, operator workspace, and project codebase maps.</p>
+      </div>
+      <div class="actions">
+        <a href="/" class="btn ghost">Sapphire Deck</a>
+        <a href="/projects" class="btn ghost">Projects Board</a>
+        <a href="/logbook" class="btn ghost">Logbook</a>
+        <a href="/secops" class="btn ghost">Sec Ops</a>
+        <a href="/architecture" class="btn ghost" aria-current="page">Architecture Map</a>
+        <a href="/organization" class="btn ghost">Organization OS</a>
+        <button id="refresh-architecture" class="btn solid" type="button">Refresh</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="summary-grid">
+        <article class="summary-card">
+          <p>Generated</p>
+          <h2 id="arch-generated-at">--</h2>
+        </article>
+        <article class="summary-card">
+          <p>Agents</p>
+          <h2 id="metric-agents">--</h2>
+        </article>
+        <article class="summary-card">
+          <p>Queue</p>
+          <h2 id="metric-queue">--</h2>
+        </article>
+        <article class="summary-card">
+          <p>Pi Reachability</p>
+          <h2 id="metric-pi">--</h2>
+        </article>
+        <article class="summary-card accent">
+          <p>Executor Policy</p>
+          <h2 id="metric-policy">--</h2>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h3>Network Topology</h3>
+          <p id="topology-meta">Live relationship map across operator workstation, Telegram, local services, and Pi workers.</p>
+        </div>
+        <div id="topology-mermaid" class="mermaid-shell">
+          <p class="muted">Loading topology...</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h3>Cross-Device Agent Workflow</h3>
+          <p>How the operator workstation, local control plane, Telegram control, and Pi executors loop work.</p>
+        </div>
+        <div id="agent-workflow-mermaid" class="mermaid-shell">
+          <p class="muted">Loading workflow...</p>
+        </div>
+      </section>
+
+      <section class="panel split">
+        <article>
+          <div class="panel-head">
+            <h3>Autonomy Loop</h3>
+            <p>Telegram, scheduler, queue leasing, and execution cycle.</p>
+          </div>
+          <div id="autonomy-mermaid" class="mermaid-shell">
+            <p class="muted">Loading autonomy loop...</p>
+          </div>
+        </article>
+        <article>
+          <div class="panel-head">
+            <h3>Local + Pi Execution Rails</h3>
+            <p>Local control plane dispatching to rari1 and rari2.</p>
+          </div>
+          <div id="gcp-pi-mermaid" class="mermaid-shell">
+            <p class="muted">Loading execution diagram...</p>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel split">
+        <article>
+          <div class="panel-head">
+            <h3>Secret Boundaries</h3>
+            <p>Scoped runtime secrets across operator workstation, local services, and Pi executors.</p>
+          </div>
+          <div id="security-boundary-mermaid" class="mermaid-shell">
+            <p class="muted">Loading secret-boundary map...</p>
+          </div>
+        </article>
+        <article>
+          <div class="panel-head">
+            <h3>Live Event Mix</h3>
+            <p>Recent control-plane activity by event type and agent source.</p>
+          </div>
+          <div id="eventmix-grid" class="eventmix-grid">
+            <p class="muted">Loading event mix...</p>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h3>Live Ops Telemetry</h3>
+          <p>Queue pressure, agent availability, and Pi reachability.</p>
+        </div>
+        <div id="telemetry-grid" class="telemetry-grid">
+          <p class="muted">Loading telemetry...</p>
+        </div>
+        <ul id="slo-summary" class="simple-list">
+          <li>Loading SLO status...</li>
+        </ul>
+        <div class="diag-grid">
+          <div>
+            <div class="panel-head minor">
+              <h3>Queue Stall Diagnosis</h3>
+              <p>Routability blockers for queued tasks.</p>
+            </div>
+            <ul id="queue-diagnostics" class="simple-list">
+              <li>Loading queue diagnostics...</li>
+            </ul>
+          </div>
+          <div>
+            <div class="panel-head minor">
+              <h3>Recommended Recovery</h3>
+              <p>High-priority next actions for queue recovery.</p>
+            </div>
+            <ul id="queue-recommendations" class="simple-list">
+              <li>Loading recommendations...</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel split">
+        <article>
+          <div class="panel-head">
+            <h3>Kimi Executor Readiness</h3>
+            <p>Pi host attestation, tool auth readiness, and executor trust posture.</p>
+          </div>
+          <div id="executor-tool-grid" class="status-chip-grid">
+            <p class="muted">Loading executor readiness...</p>
+          </div>
+          <ul id="executor-attestation-list" class="simple-list">
+            <li>Loading attestation...</li>
+          </ul>
+        </article>
+        <article>
+          <div class="panel-head">
+            <h3>Primary Executor Details</h3>
+            <p>Current executor host metadata and workspace footprint.</p>
+          </div>
+          <ul id="executor-primary-details" class="simple-list">
+            <li>Loading primary executor details...</li>
+          </ul>
+          <ul id="executor-readiness-recommendations" class="simple-list compact">
+            <li>Loading executor recommendations...</li>
+          </ul>
+        </article>
+      </section>
+
+      <section class="panel split">
+        <article>
+          <div class="panel-head">
+            <h3>Agent Communication Lanes</h3>
+            <p>Shared logbook categories for progress, incidents, decisions, verifications, and handoffs.</p>
+          </div>
+          <ul id="architecture-logbook-summary" class="simple-list">
+            <li>Loading logbook summary...</li>
+          </ul>
+          <div id="architecture-comm-cards" class="lw-grid">
+            <p class="muted">Loading communication lanes...</p>
+          </div>
+        </article>
+        <article>
+          <div class="panel-head">
+            <h3>High-Signal Logbook Entries</h3>
+            <p>Decision, incident, and handoff excerpts to support architecture debugging and planning.</p>
+          </div>
+          <div class="lw-ledger-grid">
+            <div>
+              <h4>Decisions</h4>
+              <ul id="architecture-decision-ledger" class="simple-list compact">
+                <li>Loading decisions...</li>
+              </ul>
+            </div>
+            <div>
+              <h4>Handoffs</h4>
+              <ul id="architecture-handoff-ledger" class="simple-list compact">
+                <li>Loading handoffs...</li>
+              </ul>
+            </div>
+          </div>
+          <div class="lw-ledger-stack">
+            <h4>Incidents / Verifications</h4>
+            <ul id="architecture-incident-ledger" class="simple-list compact">
+              <li>Loading incidents...</li>
+            </ul>
+            <ul id="architecture-verification-ledger" class="simple-list compact">
+              <li>Loading verifications...</li>
+            </ul>
+          </div>
+          <div id="architecture-logbook-timeline" class="lw-timeline-stack">
+            <p class="muted">Loading logbook timeline...</p>
+          </div>
+        </article>
+      </section>
+
+      <section class="split">
+        <article class="panel">
+          <div class="panel-head">
+            <h3>Executor Policy</h3>
+            <p>Current lease restrictions and active mode</p>
+          </div>
+          <ul id="policy-summary" class="simple-list">
+            <li>Loading policy...</li>
+          </ul>
+          <pre id="policy-json" class="json-block">Loading...</pre>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <h3>Recent Control Logs</h3>
+            <p>Latest task/agent events</p>
+          </div>
+          <ul id="architecture-logs" class="simple-list">
+            <li>Loading logs...</li>
+          </ul>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h3>Project Architecture Charts</h3>
+          <p id="charts-meta">Generated from tracked project codebases + repo links.</p>
+        </div>
+        <div id="project-charts" class="project-grid">
+          <p class="muted">Loading project charts...</p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
