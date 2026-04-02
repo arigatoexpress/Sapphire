@@ -2,7 +2,9 @@ fastapi>=0.115,<1.0
 uvicorn[standard]>=0.30,<1.0
 httpx>=0.27,<1.0
 feedparser>=6.0.11,<7.0
-google-cloud-firestore>=2.20,<3.0
-psycopg[binary]>=3.2,<4.0
 python-dotenv>=1.0,<2.0
 pytest>=8.0,<9.0
+# Optional: uncomment for Firestore storage backend
+# google-cloud-firestore>=2.20,<3.0
+# Optional: uncomment for PostgreSQL storage backend
+# psycopg[binary]>=3.2,<4.0

@@ -96,7 +96,7 @@ class PrecisionNormalizer:
         except Exception as e:
             logger.warning(f"⚠️ Could not fetch exchange info for {symbol}@{platform}: {e}")
             info = self._get_default_info(symbol, platform)
-            warnings.append(f"Using default precision (exchange info unavailable)")
+            warnings.append("Using default precision (exchange info unavailable)")
 
         price_dec = Decimal(str(price))
         qty_dec = Decimal(str(quantity))

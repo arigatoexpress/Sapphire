@@ -9,7 +9,7 @@ import re
 import time
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from error_classifier import ErrorCategory, ErrorSeverity
 from loguru import logger

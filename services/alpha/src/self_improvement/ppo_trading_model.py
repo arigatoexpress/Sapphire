@@ -12,18 +12,15 @@ Optimized PPO implementation for cryptocurrency perpetual futures trading:
 Designed to maximize profitability in extreme market conditions.
 """
 
+import logging
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Dict, List, Tuple
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.distributions import Normal
-import numpy as np
-from typing import Dict, List, Tuple, Optional, Any
-from dataclasses import dataclass, field
-import logging
-from pathlib import Path
-import time
-from concurrent.futures import ThreadPoolExecutor
-
 from mcp_trader.ai.trading_environment import AdvancedTradingEnvironment, TradingConfig
 
 logger = logging.getLogger(__name__)

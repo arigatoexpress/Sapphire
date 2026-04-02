@@ -15,29 +15,25 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 from urllib.parse import urlparse
 
 import httpx
-
-from app.alpha_stream import build_alpha_stream_payload
-from app.alpha_stream import score_alpha_stream_for_chat
+from app.alpha_stream import build_alpha_stream_payload, score_alpha_stream_for_chat
 from app.architecture_map import build_architecture_snapshot
-from app.autonomy import load_autonomy_proposals
-from app.autonomy import run_autonomy_cycle
+from app.autonomy import load_autonomy_proposals, run_autonomy_cycle
 from app.config import Settings
 from app.control_plane import ControlPlaneStore
 from app.digest import format_alpha_stream_message, format_digest_message, format_watchlist_message
-from app.event_stream import append_event
-from app.event_stream import recent_events
+from app.event_stream import append_event, recent_events
 from app.membership_router import get_router_overview
 from app.models import ChatConfig, NewsItem
 from app.news import NewsFetcher
 from app.project_board import get_projects_overview
-from app.project_board import load_roadmap_snapshot
-from app.runtime_policy import allowed_executor_agent_ids
-from app.runtime_policy import allowed_executor_membership_ids
-from app.runtime_policy import save_runtime_policy
+from app.runtime_policy import (
+    allowed_executor_agent_ids,
+    allowed_executor_membership_ids,
+    save_runtime_policy,
+)
 from app.sources import REPUTABLE_NEWS_SOURCES
 from app.storage import ChatStore, default_chat_config
 from app.telegram_api import TelegramClient
-
 
 logger = logging.getLogger(__name__)
 _TELEGRAM_RUNTIME_PROMPT_PATH = Path(__file__).resolve().parent / "data" / "crypton_telegram_agent_prompt.md"

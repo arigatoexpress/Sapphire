@@ -9,29 +9,26 @@ performance-based strategy selection.
 import asyncio
 import json
 import logging
+import os
+import pickle
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Dict, List, Tuple
+
+import lightgbm as lgb
 import numpy as np
 import pandas as pd
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple, Any
-from dataclasses import dataclass
-from concurrent.futures import ThreadPoolExecutor
-import pickle
-import os
-
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+import xgboost as xgb
+from mcp_trader.strategies.degen_trading import DegenTradingStrategy
+from mcp_trader.strategies.dmark_strategy import DMarkStrategy
+from mcp_trader.strategies.funding_arbitrage import FundingArbitrageStrategy
+from mcp_trader.strategies.latency_arbitrage import LatencyArbitrageStrategy
+from mcp_trader.strategies.market_making import MarketMakingStrategy
+from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-import xgboost as xgb
-import lightgbm as lgb
-
-from mcp_trader.risk.risk_manager import RiskManager
-from mcp_trader.strategies.market_making import MarketMakingStrategy
-from mcp_trader.strategies.funding_arbitrage import FundingArbitrageStrategy
-from mcp_trader.strategies.dmark_strategy import DMarkStrategy
-from mcp_trader.strategies.degen_trading import DegenTradingStrategy
-from mcp_trader.strategies.latency_arbitrage import LatencyArbitrageStrategy
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

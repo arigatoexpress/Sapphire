@@ -10,11 +10,8 @@ against actual crypto price outcomes. Tracks:
 
 import time
 from collections import defaultdict
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
-
-from loguru import logger
 
 from .prediction_signal import PredictionSignal, PredictionSource
 

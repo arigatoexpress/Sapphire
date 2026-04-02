@@ -9,16 +9,15 @@ Checks status of all system components:
 - Trading metrics
 """
 
+import asyncio
 import json
 import os
-import sys
-import subprocess
-import asyncio
-import aiohttp
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, asdict
+from typing import Any, Dict, List, Optional
+
+import aiohttp
 from firebase_admin import credentials, firestore, initialize_app
 
 # Configuration

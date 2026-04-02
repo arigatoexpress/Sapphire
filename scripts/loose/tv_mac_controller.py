@@ -5,11 +5,10 @@ Full autonomous control of TradingView Web
 """
 
 import asyncio
-import json
 import logging
 import sys
 from datetime import datetime
-from typing import Dict, Optional, Any
+from typing import Dict, Optional
 
 logging.basicConfig(
     level=logging.INFO,
@@ -18,7 +17,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 try:
-    from playwright.async_api import async_playwright, Page, Browser
+    from playwright.async_api import Browser, Page, async_playwright
 except ImportError:
     logger.error("Playwright not installed. Run: pip3 install playwright")
     sys.exit(1)
@@ -57,7 +56,7 @@ class TradingViewMacController:
         
         self.page = await context.new_page()
         
-        logger.info(f"📍 Navigating to TradingView...")
+        logger.info("📍 Navigating to TradingView...")
         await self.page.goto(self.tv_url, wait_until='networkidle')
         
         # Wait for chart
@@ -216,6 +215,7 @@ class TradingViewMacController:
 
 # HTTP API
 from aiohttp import web
+
 
 async def start_api(controller: TradingViewMacController, port: int = 8082):
     app = web.Application()

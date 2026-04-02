@@ -7,11 +7,10 @@ automatic fixes or consults LLM for complex recovery strategies.
 Part of the AI-Powered Resilience Layer for ACTS.
 """
 
-import asyncio
 import logging
 import re
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, Optional
 
 logger = logging.getLogger(__name__)
 

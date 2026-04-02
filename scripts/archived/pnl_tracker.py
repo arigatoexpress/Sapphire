@@ -7,8 +7,7 @@ Tracks realized and unrealized P&L from actual trades
 import json
 from datetime import datetime
 from pathlib import Path
-from collections import defaultdict
-from typing import Dict, List, Tuple
+from typing import Dict
 
 
 class PnLTracker:

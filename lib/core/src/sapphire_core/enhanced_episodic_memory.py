@@ -12,16 +12,14 @@ Major enhancements over v1:
 """
 
 import asyncio
-import hashlib
 import json
 import logging
-import math
 import os
 import statistics
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import google.generativeai as genai
 
@@ -857,7 +855,7 @@ Provide ONE synthesized recommendation (2-3 sentences) that combines these lesso
                     )
                 )
                 return response.text.strip() + temporal_warning
-            except Exception as e:
+            except Exception:
                 pass
 
         return "\n".join(lessons) + temporal_warning

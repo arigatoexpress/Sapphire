@@ -17,12 +17,11 @@ import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from cognitive_agent import CognitiveAgent, MarketContext
 from cognitive_mesh import (
     AgentRole,
-    CognitiveMesh,
     CognitiveMessage,
     MessageType,
     get_cognitive_mesh,

@@ -5,11 +5,11 @@ Connects to Alpha Vantage and other alpha-generating data sources
 """
 
 import asyncio
-import json
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 import aiohttp
 
 logger = logging.getLogger('alphastream')

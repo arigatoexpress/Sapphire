@@ -8,58 +8,55 @@ import time
 from collections import defaultdict, deque
 from typing import Any, Deque, Dict, List, Optional, Set
 
-import aiohttp
 import uvloop
+
 from src.ai.chat_intent import ChatIntentEngine
 from src.ai.gemini_guard import GeminiGuard
+from src.api_handlers import (
+    handle_control_status,
+    handle_forum_create_topic,
+    handle_forum_replies,
+    handle_forum_scout_publish,
+    handle_forum_scout_register,
+    handle_forum_scout_status,
+    handle_forum_topic_detail,
+    handle_forum_topics,
+    handle_intel_feed,
+    handle_market_ohlc,
+    handle_performance_stats,
+    handle_platform_status,
+    handle_routing_info,
+    handle_security_skill_scan,
+    handle_security_skills_status,
+    handle_system_logs,
+)
 from src.collaboration.forum import SapphireForumService
-from src.collaboration.reputation import BotReputationService
-from src.collaboration.swarm import SwarmAggregator
 from src.collaboration.learning import SwarmLearning
 from src.collaboration.molthub_outreach import MolthubOutreach
+from src.collaboration.reputation import BotReputationService
+from src.collaboration.swarm import SwarmAggregator
 from src.collaboration.task_manager import TaskManager
 from src.execution.dispatcher import dispatcher
 from src.execution.portfolio import PortfolioTracker
 from src.feeds.market_data import MarketDataAggregator
-from src.signals.alpha_scanner import AlphaSignalScanner
-from src.signals.grid_trader import GridSignalPlanner
-
-
-from src.telegram_handlers import dispatch_control_command
-from src.api_handlers import (
-    handle_market_ohlc,
-    handle_platform_status,
-    handle_routing_info,
-    handle_performance_stats,
-    handle_system_logs,
-    handle_intel_feed,
-    handle_control_status,
-
-    handle_security_skills_status,
-    handle_security_skill_scan,
-    handle_forum_topics,
-    handle_forum_topic_detail,
-    handle_forum_create_topic,
-    handle_forum_replies,
-    handle_forum_scout_status,
-    handle_forum_scout_register,
-    handle_forum_scout_publish,
-)
+from src.security.agent_permissions import ApprovalPolicy, Capability, PermissionDenied, gate
 from src.security.skill_auditor import SkillAuditor
 from src.security.virustotal_scanner import VirusTotalSkillScanner
-from src.security.prompt_sanitizer import sanitize_for_prompt, log_injection_attempt
-from src.security.agent_permissions import gate, Capability, PermissionDenied, ApprovalPolicy
+from src.signals.alpha_scanner import AlphaSignalScanner
+from src.signals.grid_trader import GridSignalPlanner
 from src.strategy.engine import AlphaStrategyEngine
+from src.telegram_handlers import dispatch_control_command
 
 # Add shared library to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from shared.error_classifier import ErrorCategory, ErrorSeverity, classify_error
-from shared.enhanced_episodic_memory import EnhancedMemoryBank, MarketSnapshot
-from shared.dual_speed_cognition import DualSpeedCognition, CognitionRequest, CognitionSpeed
 from health import start_health_server
+from shared.dual_speed_cognition import DualSpeedCognition
+from shared.enhanced_episodic_memory import EnhancedMemoryBank
+from shared.error_classifier import ErrorCategory, ErrorSeverity, classify_error
 from smart_notifications import notification_manager
+
 try:
-    from telegram_bot import SAPPHIRE, OBSIDIAN, EMERALD, SCOUT
+    from telegram_bot import EMERALD, OBSIDIAN, SAPPHIRE, SCOUT
 except Exception:
     SAPPHIRE = "SAPPHIRE"
     OBSIDIAN = "OBSIDIAN"
@@ -259,14 +256,14 @@ class AlphaEngine:
         self.tasks = TaskManager()
         self.vt_scanner = VirusTotalSkillScanner()
         # Phase 6: Social Media Manager
-        from src.media.manager import MediaManager
         from src.media.content_generator import ContentGenerator
+        from src.media.manager import MediaManager
         self.media_manager = MediaManager(telegram_bot=self.telegram)
         self.content_generator = ContentGenerator(gemini_guard=self.ai)
         self._media_publish_task: Optional[asyncio.Task[Any]] = None
         # Phase 9: OpenClaw Autonomous Operations
-        from src.openclaw_dispatch import OpenClawDispatcher
         from src.ci_feedback import CIFeedbackProcessor
+        from src.openclaw_dispatch import OpenClawDispatcher
         self.openclaw_dispatcher = OpenClawDispatcher()
         self.ci_feedback = CIFeedbackProcessor(
             task_manager=self.tasks,
@@ -1376,7 +1373,7 @@ class AlphaEngine:
             lines.append("\nNo open positions.")
 
         # Stats
-        lines.append(f"\n*Stats*")
+        lines.append("\n*Stats*")
         lines.append(f"  Total fills: {snap['total_trades']}")
         lines.append(
             f"  Realized PnL: {snap['total_realized_pnl']:+.4f}"
@@ -1393,7 +1390,7 @@ class AlphaEngine:
 
         # Recent closed trades
         if snap["recent_closed"]:
-            lines.append(f"\n*Recent Trades*")
+            lines.append("\n*Recent Trades*")
             for t in snap["recent_closed"][-5:]:
                 emoji = "✅" if t["pnl"] >= 0 else "❌"
                 lines.append(
@@ -3012,7 +3009,7 @@ class AlphaEngine:
                         tags=summary.get("tags", []),
                         priority=summary.get("priority", "medium"),
                     )
-                    logger.info(f"🔮 Posted prediction market summary to forum")
+                    logger.info("🔮 Posted prediction market summary to forum")
             except asyncio.CancelledError:
                 break
             except Exception as exc:

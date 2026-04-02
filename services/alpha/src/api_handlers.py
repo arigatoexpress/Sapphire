@@ -11,10 +11,8 @@ All handlers are pure request-in/response-out with read access to engine state.
 import time
 from typing import Any, Dict, List
 
-from loguru import logger
 from src.execution.dispatcher import dispatcher
-from src.security.agent_permissions import gate, Capability
-
+from src.security.agent_permissions import Capability, gate
 
 # ---------------------------------------------------------------------------
 # Market Data Endpoints

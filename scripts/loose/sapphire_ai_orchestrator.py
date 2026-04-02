@@ -5,13 +5,12 @@ Based on best practices: TradingView signals → AI Agents → Broker APIs
 """
 
 import asyncio
-import json
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from enum import Enum
-import aiohttp
+from typing import Any, Dict, List, Tuple
+
 from aiohttp import web
 
 logging.basicConfig(
@@ -415,7 +414,7 @@ class AIOrchestrator:
         # All agents approved!
         decision.status = TradeStatus.APPROVED
         decision.reasoning = f"Approved by {len(decision.approved_by)} agents: {', '.join(decision.approved_by)}"
-        logger.info(f"  ✅ APPROVED by all agents!")
+        logger.info("  ✅ APPROVED by all agents!")
         
         return decision
         

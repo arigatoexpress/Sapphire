@@ -5,7 +5,6 @@ Provides a minimal HTTP health endpoint for Cloud Run compatibility.
 Background workers (bots, scanners) need this to pass health checks.
 """
 
-import asyncio
 import logging
 import os
 from typing import Callable, Optional

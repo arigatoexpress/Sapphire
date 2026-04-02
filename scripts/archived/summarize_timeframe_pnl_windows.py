@@ -6,10 +6,9 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 import pandas as pd
-
 from run_smart_money_timeframe_matrix import run_smart_money_backtest
 
 

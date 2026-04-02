@@ -5,13 +5,12 @@ Simple interface for the existing Telegram bot to query monitoring data
 """
 
 import json
-from datetime import datetime
-from pathlib import Path
+
+from alert_system import TradingAlertSystem
+from pnl_tracker import PnLTracker
 
 # Import monitoring modules
 from trade_log_monitor import TradeLogMonitor
-from pnl_tracker import PnLTracker
-from alert_system import TradingAlertSystem
 
 
 class MonitoringAPI:

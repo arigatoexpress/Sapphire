@@ -16,19 +16,17 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
-import re
 import math
-import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import requests
 import yfinance as yf
-
 
 COINGECKO_MARKETS = "https://api.coingecko.com/api/v3/coins/markets"
 STABLE_OR_DERIVATIVE = {

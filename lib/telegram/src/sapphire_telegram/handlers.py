@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, Dict, List
 
 from loguru import logger
 from src.execution.dispatcher import dispatcher
-from src.security.agent_permissions import gate, Capability
+from src.security.agent_permissions import Capability, gate
 
 if TYPE_CHECKING:
     from src.main import AlphaEngine
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 # Re-export agent identities for message routing.
 # Fallback keeps alpha-engine boot-safe if shared telegram module changes exports.
 try:
-    from telegram_bot import SAPPHIRE, OBSIDIAN, EMERALD
+    from telegram_bot import EMERALD, OBSIDIAN, SAPPHIRE
 except Exception:
     SAPPHIRE = "SAPPHIRE"
     OBSIDIAN = "OBSIDIAN"
@@ -650,7 +650,7 @@ async def handle_swarm_commands(engine: "AlphaEngine", target: str, action: str,
         symbol = str(payload.get("symbol", "")).strip()
         ideas = engine.swarm.open_ideas(symbol)
         if not ideas:
-            msg = f"🐝 No open swarm ideas" + (f" for `{symbol}`." if symbol else ".")
+            msg = "🐝 No open swarm ideas" + (f" for `{symbol}`." if symbol else ".")
             await engine.telegram.send_as(EMERALD, msg)
         else:
             lines = [f"🐝 **Open Swarm Ideas** ({len(ideas)})\n"]
@@ -739,7 +739,7 @@ async def handle_learning_commands(engine: "AlphaEngine", target: str, action: s
         dir_bias = engine.learning.get_direction_bias(direction) if direction else 0.0
         tf_bias = engine.learning.get_timeframe_bias(timeframe)
         adjusted = engine.learning.adaptive_confidence(symbol or "?", direction or "LONG", timeframe, 0.5)
-        lines = [f"📚 **Learning Bias Check**\n"]
+        lines = ["📚 **Learning Bias Check**\n"]
         if symbol:
             lines.append(f"Symbol `{symbol}`: bias = {sym_bias:+.2f}")
         if direction:

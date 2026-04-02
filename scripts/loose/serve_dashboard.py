@@ -4,8 +4,8 @@ Simple HTTP server for Sapphire AI Dashboard
 """
 
 import http.server
-import socketserver
 import json
+import socketserver
 import subprocess
 from urllib.parse import urlparse
 

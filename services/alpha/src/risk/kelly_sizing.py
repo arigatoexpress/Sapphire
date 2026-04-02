@@ -10,10 +10,10 @@ Implements fractional Kelly sizing with:
 Target: 70-80% survival probability over 24 months
 """
 
-import numpy as np
-from typing import Dict, Optional, Tuple
 from dataclasses import dataclass
-import logging
+from typing import Dict, Optional, Tuple
+
+import numpy as np
 
 from ..logging_utils import get_logger
 

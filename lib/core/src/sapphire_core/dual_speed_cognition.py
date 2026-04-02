@@ -13,9 +13,8 @@ import logging
 import os
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, Optional
 
 import google.generativeai as genai
 
@@ -91,7 +90,7 @@ class DualSpeedCognition:
             genai.configure(api_key=api_key)
             self.system1 = genai.GenerativeModel(self.SYSTEM_1_MODEL)
             self.system2 = genai.GenerativeModel(self.SYSTEM_2_MODEL)
-            logger.info(f"🧠 Dual-Speed Cognition initialized (Flash + Pro)")
+            logger.info("🧠 Dual-Speed Cognition initialized (Flash + Pro)")
         else:
             self.system1 = None
             self.system2 = None
@@ -410,7 +409,7 @@ Should we BUY, SELL, or HOLD SOL?""",
 
     result = await cognition.process(request, on_provisional=provisional_action)
 
-    print(f"\n📊 RESULT:")
+    print("\n📊 RESULT:")
     print(f"  Decision: {result.decision}")
     print(f"  Confidence: {result.confidence:.2f}")
     print(f"  System Used: {result.system_used.value}")

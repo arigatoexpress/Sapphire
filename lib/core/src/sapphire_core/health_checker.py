@@ -5,12 +5,13 @@ Monitors all system components and sends Telegram alerts
 """
 
 import asyncio
-import aiohttp
+import logging
 import os
 import sys
 from datetime import datetime
+
+import aiohttp
 from telegram import Bot
-import logging
 
 # Configuration
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')

@@ -11,6 +11,7 @@ import re
 import sys
 from datetime import datetime
 from typing import Dict, Optional
+
 import aiohttp
 
 logging.basicConfig(
@@ -167,9 +168,9 @@ class MacStrategyBridge:
         await site.start()
         
         logger.info(f"🌐 Strategy Bridge running on port {port}")
-        logger.info(f"   POST /webhook - Receive TV alerts")
-        logger.info(f"   GET  /status  - Bridge status")
-        logger.info(f"   GET  /test    - Test pipeline")
+        logger.info("   POST /webhook - Receive TV alerts")
+        logger.info("   GET  /status  - Bridge status")
+        logger.info("   GET  /test    - Test pipeline")
         return runner
         
     async def run(self):

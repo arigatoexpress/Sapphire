@@ -23,7 +23,6 @@ from typing import Any, Dict, List, Optional
 
 from loguru import logger
 
-
 # ── Threat Categories ─────────────────────────────────────────────
 
 class ThreatSeverity(Enum):

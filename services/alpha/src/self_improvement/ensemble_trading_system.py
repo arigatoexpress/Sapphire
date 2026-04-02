@@ -16,22 +16,18 @@ Features:
 - Real-time performance monitoring and adaptation
 """
 
-import asyncio
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Tuple, Callable
-import pandas as pd
+from datetime import datetime
+from typing import Any, Dict, List, Tuple
+
 import numpy as np
-from concurrent.futures import ThreadPoolExecutor
 import torch
 import torch.nn as nn
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import StandardScaler
-
 from mcp_trader.ai.ppo_trading_model import PPOTradingModel
 from mcp_trader.ai.vpin_calculator import VPINCalculator
-from mcp_trader.backtesting.walk_forward_analysis import WalkForwardAnalyzer
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import StandardScaler
 
 logger = logging.getLogger(__name__)
 

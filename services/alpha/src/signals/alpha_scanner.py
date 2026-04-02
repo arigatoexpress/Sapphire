@@ -26,7 +26,7 @@ import logging
 import os
 import time
 from collections import deque
-from typing import Any, Deque, Dict, List, Optional, Tuple
+from typing import Any, Deque, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 

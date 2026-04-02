@@ -5,10 +5,9 @@ Uses SEPARATE browser instance that won't interfere with your main Chrome
 """
 
 import asyncio
-import json
 import logging
 from datetime import datetime
-from typing import Dict, Optional, Any
+from typing import Dict
 
 logging.basicConfig(
     level=logging.INFO,
@@ -197,7 +196,7 @@ class DedicatedTVController:
                     logger.info(f"📊 {self.current_symbol or 'Waiting...'} @ ${self.current_price:,.2f}")
                     
                 await asyncio.sleep(2)
-            except Exception as e:
+            except Exception:
                 await asyncio.sleep(5)
                 
     async def take_screenshot(self, path: str = "/tmp/tv_screenshot.png"):
@@ -228,6 +227,7 @@ class DedicatedTVController:
 
 # HTTP API
 from aiohttp import web
+
 
 async def start_api(controller: DedicatedTVController, port: int = 8085):
     app = web.Application()

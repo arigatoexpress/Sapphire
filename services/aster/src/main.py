@@ -9,19 +9,18 @@ import asyncio
 import logging
 import os
 import signal
-import time
-from decimal import ROUND_DOWN, Decimal
 
 # Add shared library to path
 import sys
+import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from decimal import ROUND_DOWN, Decimal
+from typing import Any, Dict, Optional, Tuple
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from pubsub import get_pubsub_client, publish, subscribe
-from utils import ServiceConfig, format_percent, format_price, setup_logging, utc_now
-
+from circuit_breaker import CircuitBreaker, CircuitBreakerOpen
+from execution_idempotency import ExecutionIdempotency
 from models import (
     BalanceUpdate,
     Platform,
@@ -31,8 +30,8 @@ from models import (
     TradeSide,
     TradeSignal,
 )
-from circuit_breaker import CircuitBreaker, CircuitBreakerOpen
-from execution_idempotency import ExecutionIdempotency
+from pubsub import get_pubsub_client, publish, subscribe
+from utils import ServiceConfig, setup_logging
 
 logger = logging.getLogger(__name__)
 
@@ -1290,7 +1289,7 @@ async def main():
         sys.exit(f"FATAL [{SERVICE_NAME}]: ASTER_SECRET_KEY or ASTER_API_SECRET must be set")
 
     logger.info("=" * 50)
-    logger.info(f"⭐ ASTER BOT SERVICE")
+    logger.info("⭐ ASTER BOT SERVICE")
     logger.info(f"📅 {datetime.now().isoformat()}")
     logger.info("=" * 50)
 

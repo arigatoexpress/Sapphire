@@ -12,9 +12,7 @@ Run this to start the full autonomous swarm.
 
 import asyncio
 import logging
-import os
 import signal
-import sys
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -25,15 +23,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger("ACTS")
 
-from cognitive_agent import CognitiveAgent, MarketContext, OracleAgent, ScoutAgent, SniperAgent
+from cognitive_agent import MarketContext, OracleAgent, ScoutAgent, SniperAgent
 
 # Import ACTS components
 from cognitive_mesh import (
     CognitiveMesh,
     CognitiveMessage,
     ConsensusState,
-    MessageType,
-    get_cognitive_mesh,
     init_cognitive_mesh,
 )
 from dual_speed_cognition import (
@@ -44,10 +40,7 @@ from dual_speed_cognition import (
 )
 from enhanced_episodic_memory import EnhancedMemoryBank, MarketSnapshot, get_enhanced_memory
 from executor_agent import (
-    AsterExecutorAgent,
-    AsterExecutorAgent,
     ExecutionRequest,
-    LighterExecutorAgent,
     create_executor_swarm,
 )
 

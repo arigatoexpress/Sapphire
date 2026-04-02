@@ -11,11 +11,10 @@ Endpoints:
 """
 
 import re
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import aiohttp
-from loguru import logger
 
 from .prediction_signal import (
     PredictionMarketFeed,

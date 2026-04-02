@@ -13,7 +13,6 @@ import argparse
 import json
 import os
 import subprocess
-import sys
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -22,7 +21,6 @@ from typing import Any, Dict, List, Tuple
 
 from google.cloud import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
-
 
 PROJECT_ID = os.getenv("PROJECT_ID", "sapphire-479610")
 PLATFORM = "lighter"

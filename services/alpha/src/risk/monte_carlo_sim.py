@@ -10,12 +10,11 @@ Validates survival probability and capital growth trajectory:
 Research findings: Critical for validating $50→$500K feasibility
 """
 
-import numpy as np
-import matplotlib.pyplot as plt
-from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-import logging
+from typing import Dict, Optional, Tuple
+
+import matplotlib.pyplot as plt
+import numpy as np
 
 from ..logging_utils import get_logger
 

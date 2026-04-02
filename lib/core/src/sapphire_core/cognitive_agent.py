@@ -111,7 +111,7 @@ class CognitiveAgent(ABC):
         )
 
         # Subscribe to relevant messages
-        self.mesh.subscribe(f"all", self._on_mesh_message)
+        self.mesh.subscribe("all", self._on_mesh_message)
         logger.info(f"🔗 Agent {self.agent_id} connected to mesh")
 
     @abstractmethod

@@ -3,16 +3,15 @@ Comprehensive risk management system for Aster Trader.
 Implements Kelly Criterion, dynamic position sizing, and multi-layered risk controls.
 """
 
-import asyncio
 import logging
-from typing import Dict, List, Optional, Any, Tuple
-from datetime import datetime, timedelta
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Dict, List, Tuple
+
 import numpy as np
 import pandas as pd
 
-from ..config import get_settings
-from ..trading.types import PortfolioState, MarketRegime
+from ..trading.types import MarketRegime, PortfolioState
 
 logger = logging.getLogger(__name__)
 

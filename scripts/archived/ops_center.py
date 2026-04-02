@@ -1,20 +1,14 @@
 #!/usr/bin/env python3
-import json
-import os
-import subprocess
 import time
 from datetime import datetime
 
 import requests
 from rich import box
 from rich.align import Align
-from rich.columns import Columns
 from rich.console import Console
 from rich.layout import Layout
 from rich.live import Live
 from rich.panel import Panel
-from rich.status import Status
-from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
@@ -120,9 +114,9 @@ def make_agent_matrix(metrics_data):
                         Text.assemble(
                             (f"{a['id']}\n", "bold cyan"),
                             (f"Model: {a.get('model', 'N/A')}\n", "dim"),
-                            (f"Win Rate: ", ""),
+                            ("Win Rate: ", ""),
                             (f"{wr*100:.1f}%\n", f"bold {wr_color}"),
-                            (f"PnL: ", ""),
+                            ("PnL: ", ""),
                             (
                                 f"${a.get('total_pnl', 0):,.2f}",
                                 "green" if a.get("total_pnl", 0) >= 0 else "red",

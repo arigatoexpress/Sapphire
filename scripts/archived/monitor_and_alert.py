@@ -6,14 +6,15 @@ Continuously monitors all infrastructure components and sends alerts
 when services go down.
 """
 
+import argparse
 import asyncio
-import aiohttp
 import json
 import time
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Dict, List, Optional
-from dataclasses import dataclass, asdict
-import argparse
+
+import aiohttp
 
 
 @dataclass
@@ -104,7 +105,7 @@ class ServiceMonitor:
             status = "timeout"
             latency = 9999
             self.consecutive_failures[key] = self.consecutive_failures.get(key, 0) + 1
-        except Exception as e:
+        except Exception:
             status = "offline"
             latency = 9999
             self.consecutive_failures[key] = self.consecutive_failures.get(key, 0) + 1

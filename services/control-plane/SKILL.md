@@ -3,9 +3,9 @@ name: control-plane
 description: PM hub — project board, task scoring, event stream, Telegram integration
 type: service
 runtime: python
-deploy_target: cloud-run
+deploy_target: rari1
 dependencies: [sapphire-core, sapphire-agents]
-entry_point: src/main.py
+entry_point: app/main.py
 test_command: pytest tests/
 build_command: docker build -t control-plane .
 ---
@@ -21,9 +21,19 @@ Tags: `project:`, `agent:`, `priority:`, `type:`
 Agents subscribe to relevant tags for notifications.
 
 ## Key Files
-- `src/control_plane.py` — State management and persistence
-- `src/project_board.py` — Project and task CRUD
-- `src/scoring.py` — Task priority scoring
-- `src/event_stream.py` — Event publishing and subscription
-- `src/telegram_api.py` — Telegram bot integration
-- `src/frontend/` — PM dashboard HTML pages
+- `app/main.py` — FastAPI entry point (health, events, tasks, Kimi bridge, Telegram webhook)
+- `app/control_plane.py` — State management and persistence (SQLite default)
+- `app/project_board.py` — Project and task CRUD
+- `app/scoring.py` — Task priority scoring
+- `app/event_stream.py` — JSONL event log (no GCP — file-based)
+- `app/storage.py` — Telegram chat store (in-memory default when not on Cloud Run)
+- `app/kimi_bridge.py` — `/api/kimi/pm` dispatch endpoint
+- `app/frontend/` — PM dashboard HTML pages
+
+## On-prem Deploy (rari1)
+
+```bash
+bash infra/pi/rari1/deploy-control-plane.sh
+# Service: http://100.120.191.1:8082
+# Kimi bridge: POST /api/kimi/pm  X-Control-Token: <CONTROL_PLANE_TOKEN>
+```

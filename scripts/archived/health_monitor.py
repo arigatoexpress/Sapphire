@@ -5,12 +5,12 @@ Background monitoring script for alerting on system issues
 Can be run as Cloud Run job, Cloud Function, or locally
 """
 
-import requests
-import json
 import os
 import sys
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict
+
+import requests
 
 # Configuration
 CONFIG = {

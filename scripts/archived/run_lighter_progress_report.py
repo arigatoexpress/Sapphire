@@ -108,8 +108,8 @@ def _render_charts(
     exec_rows: list[dict[str, Any]],
 ) -> dict[str, Any]:
     try:
-        import matplotlib.pyplot as plt
         import matplotlib.dates as mdates
+        import matplotlib.pyplot as plt
     except Exception as exc:  # pragma: no cover - environment-dependent
         return {"enabled": False, "error": f"matplotlib_unavailable: {type(exc).__name__}: {exc}"}
 

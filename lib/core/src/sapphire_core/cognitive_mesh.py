@@ -14,7 +14,6 @@ import asyncio
 import hashlib
 import json
 import logging
-import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -246,7 +245,7 @@ class CognitiveMesh:
 
         # Notify subscribers
         topics_to_notify = [
-            f"all",
+            "all",
             f"type:{message.message_type.value}",
             f"role:{message.agent_role.value}",
             f"symbol:{message.symbol}" if message.symbol else None,

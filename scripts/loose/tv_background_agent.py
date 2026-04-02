@@ -9,7 +9,6 @@ import asyncio
 import json
 import logging
 import subprocess
-from datetime import datetime
 from typing import Dict, Optional
 
 logging.basicConfig(
@@ -271,6 +270,7 @@ class BackgroundTVAgent:
 
 # HTTP API
 from aiohttp import web
+
 
 async def start_api(agent: BackgroundTVAgent, port: int = 8086):
     app = web.Application()

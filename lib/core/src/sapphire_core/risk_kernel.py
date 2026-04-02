@@ -14,9 +14,9 @@ This module is intentionally dependency-light so venue bots can reuse it.
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
-import time
 from typing import Any, Dict, Optional
 
 

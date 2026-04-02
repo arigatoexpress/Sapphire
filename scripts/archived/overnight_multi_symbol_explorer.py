@@ -19,9 +19,9 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from pathlib import Path
-from datetime import datetime, timezone
 from collections import deque
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Deque, Dict, List, Optional, Tuple
 
 

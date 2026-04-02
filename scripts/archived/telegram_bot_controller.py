@@ -21,14 +21,13 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 import time
-import subprocess
-import urllib.request
 import urllib.error
-from pathlib import Path
+import urllib.request
 from datetime import datetime
-from typing import Any
+from pathlib import Path
 
 # Configuration
 DAEMON_STATE_FILE = Path("/home/rari/.openclaw/runtime/codex-projects/output/trading-daemon/daemon_state.json")

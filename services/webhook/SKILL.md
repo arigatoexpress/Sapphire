@@ -3,9 +3,9 @@ name: sapphire-webhook
 description: TradingView webhook receiver — validates and routes signals to alpha engine
 type: service
 runtime: python
-deploy_target: cloud-run
+deploy_target: windows-pc
 dependencies: [sapphire-core]
-entry_point: src/main.py
+entry_point: src/receiver.py
 test_command: pytest tests/
 ---
 
@@ -27,13 +27,23 @@ Lightweight FastAPI service that receives TradingView alerts and routes them to 
 
 ## Security
 
-- Webhook secret validated via `X-Webhook-Secret` header
-- Secret stored in: `sapphire-webhook-secret` (Secret Manager)
-- Only accepts POST /webhook — all other routes 404
+- Webhook secret validated in payload body (`secret` field must match `WEBHOOK_SECRET` env var)
+- No GCP Secret Manager — secret set in local `.env` on Windows PC
 
-## Deploy
+## Deploy (on-prem — Windows PC)
 
-```bash
-gcloud run deploy sapphire-webhook --source . --project sapphire-479610
-# TradingView alert URL: https://webhook.sapphirealpha.xyz/webhook
+Signal routing: TradingView → Cloudflare Tunnel → Windows PC:9090 → rari1:18081 + rari2:18081 (Tailscale)
+
+```powershell
+# Set env vars in C:\sapphire\.env
+# WEBHOOK_SECRET, ALPHA_ENGINE_RARI1, ALPHA_ENGINE_RARI2, OLLAMA_URL
+
+cd C:\sapphire\webhook
+python -m uvicorn src.receiver:app --host 0.0.0.0 --port 9090
+
+# TradingView alert URL: https://webhook.sapphirealpha.xyz/webhook/tradingview
 ```
+
+## Cloudflare Tunnel
+
+See `infra/cloudflare/SETUP.md` for public HTTPS ingress setup.

@@ -4,7 +4,6 @@ Supports notifications and interactive commands via @mentions.
 """
 
 import asyncio
-import logging
 import re
 import time
 from enum import Enum

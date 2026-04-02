@@ -4,9 +4,9 @@ Pair Trading Signal Interpreter
 Converts pair chart signals (ETHBTC) into actionable trades on individual assets
 """
 
-from typing import Dict, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
+from typing import Optional, Tuple
 
 
 class PairSignal(Enum):

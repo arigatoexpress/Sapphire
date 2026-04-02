@@ -5,10 +5,9 @@ Monitors and automatically recovers services
 """
 
 import asyncio
-import subprocess
-import time
-from datetime import datetime
 import logging
+import subprocess
+from datetime import datetime
 
 logging.basicConfig(
     level=logging.INFO,
@@ -247,6 +246,7 @@ class AutoHealSystem:
 
 # HTTP API for monitoring
 from aiohttp import web
+
 
 async def start_heal_api(healer: AutoHealSystem, port: int = 8089):
     """Start API for auto-heal system"""

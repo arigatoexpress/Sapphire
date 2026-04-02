@@ -25,7 +25,6 @@ from urllib.parse import quote_plus
 import aiohttp
 from loguru import logger
 
-
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
 _WS_RE = re.compile(r"\s+")
 _GLINT_TITLE_RE = re.compile(r'"(?:headline|title)"\s*:\s*"([^"]{18,220})"')

@@ -23,8 +23,7 @@ Document fields:
 
 import logging
 import time
-from datetime import datetime, timezone, timedelta
-from typing import Optional
+from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 

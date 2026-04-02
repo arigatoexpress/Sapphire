@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
 import math
 import os
-from typing import Any
+from datetime import datetime, timedelta, timezone
 
 from firebase_admin import firestore
 

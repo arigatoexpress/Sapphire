@@ -7,14 +7,13 @@ Runs on Pi - bot queries it via HTTP (no import needed)
 
 import json
 import sys
-from pathlib import Path
 from datetime import datetime
 
 # Try to import monitoring modules
 try:
-    from trade_log_monitor import TradeLogMonitor
-    from pnl_tracker import PnLTracker
     from alert_system import TradingAlertSystem
+    from pnl_tracker import PnLTracker
+    from trade_log_monitor import TradeLogMonitor
     MONITORING_AVAILABLE = True
 except ImportError as e:
     print(f"Warning: Could not import monitoring modules: {e}")
@@ -26,8 +25,8 @@ try:
     HAS_FLASK = True
 except ImportError:
     HAS_FLASK = False
-    from http.server import HTTPServer, BaseHTTPRequestHandler
     import urllib.parse
+    from http.server import BaseHTTPRequestHandler, HTTPServer
 
 PORT = 18890
 

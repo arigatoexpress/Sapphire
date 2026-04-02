@@ -12,7 +12,6 @@ Features:
 5. Thread-safe in-memory store with optional JSON persistence
 """
 
-import hashlib
 import json
 import os
 import re
@@ -22,7 +21,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from loguru import logger
-
 
 # ── Task status lifecycle ──────────────────────────────────────────
 

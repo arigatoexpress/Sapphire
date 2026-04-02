@@ -27,8 +27,8 @@ ALPHA_SRC = ROOT / "services" / "alpha-engine" / "src"
 if str(ALPHA_SRC) not in sys.path:
     sys.path.insert(0, str(ALPHA_SRC))
 
-from media.twitter import TwitterClient  # noqa: E402
 from media.substack import SubstackClient  # noqa: E402
+from media.twitter import TwitterClient  # noqa: E402
 
 
 def _print_json(payload: dict):

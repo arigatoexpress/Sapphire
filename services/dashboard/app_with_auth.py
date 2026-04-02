@@ -4,13 +4,14 @@ Sapphire Trading Dashboard - With Authentication
 This version adds basic auth protection to the dashboard
 """
 
-from flask import Flask, render_template, jsonify, request, Response
 import asyncio
-import aiohttp
 import os
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from functools import wraps
+
+import aiohttp
+from flask import Flask, Response, jsonify, render_template, request
 
 app = Flask(__name__)
 

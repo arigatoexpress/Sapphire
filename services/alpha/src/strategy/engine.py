@@ -6,8 +6,8 @@ from typing import Any, Dict, List, Set
 
 from loguru import logger
 from shared.position_sizing import SizingConfig, apply_stage_multiplier
-from src.feeds.market_data import MarketDataAggregator
 
+from src.feeds.market_data import MarketDataAggregator
 
 # ---------------------------------------------------------------------------
 # Venue Profiles — each venue is a specialist, not an arb counter-party.

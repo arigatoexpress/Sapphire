@@ -4,18 +4,17 @@ Performance Monitor for Kimi-Claw Telegram Bot
 Tracks response times, CPU, memory, and system health
 """
 
-import os
-import sys
-import time
-import json
-import psutil
 import asyncio
-import subprocess
-from datetime import datetime, timedelta
-from pathlib import Path
+import json
+import time
 from collections import deque
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
+from datetime import datetime
+from pathlib import Path
 from typing import Dict, List, Optional
+
+import psutil
+
 
 @dataclass
 class MetricSnapshot:
@@ -195,20 +194,20 @@ def print_report(monitor: PerformanceMonitor):
     # Last 10 minutes
     stats = monitor.get_stats(minutes=10)
     if 'error' in stats:
-        print(f"No data yet...")
+        print("No data yet...")
         return
     
     print(f"\n📊 Last {stats['period_minutes']} minutes:")
     print(f"  Samples: {stats['samples']}")
-    print(f"\n  CPU Usage:")
+    print("\n  CPU Usage:")
     print(f"    Average: {stats['cpu']['avg']:.1f}%")
     print(f"    Peak:    {stats['cpu']['max']:.1f}%")
-    print(f"\n  Memory Usage:")
+    print("\n  Memory Usage:")
     print(f"    Average: {stats['memory']['avg']:.1f}%")
     print(f"    Peak:    {stats['memory']['max']:.1f}%")
     
     if 'kimi_response_time' in stats:
-        print(f"\n  Kimi Response Time:")
+        print("\n  Kimi Response Time:")
         print(f"    Average: {stats['kimi_response_time']['avg']:.2f}s")
         print(f"    Peak:    {stats['kimi_response_time']['max']:.2f}s")
         print(f"    Best:    {stats['kimi_response_time']['min']:.2f}s")
@@ -217,7 +216,7 @@ def print_report(monitor: PerformanceMonitor):
     
     # Recent alerts
     if monitor.alerts:
-        print(f"\n⚠️  Recent Alerts:")
+        print("\n⚠️  Recent Alerts:")
         for alert in monitor.alerts[-5:]:
             print(f"    {alert['timestamp']}: {', '.join(alert['alerts'])}")
     

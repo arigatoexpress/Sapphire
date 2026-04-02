@@ -20,17 +20,12 @@ Features:
 - Integration with ensemble predictions
 """
 
-import asyncio
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Tuple, Callable
-import pandas as pd
-import numpy as np
-from concurrent.futures import ThreadPoolExecutor
-from scipy import stats
-import json
+from datetime import datetime
+from typing import Any, Callable, Dict, List, Optional
 
+import numpy as np
 from mcp_trader.ai.ensemble_trading_system import EnsemblePrediction
 
 logger = logging.getLogger(__name__)

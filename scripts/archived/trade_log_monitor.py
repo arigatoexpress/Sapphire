@@ -5,15 +5,13 @@ Monitors live trading activity from autonomous trading system logs
 Replaces CoinGecko price tracking with actual trade data
 """
 
+import argparse
 import json
 import re
-import os
-import sys
+from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
-from collections import defaultdict
 from typing import Dict, List, Optional
-import argparse
 
 
 class TradeLogMonitor:

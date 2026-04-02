@@ -28,7 +28,6 @@ from .prediction_signal import (
     ArbitrageOpportunity,
     PredictionMarketFeed,
     PredictionSignal,
-    PredictionSource,
     SignalRelevance,
 )
 
@@ -401,7 +400,7 @@ class PredictionAggregator:
         # Whale activity & manipulation warnings for this symbol
         whale_alerts = self._detect_whale_and_manipulation(symbol)
         if whale_alerts:
-            lines.append(f"  ⚠️ Market Intelligence Alerts:")
+            lines.append("  ⚠️ Market Intelligence Alerts:")
             for alert in whale_alerts[:5]:
                 lines.append(f"    {alert}")
 

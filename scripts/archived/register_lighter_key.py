@@ -24,7 +24,6 @@ Environment Variables:
 """
 
 import asyncio
-import json
 import os
 import sys
 import time
@@ -123,7 +122,7 @@ async def main():
         print(f"    LIGHTER_PUB_KEY  = {pub_key}")
         print(f"    LIGHTER_PRIV_KEY = {priv_key}")
     else:
-        print(f"\n[2/5] Using existing keys from environment")
+        print("\n[2/5] Using existing keys from environment")
         print(f"  Public Key: {pub_key[:20]}..." if pub_key else "  Public Key: MISSING")
         print(f"  Private Key: {priv_key[:16]}..." if priv_key else "  Private Key: MISSING")
 
@@ -159,7 +158,7 @@ async def main():
         print(f"  Key not yet registered: {e}")
 
     # Step 4: Register the key (requires ETH private key)
-    print(f"\n[4/5] Registering API key on Lighter...")
+    print("\n[4/5] Registering API key on Lighter...")
 
     if not eth_private_key:
         print("  ERROR: ETH_PRIVATE_KEY required to register API key.")
@@ -196,7 +195,7 @@ async def main():
         return
 
     # Step 5: Verify registration
-    print(f"\n[5/5] Waiting for registration to propagate (10s)...")
+    print("\n[5/5] Waiting for registration to propagate (10s)...")
     time.sleep(10)
 
     try:

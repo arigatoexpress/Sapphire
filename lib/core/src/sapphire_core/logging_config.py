@@ -6,11 +6,11 @@ Structured logging for all services with GCP Cloud Logging + Firestore integrati
 
 import json
 import logging
-import sys
 import os
+import sys
 from datetime import datetime
-from typing import Dict, Any, Optional
 from enum import Enum
+from typing import Any, Dict
 
 # Optional Firestore import - only available when running with GCP credentials
 try:

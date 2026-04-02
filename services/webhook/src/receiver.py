@@ -3,62 +3,56 @@
 Sapphire Webhook Receiver — Windows PC
 
 Receives TradingView alerts, enriches via local Ollama (gemma3:27b),
-then publishes to GCP Pub/Sub `trading-signals` topic so the entire
-swarm (alpha-engine, bot-lighter, bot-aster) can consume the signal.
-
-Falls back to direct HTTPS → Sapphire Gateway if Pub/Sub is unavailable.
+then forwards to alpha-engine on rari1 (Tailscale) and alpha-engine
+on rari2 as secondary. No GCP Pub/Sub — fully on-prem.
 
 Signal flow:
-  TradingView → POST /webhook/tradingview (this service, Windows PC)
+  TradingView → POST /webhook/tradingview (this service, Windows PC, port 9090)
                 → Ollama enrichment (local, optional)
-                → Pub/Sub trading-signals  ← primary
-                → Gateway HTTPS fallback   ← if Pub/Sub fails
+                → POST http://100.120.191.1:18081/api/signals  ← rari1 alpha-engine (primary)
+                → POST http://100.87.225.89:18081/api/signals  ← rari2 alpha-engine (secondary)
 """
 
+import asyncio
+import contextlib
 import json
 import logging
-import httpx
-import asyncio
-import uuid
 import os
 import platform
 import socket
 import subprocess
+import uuid
+from contextlib import asynccontextmanager
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any, Optional
-from dataclasses import dataclass, asdict
-from contextlib import asynccontextmanager
-import contextlib
 
-from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
-from fastapi.responses import JSONResponse, HTMLResponse
+import httpx
 import uvicorn
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse, JSONResponse
 
-try:
-    from google.cloud import pubsub_v1
-    _PUBSUB_AVAILABLE = True
-except ImportError:
-    pubsub_v1 = None
-    _PUBSUB_AVAILABLE = False
-
-try:
-    from google.cloud import firestore as g_firestore
-    _FIRESTORE_AVAILABLE = True
-except ImportError:
-    g_firestore = None
-    _FIRESTORE_AVAILABLE = False
+# GCP deps removed — on-prem mode uses Tailscale HTTP routing
+pubsub_v1 = None
+_PUBSUB_AVAILABLE = False
+g_firestore = None
+_FIRESTORE_AVAILABLE = False
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 
-WEBHOOK_SECRET  = "sapphire_trading_2024"   # Must match Pine Script alert body
-GCP_PROJECT_ID  = "sapphire-479610"
-PUBSUB_TOPIC    = f"projects/{GCP_PROJECT_ID}/topics/trading-signals"
-GATEWAY_URL     = "https://sapphire-gateway-s77j6bxyra-uc.a.run.app"  # HTTPS fallback
-OLLAMA_URL      = "http://localhost:11434"   # Local Ollama (RTX 5070 Ti)
-WEBHOOK_PORT    = 9090
+WEBHOOK_SECRET  = os.getenv("WEBHOOK_SECRET", "sapphire_trading_2024")  # Must match Pine Script alert body
+OLLAMA_URL      = os.getenv("OLLAMA_URL", "http://localhost:11434")   # Local Ollama (RTX 5070 Ti)
+WEBHOOK_PORT    = int(os.getenv("WEBHOOK_PORT", "9090"))
 LOG_FILE        = os.getenv("WEBHOOK_LOG_FILE", "C:/sapphire/webhook.log")
 MAX_HISTORY     = 200
-SYSTEM_LOGS_COLLECTION = "system_logs"
+
+# On-prem signal routing — api-gateway endpoints over Tailscale
+# POST /api/signals/create with X-Sapphire-Control-Token header
+ALPHA_ENGINE_RARI1 = os.getenv("ALPHA_ENGINE_RARI1", "http://100.120.191.1:18080")
+ALPHA_ENGINE_RARI2 = os.getenv("ALPHA_ENGINE_RARI2", "http://100.87.225.89:18080")
+SAPPHIRE_CONTROL_TOKEN = os.getenv("SAPPHIRE_CONTROL_API_TOKEN", "")
+
+# Legacy GCP vars — kept for reference, no longer used
 EDGE_CAPABILITIES_COLLECTION = "edge_capabilities"
 CAPABILITY_SYNC_INTERVAL_SECONDS = int(
     os.getenv("CAPABILITY_SYNC_INTERVAL_SECONDS", "180")
@@ -155,28 +149,11 @@ _capability_snapshot: dict[str, Any] = {
 
 
 def _get_publisher():
-    """Lazy-init a thread-safe Pub/Sub PublisherClient (singleton)."""
-    global _publisher
-    if _publisher is None and _PUBSUB_AVAILABLE:
-        try:
-            _publisher = pubsub_v1.PublisherClient()
-            log.info("✅ Pub/Sub PublisherClient initialized")
-        except Exception as e:
-            log.error("❌ Failed to create PublisherClient: %s", e)
-    return _publisher
+    return None  # Pub/Sub removed — on-prem Tailscale routing
 
 
 def _get_firestore_client():
-    """Lazy-init Firestore client for cross-surface operational logs."""
-    global _firestore_client
-    if _firestore_client is None and _FIRESTORE_AVAILABLE:
-        try:
-            _firestore_client = g_firestore.Client(project=GCP_PROJECT_ID)
-            log.info("✅ Firestore client initialized")
-        except Exception as exc:
-            log.warning("Firestore client init failed: %s", exc)
-            _firestore_client = None
-    return _firestore_client
+    return None  # Firestore removed — on-prem mode
 
 
 async def _fetch_ollama_models() -> list[dict]:
@@ -419,54 +396,45 @@ def build_trade_signal(alert: TradingViewAlert) -> dict:
 
 # ─── Pub/Sub publish ──────────────────────────────────────────────────────────
 
-async def publish_to_pubsub(signal: dict) -> dict:
+async def publish_signal(signal: dict) -> dict:
     """
-    Primary path: publish TradeSignal dict to GCP Pub/Sub trading-signals.
-    Falls back to gateway HTTPS if unavailable.
+    On-prem signal routing: POST to alpha-engine on rari1 (primary),
+    then rari2 (secondary) over Tailscale. No GCP Pub/Sub.
     """
-    publisher = _get_publisher()
-    if publisher:
-        try:
-            data = json.dumps(signal).encode("utf-8")
-            future = await asyncio.to_thread(publisher.publish, PUBSUB_TOPIC, data)
-            msg_id = await asyncio.to_thread(future.result, timeout=10)
-            stats["published"] += 1
-            stats["pubsub_success"] += 1
-            log.info("📤 Published to Pub/Sub | id=%s | %s %s",
-                     msg_id, signal["side"], signal["symbol"])
-            return {"published": True, "channel": "pubsub", "message_id": msg_id}
-        except Exception as e:
-            log.error("⚠️  Pub/Sub failed: %s — trying gateway fallback", e)
+    targets = [
+        ("rari1", f"{ALPHA_ENGINE_RARI1}/api/signals/create"),
+        ("rari2", f"{ALPHA_ENGINE_RARI2}/api/signals/create"),
+    ]
+    headers = {"Content-Type": "application/json"}
+    if SAPPHIRE_CONTROL_TOKEN:
+        headers["X-Sapphire-Control-Token"] = SAPPHIRE_CONTROL_TOKEN
+    results = []
+    any_ok = False
+    async with httpx.AsyncClient(timeout=8.0) as client:
+        for name, url in targets:
+            try:
+                r = await client.post(url, json=signal, headers=headers)
+                ok = r.status_code < 300
+                if ok:
+                    any_ok = True
+                    stats["pubsub_success"] += 1
+                log.info("📤 Signal → %s HTTP %d | %s %s", name, r.status_code, signal["side"], signal["symbol"])
+                results.append({"target": name, "ok": ok, "http_status": r.status_code})
+            except Exception as e:
+                log.warning("⚠️  Signal → %s failed: %s", name, e)
+                results.append({"target": name, "ok": False, "error": str(e)[:120]})
 
-    # Fallback
-    return await forward_to_gateway(signal)
-
-
-async def forward_to_gateway(signal: dict) -> dict:
-    """
-    HTTPS fallback: POST signal to Sapphire Gateway Cloud Run.
-    Used when Pub/Sub credentials are unavailable or publish fails.
-    """
-    try:
-        async with httpx.AsyncClient(timeout=8.0) as client:
-            r = await client.post(
-                f"{GATEWAY_URL}/api/signals",
-                json=signal,
-                headers={"Content-Type": "application/json"},
-            )
-            stats["published"] += 1
-            stats["gateway_fallback"] += 1
-            log.info("📡 Gateway fallback → HTTP %d", r.status_code)
-            return {
-                "published": True,
-                "channel": "gateway_https",
-                "http_status": r.status_code,
-                "response": r.text[:200],
-            }
-    except Exception as e:
-        log.error("❌ Gateway fallback also failed: %s", e)
+    if any_ok:
+        stats["published"] += 1
+        return {"published": True, "channel": "tailscale", "targets": results}
+    else:
         stats["errors"] += 1
-        return {"published": False, "channel": "none", "error": str(e)}
+        return {"published": False, "channel": "none", "targets": results}
+
+
+# Kept for backwards compat — removed GCP gateway
+async def forward_to_gateway(signal: dict) -> dict:
+    return await publish_signal(signal)
 
 
 # ─── Ollama enrichment ────────────────────────────────────────────────────────
@@ -504,13 +472,9 @@ async def ollama_enrich(alert: TradingViewAlert) -> Optional[str]:
 async def lifespan(app: FastAPI):
     global _capability_sync_task
     log.info("🚀 Sapphire Webhook Receiver starting on port %d", WEBHOOK_PORT)
-    log.info("Pub/Sub topic:   %s", PUBSUB_TOPIC)
-    log.info("Gateway fallback: %s", GATEWAY_URL)
-    log.info("Ollama endpoint:  %s", OLLAMA_URL)
-    log.info("Pub/Sub available: %s", _PUBSUB_AVAILABLE)
-    # Warm up publisher on startup
-    _get_publisher()
-    _get_firestore_client()
+    log.info("Signal routing:  rari1=%s  rari2=%s", ALPHA_ENGINE_RARI1, ALPHA_ENGINE_RARI2)
+    log.info("Ollama endpoint: %s", OLLAMA_URL)
+    log.info("On-prem mode:    Tailscale routing active (no GCP)")
     _capability_sync_task = asyncio.create_task(_capability_sync_loop())
     yield
     if _capability_sync_task is not None:
@@ -601,9 +565,9 @@ async def status():
         "status": "active",
         "version": "2.0.0",
         "stats": stats,
-        "pubsub_topic": PUBSUB_TOPIC,
-        "pubsub_available": _PUBSUB_AVAILABLE,
-        "gateway_url": GATEWAY_URL,
+        "signal_routing": "tailscale",
+        "alpha_engine_rari1": ALPHA_ENGINE_RARI1,
+        "alpha_engine_rari2": ALPHA_ENGINE_RARI2,
         "ollama_url": OLLAMA_URL,
         "services": services,
         "capabilities": {
@@ -689,8 +653,8 @@ async def receive_tradingview(request: Request, background_tasks: BackgroundTask
     # Step 2 — Build TradeSignal dict
     signal = build_trade_signal(alert)
 
-    # Step 3 — Publish to Pub/Sub (with gateway fallback)
-    pub_result = await publish_to_pubsub(signal)
+    # Step 3 — Route signal to alpha-engine over Tailscale
+    pub_result = await publish_signal(signal)
 
     write_system_log(
         level="INFO",

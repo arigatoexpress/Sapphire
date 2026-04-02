@@ -30,7 +30,7 @@ import websockets
 from credentials import Credentials
 from enums import MarginType, OrderType, PositionSide, ResponseType, TimeInForce, WorkingType
 from httpx import HTTPStatusError
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class AsterAPIError(Exception):
@@ -1278,7 +1278,7 @@ async def test_api_connection():
 
                 print("\n9. Testing account balance...")
                 balance = await auth_client.get_account_balance()
-                print(f"   ✅ Account balance retrieved")
+                print("   ✅ Account balance retrieved")
 
                 print("\n10. Testing leverage brackets...")
                 brackets = await auth_client.get_leverage_brackets()
@@ -1292,7 +1292,7 @@ async def test_api_connection():
 
                 print("\n12. Testing commission rates...")
                 commission = await auth_client.get_commission_rate("BTCUSDT")
-                print(f"   ✅ Commission rates retrieved")
+                print("   ✅ Commission rates retrieved")
 
                 await auth_client.close()
             else:

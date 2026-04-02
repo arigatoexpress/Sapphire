@@ -6,11 +6,10 @@ import time
 from datetime import datetime
 
 import google.generativeai as genai
-
 from src.security.prompt_sanitizer import (
+    log_injection_attempt,
     sanitize_for_prompt,
     sanitize_trade_data_for_prompt,
-    log_injection_attempt,
 )
 
 logger = logging.getLogger(__name__)

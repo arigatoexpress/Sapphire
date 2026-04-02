@@ -46,7 +46,6 @@ async def test_cognitive_mesh():
     try:
         from cognitive_mesh import (
             AgentRole,
-            CognitiveMesh,
             CognitiveMessage,
             MessageType,
             get_cognitive_mesh,
@@ -143,7 +142,6 @@ async def test_dual_speed_cognition():
         from dual_speed_cognition import (
             CognitionRequest,
             CognitionSpeed,
-            DualSpeedCognition,
             get_dual_cognition,
         )
 
@@ -185,7 +183,7 @@ async def test_episodic_memory():
     logger.info("\n🧪 Testing Episodic Memory...")
 
     try:
-        from episodic_memory import EpisodicMemoryBank, MarketEpisode, get_episodic_memory
+        from episodic_memory import EpisodicMemoryBank
 
         # Use temp storage for test
         memory = EpisodicMemoryBank(storage_path="/tmp/test_sapphire_memory.json")
@@ -244,9 +242,7 @@ async def test_neural_cache():
         from sapphire_neural_cache import (
             MemoryMoE,
             NeuralKVCache,
-            PacketBuffer,
             Platform,
-            SapphireNeuralCache,
             TradePacket,
             TradeSide,
             get_neural_cache,
@@ -309,7 +305,7 @@ async def test_neural_cache():
         # Query routing
         trade_query = {"type": "trade", "symbol": "SOL"}
         results = await moe.query(trade_query)
-        test_result("MoE Trade Query", True, f"Routed successfully")
+        test_result("MoE Trade Query", True, "Routed successfully")
 
         regime_query = {"type": "regime"}
         results = await moe.query(regime_query)

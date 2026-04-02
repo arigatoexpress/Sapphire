@@ -8,12 +8,11 @@ Uses AppleScript to control Chrome without restarting
 import asyncio
 import json
 import logging
-import re
 import subprocess
 import time
 from datetime import datetime
-from typing import Dict, List, Optional, Any
-import aiohttp
+from typing import Dict, List
+
 from aiohttp import web
 
 logging.basicConfig(
@@ -236,7 +235,7 @@ class TVQuantAgent:
         if symbol:
             await self.change_symbol(symbol)
             
-        logger.info(f"📰 Fetching news...")
+        logger.info("📰 Fetching news...")
         
         # Open news panel
         self.execute_js('document.querySelector(\'[data-name="news-button"]\')?.click()')

@@ -11,13 +11,12 @@ This script runs weekly to:
 Run via: Cloud Scheduler (Sundays at 2 AM UTC)
 """
 
-import os
 import json
-import sys
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
+from typing import List, Optional
+
 from google.cloud import firestore, pubsub_v1
-from dataclasses import dataclass, asdict
-from typing import Dict, List, Optional
 
 # Configuration
 PROJECT_ID = "sapphire-479610"
@@ -208,7 +207,7 @@ class SelfImprovementEngine:
     
     def run_weekly_review(self):
         """Main entry point - run weekly self-improvement review"""
-        print(f"=== Weekly Self-Improvement Review ===")
+        print("=== Weekly Self-Improvement Review ===")
         print(f"Time: {datetime.utcnow().isoformat()}")
         
         # Get metrics
@@ -217,7 +216,7 @@ class SelfImprovementEngine:
             print("No metrics available - skipping review")
             return
             
-        print(f"\nWeekly Performance:")
+        print("\nWeekly Performance:")
         print(f"  PnL: ${metrics.pnl_weekly:.2f} (Cumulative: ${metrics.pnl_cumulative:.2f})")
         print(f"  Win Rate: {metrics.win_rate:.1%} ({metrics.winning_trades}/{metrics.total_trades})")
         print(f"  Sortino: {metrics.sortino_ratio:.2f}")

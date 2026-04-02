@@ -3,7 +3,7 @@ name: sapphire-alpha
 description: Trading engine — signals, risk, execution, self-improvement loop
 type: service
 runtime: python
-deploy_target: cloud-run
+deploy_target: rari1+rari2
 dependencies: [sapphire-core, sapphire-telegram]
 entry_point: src/main.py
 test_command: pytest tests/
@@ -17,15 +17,18 @@ Core trading engine. Receives signals from TradingView webhooks, applies risk fi
 
 - Signal ingestion (TradingView → webhook → alpha)
 - Risk kernel (circuit breaker, position sizing, drawdown limits)
-- Execution router (Lighter Protocol via rari2, future: Hyperliquid, Aster)
+- Execution router (Aster DEX + Hyperliquid via rari2)
 - Self-improvement: trade metrics → control-plane tasks → agent improvements
 
-## Signal Flow
+## Signal Flow (on-prem)
 
 ```
-TradingView → services/webhook → services/alpha → sapphire-core risk check
-  → Lighter Protocol (rari2) → event: type:trading, project:sapphire
-  → control-plane → Telegram notification
+TradingView → webhook.sapphirealpha.xyz (Cloudflare Tunnel)
+  → Windows PC:9090 (Ollama enrichment)
+  → rari1:18081 + rari2:18081 (Tailscale HTTP, parallel)
+  → sapphire-core risk check
+  → Redis pub/sub: trading-signals → aster, hyperliquid
+  → control-plane:8082 → Telegram notification
 ```
 
 ## Metrics (PnL is king)
@@ -35,8 +38,14 @@ TradingView → services/webhook → services/alpha → sapphire-core risk check
 - Max drawdown: 15%
 - Pairs: ETH/BTC, SOL/BTC, ZEC/BTC, HYPE/USDT, BTC/USDT
 
-## Deploy
+## Deploy (on-prem)
+
+Runs on both rari1 and rari2 (port 18081). See `infra/pi/` for systemd services.
+Signal broker: Redis on rari1 (`REDIS_URL=redis://100.120.191.1:6379`).
 
 ```bash
-gcloud run deploy sapphire-alpha --source . --project sapphire-479610
+# Install Redis on rari1 first:
+ssh rari@100.120.191.1 'bash -s' < infra/pi/rari1/setup-redis.sh
+# Then deploy control-plane:
+bash infra/pi/rari1/deploy-control-plane.sh
 ```

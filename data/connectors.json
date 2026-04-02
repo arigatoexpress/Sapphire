@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-03-18",
+  "updated": "2026-04-01",
   "connectors": [
     {
       "id": "openclaw-gateway",
@@ -49,14 +49,28 @@
     },
     {
       "id": "tradingview-mcp",
-      "name": "TradingView MCP",
+      "name": "TradingView MCP Bridge (tradesdontlie)",
       "type": "mcp",
-      "protocol": "mcp",
-      "mcp_id": "tradingview-mcp",
+      "protocol": "cdp",
+      "path": "~/Code/tradingview-mcp-v2",
+      "github": "tradesdontlie/tradingview-mcp",
       "device": "mac",
       "status": "active",
+      "tools": 78,
+      "cli": "tv",
       "tags": ["type:trading", "device:mac"],
-      "description": "TradingView — charts, alerts, Pine script editor, symbol data, screeners"
+      "description": "78-tool MCP bridge via Chrome DevTools Protocol — live chart data, Pine Script AI-in-the-loop, OHLCV streaming, indicator readings, strategy tester"
+    },
+    {
+      "id": "openbb",
+      "name": "OpenBB Financial Data Platform",
+      "type": "mcp",
+      "protocol": "mcp",
+      "device": "mac",
+      "status": "active",
+      "tags": ["type:trading", "type:data", "device:mac"],
+      "providers": ["yfinance", "alpha_vantage", "fred", "sec", "nasdaq", "cboe", "fmp", "benzinga", "intrinio", "tiingo", "deribit"],
+      "description": "Unified financial data — equity, crypto, options, macro, news from 32 providers via Python SDK + MCP server"
     },
     {
       "id": "figma-mcp",
@@ -157,6 +171,80 @@
       "status": "active",
       "tags": ["type:messaging", "device:rari1"],
       "description": "Primary human-agent interface — Telegram-first command and status channel"
+    },
+    {
+      "id": "claw-code",
+      "name": "Claw Code Runtime",
+      "type": "agent-runtime",
+      "protocol": "cli",
+      "device": "all",
+      "status": "active",
+      "github": "instructkr/claw-code",
+      "path": "~/Code/claw-code",
+      "binary": "~/.local/bin/claw",
+      "tags": ["agent:claw-code", "type:runtime"],
+      "description": "Rust-based local coding agent runtime — deployed per-device with role-specific profiles"
+    },
+    {
+      "id": "claw-sapphire-plugin",
+      "name": "Claw Sapphire Plugin",
+      "type": "plugin",
+      "protocol": "python",
+      "device": "all",
+      "status": "active",
+      "path": "plugins/claw-sapphire/",
+      "tags": ["agent:claw-code", "type:plugin"],
+      "description": "Sapphire integration for claw-code — mesh status, PM tasks, Telegram, inference routing"
+    },
+    {
+      "id": "satellite-project-go-forward",
+      "name": "Project Go Forward",
+      "type": "satellite-repo",
+      "path": "~/Code/Project-Go-Forward",
+      "github": "arigatoexpress/Project-Go-Forward",
+      "status": "active",
+      "tags": ["type:pm", "project:tho"],
+      "description": "Client PM system for Texas Home Outlet — ADK/FastAPI, doc generation, CRM"
+    },
+    {
+      "id": "satellite-kimi-tools",
+      "name": "Kimi Tools",
+      "type": "satellite-repo",
+      "path": "~/Code/kimi-tools",
+      "github": "arigatoexpress/kimi-tools",
+      "status": "active",
+      "tags": ["agent:kimi", "type:agent"],
+      "description": "Distributed agent infrastructure — master-slave orchestration, Nemotron integration"
+    },
+    {
+      "id": "satellite-regional-intel",
+      "name": "Regional Intel Workbench",
+      "type": "satellite-repo",
+      "path": "~/Code/regional-intel-workbench",
+      "github": "arigatoexpress/regional-intel-workbench",
+      "status": "active",
+      "tags": ["type:intelligence"],
+      "description": "Intelligence platform — relationship graphs, analytics, watch lists"
+    },
+    {
+      "id": "satellite-tradingview-mcp",
+      "name": "TradingView MCP Server",
+      "type": "satellite-repo",
+      "path": "~/Code/tradingview-mcp",
+      "github": "arigatoexpress/tradingview-mcp",
+      "status": "active",
+      "tags": ["type:trading", "type:mcp"],
+      "description": "TypeScript MCP server for TradingView Premium — charts, alerts, Pine tools"
+    },
+    {
+      "id": "satellite-cointracker",
+      "name": "Cointracker",
+      "type": "satellite-repo",
+      "path": "~/Code/Cointracker",
+      "github": "arigatoexpress/crypto-tax-tracker",
+      "status": "active",
+      "tags": ["type:tax", "type:crypto"],
+      "description": "Multi-chain crypto tax engine — HIFO cost basis, tax-loss harvesting, Form 8949"
     }
   ],
   "launchagents": [
