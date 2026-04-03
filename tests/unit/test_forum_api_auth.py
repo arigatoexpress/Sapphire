@@ -1,5 +1,5 @@
 """
-Tests for forum API auth in services/alpha-engine/shared/health.py.
+Tests for forum API auth in services/alpha/src/health.py.
 
 We intentionally allow the web dashboard to read forum state from whitelisted
 origins (CORS allowlist) while blocking anonymous curl-style access unless a

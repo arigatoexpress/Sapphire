@@ -20,8 +20,8 @@ from pathlib import Path
 import pytest
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-SIZING_PATH = ROOT_DIR / "services/alpha-engine/shared/position_sizing.py"
-ALPHA_ENGINE_ROOT = ROOT_DIR / "services/alpha-engine"
+SIZING_PATH = ROOT_DIR / "lib/core/src/sapphire_core/position_sizing.py"
+ALPHA_ENGINE_ROOT = ROOT_DIR / "lib/core/src"
 
 
 def _load_sizing_module():

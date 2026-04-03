@@ -3,7 +3,7 @@ import importlib.util
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-DISPATCHER_PATH = ROOT_DIR / "services/alpha-engine/src/execution/dispatcher.py"
+DISPATCHER_PATH = ROOT_DIR / "services/alpha/src/execution/dispatcher.py"
 
 
 def _load_module(path: Path, module_name: str):

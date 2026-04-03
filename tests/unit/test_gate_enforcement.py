@@ -7,7 +7,7 @@ and that PermissionDenied propagates correctly.
 import os
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/alpha-engine"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/alpha"))
 
 import pytest
 from src.security.agent_permissions import (

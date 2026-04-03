@@ -18,8 +18,8 @@ import time
 from typing import List
 from unittest.mock import AsyncMock, MagicMock, patch
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/alpha-engine"))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/alpha-engine/shared"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/alpha"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/alpha/src"))
 
 import pytest
 from src.feeds.prediction_aggregator import _normalize_market_name

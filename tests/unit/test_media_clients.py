@@ -5,8 +5,8 @@ import types
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-TWITTER_PATH = ROOT_DIR / "services/alpha-engine/src/media/twitter.py"
-SUBSTACK_PATH = ROOT_DIR / "services/alpha-engine/src/media/substack.py"
+TWITTER_PATH = ROOT_DIR / "services/alpha/src/media/twitter.py"
+SUBSTACK_PATH = ROOT_DIR / "services/alpha/src/media/substack.py"
 
 
 def _load_module(path: Path, name: str):

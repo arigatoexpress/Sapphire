@@ -2,7 +2,7 @@
 Fill Confirmation Test Suite — 2.4
 
 Covers the ExecutionDispatcher from
-  services/alpha-engine/src/execution/dispatcher.py
+  services/alpha/src/execution/dispatcher.py
 
 Tests:
   - Venue normalization (symbol & venue name)
@@ -21,7 +21,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/alpha-engine"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/alpha"))
 
 from src.execution.dispatcher import ExecutionDispatcher
 

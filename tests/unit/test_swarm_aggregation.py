@@ -5,7 +5,7 @@ import sys
 import tempfile
 import time
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/alpha-engine"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/alpha"))
 
 import pytest
 from src.collaboration.reputation import BotReputationService

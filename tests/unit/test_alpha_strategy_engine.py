@@ -3,8 +3,8 @@ import sys
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-ENGINE_PATH = ROOT_DIR / "services/alpha-engine/src/strategy/engine.py"
-ALPHA_ENGINE_ROOT = ROOT_DIR / "services/alpha-engine"
+ENGINE_PATH = ROOT_DIR / "services/alpha/src/strategy/engine.py"
+ALPHA_ENGINE_ROOT = ROOT_DIR / "services/alpha"
 
 
 def _load_engine_module():
