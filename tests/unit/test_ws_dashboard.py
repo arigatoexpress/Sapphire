@@ -12,11 +12,9 @@ Verifies:
 """
 
 import asyncio
-import json
 import os
 import sys
-import time
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -24,11 +22,9 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "services", "alpha-engine"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "services", "alpha-engine", "shared"))
 
-from aiohttp import web
-from aiohttp.test_utils import AioHTTPTestCase, unittest_run_loop, TestClient, TestServer
-
 import health
-
+from aiohttp import web
+from aiohttp.test_utils import TestClient, TestServer
 
 # ── Helpers ──────────────────────────────────────────────────────────
 

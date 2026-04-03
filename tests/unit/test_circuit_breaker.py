@@ -9,14 +9,13 @@ Critical paths:
   - record_success resets failure count
   - on_open / on_close callbacks fire at the right moments
 """
-import sys
 import os
+import sys
 import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/shared"))
 
 from circuit_breaker import CircuitBreaker, CircuitBreakerOpen
-
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 

@@ -11,15 +11,14 @@ Critical paths:
   - run_check(): Firestore unavailable → Pub/Sub staleness still works
   - status() returns correct counts and ages
 """
-import sys
-import os
 import asyncio
+import os
+import sys
 import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/shared"))
 
 from position_reconciler import PositionReconciler
-
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

@@ -151,7 +151,7 @@ def scan_repo(name: str, path: Path) -> RepoHealth:
                 h.issues.append(f"TEST_FAIL:{h.test_fail}")
                 h.score -= h.test_fail * 10
             if h.test_error:
-                h.issues.append(f"TEST_COLLECTION_ERROR")
+                h.issues.append("TEST_COLLECTION_ERROR")
                 h.score -= 20
     elif (path / "pyproject.toml").exists():
         h.issues.append("NO_TESTS")
@@ -187,7 +187,7 @@ def scan_all(repo_filter: str | None = None) -> dict:
 def print_summary(report: dict) -> None:
     """Print human-readable summary."""
     print(f"\n{'='*60}")
-    print(f"  SAPPHIRE FACTORY — Repo Health Report")
+    print("  SAPPHIRE FACTORY — Repo Health Report")
     print(f"  {report['timestamp']}")
     print(f"{'='*60}\n")
     print(f"  Avg Score: {report['avg_score']}/100  |  Lint: {report['total_lint_errors']}  |  Test Fails: {report['total_test_failures']}")

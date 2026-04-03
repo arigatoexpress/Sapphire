@@ -9,15 +9,14 @@ Critical paths:
   - Firestore: AlreadyExists → returns False (duplicate)
   - Firestore errors fail-open (return True to not block trades)
 """
-import sys
-import os
 import asyncio
+import os
+import sys
 import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/shared"))
 
 from execution_idempotency import ExecutionIdempotency
-
 
 # ── Memory-only mode ──────────────────────────────────────────────────────────
 

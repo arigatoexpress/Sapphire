@@ -4,7 +4,6 @@ from pathlib import Path
 
 import pytest
 
-
 ROOT_DIR = Path(__file__).resolve().parents[2]
 SCOUT_SANDBOX_PATH = ROOT_DIR / "services/scout-sandbox/app.py"
 

@@ -1,7 +1,7 @@
 """Tests for Phase 4 Bot Reputation & Points System."""
 
-import sys
 import os
+import sys
 import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/alpha-engine"))

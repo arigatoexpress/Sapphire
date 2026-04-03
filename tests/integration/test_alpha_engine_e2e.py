@@ -13,12 +13,8 @@ error propagation is sound, and concurrent operations don't race.
 
 import asyncio
 import os
-import re
 import sys
-import time
-from collections import deque
-from typing import Any, Dict, List
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 

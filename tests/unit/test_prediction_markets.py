@@ -12,21 +12,19 @@ Covers:
   - Fuzzy market name normalization
 """
 
-import asyncio
 import os
 import sys
 import time
-from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import List
 from unittest.mock import AsyncMock, MagicMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/alpha-engine"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/alpha-engine/shared"))
 
 import pytest
+from src.feeds.prediction_aggregator import _normalize_market_name
 
 # ── Signal Dataclass ─────────────────────────────────────────────────
-
 from src.feeds.prediction_signal import (
     ArbitrageOpportunity,
     PredictionMarketFeed,
@@ -34,7 +32,6 @@ from src.feeds.prediction_signal import (
     PredictionSource,
     SignalRelevance,
 )
-from src.feeds.prediction_aggregator import _normalize_market_name
 
 
 def _make_signal(**overrides) -> PredictionSignal:
@@ -408,7 +405,6 @@ class TestPolymarketClientParsing:
 from src.feeds.kalshi_client import (
     KalshiClient,
     _classify_kalshi_relevance,
-    _extract_symbols_kalshi,
 )
 
 
@@ -1277,9 +1273,9 @@ class TestAlphaScannerPredictionIntegration:
 
 # ── Swarm PM Integration ────────────────────────────────────────────
 
-from src.collaboration.swarm import SwarmAggregator
 from src.collaboration.reputation import BotReputationService
-from src.feeds.prediction_accuracy import PredictionAccuracyTracker, PredictionSnapshot
+from src.collaboration.swarm import SwarmAggregator
+from src.feeds.prediction_accuracy import PredictionAccuracyTracker
 
 
 class TestSwarmPMIntegration:

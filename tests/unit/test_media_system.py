@@ -7,13 +7,12 @@ Covers:
 - AgentGate enforcement on media operations
 """
 
-import importlib.util
 import asyncio
+import importlib.util
 import sys
 import time
-import os
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 

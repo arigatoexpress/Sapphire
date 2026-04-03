@@ -6,8 +6,8 @@ trigger category and rotation cycle.
 """
 from __future__ import annotations
 
-import sys
 import os
+import sys
 import types
 
 # Stub heavy dependencies before importing main
@@ -33,7 +33,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/alpha
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/alpha-engine/shared"))
 
 import pytest
-
 
 # ---------- Minimal mock of AlphaEngine for trigger routing ---------- #
 

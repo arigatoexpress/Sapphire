@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
-from router import _keyword_classify, Classification
+from router import _keyword_classify
 
 
 def test_t3_keywords():

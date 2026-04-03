@@ -1,14 +1,13 @@
 """Unit tests for the Skill Security Auditor."""
 
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/alpha-engine"))
 
 from src.security.skill_auditor import (
     IsnadLink,
     SkillAuditor,
-    SkillAuditReport,
     ThreatCategory,
     ThreatSeverity,
 )

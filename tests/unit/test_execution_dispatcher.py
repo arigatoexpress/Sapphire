@@ -2,7 +2,6 @@ import asyncio
 import importlib.util
 from pathlib import Path
 
-
 ROOT_DIR = Path(__file__).resolve().parents[2]
 DISPATCHER_PATH = ROOT_DIR / "services/alpha-engine/src/execution/dispatcher.py"
 
@@ -374,7 +373,6 @@ def test_zero_allocation_blocks_dispatch(monkeypatch):
 
 
 def test_get_control_state():
-    import time
     mod = _load_module(DISPATCHER_PATH, "disp_ctrl_state")
     disp = mod.ExecutionDispatcher()
     disp.bot_urls = {"ASTER": "https://example.run.app", "LIGHTER": "https://example2.run.app"}
@@ -557,7 +555,6 @@ class TestVenueRateLimiter:
         assert rl.check("LIGHTER") is True  # LIGHTER still open
 
     def test_expired_entries_purged(self):
-        import time as _time
         rl = self._limiter_cls()(default_per_minute=2)
         assert rl.check("ASTER") is True
         assert rl.check("ASTER") is True

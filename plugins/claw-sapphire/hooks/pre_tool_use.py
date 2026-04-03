@@ -15,8 +15,8 @@ from pathlib import Path
 
 # Add lib to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
+from runtime_policy import is_tier_allowed
 from token_governor import is_available, remaining
-from runtime_policy import is_tier_allowed, is_repo_allowed
 
 # Map claw-code tool names to risk levels
 HIGH_RISK_TOOLS = {"bash", "write_file", "edit_file"}
@@ -59,7 +59,7 @@ def main():
         # Don't deny — just warn. The token_governor tracks overages.
         # Deny only if massively over budget
         if current_tier == "t3" and remaining("t3") < -50000:
-            print(f"🛑 Claude budget severely overdrawn. Denying tool execution.")
+            print("🛑 Claude budget severely overdrawn. Denying tool execution.")
             sys.exit(2)
 
     # Policy: check if tool is allowed

@@ -2,7 +2,6 @@ import asyncio
 import importlib.util
 from pathlib import Path
 
-
 ROOT_DIR = Path(__file__).resolve().parents[2]
 SCANNER_PATH = ROOT_DIR / "services/alpha-engine/src/security/virustotal_scanner.py"
 

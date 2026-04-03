@@ -1,7 +1,6 @@
 import importlib.util
 from pathlib import Path
 
-
 ROOT_DIR = Path(__file__).resolve().parents[2]
 CLASSIFIER_PATH = ROOT_DIR / "services/alpha-engine/shared/error_classifier.py"
 

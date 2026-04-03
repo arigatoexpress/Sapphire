@@ -1,21 +1,20 @@
 """Unit tests for the Prompt Injection Sanitizer."""
 
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/alpha-engine"))
 
 from src.security.prompt_sanitizer import (
+    UNTRUSTED_CLOSE,
+    UNTRUSTED_OPEN,
+    _injection_log,
     detect_injection,
+    get_injection_stats,
+    log_injection_attempt,
     sanitize_for_prompt,
     sanitize_trade_data_for_prompt,
-    log_injection_attempt,
-    get_injection_stats,
-    UNTRUSTED_OPEN,
-    UNTRUSTED_CLOSE,
-    _injection_log,
 )
-
 
 # ── Role Override Detection ──────────────────────────────────────
 

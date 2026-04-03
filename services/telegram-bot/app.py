@@ -12,7 +12,6 @@ Run:
 
 from __future__ import annotations
 
-import asyncio
 import json
 import os
 import ssl
@@ -179,14 +178,14 @@ def handle_command(cmd: str, args: str, chat_id: str) -> str:
         return run_tool_direct("status.py")
     elif cmd == "/ask" and args:
         send_message("🧠 Thinking...", chat_id)
-        from lib.nemotron import generate, MODELS
+        from lib.nemotron import MODELS, generate
         result = generate(args, model=MODELS["classify"], timeout=30)
         if result.success:
             return f"{result.response}\n\n_({result.endpoint} • {result.model} • {result.eval_tokens} tokens • {result.tokens_per_second} t/s)_"
         return f"❌ {result.error}"
     elif cmd == "/think" and args:
         send_message("🧠 Deep thinking with nemotron-cascade-2...", chat_id)
-        from lib.nemotron import generate, MODELS
+        from lib.nemotron import MODELS, generate
         result = generate(args, model=MODELS["analyze"], timeout=120, max_tokens=1024)
         if result.success:
             return f"{result.response}\n\n_({result.endpoint} • {result.model} • {result.eval_tokens} tokens • {result.tokens_per_second} t/s)_"
@@ -255,7 +254,7 @@ def handle_message(msg: dict) -> None:
     else:
         # Free text → Nemotron inference
         sys.path.insert(0, str(PLUGIN_DIR / "lib"))
-        from nemotron import generate, MODELS
+        from nemotron import MODELS, generate
         result = generate(text, model=MODELS["classify"], timeout=30)
         if result.success:
             send_message(
@@ -269,7 +268,7 @@ def handle_message(msg: dict) -> None:
 def poll_loop() -> None:
     """Long-polling mode for development."""
     import time
-    print(f"🤖 NemotronRariBot (polling mode)")
+    print("🤖 NemotronRariBot (polling mode)")
     print(f"   Allowed users: {ALLOWED_USERS}")
 
     offset = 0

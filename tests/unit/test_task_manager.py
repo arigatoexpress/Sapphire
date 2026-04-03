@@ -1,9 +1,8 @@
 """Tests for Phase 5 Task Management System."""
 
-import sys
 import os
+import sys
 import tempfile
-import json
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/alpha-engine"))
 

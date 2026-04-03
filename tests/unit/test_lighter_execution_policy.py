@@ -3,7 +3,6 @@ from pathlib import Path
 
 import pytest
 
-
 MODULE_PATH = Path(__file__).resolve().parents[2] / "services" / "bot-lighter" / "src" / "main.py"
 spec = importlib.util.spec_from_file_location("bot_lighter_main", MODULE_PATH)
 mod = importlib.util.module_from_spec(spec)

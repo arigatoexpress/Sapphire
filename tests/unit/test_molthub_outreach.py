@@ -1,7 +1,7 @@
 """Tests for Phase 4 Molthub Outreach — External Bot Recruitment."""
 
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/alpha-engine"))
 

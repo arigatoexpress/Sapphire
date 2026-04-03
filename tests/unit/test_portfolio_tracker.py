@@ -1,11 +1,11 @@
 """Unit tests for the PortfolioTracker module."""
 
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/alpha-engine"))
 
-from src.execution.portfolio import ClosedTrade, PortfolioTracker
+from src.execution.portfolio import PortfolioTracker
 
 
 def _fill(

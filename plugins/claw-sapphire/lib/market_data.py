@@ -10,7 +10,6 @@ import json
 import subprocess
 import urllib.request
 from dataclasses import dataclass
-from typing import Any
 
 OPENBB_BASE = "http://127.0.0.1:6900/api/v1"
 TV_BIN = "tv"

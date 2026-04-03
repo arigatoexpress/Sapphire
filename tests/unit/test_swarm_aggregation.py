@@ -1,7 +1,7 @@
 """Tests for Phase 4 Swarm Intelligence — Reputation-Weighted Aggregation."""
 
-import sys
 import os
+import sys
 import tempfile
 import time
 

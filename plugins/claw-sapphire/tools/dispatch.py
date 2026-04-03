@@ -15,9 +15,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
-from router import classify, EXECUTORS, FALLBACK_CHAINS, Classification
-from token_governor import is_available, record, format_report
-from runtime_policy import is_tier_allowed, is_repo_allowed, max_complexity
+from router import EXECUTORS, FALLBACK_CHAINS, Classification, classify
+from runtime_policy import is_repo_allowed, is_tier_allowed, max_complexity
+from token_governor import is_available, record
 
 
 def dispatch(task: str, tier: str | None = None, repo: str | None = None) -> dict:

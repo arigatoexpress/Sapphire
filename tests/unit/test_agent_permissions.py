@@ -1,21 +1,21 @@
 """Unit tests for the Agent Capability Permission System."""
 
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/alpha-engine"))
 
 import pytest
 from src.security.agent_permissions import (
+    CAPABILITY_RISK_TIER,
+    EMERALD_CAPABILITIES,
+    OBSIDIAN_CAPABILITIES,
+    SAPPHIRE_CAPABILITIES,
+    SCOUT_CAPABILITIES,
     AgentGate,
     ApprovalPolicy,
     Capability,
-    CAPABILITY_RISK_TIER,
     PermissionDenied,
-    SAPPHIRE_CAPABILITIES,
-    OBSIDIAN_CAPABILITIES,
-    EMERALD_CAPABILITIES,
-    SCOUT_CAPABILITIES,
 )
 
 

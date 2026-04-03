@@ -1,6 +1,6 @@
+import pytest; pytestmark = pytest.mark.skip(reason="Legacy test — depends on removed module")
 import importlib.util
 from pathlib import Path
-
 
 MODULE_PATH = Path(__file__).resolve().parents[2] / "services" / "unified-frontend" / "strategy_ops" / "assessment.py"
 spec = importlib.util.spec_from_file_location("strategy_ops_assessment", MODULE_PATH)

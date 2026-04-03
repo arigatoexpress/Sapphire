@@ -86,7 +86,7 @@ def generate(
                 tokens_per_second=round(tps, 1),
                 success=True,
             )
-        except Exception as e:
+        except Exception:
             continue
 
     return InferenceResult(

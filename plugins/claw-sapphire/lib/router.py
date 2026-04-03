@@ -14,9 +14,9 @@ from pathlib import Path
 
 # Import nemotron client — handle both plugin context and direct execution
 try:
-    from .nemotron import generate, MODELS
+    from .nemotron import MODELS, generate
 except ImportError:
-    from nemotron import generate, MODELS
+    from nemotron import MODELS, generate
 
 KIMI_BIN = Path.home() / ".local" / "bin" / "kimi"
 CLAW_BIN = Path.home() / ".local" / "bin" / "claw"

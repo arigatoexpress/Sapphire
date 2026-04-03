@@ -1,11 +1,10 @@
-import importlib.util
 import asyncio
+import importlib.util
 import json
 from pathlib import Path
 from unittest.mock import AsyncMock
 
 import pytest
-
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 TELEGRAM_BOT_PATH = ROOT_DIR / "services/alpha-engine/shared/telegram_bot.py"

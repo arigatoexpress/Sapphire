@@ -10,10 +10,8 @@ import os
 import sys
 
 import pytest
-
 from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
-
 
 # Add alpha-engine shared to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "services", "alpha-engine"))

@@ -11,9 +11,8 @@ Critical paths:
   - Explicit payload TP/SL wins over env var defaults
   - No price → TP/SL not computed
 """
-import sys
 import os
-import importlib
+import sys
 import types
 
 # We only need the pure-function parts of the gateway — import them without
@@ -84,6 +83,7 @@ class TestWebhookAuth:
     def _validate(self, secret_env, header_val, body_val=None):
         """Mirrors _validate_tradingview_secret using constant-time comparison."""
         import hmac as _hmac
+
         from fastapi import HTTPException
 
         if not secret_env:

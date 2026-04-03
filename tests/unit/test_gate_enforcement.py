@@ -4,19 +4,17 @@ These tests verify that the gate.require() calls are in the right places
 and that PermissionDenied propagates correctly.
 """
 
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/alpha-engine"))
 
 import pytest
 from src.security.agent_permissions import (
-    AgentGate,
     Capability,
     PermissionDenied,
     gate,
 )
-
 
 # ── Kill Switch ─────────────────────────────────────────────────
 

@@ -3,7 +3,6 @@ import importlib.util
 import json
 from pathlib import Path
 
-
 ROOT_DIR = Path(__file__).resolve().parents[2]
 FORUM_PATH = ROOT_DIR / "services/alpha-engine/src/collaboration/forum.py"
 
