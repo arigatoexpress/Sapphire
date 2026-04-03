@@ -3,19 +3,7 @@
 // Version 3.0 ULTRA - Maximum Win Rate Optimization
 
 //@version=5
-strategy("AI Pair Trading ULTRA v3.0",
-         shorttitle="AI-ULTRA",
-         overlay=false,
-         pyramiding=0,
-         default_qty_type=strategy.percent_of_equity,
-         default_qty_value=100,
-         initial_capital=10000,
-         commission_type=strategy.commission.percent,
-         commission_value=0.1,
-         slippage=1,
-         calc_on_every_tick=false,
-         process_orders_on_close=true,
-         max_bars_back=500)
+strategy("AI Pair Trading ULTRA v3.0", shorttitle="AI-ULTRA", overlay=false, pyramiding=0, default_qty_type=strategy.percent_of_equity, default_qty_value=100, initial_capital=10000, commission_type=strategy.commission.percent, commission_value=0.1, slippage=1, calc_on_every_tick=false, process_orders_on_close=true, max_bars_back=500)
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ██╗   ██╗██╗  ████████╗██████╗  █████╗     ███╗   ███╗ ██████╗ ██████╗ ███████╗
@@ -150,8 +138,7 @@ dtfZ = dtfStd != 0 ? (dtfSpread - dtfMean) / dtfStd : 0
 zConsensus = (standardZ + kalmanZ + robustZ + emaZ) / 4
 
 // Calculate agreement (manual std dev of 4 values)
-zVariance = (math.pow(standardZ - zConsensus, 2) + math.pow(kalmanZ - zConsensus, 2) +
-             math.pow(robustZ - zConsensus, 2) + math.pow(emaZ - zConsensus, 2)) / 4
+zVariance = (math.pow(standardZ - zConsensus, 2) + math.pow(kalmanZ - zConsensus, 2) + math.pow(robustZ - zConsensus, 2) + math.pow(emaZ - zConsensus, 2)) / 4
 zStdDev = math.sqrt(zVariance)
 zAgreement = 1 - (zStdDev / math.max(0.1, math.abs(zConsensus)))
 zAgreement := math.max(0, math.min(1, zAgreement))
@@ -193,21 +180,13 @@ ar1 = ta.correlation(spread, spread[1], regLookback)
 halfLife = ar1 < 1 and ar1 > 0 ? -math.log(2) / math.log(ar1) : 999
 
 // Cointegration score
-cointScore = halfLife < 5 ? 1.0 :
-             halfLife < 10 ? 0.85 :
-             halfLife < 20 ? 0.70 :
-             halfLife < 40 ? 0.50 :
-             halfLife < 80 ? 0.30 : 0.1
+cointScore = halfLife < 5 ? 1.0 : halfLife < 10 ? 0.85 : halfLife < 20 ? 0.70 : halfLife < 40 ? 0.50 : halfLife < 80 ? 0.30 : 0.1
 
 // Variance ratio for mean reversion
 shortVar = ta.variance(spread, 20)
 longVar = ta.variance(spread, 100)
 varRatio = longVar != 0 ? (shortVar * 5) / longVar : 1
-meanRevScore = varRatio < 0.4 ? 1.0 :
-               varRatio < 0.6 ? 0.85 :
-               varRatio < 0.8 ? 0.70 :
-               varRatio < 1.0 ? 0.55 :
-               varRatio < 1.3 ? 0.35 : 0.15
+meanRevScore = varRatio < 0.4 ? 1.0 : varRatio < 0.6 ? 0.85 : varRatio < 0.8 ? 0.70 : varRatio < 1.0 ? 0.55 : varRatio < 1.3 ? 0.35 : 0.15
 
 // Trend detection
 upMove = spread > spread[1] ? spread - spread[1] : 0
@@ -317,15 +296,11 @@ rsiHigher = rsi > rsi[10]
 bullDiv = zLower and rsiHigher and finalZ < -finalEntryZ
 
 // Extreme exhaustion
-extremeExhaustion = (finalZ < -extremeEntryZ and rsi < 20 and stochK < 15) or
-                    (finalZ > extremeEntryZ and rsi > 80 and stochK > 85)
+extremeExhaustion = (finalZ < -extremeEntryZ and rsi < 20 and stochK < 15) or (finalZ > extremeEntryZ and rsi > 80 and stochK > 85)
 
 // Pattern score
 patternFound = doubleTop or doubleBottom or tripleTop or tripleBottom or bullDiv or bearDiv
-patternConfidence = tripleTop or tripleBottom ? 0.15 :
-                    doubleTop or doubleBottom ? 0.12 :
-                    bullDiv or bearDiv ? 0.10 :
-                    extremeExhaustion ? 0.08 : 0
+patternConfidence = tripleTop or tripleBottom ? 0.15 : doubleTop or doubleBottom ? 0.12 : bullDiv or bearDiv ? 0.10 : extremeExhaustion ? 0.08 : 0
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SECTION 8: ULTRA CONFIDENCE SCORING ENGINE
@@ -339,8 +314,7 @@ f_rsiExt = rsiExtreme ? 1.0 : (rsi < 35 or rsi > 65) ? 0.6 : 0.2
 f_stoch = stochExtreme ? 1.0 : (stochK < 25 or stochK > 75) ? 0.6 : 0.2
 f_vol = highVol ? 1.0 : relVol > 1.0 ? 0.6 : 0.3
 f_mom = (finalZ < 0 and momReversingUp) or (finalZ > 0 and momReversingDown) ? 1.0 : 0.3
-f_macd = (finalZ < 0 and macdBull) or (finalZ > 0 and macdBear) ? 1.0 :
-         (finalZ < 0 and macdCrossUp) or (finalZ > 0 and macdCrossDown) ? 0.85 : 0.25
+f_macd = (finalZ < 0 and macdBull) or (finalZ > 0 and macdBear) ? 1.0 : (finalZ < 0 and macdCrossUp) or (finalZ > 0 and macdCrossDown) ? 0.85 : 0.25
 f_bb = beyondBB ? 1.0 : atLowerBB or atUpperBB ? 0.85 : 0.3
 f_mtf = fullMTFAlign ? 1.0 : htfAligned ? 0.7 : 0.3
 f_pattern = patternFound ? 1.0 : 0.3
@@ -372,17 +346,7 @@ w_bb = 0.06
 w_mtf = 0.08
 w_pattern = 0.07
 
-rawConfidence = f_zMag * w_zMag +
-                f_zAgree * w_zAgree +
-                f_regime * w_regime +
-                f_rsiExt * w_rsiExt +
-                f_stoch * w_stoch +
-                f_vol * w_vol +
-                f_mom * w_mom +
-                f_macd * w_macd +
-                f_bb * w_bb +
-                f_mtf * w_mtf +
-                f_pattern * w_pattern
+rawConfidence = f_zMag * w_zMag + f_zAgree * w_zAgree + f_regime * w_regime + f_rsiExt * w_rsiExt + f_stoch * w_stoch + f_vol * w_vol + f_mom * w_mom + f_macd * w_macd + f_bb * w_bb + f_mtf * w_mtf + f_pattern * w_pattern
 
 // Add pattern bonus
 confidence = rawConfidence + (patternFound ? patternBoost : 0)
@@ -418,8 +382,7 @@ patternGate = not requirePattern or patternFound
 barOfDay = hour(time) * 60 + minute(time)
 isLowLiquidity = barOfDay < 120 or barOfDay > 1200  // Before 2am or after 8pm UTC
 isOpenHour = barOfDay < 60
-timeGate = (not avoidLowLiquidity or not isLowLiquidity) and
-           (not avoidVolatileOpen or not isOpenHour)
+timeGate = (not avoidLowLiquidity or not isLowLiquidity) and (not avoidVolatileOpen or not isOpenHour)
 
 // Cooldown after losses
 var int barsSinceLoss = 999
@@ -436,12 +399,10 @@ perfectShort = zExtremeShort and regimeGate and ultraConfGate and confirmCount >
 
 // === FINAL SIGNALS ===
 longSignal = requirePerfectSetup ?
-             (perfectLong and cooldownGate and timeGate) :
-             (zLong and regimeGate and confGate and confirmGate and patternGate and cooldownGate and timeGate)
+             (perfectLong and cooldownGate and timeGate) : (zLong and regimeGate and confGate and confirmGate and patternGate and cooldownGate and timeGate)
 
 shortSignal = requirePerfectSetup ?
-              (perfectShort and cooldownGate and timeGate) :
-              (zShort and regimeGate and confGate and confirmGate and patternGate and cooldownGate and timeGate)
+              (perfectShort and cooldownGate and timeGate) : (zShort and regimeGate and confGate and confirmGate and patternGate and cooldownGate and timeGate)
 
 // Exit signals
 exitLong = finalZ > -finalExitZ or finalZ < -finalStopZ
@@ -517,10 +478,8 @@ recentWR = tradeIdx >= 10 ? recentWins * 10 : (tradeIdx > 0 ? recentWins / trade
 
 // Z-Score with color based on confidence
 zColor = calibratedConf >= ultraConfidence ?
-         (finalZ < 0 ? color.lime : color.red) :
-         calibratedConf >= minConfidence ?
-         (finalZ < 0 ? color.green : color.maroon) :
-         color.gray
+         (finalZ < 0 ? color.lime : color.red) : calibratedConf >= minConfidence ?
+         (finalZ < 0 ? color.green : color.maroon) : color.gray
 
 plot(finalZ, "Z-Score", color=zColor, linewidth=2)
 
@@ -538,40 +497,30 @@ fill(h_entry_up, h_stop_up, color=color.new(color.red, 92))
 fill(h_entry_dn, h_stop_dn, color=color.new(color.green, 92))
 
 // Signals
-plotshape(longSignal and strategy.position_size[1] == 0 ? finalZ : na,
-          "LONG", shape.triangleup, location.absolute, color.lime, size=size.normal)
-plotshape(shortSignal and strategy.position_size[1] == 0 ? finalZ : na,
-          "SHORT", shape.triangledown, location.absolute, color.red, size=size.normal)
+plotshape(longSignal and strategy.position_size[1] == 0 ? finalZ : na, "LONG", shape.triangleup, location.absolute, color.lime, size=size.normal)
+plotshape(shortSignal and strategy.position_size[1] == 0 ? finalZ : na, "SHORT", shape.triangledown, location.absolute, color.red, size=size.normal)
 
 // Perfect setup markers
-plotshape(perfectLong and not longSignal ? finalZ - 0.3 : na,
-          "Perfect Long Blocked", shape.diamond, location.absolute, color.new(color.green, 50), size=size.tiny)
-plotshape(perfectShort and not shortSignal ? finalZ + 0.3 : na,
-          "Perfect Short Blocked", shape.diamond, location.absolute, color.new(color.red, 50), size=size.tiny)
+plotshape(perfectLong and not longSignal ? finalZ - 0.3 : na, "Perfect Long Blocked", shape.diamond, location.absolute, color.new(color.green, 50), size=size.tiny)
+plotshape(perfectShort and not shortSignal ? finalZ + 0.3 : na, "Perfect Short Blocked", shape.diamond, location.absolute, color.new(color.red, 50), size=size.tiny)
 
 // Position background
-bgcolor(strategy.position_size > 0 ? color.new(color.green, 93) :
-        strategy.position_size < 0 ? color.new(color.red, 93) : na)
+bgcolor(strategy.position_size > 0 ? color.new(color.green, 93) : strategy.position_size < 0 ? color.new(color.red, 93) : na)
 
-// Cooldown indicator
-bgcolor(not cooldownGate ? color.new(color.orange, 90) : na)
+// Cooldown indicator bgcolor(not cooldownGate ? color.new(color.orange, 90) : na)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SECTION 12: ULTRA DASHBOARD
 // ═══════════════════════════════════════════════════════════════════════════════
 
 if showDash and barstate.islast
-    var table dash = table.new(position.top_right, 3, 22,
-                               bgcolor=color.new(#0a0a1a, 5),
-                               border_width=1,
-                               border_color=color.new(#333366, 0))
+    var table dash = table.new(position.top_right, 3, 22, bgcolor=color.new(#0a0a1a, 5), border_width=1, border_color=color.new(#333366, 0))
 
     // Header
     table.cell(dash, 0, 0, "🏆 ULTRA MODE", text_color=#00ffff, bgcolor=color.new(#1a1a3a, 0), text_size=size.small)
     table.cell(dash, 1, 0, "v3.0", text_color=#00ff88, bgcolor=color.new(#1a1a3a, 0), text_size=size.small)
     wrColor = winRate >= 80 ? color.lime : winRate >= 70 ? color.green : winRate >= 60 ? color.yellow : color.red
-    table.cell(dash, 2, 0, str.tostring(winRate, "#.#") + "% WR", text_color=wrColor,
-               bgcolor=color.new(#1a1a3a, 0), text_size=size.small)
+    table.cell(dash, 2, 0, str.tostring(winRate, "#.#") + "% WR", text_color=wrColor, bgcolor=color.new(#1a1a3a, 0), text_size=size.small)
 
     // Z-Score Section
     table.cell(dash, 0, 1, "═══ Z-SCORE ═══", text_color=#00ffff, text_size=size.tiny)
@@ -593,20 +542,16 @@ if showDash and barstate.islast
     table.cell(dash, 1, 4, "", text_size=size.tiny)
     table.cell(dash, 2, 4, "", text_size=size.tiny)
 
-    confColor = calibratedConf >= ultraConfidence ? color.lime :
-                calibratedConf >= minConfidence ? color.green :
-                calibratedConf >= 0.5 ? color.yellow : color.red
+    confColor = calibratedConf >= ultraConfidence ? color.lime : calibratedConf >= minConfidence ? color.green : calibratedConf >= 0.5 ? color.yellow : color.red
     table.cell(dash, 0, 5, "Confidence", text_color=color.white, text_size=size.tiny)
     table.cell(dash, 1, 5, str.tostring(calibratedConf * 100, "#.#") + "%", text_color=confColor, text_size=size.tiny)
-    confStatus = calibratedConf >= ultraConfidence ? "🌟 ULTRA" :
-                 calibratedConf >= minConfidence ? "✓ PASS" : "✗ LOW"
+    confStatus = calibratedConf >= ultraConfidence ? "🌟 ULTRA" : calibratedConf >= minConfidence ? "✓ PASS" : "✗ LOW"
     table.cell(dash, 2, 5, confStatus, text_color=confColor, text_size=size.tiny)
 
     table.cell(dash, 0, 6, "Confirms", text_color=color.white, text_size=size.tiny)
     cntColor = confirmCount >= requireMultipleConfirms ? color.green : color.red
     table.cell(dash, 1, 6, str.tostring(confirmCount) + "/11", text_color=cntColor, text_size=size.tiny)
-    table.cell(dash, 2, 6, confirmCount >= requireMultipleConfirms ? "✓ ENOUGH" : "✗ NEED " +
-               str.tostring(requireMultipleConfirms), text_color=cntColor, text_size=size.tiny)
+    table.cell(dash, 2, 6, confirmCount >= requireMultipleConfirms ? "✓ ENOUGH" : "✗ NEED " + str.tostring(requireMultipleConfirms), text_color=cntColor, text_size=size.tiny)
 
     // Regime Section
     table.cell(dash, 0, 7, "═══ REGIME ═══", text_color=#00ffff, text_size=size.tiny)
@@ -643,8 +588,7 @@ if showDash and barstate.islast
     table.cell(dash, 2, 13, confGate ? "✓" : "✗", text_color=confGate ? color.green : color.red, text_size=size.tiny)
 
     table.cell(dash, 0, 14, "Cooldown", text_color=color.white, text_size=size.tiny)
-    table.cell(dash, 1, 14, cooldownGate ? "READY" : str.tostring(streakCooldown - barsSinceLoss) + " bars",
-               text_color=cooldownGate ? color.green : color.orange, text_size=size.tiny)
+    table.cell(dash, 1, 14, cooldownGate ? "READY" : str.tostring(streakCooldown - barsSinceLoss) + " bars", text_color=cooldownGate ? color.green : color.orange, text_size=size.tiny)
     table.cell(dash, 2, 14, cooldownGate ? "✓" : "⏳", text_color=cooldownGate ? color.green : color.orange, text_size=size.tiny)
 
     // Pattern Section
@@ -652,15 +596,11 @@ if showDash and barstate.islast
     table.cell(dash, 1, 15, "", text_size=size.tiny)
     table.cell(dash, 2, 15, "", text_size=size.tiny)
 
-    patternText = tripleTop or tripleBottom ? "TRIPLE" :
-                  doubleTop or doubleBottom ? "DOUBLE" :
-                  bullDiv or bearDiv ? "DIVERGE" :
-                  extremeExhaustion ? "EXHAUST" : "NONE"
+    patternText = tripleTop or tripleBottom ? "TRIPLE" : doubleTop or doubleBottom ? "DOUBLE" : bullDiv or bearDiv ? "DIVERGE" : extremeExhaustion ? "EXHAUST" : "NONE"
     patColor = patternFound ? color.lime : color.gray
     table.cell(dash, 0, 16, "Pattern", text_color=color.white, text_size=size.tiny)
     table.cell(dash, 1, 16, patternText, text_color=patColor, text_size=size.tiny)
-    table.cell(dash, 2, 16, patternFound ? "+" + str.tostring(patternConfidence * 100, "#") + "%" : "—",
-               text_color=patColor, text_size=size.tiny)
+    table.cell(dash, 2, 16, patternFound ? "+" + str.tostring(patternConfidence * 100, "#") + "%" : "—", text_color=patColor, text_size=size.tiny)
 
     // Performance Section
     table.cell(dash, 0, 17, "═══ PERFORMANCE ═══", text_color=#00ffff, text_size=size.tiny)
@@ -669,8 +609,7 @@ if showDash and barstate.islast
 
     table.cell(dash, 0, 18, "Trades", text_color=color.white, text_size=size.tiny)
     table.cell(dash, 1, 18, str.tostring(totalTrades), text_color=color.white, text_size=size.tiny)
-    table.cell(dash, 2, 18, str.tostring(wins) + "W / " + str.tostring(totalTrades - wins) + "L",
-               text_color=color.white, text_size=size.tiny)
+    table.cell(dash, 2, 18, str.tostring(wins) + "W / " + str.tostring(totalTrades - wins) + "L", text_color=color.white, text_size=size.tiny)
 
     table.cell(dash, 0, 19, "Win Rate", text_color=color.white, text_size=size.tiny)
     table.cell(dash, 1, 19, str.tostring(winRate, "#.#") + "%", text_color=wrColor, text_size=size.tiny)
@@ -687,58 +626,39 @@ if showDash and barstate.islast
     posColor = strategy.position_size > 0 ? color.green : strategy.position_size < 0 ? color.red : color.gray
     table.cell(dash, 0, 21, "Position", text_color=color.white, text_size=size.tiny)
     table.cell(dash, 1, 21, posText, text_color=posColor, text_size=size.tiny)
-    table.cell(dash, 2, 21, barsInPos > 0 ? str.tostring(barsInPos) + " bars" : "—",
-               text_color=posColor, text_size=size.tiny)
+    table.cell(dash, 2, 21, barsInPos > 0 ? str.tostring(barsInPos) + " bars" : "—", text_color=posColor, text_size=size.tiny)
 
 // Confidence Breakdown Table
 if showConfBreakdown and barstate.islast
-    var table confTable = table.new(position.bottom_right, 2, 13,
-                                    bgcolor=color.new(#0a0a1a, 5),
-                                    border_width=1)
+    var table confTable = table.new(position.bottom_right, 2, 13, bgcolor=color.new(#0a0a1a, 5), border_width=1)
 
     table.cell(confTable, 0, 0, "FEATURE", text_color=#00ffff, text_size=size.tiny)
     table.cell(confTable, 1, 0, "SCORE", text_color=#00ffff, text_size=size.tiny)
 
-    features = array.from("Z Magnitude", "Z Agreement", "Regime", "RSI Extreme", "Stochastic",
-                          "Volume", "Momentum", "MACD", "Bollinger", "MTF Align", "Pattern")
-    vals = array.from(f_zMag, f_zAgree, f_regime, f_rsiExt, f_stoch,
-                      f_vol, f_mom, f_macd, f_bb, f_mtf, f_pattern)
+    features = array.from("Z Magnitude", "Z Agreement", "Regime", "RSI Extreme", "Stochastic", "Volume", "Momentum", "MACD", "Bollinger", "MTF Align", "Pattern")
+    vals = array.from(f_zMag, f_zAgree, f_regime, f_rsiExt, f_stoch, f_vol, f_mom, f_macd, f_bb, f_mtf, f_pattern)
 
     for i = 0 to 10
-        fColor = array.get(vals, i) >= 0.7 ? color.lime :
-                 array.get(vals, i) >= 0.5 ? color.yellow : color.red
+        fColor = array.get(vals, i) >= 0.7 ? color.lime : array.get(vals, i) >= 0.5 ? color.yellow : color.red
         table.cell(confTable, 0, i + 1, array.get(features, i), text_color=color.white, text_size=size.tiny)
         bar = ""
         barLen = math.round(array.get(vals, i) * 10)
         for j = 0 to 9
             bar := bar + (j < barLen ? "█" : "░")
-        table.cell(confTable, 1, i + 1, bar + " " + str.tostring(array.get(vals, i) * 100, "#") + "%",
-                   text_color=fColor, text_size=size.tiny)
+        table.cell(confTable, 1, i + 1, bar + " " + str.tostring(array.get(vals, i) * 100, "#") + "%", text_color=fColor, text_size=size.tiny)
 
     table.cell(confTable, 0, 12, "TOTAL", text_color=#00ffff, text_size=size.tiny)
-    table.cell(confTable, 1, 12, str.tostring(calibratedConf * 100, "#.#") + "%",
-               text_color=confColor, text_size=size.tiny)
+    totalColor = calibratedConf >= ultraConfidence ? color.lime : calibratedConf >= minConfidence ? color.green : calibratedConf >= 0.5 ? color.yellow : color.red
+    table.cell(confTable, 1, 12, str.tostring(calibratedConf * 100, "#.#") + "%", text_color=totalColor, text_size=size.tiny)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SECTION 13: ALERTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-alertcondition(longSignal and strategy.position_size[1] == 0,
-               "🏆 ULTRA LONG",
-               "ULTRA v3: HIGH-CONFIDENCE LONG\nZ: {{plot_0}}\nConf: " +
-               str.tostring(calibratedConf * 100, "#.#") + "%\nConfirms: " +
-               str.tostring(confirmCount) + "/11")
+alertcondition(longSignal and strategy.position_size[1] == 0, "🏆 ULTRA LONG", "ULTRA v3: HIGH-CONFIDENCE LONG\nZ: {{plot_0}}")
 
-alertcondition(shortSignal and strategy.position_size[1] == 0,
-               "🏆 ULTRA SHORT",
-               "ULTRA v3: HIGH-CONFIDENCE SHORT\nZ: {{plot_0}}\nConf: " +
-               str.tostring(calibratedConf * 100, "#.#") + "%\nConfirms: " +
-               str.tostring(confirmCount) + "/11")
+alertcondition(shortSignal and strategy.position_size[1] == 0, "🏆 ULTRA SHORT", "ULTRA v3: HIGH-CONFIDENCE SHORT\nZ: {{plot_0}}")
 
-alertcondition(perfectLong or perfectShort,
-               "🌟 PERFECT SETUP",
-               "ULTRA v3: PERFECT SETUP DETECTED!\nThis is the highest quality signal possible.")
+alertcondition(perfectLong or perfectShort, "🌟 PERFECT SETUP", "ULTRA v3: PERFECT SETUP DETECTED!\nThis is the highest quality signal possible.")
 
-alertcondition(winRate >= 80,
-               "🎯 80% WIN RATE ACHIEVED",
-               "ULTRA v3: Congratulations! Win rate has reached 80%+")
+alertcondition(winRate >= 80, "🎯 80% WIN RATE ACHIEVED", "ULTRA v3: Congratulations! Win rate has reached 80%+")
