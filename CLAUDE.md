@@ -71,13 +71,24 @@ Autonomous trading + project management + intelligence system. Telegram-first, a
 
 All bots receive signals from `services/alpha/` via direct HTTP over Tailscale (no GCP Pub/Sub).
 
-## Infrastructure
+## Infrastructure (Pi-less since 2026-04-03)
 
-**On-prem — no GCP Cloud Run:**
-- rari1 (100.120.191.1): dashboard:8080, control-plane:8082, kimi-claw, openclaw-gateway:18789
-- rari2 (100.87.225.89): aster, hyperliquid, kimi-claw-slave, alpha-engine:18081
-- Windows PC (100.71.10.48): webhook:9090 (Cloudflare Tunnel → webhook.sapphirealpha.xyz), Ollama
-- Mac (100.67.171.79): OpenClaw workers, Claude Code, git
+**Mac (100.67.171.79) — runs everything:**
+- control-plane:8082 (FastAPI, LaunchAgent)
+- dashboard:8080 (Flask, LaunchAgent, auth: sapphire)
+- telegram-bot (NemotronRariBot, LaunchAgent)
+- OpenBB API:6900 (LaunchAgent)
+- Redis:6379 (Homebrew service)
+- Ollama:11434 (4 local models)
+- Claude Code, claw-code, all MCPs
+
+**Windows PC (100.71.10.48) — GPU + webhook:**
+- Ollama:11434 (26 models, auto-start, OLLAMA_HOST=0.0.0.0)
+- webhook:9090 (TradingView signal receiver, scheduled task)
+
+**Pis — DECOMMISSIONED:**
+- rari1/rari2 offline. Pi OS Bookworm + 6GHz WiFi incompatible. Need ethernet for setup.
+- Trading execution (Aster DEX, Hyperliquid) paused.
 
 **Public ingress**: Cloudflare Tunnel (see `infra/cloudflare/SETUP.md`) — no port forwarding needed.
 

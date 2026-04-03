@@ -1,33 +1,38 @@
 {
-  "version": 1,
-  "updated": "2026-04-01",
-  "description": "Sapphire OS device mesh topology — canonical source of truth for all devices",
+  "version": 2,
+  "updated": "2026-04-03",
+  "description": "Sapphire OS device mesh — Pi-less architecture (Mac + Windows only)",
 
   "devices": {
     "mac": {
       "hostname": "macbook-pro-8",
       "tailscaleIp": "100.67.171.79",
       "os": "macOS",
-      "role": "Commander — architecture, refactors, planning, git, all MCPs",
+      "role": "Commander — all services, all MCPs, primary control node",
       "status": "online",
       "clawProfile": "mac-commander",
-      "agents": ["claude-code", "claw-code", "openclaw-workers"],
+      "agents": ["claude-code", "claw-code", "nemotron-rari-bot"],
       "tools": {
         "brew": "5.1.0", "tailscale": "1.96.2", "node": "24.4.0",
         "uv": "0.10.4", "gh": "2.86.0", "ollama": "0.19.0",
-        "docker": "29.1.2", "cargo": "1.94.1", "python3": "3.12.8"
+        "docker": "29.1.2", "cargo": "1.94.1", "python3": "3.12.8",
+        "redis": "7.x", "tv": "tradingview-mcp"
       },
       "ollamaModels": ["llama3.2:3b", "llama3.3:70b", "abspec999/new1:latest"],
-      "services": [],
+      "services": [
+        {"name": "control-plane", "port": 8082, "status": "active", "launchAgent": "com.sapphire.control-plane"},
+        {"name": "dashboard", "port": 8080, "status": "active", "launchAgent": "com.sapphire.dashboard"},
+        {"name": "telegram-bot", "status": "active", "launchAgent": "com.sapphire.nemotron-bot"},
+        {"name": "openbb-api", "port": 6900, "status": "active", "launchAgent": "com.sapphire.openbb-api"},
+        {"name": "redis", "port": 6379, "status": "active", "launchAgent": "homebrew.mxcl.redis"},
+        {"name": "ollama", "port": 11434, "status": "active"}
+      ],
       "launchAgents": [
-        "ai.openclaw.gateway",
-        "com.aribs.agentic.control-api",
-        "com.aribs.agentic.worker.claude",
-        "com.aribs.agentic.worker.codex",
-        "com.aribs.agentic.worker.kimi",
-        "com.aribs.agentic.worker.antigravity",
-        "com.aribs.agentic.worker.openclaw-main",
-        "com.sapphire.sync-eu-proxy-firewall"
+        "com.sapphire.control-plane",
+        "com.sapphire.dashboard",
+        "com.sapphire.nemotron-bot",
+        "com.sapphire.openbb-api",
+        "homebrew.mxcl.redis"
       ]
     },
 
@@ -35,57 +40,38 @@
       "hostname": "DESKTOP-HFCK6U9",
       "tailscaleIp": "100.71.10.48",
       "os": "Windows",
-      "role": "GPU Workbench — RTX 5070 Ti, inference, TradingView webhook relay",
+      "role": "GPU Workbench — inference, webhook relay, backtesting",
       "status": "online",
       "clawProfile": "windows-workbench",
       "agents": ["claw-code"],
-      "gpu": "NVIDIA RTX 5070 Ti",
-      "tools": {
-        "python": "3.13", "docker": true, "git": true, "node": true,
-        "gcloud": true, "ollama": "pending-setup"
-      },
-      "ollamaModels": [],
+      "gpu": "NVIDIA RTX 5070 Ti (16GB GDDR7)",
+      "ollamaModels": "26 models (nemotron-cascade-2, llama3.3:70b, deepseek-r1, qwen3, gemma3, phi4, etc.)",
       "services": [
-        {"name": "webhook", "port": 9090, "status": "planned"}
-      ],
-      "notes": "Chronos forecasting, TradingView Pine scripts, Nosana GPU compute registration"
+        {"name": "ollama", "port": 11434, "status": "active", "task": "OllamaTailscale"},
+        {"name": "webhook", "port": 9090, "status": "active", "task": "SapphireWebhook"}
+      ]
     },
 
     "rari1": {
       "hostname": "rari1",
       "tailscaleIp": "100.120.191.1",
       "os": "Linux (Raspberry Pi OS)",
-      "role": "Controller Pi — Telegram bot, Kimi agent, control-plane, dashboard",
+      "role": "DECOMMISSIONED — services moved to Mac",
       "status": "offline",
-      "lastSeen": "2026-03-28T04:39:59Z",
-      "clawProfile": "rari1-controller",
-      "agents": ["kimi-claw", "claw-code"],
-      "services": [
-        {"name": "control-plane", "port": 8082, "status": "offline"},
-        {"name": "dashboard", "port": 8080, "status": "offline"},
-        {"name": "openclaw-gateway", "port": 18789, "status": "offline"},
-        {"name": "redis", "port": 6379, "bind": "127.0.0.1", "status": "offline"},
-        {"name": "telegram-bot", "status": "offline"}
-      ],
-      "storage": "/mnt/ssd/sapphire/"
+      "decommissionReason": "Pi OS Bookworm ignores wpa_supplicant.conf, 6GHz WiFi incompatible, no ethernet available",
+      "servicesMovedTo": "mac"
     },
 
     "rari2": {
       "hostname": "rari2",
       "tailscaleIp": "100.87.225.89",
       "os": "Linux (Raspberry Pi OS)",
-      "role": "Trading Pi — Aster DEX, Hyperliquid, Alpha engine, ProtonVPN",
+      "role": "DECOMMISSIONED — trading execution paused until re-provisioned",
       "status": "offline",
-      "lastSeen": "2026-03-28T04:39:57Z",
-      "clawProfile": "rari2-trader",
-      "agents": ["claw-code"],
-      "services": [
-        {"name": "aster", "port": 18081, "status": "offline"},
-        {"name": "hyperliquid", "port": 18082, "status": "offline"},
-        {"name": "alpha-engine", "port": 18081, "status": "offline"}
-      ],
-      "vpn": {"provider": "ProtonVPN", "location": "Switzerland", "protocol": "WireGuard"},
-      "security": "Strictest permissions — trading-only, no general access"
+      "decommissionReason": "Same as rari1. Trading execution (Aster, Hyperliquid) on hold.",
+      "servicesMovedTo": "pending"
     }
-  }
+  },
+
+  "architecture_note": "Pi-less since 2026-04-03. All services run on Mac (commander) with GPU inference on Windows PC over Tailscale. Trading execution (Aster DEX, Hyperliquid) paused until Pis are re-provisioned with ethernet access or compatible WiFi setup."
 }
