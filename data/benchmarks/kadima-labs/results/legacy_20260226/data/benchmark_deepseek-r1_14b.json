@@ -1,0 +1,46 @@
+{
+  "model": "deepseek-r1:14b",
+  "timestamp": "2026-02-26T15:48:06.459318",
+  "tests": {
+    "speed_test": {
+      "success": true,
+      "output": "Thinking...\nAlright, I need to come up with five interesting facts about space. Let me start by brainstorming what I know.\n\nFirst, there's the concept of a black hole. I remember that not only do they pull things in, but they can also launch material back out through jets. That seems pretty cool and underappreciated, so that could be one fact.\n\nNext, our solar system has this cool dwarf planet called Pluto, which was reclassified, but it's still fascinating with its methane ice and possible subs...",
+      "response_time": 10.41,
+      "tokens_estimate": 337,
+      "tokens_per_sec": 32.39
+    },
+    "math_reasoning": {
+      "success": true,
+      "output": "Thinking...\nFirst, determine the train's speed by dividing the distance traveled by the time taken. The train covers 120 km in 2 hours, so its speed is 60 km per hour.\n\nNext, calculate how far the train will travel in 5 hours at this constant speed. Multiply the speed (60 km/h) by the time (5 hours), resulting in a distance of 300 kilometers.\n...done thinking.\n\n**Solution:**\n\nTo determine how far the train will travel in 5 hours at the same speed, follow these steps:\n\n1. **Find the Speed of the ...",
+      "response_time": 4.54,
+      "tokens_estimate": 161,
+      "tokens_per_sec": 35.48
+    },
+    "code_generation": {
+      "success": true,
+      "output": "Thinking...\nOkay, I need to write a Python function called factorial that calculates the factorial of a number using recursion. Also, I have to include error handling. Hmm, let me think about how to approach this.\n\nFirst, what's a factorial? Oh right, the factorial of a number n is the product of all positive integers up to n. So like 5! is 5*4*3*2*1 = 120.\n\nNow, recursion means the function will call itself with a smaller value until it reaches a base case. The base case for factorial is when n...",
+      "response_time": 25.29,
+      "tokens_estimate": 1308,
+      "tokens_per_sec": 51.73
+    },
+    "creative_writing": {
+      "success": true,
+      "output": "Thinking...\nOkay, so I need to write a three-sentence story about a robot discovering emotions. Let me think about how robots are typically portrayed and what emotions they might \"discover.\" Maybe the robot is advanced, like an AI, but still lacks emotions until something happens.\n\nFirst sentence: Introduce the robot in its usual environment without emotions. Perhaps it's efficient but lacks something. For example, it could be going through daily tasks but feeling empty or void.\n\nSecond sentence...",
+      "response_time": 10.58,
+      "tokens_estimate": 622,
+      "tokens_per_sec": 58.77
+    },
+    "knowledge_qa": {
+      "success": true,
+      "output": "Thinking...\nOkay, so I'm trying to understand what quantum computing is. From what I've heard before, it's something related to computers but on a very small scale, maybe involving atoms or something like that. I remember hearing the term \"qubits\" somewhere, which must be important because traditional computers use bits.\n\nLet me start by breaking down what I know. Regular computers, like the one I'm using right now, process information using binary digits, or bits. Each bit can be either a 0 or ...",
+      "response_time": 20.81,
+      "tokens_estimate": 1217,
+      "tokens_per_sec": 58.47
+    }
+  },
+  "summary": {
+    "avg_response_time": 14.33,
+    "avg_tokens_per_sec": 47.37,
+    "tests_passed": "5/5"
+  }
+}

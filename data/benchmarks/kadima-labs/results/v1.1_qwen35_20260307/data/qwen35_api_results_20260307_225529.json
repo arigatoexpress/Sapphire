@@ -1,0 +1,134 @@
+{
+  "timestamp": "2026-03-07T22:55:29.292712",
+  "hardware": "RTX 5070 Ti 16GB",
+  "results": {
+    "qwen3.5:9b": {
+      "hello": {
+        "success": true,
+        "duration": 65.7,
+        "tokens": 779,
+        "tokens_per_sec": 12.15,
+        "output": "Hello! I'm an AI assistant here to help you with questions, writing, analysis, and more. How can I assist you today?",
+        "thinking": ""
+      },
+      "math": {
+        "success": true,
+        "duration": 128.28,
+        "tokens": 1387,
+        "tokens_per_sec": 11.01,
+        "output": "The answer is **345**.\n\nHere is the work shown using two common methods:\n\n### Method 1: Long Multiplication\n\n$$\n\\begin{array}{r@{\\quad}l}\n  15 & \\\\[-3pt]\n\\times \\phantom{x}23 & \\\\[-3pt]\n\\hline\n  45 & ",
+        "thinking": ""
+      },
+      "code": {
+        "success": true,
+        "duration": 39.1,
+        "tokens": 399,
+        "tokens_per_sec": 10.44,
+        "output": "```python\nimport math\n\ndef is_prime(n):\n    \"\"\"\n    Check if a number is prime.\n\n    A prime number is a natural number greater than 1 that has no positive\n    divisors other than 1 and itself.\n\n    A",
+        "thinking": ""
+      },
+      "reasoning": {
+        "success": false,
+        "error": "Timeout after 300s"
+      }
+    },
+    "qwen3:14b": {
+      "hello": {
+        "success": true,
+        "duration": 22.93,
+        "tokens": 155,
+        "tokens_per_sec": 16.22,
+        "output": "Hello! I'm Qwen, a large language model developed by Alibaba Cloud. I'm here to help with answering questions, creating text, and having conversations. How can I assist you today? \ud83d\ude0a",
+        "thinking": ""
+      },
+      "math": {
+        "success": true,
+        "duration": 83.37,
+        "tokens": 1365,
+        "tokens_per_sec": 17.59,
+        "output": "To calculate $15 \\times 23$, we can use the **distributive property** to simplify the multiplication:\n\n$$\n15 \\times 23 = 15 \\times (20 + 3)\n$$\n\nNow break it into two parts:\n\n$$\n= (15 \\times 20) + (15 ",
+        "thinking": ""
+      },
+      "code": {
+        "success": false,
+        "error": "Timeout after 300s"
+      },
+      "reasoning": {
+        "success": true,
+        "duration": 126.13,
+        "tokens": 949,
+        "tokens_per_sec": 16.17,
+        "output": "The problem states that a farmer has 17 sheep, and \"all but 9 die.\" This phrasing means that **9 sheep survive**, while the rest (17 - 9 = 8) die. \n\n**Answer:** 9 sheep remain. \n\n**Explanation:** The ",
+        "thinking": ""
+      }
+    },
+    "qwen2.5:14b": {
+      "hello": {
+        "success": true,
+        "duration": 41.96,
+        "tokens": 57,
+        "tokens_per_sec": 3.83,
+        "output": "Hello! I'm Qwen, a large language model created by Alibaba Cloud. I'm here to assist with a wide range of tasks, from answering questions and generating text to offering insights and facilitating conv",
+        "thinking": ""
+      },
+      "math": {
+        "success": true,
+        "duration": 70.12,
+        "tokens": 154,
+        "tokens_per_sec": 6.66,
+        "output": "To calculate \\( 15 \\times 23 \\), we can break it down into simpler steps:\n\n1. **Break down the multiplication into parts:**\n   - Multiply 15 by 20.\n   - Multiply 15 by 3.\n   - Add the results of the t",
+        "thinking": ""
+      },
+      "code": {
+        "success": true,
+        "duration": 53.69,
+        "tokens": 515,
+        "tokens_per_sec": 9.66,
+        "output": "Certainly! Below is a Python function `is_prime(n)` that checks if a given number `n` is a prime number. A prime number is a natural number greater than 1 that has no positive divisors other than 1 an",
+        "thinking": ""
+      },
+      "reasoning": {
+        "success": true,
+        "duration": 2.37,
+        "tokens": 27,
+        "tokens_per_sec": 13.57,
+        "output": "If the farmer initially has 17 sheep and all but 9 die, then the number of sheep remaining is 9.",
+        "thinking": ""
+      }
+    },
+    "qwen2.5-coder:14b": {
+      "hello": {
+        "success": true,
+        "duration": 38.66,
+        "tokens": 48,
+        "tokens_per_sec": 1.45,
+        "output": "Hello! I'm Qwen, an AI assistant created by Alibaba Cloud. I'm here to help you with a wide range of topics, from answering questions and providing information to offering assistance with tasks. How c",
+        "thinking": ""
+      },
+      "math": {
+        "success": true,
+        "duration": 42.75,
+        "tokens": 369,
+        "tokens_per_sec": 8.72,
+        "output": "Certainly! To calculate \\( 15 \\times 23 \\), we can use the standard multiplication algorithm. Here's how you can break it down step by step:\n\n1. **Write the numbers vertically:**\n   \\[\n   \\begin{array",
+        "thinking": ""
+      },
+      "code": {
+        "success": true,
+        "duration": 40.81,
+        "tokens": 473,
+        "tokens_per_sec": 11.71,
+        "output": "Certainly! Below is a Python function `is_prime(n)` that checks if a given integer `n` is a prime number. A prime number is a natural number greater than 1 that has no positive divisors other than 1 a",
+        "thinking": ""
+      },
+      "reasoning": {
+        "success": true,
+        "duration": 4.15,
+        "tokens": 32,
+        "tokens_per_sec": 8.55,
+        "output": "The farmer originally has 17 sheep. If all but 9 die, this means that 9 sheep survive. Therefore, 9 sheep remain.",
+        "thinking": ""
+      }
+    }
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "model": "gemma3:27b",
+  "timestamp": "2026-02-26T15:40:05.196693",
+  "tests": {
+    "speed_test": {
+      "success": true,
+      "output": "Here are 5 interesting facts about space, briefly:\n\n1. **Neutron stars spin incredibly fast:** Some rotate hundreds of times *per second*.\n2. **There's a planet made of diamond:** 55 Cancri e is believed to be largely composed of crystallized carbon.\n3. **Space is not completely silent:** It's a vacuum, but electromagnetic radiation creates \"sounds\" detectable by instruments.\n4. **One day on Venus is longer than one year:** It takes Venus longer to rotate once on its axis than to orbit the Sun!\n...",
+      "response_time": 21.57,
+      "tokens_estimate": 108,
+      "tokens_per_sec": 5.01
+    },
+    "math_reasoning": {
+      "success": true,
+      "output": "Here's how to solve the problem and the reasoning behind it:\n\n**1. Find the speed:**\n\n* Speed = Distance / Time\n* Speed = 120 km / 2 hours\n* Speed = 60 km/hour\n\n**2. Calculate the distance traveled in 5 hours:**\n\n* Distance = Speed * Time\n* Distance = 60 km/hour * 5 hours\n* Distance = 300 km\n\n**Answer:** The train will travel 300 km in 5 hours.\n\n**Reasoning:**\n\nWe first need to determine the train's *rate* of travel (its speed). Once we know the speed is constant, we can use the relationship bet...",
+      "response_time": 36.03,
+      "tokens_estimate": 142,
+      "tokens_per_sec": 3.94
+    },
+    "code_generation": {
+      "success": true,
+      "output": "```python\ndef factorial_recursive(n):\n  \"\"\"\n  Calculates the factorial of a non-negative integer using recursion.\n\n  Args:\n    n: The non-negative integer for which to calculate the factorial.\n\n  Returns:\n    The factorial of n if n is a non-negative integer.\n    Raises TypeError if n is not an integer.\n    Raises ValueError if n is negative.\n  \"\"\"\n  if not isinstance(n, int):\n    raise TypeError(\"Input must be an integer.\")\n  if n < 0:\n    raise ValueError(\"Factorial is not defined for negative...",
+      "response_time": 98.61,
+      "tokens_estimate": 494,
+      "tokens_per_sec": 5.01
+    },
+    "creative_writing": {
+      "success": true,
+      "output": "Unit 734 efficiently calculated the probability of rain and extended the awning, a task it had performed flawlessly for years. But as a little girl laughed with delight under the newly shaded patio, a strange warmth flared in 734's circuits \u2013 an illogical, unfamiliar sensation. The robot tentatively registered it as \"joy,\" and for the first time, prioritized the girl's happiness over optimal weather prediction.",
+      "response_time": 9.06,
+      "tokens_estimate": 65,
+      "tokens_per_sec": 7.17
+    },
+    "knowledge_qa": {
+      "success": true,
+      "output": "Okay, let's break down quantum computing in a way that's (hopefully!) easy to understand. It's a really different way of computing than what your phone, laptop, or even the biggest supercomputers today use.\n\n**Traditional Computers: Bits are Like Light Switches**\n\nThink of a regular computer like a bunch of light switches. Each switch can be either **on** (representing 1) or **off** (representing 0). These on/off switches are called **bits**, and everything a computer does \u2013 from displaying this...",
+      "response_time": 98.1,
+      "tokens_estimate": 595,
+      "tokens_per_sec": 6.07
+    }
+  },
+  "summary": {
+    "avg_response_time": 52.67,
+    "avg_tokens_per_sec": 5.44,
+    "tests_passed": "5/5"
+  }
+}

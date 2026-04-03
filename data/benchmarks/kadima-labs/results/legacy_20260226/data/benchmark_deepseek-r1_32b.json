@@ -1,0 +1,46 @@
+{
+  "model": "deepseek-r1:32b",
+  "timestamp": "2026-02-26T15:49:18.086016",
+  "tests": {
+    "speed_test": {
+      "success": true,
+      "output": "Thinking...\nOkay, so I need to list five interesting facts about space. Let me think of what I know and maybe some things that are a bit surprising or cool.\n\nFirst off, the Moon being a part of Earth's history is something people might not realize. I remember hearing that it was formed from a massive collision. That must have been an eventful time!\n\nNext, dark matter is this mysterious stuff that we can't see but know exists because of gravity effects. It makes up most of the universe, so that's...",
+      "response_time": 107.03,
+      "tokens_estimate": 337,
+      "tokens_per_sec": 3.15
+    },
+    "math_reasoning": {
+      "success": true,
+      "output": "Thinking...\nTo determine how far the train will travel in 5 hours, I first need to calculate its speed.\n\nI know that speed is equal to distance divided by time. The train travels 120 km in 2 hours, so its speed is 60 km/h.\n\nOnce I have the speed, I can find out the distance traveled in any given time by multiplying the speed by that time. Therefore, for 5 hours, the train will travel 60 km/h multiplied by 5 h, which equals 300 km.\n...done thinking.\n\nSure! Let's solve this problem step by step.\n\n...",
+      "response_time": 77.08,
+      "tokens_estimate": 228,
+      "tokens_per_sec": 2.96
+    },
+    "code_generation": {
+      "success": false,
+      "output": "TIMEOUT",
+      "response_time": 120,
+      "tokens_estimate": 0,
+      "tokens_per_sec": 0
+    },
+    "creative_writing": {
+      "success": false,
+      "output": "ERROR: \u001b[?2026h\u001b[?25l\u001b[1G\u2839 \u001b[K\u001b[?25h\u001b[?2026l\u001b[?25l\u001b[?2026h\u001b[?25l\u001b[1G\u001b[K\u001b[?25h\u001b[?2026l\u001b[2K\u001b[1G\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25l\u001b[?25h\u001b[?25...",
+      "response_time": 24.27,
+      "tokens_estimate": 3,
+      "tokens_per_sec": 0.12
+    },
+    "knowledge_qa": {
+      "success": false,
+      "output": "TIMEOUT",
+      "response_time": 120,
+      "tokens_estimate": 0,
+      "tokens_per_sec": 0
+    }
+  },
+  "summary": {
+    "avg_response_time": 92.06,
+    "avg_tokens_per_sec": 3.05,
+    "tests_passed": "2/5"
+  }
+}

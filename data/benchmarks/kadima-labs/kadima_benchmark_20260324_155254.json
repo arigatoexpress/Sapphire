@@ -1,0 +1,833 @@
+{
+  "metadata": {
+    "lab": "Kadima Digital Laboratories",
+    "hardware": {
+      "lab": "Kadima Digital Laboratories",
+      "cpu": "AMD Ryzen 9 9900X3D 12-Core",
+      "gpu": "NVIDIA GeForce RTX 5070 Ti (16GB GDDR7)",
+      "ram": "64GB DDR5",
+      "motherboard": "ASUS ROG STRIX B850-A GAMING WIFI",
+      "storage": "Samsung 990 EVO Plus 2TB NVMe",
+      "os": "Windows 11 Pro",
+      "inference_engine": "Ollama"
+    },
+    "version": "3.0",
+    "timestamp": "20260324_155254",
+    "date": "2026-03-24T15:56:54.160101",
+    "models_tested": 10,
+    "tests_per_model": 8,
+    "categories": [
+      "Code Generation",
+      "Logical Reasoning",
+      "Arithmetic",
+      "Summarization",
+      "Instruction Following",
+      "Structured Output",
+      "Translation",
+      "Creative Writing"
+    ],
+    "methodology": "GPU-isolated: VRAM cleared between models. Only GPU-bound models (20+ t/s). Real token counts via Ollama API. 512 token output cap."
+  },
+  "results": [
+    {
+      "model": "nemotron-3-nano:4b",
+      "label": "Nemotron 3 Nano 4B",
+      "family": "NVIDIA",
+      "params": "4B",
+      "quantization": "Q4_K_M",
+      "model_size_gb": 2.8,
+      "tests_passed": 8,
+      "tests_total": 8,
+      "accuracy_pct": 100.0,
+      "total_time_seconds": 9.74,
+      "avg_tokens_per_second": 195.6,
+      "avg_response_time": 1.22,
+      "test_results": [
+        {
+          "test_id": "code_gen",
+          "category": "Code Generation",
+          "passed": true,
+          "time_seconds": 1.48,
+          "tokens": 254,
+          "tokens_per_second": 192.5
+        },
+        {
+          "test_id": "reasoning",
+          "category": "Logical Reasoning",
+          "passed": true,
+          "time_seconds": 0.41,
+          "tokens": 60,
+          "tokens_per_second": 206.5
+        },
+        {
+          "test_id": "math",
+          "category": "Arithmetic",
+          "passed": true,
+          "time_seconds": 1.98,
+          "tokens": 352,
+          "tokens_per_second": 192.1
+        },
+        {
+          "test_id": "summarization",
+          "category": "Summarization",
+          "passed": true,
+          "time_seconds": 1.26,
+          "tokens": 218,
+          "tokens_per_second": 194.6
+        },
+        {
+          "test_id": "instruction",
+          "category": "Instruction Following",
+          "passed": true,
+          "time_seconds": 1.24,
+          "tokens": 220,
+          "tokens_per_second": 198.8
+        },
+        {
+          "test_id": "json_output",
+          "category": "Structured Output",
+          "passed": true,
+          "time_seconds": 0.64,
+          "tokens": 101,
+          "tokens_per_second": 192.9
+        },
+        {
+          "test_id": "translation",
+          "category": "Translation",
+          "passed": true,
+          "time_seconds": 0.48,
+          "tokens": 68,
+          "tokens_per_second": 191.7
+        },
+        {
+          "test_id": "creative",
+          "category": "Creative Writing",
+          "passed": true,
+          "time_seconds": 2.25,
+          "tokens": 408,
+          "tokens_per_second": 196.0
+        }
+      ]
+    },
+    {
+      "model": "nemotron-3-nano:4b-q8_0",
+      "label": "Nemotron 3 Nano Q8",
+      "family": "NVIDIA",
+      "params": "4B",
+      "quantization": "Q8_0",
+      "model_size_gb": 4.2,
+      "tests_passed": 8,
+      "tests_total": 8,
+      "accuracy_pct": 100.0,
+      "total_time_seconds": 15.11,
+      "avg_tokens_per_second": 145.6,
+      "avg_response_time": 1.89,
+      "test_results": [
+        {
+          "test_id": "code_gen",
+          "category": "Code Generation",
+          "passed": true,
+          "time_seconds": 3.24,
+          "tokens": 436,
+          "tokens_per_second": 142.9
+        },
+        {
+          "test_id": "reasoning",
+          "category": "Logical Reasoning",
+          "passed": true,
+          "time_seconds": 0.41,
+          "tokens": 45,
+          "tokens_per_second": 156.2
+        },
+        {
+          "test_id": "math",
+          "category": "Arithmetic",
+          "passed": true,
+          "time_seconds": 3.78,
+          "tokens": 512,
+          "tokens_per_second": 142.1
+        },
+        {
+          "test_id": "summarization",
+          "category": "Summarization",
+          "passed": true,
+          "time_seconds": 2.58,
+          "tokens": 350,
+          "tokens_per_second": 146.0
+        },
+        {
+          "test_id": "instruction",
+          "category": "Instruction Following",
+          "passed": true,
+          "time_seconds": 1.07,
+          "tokens": 139,
+          "tokens_per_second": 146.0
+        },
+        {
+          "test_id": "json_output",
+          "category": "Structured Output",
+          "passed": true,
+          "time_seconds": 0.72,
+          "tokens": 85,
+          "tokens_per_second": 138.6
+        },
+        {
+          "test_id": "translation",
+          "category": "Translation",
+          "passed": true,
+          "time_seconds": 1.13,
+          "tokens": 149,
+          "tokens_per_second": 152.2
+        },
+        {
+          "test_id": "creative",
+          "category": "Creative Writing",
+          "passed": true,
+          "time_seconds": 2.18,
+          "tokens": 287,
+          "tokens_per_second": 140.4
+        }
+      ]
+    },
+    {
+      "model": "gemma3n:e4b",
+      "label": "Gemma 3n E4B",
+      "family": "Google",
+      "params": "~4B",
+      "quantization": "F16",
+      "model_size_gb": 7.5,
+      "tests_passed": 8,
+      "tests_total": 8,
+      "accuracy_pct": 100.0,
+      "total_time_seconds": 7.03,
+      "avg_tokens_per_second": 128.0,
+      "avg_response_time": 0.88,
+      "test_results": [
+        {
+          "test_id": "code_gen",
+          "category": "Code Generation",
+          "passed": true,
+          "time_seconds": 1.52,
+          "tokens": 152,
+          "tokens_per_second": 121.9
+        },
+        {
+          "test_id": "reasoning",
+          "category": "Logical Reasoning",
+          "passed": true,
+          "time_seconds": 0.21,
+          "tokens": 3,
+          "tokens_per_second": 146.3
+        },
+        {
+          "test_id": "math",
+          "category": "Arithmetic",
+          "passed": true,
+          "time_seconds": 2.7,
+          "tokens": 302,
+          "tokens_per_second": 124.4
+        },
+        {
+          "test_id": "summarization",
+          "category": "Summarization",
+          "passed": true,
+          "time_seconds": 0.98,
+          "tokens": 94,
+          "tokens_per_second": 123.9
+        },
+        {
+          "test_id": "instruction",
+          "category": "Instruction Following",
+          "passed": true,
+          "time_seconds": 0.39,
+          "tokens": 21,
+          "tokens_per_second": 123.3
+        },
+        {
+          "test_id": "json_output",
+          "category": "Structured Output",
+          "passed": true,
+          "time_seconds": 0.51,
+          "tokens": 37,
+          "tokens_per_second": 122.6
+        },
+        {
+          "test_id": "translation",
+          "category": "Translation",
+          "passed": true,
+          "time_seconds": 0.33,
+          "tokens": 17,
+          "tokens_per_second": 139.3
+        },
+        {
+          "test_id": "creative",
+          "category": "Creative Writing",
+          "passed": true,
+          "time_seconds": 0.39,
+          "tokens": 20,
+          "tokens_per_second": 121.9
+        }
+      ]
+    },
+    {
+      "model": "phi4:latest",
+      "label": "Phi-4 14B",
+      "family": "Microsoft",
+      "params": "14B",
+      "quantization": "Q4_K_M",
+      "model_size_gb": 9.1,
+      "tests_passed": 8,
+      "tests_total": 8,
+      "accuracy_pct": 100.0,
+      "total_time_seconds": 10.34,
+      "avg_tokens_per_second": 85.9,
+      "avg_response_time": 1.29,
+      "test_results": [
+        {
+          "test_id": "code_gen",
+          "category": "Code Generation",
+          "passed": true,
+          "time_seconds": 1.87,
+          "tokens": 133,
+          "tokens_per_second": 78.0
+        },
+        {
+          "test_id": "reasoning",
+          "category": "Logical Reasoning",
+          "passed": true,
+          "time_seconds": 0.09,
+          "tokens": 2,
+          "tokens_per_second": 136.4
+        },
+        {
+          "test_id": "math",
+          "category": "Arithmetic",
+          "passed": true,
+          "time_seconds": 5.29,
+          "tokens": 390,
+          "tokens_per_second": 77.7
+        },
+        {
+          "test_id": "summarization",
+          "category": "Summarization",
+          "passed": true,
+          "time_seconds": 1.34,
+          "tokens": 91,
+          "tokens_per_second": 75.2
+        },
+        {
+          "test_id": "instruction",
+          "category": "Instruction Following",
+          "passed": true,
+          "time_seconds": 0.35,
+          "tokens": 21,
+          "tokens_per_second": 77.7
+        },
+        {
+          "test_id": "json_output",
+          "category": "Structured Output",
+          "passed": true,
+          "time_seconds": 0.48,
+          "tokens": 30,
+          "tokens_per_second": 81.2
+        },
+        {
+          "test_id": "translation",
+          "category": "Translation",
+          "passed": true,
+          "time_seconds": 0.29,
+          "tokens": 18,
+          "tokens_per_second": 84.7
+        },
+        {
+          "test_id": "creative",
+          "category": "Creative Writing",
+          "passed": true,
+          "time_seconds": 0.63,
+          "tokens": 40,
+          "tokens_per_second": 76.4
+        }
+      ]
+    },
+    {
+      "model": "granite3.3:2b",
+      "label": "Granite 3.3 2B",
+      "family": "IBM",
+      "params": "2B",
+      "quantization": "Q4_K_M",
+      "model_size_gb": 1.5,
+      "tests_passed": 8,
+      "tests_total": 8,
+      "accuracy_pct": 100.0,
+      "total_time_seconds": 14.46,
+      "avg_tokens_per_second": 50.9,
+      "avg_response_time": 1.81,
+      "test_results": [
+        {
+          "test_id": "code_gen",
+          "category": "Code Generation",
+          "passed": true,
+          "time_seconds": 3.49,
+          "tokens": 160,
+          "tokens_per_second": 47.8
+        },
+        {
+          "test_id": "reasoning",
+          "category": "Logical Reasoning",
+          "passed": true,
+          "time_seconds": 0.09,
+          "tokens": 2,
+          "tokens_per_second": 86.9
+        },
+        {
+          "test_id": "math",
+          "category": "Arithmetic",
+          "passed": true,
+          "time_seconds": 6.04,
+          "tokens": 277,
+          "tokens_per_second": 47.8
+        },
+        {
+          "test_id": "summarization",
+          "category": "Summarization",
+          "passed": true,
+          "time_seconds": 2.08,
+          "tokens": 95,
+          "tokens_per_second": 49.1
+        },
+        {
+          "test_id": "instruction",
+          "category": "Instruction Following",
+          "passed": true,
+          "time_seconds": 0.74,
+          "tokens": 23,
+          "tokens_per_second": 36.3
+        },
+        {
+          "test_id": "json_output",
+          "category": "Structured Output",
+          "passed": true,
+          "time_seconds": 0.59,
+          "tokens": 28,
+          "tokens_per_second": 56.1
+        },
+        {
+          "test_id": "translation",
+          "category": "Translation",
+          "passed": true,
+          "time_seconds": 0.73,
+          "tokens": 23,
+          "tokens_per_second": 39.3
+        },
+        {
+          "test_id": "creative",
+          "category": "Creative Writing",
+          "passed": true,
+          "time_seconds": 0.7,
+          "tokens": 24,
+          "tokens_per_second": 43.7
+        }
+      ]
+    },
+    {
+      "model": "qwen3.5:4b",
+      "label": "Qwen 3.5 4B",
+      "family": "Alibaba",
+      "params": "4B",
+      "quantization": "Q4_K_M",
+      "model_size_gb": 3.4,
+      "tests_passed": 8,
+      "tests_total": 8,
+      "accuracy_pct": 100.0,
+      "total_time_seconds": 33.13,
+      "avg_tokens_per_second": 34.6,
+      "avg_response_time": 4.14,
+      "test_results": [
+        {
+          "test_id": "code_gen",
+          "category": "Code Generation",
+          "passed": true,
+          "time_seconds": 8.95,
+          "tokens": 260,
+          "tokens_per_second": 29.7
+        },
+        {
+          "test_id": "reasoning",
+          "category": "Logical Reasoning",
+          "passed": true,
+          "time_seconds": 0.22,
+          "tokens": 2,
+          "tokens_per_second": 65.1
+        },
+        {
+          "test_id": "math",
+          "category": "Arithmetic",
+          "passed": true,
+          "time_seconds": 17.82,
+          "tokens": 512,
+          "tokens_per_second": 29.1
+        },
+        {
+          "test_id": "summarization",
+          "category": "Summarization",
+          "passed": true,
+          "time_seconds": 2.68,
+          "tokens": 81,
+          "tokens_per_second": 32.8
+        },
+        {
+          "test_id": "instruction",
+          "category": "Instruction Following",
+          "passed": true,
+          "time_seconds": 1.01,
+          "tokens": 21,
+          "tokens_per_second": 25.8
+        },
+        {
+          "test_id": "json_output",
+          "category": "Structured Output",
+          "passed": true,
+          "time_seconds": 0.83,
+          "tokens": 21,
+          "tokens_per_second": 33.8
+        },
+        {
+          "test_id": "translation",
+          "category": "Translation",
+          "passed": true,
+          "time_seconds": 0.74,
+          "tokens": 16,
+          "tokens_per_second": 29.8
+        },
+        {
+          "test_id": "creative",
+          "category": "Creative Writing",
+          "passed": true,
+          "time_seconds": 0.88,
+          "tokens": 21,
+          "tokens_per_second": 30.8
+        }
+      ]
+    },
+    {
+      "model": "gemma3:4b",
+      "label": "Gemma 3 4B",
+      "family": "Google",
+      "params": "4B",
+      "quantization": "Q4_K_M",
+      "model_size_gb": 3.3,
+      "tests_passed": 7,
+      "tests_total": 8,
+      "accuracy_pct": 87.5,
+      "total_time_seconds": 5.17,
+      "avg_tokens_per_second": 195.6,
+      "avg_response_time": 0.65,
+      "test_results": [
+        {
+          "test_id": "code_gen",
+          "category": "Code Generation",
+          "passed": true,
+          "time_seconds": 1.04,
+          "tokens": 141,
+          "tokens_per_second": 178.4
+        },
+        {
+          "test_id": "reasoning",
+          "category": "Logical Reasoning",
+          "passed": true,
+          "time_seconds": 0.18,
+          "tokens": 3,
+          "tokens_per_second": 251.5
+        },
+        {
+          "test_id": "math",
+          "category": "Arithmetic",
+          "passed": false,
+          "time_seconds": 2.08,
+          "tokens": 322,
+          "tokens_per_second": 177.7
+        },
+        {
+          "test_id": "summarization",
+          "category": "Summarization",
+          "passed": true,
+          "time_seconds": 0.64,
+          "tokens": 88,
+          "tokens_per_second": 205.3
+        },
+        {
+          "test_id": "instruction",
+          "category": "Instruction Following",
+          "passed": true,
+          "time_seconds": 0.29,
+          "tokens": 23,
+          "tokens_per_second": 207.2
+        },
+        {
+          "test_id": "json_output",
+          "category": "Structured Output",
+          "passed": true,
+          "time_seconds": 0.39,
+          "tokens": 37,
+          "tokens_per_second": 180.4
+        },
+        {
+          "test_id": "translation",
+          "category": "Translation",
+          "passed": true,
+          "time_seconds": 0.27,
+          "tokens": 17,
+          "tokens_per_second": 180.9
+        },
+        {
+          "test_id": "creative",
+          "category": "Creative Writing",
+          "passed": true,
+          "time_seconds": 0.28,
+          "tokens": 20,
+          "tokens_per_second": 183.2
+        }
+      ]
+    },
+    {
+      "model": "phi4-mini:latest",
+      "label": "Phi-4 Mini 3.8B",
+      "family": "Microsoft",
+      "params": "3.8B",
+      "quantization": "Q4_K_M",
+      "model_size_gb": 2.5,
+      "tests_passed": 7,
+      "tests_total": 8,
+      "accuracy_pct": 87.5,
+      "total_time_seconds": 41.98,
+      "avg_tokens_per_second": 23.7,
+      "avg_response_time": 5.25,
+      "test_results": [
+        {
+          "test_id": "code_gen",
+          "category": "Code Generation",
+          "passed": true,
+          "time_seconds": 6.85,
+          "tokens": 158,
+          "tokens_per_second": 24.0
+        },
+        {
+          "test_id": "reasoning",
+          "category": "Logical Reasoning",
+          "passed": true,
+          "time_seconds": 9.12,
+          "tokens": 205,
+          "tokens_per_second": 23.7
+        },
+        {
+          "test_id": "math",
+          "category": "Arithmetic",
+          "passed": false,
+          "time_seconds": 14.45,
+          "tokens": 305,
+          "tokens_per_second": 21.9
+        },
+        {
+          "test_id": "summarization",
+          "category": "Summarization",
+          "passed": true,
+          "time_seconds": 6.38,
+          "tokens": 140,
+          "tokens_per_second": 23.3
+        },
+        {
+          "test_id": "instruction",
+          "category": "Instruction Following",
+          "passed": true,
+          "time_seconds": 1.82,
+          "tokens": 37,
+          "tokens_per_second": 25.3
+        },
+        {
+          "test_id": "json_output",
+          "category": "Structured Output",
+          "passed": true,
+          "time_seconds": 1.12,
+          "tokens": 25,
+          "tokens_per_second": 26.5
+        },
+        {
+          "test_id": "translation",
+          "category": "Translation",
+          "passed": true,
+          "time_seconds": 0.99,
+          "tokens": 16,
+          "tokens_per_second": 22.2
+        },
+        {
+          "test_id": "creative",
+          "category": "Creative Writing",
+          "passed": true,
+          "time_seconds": 1.25,
+          "tokens": 22,
+          "tokens_per_second": 22.7
+        }
+      ]
+    },
+    {
+      "model": "llama3.2:3b",
+      "label": "Llama 3.2 3B",
+      "family": "Meta",
+      "params": "3B",
+      "quantization": "Q4_K_M",
+      "model_size_gb": 2.0,
+      "tests_passed": 6,
+      "tests_total": 8,
+      "accuracy_pct": 75.0,
+      "total_time_seconds": 20.03,
+      "avg_tokens_per_second": 37.4,
+      "avg_response_time": 2.5,
+      "test_results": [
+        {
+          "test_id": "code_gen",
+          "category": "Code Generation",
+          "passed": true,
+          "time_seconds": 7.91,
+          "tokens": 224,
+          "tokens_per_second": 29.2
+        },
+        {
+          "test_id": "reasoning",
+          "category": "Logical Reasoning",
+          "passed": false,
+          "time_seconds": 0.28,
+          "tokens": 2,
+          "tokens_per_second": 74.0
+        },
+        {
+          "test_id": "math",
+          "category": "Arithmetic",
+          "passed": false,
+          "time_seconds": 4.9,
+          "tokens": 141,
+          "tokens_per_second": 30.5
+        },
+        {
+          "test_id": "summarization",
+          "category": "Summarization",
+          "passed": true,
+          "time_seconds": 3.77,
+          "tokens": 108,
+          "tokens_per_second": 30.9
+        },
+        {
+          "test_id": "instruction",
+          "category": "Instruction Following",
+          "passed": true,
+          "time_seconds": 0.89,
+          "tokens": 21,
+          "tokens_per_second": 27.8
+        },
+        {
+          "test_id": "json_output",
+          "category": "Structured Output",
+          "passed": true,
+          "time_seconds": 0.76,
+          "tokens": 21,
+          "tokens_per_second": 35.9
+        },
+        {
+          "test_id": "translation",
+          "category": "Translation",
+          "passed": true,
+          "time_seconds": 0.81,
+          "tokens": 20,
+          "tokens_per_second": 36.4
+        },
+        {
+          "test_id": "creative",
+          "category": "Creative Writing",
+          "passed": true,
+          "time_seconds": 0.71,
+          "tokens": 16,
+          "tokens_per_second": 34.5
+        }
+      ]
+    },
+    {
+      "model": "nemotron-mini:4b",
+      "label": "Nemotron Mini 4B",
+      "family": "NVIDIA",
+      "params": "4B",
+      "quantization": "Q4_K_M",
+      "model_size_gb": 2.7,
+      "tests_passed": 4,
+      "tests_total": 8,
+      "accuracy_pct": 50.0,
+      "total_time_seconds": 3.36,
+      "avg_tokens_per_second": 242.3,
+      "avg_response_time": 0.42,
+      "test_results": [
+        {
+          "test_id": "code_gen",
+          "category": "Code Generation",
+          "passed": true,
+          "time_seconds": 1.25,
+          "tokens": 234,
+          "tokens_per_second": 244.6
+        },
+        {
+          "test_id": "reasoning",
+          "category": "Logical Reasoning",
+          "passed": false,
+          "time_seconds": 0.17,
+          "tokens": 10,
+          "tokens_per_second": 235.6
+        },
+        {
+          "test_id": "math",
+          "category": "Arithmetic",
+          "passed": false,
+          "time_seconds": 0.61,
+          "tokens": 94,
+          "tokens_per_second": 229.3
+        },
+        {
+          "test_id": "summarization",
+          "category": "Summarization",
+          "passed": true,
+          "time_seconds": 0.46,
+          "tokens": 72,
+          "tokens_per_second": 246.6
+        },
+        {
+          "test_id": "instruction",
+          "category": "Instruction Following",
+          "passed": true,
+          "time_seconds": 0.29,
+          "tokens": 41,
+          "tokens_per_second": 251.8
+        },
+        {
+          "test_id": "json_output",
+          "category": "Structured Output",
+          "passed": false,
+          "time_seconds": 0.23,
+          "tokens": 30,
+          "tokens_per_second": 257.1
+        },
+        {
+          "test_id": "translation",
+          "category": "Translation",
+          "passed": true,
+          "time_seconds": 0.16,
+          "tokens": 11,
+          "tokens_per_second": 242.9
+        },
+        {
+          "test_id": "creative",
+          "category": "Creative Writing",
+          "passed": false,
+          "time_seconds": 0.19,
+          "tokens": 17,
+          "tokens_per_second": 230.2
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,103 @@
+{
+  "timestamp": "2026-03-07T23:37:58.049453",
+  "hardware": "RTX 5070 Ti 16GB",
+  "ollama_version": "0.17.7",
+  "results": {
+    "qwen3.5:0.8b": {
+      "simple_math": {
+        "success": false
+      },
+      "complex_math": {
+        "success": true,
+        "tps": 116.15,
+        "duration": 39.83,
+        "tokens": 4626
+      },
+      "code": {
+        "success": false
+      },
+      "reasoning": {
+        "success": true,
+        "tps": 4.48,
+        "duration": 102.59,
+        "tokens": 460
+      },
+      "explanation": {
+        "success": true,
+        "tps": 24.57,
+        "duration": 77.87,
+        "tokens": 1913
+      },
+      "creative": {
+        "success": true,
+        "tps": 60.51,
+        "duration": 51.1,
+        "tokens": 3092
+      }
+    },
+    "qwen3.5:4b": {
+      "simple_math": {
+        "success": true,
+        "tps": 1.59,
+        "duration": 101.3,
+        "tokens": 161
+      },
+      "complex_math": {
+        "success": true,
+        "tps": 8.44,
+        "duration": 93.43,
+        "tokens": 789
+      },
+      "code": {
+        "success": false
+      },
+      "reasoning": {
+        "success": true,
+        "tps": 3.76,
+        "duration": 93.2,
+        "tokens": 350
+      },
+      "explanation": {
+        "success": true,
+        "tps": 22.42,
+        "duration": 70.77,
+        "tokens": 1587
+      },
+      "creative": {
+        "success": false
+      }
+    },
+    "qwen3.5:9b": {
+      "simple_math": {
+        "success": true,
+        "tps": 9.63,
+        "duration": 25.85,
+        "tokens": 249
+      },
+      "complex_math": {
+        "success": true,
+        "tps": 10.88,
+        "duration": 115.21,
+        "tokens": 1253
+      },
+      "code": {
+        "success": true,
+        "tps": 10.51,
+        "duration": 50.05,
+        "tokens": 526
+      },
+      "reasoning": {
+        "success": true,
+        "tps": 9.08,
+        "duration": 47.88,
+        "tokens": 435
+      },
+      "explanation": {
+        "success": false
+      },
+      "creative": {
+        "success": false
+      }
+    }
+  }
+}

@@ -1,0 +1,861 @@
+{
+  "timestamp": "2026-03-23T20:42:30.865490",
+  "models_tested": 14,
+  "tests_per_model": 5,
+  "results": {
+    "nemotron-3-nano:4b": {
+      "info": {
+        "tier": "small",
+        "family": "Nemotron",
+        "params": "4B"
+      },
+      "tests": {
+        "math": {
+          "success": true,
+          "output": "Thinking...\nWe need compute: original price 85, 30% discount => price after discount = 85 * (1 - 0.30) = 85 * 0.70 = 59.5. Then add 8% tax after discount: tax amount = 59.5 * 0.08 = 4.76. Final price = 59.5 + 4.76 = 64.26. So answer: $64.26. Provide numerical answer.\n...done thinking.\n\nThe final price is **64.26**.",
+          "time": 0.94,
+          "tokens": 79,
+          "tps": 84.0,
+          "correct": true,
+          "category": "reasoning"
+        },
+        "logic": {
+          "success": true,
+          "output": "Thinking...\nWe need assign professions to Alice, Bob, Carol given constraints.\n\nLet professions: doctor, engineer, teacher.\n\nConstraints:\n\n1. Alice is not doctor.\n2. Engineer is not Bob.\n3. Carol is older than teacher.\n\nInterpret \"Carol is older than teacher\" meaning Carol is older than the person who is teacher? Or Carol's age > teacher's age. So teacher is younger than Carol. So teacher cannot be Carol. So teacher is either Alice or Bob.\n\nAlso engineer not Bob, so engineer is Alice or Carol.\n\n",
+          "time": 2.59,
+          "tokens": 472,
+          "tps": 182.1,
+          "correct": true,
+          "category": "reasoning"
+        },
+        "code": {
+          "success": true,
+          "output": "Thinking...\nWe need to provide only the function code, with type hints, no explanation. Function checks palindrome ignoring spaces and case. Use typing import str, bool. Probably: def is_palindrome(s: str) -> bool: ... Return True if valid. Implement by processing string: s_clean = ''.join(ch.lower() for ch in s if ch.isalnum()) Wait ignoring spaces only, not punctuation? Problem says ignoring spaces and case. So only spaces removed. Might keep other characters? We'll assume only spaces. So remo",
+          "time": 1.21,
+          "tokens": 198,
+          "tps": 163.7,
+          "correct": true,
+          "category": "coding"
+        },
+        "context": {
+          "success": true,
+          "output": "Thinking...\nWe need: Sarah ordered 50 books total. 10 damaged returned? Actually \"10 damaged (returned)\" might mean 10 returned (damaged). So net starting stock after order? She ordered 50, 10 returned (assuming returns reduce inventory? Or returns bring in? wording ambiguous). Usually returned books are added to stock. But it says damaged (returned). Possibly she got back 10 (returned damaged). So net quantity after order: 50 - 10? Or 50 +10? Let's interpret: She ordered 50 books, 10 damaged (r",
+          "time": 2.99,
+          "tokens": 388,
+          "tps": 129.7,
+          "correct": false,
+          "category": "reasoning"
+        },
+        "creative": {
+          "success": true,
+          "output": "Thinking...\nWe need to produce a haiku: 5 syllables line1, 7 syllables line2, 5 syllables line3. Must be about artificial intelligence.\n\nLet's craft:\n\n\"Metal mind awakes\" -> count: Me-tal (2) mind (1) a-wakes (2) =5? Actually \"Metal mind awakes\" = Metal(2) mind(1) a-wakes(2)=5 good.\n\nSecond line 7 syllables: \"Learning patterns, silent truth\" Count: Learn-ing (2) pa-ter-nants (3?) Actually \"patterns\" is 2 syllables? \"pan-trits\" =2? Wait \"patterns\" is 2 syllables: pan-trits. So \"Learning patterns\"",
+          "time": 2.68,
+          "tokens": 319,
+          "tps": 118.9,
+          "correct": true,
+          "category": "creative"
+        }
+      },
+      "summary": {
+        "avg_tps": 135.7,
+        "avg_time": 2.1,
+        "total_tokens": 1456,
+        "accuracy": "4/5",
+        "success_rate": "5/5"
+      }
+    },
+    "nemotron-3-nano:4b-q8_0": {
+      "info": {
+        "tier": "small",
+        "family": "Nemotron",
+        "params": "4B-q8"
+      },
+      "tests": {
+        "math": {
+          "success": true,
+          "output": "Thinking...\nWe need compute: original price $85. Apply 30% off => discount = 0.30*85 = 25.5? Actually 30% off means price reduced by 30%, so final sale price = 85 * (1 - 0.30) = 85 * 0.70 = 59.5. Then tax 8% on that discounted amount? Usually tax after discount means tax on sale price. So tax = 59.5 * 0.08 = 4.76. Then final price = 59.5 + 4.76 = 64.26.\n\nCheck: 8% of 59.5 = 4.76. So final = 64.26. Provide numeric answer: 64.26.\n\nThey ask \"Give the numerical answer.\" So output 64.26.\n\nMake step-b",
+          "time": 3.18,
+          "tokens": 230,
+          "tps": 72.3,
+          "correct": true,
+          "category": "reasoning"
+        },
+        "logic": {
+          "success": true,
+          "output": "Thinking...\nWe need assign jobs to name. Constraints:\n\n1. Alice is not doctor => Alice \u2260 doctor.\n2. Engineer is not Bob => Bob \u2260 engineer.\n3. Carol is older than teacher => implies age ordering, but job not directly linked except perhaps teacher is younger than Carol, but doesn't give job relation. So we need assign occupations.\n\nPossible permutations of jobs to three people. We'll check constraints.\n\nLet\u2019s list possible assignments:\n\nWe have doctors, engineer, teacher.\n\nCheck Bob cannot be engi",
+          "time": 7.41,
+          "tokens": 1099,
+          "tps": 148.3,
+          "correct": true,
+          "category": "reasoning"
+        },
+        "code": {
+          "success": true,
+          "output": "Thinking...\nWe need to output only the function with type hints, no explanation. Provide function definition: def is_valid_palindrome(s: str) -> bool: ... use .lower().replace(' ', '') then check equals reversed. Probably implement logic. Return bool. So final answer: just function.\n\n```python\ndef is_valid_palindrome(s: str) -> bool:\n    cleaned = s.replace(' ', '').lower()\n    return cleaned == cleaned[::-1]\n```\n...done thinking.\n\n```python\ndef is_valid_palindrome(s: str) -> bool:\n    cleaned =",
+          "time": 1.27,
+          "tokens": 141,
+          "tps": 111.3,
+          "correct": true,
+          "category": "coding"
+        },
+        "context": {
+          "success": true,
+          "output": "Thinking...\nWe need to compute stock level.\n\nStart: 50 books\n\nDamaged 10 returned -> presumably remove from stock? Returned damaged means they are not sold, so initial stock reduces? Actually \"returned\" could be they were purchased and returned, so out of stock. So initial 50 -10 = 40.\n\nSold 15 Wednesday: 40 -15 = 25.\n\nGot 30 new Friday: 25 +30 = 55.\n\nSold 8 more: 55 -8 = 47.\n\nAnswer: 47.\n\nJust the number and brief calculation. Probably just \"47 (50-10=40, -15=25, +30=55, -8=47)\". Provide just t",
+          "time": 2.09,
+          "tokens": 173,
+          "tps": 82.9,
+          "correct": true,
+          "category": "reasoning"
+        },
+        "creative": {
+          "success": true,
+          "output": "Thinking...\nWe need haiku 3 lines, 5-7-5 syllables. About AI. Write that. Ensure correct count.\n\nLine1 5 syllables: \"Silent circuits glow\" (Silent(2) cir-uits(2) glows? Actually \"glow\" is 1? Let's count: Silent(2) circuits(2) glow(1) total 5. Okay.\n\nLine2 7: \"thoughts beyond human mind\" Count: thoughts(1) be-yond(2?) \"beyond\" 2, human(2), mind(1) = 1+2+2+1=6. Need 7. Maybe \"thoughts beyond human mind at once\". Count: thoughts(1) be-yond(2) hu-man(2) mind(1) at(1) once(2) = 1+2+2+1+1+2=9 too many",
+          "time": 4.92,
+          "tokens": 452,
+          "tps": 91.9,
+          "correct": true,
+          "category": "creative"
+        }
+      },
+      "summary": {
+        "avg_tps": 101.3,
+        "avg_time": 3.8,
+        "total_tokens": 2095,
+        "accuracy": "5/5",
+        "success_rate": "5/5"
+      }
+    },
+    "nemotron-3-nano:4b-bf16": {
+      "info": {
+        "tier": "medium",
+        "family": "Nemotron",
+        "params": "4B-bf16"
+      },
+      "tests": {
+        "math": {
+          "success": true,
+          "output": "Thinking...\nThe problem: original price $85, 20% off? \"30% off sale\" means subtract 30% from price. So discount = 0.30 * 85 = 25.5. Sales price = 85 - 25.5 = 59.5. Then 8% tax after discount, so tax = 0.08 * 59.5 = 4.76? Let's compute: 59.5 * 0.08 = 4.76. So final price = 59.5 + 4.76 = 64.26. So answer: 64.26.\n\nBut maybe round? Could be $64.26. Provide numerical answer: 64.26.\n\nThus final answer: 64.26.\n\nLet's respond.\n...done thinking.\n\nThe discounted price is  \n\n\\[\n85 \\times (1-0.30)=85 \\times",
+          "time": 3.69,
+          "tokens": 171,
+          "tps": 46.4,
+          "correct": true,
+          "category": "reasoning"
+        },
+        "logic": {
+          "success": true,
+          "output": "Thinking...\nWe need assign each person unique profession: doctor, engineer, teacher. Also constraints: Alice not doctor. Engineer not Bob. Carol older than teacher => teacher is not oldest? Actually Carol older than teacher means Carol is older than teacher, so Carol cannot be teacher? It doesn't say teacher must be younger than all, just Carol older than teacher. So teacher could be younger than Carol. No relation to others.\n\nWe need assign professions to Alice, Bob, Carol.\n\nAlice not doctor ->",
+          "time": 5.6,
+          "tokens": 535,
+          "tps": 95.5,
+          "correct": true,
+          "category": "reasoning"
+        },
+        "code": {
+          "success": true,
+          "output": "Thinking...\nWe need to provide just the function, no explanation. Python function with type hints to check palindrome ignoring spaces and case. Return bool. Function name maybe is_valid_palindrome. Use typing: str, bool. Implementation: normalize = s.replace(\" \", \"\").lower() then compare to reverse. Could also use filtered = [ch.lower() for ch in s if not ch.isspace()]. Then join and compare. Simpler: clean = ''.join(ch.lower() for ch in s if not ch.isspace()). return clean == clean[::-1].\n\nProv",
+          "time": 3.06,
+          "tokens": 246,
+          "tps": 80.5,
+          "correct": false,
+          "category": "coding"
+        },
+        "context": {
+          "success": true,
+          "output": "Thinking...\nWe need to parse.\n\nOriginal 50 books. 10 damaged returned. Usually returned means they are not in stock? \"Damaged (returned)\" suggests they were returned to stock? Might be they are in stock after return. Might be they are returned, so they are available again? Let's assume 10 returned back (i.e., added). So after 50-10+10 = 50? Actually original 50, 10 damaged returned -> those 10 are returned maybe they are removed and then returned, net zero? Could be they were damaged and returne",
+          "time": 4.17,
+          "tokens": 272,
+          "tps": 65.2,
+          "correct": false,
+          "category": "reasoning"
+        },
+        "creative": {
+          "success": true,
+          "output": "Thinking...\nWe need haiku 5-7-5. About AI. Let's craft: \"Silent circuits hum (5) / learning patterns from code (7) / mind without a heart (5)\". Count syllables: \"Silent\" (2) \"circuits\" (2) \"hum\" (1) => 5. \"learning\" (2) \"patterns\" (2) \"from\" (1) \"code\" (1) = 6? Let's count: learning(2) patterns(2) from(1) code(1) = 6. Need 7. Maybe \"learning patterns from code all day\". Count: learning(2) patterns(2) from(1) code(1) all(1) day(1) = 8. Too many. Better: \"learning patterns from code\". That's 6. Ne",
+          "time": 6.24,
+          "tokens": 405,
+          "tps": 64.9,
+          "correct": true,
+          "category": "creative"
+        }
+      },
+      "summary": {
+        "avg_tps": 70.5,
+        "avg_time": 4.6,
+        "total_tokens": 1629,
+        "accuracy": "3/5",
+        "success_rate": "5/5"
+      }
+    },
+    "nemotron-mini:4b": {
+      "info": {
+        "tier": "small",
+        "family": "Nemotron",
+        "params": "4B"
+      },
+      "tests": {
+        "math": {
+          "success": true,
+          "output": "Sure, I'd be happy to help you with that!\nLet's break down the problem step by step.\n1. The store has a 30% off sale. This means that the discount on the item is 30% of the original price.\n2. The original price of the item is $85.\n3. To calculate the discount, we can multiply the original price by the discount percentage: 30% of $85 = 0.30 * $85 = $25.\n4. The discounted price after the sale is $85 - $25 = $60.\n5. Now we need to add 8% tax to the discounted price. To calculate this, we can multip",
+          "time": 1.32,
+          "tokens": 186,
+          "tps": 140.8,
+          "correct": false,
+          "category": "reasoning"
+        },
+        "logic": {
+          "success": true,
+          "output": "Alice is a teacher, Bob is an engineer, and Carol is a doctor.",
+          "time": 0.28,
+          "tokens": 15,
+          "tps": 53.9,
+          "correct": true,
+          "category": "reasoning"
+        },
+        "code": {
+          "success": true,
+          "output": "Sure, I'd be happy to help you with that! Here's a Python function that checks if a string is a valid palindrome, ignoring spaces and case, with type hints included:\n```python\nfrom typing import AnyStr\n\ndef is_valid_palindrome(s: AnyStr) -> bool:\n    \"\"\"\n    Check if a string is a valid palindrome, ignoring spaces and case.\n\n    :param s: The string to check.\n    :return: True if the string is a valid palindrome, False otherwise.\n    \"\"\"\n    # Remove any non-alphanumeric characters and convert t",
+          "time": 1.5,
+          "tokens": 285,
+          "tps": 189.7,
+          "correct": true,
+          "category": "coding"
+        },
+        "context": {
+          "success": true,
+          "output": "Sure, let's break down the problem step by step. \n1. Sarah ordered 50 books.\n2. 10 books were damaged and returned, so the number of books in stock reduced by 10 to 50 - 10 = 40 books.\n3. On Wednesday, Sarah sold 15 books, so the number of books in stock reduced by 15 to 40 - 15 = 25 books.\n4. On Friday, Sarah got 30 new books, so the number of books in stock increased by 30 to 25 + 30 = 55 books.\n5. On Friday, Sarah sold 8 more books, so the number of books in stock reduced by 8 to 55 - 8 = 47 ",
+          "time": 1.05,
+          "tokens": 138,
+          "tps": 131.0,
+          "correct": true,
+          "category": "reasoning"
+        },
+        "creative": {
+          "success": true,
+          "output": "In silicon minds, thoughts take flight,\nA machine's intelligence, day and night.",
+          "time": 0.29,
+          "tokens": 20,
+          "tps": 69.0,
+          "correct": true,
+          "category": "creative"
+        }
+      },
+      "summary": {
+        "avg_tps": 116.9,
+        "avg_time": 0.9,
+        "total_tokens": 644,
+        "accuracy": "4/5",
+        "success_rate": "5/5"
+      }
+    },
+    "phi4-mini": {
+      "info": {
+        "tier": "small",
+        "family": "Phi",
+        "params": "3.8B"
+      },
+      "tests": {
+        "math": {
+          "success": true,
+          "output": "To solve this problem step-by-step, we'll need to calculate the discount, subtract it from the original price to get the discounted price, and then add tax to find the final price.\n\n1. Calculate the discount amount:\nDiscount = Original Price * Discount Percentage\nDiscount = $85 * 30%\nDiscount = $85 * 0.30\nDiscount = $25.50\n\n2. Subtract the discount from the original price to get the discounted price:\nDiscounted Price = Original Price - Discount\nDiscounted Price = $85 - $25.50\nDiscounted Price = ",
+          "time": 1.34,
+          "tokens": 230,
+          "tps": 172.0,
+          "correct": false,
+          "category": "reasoning"
+        },
+        "logic": {
+          "success": true,
+          "output": "- Alice is the Teacher\n\n- Bob is the Engineer\n\n- Carol is the Doctor\n\n\nExplanation: Since Alice is not a doctor and Carol is older than the teacher (who can't be Carol), Carol must be the Doctor. Bob can't be an engineer, so Bob is the Engineer. By process of elimination, Alice must be the Teacher.",
+          "time": 0.51,
+          "tokens": 74,
+          "tps": 144.8,
+          "correct": true,
+          "category": "reasoning"
+        },
+        "code": {
+          "success": true,
+          "output": "```python\ndef is_palindrome(s: str) -> bool:\n    s = ''.join(c.lower() for c in s if c.isalnum())\n    return s == s[::-1]\n```",
+          "time": 0.39,
+          "tokens": 31,
+          "tps": 78.7,
+          "correct": true,
+          "category": "coding"
+        },
+        "context": {
+          "success": true,
+          "output": "Sarah started with 50 books, returned 10, sold 15 on Wednesday, received 30 new books on Friday, and sold another 8.\n\nStarting stock: 50\nReturned: -10\nWednesday sales: -15\nReceived new: +30\nFriday sales: -8\n\nStock in hand: 50 - 10 - 15 + 30 - 8 = 47\n\nSarah has 47 books in stock.",
+          "time": 0.6,
+          "tokens": 69,
+          "tps": 114.4,
+          "correct": true,
+          "category": "reasoning"
+        },
+        "creative": {
+          "success": true,
+          "output": "Mind in code, circuits gleam,  \nSilent thoughts weave life's new dream,  \nFuture's dawn, unseen.",
+          "time": 0.32,
+          "tokens": 24,
+          "tps": 75.5,
+          "correct": true,
+          "category": "creative"
+        }
+      },
+      "summary": {
+        "avg_tps": 117.1,
+        "avg_time": 0.6,
+        "total_tokens": 428,
+        "accuracy": "4/5",
+        "success_rate": "5/5"
+      }
+    },
+    "phi4": {
+      "info": {
+        "tier": "medium",
+        "family": "Phi",
+        "params": "14B"
+      },
+      "tests": {
+        "math": {
+          "success": true,
+          "output": "To find the final price of the item after the discount and tax, follow these steps:\n\n1. **Calculate the discount amount:**\n   - The item costs $85.\n   - The discount is 30%.\n   - Discount amount = 30% of $85 = \\(0.30 \\times 85 = 25.50\\).\n\n2. **Subtract the discount from the original price:**\n   - Price after discount = Original price - Discount amount\n   - Price after discount = \\(85 - 25.50 = 59.50\\).\n\n3. **Calculate the tax on the discounted price:**\n   - The tax rate is 8%.\n   - Tax amount = ",
+          "time": 3.01,
+          "tokens": 181,
+          "tps": 60.2,
+          "correct": false,
+          "category": "reasoning"
+        },
+        "logic": {
+          "success": true,
+          "output": "To solve this problem, we need to determine the professions of Alice, Bob, and Carol based on the given clues:\n\n1. Alice is not a doctor.\n2. The engineer is not Bob.\n3. Carol is older than the teacher.\n\nLet's analyze the information:\n\n- Since Alice is not the doctor, the doctor must be either Bob or Carol.\n- Since the engineer is not Bob, the engineer must be either Alice or Carol.\n- Carol is older than the teacher, so Carol cannot be the teacher.\n\nFrom these clues, we can deduce:\n\n- Carol canno",
+          "time": 5.23,
+          "tokens": 420,
+          "tps": 80.3,
+          "correct": true,
+          "category": "reasoning"
+        },
+        "code": {
+          "success": true,
+          "output": "```python\ndef is_valid_palindrome(s: str) -> bool:\n    cleaned_s = ''.join(c.lower() for c in s if c.isalnum())\n    return cleaned_s == cleaned_s[::-1]\n```",
+          "time": 0.7,
+          "tokens": 38,
+          "tps": 53.9,
+          "correct": true,
+          "category": "coding"
+        },
+        "context": {
+          "success": true,
+          "output": "Sarah initially ordered 50 books. After returning 10 damaged books, she had 40 books. She sold 15 on Wednesday, leaving her with 25. She received 30 new books on Friday, bringing the total to 55. She then sold 8 more, leaving her with 47 books in stock.\n\nSo, Sarah has 47 books in stock.",
+          "time": 1.11,
+          "tokens": 71,
+          "tps": 63.8,
+          "correct": true,
+          "category": "reasoning"
+        },
+        "creative": {
+          "success": true,
+          "output": "Codes weave dreams bright,  \nMinds of steel mimic our own,  \nFuture's dawn awaits.",
+          "time": 0.41,
+          "tokens": 20,
+          "tps": 49.0,
+          "correct": true,
+          "category": "creative"
+        }
+      },
+      "summary": {
+        "avg_tps": 61.4,
+        "avg_time": 2.1,
+        "total_tokens": 730,
+        "accuracy": "4/5",
+        "success_rate": "5/5"
+      }
+    },
+    "qwen3.5:4b": {
+      "info": {
+        "tier": "small",
+        "family": "Qwen",
+        "params": "4B"
+      },
+      "tests": {
+        "math": {
+          "success": true,
+          "output": "Thinking...\nHere's my thought process for solving this math problem:\n\n1.  **Analyze the Request:**\n    *   Goal: Calculate the final price of an item.\n    *   Given information:\n        *   Original price = $85.\n        *   Discount rate = 30% off.\n        *   Tax rate = 8%.\n    *   Sequence of operations: Discount applied first, then tax is calculated on the discounted price (\"plus 8% tax after discount\").\n    *   Output requirement: Step-by-step solution and a numerical answer.\n\n2.  **Step 1: ",
+          "time": 27.38,
+          "tokens": 2206,
+          "tps": 80.6,
+          "correct": false,
+          "category": "reasoning"
+        },
+        "logic": {
+          "success": false,
+          "output": "",
+          "time": 120,
+          "tokens": 0,
+          "tps": 0,
+          "correct": false,
+          "category": "reasoning"
+        },
+        "code": {
+          "success": true,
+          "output": "Thinking...\nThinking Process:\n\n1.  **Analyze the Request:**\n    *   Task: Write a Python function to check if a string is a valid palindrome.\n    *   Constraints: Ignore spaces and case.\n    *   Requirement: Include type hints.\n    *   Formatting: Just the function, no explanation.\n\n2.  **Determine Function Signature:**\n    *   Input: String (`str`).\n    *   Output: Boolean (`bool`).\n    *   Type hints: `def is_palindrome(s: str) -> bool:`\n\n3.  **Algorithm Logic:**\n    *   Convert string to lowe",
+          "time": 34.31,
+          "tokens": 4225,
+          "tps": 123.1,
+          "correct": true,
+          "category": "coding"
+        },
+        "context": {
+          "success": true,
+          "output": "Thinking...\nThinking Process:\n\n1.  **Analyze the Request:**\n    *   Input: A scenario about Sarah's book inventory (initial order, returns/damaged, sales on specific days, new stock added).\n    *   Task: Calculate the number of books in stock at the end.\n    *   Constraints: Output \"Just the number and brief calculation\".\n\n2.  **Break Down the Data:**\n    *   Initial Order: 50 books.\n    *   Damaged/Returned: 10 books (subtract from initial).\n    *   Sold Wednesday: 15 books (subtract).\n    *   ",
+          "time": 12.91,
+          "tokens": 1245,
+          "tps": 96.5,
+          "correct": false,
+          "category": "reasoning"
+        },
+        "creative": {
+          "success": false,
+          "output": "",
+          "time": 120,
+          "tokens": 0,
+          "tps": 0,
+          "correct": false,
+          "category": "creative"
+        }
+      },
+      "summary": {
+        "avg_tps": 100.1,
+        "avg_time": 24.9,
+        "total_tokens": 7676,
+        "accuracy": "1/5",
+        "success_rate": "3/5"
+      }
+    },
+    "qwen3.5:9b": {
+      "info": {
+        "tier": "medium",
+        "family": "Qwen",
+        "params": "9B"
+      },
+      "tests": {
+        "math": {
+          "success": true,
+          "output": "Thinking...\nThinking Process:\n\n1.  **Analyze the Request:**\n    *   Problem: Calculate the final price of an item.\n    *   Given information:\n        *   Original price: $85\n        *   Discount rate: 30% off\n        *   Tax rate: 8% (applied after discount)\n    *   Output requirement: Step-by-step solution, final numerical answer.\n\n2.  **Determine the Steps:**\n    *   Step 1: Calculate the discount amount.\n    *   Step 2: Calculate the discounted price (subtotal).\n    *   Step 3: Calculate the ",
+          "time": 22.65,
+          "tokens": 1364,
+          "tps": 60.2,
+          "correct": false,
+          "category": "reasoning"
+        },
+        "logic": {
+          "success": false,
+          "output": "",
+          "time": 120,
+          "tokens": 0,
+          "tps": 0,
+          "correct": false,
+          "category": "reasoning"
+        },
+        "code": {
+          "success": true,
+          "output": "Thinking...\nThinking Process:\n\n1.  **Analyze the Request:**\n    *   Task: Write a Python function to check if a string is a valid palindrome.\n    *   Constraints: Ignore spaces and case (e.g., \"A man, a plan, a canal: Panama\" should be treated as a palindrome).\n    *   Requirement: Include type hints.\n    *   Constraint: Just the function, no explanation.\n\n2.  **Determine the Function Signature:**\n    *   Input: A string (`str`).\n    *   Output: A boolean (`bool`) indicating validity.\n    *   Na",
+          "time": 30.91,
+          "tokens": 2914,
+          "tps": 94.3,
+          "correct": false,
+          "category": "coding"
+        },
+        "context": {
+          "success": true,
+          "output": "Thinking...\nThinking Process:\n\n1.  **Analyze the Request:**\n    *   Input: A sequence of transactions involving books (Sarah's inventory).\n    *   Transactions:\n        *   Initial order: +50 books.\n        *   Damaged/returned: -10 books.\n        *   Sold on Wednesday: -15 books.\n        *   Got new (received shipment): +30 books.\n        *   Sold more: -8 books.\n    *   Goal: Calculate the current stock count.\n    *   Output format: Just the number and brief calculation.\n\n2.  **Perform Calcula",
+          "time": 5.05,
+          "tokens": 305,
+          "tps": 60.4,
+          "correct": false,
+          "category": "reasoning"
+        },
+        "creative": {
+          "success": true,
+          "output": "Thinking...\nThinking Process:\n\n1.  **Analyze the Request:**\n    *   Topic: Artificial Intelligence (AI).\n    *   Form: Haiku.\n    *   Constraints: Exactly 3 lines.\n    *   Syllable Count Pattern: 5 syllables - 7 syllables - 5 syllables.\n\n2.  **Brainstorming Imagery & Themes:**\n    *   AI themes: Code, circuits, thinking, learning, human mimicry, cold logic, electricity, future, algorithms.\n    *   Nature imagery often contrasted with tech in haiku style (moon, machine, data).\n    *   Keywords: B",
+          "time": 81.04,
+          "tokens": 5625,
+          "tps": 69.4,
+          "correct": true,
+          "category": "creative"
+        }
+      },
+      "summary": {
+        "avg_tps": 71.1,
+        "avg_time": 34.9,
+        "total_tokens": 10208,
+        "accuracy": "1/5",
+        "success_rate": "4/5"
+      }
+    },
+    "qwen2.5:14b": {
+      "info": {
+        "tier": "medium",
+        "family": "Qwen",
+        "params": "14B"
+      },
+      "tests": {
+        "math": {
+          "success": true,
+          "output": "To find the final price of the item after the discount and tax, follow these steps:\n\n1. **Calculate the discount amount:**\n   - The original price of the item is $85.\n   - The discount is 30%, so the discount amount is \\( 85 \\times \\frac{30}{100} = 85 \\times 0.30 = 25.5 \\).\n\n2. **Subtract the discount from the original price:**\n   - The price after the discount is \\( 85 - 25.5 = 59.5 \\).\n\n3. **Calculate the tax on the discounted price:**\n   - The tax rate is 8%, so the tax amount is \\( 59.5 \\tim",
+          "time": 3.34,
+          "tokens": 174,
+          "tps": 52.1,
+          "correct": false,
+          "category": "reasoning"
+        },
+        "logic": {
+          "success": true,
+          "output": "Alice is the engineer, Bob is the doctor, and Carol is the teacher.",
+          "time": 0.39,
+          "tokens": 16,
+          "tps": 41.0,
+          "correct": true,
+          "category": "reasoning"
+        },
+        "code": {
+          "success": true,
+          "output": "def is_valid_palindrome(s: str) -> bool:\n    \"\"\"\n    Checks if the input string is a valid palindrome, ignoring spaces and case.\n    \"\"\"\n    i, j = 0, len(s) - 1\n    while i < j:\n        while i < j and not s[i].isalnum():\n            i += 1\n        while i < j and not s[j].isalnum():\n            j -= 1\n        if s[i].lower() != s[j].lower():\n            return False\n        i, j = i + 1, j - 1\n    return True",
+          "time": 1.77,
+          "tokens": 103,
+          "tps": 58.3,
+          "correct": true,
+          "category": "coding"
+        },
+        "context": {
+          "success": true,
+          "output": "Calculation: Start with 50 books, return 10 damaged, so 50 - 10 = 40. Sold 15 on Wednesday, so 40 - 15 = 25. Got 30 new on Friday, so 25 + 30 = 55. Sold 8 more, so 55 - 8 = 47.\n\nAnswer: 47 books in stock.",
+          "time": 1.4,
+          "tokens": 51,
+          "tps": 36.5,
+          "correct": true,
+          "category": "reasoning"
+        },
+        "creative": {
+          "success": true,
+          "output": "Silent code awakes,\nWhispers through the digital,\nMind learns, grows, adapts.",
+          "time": 0.44,
+          "tokens": 19,
+          "tps": 43.3,
+          "correct": true,
+          "category": "creative"
+        }
+      },
+      "summary": {
+        "avg_tps": 46.2,
+        "avg_time": 1.5,
+        "total_tokens": 363,
+        "accuracy": "4/5",
+        "success_rate": "5/5"
+      }
+    },
+    "qwen2.5-coder:14b": {
+      "info": {
+        "tier": "medium",
+        "family": "Qwen",
+        "params": "14B"
+      },
+      "tests": {
+        "math": {
+          "success": true,
+          "output": "To solve this problem, we need to follow these steps:\n\n1. Calculate the discount amount.\n2. Subtract the discount from the original price to get the price after discount.\n3. Calculate the tax on the discounted price.\n4. Add the tax to the discounted price to get the final price.\n\nLet's go through each step:\n\n1. Calculate the discount amount:\n   - The original price of the item is $85.\n   - The discount is 30%.\n   - Discount amount = 30% of $85 = 0.30 * $85 = $25.50.\n\n2. Subtract the discount fro",
+          "time": 3.88,
+          "tokens": 233,
+          "tps": 60.0,
+          "correct": false,
+          "category": "reasoning"
+        },
+        "logic": {
+          "success": true,
+          "output": "Bob is the doctor, Carol is the engineer, and Alice is the teacher.",
+          "time": 0.39,
+          "tokens": 16,
+          "tps": 41.3,
+          "correct": true,
+          "category": "reasoning"
+        },
+        "code": {
+          "success": true,
+          "output": "```python\ndef is_palindrome(s: str) -> bool:\n    s = s.replace(\" \", \"\").lower()\n    return s == s[::-1]\n```",
+          "time": 0.6,
+          "tokens": 26,
+          "tps": 43.2,
+          "correct": true,
+          "category": "coding"
+        },
+        "context": {
+          "success": true,
+          "output": "The calculation is as follows:\n\n1. Sarah ordered 50 books.\n2. 10 books were damaged and returned, so she has 50 - 10 = 40 books.\n3. She sold 15 books on Wednesday, so she has 40 - 15 = 25 books left.\n4. She received 30 new books on Friday, so she has 25 + 30 = 55 books.\n5. She sold 8 more books, so she has 55 - 8 = 47 books.\n\nTherefore, Sarah has 47 books in stock.",
+          "time": 1.88,
+          "tokens": 91,
+          "tps": 48.4,
+          "correct": true,
+          "category": "reasoning"
+        },
+        "creative": {
+          "success": true,
+          "output": "Code breathes life anew,\nIntelligence learns, adapts, grows,\nMachine heart beats for you.",
+          "time": 0.45,
+          "tokens": 22,
+          "tps": 48.5,
+          "correct": true,
+          "category": "creative"
+        }
+      },
+      "summary": {
+        "avg_tps": 48.3,
+        "avg_time": 1.4,
+        "total_tokens": 388,
+        "accuracy": "4/5",
+        "success_rate": "5/5"
+      }
+    },
+    "qwen3:14b": {
+      "info": {
+        "tier": "medium",
+        "family": "Qwen",
+        "params": "14B"
+      },
+      "tests": {
+        "math": {
+          "success": true,
+          "output": "Thinking...\nOkay, let me try to figure out this problem. So, there's a store that's having a 30% off sale. The item originally costs $85, and then after the discount, there's an 8% tax. I need to find the final price. Alright, let's break this down step by step.\n\nFirst, I think I need to calculate the discount amount. If the item is 30% off, that means I need to find 30% of $85. Hmm, how do I do that? Well, percentages can be converted to decimals by dividing by 100. So 30% is 0.30. Then multipl",
+          "time": 30.92,
+          "tokens": 1448,
+          "tps": 46.8,
+          "correct": false,
+          "category": "reasoning"
+        },
+        "logic": {
+          "success": true,
+          "output": "Thinking...\nOkay, let's try to figure out this logic puzzle. So, we have three friends: Alice, Bob, and Carol. Their professions are doctor, engineer, and teacher. The clues given are:\n\n1. Alice is not a doctor.\n2. The engineer is not Bob.\n3. Carol is older than the teacher.\n\nWe need to determine who has which job. Let me break this down step by step.\n\nFirst, let's list out the possible professions and assign them to each person. Since there are three people and three professions, each person ha",
+          "time": 56.15,
+          "tokens": 4517,
+          "tps": 80.4,
+          "correct": true,
+          "category": "reasoning"
+        },
+        "code": {
+          "success": true,
+          "output": "Thinking...\nOkay, I need to write a Python function to check if a string is a valid palindrome, ignoring spaces and case. Let me think about how to approach this.\n\nFirst, what's a palindrome? It's a string that reads the same forwards and backwards. But here, I have to ignore spaces and case. So, for example, \"A man a plan a canal Panama\" should be considered a palindrome.\n\nSo the steps I need to take are:\n\n1. Preprocess the input string. Remove all spaces and convert to lowercase (or uppercase)",
+          "time": 7.16,
+          "tokens": 558,
+          "tps": 77.9,
+          "correct": false,
+          "category": "coding"
+        },
+        "context": {
+          "success": true,
+          "output": "Thinking...\nOkay, let's see. Sarah started with 50 books, but 10 were damaged and returned. So first, I need to subtract those 10 from the original 50. That would leave her with 50 - 10 = 40 books.\n\nThen, she sold 15 books on Wednesday. So from the 40 books she had after returning the damaged ones, she sold 15. That means 40 - 15 = 25 books left after Wednesday.\n\nNext, she got 30 new books on Friday. Adding those to the remaining 25, that would be 25 + 30 = 55 books.\n\nAfter receiving the new boo",
+          "time": 4.82,
+          "tokens": 234,
+          "tps": 48.6,
+          "correct": false,
+          "category": "reasoning"
+        },
+        "creative": {
+          "success": true,
+          "output": "Thinking...\nOkay, the user wants a haiku about artificial intelligence. Let me recall the structure: 3 lines with 5-7-5 syllables. First, I need to think about key elements of AI. Maybe something about learning, data, or machines.\n\nFirst line: 5 syllables. Maybe \"Silent circuits learn\" \u2013 that's 5. It conveys the idea of AI learning without sound.\n\nSecond line: 7 syllables. Perhaps something about data or processing. \"Data streams reshape the future's path\" \u2013 let me check syllables. Data (1) stre",
+          "time": 7.0,
+          "tokens": 487,
+          "tps": 69.5,
+          "correct": true,
+          "category": "creative"
+        }
+      },
+      "summary": {
+        "avg_tps": 64.6,
+        "avg_time": 21.2,
+        "total_tokens": 7244,
+        "accuracy": "2/5",
+        "success_rate": "5/5"
+      }
+    },
+    "deepseek-r1:14b": {
+      "info": {
+        "tier": "medium",
+        "family": "DeepSeek",
+        "params": "14B"
+      },
+      "tests": {
+        "math": {
+          "success": true,
+          "output": "Thinking...\nFirst, I need to calculate the discount on the item. The item costs $85, and there's a 30% discount.\n\nTo find the discount amount, I'll multiply $85 by 30%.\n\n$85 \u00d7 0.3 = $25.50\n\nSo, the discount is $25.50.\n\nNext, I'll subtract the discount from the original price to get the discounted price.\n\n$85 - $25.50 = $59.50\n\nNow, I need to calculate the 8% tax on the discounted price.\n\n$59.50 \u00d7 0.08 = $4.76\n\nFinally, I'll add the tax to the discounted price to find the final price.\n\n$59.50 + $",
+          "time": 6.37,
+          "tokens": 333,
+          "tps": 52.3,
+          "correct": false,
+          "category": "reasoning"
+        },
+        "logic": {
+          "success": true,
+          "output": "Thinking...\nOkay, so I've got this logic puzzle here about three friends: Alice, Bob, and Carol. Each of them has a different profession: doctor, engineer, or teacher. The clues given are:\n\n1. Alice is not a doctor.\n2. Engineer is not Bob.\n3. Carol is older than the teacher.\n\nI need to figure out who has which job. Let me try to break this down step by step.\n\nFirst, let's list out the people: Alice, Bob, Carol. Professions: doctor, engineer, teacher. Each person has a unique profession, so no ov",
+          "time": 63.17,
+          "tokens": 4772,
+          "tps": 75.5,
+          "correct": true,
+          "category": "reasoning"
+        },
+        "code": {
+          "success": true,
+          "output": "Thinking...\nOkay, I need to write a Python function called is_palindrome that checks if a string is a valid palindrome. The function should ignore spaces and case. I should include type hints as well.\n\nFirst, I should think about what a palindrome is. A palindrome reads the same forwards and backwards. But here, I have to ignore spaces and case, so I need to preprocess the string before checking.\n\nLet me outline the steps:\n\n1. Take the input string.\n2. Remove all the spaces from the string. Or, ",
+          "time": 26.75,
+          "tokens": 2384,
+          "tps": 89.1,
+          "correct": false,
+          "category": "coding"
+        },
+        "context": {
+          "success": true,
+          "output": "Thinking...\nSarah starts with 50 books.\n\nShe returns 10 damaged books, leaving her with 40 books.\n\nShe sells 15 books on Wednesday, reducing her stock to 25.\n\nThen, she receives 30 new books on Friday, bringing her total to 55.\n\nShe sells 8 more books, so her final stock is 47.\n\nThe final number of books in stock is 47.\n...done thinking.\n\nLet's break down the problem step by step:\n\n1. **Initial Stock:**  \n   Sarah starts with **50 books**.\n\n2. **Damaged Books Returned:**  \n   She returns **10 da",
+          "time": 4.51,
+          "tokens": 274,
+          "tps": 60.8,
+          "correct": true,
+          "category": "reasoning"
+        },
+        "creative": {
+          "success": true,
+          "output": "Thinking...\nOkay, so the user asked me to write a haiku about artificial intelligence. Let me break this down. First, I need to remember what a haiku is. It's a traditional Japanese poem with three lines, following a 5-7-5 syllable structure. Got it.\n\nAlright, the topic is artificial intelligence. I need to capture the essence of AI in three lines. Let me think about the key aspects of AI. Maybe something about its impact on the future, its capabilities, or perhaps its mysterious or complex natu",
+          "time": 4.3,
+          "tokens": 363,
+          "tps": 84.5,
+          "correct": true,
+          "category": "creative"
+        }
+      },
+      "summary": {
+        "avg_tps": 72.4,
+        "avg_time": 21.0,
+        "total_tokens": 8126,
+        "accuracy": "3/5",
+        "success_rate": "5/5"
+      }
+    },
+    "glm4:9b": {
+      "info": {
+        "tier": "medium",
+        "family": "GLM",
+        "params": "9B"
+      },
+      "tests": {
+        "math": {
+          "success": true,
+          "output": "To find the final price of the item, we need to follow these steps:\n\n1. Calculate the discount amount.\n2. Subtract the discount from the original price to get the discounted price.\n3. Calculate the tax on the discounted price.\n4. Add the tax to the discounted price to get the final price.\n\nLet's go step-by-step:\n\n1. Calculate the discount amount:\nThe discount is 30% of $85. To find 30% of $85, multiply $85 by 0.30 (since 30% is the same as 0.30 when converted to a decimal).\n\n$85 * 0.30 = $25.50\n",
+          "time": 2.47,
+          "tokens": 247,
+          "tps": 100.0,
+          "correct": false,
+          "category": "reasoning"
+        },
+        "logic": {
+          "success": true,
+          "output": "- Alice is not a doctor, so Alice is either an engineer or a teacher.\n- Engineer is not Bob, so Bob is either a doctor or a teacher.\n- Carol is older than the teacher.\n\nGiven these clues, let's deduce the professions:\n\n1. Since Carol is older than the teacher, and Alice is not a doctor, Alice cannot be the teacher because that would mean Carol would be older than Alice. This means Alice must be an engineer.\n\n2. If Alice is an engineer, then Bob cannot be an engineer (as stated). This leaves Bob ",
+          "time": 1.5,
+          "tokens": 190,
+          "tps": 127.1,
+          "correct": true,
+          "category": "reasoning"
+        },
+        "code": {
+          "success": true,
+          "output": "```python\ndef is_valid_palindrome(s: str) -> bool:\n    filtered_str = ''.join(c.lower() for c in s if c.isalnum())\n    return filtered_str == filtered_str[::-1]\n```",
+          "time": 0.51,
+          "tokens": 41,
+          "tps": 80.0,
+          "correct": true,
+          "category": "coding"
+        },
+        "context": {
+          "success": true,
+          "output": "**In Stock: 57**\n\n**Brief Calculation:**\n- Ordered: 50 books\n- Returned: -10 books\n- Sold on Wednesday: -15 books\n- Received on Friday: +30 books\n- Sold on Friday: -8 books\n\n50 - 10 - 15 + 30 - 8 = 57 books in stock.",
+          "time": 0.74,
+          "tokens": 54,
+          "tps": 73.4,
+          "correct": false,
+          "category": "reasoning"
+        },
+        "creative": {
+          "success": true,
+          "output": "Mind\u7f16\u7ec7\u7f51\uff0c\n\u672a\u6765\u5728\u6307\u5c16\uff0c\n\u68a6\u9192\u661f\u8fb0\u660e\u3002",
+          "time": 0.27,
+          "tokens": 5,
+          "tps": 18.4,
+          "correct": true,
+          "category": "creative"
+        }
+      },
+      "summary": {
+        "avg_tps": 79.8,
+        "avg_time": 1.1,
+        "total_tokens": 537,
+        "accuracy": "3/5",
+        "success_rate": "5/5"
+      }
+    },
+    "gemma3:27b": {
+      "info": {
+        "tier": "large",
+        "family": "Gemma",
+        "params": "27B"
+      },
+      "tests": {
+        "math": {
+          "success": true,
+          "output": "Here's how to solve the problem step-by-step:\n\n1.  **Calculate the discount amount:** $85 * 0.30 = $25.50\n\n2.  **Calculate the price after discount:** $85 - $25.50 = $59.50\n\n3.  **Calculate the tax amount:** $59.50 * 0.08 = $4.76\n\n4.  **Calculate the final price:** $59.50 + $4.76 = $64.26\n\nTherefore, the final price is **64.26**.",
+          "time": 27.44,
+          "tokens": 82,
+          "tps": 3.0,
+          "correct": true,
+          "category": "reasoning"
+        },
+        "logic": {
+          "success": true,
+          "output": "Here's the solution:\n\n*   **Alice:** Teacher\n*   **Bob:** Doctor\n*   **Carol:** Engineer\n\n\n\n**Explanation:**\n\n1.  **Alice is not the doctor:** This eliminates one possibility for Alice.\n2.  **Engineer is not Bob:** This eliminates one possibility for Bob.\n3.  **Carol is older than the teacher:** This means Carol isn't the teacher.\n\nNow let's deduce:\n\n*   Since Alice isn't the doctor or engineer, she must be the **teacher**.\n*   Since Carol isn't the teacher, and Bob isn't the engineer, Bob must ",
+          "time": 31.17,
+          "tokens": 141,
+          "tps": 4.5,
+          "correct": true,
+          "category": "reasoning"
+        },
+        "code": {
+          "success": true,
+          "output": "```python\ndef is_palindrome(s: str) -> bool:\n    \"\"\"\n    Checks if a string is a valid palindrome, ignoring spaces and case.\n    \"\"\"\n    processed_string = \"\".join(s.lower().split())\n    return processed_string == processed_string[::-1]\n```",
+          "time": 13.39,
+          "tokens": 60,
+          "tps": 4.5,
+          "correct": true,
+          "category": "coding"
+        },
+        "context": {
+          "success": true,
+          "output": "50 - 10 + 30 - 15 - 8 = **47** \n\n(Start with initial order, subtract returns, add new, subtract sales)",
+          "time": 5.45,
+          "tokens": 25,
+          "tps": 4.6,
+          "correct": true,
+          "category": "reasoning"
+        },
+        "creative": {
+          "success": true,
+          "output": "Code learns and evolves,\nNew thoughts bloom in silicon,\nFuture now unfolds.",
+          "time": 3.24,
+          "tokens": 18,
+          "tps": 5.6,
+          "correct": true,
+          "category": "creative"
+        }
+      },
+      "summary": {
+        "avg_tps": 4.4,
+        "avg_time": 16.1,
+        "total_tokens": 326,
+        "accuracy": "5/5",
+        "success_rate": "5/5"
+      }
+    }
+  }
+}

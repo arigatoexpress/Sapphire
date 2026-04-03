@@ -1,0 +1,41 @@
+{
+  "model": "nemotron-3-nano:4b",
+  "results": [
+    {
+      "test": "math_reasoning",
+      "time": 4.4,
+      "tokens": 244,
+      "tps": 54.9,
+      "ok": true
+    },
+    {
+      "test": "logic_puzzle",
+      "time": 7.5,
+      "tokens": 1443,
+      "tps": 191.3,
+      "ok": true
+    },
+    {
+      "test": "code_gen",
+      "time": 8.9,
+      "tokens": 1535,
+      "tps": 172.9,
+      "ok": true
+    },
+    {
+      "test": "context_retention",
+      "time": 1.9,
+      "tokens": 265,
+      "tps": 143.2,
+      "ok": true
+    },
+    {
+      "test": "instruction_following",
+      "time": 2.3,
+      "tokens": 491,
+      "tps": 216.4,
+      "ok": true
+    }
+  ],
+  "timestamp": "2026-03-23T19:41:37"
+}

@@ -1,0 +1,331 @@
+{
+  "benchmark_date": "2026-03-07T21:00:44.692952",
+  "system_info": {
+    "timestamp": "2026-03-07T20:52:07.091413",
+    "platform": "win32",
+    "gpu": {
+      "name": "NVIDIA GeForce RTX 5070 Ti",
+      "memory": "16303 MiB"
+    }
+  },
+  "models_tested": [
+    {
+      "model": "qwen3:14b",
+      "tests": {
+        "reasoning": {
+          "success": true,
+          "duration": 14.82,
+          "load_duration": 0.065328,
+          "prompt_eval_duration": 0.0388152,
+          "eval_duration": 14.0175632,
+          "tokens_generated": 1093,
+          "tokens_per_sec": 77.97,
+          "gpu_memory_mb": 11649,
+          "output_preview": "The farmer starts with 17 sheep. The phrase \"all but 9 die\" means that **9 sheep survive**, and the rest (17 - 9 = 8) die. \n\n**Answer:** 9 sheep are left. \n\n**Explanation:**  \n- \"All but 9 die\" implies that **9 sheep are exceptions** (they do not die).  \n- Thus, the number of surviving sheep is **9*"
+        },
+        "code": {
+          "success": false,
+          "error": "the JSON object must be str, bytes or bytearray, not NoneType",
+          "duration": 0
+        },
+        "knowledge": {
+          "success": true,
+          "duration": 13.52,
+          "load_duration": 0.0638546,
+          "prompt_eval_duration": 0.0220457,
+          "eval_duration": 12.8318005,
+          "tokens_generated": 883,
+          "tokens_per_sec": 68.81,
+          "gpu_memory_mb": 11553,
+          "output_preview": "**Quantum Computing Explained Simply:**  \nQuantum computing uses **qubits** (quantum bits) instead of regular bits. While classical bits are either 0 or 1, qubits can be **both 0 and 1 at the same time** (called *superposition*). They can also be *entangled*, meaning the state of one qubit instantly"
+        },
+        "math": {
+          "success": true,
+          "duration": 22.53,
+          "load_duration": 0.0654047,
+          "prompt_eval_duration": 0.0257405,
+          "eval_duration": 21.5261691,
+          "tokens_generated": 1481,
+          "tokens_per_sec": 68.8,
+          "gpu_memory_mb": 11552,
+          "output_preview": "To solve the expression:\n\n$$\n(15 \\times 23) + (47 \\times 12) - (156 \\div 4)\n$$\n\nwe follow the **order of operations** (PEMDAS/BODMAS): **Parentheses, Exponents, Multiplication and Division (from left to right), Addition and Subtraction (from left to right)**.\n\n---\n\n### **Step 1: Perform the Multipli"
+        },
+        "creative": {
+          "success": true,
+          "duration": 15.98,
+          "load_duration": 0.061354,
+          "prompt_eval_duration": 2.1007241,
+          "eval_duration": 13.2166478,
+          "tokens_generated": 907,
+          "tokens_per_sec": 68.63,
+          "gpu_memory_mb": 11560,
+          "output_preview": "**Haiku:**  \nSilent circuits humâ€”  \nData streams flow through silicon veins,  \nShaping tomorrow's dawn.  \n\nThis haiku blends the mechanical (\"circuits,\" \"silicon\") with the dynamic (\"data streams\") and the aspirational (\"shaping tomorrow's dawn\"), capturing AI's role as both a hidden force and a h"
+        },
+        "context": {
+          "success": true,
+          "duration": 13.95,
+          "load_duration": 0.063313,
+          "prompt_eval_duration": 0.0247486,
+          "eval_duration": 13.2745783,
+          "tokens_generated": 912,
+          "tokens_per_sec": 68.7,
+          "gpu_memory_mb": 11544,
+          "output_preview": "Sarah starts with 3 apples. After giving 1 away, she has $3 - 1 = 2$ apples. She then buys 5 more, resulting in $2 + 5 = 7$ apples. Her friend gives her twice as many as she currently has, which is $2 \\times 7 = 14$ apples. Adding these to her total gives $7 + 14 = 21$ apples.\n\n**Answer:** Sarah has"
+        }
+      },
+      "timestamp": "2026-03-07T20:52:15.733869",
+      "summary": {
+        "avg_tokens_per_sec": 70.58,
+        "min_tokens_per_sec": 68.63,
+        "max_tokens_per_sec": 77.97,
+        "successful_tests": 5,
+        "total_tests": 6,
+        "total_duration": 80.8,
+        "avg_gpu_memory_mb": 11572.0
+      }
+    },
+    {
+      "model": "qwen2.5-coder:14b",
+      "tests": {
+        "reasoning": {
+          "success": true,
+          "duration": 1.55,
+          "load_duration": 0.0634555,
+          "prompt_eval_duration": 0.0248254,
+          "eval_duration": 1.406963,
+          "tokens_generated": 118,
+          "tokens_per_sec": 83.87,
+          "gpu_memory_mb": 11602,
+          "output_preview": "The farmer initially has 17 sheep. According to the problem, all but 9 of these sheep die. This means that 9 sheep survive. Therefore, the number of sheep left is 9.\n\nTo break it down step by step:\n1. Start with the initial number of sheep: 17.\n2. Subtract the number of sheep that die: 17 - 8 (since"
+        },
+        "code": {
+          "success": true,
+          "duration": 6.13,
+          "load_duration": 0.0610122,
+          "prompt_eval_duration": 0.022726,
+          "eval_duration": 5.8533853,
+          "tokens_generated": 487,
+          "tokens_per_sec": 83.2,
+          "gpu_memory_mb": 11572,
+          "output_preview": "Certainly! Below is a Python function `is_prime(n)` with a docstring and error handling:\n\n```python\ndef is_prime(n):\n    \"\"\"\n    Determine if a given integer n is a prime number.\n    \n    Parameters:\n    n (int): The integer to check for primality.\n    \n    Returns:\n    bool: True if n is a prime nu"
+        },
+        "knowledge": {
+          "success": true,
+          "duration": 1.86,
+          "load_duration": 0.0629533,
+          "prompt_eval_duration": 0.0216287,
+          "eval_duration": 1.712088,
+          "tokens_generated": 143,
+          "tokens_per_sec": 83.52,
+          "gpu_memory_mb": 11572,
+          "output_preview": "Quantum computing is a type of computing that uses the principles of quantum mechanics to perform calculations and process information. In classical computing, information is processed using bits, which can have a value of either 0 or 1. In quantum computing, information is processed using quantum b"
+        },
+        "math": {
+          "success": true,
+          "duration": 3.82,
+          "load_duration": 0.0616587,
+          "prompt_eval_duration": 0.0268192,
+          "eval_duration": 3.6086399,
+          "tokens_generated": 301,
+          "tokens_per_sec": 83.41,
+          "gpu_memory_mb": 11572,
+          "output_preview": "Certainly! Let's break down the calculation step by step.\n\nThe expression given is:\n\n\\[\n(15 \\times 23) + (47 \\times 12) - \\left(\\frac{156}{4}\\right)\n\\]\n\n### Step 1: Calculate \\(15 \\times 23\\)\n\n\\[\n15 \\times 23 = 345\n\\]\n\n### Step 2: Calculate \\(47 \\times 12\\)\n\n\\[\n47 \\times 12 = 564\n\\]\n\n### Step 3: Cal"
+        },
+        "creative": {
+          "success": true,
+          "duration": 0.31,
+          "load_duration": 0.0616687,
+          "prompt_eval_duration": 0.0356121,
+          "eval_duration": 0.1926667,
+          "tokens_generated": 17,
+          "tokens_per_sec": 88.24,
+          "gpu_memory_mb": 11572,
+          "output_preview": "Code comes to life,\nIntelligence learns and adapts,\nArtificial mind."
+        },
+        "context": {
+          "success": true,
+          "duration": 1.59,
+          "load_duration": 0.0628653,
+          "prompt_eval_duration": 0.0249362,
+          "eval_duration": 1.4420534,
+          "tokens_generated": 121,
+          "tokens_per_sec": 83.91,
+          "gpu_memory_mb": 11572,
+          "output_preview": "Let's break down the problem step by step:\n\n1. Sarah starts with 3 apples.\n2. She gives 1 apple away: 3 - 1 = 2 apples left.\n3. She buys 5 more apples: 2 + 5 = 7 apples.\n4. Her friend gives her twice as many as she currently has (which is 7): 2 * 7 = 14 apples.\n5. Adding the apples from her friend: "
+        }
+      },
+      "timestamp": "2026-03-07T20:55:04.894705",
+      "summary": {
+        "avg_tokens_per_sec": 84.36,
+        "min_tokens_per_sec": 83.2,
+        "max_tokens_per_sec": 88.24,
+        "successful_tests": 6,
+        "total_tests": 6,
+        "total_duration": 15.26,
+        "avg_gpu_memory_mb": 11577
+      }
+    },
+    {
+      "model": "qwen2.5:32b",
+      "tests": {
+        "reasoning": {
+          "success": true,
+          "duration": 27.65,
+          "load_duration": 0.062736,
+          "prompt_eval_duration": 0.9149513,
+          "eval_duration": 26.6529373,
+          "tokens_generated": 70,
+          "tokens_per_sec": 2.63,
+          "gpu_memory_mb": 15616,
+          "output_preview": "The farmer has 9 sheep left.\n\nExplanation:\nThe phrase \"all but 9\" means that all of the sheep except for 9 of them died. So, if the farmer originally had 17 sheep and all but 9 died, it means that 9 sheep survived. Therefore, the farmer is left with 9 sheep."
+        },
+        "code": {
+          "success": true,
+          "duration": 55.47,
+          "load_duration": 0.0637339,
+          "prompt_eval_duration": 0.7204707,
+          "eval_duration": 54.6499381,
+          "tokens_generated": 340,
+          "tokens_per_sec": 6.22,
+          "gpu_memory_mb": 15616,
+          "output_preview": "Certainly! Below is a Python function `is_prime(n)` that includes a docstring and error handling to ensure that the input is a positive integer:\n\n```python\ndef is_prime(n):\n    \"\"\"\n    Checks if a number is prime.\n    \n    Parameters:\n    n (int): The number to check. Must be a positive integer.\n   "
+        },
+        "knowledge": {
+          "success": true,
+          "duration": 53.3,
+          "load_duration": 0.0628684,
+          "prompt_eval_duration": 0.6303703,
+          "eval_duration": 52.5742997,
+          "tokens_generated": 323,
+          "tokens_per_sec": 6.14,
+          "gpu_memory_mb": 15614,
+          "output_preview": "Quantum computing is a type of computing that uses the principles of quantum mechanics to process information. Traditional computers use bits (1s and 0s) to process information, but quantum computers use quantum bits or qubits. The special property of qubits is that they can exist in multiple states"
+        },
+        "math": {
+          "success": true,
+          "duration": 40.16,
+          "load_duration": 0.0626648,
+          "prompt_eval_duration": 0.1987224,
+          "eval_duration": 39.8736833,
+          "tokens_generated": 234,
+          "tokens_per_sec": 5.87,
+          "gpu_memory_mb": 15873,
+          "output_preview": "To solve the expression \\((15 * 23) + (47 * 12) - (156 / 4)\\), we'll break it down into parts and calculate each part step by step.\n\nFirst, calculate \\(15 * 23\\):\n\\[ 15 * 23 = 345 \\]\n\nNext, calculate \\(47 * 12\\):\n\\[ 47 * 12 = 564 \\]\n\nThen, calculate \\(156 / 4\\):\n\\[ 156 / 4 = 39 \\]\n\nNow, substitute t"
+        },
+        "creative": {
+          "success": true,
+          "duration": 21.9,
+          "load_duration": 18.4419325,
+          "prompt_eval_duration": 0.1973264,
+          "eval_duration": 3.242537,
+          "tokens_generated": 21,
+          "tokens_per_sec": 6.48,
+          "gpu_memory_mb": 15873,
+          "output_preview": "Code blooms in silicon,\nWhispers of ones and zeros danceâ€”\nNew minds glimpse the sun."
+        },
+        "context": {
+          "success": true,
+          "duration": 36.52,
+          "load_duration": 13.9944234,
+          "prompt_eval_duration": 0.2029295,
+          "eval_duration": 22.2947806,
+          "tokens_generated": 140,
+          "tokens_per_sec": 6.28,
+          "gpu_memory_mb": 15873,
+          "output_preview": "Let's break it down step by step:\n\n1. Sarah starts with 3 apples.\n2. She gives away 1 apple, so she has \\(3 - 1 = 2\\) apples left.\n3. She then buys 5 more apples, which gives her \\(2 + 5 = 7\\) apples.\n4. A friend gives her twice as many apples as she currently has. Since she has 7 apples, her friend"
+        }
+      },
+      "timestamp": "2026-03-07T20:55:43.259051",
+      "summary": {
+        "avg_tokens_per_sec": 5.6,
+        "min_tokens_per_sec": 2.63,
+        "max_tokens_per_sec": 6.48,
+        "successful_tests": 6,
+        "total_tests": 6,
+        "total_duration": 235.0,
+        "avg_gpu_memory_mb": 15744.0
+      }
+    },
+    {
+      "model": "qwen2.5:14b",
+      "tests": {
+        "reasoning": {
+          "success": true,
+          "duration": 9.11,
+          "load_duration": 8.4902207,
+          "prompt_eval_duration": 0.0296238,
+          "eval_duration": 0.5471623,
+          "tokens_generated": 46,
+          "tokens_per_sec": 84.07,
+          "gpu_memory_mb": 11629,
+          "output_preview": "The farmer has 9 sheep left. The phrase \"all but 9\" means that every sheep except for 9 of them died. Therefore, out of the original 17 sheep, only 9 remain alive."
+        },
+        "code": {
+          "success": true,
+          "duration": 6.54,
+          "load_duration": 0.068897,
+          "prompt_eval_duration": 0.0332372,
+          "eval_duration": 6.2356355,
+          "tokens_generated": 517,
+          "tokens_per_sec": 82.91,
+          "gpu_memory_mb": 11629,
+          "output_preview": "Certainly! Below is a Python function `is_prime(n)` that checks if a given number `n` is a prime number. The function includes a docstring explaining its purpose and behavior, and it also includes error handling to ensure the input is a positive integer.\n\n```python\ndef is_prime(n):\n    \"\"\"\n    Check"
+        },
+        "knowledge": {
+          "success": true,
+          "duration": 10.7,
+          "load_duration": 6.7975187,
+          "prompt_eval_duration": 0.0279285,
+          "eval_duration": 3.7686844,
+          "tokens_generated": 312,
+          "tokens_per_sec": 82.79,
+          "gpu_memory_mb": 11609,
+          "output_preview": "Quantum computing is a type of computing that uses the principles of quantum mechanics to process information. Unlike classical computers, which use bits (1s and 0s) to process information, quantum computers use quantum bits, or qubits. Qubits can represent and store information as both 1s and 0s si"
+        },
+        "math": {
+          "success": true,
+          "duration": 8.26,
+          "load_duration": 5.5795805,
+          "prompt_eval_duration": 0.0310103,
+          "eval_duration": 2.5744556,
+          "tokens_generated": 214,
+          "tokens_per_sec": 83.12,
+          "gpu_memory_mb": 11605,
+          "output_preview": "Let's break down the calculation step by step:\n\n1. Calculate \\(15 \\times 23\\):\n\\[ 15 \\times 23 = 345 \\]\n\n2. Calculate \\(47 \\times 12\\):\n\\[ 47 \\times 12 = 564 \\]\n\n3. Calculate \\(156 \\div 4\\):\n\\[ 156 \\div 4 = 39 \\]\n\n4. Substitute these values back into the expression:\n\\[ (15 \\times 23) + (47 \\times 12"
+        },
+        "creative": {
+          "success": true,
+          "duration": 6.29,
+          "load_duration": 6.0633351,
+          "prompt_eval_duration": 0.0273645,
+          "eval_duration": 0.1836511,
+          "tokens_generated": 16,
+          "tokens_per_sec": 87.12,
+          "gpu_memory_mb": 11605,
+          "output_preview": "Silent algorithms,\nWhispers of data and dreams,\nIntelligence blooms."
+        },
+        "context": {
+          "success": true,
+          "duration": 2.11,
+          "load_duration": 0.0868417,
+          "prompt_eval_duration": 0.035381,
+          "eval_duration": 1.9263149,
+          "tokens_generated": 161,
+          "tokens_per_sec": 83.58,
+          "gpu_memory_mb": 11605,
+          "output_preview": "Let's break down the steps to find out how many apples Sarah has:\n\n1. **Sarah starts with 3 apples.**\n2. **She gives 1 away:** \n   - Now she has \\( 3 - 1 = 2 \\) apples.\n3. **She buys 5 more apples:**\n   - Now she has \\( 2 + 5 = 7 \\) apples.\n4. **A friend gives her twice as many as she currently has:"
+        }
+      },
+      "timestamp": "2026-03-07T21:00:01.675136",
+      "summary": {
+        "avg_tokens_per_sec": 83.93,
+        "min_tokens_per_sec": 82.79,
+        "max_tokens_per_sec": 87.12,
+        "successful_tests": 6,
+        "total_tests": 6,
+        "total_duration": 43.01,
+        "avg_gpu_memory_mb": 11614.0
+      }
+    }
+  ]
+}

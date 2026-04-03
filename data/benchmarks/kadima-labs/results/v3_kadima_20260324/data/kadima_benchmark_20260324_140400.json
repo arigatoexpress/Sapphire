@@ -1,0 +1,141 @@
+{
+  "metadata": {
+    "lab": "Kadima Digital Laboratories",
+    "hardware": {
+      "lab": "Kadima Digital Laboratories",
+      "cpu": "AMD Ryzen 9 9900X3D 12-Core Processor",
+      "gpu": "NVIDIA GeForce RTX 5070 Ti (16GB GDDR7)",
+      "ram": "64GB DDR5",
+      "motherboard": "ASUS ROG STRIX B850-A GAMING WIFI",
+      "storage": ["Samsung SSD 990 EVO Plus 2TB (Primary)", "Samsung SSD 970 EVO 1TB", "Seagate IronWolf 4TB HDD"],
+      "os": "Windows 11 Pro (Build 26200)",
+      "inference_engine": "Ollama",
+      "driver": "NVIDIA 32.0.15.9579"
+    },
+    "benchmark_version": "2.0",
+    "timestamp": "20260324_140400",
+    "date": "2026-03-24T14:04:00",
+    "total_models": 5,
+    "tests_per_model": 7,
+    "test_categories": ["Code Generation", "Logical Reasoning", "Mathematics", "Summarization", "Instruction Following", "Data Analysis", "Creative Writing"],
+    "methodology": "GPU-isolated testing: VRAM cleared between each model, warmup run before scoring. Only GPU-bound models included (20+ t/s). Token counts from Ollama API.",
+    "note": "Models that spill to CPU RAM (sub-20 t/s) excluded for fair comparison. 14B models on 16GB VRAM cause system instability."
+  },
+  "results": [
+    {
+      "model": "nemotron-3-nano:4b",
+      "label": "Nemotron 3 Nano 4B (Q4)",
+      "family": "NVIDIA Nemotron",
+      "params": "4B",
+      "quantization": "Q4_K_M",
+      "model_size_gb": 2.8,
+      "tests_passed": 7,
+      "tests_total": 7,
+      "accuracy_pct": 100.0,
+      "total_time_seconds": 16.4,
+      "avg_tokens_per_second": 203.6,
+      "avg_response_time": 2.34,
+      "test_results": [
+        {"test_id": "code_gen", "category": "Code Generation", "passed": true, "time_seconds": 1.6, "tokens_per_second": 207.0},
+        {"test_id": "reasoning", "category": "Logical Reasoning", "passed": true, "time_seconds": 1.0, "tokens_per_second": 200.0},
+        {"test_id": "math", "category": "Mathematics", "passed": true, "time_seconds": 2.5, "tokens_per_second": 203.0},
+        {"test_id": "summarization", "category": "Summarization", "passed": true, "time_seconds": 2.6, "tokens_per_second": 202.0},
+        {"test_id": "instruction_follow", "category": "Instruction Following", "passed": true, "time_seconds": 0.9, "tokens_per_second": 203.0},
+        {"test_id": "analysis", "category": "Data Analysis", "passed": true, "time_seconds": 5.3, "tokens_per_second": 202.0},
+        {"test_id": "creative", "category": "Creative Writing", "passed": true, "time_seconds": 2.6, "tokens_per_second": 203.0}
+      ]
+    },
+    {
+      "model": "nemotron-3-nano:4b-q8_0",
+      "label": "Nemotron 3 Nano 4B (Q8)",
+      "family": "NVIDIA Nemotron",
+      "params": "4B",
+      "quantization": "Q8_0",
+      "model_size_gb": 4.2,
+      "tests_passed": 7,
+      "tests_total": 7,
+      "accuracy_pct": 100.0,
+      "total_time_seconds": 18.3,
+      "avg_tokens_per_second": 152.4,
+      "avg_response_time": 2.61,
+      "test_results": [
+        {"test_id": "code_gen", "category": "Code Generation", "passed": true, "time_seconds": 1.9, "tokens_per_second": 152.0},
+        {"test_id": "reasoning", "category": "Logical Reasoning", "passed": true, "time_seconds": 1.3, "tokens_per_second": 155.0},
+        {"test_id": "math", "category": "Mathematics", "passed": true, "time_seconds": 2.5, "tokens_per_second": 151.0},
+        {"test_id": "summarization", "category": "Summarization", "passed": true, "time_seconds": 1.6, "tokens_per_second": 151.0},
+        {"test_id": "instruction_follow", "category": "Instruction Following", "passed": true, "time_seconds": 1.8, "tokens_per_second": 150.0},
+        {"test_id": "analysis", "category": "Data Analysis", "passed": true, "time_seconds": 7.0, "tokens_per_second": 152.0},
+        {"test_id": "creative", "category": "Creative Writing", "passed": true, "time_seconds": 2.2, "tokens_per_second": 152.0}
+      ]
+    },
+    {
+      "model": "nemotron-3-nano:4b-bf16",
+      "label": "Nemotron 3 Nano 4B (BF16)",
+      "family": "NVIDIA Nemotron",
+      "params": "4B",
+      "quantization": "BF16",
+      "model_size_gb": 8.0,
+      "tests_passed": 7,
+      "tests_total": 7,
+      "accuracy_pct": 100.0,
+      "total_time_seconds": 112.5,
+      "avg_tokens_per_second": 28.1,
+      "avg_response_time": 16.07,
+      "test_results": [
+        {"test_id": "code_gen", "category": "Code Generation", "passed": true, "time_seconds": 11.4, "tokens_per_second": 25.0},
+        {"test_id": "reasoning", "category": "Logical Reasoning", "passed": true, "time_seconds": 7.0, "tokens_per_second": 27.0},
+        {"test_id": "math", "category": "Mathematics", "passed": true, "time_seconds": 19.2, "tokens_per_second": 28.0},
+        {"test_id": "summarization", "category": "Summarization", "passed": true, "time_seconds": 12.3, "tokens_per_second": 30.0},
+        {"test_id": "instruction_follow", "category": "Instruction Following", "passed": true, "time_seconds": 8.9, "tokens_per_second": 29.0},
+        {"test_id": "analysis", "category": "Data Analysis", "passed": true, "time_seconds": 36.7, "tokens_per_second": 28.0},
+        {"test_id": "creative", "category": "Creative Writing", "passed": true, "time_seconds": 16.9, "tokens_per_second": 28.0}
+      ]
+    },
+    {
+      "model": "nemotron-mini:4b",
+      "label": "Nemotron Mini 4B",
+      "family": "NVIDIA Nemotron",
+      "params": "4B",
+      "quantization": "Q4_K_M",
+      "model_size_gb": 2.7,
+      "tests_passed": 5,
+      "tests_total": 7,
+      "accuracy_pct": 71.4,
+      "total_time_seconds": 5.4,
+      "avg_tokens_per_second": 249.3,
+      "avg_response_time": 0.77,
+      "test_results": [
+        {"test_id": "code_gen", "category": "Code Generation", "passed": true, "time_seconds": 0.8, "tokens_per_second": 247.0},
+        {"test_id": "reasoning", "category": "Logical Reasoning", "passed": true, "time_seconds": 0.4, "tokens_per_second": 245.0},
+        {"test_id": "math", "category": "Mathematics", "passed": false, "time_seconds": 0.5, "tokens_per_second": 247.0},
+        {"test_id": "summarization", "category": "Summarization", "passed": true, "time_seconds": 0.4, "tokens_per_second": 251.0},
+        {"test_id": "instruction_follow", "category": "Instruction Following", "passed": true, "time_seconds": 0.3, "tokens_per_second": 252.0},
+        {"test_id": "analysis", "category": "Data Analysis", "passed": false, "time_seconds": 2.8, "tokens_per_second": 241.0},
+        {"test_id": "creative", "category": "Creative Writing", "passed": true, "time_seconds": 0.2, "tokens_per_second": 245.0}
+      ]
+    },
+    {
+      "model": "phi4:latest",
+      "label": "Phi-4 14B",
+      "family": "Microsoft Phi",
+      "params": "14B",
+      "quantization": "Q4_K_M",
+      "model_size_gb": 9.1,
+      "tests_passed": 7,
+      "tests_total": 7,
+      "accuracy_pct": 100.0,
+      "total_time_seconds": 49.2,
+      "avg_tokens_per_second": 26.4,
+      "avg_response_time": 7.03,
+      "test_results": [
+        {"test_id": "code_gen", "category": "Code Generation", "passed": true, "time_seconds": 5.7, "tokens_per_second": 26.0},
+        {"test_id": "reasoning", "category": "Logical Reasoning", "passed": true, "time_seconds": 3.3, "tokens_per_second": 23.0},
+        {"test_id": "math", "category": "Mathematics", "passed": true, "time_seconds": 7.0, "tokens_per_second": 32.0},
+        {"test_id": "summarization", "category": "Summarization", "passed": true, "time_seconds": 3.8, "tokens_per_second": 27.0},
+        {"test_id": "instruction_follow", "category": "Instruction Following", "passed": true, "time_seconds": 1.2, "tokens_per_second": 24.0},
+        {"test_id": "analysis", "category": "Data Analysis", "passed": true, "time_seconds": 25.3, "tokens_per_second": 27.0},
+        {"test_id": "creative", "category": "Creative Writing", "passed": true, "time_seconds": 2.9, "tokens_per_second": 26.0}
+      ]
+    }
+  ]
+}

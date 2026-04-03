@@ -1,0 +1,33 @@
+{
+  "timestamp": "2026-03-07T21:06:54.707195",
+  "models": {
+    "qwen2.5:14b": {
+      "reasoning": 84.7,
+      "code": 83.1,
+      "math": 83.2,
+      "creative": 87.0,
+      "avg": 84.5
+    },
+    "qwen2.5-coder:14b": {
+      "reasoning": 87.0,
+      "code": 83.0,
+      "math": 83.4,
+      "creative": 89.0,
+      "avg": 85.6
+    },
+    "qwen3:14b": {
+      "reasoning": 79.6,
+      "code": 78.5,
+      "math": 75.9,
+      "creative": 74.8,
+      "avg": 77.2
+    },
+    "qwen2.5:32b": {
+      "reasoning": 5.6,
+      "code": 5.6,
+      "math": 4.5,
+      "creative": 6.0,
+      "avg": 5.4
+    }
+  }
+}

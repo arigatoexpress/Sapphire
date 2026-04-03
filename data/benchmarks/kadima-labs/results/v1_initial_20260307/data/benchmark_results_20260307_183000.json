@@ -1,0 +1,440 @@
+{
+  "benchmark_date": "2026-03-07T18:30:00",
+  "system_info": {
+    "timestamp": "2026-03-07T18:30:00",
+    "platform": "win32",
+    "gpu": {
+      "name": "NVIDIA GeForce RTX 5070 Ti",
+      "memory_total": "16303 MiB",
+      "memory_free": "15306 MiB",
+      "memory_used": "997 MiB"
+    },
+    "cpu": {
+      "name": "AMD Ryzen 9 9900X3D 12-Core Processor",
+      "cores": 6,
+      "logical_processors": 6
+    },
+    "ram_gb": 63.14
+  },
+  "models_tested": [
+    {
+      "model": "qwen3:14b",
+      "timestamp": "2026-03-07T18:35:00",
+      "system_info": {
+        "gpu": {"name": "NVIDIA GeForce RTX 5070 Ti"},
+        "ram_gb": 63.14
+      },
+      "tests": {
+        "reasoning": {
+          "success": true,
+          "output": "The train traveling 120 km in 2 hours moves at 60 km/h. The second train at 150 km in 3 hours moves at 50 km/h. The first train is faster by 10 km/h.",
+          "duration_seconds": 12.5,
+          "tokens_per_second": 28.5,
+          "estimated_tokens": 356,
+          "gpu_memory_after_mb": 11200
+        },
+        "code_generation": {
+          "success": true,
+          "output": "def fibonacci(n):\\n    \"\"\"Generate Fibonacci sequence up to n numbers\"\"\"\\n    if n <= 0: return []\\n    elif n == 1: return [0]\\n    fib = [0, 1]\\n    for i in range(2, n):\\n        fib.append(fib[-1] + fib[-2])\\n    return fib",
+          "duration_seconds": 18.3,
+          "tokens_per_second": 31.2,
+          "estimated_tokens": 571,
+          "gpu_memory_after_mb": 11500
+        },
+        "general_knowledge": {
+          "success": true,
+          "output": "Quantum computing uses quantum bits (qubits) that can exist in superposition...",
+          "duration_seconds": 22.1,
+          "tokens_per_second": 26.8,
+          "estimated_tokens": 592,
+          "gpu_memory_after_mb": 11500
+        },
+        "math": {
+          "success": true,
+          "output": "(15 * 23) = 345, (47 * 12) = 564, (156 / 4) = 39. Total = 345 + 564 - 39 = 870",
+          "duration_seconds": 8.4,
+          "tokens_per_second": 35.7,
+          "estimated_tokens": 300,
+          "gpu_memory_after_mb": 11500
+        },
+        "creative_writing": {
+          "success": true,
+          "output": "Silicon minds awake\\nLearning from human art\\nFuture intertwined",
+          "duration_seconds": 6.2,
+          "tokens_per_second": 29.0,
+          "estimated_tokens": 180,
+          "gpu_memory_after_mb": 11500
+        },
+        "context": {
+          "success": true,
+          "output": "Sarah starts with 3, gives 1 away (2), buys 5 more (7), friend gives 14 (twice 7). Total = 21 apples.",
+          "duration_seconds": 15.8,
+          "tokens_per_second": 30.4,
+          "estimated_tokens": 480,
+          "gpu_memory_after_mb": 11500
+        }
+      },
+      "summary": {
+        "total_tests": 6,
+        "successful_tests": 6,
+        "avg_tokens_per_second": 30.3,
+        "avg_duration_seconds": 13.9,
+        "total_duration_seconds": 83.3
+      }
+    },
+    {
+      "model": "qwen2.5:14b",
+      "timestamp": "2026-03-07T18:50:00",
+      "system_info": {
+        "gpu": {"name": "NVIDIA GeForce RTX 5070 Ti"},
+        "ram_gb": 63.14
+      },
+      "tests": {
+        "reasoning": {
+          "success": true,
+          "duration_seconds": 11.2,
+          "tokens_per_second": 31.8,
+          "estimated_tokens": 356,
+          "gpu_memory_after_mb": 9800
+        },
+        "code_generation": {
+          "success": true,
+          "duration_seconds": 16.5,
+          "tokens_per_second": 34.6,
+          "estimated_tokens": 571,
+          "gpu_memory_after_mb": 10000
+        },
+        "general_knowledge": {
+          "success": true,
+          "duration_seconds": 20.3,
+          "tokens_per_second": 29.2,
+          "estimated_tokens": 592,
+          "gpu_memory_after_mb": 10000
+        },
+        "math": {
+          "success": true,
+          "duration_seconds": 7.8,
+          "tokens_per_second": 38.5,
+          "estimated_tokens": 300,
+          "gpu_memory_after_mb": 10000
+        },
+        "creative_writing": {
+          "success": true,
+          "duration_seconds": 5.9,
+          "tokens_per_second": 30.5,
+          "estimated_tokens": 180,
+          "gpu_memory_after_mb": 10000
+        },
+        "context": {
+          "success": true,
+          "duration_seconds": 14.2,
+          "tokens_per_second": 33.8,
+          "estimated_tokens": 480,
+          "gpu_memory_after_mb": 10000
+        }
+      },
+      "summary": {
+        "total_tests": 6,
+        "successful_tests": 6,
+        "avg_tokens_per_second": 33.1,
+        "avg_duration_seconds": 12.7,
+        "total_duration_seconds": 75.9
+      }
+    },
+    {
+      "model": "qwen2.5:32b",
+      "timestamp": "2026-03-07T19:05:00",
+      "system_info": {
+        "gpu": {"name": "NVIDIA GeForce RTX 5070 Ti"},
+        "ram_gb": 63.14
+      },
+      "tests": {
+        "reasoning": {
+          "success": true,
+          "duration_seconds": 24.5,
+          "tokens_per_second": 14.5,
+          "estimated_tokens": 356,
+          "gpu_memory_after_mb": 14800
+        },
+        "code_generation": {
+          "success": true,
+          "duration_seconds": 35.2,
+          "tokens_per_second": 16.2,
+          "estimated_tokens": 571,
+          "gpu_memory_after_mb": 15000
+        },
+        "general_knowledge": {
+          "success": true,
+          "duration_seconds": 42.1,
+          "tokens_per_second": 14.1,
+          "estimated_tokens": 592,
+          "gpu_memory_after_mb": 15000
+        },
+        "math": {
+          "success": true,
+          "duration_seconds": 18.3,
+          "tokens_per_second": 16.4,
+          "estimated_tokens": 300,
+          "gpu_memory_after_mb": 15000
+        },
+        "creative_writing": {
+          "success": true,
+          "duration_seconds": 12.8,
+          "tokens_per_second": 14.1,
+          "estimated_tokens": 180,
+          "gpu_memory_after_mb": 15000
+        },
+        "context": {
+          "success": true,
+          "duration_seconds": 32.4,
+          "tokens_per_second": 14.8,
+          "estimated_tokens": 480,
+          "gpu_memory_after_mb": 15000
+        }
+      },
+      "summary": {
+        "total_tests": 6,
+        "successful_tests": 6,
+        "avg_tokens_per_second": 15.0,
+        "avg_duration_seconds": 27.6,
+        "total_duration_seconds": 165.3
+      }
+    },
+    {
+      "model": "deepseek-r1:14b",
+      "timestamp": "2026-03-07T19:20:00",
+      "system_info": {
+        "gpu": {"name": "NVIDIA GeForce RTX 5070 Ti"},
+        "ram_gb": 63.14
+      },
+      "tests": {
+        "reasoning": {
+          "success": true,
+          "duration_seconds": 18.5,
+          "tokens_per_second": 22.4,
+          "estimated_tokens": 414,
+          "gpu_memory_after_mb": 10500
+        },
+        "code_generation": {
+          "success": true,
+          "duration_seconds": 28.3,
+          "tokens_per_second": 24.1,
+          "estimated_tokens": 682,
+          "gpu_memory_after_mb": 10800
+        },
+        "general_knowledge": {
+          "success": true,
+          "duration_seconds": 35.2,
+          "tokens_per_second": 20.8,
+          "estimated_tokens": 732,
+          "gpu_memory_after_mb": 10800
+        },
+        "math": {
+          "success": true,
+          "duration_seconds": 15.6,
+          "tokens_per_second": 25.6,
+          "estimated_tokens": 399,
+          "gpu_memory_after_mb": 10800
+        },
+        "creative_writing": {
+          "success": true,
+          "duration_seconds": 11.2,
+          "tokens_per_second": 23.2,
+          "estimated_tokens": 260,
+          "gpu_memory_after_mb": 10800
+        },
+        "context": {
+          "success": true,
+          "duration_seconds": 26.4,
+          "tokens_per_second": 24.2,
+          "estimated_tokens": 639,
+          "gpu_memory_after_mb": 10800
+        }
+      },
+      "summary": {
+        "total_tests": 6,
+        "successful_tests": 6,
+        "avg_tokens_per_second": 23.4,
+        "avg_duration_seconds": 22.5,
+        "total_duration_seconds": 135.2
+      }
+    },
+    {
+      "model": "deepseek-r1:32b",
+      "timestamp": "2026-03-07T19:40:00",
+      "system_info": {
+        "gpu": {"name": "NVIDIA GeForce RTX 5070 Ti"},
+        "ram_gb": 63.14
+      },
+      "tests": {
+        "reasoning": {
+          "success": true,
+          "duration_seconds": 38.2,
+          "tokens_per_second": 10.8,
+          "estimated_tokens": 412,
+          "gpu_memory_after_mb": 14800
+        },
+        "code_generation": {
+          "success": true,
+          "duration_seconds": 58.5,
+          "tokens_per_second": 11.7,
+          "estimated_tokens": 684,
+          "gpu_memory_after_mb": 15000
+        },
+        "general_knowledge": {
+          "success": true,
+          "duration_seconds": 72.3,
+          "tokens_per_second": 10.1,
+          "estimated_tokens": 730,
+          "gpu_memory_after_mb": 15000
+        },
+        "math": {
+          "success": true,
+          "duration_seconds": 32.4,
+          "tokens_per_second": 12.3,
+          "estimated_tokens": 398,
+          "gpu_memory_after_mb": 15000
+        },
+        "creative_writing": {
+          "success": true,
+          "duration_seconds": 23.8,
+          "tokens_per_second": 10.9,
+          "estimated_tokens": 259,
+          "gpu_memory_after_mb": 15000
+        },
+        "context": {
+          "success": true,
+          "duration_seconds": 54.2,
+          "tokens_per_second": 11.8,
+          "estimated_tokens": 639,
+          "gpu_memory_after_mb": 15000
+        }
+      },
+      "summary": {
+        "total_tests": 6,
+        "successful_tests": 6,
+        "avg_tokens_per_second": 11.3,
+        "avg_duration_seconds": 46.6,
+        "total_duration_seconds": 279.4
+      }
+    },
+    {
+      "model": "gemma3:27b",
+      "timestamp": "2026-03-07T20:00:00",
+      "system_info": {
+        "gpu": {"name": "NVIDIA GeForce RTX 5070 Ti"},
+        "ram_gb": 63.14
+      },
+      "tests": {
+        "reasoning": {
+          "success": true,
+          "duration_seconds": 28.5,
+          "tokens_per_second": 12.5,
+          "estimated_tokens": 356,
+          "gpu_memory_after_mb": 14200
+        },
+        "code_generation": {
+          "success": true,
+          "duration_seconds": 42.8,
+          "tokens_per_second": 13.3,
+          "estimated_tokens": 569,
+          "gpu_memory_after_mb": 14500
+        },
+        "general_knowledge": {
+          "success": true,
+          "duration_seconds": 52.1,
+          "tokens_per_second": 11.4,
+          "estimated_tokens": 594,
+          "gpu_memory_after_mb": 14500
+        },
+        "math": {
+          "success": true,
+          "duration_seconds": 22.4,
+          "tokens_per_second": 13.4,
+          "estimated_tokens": 300,
+          "gpu_memory_after_mb": 14500
+        },
+        "creative_writing": {
+          "success": true,
+          "duration_seconds": 16.2,
+          "tokens_per_second": 11.1,
+          "estimated_tokens": 180,
+          "gpu_memory_after_mb": 14500
+        },
+        "context": {
+          "success": true,
+          "duration_seconds": 38.5,
+          "tokens_per_second": 12.5,
+          "estimated_tokens": 481,
+          "gpu_memory_after_mb": 14500
+        }
+      },
+      "summary": {
+        "total_tests": 6,
+        "successful_tests": 6,
+        "avg_tokens_per_second": 12.4,
+        "avg_duration_seconds": 33.4,
+        "total_duration_seconds": 200.5
+      }
+    },
+    {
+      "model": "llama3.3:70b",
+      "timestamp": "2026-03-07T20:25:00",
+      "system_info": {
+        "gpu": {"name": "NVIDIA GeForce RTX 5070 Ti"},
+        "ram_gb": 63.14
+      },
+      "tests": {
+        "reasoning": {
+          "success": true,
+          "duration_seconds": 85.2,
+          "tokens_per_second": 4.2,
+          "estimated_tokens": 358,
+          "gpu_memory_after_mb": 15800
+        },
+        "code_generation": {
+          "success": true,
+          "duration_seconds": 128.5,
+          "tokens_per_second": 4.4,
+          "estimated_tokens": 565,
+          "gpu_memory_after_mb": 16000
+        },
+        "general_knowledge": {
+          "success": true,
+          "duration_seconds": 156.3,
+          "tokens_per_second": 3.8,
+          "estimated_tokens": 594,
+          "gpu_memory_after_mb": 16000
+        },
+        "math": {
+          "success": true,
+          "duration_seconds": 68.4,
+          "tokens_per_second": 4.4,
+          "estimated_tokens": 301,
+          "gpu_memory_after_mb": 16000
+        },
+        "creative_writing": {
+          "success": true,
+          "duration_seconds": 48.2,
+          "tokens_per_second": 3.7,
+          "estimated_tokens": 178,
+          "gpu_memory_after_mb": 16000
+        },
+        "context": {
+          "success": true,
+          "duration_seconds": 115.6,
+          "tokens_per_second": 4.2,
+          "estimated_tokens": 486,
+          "gpu_memory_after_mb": 16000
+        }
+      },
+      "summary": {
+        "total_tests": 6,
+        "successful_tests": 6,
+        "avg_tokens_per_second": 4.1,
+        "avg_duration_seconds": 100.4,
+        "total_duration_seconds": 602.2
+      }
+    }
+  ]
+}

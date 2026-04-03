@@ -1,0 +1,105 @@
+{
+  "timestamp": "2026-03-07T23:23:05.815750",
+  "hardware": "RTX 5070 Ti 16GB",
+  "results": {
+    "qwen3.5:0.8b": {
+      "hello": {
+        "success": true,
+        "duration": 18.0,
+        "tokens": 1539,
+        "tps": 85.52,
+        "output": "Hello! \ud83d\udc4b I'm Qwen3.5, an AI assistant from Alibaba Cloud. How can I assist you today?"
+      },
+      "math": {
+        "success": true,
+        "duration": 13.06,
+        "tokens": 3043,
+        "tps": 232.95,
+        "output": "To find the product of 15 and 23:\n\n$$15 \\times 23 = 345$$"
+      },
+      "code": {
+        "success": true,
+        "duration": 1.97,
+        "tokens": 423,
+        "tps": 215.23,
+        "output": "Here's an example of a Python function that checks if a number `n` is a prime number:\n\n```python\ndef is_prime(n):\n    \"\"\"\n    Returns True if n is a p"
+      },
+      "reasoning": {
+        "success": true,
+        "duration": 8.37,
+        "tokens": 1919,
+        "tps": 229.28,
+        "output": "The farmer has 17 sheep, and 9 of them die. Therefore, the number of remaining sheep is:\n\n$$17 - 9 = 8$$\n\n**There are 8 remaining sheep.**"
+      },
+      "creative": {
+        "success": false,
+        "error": "Timeout after 300s"
+      }
+    },
+    "qwen3.5:4b": {
+      "hello": {
+        "success": true,
+        "duration": 19.27,
+        "tokens": 197,
+        "tps": 10.22,
+        "output": "Hello!"
+      },
+      "math": {
+        "success": true,
+        "duration": 29.46,
+        "tokens": 346,
+        "tps": 11.75,
+        "output": "The result of $15 \\times 23$ is **345**.\n\nHere is the breakdown:\n$$15 \\times 23 = (10 \\times 23) + (5 \\times 23) = 230 + 115 = 345$$"
+      },
+      "code": {
+        "success": true,
+        "duration": 37.84,
+        "tokens": 759,
+        "tps": 20.06,
+        "output": "Here's an efficient and well-documented Python function `is_prime(n)` that checks whether a given integer is a prime number:\n\n```python\ndef is_prime(n"
+      },
+      "reasoning": {
+        "success": false,
+        "error": "Timeout after 300s"
+      },
+      "creative": {
+        "success": false,
+        "error": "Timeout after 300s"
+      }
+    },
+    "qwen3.5:9b": {
+      "hello": {
+        "success": true,
+        "duration": 69.41,
+        "tokens": 653,
+        "tps": 9.41,
+        "output": "Hello!"
+      },
+      "math": {
+        "success": true,
+        "duration": 46.14,
+        "tokens": 363,
+        "tps": 7.87,
+        "output": "15 * 23 = **345**"
+      },
+      "code": {
+        "success": true,
+        "duration": 110.64,
+        "tokens": 1071,
+        "tps": 9.68,
+        "output": "Here's an efficient Python function to check whether a number `n` is prime:\n\n```python\ndef is_prime(n):\n    \"\"\"\n    Check if a number is prime using o"
+      },
+      "reasoning": {
+        "success": true,
+        "duration": 59.05,
+        "tokens": 479,
+        "tps": 8.11,
+        "output": "The answer is **9**.\n\n\"All but 9\" means that 9 did not die, so they are the ones remaining."
+      },
+      "creative": {
+        "success": false,
+        "error": "Timeout after 300s"
+      }
+    }
+  }
+}

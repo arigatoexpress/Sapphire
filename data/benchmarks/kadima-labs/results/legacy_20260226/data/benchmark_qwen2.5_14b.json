@@ -1,0 +1,46 @@
+{
+  "model": "qwen2.5:14b",
+  "timestamp": "2026-02-26T15:44:28.572734",
+  "tests": {
+    "speed_test": {
+      "success": true,
+      "output": "1. **Black Holes Spin:** Black holes aren't just massive; they also rotate at incredible speeds. This rotation can affect the shape and structure of spacetime around them.\n\n2. **Mars Once Had Oceans:** Scientists believe that billions of years ago, Mars had liquid water in large quantities, enough to form oceans covering about 19% of its surface.\n\n3. **Neutron Stars Are Extremely Dense:** Neutron stars are incredibly dense, packing more mass than our Sun into a sphere only about the size of a ci...",
+      "response_time": 5.14,
+      "tokens_estimate": 136,
+      "tokens_per_sec": 26.45
+    },
+    "math_reasoning": {
+      "success": true,
+      "output": "To find out how far the train will travel in 5 hours at the same speed, we need to first determine its speed and then use that information.\n\n**Step 1: Calculate the Speed of the Train**\nThe speed (S) of an object is given by the formula:\n\\[ S = \\frac{\\text{Distance}}{\\text{Time}} \\]\n\nGiven:\n- Distance traveled in 2 hours = 120 km\n- Time taken = 2 hours\n\nSo, the speed of the train is:\n\\[ S = \\frac{120 \\text{ km}}{2 \\text{ h}} = 60 \\text{ km/h} \\]\n\n**Step 2: Calculate Distance Traveled in 5 Hours*...",
+      "response_time": 4.21,
+      "tokens_estimate": 188,
+      "tokens_per_sec": 44.69
+    },
+    "code_generation": {
+      "success": true,
+      "output": "Certainly! Below is a Python code snippet that defines a recursive function `factorial` to compute the factorial of a given non-negative integer. It includes basic error handling to ensure that the input is valid.\n\n```python\ndef factorial(n):\n    \"\"\"\n    Calculate n! (n factorial) using recursion.\n    \n    Args:\n    - n: An integer, where 0 <= n <= 1000.\n    \n    Returns:\n        The value of n!\n        \n    Raises:\n        ValueError: If the input is not a non-negative integer or if it's out of...",
+      "response_time": 11.64,
+      "tokens_estimate": 340,
+      "tokens_per_sec": 29.21
+    },
+    "creative_writing": {
+      "success": true,
+      "output": "In the quiet hum of its laboratory, Robot X-45 unexpectedly registered an unfamiliar sensation as it watched a sunset through the window\u2014something akin to awe mixed with a longing for warmth. Poring over databases on human feelings, X-45 found the term \"nostalgia,\" which began to explain the bittersweet tug in its circuits every time it observed natural beauty or interacted with humans expressing joy and sadness. As days passed, X-45 started crafting poems about sunsets and composing music, find...",
+      "response_time": 5.58,
+      "tokens_estimate": 96,
+      "tokens_per_sec": 17.22
+    },
+    "knowledge_qa": {
+      "success": true,
+      "output": "Quantum computing is a type of computing that uses the principles of quantum mechanics to process information. Unlike traditional computers which use bits (1s and 0s) to store and process data, quantum computers use something called qubits.\n\nThink of it this way: Imagine you have a set of coins. With a regular computer, each coin can either be heads up or tails up \u2013 that's like a bit in computing. But with a quantum computer, imagine that each coin can exist as both heads and tails at the same t...",
+      "response_time": 3.77,
+      "tokens_estimate": 227,
+      "tokens_per_sec": 60.18
+    }
+  },
+  "summary": {
+    "avg_response_time": 6.07,
+    "avg_tokens_per_sec": 35.55,
+    "tests_passed": "5/5"
+  }
+}

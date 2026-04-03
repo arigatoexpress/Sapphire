@@ -1,0 +1,272 @@
+{
+  "metadata": {
+    "lab": "Kadima Digital Laboratories",
+    "hardware": {
+      "cpu": "AMD Ryzen 9 9900X3D 12-Core",
+      "gpu": "NVIDIA GeForce RTX 5070 Ti (16GB GDDR7)",
+      "ram": "64GB DDR5",
+      "motherboard": "ASUS ROG STRIX B850-A GAMING WIFI",
+      "storage": "Samsung 990 EVO Plus 2TB NVMe",
+      "os": "Windows 11 Pro",
+      "inference_engine": "Ollama"
+    },
+    "version": "0.1.0",
+    "timestamp": "20260324_163454",
+    "date": "2026-03-24T16:35:47.848175",
+    "models_tested": 2,
+    "tests_per_model": 8,
+    "categories": [
+      "Code Generation",
+      "Logical Reasoning",
+      "Arithmetic",
+      "Summarization",
+      "Instruction Following",
+      "Structured Output",
+      "Translation",
+      "Creative Writing"
+    ],
+    "methodology": "GPU-isolated: VRAM cleared between models. Streaming for latency metrics (TTFT, ITL percentiles). nvidia-smi polling for VRAM/power tracking. 512 token output cap.",
+    "suite_preset": "quick",
+    "scoring_weights": {
+      "quality": 0.5,
+      "speed": 0.3,
+      "efficiency": 0.2
+    }
+  },
+  "results": [
+    {
+      "model": "nemotron-3-nano:4b",
+      "label": "Nemotron 3 Nano 4B",
+      "family": "NVIDIA",
+      "params": "4B",
+      "quantization": "Q4_K_M",
+      "model_size_gb": 2.6,
+      "tests_passed": 8,
+      "tests_total": 8,
+      "accuracy_pct": 100.0,
+      "avg_tokens_per_second": 197.8,
+      "avg_response_time": 1.25,
+      "total_time_seconds": 10.02,
+      "test_results": [
+        {
+          "test_id": "code_gen",
+          "category": "Code Generation",
+          "passed": true,
+          "time_seconds": 1.737,
+          "tokens": 301,
+          "tokens_per_second": 191.5
+        },
+        {
+          "test_id": "reasoning",
+          "category": "Logical Reasoning",
+          "passed": true,
+          "time_seconds": 0.367,
+          "tokens": 54,
+          "tokens_per_second": 206.3
+        },
+        {
+          "test_id": "math",
+          "category": "Arithmetic",
+          "passed": true,
+          "time_seconds": 2.065,
+          "tokens": 361,
+          "tokens_per_second": 190.1
+        },
+        {
+          "test_id": "summarization",
+          "category": "Summarization",
+          "passed": true,
+          "time_seconds": 1.299,
+          "tokens": 233,
+          "tokens_per_second": 198.0
+        },
+        {
+          "test_id": "instruction",
+          "category": "Instruction Following",
+          "passed": true,
+          "time_seconds": 0.719,
+          "tokens": 111,
+          "tokens_per_second": 191.1
+        },
+        {
+          "test_id": "json_output",
+          "category": "Structured Output",
+          "passed": true,
+          "time_seconds": 0.563,
+          "tokens": 93,
+          "tokens_per_second": 205.9
+        },
+        {
+          "test_id": "translation",
+          "category": "Translation",
+          "passed": true,
+          "time_seconds": 0.448,
+          "tokens": 66,
+          "tokens_per_second": 206.1
+        },
+        {
+          "test_id": "creative",
+          "category": "Creative Writing",
+          "passed": true,
+          "time_seconds": 2.825,
+          "tokens": 512,
+          "tokens_per_second": 193.2
+        }
+      ],
+      "speed_metrics": {
+        "ttft_ms": 107.8,
+        "ttft_p50_ms": 110.4,
+        "ttft_p95_ms": 113.0,
+        "itl_mean_ms": 5.45,
+        "itl_p50_ms": 5.23,
+        "itl_p95_ms": 6.01,
+        "itl_p99_ms": 10.97,
+        "tpot_ms": 5.45,
+        "throughput_tps": 158.6,
+        "total_tokens": 380,
+        "total_time_s": 2.396,
+        "runs": 3
+      },
+      "gpu_snapshot": {
+        "peak_vram_mb": 10997.0,
+        "avg_vram_mb": 10996.9,
+        "peak_power_w": 204.3,
+        "avg_power_w": 176.3,
+        "samples": 23,
+        "duration_seconds": 12.5
+      },
+      "efficiency_tps_per_gb": 76.1,
+      "energy_per_token_mj": 891.5,
+      "composite_score": 100.0,
+      "pareto_optimal": true
+    },
+    {
+      "model": "granite3.3:2b",
+      "label": "Granite 3.3 2B",
+      "family": "IBM",
+      "params": "2B",
+      "quantization": "Q4_K_M",
+      "model_size_gb": 1.4,
+      "tests_passed": 8,
+      "tests_total": 8,
+      "accuracy_pct": 100.0,
+      "avg_tokens_per_second": 51.9,
+      "avg_response_time": 1.84,
+      "total_time_seconds": 14.71,
+      "test_results": [
+        {
+          "test_id": "code_gen",
+          "category": "Code Generation",
+          "passed": true,
+          "time_seconds": 3.736,
+          "tokens": 158,
+          "tokens_per_second": 43.7
+        },
+        {
+          "test_id": "reasoning",
+          "category": "Logical Reasoning",
+          "passed": true,
+          "time_seconds": 0.093,
+          "tokens": 2,
+          "tokens_per_second": 104.7
+        },
+        {
+          "test_id": "math",
+          "category": "Arithmetic",
+          "passed": true,
+          "time_seconds": 5.148,
+          "tokens": 168,
+          "tokens_per_second": 35.1
+        },
+        {
+          "test_id": "summarization",
+          "category": "Summarization",
+          "passed": true,
+          "time_seconds": 2.05,
+          "tokens": 95,
+          "tokens_per_second": 50.1
+        },
+        {
+          "test_id": "instruction",
+          "category": "Instruction Following",
+          "passed": true,
+          "time_seconds": 0.508,
+          "tokens": 23,
+          "tokens_per_second": 52.8
+        },
+        {
+          "test_id": "json_output",
+          "category": "Structured Output",
+          "passed": true,
+          "time_seconds": 0.734,
+          "tokens": 28,
+          "tokens_per_second": 44.1
+        },
+        {
+          "test_id": "translation",
+          "category": "Translation",
+          "passed": true,
+          "time_seconds": 0.607,
+          "tokens": 23,
+          "tokens_per_second": 50.5
+        },
+        {
+          "test_id": "creative",
+          "category": "Creative Writing",
+          "passed": true,
+          "time_seconds": 1.838,
+          "tokens": 57,
+          "tokens_per_second": 34.1
+        }
+      ],
+      "speed_metrics": {
+        "ttft_ms": 108.2,
+        "ttft_p50_ms": 110.5,
+        "ttft_p95_ms": 113.4,
+        "itl_mean_ms": 24.65,
+        "itl_p50_ms": 20.52,
+        "itl_p95_ms": 48.94,
+        "itl_p99_ms": 85.54,
+        "tpot_ms": 24.65,
+        "throughput_tps": 39.3,
+        "total_tokens": 407,
+        "total_time_s": 10.358,
+        "runs": 3
+      },
+      "gpu_snapshot": {
+        "peak_vram_mb": 9139.0,
+        "avg_vram_mb": 9139.0,
+        "peak_power_w": 65.0,
+        "avg_power_w": 55.3,
+        "samples": 41,
+        "duration_seconds": 25.1
+      },
+      "efficiency_tps_per_gb": 37.1,
+      "energy_per_token_mj": 1065.4,
+      "composite_score": 67.6,
+      "pareto_optimal": true
+    }
+  ],
+  "pareto_frontier": [
+    "Nemotron 3 Nano 4B",
+    "Granite 3.3 2B"
+  ],
+  "rankings": {
+    "by_composite": [
+      "Nemotron 3 Nano 4B",
+      "Granite 3.3 2B"
+    ],
+    "by_accuracy": [
+      "Nemotron 3 Nano 4B",
+      "Granite 3.3 2B"
+    ],
+    "by_speed": [
+      "Nemotron 3 Nano 4B",
+      "Granite 3.3 2B"
+    ],
+    "by_efficiency": [
+      "Nemotron 3 Nano 4B",
+      "Granite 3.3 2B"
+    ]
+  }
+}

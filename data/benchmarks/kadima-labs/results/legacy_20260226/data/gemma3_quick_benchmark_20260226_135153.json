@@ -1,0 +1,33 @@
+{
+  "results": [
+    {
+      "test": "Basic Math",
+      "success": true,
+      "time": 11.457608461380005,
+      "tokens": 34,
+      "speed": 2.9674604534273716
+    },
+    {
+      "test": "Code Gen",
+      "success": true,
+      "time": 43.288946866989136,
+      "tokens": 257,
+      "speed": 5.936850364820969
+    },
+    {
+      "test": "Knowledge",
+      "success": true,
+      "time": 5.328423500061035,
+      "tokens": 24,
+      "speed": 4.504146489055363
+    },
+    {
+      "test": "Summarization",
+      "success": true,
+      "time": 5.81708025932312,
+      "tokens": 40,
+      "speed": 6.876301893186262
+    }
+  ],
+  "timestamp": "2026-02-26T13:51:53.349131"
+}

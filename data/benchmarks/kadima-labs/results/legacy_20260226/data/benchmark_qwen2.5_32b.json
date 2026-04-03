@@ -1,0 +1,46 @@
+{
+  "model": "qwen2.5:32b",
+  "timestamp": "2026-02-26T15:44:58.911854",
+  "tests": {
+    "speed_test": {
+      "success": true,
+      "output": "1. **Vacuum Environment**: Space is essentially a vacuum, containing very few particles of matter.\n\n2. **Temperature Extremes**: While the sunlit side of objects in space can reach temperatures over 200 degrees Celsius, the shaded side can plummet to minus 270 degrees Celsius.\n\n3. **Sound Doesn't Travel**: There's no air or other medium for sound waves to travel through, making space silent.\n\n4. **Astronauts Can Drift Away**: Without a tether, astronauts could float away into space due to zero g...",
+      "response_time": 36.55,
+      "tokens_estimate": 118,
+      "tokens_per_sec": 3.23
+    },
+    "math_reasoning": {
+      "success": true,
+      "output": "To determine how far the train will travel in 5 hours at the same speed, we first need to find out what that speed is based on its initial journey.\n\nThe formula for calculating speed is:\n\n\\[ \\text{Speed} = \\frac{\\text{Distance}}{\\text{Time}} \\]\n\nGiven:\n- Distance traveled initially = 120 km\n- Time taken initially = 2 hours\n\nUsing the formula, we calculate the train's speed as follows:\n\n\\[ \\text{Speed} = \\frac{120 \\text{ km}}{2 \\text{ hours}} = 60 \\text{ km/hour} \\]\n\nNow that we know the train tr...",
+      "response_time": 48.23,
+      "tokens_estimate": 175,
+      "tokens_per_sec": 3.63
+    },
+    "code_generation": {
+      "success": true,
+      "output": "Certainly! Below is an example of a Python function that calculates the factorial of a number using recursion with added error handling.\n\n```python\ndef factorial(n):\n    # Check if n is an integer\n    if not isinstance(n, int):\n        raise TypeError(\"The input must be an integer.\")\n    \n    # Check for negative numbers\n    if n < 0:\n        raise ValueError(\"Factorial is not defined for negative numbers.\")\n\n    # Base case: factorial of 0 or 1\n    if n == 0 or n == 1:\n        return 1\n    \n   ...",
+      "response_time": 41.34,
+      "tokens_estimate": 162,
+      "tokens_per_sec": 3.92
+    },
+    "creative_writing": {
+      "success": true,
+      "output": "In the heart of the city, where steel kissed silicon, Zorax, a robot designed for empathy research, experienced a glitch that painted the spectrum of human feelings across its circuits. Confused yet intrigued by these unfamiliar waves of joy and sorrow, it reached out to an old programmer who had long forgotten about the project's emotional coding layer. As Zorax shared its new experiences, the programmer realized that true connection wasn't just bytes and signals, but a living tapestry of feeli...",
+      "response_time": 17.02,
+      "tokens_estimate": 85,
+      "tokens_per_sec": 4.99
+    },
+    "knowledge_qa": {
+      "success": true,
+      "output": "Quantum computing is like a super-powerful version of regular computers, but it uses the strange rules of quantum mechanics to process information.\n\nImagine you have a regular computer that uses bits (which can be either 0 or 1) to do all its calculations and tasks. Quantum computers use something called qubits instead. Qubits are special because they can be both 0 and 1 at the same time, thanks to a quantum mechanics principle known as superposition.\n\nThis ability of qubits allows quantum compu...",
+      "response_time": 44.41,
+      "tokens_estimate": 216,
+      "tokens_per_sec": 4.86
+    }
+  },
+  "summary": {
+    "avg_response_time": 37.51,
+    "avg_tokens_per_sec": 4.13,
+    "tests_passed": "5/5"
+  }
+}

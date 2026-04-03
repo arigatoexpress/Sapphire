@@ -1,0 +1,44 @@
+{
+  "model": "qwen2.5:14b",
+  "timestamp": "2026-02-26T16:00:08.375047",
+  "tests": {
+    "threejs": {
+      "success": true,
+      "output": "<!DOCTYPE html>\n<html>\n<head>\n    <title>3D Neural Network Visualization</title>\n    <style>\n        body { margin: 0; }\n        #stats { position: absolute; top: 0; right: 0; z-index: 100; }\n    </style>\n</head>\n<body>\n<script src=\"https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js\"></script>\n<script src=\"https://mrdoob.github.io/stats.js/build/stats.min.js\"></script>\n\n<div id=\"stats\"></div>\n<script type=\"text/javascript\">\n    const scene = new THREE.Scene();\n    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);\n    const renderer = new THREE.WebGLRenderer({ antialias: true });\n    renderer.setSize(window.innerWidth, window.innerHeight);\n    document.body.appendChild(renderer.domElement);\n\n    // Stats.js\n    let stats = new Stats();\n    document.body.appendChild(stats.dom);\n\n    function createSphere(radius) {\n        return new THREE.SphereGeometry(radius, 32, 32);\n    }\n\n    function createCylinder(radius) {\n        re...",
+      "code": "<!DOCTYPE html>\n<html>\n<head>\n    <title>3D Neural Network Visualization</title>\n    <style>\n        body { margin: 0; }\n        #stats { position: absolute; top: 0; right: 0; z-index: 100; }\n    </style>\n</head>\n<body>\n<script src=\"https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js\"></script>\n<script src=\"https://mrdoob.github.io/stats.js/build/stats.min.js\"></script>\n\n<div id=\"stats\"></div>\n<script type=\"text/javascript\">\n    const scene = new THREE.Scene();\n    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);\n    const renderer = new THREE.WebGLRenderer({ antialias: true });\n    renderer.setSize(window.innerWidth, window.innerHeight);\n    document.body.appendChild(renderer.domElement);\n\n    // Stats.js\n    let stats = new Stats();\n    document.body.appendChild(stats.dom);\n\n    function createSphere(radius) {\n        return new THREE.SphereGeometry(radius, 32, 32);\n    }\n\n    function createCylinder(radius) {\n        return new THREE.CylinderGeometry(0.5 * radius, 0.5 * radius, radius, 16, 1);\n    }\n\n    function createCube(size) {\n        return new THREE.BoxGeometry(size, size, size);\n    }\n\n    function createPyramid(width, height) {\n        const shape = new THREE.Shape();\n        shape.moveTo(0, -height / 2);\n        shape.lineTo(width / 2, height / 2);\n        shape.lineTo(-width / 2, height / 2);\n        shape.lineTo(0, -height / 2);\n\n        return new THREE.ExtrudeGeometry(shape, { depth: 1.5, bevelEnabled: false });\n    }\n\n    function createCone(radius) {\n        return new THREE.CylinderGeometry(0, radius, radius * 2, 32);\n    }\n\n    const boundingVolume = [\n        createSphere(4),\n        createCone(4),\n        createCube(8),\n        createPyramid(6, 5.5),\n        createCylinder(4)\n    ];\n\n    let volumeIndex = 0;\n    function getNextBoundingVolume() {\n        return boundingVolume[volumeIndex++ % boundingVolume.length];\n    }\n\n    const nodes = [];\n    for (let i = 0; i < 1200; ++i) {\n...",
+      "response_time": 24.84,
+      "ttft_ms": 24842.0,
+      "word_count": 708,
+      "peak_ram_mb": 17582.0,
+      "avg_cpu_percent": 42.1,
+      "peak_gpu_vram_mb": 11266.0,
+      "telemetry_samples": 24,
+      "judge_score": 8,
+      "judge_reasoning": "The code correctly implements Three.js syntax and structure, creates a variety of geometric shapes for morphing bounding volumes, and initializes Stats.js for telemetry. However, it lacks the implementation of proximity networking with dynamic lines and neural firing meteor effect with proper timing.",
+      "executable": true
+    },
+    "blender": {
+      "success": true,
+      "output": "import bpy\n\n# Initialization: Clear default objects\nbpy.ops.wm.read_factory_settings(use_empty=True)\n\n# Base Geometry: Create primary cylinder and central bore\nbpy.ops.mesh.primitive_cylinder_add(vertices=64, radius=5.0, depth=1.0)\ncylinder = bpy.context.object\n\nbpy.ops.mesh.primitive_cylinder_add(vertices=64, radius=1.5, depth=2.0, location=(0, 0, 0.5))\ncentral_bore = bpy.context.object\ncentral_bore.name = \"CentralBore\"\n\n# Add Boolean Difference Modifier\nbool_diff = cylinder.modifiers.new(name=\"Boolean\", type='BOOLEAN')\nbool_diff.operation = 'DIFFERENCE'\nbool_diff.object = central_bore\n\nbpy.ops.object.modifier_apply(modifier=bool_diff.name)\n\n# Gear Tooth Template\nbpy.ops.mesh.primitive_cube_add(size=1, location=(5.04, 0, -0.5))\ntooth_template = bpy.context.object\ntooth_template.scale[2] *= 0.3\n\n# Array Modifier for Teeth\narray_modifier = tooth_template.modifiers.new(name=\"Array\", type='ARRAY')\narray_modifier.count = 24\narray_modifier.relative_offset_displace[0] = 1\nempty_object = bpy....",
+      "code": "import bpy\n\n# Initialization: Clear default objects\nbpy.ops.wm.read_factory_settings(use_empty=True)\n\n# Base Geometry: Create primary cylinder and central bore\nbpy.ops.mesh.primitive_cylinder_add(vertices=64, radius=5.0, depth=1.0)\ncylinder = bpy.context.object\n\nbpy.ops.mesh.primitive_cylinder_add(vertices=64, radius=1.5, depth=2.0, location=(0, 0, 0.5))\ncentral_bore = bpy.context.object\ncentral_bore.name = \"CentralBore\"\n\n# Add Boolean Difference Modifier\nbool_diff = cylinder.modifiers.new(name=\"Boolean\", type='BOOLEAN')\nbool_diff.operation = 'DIFFERENCE'\nbool_diff.object = central_bore\n\nbpy.ops.object.modifier_apply(modifier=bool_diff.name)\n\n# Gear Tooth Template\nbpy.ops.mesh.primitive_cube_add(size=1, location=(5.04, 0, -0.5))\ntooth_template = bpy.context.object\ntooth_template.scale[2] *= 0.3\n\n# Array Modifier for Teeth\narray_modifier = tooth_template.modifiers.new(name=\"Array\", type='ARRAY')\narray_modifier.count = 24\narray_modifier.relative_offset_displace[0] = 1\nempty_object = bpy.data.objects.new(\"Empty\", None)\nbpy.context.collection.objects.link(empty_object)\nempty_object.location = (5.0, 0, -0.5)\narray_modifier.use_object_offset = True\narray_modifier.offset_object = empty_object\n\n# Boolean Union Modifier to fuse teeth and main body\ntooth_template.modifiers.new(name=\"BooleanUnion\", type='BOOLEAN').operation = 'UNION'\nbpy.context.view_layer.objects.active = cylinder\ncylinder.select_set(True)\nbpy.ops.object.join()\n\n# Material Assignment: Gear Body\nmaterial = bpy.data.materials.new(name=\"GearMaterial\")\nmaterial.use_nodes = True\nprincipled_bsdf = material.node_tree.nodes['Principled BSDF']\nprincipled_bsdf.inputs['Base Color'].default_value = (0.1, 0.2, 0.4, 1)\nprincipled_bsdf.inputs['Metallic'].default_value = 1.0\nprincipled_bsdf.inputs['Roughness'].default_value = 0.2\n\ncylinder.data.materials.append(material)\n\n# Render Setup: Camera and Lighting\nbpy.ops.object.camera_add(location=(10, -10, 10), rotation=(1.15, 0, 1.7))\ncamera = bpy.context.object\ncamera.name = \"C...",
+      "response_time": 17.91,
+      "ttft_ms": 17908.0,
+      "word_count": 245,
+      "peak_ram_mb": 47043.0,
+      "avg_cpu_percent": 53.2,
+      "peak_gpu_vram_mb": 11349.0,
+      "telemetry_samples": 17,
+      "judge_score": 8,
+      "judge_reasoning": "The code demonstrates correct bpy syntax and imports, proper scene initialization and cleanup, gear geometry with Boolean operations, array modifier for teeth, and material assignment. However, the render configuration is incomplete and the lighting setup is missing.",
+      "executable": true
+    }
+  },
+  "summary": {
+    "threejs_score": 8,
+    "blender_score": 8,
+    "average_score": 8.0,
+    "total_time": 42.8,
+    "peak_ram_mb": 47043.0,
+    "peak_gpu_vram_mb": 11349.0
+  }
+}

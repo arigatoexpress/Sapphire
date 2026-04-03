@@ -1,0 +1,91 @@
+{
+  "timestamp": "2026-03-07T22:06:11.129801",
+  "hardware": {
+    "gpu": "NVIDIA GeForce RTX 5070 Ti 16GB",
+    "cpu": "AMD Ryzen 9 9900X3D",
+    "ram": "64GB"
+  },
+  "models": {
+    "qwen3:14b": {
+      "reasoning": {
+        "success": false,
+        "error": "Command '['ollama', 'run', 'qwen3:14b', 'What is 15 + 27? Explain.']' timed out after 120 seconds",
+        "duration": 120,
+        "tokens_per_sec": 0
+      },
+      "coding": {
+        "success": false,
+        "error": "Command '['ollama', 'run', 'qwen3:14b', 'Write a Python function to add two numbers.']' timed out after 120 seconds",
+        "duration": 120,
+        "tokens_per_sec": 0
+      },
+      "knowledge": {
+        "success": false,
+        "error": "Command '['ollama', 'run', 'qwen3:14b', 'What is machine learning in one sentence?']' timed out after 120 seconds",
+        "duration": 120,
+        "tokens_per_sec": 0
+      }
+    },
+    "qwen2.5:14b": {
+      "reasoning": {
+        "success": false,
+        "error": "Command '['ollama', 'run', 'qwen2.5:14b', 'What is 15 + 27? Explain.']' timed out after 120 seconds",
+        "duration": 120,
+        "tokens_per_sec": 0
+      },
+      "coding": {
+        "success": false,
+        "error": "Command '['ollama', 'run', 'qwen2.5:14b', 'Write a Python function to add two numbers.']' timed out after 120 seconds",
+        "duration": 120,
+        "tokens_per_sec": 0
+      },
+      "knowledge": {
+        "success": false,
+        "error": "Command '['ollama', 'run', 'qwen2.5:14b', 'What is machine learning in one sentence?']' timed out after 120 seconds",
+        "duration": 120,
+        "tokens_per_sec": 0
+      }
+    },
+    "deepseek-r1:14b": {
+      "reasoning": {
+        "success": false,
+        "error": "Command '['ollama', 'run', 'deepseek-r1:14b', 'What is 15 + 27? Explain.']' timed out after 120 seconds",
+        "duration": 120,
+        "tokens_per_sec": 0
+      },
+      "coding": {
+        "success": false,
+        "error": "Command '['ollama', 'run', 'deepseek-r1:14b', 'Write a Python function to add two numbers.']' timed out after 120 seconds",
+        "duration": 120,
+        "tokens_per_sec": 0
+      },
+      "knowledge": {
+        "success": false,
+        "error": "Command '['ollama', 'run', 'deepseek-r1:14b', 'What is machine learning in one sentence?']' timed out after 120 seconds",
+        "duration": 120,
+        "tokens_per_sec": 0
+      }
+    },
+    "gemma3:27b": {
+      "reasoning": {
+        "success": false,
+        "error": "Command '['ollama', 'run', 'gemma3:27b', 'What is 15 + 27? Explain.']' timed out after 120 seconds",
+        "duration": 120,
+        "tokens_per_sec": 0
+      },
+      "coding": {
+        "success": false,
+        "duration": 95.83,
+        "tokens_per_sec": 0.1,
+        "tokens": 10,
+        "output_preview": ""
+      },
+      "knowledge": {
+        "success": false,
+        "error": "Command '['ollama', 'run', 'gemma3:27b', 'What is machine learning in one sentence?']' timed out after 120 seconds",
+        "duration": 120,
+        "tokens_per_sec": 0
+      }
+    }
+  }
+}
