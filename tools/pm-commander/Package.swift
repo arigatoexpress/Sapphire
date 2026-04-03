@@ -2,14 +2,14 @@
 import PackageDescription
 
 let package = Package(
-    name: "PMCommanderApp",
+    name: "SapphireCommand",
     platforms: [.macOS(.v14)],
     products: [
-        .executable(name: "PMCommanderApp", targets: ["PMCommanderApp"]),
+        .executable(name: "SapphireCommand", targets: ["SapphireCommand"]),
     ],
     targets: [
         .executableTarget(
-            name: "PMCommanderApp",
+            name: "SapphireCommand",
             path: "Sources"
         )
     ]

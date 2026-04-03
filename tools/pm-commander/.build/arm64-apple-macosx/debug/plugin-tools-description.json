@@ -1,0 +1,296 @@
+{
+  "builtTestProducts" : [
+
+  ],
+  "copyCommands" : {
+
+  },
+  "explicitTargetDependencyImportCheckingMode" : {
+    "none" : {
+
+    }
+  },
+  "generatedSourceTargetSet" : [
+
+  ],
+  "pluginDescriptions" : [
+
+  ],
+  "swiftCommands" : {
+    "C.SapphireCommand-arm64-apple-macosx-debug.module" : {
+      "executable" : "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "fileList" : "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/sources",
+      "importPath" : "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/AppState.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/ContentView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/Models.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/SapphireCommandApp.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/sources"
+        }
+      ],
+      "isLibrary" : false,
+      "moduleName" : "SapphireCommand",
+      "moduleOutputPath" : "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/Modules/SapphireCommand.swiftmodule",
+      "objects" : [
+        "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/AppState.swift.o",
+        "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/ContentView.swift.o",
+        "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/Models.swift.o",
+        "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/SapphireCommandApp.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-j14",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-Xfrontend",
+        "-entry-point-function-name",
+        "-Xfrontend",
+        "SapphireCommand_main",
+        "-swift-version",
+        "6",
+        "-I",
+        "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+        "-L",
+        "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+        "-plugin-path",
+        "/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "pm_commander"
+      ],
+      "outputFileMapPath" : "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/AppState.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/ContentView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/Models.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/SapphireCommandApp.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/Modules/SapphireCommand.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/AppState.swift",
+        "/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/ContentView.swift",
+        "/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/Models.swift",
+        "/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/SapphireCommandApp.swift"
+      ],
+      "tempsPath" : "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build",
+      "wholeModuleOptimization" : false
+    }
+  },
+  "swiftFrontendCommands" : {
+
+  },
+  "swiftTargetScanArgs" : {
+    "SapphireCommand" : [
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "-module-name",
+      "SapphireCommand",
+      "-package-name",
+      "pm_commander",
+      "-c",
+      "/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/AppState.swift",
+      "/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/ContentView.swift",
+      "/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/Models.swift",
+      "/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/SapphireCommandApp.swift",
+      "-I",
+      "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-j14",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-Xfrontend",
+      "-entry-point-function-name",
+      "-Xfrontend",
+      "SapphireCommand_main",
+      "-swift-version",
+      "6",
+      "-I",
+      "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+      "-L",
+      "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+      "-plugin-path",
+      "/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "pm_commander",
+      "-driver-use-frontend-path",
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc"
+    ]
+  },
+  "targetDependencyMap" : {
+    "SapphireCommand" : [
+
+    ]
+  },
+  "testDiscoveryCommands" : {
+
+  },
+  "testEntryPointCommands" : {
+
+  },
+  "traitConfiguration" : {
+    "default" : {
+
+    }
+  },
+  "writeCommands" : {
+    "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand-entitlement.plist" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<entitlement-plist>"
+        },
+        {
+          "kind" : "virtual",
+          "name" : "<com.apple.security.get-task-allow>"
+        }
+      ],
+      "outputFilePath" : "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand-entitlement.plist"
+    },
+    "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/AppState.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/ContentView.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/Models.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/SapphireCommandApp.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/sources"
+    },
+    "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/AppState.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/ContentView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/Models.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/SapphireCommandApp.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.product/Objects.LinkFileList"
+    },
+    "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt" : {
+      "alwaysOutOfDate" : true,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<swift-get-version>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Library/Developer/CommandLineTools/usr/bin/swiftc"
+        }
+      ],
+      "outputFilePath" : "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+    }
+  }
+}

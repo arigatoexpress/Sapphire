@@ -1,0 +1,66 @@
+client:
+  name: basic
+  file-system: device-agnostic
+tools: {}
+targets:
+  "PackageStructure": ["<PackageStructure>"]
+  "SapphireCommand-arm64-apple-macosx-release.exe": ["<SapphireCommand-arm64-apple-macosx-release.exe>"]
+  "SapphireCommand-arm64-apple-macosx-release.module": ["<SapphireCommand-arm64-apple-macosx-release.module>"]
+  "main": ["<SapphireCommand-arm64-apple-macosx-release.exe>","<SapphireCommand-arm64-apple-macosx-release.module>"]
+  "test": ["<SapphireCommand-arm64-apple-macosx-release.exe>","<SapphireCommand-arm64-apple-macosx-release.module>"]
+default: "main"
+nodes:
+  "/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+commands:
+  "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/AppState.swift","/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/ContentView.swift","/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/Models.swift","/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/SapphireCommandApp.swift"]
+    outputs: ["/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand.build/sources"]
+    description: "Write auxiliary file /Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand.build/sources"
+
+  "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand.product/Objects.LinkFileList":
+    tool: write-auxiliary-file
+    inputs: ["<link-file-list>","/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand.build/AppState.swift.o","/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand.build/ContentView.swift.o","/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand.build/Models.swift.o","/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand.build/SapphireCommandApp.swift.o"]
+    outputs: ["/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand.product/Objects.LinkFileList"]
+    description: "Write auxiliary file /Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand.product/Objects.LinkFileList"
+
+  "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/swift-version--1AB21518FC5DEDBE.txt":
+    tool: write-auxiliary-file
+    inputs: ["<swift-get-version>","/Library/Developer/CommandLineTools/usr/bin/swiftc"]
+    outputs: ["/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/swift-version--1AB21518FC5DEDBE.txt"]
+    always-out-of-date: "true"
+    description: "Write auxiliary file /Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/swift-version--1AB21518FC5DEDBE.txt"
+
+  "<SapphireCommand-arm64-apple-macosx-release.exe>":
+    tool: phony
+    inputs: ["/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand"]
+    outputs: ["<SapphireCommand-arm64-apple-macosx-release.exe>"]
+
+  "<SapphireCommand-arm64-apple-macosx-release.module>":
+    tool: phony
+    inputs: ["/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand.build/AppState.swift.o","/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand.build/ContentView.swift.o","/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand.build/Models.swift.o","/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand.build/SapphireCommandApp.swift.o","/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/Modules/SapphireCommand.swiftmodule"]
+    outputs: ["<SapphireCommand-arm64-apple-macosx-release.module>"]
+
+  "C.SapphireCommand-arm64-apple-macosx-release.exe":
+    tool: shell
+    inputs: ["/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand.build/AppState.swift.o","/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand.build/ContentView.swift.o","/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand.build/Models.swift.o","/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand.build/SapphireCommandApp.swift.o","/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand.product/Objects.LinkFileList"]
+    outputs: ["/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand"]
+    description: "Linking ./.build/arm64-apple-macosx/release/SapphireCommand"
+    args: ["/Library/Developer/CommandLineTools/usr/bin/swiftc","-L","/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release","-o","/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand","-module-name","SapphireCommand","-Xlinker","-no_warn_duplicate_libraries","-emit-executable","-Xlinker","-dead_strip","-Xlinker","-alias","-Xlinker","_SapphireCommand_main","-Xlinker","_main","-Xlinker","-rpath","-Xlinker","@loader_path","@/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand.product/Objects.LinkFileList","-Xlinker","-rpath","-Xlinker","/Library/Developer/CommandLineTools/usr/lib/swift-6.2/macosx","-target","arm64-apple-macosx14.0","-I","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-L","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-plugin-path","/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing","-sdk","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-g"]
+
+  "C.SapphireCommand-arm64-apple-macosx-release.module":
+    tool: shell
+    inputs: ["/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/AppState.swift","/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/ContentView.swift","/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/Models.swift","/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/SapphireCommandApp.swift","/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/swift-version--1AB21518FC5DEDBE.txt","/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand.build/sources"]
+    outputs: ["/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand.build/AppState.swift.o","/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand.build/ContentView.swift.o","/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand.build/Models.swift.o","/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand.build/SapphireCommandApp.swift.o","/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/Modules/SapphireCommand.swiftmodule"]
+    description: "Compiling Swift Module 'SapphireCommand' (4 sources)"
+    args: ["/Library/Developer/CommandLineTools/usr/bin/swiftc","-module-name","SapphireCommand","-emit-dependencies","-emit-module","-emit-module-path","/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/Modules/SapphireCommand.swiftmodule","-output-file-map","/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand.build/output-file-map.json","-whole-module-optimization","-num-threads","14","-c","@/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/SapphireCommand.build/sources","-I","/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/Modules","-target","arm64-apple-macosx14.0","-whole-module-optimization","-num-threads","14","-serialize-diagnostics","-O","-j14","-DSWIFT_PACKAGE","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/release/ModuleCache","-parseable-output","-Xfrontend","-entry-point-function-name","-Xfrontend","SapphireCommand_main","-swift-version","6","-I","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-L","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-plugin-path","/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing","-sdk","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-g","-Xcc","-isysroot","-Xcc","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-Xcc","-fPIC","-Xcc","-g","-package-name","pm_commander"]
+
+  "PackageStructure":
+    tool: package-structure-tool
+    inputs: ["/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/","/Users/aribs/Code/Sapphire/tools/pm-commander/Package.swift","/Users/aribs/Code/Sapphire/tools/pm-commander/Package.resolved"]
+    outputs: ["<PackageStructure>"]
+    description: "Planning build"
+    allow-missing-inputs: true
+

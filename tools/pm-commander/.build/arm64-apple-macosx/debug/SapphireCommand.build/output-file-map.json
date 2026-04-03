@@ -1,0 +1,33 @@
+{
+  "": {
+    "swift-dependencies": "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/primary.swiftdeps"
+  },
+  "/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/AppState.swift": {
+    "dependencies": "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/AppState.d",
+    "object": "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/AppState.swift.o",
+    "swiftmodule": "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/AppState~partial.swiftmodule",
+    "swift-dependencies": "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/AppState.swiftdeps",
+    "diagnostics": "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/AppState.dia"
+  },
+  "/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/ContentView.swift": {
+    "dependencies": "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/ContentView.d",
+    "object": "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/ContentView.swift.o",
+    "swiftmodule": "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/ContentView~partial.swiftmodule",
+    "swift-dependencies": "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/ContentView.swiftdeps",
+    "diagnostics": "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/ContentView.dia"
+  },
+  "/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/Models.swift": {
+    "dependencies": "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/Models.d",
+    "object": "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/Models.swift.o",
+    "swiftmodule": "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/Models~partial.swiftmodule",
+    "swift-dependencies": "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/Models.swiftdeps",
+    "diagnostics": "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/Models.dia"
+  },
+  "/Users/aribs/Code/Sapphire/tools/pm-commander/Sources/SapphireCommandApp.swift": {
+    "dependencies": "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/SapphireCommandApp.d",
+    "object": "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/SapphireCommandApp.swift.o",
+    "swiftmodule": "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/SapphireCommandApp~partial.swiftmodule",
+    "swift-dependencies": "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/SapphireCommandApp.swiftdeps",
+    "diagnostics": "/Users/aribs/Code/Sapphire/tools/pm-commander/.build/arm64-apple-macosx/debug/SapphireCommand.build/SapphireCommandApp.dia"
+  }
+}
