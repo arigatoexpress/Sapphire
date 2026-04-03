@@ -12,7 +12,7 @@ import time
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import google.generativeai as genai
 from cognitive_mesh import (
@@ -35,11 +35,11 @@ class MarketContext:
     price_change_1h: float
     price_change_24h: float
     volume_24h: float
-    open_interest: Optional[float] = None
-    funding_rate: Optional[float] = None
-    order_book_imbalance: Optional[float] = None
-    recent_trades: List[Dict[str, Any]] = None
-    news_summary: Optional[str] = None
+    open_interest: float | None = None
+    funding_rate: float | None = None
+    order_book_imbalance: float | None = None
+    recent_trades: list[dict[str, Any]] = None
+    news_summary: str | None = None
 
     def to_prompt(self) -> str:
         """Convert context to natural language for LLM."""
@@ -85,7 +85,7 @@ class CognitiveAgent(ABC):
         self.agent_id = agent_id
         self.role = role
         self.model_name = model_name
-        self.mesh: Optional[CognitiveMesh] = None
+        self.mesh: CognitiveMesh | None = None
 
         # Initialize Gemini
         api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
@@ -101,7 +101,7 @@ class CognitiveAgent(ABC):
         self.message_count = 0
         self.last_reasoning_time_ms = 0.0
 
-    async def connect(self, mesh: Optional[CognitiveMesh] = None) -> None:
+    async def connect(self, mesh: CognitiveMesh | None = None) -> None:
         """Connect this agent to the cognitive mesh."""
         self.mesh = mesh or get_cognitive_mesh()
         await self.mesh.register_agent(
@@ -115,7 +115,7 @@ class CognitiveAgent(ABC):
         logger.info(f"🔗 Agent {self.agent_id} connected to mesh")
 
     @abstractmethod
-    def get_capabilities(self) -> List[str]:
+    def get_capabilities(self) -> list[str]:
         """Return list of capabilities this agent provides."""
         pass
 
@@ -175,10 +175,10 @@ class CognitiveAgent(ABC):
         self,
         message_type: MessageType,
         reasoning: str,
-        symbol: Optional[str] = None,
-        suggested_action: Optional[str] = None,
+        symbol: str | None = None,
+        suggested_action: str | None = None,
         confidence: float = 0.0,
-        metadata: Dict[str, Any] = None,
+        metadata: dict[str, Any] = None,
     ) -> CognitiveMessage:
         """Broadcast a cognitive message to the mesh."""
         message = CognitiveMessage(
@@ -211,7 +211,7 @@ class ScoutAgent(CognitiveAgent):
     def __init__(self, agent_id: str = "scout-1"):
         super().__init__(agent_id, AgentRole.SCOUT, "gemini-2.0-flash")
 
-    def get_capabilities(self) -> List[str]:
+    def get_capabilities(self) -> list[str]:
         return ["market_observation", "pattern_detection", "anomaly_detection"]
 
     def get_system_prompt(self) -> str:
@@ -280,7 +280,7 @@ class SniperAgent(CognitiveAgent):
     def __init__(self, agent_id: str = "sniper-1"):
         super().__init__(agent_id, AgentRole.SNIPER, "gemini-2.0-flash")
 
-    def get_capabilities(self) -> List[str]:
+    def get_capabilities(self) -> list[str]:
         return ["execution_timing", "entry_analysis", "exit_analysis", "order_book_reading"]
 
     def get_system_prompt(self) -> str:
@@ -348,7 +348,7 @@ class OracleAgent(CognitiveAgent):
     def __init__(self, agent_id: str = "oracle-1"):
         super().__init__(agent_id, AgentRole.ORACLE, "gemini-2.0-flash")
 
-    def get_capabilities(self) -> List[str]:
+    def get_capabilities(self) -> list[str]:
         return ["consensus_arbitration", "risk_assessment", "final_decision", "strategy_synthesis"]
 
     def get_system_prompt(self) -> str:

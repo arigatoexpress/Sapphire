@@ -16,7 +16,7 @@ for agent consumption and strategy refinement.
 import threading
 import time
 from collections import defaultdict
-from typing import Any, Dict, List
+from typing import Any
 
 from loguru import logger
 
@@ -34,21 +34,21 @@ class SwarmLearning:
     def __init__(self):
         self._lock = threading.Lock()
         # Resolved idea outcomes — the raw learning data
-        self._history: List[Dict[str, Any]] = []
+        self._history: list[dict[str, Any]] = []
         # Aggregated performance by dimension
-        self._symbol_stats: Dict[str, Dict[str, float]] = defaultdict(
+        self._symbol_stats: dict[str, dict[str, float]] = defaultdict(
             lambda: {"wins": 0, "losses": 0, "total_pnl": 0.0, "count": 0}
         )
-        self._timeframe_stats: Dict[str, Dict[str, float]] = defaultdict(
+        self._timeframe_stats: dict[str, dict[str, float]] = defaultdict(
             lambda: {"wins": 0, "losses": 0, "accurate": 0, "count": 0}
         )
-        self._direction_stats: Dict[str, Dict[str, float]] = defaultdict(
+        self._direction_stats: dict[str, dict[str, float]] = defaultdict(
             lambda: {"wins": 0, "losses": 0, "accurate": 0, "count": 0}
         )
-        self._conviction_buckets: Dict[str, Dict[str, float]] = defaultdict(
+        self._conviction_buckets: dict[str, dict[str, float]] = defaultdict(
             lambda: {"wins": 0, "losses": 0, "count": 0}
         )
-        self._bot_pair_stats: Dict[str, Dict[str, float]] = defaultdict(
+        self._bot_pair_stats: dict[str, dict[str, float]] = defaultdict(
             lambda: {"wins": 0, "losses": 0, "count": 0}
         )
         self._last_insight_at = 0.0
@@ -59,12 +59,12 @@ class SwarmLearning:
         direction: str,
         timeframe: str,
         conviction: float,
-        contributors: List[str],
+        contributors: list[str],
         accurate: bool,
         profitable: bool,
         pnl: float = 0.0,
         consensus: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Record a resolved trade outcome for learning.
 
         This should be called after a swarm consensus trade is executed
@@ -157,7 +157,7 @@ class SwarmLearning:
 
             return {"ok": True, "total_records": len(self._history)}
 
-    def get_symbol_insights(self, min_samples: int = 0) -> List[Dict[str, Any]]:
+    def get_symbol_insights(self, min_samples: int = 0) -> list[dict[str, Any]]:
         """Return performance insights per symbol."""
         threshold = min_samples or self.MIN_SAMPLES_FOR_INSIGHT
         with self._lock:
@@ -183,7 +183,7 @@ class SwarmLearning:
             results.sort(key=lambda x: x["win_rate"], reverse=True)
             return results
 
-    def get_timeframe_insights(self, min_samples: int = 0) -> List[Dict[str, Any]]:
+    def get_timeframe_insights(self, min_samples: int = 0) -> list[dict[str, Any]]:
         """Return performance insights per timeframe."""
         threshold = min_samples or self.MIN_SAMPLES_FOR_INSIGHT
         with self._lock:
@@ -208,7 +208,7 @@ class SwarmLearning:
             results.sort(key=lambda x: x["win_rate"], reverse=True)
             return results
 
-    def get_direction_insights(self) -> Dict[str, Any]:
+    def get_direction_insights(self) -> dict[str, Any]:
         """Return long vs short performance comparison."""
         with self._lock:
             result = {}
@@ -228,7 +228,7 @@ class SwarmLearning:
                 }
             return result
 
-    def get_conviction_calibration(self) -> List[Dict[str, Any]]:
+    def get_conviction_calibration(self) -> list[dict[str, Any]]:
         """Return conviction vs actual win rate (calibration curve).
 
         This reveals whether high-conviction signals actually win more often.
@@ -252,7 +252,7 @@ class SwarmLearning:
                 })
             return results
 
-    def get_bot_synergy(self, min_samples: int = 0) -> List[Dict[str, Any]]:
+    def get_bot_synergy(self, min_samples: int = 0) -> list[dict[str, Any]]:
         """Return bot pair synergy insights.
 
         Which pairs of bots, when they agree, produce the best results?
@@ -280,7 +280,7 @@ class SwarmLearning:
             results.sort(key=lambda x: x["win_rate"], reverse=True)
             return results
 
-    def generate_report(self) -> Dict[str, Any]:
+    def generate_report(self) -> dict[str, Any]:
         """Generate a comprehensive learning report.
 
         Combines all dimensions into a single structured report suitable
@@ -379,7 +379,7 @@ class SwarmLearning:
 
         return round(max(0.0, min(1.0, adjusted)), 4)
 
-    def summary(self) -> Dict[str, Any]:
+    def summary(self) -> dict[str, Any]:
         """Quick summary stats."""
         with self._lock:
             total = len(self._history)

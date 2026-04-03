@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Dict, List
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ class CIFeedbackProcessor:
         self.tasks = task_manager
         self.telegram = telegram_bot
 
-    def process_test_results(self, raw_output: str) -> Dict[str, Any]:
+    def process_test_results(self, raw_output: str) -> dict[str, Any]:
         """Parse pytest output and create tasks for failures.
 
         Returns summary of actions taken.
@@ -62,7 +62,7 @@ class CIFeedbackProcessor:
             "failure_names": [f["test_name"] for f in failures[:10]],
         }
 
-    def process_build_result(self, status: str, build_id: str = "", error: str = "") -> Dict[str, Any]:
+    def process_build_result(self, status: str, build_id: str = "", error: str = "") -> dict[str, Any]:
         """Process a Cloud Build result. Creates task on failure."""
         if status.upper() == "SUCCESS":
             return {"ok": True, "action": "none"}
@@ -80,9 +80,9 @@ class CIFeedbackProcessor:
     # ── Internal parsers ─────────────────────────────────────────────
 
     @staticmethod
-    def _parse_pytest_failures(output: str) -> List[Dict[str, str]]:
+    def _parse_pytest_failures(output: str) -> list[dict[str, str]]:
         """Extract individual test failures from pytest output."""
-        failures: List[Dict[str, str]] = []
+        failures: list[dict[str, str]] = []
         # Pattern: FAILED tests/unit/test_foo.py::test_bar - AssertionError: ...
         pattern = re.compile(r"FAILED\s+([\w/\.\-:]+)\s*[-–]\s*(.*)")
         for match in pattern.finditer(output):

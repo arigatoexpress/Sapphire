@@ -7,7 +7,6 @@ Uses SEPARATE browser instance that won't interfere with your main Chrome
 import asyncio
 import logging
 from datetime import datetime
-from typing import Dict
 
 logging.basicConfig(
     level=logging.INFO,
@@ -146,7 +145,7 @@ class DedicatedTVController:
             logger.error(f"Watchlist error: {e}")
             return {"status": "error", "message": str(e)}
             
-    async def get_chart_data(self) -> Dict:
+    async def get_chart_data(self) -> dict:
         """Extract chart data"""
         if not self.page:
             return {}
@@ -206,7 +205,7 @@ class DedicatedTVController:
             return {"status": "ok", "path": path}
         return {"status": "error", "message": "No page"}
         
-    async def get_status(self) -> Dict:
+    async def get_status(self) -> dict:
         return {
             "connected": self.connected,
             "browser": "Dedicated Chromium",

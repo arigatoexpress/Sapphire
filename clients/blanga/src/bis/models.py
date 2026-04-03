@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from enum import Enum
-from typing import Dict, List, Optional
 from uuid import uuid4
 
 
 def utc_now() -> datetime:
-    return datetime.now(tz=timezone.utc)
+    return datetime.now(tz=UTC)
 
 
 def make_urn(prefix: str) -> str:
@@ -53,8 +52,8 @@ class ReviewStatus(str, Enum):
 class Person:
     person_urn: str
     full_name: str
-    phones: List[str] = field(default_factory=list)
-    emails: List[str] = field(default_factory=list)
+    phones: list[str] = field(default_factory=list)
+    emails: list[str] = field(default_factory=list)
     dnc: bool = False
     notes: str = ""
     created_at: datetime = field(default_factory=utc_now)
@@ -67,7 +66,7 @@ class LlcEntity:
     legal_name: str
     state: str = "TX"
     sos_file_number: str = ""
-    officer_person_urns: List[str] = field(default_factory=list)
+    officer_person_urns: list[str] = field(default_factory=list)
     created_at: datetime = field(default_factory=utc_now)
     updated_at: datetime = field(default_factory=utc_now)
 
@@ -85,21 +84,21 @@ class PropertyAsset:
     asset_type: str = "stnl_retail"
     tenant_brand: str = ""
     occupancy_status: str = ""
-    building_sqft: Optional[float] = None
-    land_acres: Optional[float] = None
-    year_built: Optional[int] = None
-    asking_price: Optional[float] = None
-    noi: Optional[float] = None
-    cap_rate: Optional[float] = None
-    current_rent_psf: Optional[float] = None
-    submarket_avg_rent_psf: Optional[float] = None
-    lease_expiration: Optional[date] = None
-    ownership_start: Optional[date] = None
-    owner_llc_urns: List[str] = field(default_factory=list)
+    building_sqft: float | None = None
+    land_acres: float | None = None
+    year_built: int | None = None
+    asking_price: float | None = None
+    noi: float | None = None
+    cap_rate: float | None = None
+    current_rent_psf: float | None = None
+    submarket_avg_rent_psf: float | None = None
+    lease_expiration: date | None = None
+    ownership_start: date | None = None
+    owner_llc_urns: list[str] = field(default_factory=list)
     listing_status: ListingStatus = ListingStatus.DRAFT
-    listed_at: Optional[date] = None
-    sold_at: Optional[date] = None
-    close_price: Optional[float] = None
+    listed_at: date | None = None
+    sold_at: date | None = None
+    close_price: float | None = None
     listing_broker: str = ""
     redo: bool = False
     potential_listing: bool = False
@@ -112,9 +111,9 @@ class PropertyAsset:
 class NoteEntry:
     note_urn: str
     note_text: str
-    owner_person_urn: Optional[str] = None
-    property_urn: Optional[str] = None
-    tags: List[str] = field(default_factory=list)
+    owner_person_urn: str | None = None
+    property_urn: str | None = None
+    tags: list[str] = field(default_factory=list)
     created_by: str = "broker"
     created_at: datetime = field(default_factory=utc_now)
 
@@ -125,19 +124,19 @@ class ProgressSignal:
     source: str
     signal_type: SignalType
     observed_at: datetime
-    property_urn: Optional[str] = None
+    property_urn: str | None = None
     property_address_hint: str = ""
-    value_delta: Optional[float] = None
-    attributes: Dict[str, str] = field(default_factory=dict)
+    value_delta: float | None = None
+    attributes: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
 class OMExtractionRecord:
     extraction_urn: str
     source_name: str
-    property_urn: Optional[str]
-    fields: Dict[str, str]
-    confidences: Dict[str, float]
+    property_urn: str | None
+    fields: dict[str, str]
+    confidences: dict[str, float]
     extracted_at: datetime = field(default_factory=utc_now)
 
 
@@ -145,7 +144,7 @@ class OMExtractionRecord:
 class PropensityScore:
     property_urn: str
     score: float
-    components: Dict[str, float]
+    components: dict[str, float]
     generated_at: datetime = field(default_factory=utc_now)
 
 
@@ -155,9 +154,9 @@ class GeneratedDocument:
     doc_type: str
     title: str
     content: str
-    property_urn: Optional[str] = None
-    owner_person_urn: Optional[str] = None
-    source_event_urn: Optional[str] = None
+    property_urn: str | None = None
+    owner_person_urn: str | None = None
+    source_event_urn: str | None = None
     created_at: datetime = field(default_factory=utc_now)
 
 
@@ -167,13 +166,13 @@ class MarketEvent:
     event_type: MarketEventType
     title: str
     observed_at: datetime
-    property_urn: Optional[str] = None
+    property_urn: str | None = None
     property_address_hint: str = ""
-    owner_person_urn: Optional[str] = None
+    owner_person_urn: str | None = None
     company_name: str = ""
     source_url: str = ""
     summary: str = ""
-    attributes: Dict[str, str] = field(default_factory=dict)
+    attributes: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -200,6 +199,6 @@ class ReviewTask:
     field_name: str
     status: ReviewStatus = ReviewStatus.PENDING
     created_at: datetime = field(default_factory=utc_now)
-    reviewed_at: Optional[datetime] = None
+    reviewed_at: datetime | None = None
     reviewed_by: str = ""
     review_note: str = ""

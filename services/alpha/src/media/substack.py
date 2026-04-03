@@ -4,7 +4,6 @@ import os
 import smtplib
 import time
 from email.message import EmailMessage
-from typing import Optional
 
 import aiohttp
 from loguru import logger
@@ -74,7 +73,7 @@ class SubstackClient:
             "`SAPPHIRE_MEDIA_SUBSTACK_POST_URL` or SMTP + publication email vars."
         )
 
-    async def post(self, title: str, body: str) -> Optional[str]:
+    async def post(self, title: str, body: str) -> str | None:
         """
         Publish to Substack via configured mode.
 

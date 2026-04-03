@@ -8,7 +8,6 @@ Can be run as Cloud Run job, Cloud Function, or locally
 import os
 import sys
 from datetime import datetime
-from typing import Dict
 
 import requests
 
@@ -36,7 +35,7 @@ class HealthMonitor:
         self.previous_status = {}
         self.alert_count = 0
     
-    def check_health(self) -> Dict:
+    def check_health(self) -> dict:
         """Check system health and return status"""
         try:
             resp = requests.get(
@@ -101,7 +100,7 @@ class HealthMonitor:
                 'timestamp': datetime.utcnow().isoformat()
             }
     
-    def send_alert(self, status: Dict):
+    def send_alert(self, status: dict):
         """Send alert via configured channels"""
         message = self._format_alert(status)
         
@@ -116,7 +115,7 @@ class HealthMonitor:
         # Print to stdout (for Cloud Logging)
         print(f"ALERT: {message}")
     
-    def _format_alert(self, status: Dict) -> str:
+    def _format_alert(self, status: dict) -> str:
         """Format alert message"""
         status_emoji = {
             'healthy': '✅',

@@ -13,7 +13,7 @@ Endpoints:
 import os
 import re
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import aiohttp
 
@@ -65,7 +65,7 @@ _SYMBOL_EXTRACTION = {
 }
 
 
-def _classify_kalshi_relevance(title: str, category: str) -> Optional[SignalRelevance]:
+def _classify_kalshi_relevance(title: str, category: str) -> SignalRelevance | None:
     """Classify market relevance to crypto trading."""
     text = f"{title} {category}".lower()
     if _CRYPTO_PATTERNS.search(text):
@@ -75,7 +75,7 @@ def _classify_kalshi_relevance(title: str, category: str) -> Optional[SignalRele
     return None
 
 
-def _extract_symbols_kalshi(title: str) -> List[str]:
+def _extract_symbols_kalshi(title: str) -> list[str]:
     """Extract crypto symbols mentioned in market title."""
     symbols = []
     text = title.lower()
@@ -93,7 +93,7 @@ class KalshiClient(PredictionMarketFeed):
         poll_interval: float = 90.0,
         min_volume: int = 100,
         max_markets: int = 50,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
     ):
         super().__init__(source=PredictionSource.KALSHI, poll_interval=poll_interval)
         self.min_volume = min_volume
@@ -101,9 +101,9 @@ class KalshiClient(PredictionMarketFeed):
         self._api_base = KALSHI_API_BASE
         self._api_key = api_key or os.getenv("KALSHI_API_KEY", "")
 
-    async def _fetch_markets(self, session: aiohttp.ClientSession) -> List[PredictionSignal]:
+    async def _fetch_markets(self, session: aiohttp.ClientSession) -> list[PredictionSignal]:
         """Fetch active Kalshi markets and filter for crypto/macro relevance."""
-        signals: List[PredictionSignal] = []
+        signals: list[PredictionSignal] = []
 
         try:
             params = {
@@ -142,7 +142,7 @@ class KalshiClient(PredictionMarketFeed):
 
         return signals
 
-    def _parse_market(self, raw: Dict[str, Any]) -> Optional[PredictionSignal]:
+    def _parse_market(self, raw: dict[str, Any]) -> PredictionSignal | None:
         """Parse a Kalshi market into a PredictionSignal if relevant."""
         ticker = str(raw.get("ticker", "")).strip()
         event_ticker = str(raw.get("event_ticker", "")).strip()
@@ -226,7 +226,7 @@ class KalshiClient(PredictionMarketFeed):
         )
 
     @staticmethod
-    def _extract_probability(raw: Dict[str, Any]) -> Optional[float]:
+    def _extract_probability(raw: dict[str, Any]) -> float | None:
         """Extract YES probability from Kalshi market data (prices in cents 0-100)."""
         # Use yes_bid and yes_ask midpoint
         yes_bid = raw.get("yes_bid")

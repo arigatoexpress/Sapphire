@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from loguru import logger
 
@@ -71,9 +71,9 @@ class PortfolioTracker:
 
     def __init__(self, max_closed_trades: int = 500) -> None:
         # Active positions: key = (VENUE, SYMBOL)
-        self._positions: Dict[Tuple[str, str], Position] = {}
+        self._positions: dict[tuple[str, str], Position] = {}
         # Closed trade history (ring buffer)
-        self._closed_trades: List[ClosedTrade] = []
+        self._closed_trades: list[ClosedTrade] = []
         self._max_closed = max(1, max_closed_trades)
         # Aggregate stats
         self._total_realized_pnl: float = 0.0
@@ -83,7 +83,7 @@ class PortfolioTracker:
 
     # ── Fill Processing ────────────────────────────────────────────
 
-    def process_fill(self, fill: Dict[str, Any]) -> Optional[ClosedTrade]:
+    def process_fill(self, fill: dict[str, Any]) -> ClosedTrade | None:
         """Process a trade execution fill.
 
         Returns a ClosedTrade if the fill closed a position, else None.
@@ -196,8 +196,8 @@ class PortfolioTracker:
             return None
 
     def _close_position(
-        self, key: Tuple[str, str], exit_price: float, qty: float, fill: Dict[str, Any]
-    ) -> Optional[ClosedTrade]:
+        self, key: tuple[str, str], exit_price: float, qty: float, fill: dict[str, Any]
+    ) -> ClosedTrade | None:
         existing = self._positions.pop(key, None)
         if existing is None:
             return None
@@ -254,7 +254,7 @@ class PortfolioTracker:
 
     # ── Market Price Updates ───────────────────────────────────────
 
-    def update_prices(self, snapshot: Dict[str, Dict[str, Dict[str, Any]]]) -> None:
+    def update_prices(self, snapshot: dict[str, dict[str, dict[str, Any]]]) -> None:
         """Update all positions with latest market prices.
 
         snapshot format: {VENUE: {SYMBOL: {price: float, ...}}}
@@ -269,18 +269,18 @@ class PortfolioTracker:
     # ── Queries ────────────────────────────────────────────────────
 
     @property
-    def open_positions(self) -> List[Position]:
+    def open_positions(self) -> list[Position]:
         return list(self._positions.values())
 
     @property
-    def closed_trades(self) -> List[ClosedTrade]:
+    def closed_trades(self) -> list[ClosedTrade]:
         return list(self._closed_trades)
 
-    def position_for(self, venue: str, symbol: str) -> Optional[Position]:
+    def position_for(self, venue: str, symbol: str) -> Position | None:
         key = (venue.upper(), self._normalize_symbol(venue.upper(), symbol))
         return self._positions.get(key)
 
-    def snapshot(self) -> Dict[str, Any]:
+    def snapshot(self) -> dict[str, Any]:
         """Full portfolio snapshot for Telegram / API / AI context."""
         positions = []
         total_unrealized = 0.0

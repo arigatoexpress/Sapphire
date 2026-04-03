@@ -13,7 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 from collections import Counter, defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -32,11 +32,11 @@ def _as_dt(value: Any) -> datetime | None:
     if value is None:
         return None
     if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
     if isinstance(value, str):
         try:
             parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-            return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+            return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
         except ValueError:
             return None
     return None
@@ -158,7 +158,7 @@ def _write_html_dashboard(
     exec_rows: list[dict[str, Any]],
 ) -> str:
     labels = [
-        row["recorded_at"].astimezone(timezone.utc).strftime("%m-%d %H:%M")
+        row["recorded_at"].astimezone(UTC).strftime("%m-%d %H:%M")
         for row in equity_rows
     ]
     equity = [_as_float(row.get("equity_estimate")) for row in equity_rows]
@@ -244,7 +244,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     since = now - timedelta(hours=max(1, args.hours))
     stamp = now.strftime("%Y%m%d_%H%M%S")
     out_dir = (

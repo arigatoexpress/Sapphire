@@ -29,7 +29,7 @@ import math
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -49,8 +49,8 @@ class ShieldStatus(Enum):
 class ShieldTradeResult:
     """Result of a shield trade execution"""
     status: ShieldStatus
-    entry_order_id: Optional[str] = None
-    sl_order_id: Optional[str] = None
+    entry_order_id: str | None = None
+    sl_order_id: str | None = None
     entry_price: float = 0.0
     sl_price: float = 0.0
     leverage: float = 0.0
@@ -58,7 +58,7 @@ class ShieldTradeResult:
     entry_timestamp: float = 0.0
     sl_timestamp: float = 0.0
     sl_placement_latency_ms: float = 0.0
-    error: Optional[str] = None
+    error: str | None = None
     reasoning: str = ""
 
 
@@ -95,7 +95,7 @@ class AsterShieldStrategy:
             aster_client: Aster API client for order execution
         """
         self.aster_client = aster_client
-        self.active_shields: Dict[str, Dict[str, Any]] = {}
+        self.active_shields: dict[str, dict[str, Any]] = {}
 
         # Performance tracking
         self.shield_stats = {
@@ -234,7 +234,7 @@ class AsterShieldStrategy:
         side: str = "LONG",
         volatility: float = 0.02,
         portfolio_leverage: float = 0.0,
-        quantity: Optional[float] = None
+        quantity: float | None = None
     ) -> ShieldTradeResult:
         """
         Execute a shield-protected trade with rapid SL placement
@@ -472,7 +472,7 @@ class AsterShieldStrategy:
             self.shield_stats["slowest_sl_ms"], latency_ms
         )
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get shield strategy statistics"""
         return {
             **self.shield_stats,
@@ -482,6 +482,6 @@ class AsterShieldStrategy:
             ),
         }
 
-    def get_active_shields(self) -> Dict[str, Dict[str, Any]]:
+    def get_active_shields(self) -> dict[str, dict[str, Any]]:
         """Get all active shield positions"""
         return self.active_shields.copy()

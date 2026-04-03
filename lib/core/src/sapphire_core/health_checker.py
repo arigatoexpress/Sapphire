@@ -48,7 +48,7 @@ class HealthChecker:
                         return True, data
                     else:
                         return False, f"HTTP {resp.status}"
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return False, "Timeout"
         except Exception as e:
             return False, str(e)[:100]

@@ -8,7 +8,7 @@ import asyncio
 import logging
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import aiohttp
 
@@ -26,12 +26,12 @@ class MarketData:
     source: str = ""
     
     # Technical indicators
-    rsi: Optional[float] = None
-    ema_20: Optional[float] = None
-    ema_50: Optional[float] = None
-    macd: Optional[float] = None
+    rsi: float | None = None
+    ema_20: float | None = None
+    ema_50: float | None = None
+    macd: float | None = None
     
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return asdict(self)
 
 
@@ -45,10 +45,10 @@ class AlphaSignal:
     timestamp: str
     
     # Signal metadata
-    expected_return: Optional[float] = None
+    expected_return: float | None = None
     timeframe: str = "1d"  # '1h', '4h', '1d', '1w'
     
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return asdict(self)
 
 
@@ -59,7 +59,7 @@ class AlphaVantageClient:
     
     def __init__(self, api_key: str):
         self.api_key = api_key
-        self.session: Optional[aiohttp.ClientSession] = None
+        self.session: aiohttp.ClientSession | None = None
         self.rate_limit_delay = 12  # Free tier: 5 calls per minute
         
     async def connect(self):
@@ -73,7 +73,7 @@ class AlphaVantageClient:
             await self.session.close()
             self.session = None
     
-    async def _call_api(self, params: Dict) -> Dict:
+    async def _call_api(self, params: dict) -> dict:
         """Make API call with rate limiting"""
         if not self.session:
             return {'error': 'Not connected'}
@@ -99,7 +99,7 @@ class AlphaVantageClient:
             # Rate limiting
             await asyncio.sleep(self.rate_limit_delay)
     
-    async def get_quote(self, symbol: str) -> Dict:
+    async def get_quote(self, symbol: str) -> dict:
         """Get global quote for symbol"""
         params = {
             'function': 'GLOBAL_QUOTE',
@@ -107,7 +107,7 @@ class AlphaVantageClient:
         }
         return await self._call_api(params)
     
-    async def get_daily(self, symbol: str) -> Dict:
+    async def get_daily(self, symbol: str) -> dict:
         """Get daily time series"""
         params = {
             'function': 'TIME_SERIES_DAILY',
@@ -116,7 +116,7 @@ class AlphaVantageClient:
         }
         return await self._call_api(params)
     
-    async def get_crypto_quote(self, symbol: str, market: str = 'USD') -> Dict:
+    async def get_crypto_quote(self, symbol: str, market: str = 'USD') -> dict:
         """Get cryptocurrency quote"""
         params = {
             'function': 'CURRENCY_EXCHANGE_RATE',
@@ -130,9 +130,9 @@ class AlphaStreamAggregator:
     """Aggregate alpha from multiple sources"""
     
     def __init__(self):
-        self.sources: Dict[str, Any] = {}
-        self.signals: List[AlphaSignal] = []
-        self.market_data: Dict[str, MarketData] = {}
+        self.sources: dict[str, Any] = {}
+        self.signals: list[AlphaSignal] = []
+        self.market_data: dict[str, MarketData] = {}
         self.favorite_symbols = [
             'ETH', 'BTC', 'SOL', 'ZEC', 'HYPE',
             'ETHBTC', 'SOLBTC', 'ZECBTC', 'BTCUSDT', 'ETHUSDT', 'HYPEUSDT'
@@ -143,7 +143,7 @@ class AlphaStreamAggregator:
         self.sources[name] = client
         logger.info(f"Added alpha source: {name}")
     
-    async def fetch_all_market_data(self) -> Dict[str, MarketData]:
+    async def fetch_all_market_data(self) -> dict[str, MarketData]:
         """Fetch market data from all sources"""
         tasks = []
         
@@ -184,7 +184,7 @@ class AlphaStreamAggregator:
             logger.error(f"Error fetching {symbol}: {e}")
             raise
     
-    def generate_signals(self) -> List[AlphaSignal]:
+    def generate_signals(self) -> list[AlphaSignal]:
         """Generate trading signals from aggregated data"""
         signals = []
         
@@ -210,7 +210,7 @@ class AlphaStreamAggregator:
         self.signals = signals
         return signals
     
-    def get_signal_summary(self) -> Dict:
+    def get_signal_summary(self) -> dict:
         """Get summary of current signals"""
         if not self.signals:
             return {'status': 'no_signals', 'count': 0}
@@ -235,7 +235,7 @@ class AlphaStreamAggregator:
 class MockAlphaSource:
     """Mock alpha source for testing without API keys"""
     
-    async def get_crypto_quote(self, symbol: str) -> Dict:
+    async def get_crypto_quote(self, symbol: str) -> dict:
         """Return mock crypto data"""
         mock_prices = {
             'BTC': 65000.0,
@@ -320,12 +320,12 @@ FAVORITE_SYMBOLS_CONFIG = {
 }
 
 
-def get_favorite_symbols() -> List[str]:
+def get_favorite_symbols() -> list[str]:
     """Get list of favorite trading symbols"""
     return list(FAVORITE_SYMBOLS_CONFIG.keys())
 
 
-def get_symbol_config(symbol: str) -> Dict:
+def get_symbol_config(symbol: str) -> dict:
     """Get configuration for a specific symbol"""
     return FAVORITE_SYMBOLS_CONFIG.get(symbol.upper(), {})
 

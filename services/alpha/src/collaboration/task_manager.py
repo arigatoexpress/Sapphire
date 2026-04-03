@@ -18,7 +18,7 @@ import re
 import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from loguru import logger
 
@@ -48,11 +48,11 @@ class TaskManager:
         self._store_path = store_path or os.getenv(
             "SAPPHIRE_TASK_STORE_PATH", ""
         )
-        self._tasks: Dict[str, Dict[str, Any]] = {}
+        self._tasks: dict[str, dict[str, Any]] = {}
         self._task_counter = 0
-        self._milestones: Dict[str, Dict[str, Any]] = {}  # milestone_id → milestone
+        self._milestones: dict[str, dict[str, Any]] = {}  # milestone_id → milestone
         self._milestone_counter = 0
-        self._deliverables: Dict[str, Dict[str, Any]] = {}  # deliverable_id → deliverable
+        self._deliverables: dict[str, dict[str, Any]] = {}  # deliverable_id → deliverable
         self._deliverable_counter = 0
 
         # Load persisted state if available
@@ -68,8 +68,8 @@ class TaskManager:
         agent: str = "UNASSIGNED",
         priority: str = "medium",
         description: str = "",
-        tags: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        tags: list[str] | None = None,
+    ) -> dict[str, Any]:
         """Create a new task.
 
         Args:
@@ -127,7 +127,7 @@ class TaskManager:
             logger.info(f"Task created: {task_id} — {title_clean} (agent={agent_clean})")
             return {"ok": True, "task": task}
 
-    def get_task(self, task_id: str) -> Dict[str, Any]:
+    def get_task(self, task_id: str) -> dict[str, Any]:
         """Retrieve a task by ID."""
         with self._lock:
             task_id_clean = str(task_id or "").strip().upper()
@@ -156,8 +156,8 @@ class TaskManager:
         agent: str = "",
         title: str = "",
         description: str = "",
-        tags: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        tags: list[str] | None = None,
+    ) -> dict[str, Any]:
         """Update a task's fields.
 
         Only provided (non-empty) fields are updated.
@@ -201,7 +201,7 @@ class TaskManager:
             logger.info(f"Task updated: {task_id_clean} status={task['status']}")
             return {"ok": True, "task": task}
 
-    def delete_task(self, task_id: str) -> Dict[str, Any]:
+    def delete_task(self, task_id: str) -> dict[str, Any]:
         """Delete a task and its linked milestones/deliverables."""
         with self._lock:
             task_id_clean = str(task_id or "").strip().upper()
@@ -227,7 +227,7 @@ class TaskManager:
         priority: str = "",
         tag: str = "",
         limit: int = 50,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """List tasks with optional filters.
 
         Args:
@@ -284,7 +284,7 @@ class TaskManager:
         title: str,
         target_date: str = "",
         description: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Add a milestone to a task.
 
         Args:
@@ -331,7 +331,7 @@ class TaskManager:
             logger.info(f"Milestone added: {milestone_id} → {task_id_clean}")
             return {"ok": True, "milestone": milestone}
 
-    def complete_milestone(self, milestone_id: str) -> Dict[str, Any]:
+    def complete_milestone(self, milestone_id: str) -> dict[str, Any]:
         """Mark a milestone as completed."""
         with self._lock:
             mid_clean = str(milestone_id or "").strip().upper()
@@ -360,7 +360,7 @@ class TaskManager:
         deliverable_type: str = "code",
         description: str = "",
         reference: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Add a deliverable to a task.
 
         Args:
@@ -414,7 +414,7 @@ class TaskManager:
             logger.info(f"Deliverable added: {deliverable_id} → {task_id_clean}")
             return {"ok": True, "deliverable": deliverable}
 
-    def verify_deliverable(self, deliverable_id: str) -> Dict[str, Any]:
+    def verify_deliverable(self, deliverable_id: str) -> dict[str, Any]:
         """Mark a deliverable as verified."""
         with self._lock:
             did_clean = str(deliverable_id or "").strip().upper()
@@ -438,7 +438,7 @@ class TaskManager:
 
     def add_note(
         self, task_id: str, text: str, author: str = "SYSTEM"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Add a note/comment to a task.
 
         Args:
@@ -484,7 +484,7 @@ class TaskManager:
 
     def progress_report(
         self, phase: str = "", agent: str = ""
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate a progress report.
 
         Args:
@@ -520,13 +520,13 @@ class TaskManager:
                 }
 
             # Status breakdown
-            by_status: Dict[str, int] = {}
+            by_status: dict[str, int] = {}
             for t in tasks:
                 s = t["status"]
                 by_status[s] = by_status.get(s, 0) + 1
 
             # Agent breakdown
-            by_agent: Dict[str, Dict[str, int]] = {}
+            by_agent: dict[str, dict[str, int]] = {}
             for t in tasks:
                 a = t["agent"]
                 if a not in by_agent:
@@ -538,7 +538,7 @@ class TaskManager:
                     by_agent[a]["in_progress"] += 1
 
             # Priority breakdown
-            by_priority: Dict[str, int] = {}
+            by_priority: dict[str, int] = {}
             for t in tasks:
                 p = t["priority"]
                 by_priority[p] = by_priority.get(p, 0) + 1
@@ -594,7 +594,7 @@ class TaskManager:
                 "filter_agent": agent or "all",
             }
 
-    def agent_report(self, agent: str) -> Dict[str, Any]:
+    def agent_report(self, agent: str) -> dict[str, Any]:
         """Generate a report for a specific agent's tasks.
 
         Args:
@@ -666,7 +666,7 @@ class TaskManager:
                 "tasks": task_summaries,
             }
 
-    def summary(self) -> Dict[str, Any]:
+    def summary(self) -> dict[str, Any]:
         """Quick overall summary of the task system."""
         with self._lock:
             total = len(self._tasks)
@@ -680,9 +680,9 @@ class TaskManager:
                     "phases": {},
                 }
 
-            by_agent: Dict[str, int] = {}
-            by_phase: Dict[str, int] = {}
-            by_status: Dict[str, int] = {}
+            by_agent: dict[str, int] = {}
+            by_phase: dict[str, int] = {}
+            by_status: dict[str, int] = {}
             for t in self._tasks.values():
                 by_agent[t["agent"]] = by_agent.get(t["agent"], 0) + 1
                 if t["phase"]:
@@ -702,8 +702,8 @@ class TaskManager:
     # ── Batch Operations ──────────────────────────────────────────
 
     def bulk_create_from_phase(
-        self, phase: str, items: List[Dict[str, str]]
-    ) -> Dict[str, Any]:
+        self, phase: str, items: list[dict[str, str]]
+    ) -> dict[str, Any]:
         """Create multiple tasks for a phase at once.
 
         Args:
@@ -815,7 +815,7 @@ class TaskManager:
 # Maps phase header keywords → agent assignment.
 # Order matters: more specific patterns are tried first, then generic ones.
 # Uses word-boundary regex to avoid substring false positives (e.g. "ci" in "social").
-_PHASE_AGENT_PATTERNS: List[Tuple[re.Pattern, str]] = [
+_PHASE_AGENT_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"\bsocial\b"), "SAPPHIRE"),
     (re.compile(r"\bmedia\b"), "SAPPHIRE"),
     (re.compile(r"\bprediction\b"), "SAPPHIRE"),
@@ -855,7 +855,7 @@ class RoadmapParser:
             os.path.join(os.path.dirname(__file__), "..", "..", "..", "ROADMAP.md"),
         )
 
-    def parse_incomplete_items(self) -> List[Dict[str, str]]:
+    def parse_incomplete_items(self) -> list[dict[str, str]]:
         """Scan ROADMAP.md for unchecked ``- [ ]`` items.
 
         Returns a list of dicts with 'title', 'phase', 'agent'.
@@ -871,7 +871,7 @@ class RoadmapParser:
             logger.warning(f"Failed to read roadmap: {exc}")
             return []
 
-        items: List[Dict[str, str]] = []
+        items: list[dict[str, str]] = []
         current_phase = "unknown"
 
         for line in content.splitlines():
@@ -897,7 +897,7 @@ class RoadmapParser:
 
         return items
 
-    def generate_tasks(self, task_manager: "TaskManager") -> Dict[str, Any]:
+    def generate_tasks(self, task_manager: "TaskManager") -> dict[str, Any]:
         """Create tasks for all unchecked roadmap items.
 
         Skips items whose title already exists as an active task (pending /

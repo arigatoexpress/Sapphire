@@ -2,7 +2,7 @@ import importlib.util
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-CLASSIFIER_PATH = ROOT_DIR / "services/alpha/src/error_classifier.py"
+CLASSIFIER_PATH = ROOT_DIR / "lib/core/src/sapphire_core/error_classifier.py"
 
 
 def _load_module(path: Path, module_name: str):

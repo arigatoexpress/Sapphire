@@ -2,7 +2,7 @@ import asyncio
 import os
 import re
 import time
-from typing import Any, Dict, List, Set
+from typing import Any
 
 from loguru import logger
 from shared.position_sizing import SizingConfig, apply_stage_multiplier
@@ -13,7 +13,7 @@ from src.feeds.market_data import MarketDataAggregator
 # Venue Profiles — each venue is a specialist, not an arb counter-party.
 # ---------------------------------------------------------------------------
 
-VENUE_PROFILES: Dict[str, Dict[str, Any]] = {
+VENUE_PROFILES: dict[str, dict[str, Any]] = {
     "ASTER": {
         "name": "Aster",
         "role": "High-leverage ultra-high-frequency trading",
@@ -46,11 +46,11 @@ VENUE_PROFILES: Dict[str, Dict[str, Any]] = {
 _DEFAULT_PREFERRED_SYMBOLS = "BTC,ETH,SOL,BCH,ZEC,XMR,PENGU,MON,LIT,ASTER,MEGAETH"
 
 
-def _parse_preferred_symbols(raw: str) -> List[str]:
+def _parse_preferred_symbols(raw: str) -> list[str]:
     """Parse a comma/semicolon/space separated symbol list into unique uppercase tokens."""
     tokens = re.split(r"[,;|\s]+", str(raw or "").strip())
-    seen: Set[str] = set()
-    result: List[str] = []
+    seen: set[str] = set()
+    result: list[str] = []
     for token in tokens:
         sym = token.strip().upper()
         if sym and sym not in seen:
@@ -59,7 +59,7 @@ def _parse_preferred_symbols(raw: str) -> List[str]:
     return result
 
 
-PREFERRED_SYMBOLS: List[str] = _parse_preferred_symbols(
+PREFERRED_SYMBOLS: list[str] = _parse_preferred_symbols(
     os.getenv("SAPPHIRE_PREFERRED_SYMBOLS", _DEFAULT_PREFERRED_SYMBOLS)
 )
 
@@ -114,8 +114,8 @@ class AlphaStrategyEngine:
         )
 
         # --- Venue profiles & preferred symbols (immutable after init) --------
-        self.venue_profiles: Dict[str, Dict[str, Any]] = dict(VENUE_PROFILES)
-        self.preferred_symbols: List[str] = list(PREFERRED_SYMBOLS)
+        self.venue_profiles: dict[str, dict[str, Any]] = dict(VENUE_PROFILES)
+        self.preferred_symbols: list[str] = list(PREFERRED_SYMBOLS)
 
         # --- Health monitoring loop -------------------------------------------
         self._health_log_interval_seconds = 300  # log venue health every 5 min
@@ -157,7 +157,7 @@ class AlphaStrategyEngine:
             return fallback
         return max(0.0, min(1.0, value))
 
-    def set_execution_stage(self, stage: str) -> Dict[str, Any]:
+    def set_execution_stage(self, stage: str) -> dict[str, Any]:
         previous = self.dex_execution_stage
         normalized = self._normalize_stage(stage)
         self.dex_execution_stage = normalized
@@ -191,7 +191,7 @@ class AlphaStrategyEngine:
     # Execution state
     # ------------------------------------------------------------------
 
-    def execution_state(self) -> Dict[str, Any]:
+    def execution_state(self) -> dict[str, Any]:
         multiplier = self._stage_multiplier()
         effective_quantity = self.apply_stage_to_quantity(self.default_quantity)
         return {
@@ -222,7 +222,7 @@ class AlphaStrategyEngine:
     # Quantity resolution (used by TradingView signal dispatch)
     # ------------------------------------------------------------------
 
-    def _resolve_dispatch_quantity(self, reference_price: float, baseline_quantity: float) -> Dict[str, Any]:
+    def _resolve_dispatch_quantity(self, reference_price: float, baseline_quantity: float) -> dict[str, Any]:
         quantity = max(0.0, float(baseline_quantity))
         if quantity <= 0:
             return {"quantity": 0.0, "adjusted": False, "blocked": False, "reason": "non_positive_quantity"}

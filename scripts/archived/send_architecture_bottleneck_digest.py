@@ -8,7 +8,7 @@ import hashlib
 import json
 import os
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -51,7 +51,7 @@ def _build_message(telemetry: dict[str, Any], brief: dict[str, Any]) -> tuple[st
 
     lines = [
         "⚙️ <b>Sapphire Bottleneck Digest</b>",
-        f"Time: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC",
+        f"Time: {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')} UTC",
         f"Conversion: <b>{conversion:.1f}%</b> ({conversion_sev.upper()}) • {executions}/{signals} executions/signals",
         f"Risk State: <b>{risk_state}</b>",
     ]

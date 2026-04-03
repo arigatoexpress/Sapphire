@@ -4,8 +4,8 @@ import os
 import time
 from collections import defaultdict, deque
 from contextlib import suppress
-from datetime import datetime, timezone
-from typing import Any, Deque, Dict, List, Optional, Tuple
+from datetime import UTC, datetime
+from typing import Any
 
 import aiohttp
 import websockets
@@ -15,11 +15,11 @@ from loguru import logger
 class MarketDataAggregator:
     def __init__(self):
         self._chart_symbol = str(os.getenv("MARKET_CHART_SYMBOL", "SOL")).strip().upper() or "SOL"
-        self.prices: Dict[str, Dict[str, float]] = {
+        self.prices: dict[str, dict[str, float]] = {
             "ASTER": {self._chart_symbol: 0.0},
             "LIGHTER": {self._chart_symbol: 0.0},
         }
-        self._tick_history: Dict[str, Dict[str, Deque[Tuple[float, float, float]]]] = defaultdict(
+        self._tick_history: dict[str, dict[str, deque[tuple[float, float, float]]]] = defaultdict(
             lambda: defaultdict(deque)
         )
         self._history_retention_seconds = self._env_float(
@@ -86,7 +86,7 @@ class MarketDataAggregator:
             "on",
         }
         self._lighter_ws_urls = self._parse_ws_urls()
-        self._lighter_seen_hashes: Deque[str] = deque()
+        self._lighter_seen_hashes: deque[str] = deque()
         self._lighter_seen_hash_set: set[str] = set()
         self._lighter_seen_hash_max = max(1000, int(os.getenv("LIGHTER_SEEN_HASH_MAX", "4000")))
         self._lighter_max_tick_jump_ratio = self._env_float(
@@ -106,7 +106,7 @@ class MarketDataAggregator:
         self._multi_symbol_poll_interval = self._env_float(
             "MARKET_MULTI_SYMBOL_POLL_SECONDS", 10.0, minimum=3.0
         )
-        self._extra_symbols: List[str] = self._parse_extra_symbols()
+        self._extra_symbols: list[str] = self._parse_extra_symbols()
         self._aster_batch_ticker_url = str(
             os.getenv("ASTER_BATCH_TICKER_URL", "https://fapi.asterdex.com/fapi/v1/ticker/price")
         ).strip()
@@ -115,13 +115,13 @@ class MarketDataAggregator:
         ).strip()
 
     @staticmethod
-    def _parse_extra_symbols() -> List[str]:
+    def _parse_extra_symbols() -> list[str]:
         """Parse SAPPHIRE_PREFERRED_SYMBOLS for multi-symbol feeds."""
         import re as _re
         raw = os.getenv("SAPPHIRE_PREFERRED_SYMBOLS", "BTC,ETH,SOL,BCH,ZEC,XMR,PENGU,MON,LIT,ASTER,MEGAETH")
         tokens = _re.split(r"[,;|\s]+", str(raw or "").strip())
         seen: set[str] = set()
-        result: List[str] = []
+        result: list[str] = []
         for token in tokens:
             sym = token.strip().upper()
             if sym and sym not in seen:
@@ -129,9 +129,9 @@ class MarketDataAggregator:
                 result.append(sym)
         return result
 
-    def _parse_lighter_market_ids(self) -> Dict[str, str]:
+    def _parse_lighter_market_ids(self) -> dict[str, str]:
         """Parse LIGHTER_MARKET_IDS env var (e.g. 'BTC:0,ETH:1,SOL:2') into a mapping."""
-        result: Dict[str, str] = {}
+        result: dict[str, str] = {}
         _default_ids = "BTC:1,ETH:0,SOL:2,BCH:58,ZEC:90,PENGU:47,XMR:77,MON:91,LIT:120,ASTER:83"
         raw = os.getenv("LIGHTER_MARKET_IDS", _default_ids).strip()
         if raw:
@@ -161,7 +161,7 @@ class MarketDataAggregator:
             value = default
         return max(minimum, value)
 
-    def _parse_ws_urls(self) -> List[str]:
+    def _parse_ws_urls(self) -> list[str]:
         raw = str(os.getenv("LIGHTER_WS_URLS", "")).strip()
         if raw:
             tokens = [item.strip() for item in raw.replace(";", ",").split(",")]
@@ -172,7 +172,7 @@ class MarketDataAggregator:
             "wss://mainnet.zklighter.elliot.ai/stream",
             "wss://testnet.zklighter.elliot.ai/stream",
         ]
-        deduped: List[str] = []
+        deduped: list[str] = []
         for url in fallback:
             if url and url not in deduped:
                 deduped.append(url)
@@ -200,10 +200,10 @@ class MarketDataAggregator:
         venue_prices = self.prices.get(venue, {})
         return venue_prices.get(symbol, venue_prices.get(self._chart_symbol, 0.0))
 
-    def get_market_snapshot(self, symbol: str = "SOL") -> Dict[str, Dict[str, Any]]:
+    def get_market_snapshot(self, symbol: str = "SOL") -> dict[str, dict[str, Any]]:
         symbol_key = str(symbol or "").strip().upper() or self._chart_symbol
         now = time.time()
-        snapshot: Dict[str, Dict[str, Any]] = {}
+        snapshot: dict[str, dict[str, Any]] = {}
 
         for venue in ("ASTER", "LIGHTER"):
             price = self.get_price(venue, symbol_key)
@@ -233,7 +233,7 @@ class MarketDataAggregator:
         symbol: str,
         price: float,
         volume: float = 0.0,
-        timestamp: Optional[float] = None,
+        timestamp: float | None = None,
     ) -> None:
         try:
             price_value = float(price)
@@ -277,8 +277,8 @@ class MarketDataAggregator:
             ticks.popleft()
 
     @staticmethod
-    def _parse_interval(interval: str) -> Tuple[str, int]:
-        known: Dict[str, int] = {
+    def _parse_interval(interval: str) -> tuple[str, int]:
+        known: dict[str, int] = {
             "1m": 60,
             "3m": 180,
             "5m": 300,
@@ -310,7 +310,7 @@ class MarketDataAggregator:
 
     @staticmethod
     def _closest_aster_interval(seconds: int) -> str:
-        supported: Dict[str, int] = {
+        supported: dict[str, int] = {
             "1m": 60,
             "3m": 180,
             "5m": 300,
@@ -333,16 +333,16 @@ class MarketDataAggregator:
 
     @staticmethod
     def _aggregate_samples(
-        samples: List[Tuple[float, float, float]],
+        samples: list[tuple[float, float, float]],
         interval_seconds: int,
         limit: int,
-    ) -> List[Dict[str, float]]:
+    ) -> list[dict[str, float]]:
         if interval_seconds <= 0 or limit <= 0:
             return []
         if not samples:
             return []
 
-        buckets: Dict[int, Dict[str, float]] = {}
+        buckets: dict[int, dict[str, float]] = {}
         for ts, price, volume in sorted(samples, key=lambda item: item[0]):
             if ts <= 0 or price <= 0:
                 continue  # Skip degenerate data
@@ -364,7 +364,7 @@ class MarketDataAggregator:
             candle["close"] = price
             candle["volume"] += max(volume, 0.0) if volume > 0 else 1.0
 
-        candles: List[Dict[str, float]] = []
+        candles: list[dict[str, float]] = []
         for key in sorted(buckets.keys())[-limit:]:
             candle = buckets[key]
             candles.append(
@@ -385,7 +385,7 @@ class MarketDataAggregator:
         symbol: str,
         interval_seconds: int,
         limit: int,
-    ) -> List[Dict[str, float]]:
+    ) -> list[dict[str, float]]:
         venue_key = str(venue or "").strip().upper()
         symbol_key = str(symbol or "").strip().upper() or self._chart_symbol
         ticks = list(self._tick_history.get(venue_key, {}).get(symbol_key, []))
@@ -396,7 +396,7 @@ class MarketDataAggregator:
         return self._aggregate_samples(filtered, interval_seconds=interval_seconds, limit=limit)
 
     @staticmethod
-    def _parse_timestamp(value: Any) -> Optional[float]:
+    def _parse_timestamp(value: Any) -> float | None:
         if value is None:
             return None
         if isinstance(value, (int, float)):
@@ -415,7 +415,7 @@ class MarketDataAggregator:
                 return ts
             try:
                 parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
-                return parsed.astimezone(timezone.utc).timestamp()
+                return parsed.astimezone(UTC).timestamp()
             except Exception:
                 return None
         return None
@@ -434,9 +434,9 @@ class MarketDataAggregator:
         return True
 
     def _extract_lighter_ticks_from_logs(
-        self, payload: Any, *, market_id_override: Optional[str] = None,
-    ) -> List[Tuple[float, float, float]]:
-        entries: List[Any]
+        self, payload: Any, *, market_id_override: str | None = None,
+    ) -> list[tuple[float, float, float]]:
+        entries: list[Any]
         if isinstance(payload, list):
             entries = payload
         elif isinstance(payload, dict):
@@ -446,13 +446,13 @@ class MarketDataAggregator:
 
         # Use per-symbol market ID when provided, else fall back to global default
         raw_id = market_id_override if market_id_override is not None else self._lighter_market_id
-        expected_market_index: Optional[int] = None
+        expected_market_index: int | None = None
         try:
             expected_market_index = int(str(raw_id).strip())
         except (TypeError, ValueError):
             expected_market_index = None
 
-        ticks: List[Tuple[float, float, float]] = []
+        ticks: list[tuple[float, float, float]] = []
         for item in entries:
             if not isinstance(item, dict):
                 continue
@@ -490,11 +490,11 @@ class MarketDataAggregator:
 
     @staticmethod
     def _merge_candles(
-        primary: List[Dict[str, float]],
-        secondary: List[Dict[str, float]],
+        primary: list[dict[str, float]],
+        secondary: list[dict[str, float]],
         limit: int,
-    ) -> List[Dict[str, float]]:
-        merged: Dict[int, Dict[str, float]] = {}
+    ) -> list[dict[str, float]]:
+        merged: dict[int, dict[str, float]] = {}
         for candle in primary:
             key = int(candle.get("time", 0))
             if key <= 0:
@@ -514,7 +514,7 @@ class MarketDataAggregator:
         symbol: str,
         interval_seconds: int,
         limit: int,
-    ) -> List[Dict[str, float]]:
+    ) -> list[dict[str, float]]:
         params = {
             "symbol": self._normalize_aster_symbol(symbol or self._aster_symbol),
             "interval": self._closest_aster_interval(interval_seconds),
@@ -533,7 +533,7 @@ class MarketDataAggregator:
         if not isinstance(payload, list):
             return []
 
-        candles: List[Dict[str, float]] = []
+        candles: list[dict[str, float]] = []
         for row in payload:
             if not isinstance(row, list) or len(row) < 6:
                 continue
@@ -569,7 +569,7 @@ class MarketDataAggregator:
         self,
         interval_seconds: int,
         limit: int,
-    ) -> List[Dict[str, float]]:
+    ) -> list[dict[str, float]]:
         timeout = aiohttp.ClientTimeout(total=self._lighter_http_timeout_seconds)
         try:
             async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -591,14 +591,14 @@ class MarketDataAggregator:
         symbol: str = "SOL",
         interval: str = "1m",
         limit: int = 120,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         venue_key = str(venue or "").strip().upper()
         symbol_key = str(symbol or "").strip().upper() or self._chart_symbol
         interval_key, interval_seconds = self._parse_interval(interval)
         bar_limit = max(10, min(int(limit or 120), 500))
         tracking_symbol = symbol_key
 
-        candles: List[Dict[str, float]] = []
+        candles: list[dict[str, float]] = []
         source = "tick_buffer"
 
         if venue_key == "ASTER":
@@ -687,14 +687,14 @@ class MarketDataAggregator:
                     self._log_aster_issue(f"Aster poll error: {exc}")
                 await asyncio.sleep(self._aster_poll_interval_seconds)
 
-    async def _fetch_aster_price(self, session: aiohttp.ClientSession) -> Optional[float]:
+    async def _fetch_aster_price(self, session: aiohttp.ClientSession) -> float | None:
         endpoint_candidates = [
             self._aster_ticker_url,
             self._aster_mark_price_url,
             self._aster_book_ticker_url,
         ]
-        tried: List[str] = []
-        errors: List[str] = []
+        tried: list[str] = []
+        errors: list[str] = []
 
         for endpoint in endpoint_candidates:
             endpoint = str(endpoint or "").strip()
@@ -727,7 +727,7 @@ class MarketDataAggregator:
         return None
 
     async def _lighter_feed(self):
-        ws_task: Optional[asyncio.Task[Any]] = None
+        ws_task: asyncio.Task[Any] | None = None
         logger.info(
             f"💧 Lighter feed starting (symbol={self._lighter_market_symbol}, logs={self._lighter_logs_url})"
         )
@@ -851,13 +851,13 @@ class MarketDataAggregator:
 
                 await asyncio.sleep(self._lighter_poll_interval_seconds)
 
-    def _extract_lighter_price_from_logs(self, payload: Any) -> Optional[float]:
+    def _extract_lighter_price_from_logs(self, payload: Any) -> float | None:
         ticks = self._extract_lighter_ticks_from_logs(payload)
         if ticks:
             return float(ticks[-1][1])
         return None
 
-    def _extract_lighter_price_from_ws_message(self, message: Any) -> Optional[float]:
+    def _extract_lighter_price_from_ws_message(self, message: Any) -> float | None:
         if isinstance(message, bytes):
             try:
                 message = message.decode("utf-8")
@@ -874,7 +874,7 @@ class MarketDataAggregator:
 
         return self._extract_price_from_object(payload)
 
-    def _extract_price_from_object(self, payload: Any) -> Optional[float]:
+    def _extract_price_from_object(self, payload: Any) -> float | None:
         if isinstance(payload, dict):
             for key in (
                 "price",
@@ -915,7 +915,7 @@ class MarketDataAggregator:
 
         return self._coerce_price(payload)
 
-    def _extract_book_ticker_midpoint(self, payload: Any) -> Optional[float]:
+    def _extract_book_ticker_midpoint(self, payload: Any) -> float | None:
         if not isinstance(payload, dict):
             return None
 
@@ -925,7 +925,7 @@ class MarketDataAggregator:
             return (bid + ask) / 2.0
         return None
 
-    def _extract_best_side_price(self, entries: List[Any]) -> Optional[float]:
+    def _extract_best_side_price(self, entries: list[Any]) -> float | None:
         if not entries:
             return None
 
@@ -937,7 +937,7 @@ class MarketDataAggregator:
         return None
 
     @staticmethod
-    def _coerce_price(value: Any) -> Optional[float]:
+    def _coerce_price(value: Any) -> float | None:
         if value is None:
             return None
         try:
@@ -1008,12 +1008,12 @@ class MarketDataAggregator:
                 if remaining_wait > 0:
                     await asyncio.sleep(remaining_wait)
 
-    def get_multi_symbol_snapshot(self) -> Dict[str, Dict[str, Dict[str, Any]]]:
+    def get_multi_symbol_snapshot(self) -> dict[str, dict[str, dict[str, Any]]]:
         """Get current prices for all tracked symbols across all venues."""
         now = time.time()
-        result: Dict[str, Dict[str, Dict[str, Any]]] = {}
+        result: dict[str, dict[str, dict[str, Any]]] = {}
         for venue in ("ASTER", "LIGHTER"):
-            venue_data: Dict[str, Dict[str, Any]] = {}
+            venue_data: dict[str, dict[str, Any]] = {}
             venue_prices = self.prices.get(venue, {})
             for symbol, price in venue_prices.items():
                 ticks = self._tick_history.get(venue, {}).get(symbol, deque())

@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional
+from datetime import UTC, datetime, timedelta
 from urllib.parse import quote_plus
 
 import feedparser
@@ -18,13 +17,13 @@ class NewsSourcePreference:
     display_name: str
     publication_match: str
     domain: str
-    sections: List[str]
+    sections: list[str]
     access_mode: str
     auto_ingest: bool
     notes: str = ""
 
 
-CLIENT_NEWS_SOURCE_PREFERENCES: List[NewsSourcePreference] = [
+CLIENT_NEWS_SOURCE_PREFERENCES: list[NewsSourcePreference] = [
     NewsSourcePreference(
         source_key="community_impact",
         display_name="Community Impact",
@@ -68,7 +67,7 @@ CLIENT_NEWS_SOURCE_PREFERENCES: List[NewsSourcePreference] = [
 ]
 
 
-def news_source_preferences_as_dicts() -> List[Dict[str, object]]:
+def news_source_preferences_as_dicts() -> list[dict[str, object]]:
     return [
         {
             "source_key": src.source_key,
@@ -88,7 +87,7 @@ def _norm(text: str) -> str:
     return " ".join((text or "").strip().lower().split())
 
 
-def _find_person_by_name(store: InMemoryMasterArena, full_name: str) -> Optional[Person]:
+def _find_person_by_name(store: InMemoryMasterArena, full_name: str) -> Person | None:
     target = _norm(full_name)
     if not target:
         return None
@@ -111,7 +110,7 @@ def _entry_source_href(entry) -> str:
     return str(href or "").strip()
 
 
-def _matches_preferred_publication(entry, preferred_publications: List[str]) -> bool:
+def _matches_preferred_publication(entry, preferred_publications: list[str]) -> bool:
     if not preferred_publications:
         return True
     src_title = _norm(_entry_source_title(entry))
@@ -128,7 +127,7 @@ def _matches_preferred_publication(entry, preferred_publications: List[str]) -> 
 def _published_from_entry(entry) -> datetime:
     parsed = getattr(entry, "published_parsed", None) or getattr(entry, "updated_parsed", None)
     if parsed is None:
-        return datetime.now(tz=timezone.utc)
+        return datetime.now(tz=UTC)
     return datetime(
         parsed.tm_year,
         parsed.tm_mon,
@@ -136,11 +135,11 @@ def _published_from_entry(entry) -> datetime:
         parsed.tm_hour,
         parsed.tm_min,
         parsed.tm_sec,
-        tzinfo=timezone.utc,
+        tzinfo=UTC,
     )
 
 
-def _news_event_type_for_entry(*, title: str, query_term: str, person_name_map: Dict[str, str]) -> MarketEventType:
+def _news_event_type_for_entry(*, title: str, query_term: str, person_name_map: dict[str, str]) -> MarketEventType:
     lowered_title = _norm(title)
     lowered_query = _norm(query_term)
 
@@ -164,7 +163,7 @@ def _news_event_type_for_entry(*, title: str, query_term: str, person_name_map: 
     return MarketEventType.INDUSTRY_NEWS
 
 
-def _client_local_news_seed_queries() -> List[str]:
+def _client_local_news_seed_queries() -> list[str]:
     # Client-specific focus: public local sources + vacancy/opening/new construction signals.
     return [
         "Community Impact Austin business retail vacancy",
@@ -179,8 +178,8 @@ def _client_local_news_seed_queries() -> List[str]:
     ]
 
 
-def _default_news_queries(store: InMemoryMasterArena) -> List[str]:
-    queries: List[str] = []
+def _default_news_queries(store: InMemoryMasterArena) -> list[str]:
+    queries: list[str] = []
     for person in store.people.values():
         if person.full_name.strip():
             queries.append(person.full_name.strip())
@@ -194,7 +193,7 @@ def _default_news_queries(store: InMemoryMasterArena) -> List[str]:
     queries.extend(_client_local_news_seed_queries())
     queries.append("Austin single tenant net lease")
     queries.append("Austin retail redevelopment")
-    unique: List[str] = []
+    unique: list[str] = []
     seen = set()
     for query in queries:
         normalized = _norm(query)
@@ -232,23 +231,23 @@ def _detect_signal_kind(title: str, summary: str) -> str:
 def refresh_news_intelligence(
     store: InMemoryMasterArena,
     *,
-    queries: Optional[List[str]] = None,
-    preferred_publications: Optional[List[str]] = None,
+    queries: list[str] | None = None,
+    preferred_publications: list[str] | None = None,
     max_queries: int = 12,
     per_query_limit: int = 5,
     lookback_days: int = 21,
     require_address_for_actionable_signals: bool = True,
-) -> List[MarketEvent]:
+) -> list[MarketEvent]:
     if max_queries <= 0 or per_query_limit <= 0:
         return []
 
     query_terms = queries or _default_news_queries(store)
     query_terms = query_terms[:max_queries]
-    cutoff = datetime.now(tz=timezone.utc) - timedelta(days=max(0, lookback_days))
+    cutoff = datetime.now(tz=UTC) - timedelta(days=max(0, lookback_days))
 
     person_name_map = {_norm(person.full_name): person.person_urn for person in store.people.values()}
     existing_urls = {event.source_url for event in store.market_events.values() if event.source_url}
-    created_events: List[MarketEvent] = []
+    created_events: list[MarketEvent] = []
     publication_filters = preferred_publications or [
         src.publication_match for src in CLIENT_NEWS_SOURCE_PREFERENCES if src.auto_ingest
     ]
@@ -318,15 +317,15 @@ def ingest_market_event(
     *,
     event_type: str,
     title: str,
-    observed_at: Optional[datetime] = None,
-    property_urn: Optional[str] = None,
+    observed_at: datetime | None = None,
+    property_urn: str | None = None,
     property_address_hint: str = "",
-    owner_person_urn: Optional[str] = None,
+    owner_person_urn: str | None = None,
     owner_name_hint: str = "",
     company_name: str = "",
     source_url: str = "",
     summary: str = "",
-    attributes: Optional[Dict[str, str]] = None,
+    attributes: dict[str, str] | None = None,
 ) -> MarketEvent:
     try:
         typed_event = MarketEventType(event_type)
@@ -342,7 +341,7 @@ def ingest_market_event(
         event_urn=make_urn("event"),
         event_type=typed_event,
         title=title,
-        observed_at=observed_at or datetime.now(tz=timezone.utc),
+        observed_at=observed_at or datetime.now(tz=UTC),
         property_urn=property_urn,
         property_address_hint=property_address_hint,
         owner_person_urn=owner_person_urn,
@@ -357,16 +356,16 @@ def ingest_market_event(
 def client_intel_summary(
     store: InMemoryMasterArena,
     *,
-    owner_person_urn: Optional[str] = None,
+    owner_person_urn: str | None = None,
     since_days: int = 90,
-) -> Dict[str, object]:
+) -> dict[str, object]:
     if owner_person_urn:
         people = [store.get_person(owner_person_urn)]
         people = [person for person in people if person is not None]
     else:
         people = list(store.people.values())
 
-    summaries: List[Dict[str, object]] = []
+    summaries: list[dict[str, object]] = []
     for person in people:
         events = store.list_market_events(owner_person_urn=person.person_urn, since_days=since_days)
         client_news = [event for event in events if event.event_type == MarketEventType.CLIENT_NEWS]

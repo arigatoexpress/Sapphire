@@ -8,7 +8,7 @@ for inter-service communication via Pub/Sub and Firestore storage.
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class TradeSide(str, Enum):
@@ -52,18 +52,18 @@ class TradeSignal:
     signal_type: SignalType
     confidence: float
     source: str  # e.g., "ai-engine", "market-scanner", "arbitrage-scanner"
-    target_platforms: List[str] = field(default_factory=list)  # Empty = all platforms
+    target_platforms: list[str] = field(default_factory=list)  # Empty = all platforms
 
     # Optional parameters
-    entry_price: Optional[float] = None
-    stop_loss: Optional[float] = None
-    take_profit: Optional[float] = None
-    quantity: Optional[float] = None
-    leverage: Optional[float] = None
+    entry_price: float | None = None
+    stop_loss: float | None = None
+    take_profit: float | None = None
+    quantity: float | None = None
+    leverage: float | None = None
 
     # Metadata
     timestamp: datetime = field(default_factory=datetime.utcnow)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @staticmethod
     def _normalize_platform_name(value: Any) -> str:
@@ -94,20 +94,20 @@ class TradeResult:
     """
 
     trade_id: str
-    signal_id: Optional[str]  # Reference to the originating signal
+    signal_id: str | None  # Reference to the originating signal
     platform: str
     symbol: str
     side: TradeSide
 
     # Execution details
     success: bool
-    order_id: Optional[str] = None
+    order_id: str | None = None
     filled_quantity: float = 0.0
     avg_price: float = 0.0
     fee: float = 0.0
 
     # Error handling
-    error_message: Optional[str] = None
+    error_message: str | None = None
     retry_count: int = 0
 
     # Timing
@@ -115,7 +115,7 @@ class TradeResult:
     execution_time_ms: float = 0.0
 
     # Additional data
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -135,9 +135,9 @@ class Position:
     current_price: float = 0.0
 
     # Risk management
-    stop_loss: Optional[float] = None
-    take_profit: Optional[float] = None
-    trailing_stop: Optional[float] = None
+    stop_loss: float | None = None
+    take_profit: float | None = None
+    trailing_stop: float | None = None
 
     # P&L
     unrealized_pnl: float = 0.0
@@ -146,8 +146,8 @@ class Position:
     # Metadata
     opened_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
-    agent_id: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    agent_id: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def pnl_percent(self) -> float:
@@ -172,7 +172,7 @@ class BalanceUpdate:
     margin_used: float = 0.0
 
     # Breakdown by asset
-    assets: Dict[str, float] = field(default_factory=dict)
+    assets: dict[str, float] = field(default_factory=dict)
 
     timestamp: datetime = field(default_factory=datetime.utcnow)
 
@@ -188,11 +188,11 @@ class RiskAlert:
     alert_type: str  # "max_drawdown", "correlation_spike", "exposure_limit"
 
     message: str
-    affected_platforms: List[str] = field(default_factory=list)
-    affected_symbols: List[str] = field(default_factory=list)
+    affected_platforms: list[str] = field(default_factory=list)
+    affected_symbols: list[str] = field(default_factory=list)
 
     # Recommended action
     action: str = "none"  # "none", "reduce_position", "close_all", "halt_trading"
 
     timestamp: datetime = field(default_factory=datetime.utcnow)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)

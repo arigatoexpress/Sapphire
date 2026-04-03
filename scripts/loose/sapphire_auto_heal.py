@@ -100,12 +100,11 @@ class AutoHealSystem:
         """Check if service is healthy"""
         try:
             import aiohttp
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    config["check_url"],
-                    timeout=aiohttp.ClientTimeout(total=3)
-                ) as resp:
-                    return resp.status == 200
+            async with aiohttp.ClientSession() as session, session.get(
+                config["check_url"],
+                timeout=aiohttp.ClientTimeout(total=3)
+            ) as resp:
+                return resp.status == 200
         except Exception:
             return False
             
@@ -115,7 +114,7 @@ class AutoHealSystem:
         
         # Try to kill existing process
         try:
-            with open(config["pid_file"], 'r') as f:
+            with open(config["pid_file"]) as f:
                 pid = f.read().strip()
                 subprocess.run(['kill', pid], capture_output=True)
                 await asyncio.sleep(1)

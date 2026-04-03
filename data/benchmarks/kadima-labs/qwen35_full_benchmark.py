@@ -108,7 +108,7 @@ def main():
     for model, data in all_results.items():
         speeds = []
         speed_strs = []
-        for test in tests.keys():
+        for test in tests:
             tps = data.get(test, {}).get('tps', 0)
             speeds.append(tps)
             speed_strs.append(f"{tps:.1f}" if tps > 0 else "N/A")
@@ -123,7 +123,7 @@ def main():
     
     model_sizes = {'qwen3.5:0.8b': 0.8, 'qwen3.5:4b': 4, 'qwen3.5:9b': 9}
     
-    for test in tests.keys():
+    for test in tests:
         print(f"\n{test.upper()}:")
         for model in models:
             result = all_results[model].get(test, {})

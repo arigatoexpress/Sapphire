@@ -74,7 +74,7 @@ def load_latest_results(directory="D:/Dev/01_AI/AI_Benchmark"):
         print("ERROR: No kadima_benchmark_*.json files found!")
         sys.exit(1)
     print(f"Loading: {files[0]}")
-    with open(files[0], 'r', encoding='utf-8') as f:
+    with open(files[0], encoding='utf-8') as f:
         return json.load(f), files[0]
 
 

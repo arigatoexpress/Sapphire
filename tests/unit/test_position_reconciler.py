@@ -180,7 +180,7 @@ class TestFirestoreDiff:
     def test_firestore_error_does_not_crash_and_staleness_still_works(self):
         class BrokenDb:
             def collection(self, name):
-                raise IOError("Firestore unavailable")
+                raise OSError("Firestore unavailable")
 
         rec = _make(db=BrokenDb(), stale_threshold=60)
         rec.handle_position_update({"platform": "lighter", "positions": [1]})

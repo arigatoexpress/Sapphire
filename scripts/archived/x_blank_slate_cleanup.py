@@ -18,10 +18,11 @@ import random
 import re
 import time
 import urllib.parse
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from pathlib import Path
-from typing import Any, Dict, Iterable, List
+from typing import Any
 
 import requests
 
@@ -113,7 +114,7 @@ def _parse_cutoff(value: str) -> datetime:
     return dt.astimezone(UTC)
 
 
-def _load_state(path: Path) -> Dict[str, Any]:
+def _load_state(path: Path) -> dict[str, Any]:
     if path.exists():
         try:
             return json.loads(path.read_text())
@@ -122,12 +123,12 @@ def _load_state(path: Path) -> Dict[str, Any]:
     return {"deleted_ids": [], "runs": []}
 
 
-def _save_state(path: Path, state: Dict[str, Any]) -> None:
+def _save_state(path: Path, state: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(state, indent=2, sort_keys=True))
 
 
-def _session_from_browser() -> tuple[requests.Session, Dict[str, str], str]:
+def _session_from_browser() -> tuple[requests.Session, dict[str, str], str]:
     cj = browser_cookie3.chrome(domain_name=".x.com")
     ct0 = next((c.value for c in cj if c.name == "ct0"), "")
     twid = next((c.value for c in cj if c.name == "twid"), "")
@@ -153,7 +154,7 @@ def _session_from_browser() -> tuple[requests.Session, Dict[str, str], str]:
     return s, headers, uid
 
 
-def _timeline_entries(payload: Dict[str, Any]) -> Iterable[Dict[str, Any]]:
+def _timeline_entries(payload: dict[str, Any]) -> Iterable[dict[str, Any]]:
     instructions = (
         payload.get("data", {})
         .get("user", {})
@@ -170,7 +171,7 @@ def _timeline_entries(payload: Dict[str, Any]) -> Iterable[Dict[str, Any]]:
                     yield e
 
 
-def _extract_tweet(entry: Dict[str, Any], own_uid: str) -> Dict[str, Any] | None:
+def _extract_tweet(entry: dict[str, Any], own_uid: str) -> dict[str, Any] | None:
     content = entry.get("content", {}) or {}
     item = content.get("itemContent", {}) or {}
     tweet = item.get("tweet_results", {}).get("result")
@@ -225,16 +226,16 @@ def _wait_from_rate_limit_headers(resp: requests.Response, default_seconds: int 
 
 def collect_candidates(
     s: requests.Session,
-    headers: Dict[str, str],
+    headers: dict[str, str],
     own_uid: str,
     cutoff: datetime,
     max_scan: int,
     max_rate_limit_retries: int = 3,
     max_rate_limit_wait: int = 90,
-) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     seen_ids = set()
-    rows: List[Dict[str, Any]] = []
-    meta: Dict[str, Any] = {"rate_limited": False, "errors": [], "requests": 0}
+    rows: list[dict[str, Any]] = []
+    meta: dict[str, Any] = {"rate_limited": False, "errors": [], "requests": 0}
 
     for op_name, qid in QUERIES.items():
         cursor = None
@@ -305,7 +306,7 @@ def collect_candidates(
     return rows, meta
 
 
-def delete_tweet(s: requests.Session, headers: Dict[str, str], tweet_id: str) -> tuple[bool, str]:
+def delete_tweet(s: requests.Session, headers: dict[str, str], tweet_id: str) -> tuple[bool, str]:
     h = dict(headers)
     h["content-type"] = "application/json"
     url = f"https://x.com/i/api/graphql/{DELETE_TWEET_MUTATION_ID}/DeleteTweet"

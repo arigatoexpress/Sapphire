@@ -16,7 +16,7 @@ import logging
 import os
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import google.generativeai as genai
 
@@ -41,12 +41,12 @@ class MarketEpisode:
 
     # Time bounds
     start_time: datetime
-    end_time: Optional[datetime] = None
+    end_time: datetime | None = None
 
     # Market context
     regime: str = "unknown"  # "high_volatility", "trending_up", "trending_down", "ranging"
-    key_events: List[str] = field(default_factory=list)
-    symbols_involved: List[str] = field(default_factory=list)
+    key_events: list[str] = field(default_factory=list)
+    symbols_involved: list[str] = field(default_factory=list)
 
     # Quantitative summary
     price_change_pct: float = 0.0
@@ -54,20 +54,20 @@ class MarketEpisode:
     max_drawdown_pct: float = 0.0
 
     # Actions taken
-    trades: List[Dict[str, Any]] = field(default_factory=list)
+    trades: list[dict[str, Any]] = field(default_factory=list)
 
     # Outcomes
     total_pnl: float = 0.0
     win_rate: float = 0.0
 
     # AI-generated lesson
-    lesson: Optional[str] = None
-    tags: List[str] = field(default_factory=list)
+    lesson: str | None = None
+    tags: list[str] = field(default_factory=list)
 
     # Embedding for similarity search (would be populated by vector DB)
-    embedding: Optional[List[float]] = None
+    embedding: list[float] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize for storage."""
         return {
             "episode_id": self.episode_id,
@@ -88,7 +88,7 @@ class MarketEpisode:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "MarketEpisode":
+    def from_dict(cls, data: dict[str, Any]) -> "MarketEpisode":
         """Deserialize from storage."""
         return cls(
             episode_id=data["episode_id"],
@@ -128,10 +128,10 @@ class EpisodicMemoryBank:
     - Build on successful patterns
     """
 
-    def __init__(self, storage_path: Optional[str] = None):
-        self.episodes: Dict[str, MarketEpisode] = {}
+    def __init__(self, storage_path: str | None = None):
+        self.episodes: dict[str, MarketEpisode] = {}
         self.storage_path = storage_path or "/tmp/sapphire_memory.json"
-        self.current_episode: Optional[MarketEpisode] = None
+        self.current_episode: MarketEpisode | None = None
 
         # AI for lesson extraction
         api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
@@ -148,7 +148,7 @@ class EpisodicMemoryBank:
         """Load episodes from storage."""
         try:
             if os.path.exists(self.storage_path):
-                with open(self.storage_path, "r") as f:
+                with open(self.storage_path) as f:
                     data = json.load(f)
                     for ep_data in data.get("episodes", []):
                         ep = MarketEpisode.from_dict(ep_data)
@@ -173,7 +173,7 @@ class EpisodicMemoryBank:
         self,
         name: str,
         regime: str,
-        symbols: List[str] = None,
+        symbols: list[str] = None,
     ) -> MarketEpisode:
         """Start recording a new market episode."""
         episode_id = f"ep-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}"
@@ -194,7 +194,7 @@ class EpisodicMemoryBank:
         price_change_pct: float = 0.0,
         volume_change_pct: float = 0.0,
         max_drawdown_pct: float = 0.0,
-    ) -> Optional[MarketEpisode]:
+    ) -> MarketEpisode | None:
         """End the current episode and calculate outcomes."""
         if not self.current_episode:
             return None
@@ -219,7 +219,7 @@ class EpisodicMemoryBank:
         logger.info(f"📚 Episode ended: {ep.name} (PnL: ${ep.total_pnl:+,.2f})")
         return ep
 
-    def record_trade(self, trade_data: Dict[str, Any]):
+    def record_trade(self, trade_data: dict[str, Any]):
         """Record a trade in the current episode."""
         if self.current_episode:
             self.current_episode.trades.append(trade_data)
@@ -273,9 +273,9 @@ Lesson:"""
     def find_similar_episodes(
         self,
         regime: str,
-        symbols: List[str] = None,
+        symbols: list[str] = None,
         limit: int = 3,
-    ) -> List[MarketEpisode]:
+    ) -> list[MarketEpisode]:
         """
         Find episodes similar to current market conditions.
 
@@ -354,7 +354,7 @@ What should we remember before trading {symbol}?"""
         else:
             return chr(10).join(lessons)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get memory bank statistics."""
         total_pnl = sum(ep.total_pnl for ep in self.episodes.values())
         total_trades = sum(len(ep.trades) for ep in self.episodes.values())
@@ -373,7 +373,7 @@ What should we remember before trading {symbol}?"""
 
 
 # Global instance
-_memory_instance: Optional[EpisodicMemoryBank] = None
+_memory_instance: EpisodicMemoryBank | None = None
 
 
 def get_episodic_memory() -> EpisodicMemoryBank:

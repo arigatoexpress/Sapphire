@@ -9,10 +9,11 @@ import asyncio
 import json
 import logging
 import os
+from collections.abc import Callable
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import asdict, is_dataclass
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 try:
     from google.cloud import pubsub_v1
@@ -77,9 +78,9 @@ class PubSubClient:
     def __init__(self):
         self._publisher = None
         self._subscriber = None
-        self._subscriptions: Dict[str, Any] = {}
-        self._handlers: Dict[str, List[Callable]] = {}
-        self._pull_tasks: List[asyncio.Task] = []
+        self._subscriptions: dict[str, Any] = {}
+        self._handlers: dict[str, list[Callable]] = {}
+        self._pull_tasks: list[asyncio.Task] = []
         self._closing = False
         self._initialized = False
 
@@ -109,7 +110,7 @@ class PubSubClient:
             # Continue without Pub/Sub for resilience
             self._initialized = True
 
-    async def publish(self, topic: str, message: Any) -> Optional[str]:
+    async def publish(self, topic: str, message: Any) -> str | None:
         """
         Publish a message to a topic.
 
@@ -183,8 +184,8 @@ class PubSubClient:
     async def subscribe(
         self,
         topic: str,
-        handler: Callable[[Dict[str, Any]], Any],
-        subscription_name: Optional[str] = None,
+        handler: Callable[[dict[str, Any]], Any],
+        subscription_name: str | None = None,
     ):
         """
         Subscribe to a topic with a message handler.
@@ -327,7 +328,7 @@ class PubSubClient:
         self._handlers = {}
         self._initialized = False
 
-    def _serialize_datetimes(self, data: Dict) -> Dict:
+    def _serialize_datetimes(self, data: dict) -> dict:
         """Convert datetime objects to ISO format strings."""
         result = {}
         for key, value in data.items():
@@ -350,7 +351,7 @@ class PubSubClient:
 
 
 # Singleton instance
-_client: Optional[PubSubClient] = None
+_client: PubSubClient | None = None
 
 
 def get_pubsub_client() -> PubSubClient:
@@ -372,13 +373,13 @@ def get_pubsub_client() -> PubSubClient:
 
 
 # Convenience functions
-async def publish(topic: str, message: Any) -> Optional[str]:
+async def publish(topic: str, message: Any) -> str | None:
     """Publish a message to a topic."""
     client = get_pubsub_client()
     return await client.publish(topic, message)
 
 
-async def subscribe(topic: str, handler: Callable[[Dict[str, Any]], Any]):
+async def subscribe(topic: str, handler: Callable[[dict[str, Any]], Any]):
     """Subscribe to a topic with a handler."""
     client = get_pubsub_client()
     await client.subscribe(topic, handler)

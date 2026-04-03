@@ -15,7 +15,6 @@ Designed to maximize profitability in extreme market conditions.
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 import numpy as np
 import torch
@@ -31,8 +30,8 @@ class PPOConfig:
     """Configuration for PPO training"""
 
     # Model architecture
-    actor_hidden_dims: List[int] = field(default_factory=lambda: [512, 256, 128])
-    critic_hidden_dims: List[int] = field(default_factory=lambda: [512, 256, 128])
+    actor_hidden_dims: list[int] = field(default_factory=lambda: [512, 256, 128])
+    critic_hidden_dims: list[int] = field(default_factory=lambda: [512, 256, 128])
     activation: str = 'relu'
 
     # Training hyperparameters
@@ -131,7 +130,7 @@ class TradingActor(nn.Module):
             nn.init.orthogonal_(module.weight, gain=0.01)
             nn.init.constant_(module.bias, 0.0)
 
-    def forward(self, obs: torch.Tensor) -> List[torch.Tensor]:
+    def forward(self, obs: torch.Tensor) -> list[torch.Tensor]:
         """
         Forward pass through actor network
 
@@ -152,7 +151,7 @@ class TradingActor(nn.Module):
 
         return action_logits
 
-    def get_action_distribution(self, obs: torch.Tensor) -> List[torch.distributions.Categorical]:
+    def get_action_distribution(self, obs: torch.Tensor) -> list[torch.distributions.Categorical]:
         """
         Get action distributions for sampling
 
@@ -168,7 +167,7 @@ class TradingActor(nn.Module):
 
         return distributions
 
-    def sample_actions(self, obs: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def sample_actions(self, obs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Sample actions from policy
 
@@ -203,7 +202,7 @@ class TradingActor(nn.Module):
 
         return actions, log_probs, entropies
 
-    def evaluate_actions(self, obs: torch.Tensor, actions: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def evaluate_actions(self, obs: torch.Tensor, actions: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Evaluate log probabilities and entropy of given actions
 
@@ -350,7 +349,7 @@ class PPOMemory:
         self.values.append(value)
         self.dones.append(done)
 
-    def compute_advantages(self, gamma: float, gae_lambda: float) -> Tuple[np.ndarray, np.ndarray]:
+    def compute_advantages(self, gamma: float, gae_lambda: float) -> tuple[np.ndarray, np.ndarray]:
         """Compute GAE advantages and returns"""
 
         rewards = np.array(self.rewards)
@@ -378,7 +377,7 @@ class PPOMemory:
 
         return advantages, returns
 
-    def get_batch(self, batch_size: int = None) -> Dict[str, np.ndarray]:
+    def get_batch(self, batch_size: int = None) -> dict[str, np.ndarray]:
         """Get a batch of experiences"""
 
         if batch_size is None:
@@ -459,7 +458,7 @@ class PPOMostProfitableTrader:
         logger.info(f"Observation dim: {obs_dim}")
         logger.info(f"Action dim: {action_dim}")
 
-    def train(self, num_episodes: int = None) -> Dict[str, List[float]]:
+    def train(self, num_episodes: int = None) -> dict[str, list[float]]:
         """
         Train the PPO agent
 
@@ -536,7 +535,7 @@ class PPOMostProfitableTrader:
         logger.info("PPO training completed")
         return training_history
 
-    def _collect_experience(self) -> Tuple[float, int]:
+    def _collect_experience(self) -> tuple[float, int]:
         """Collect experience for one episode"""
 
         state, info = self.env.reset()
@@ -572,7 +571,7 @@ class PPOMostProfitableTrader:
 
         return episode_reward, steps
 
-    def _update_policy(self) -> Dict[str, float]:
+    def _update_policy(self) -> dict[str, float]:
         """Update policy using PPO algorithm"""
 
         # Get batch data
@@ -691,7 +690,7 @@ class PPOMostProfitableTrader:
         # Clip entropy coefficient to reasonable bounds
         self.config.entropy_coef = np.clip(self.config.entropy_coef, 0.001, 0.1)
 
-    def _log_training_progress(self, episode: int, reward: float, losses: Dict[str, float] = None):
+    def _log_training_progress(self, episode: int, reward: float, losses: dict[str, float] = None):
         """Log training progress"""
 
         log_msg = f"Episode {episode} | Reward: {reward:.2f}"

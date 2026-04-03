@@ -15,7 +15,6 @@ Covers:
 import os
 import sys
 import time
-from typing import List
 from unittest.mock import AsyncMock, MagicMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/alpha"))
@@ -535,7 +534,7 @@ class TestPredictionAggregator:
             agg = PredictionAggregator()
         return agg
 
-    def _inject_signals(self, agg: PredictionAggregator, signals: List[PredictionSignal]):
+    def _inject_signals(self, agg: PredictionAggregator, signals: list[PredictionSignal]):
         for sig in signals:
             if sig.source == PredictionSource.POLYMARKET:
                 agg._polymarket._signals[sig.market_id] = sig
@@ -911,7 +910,7 @@ class TestArbitrageDetection:
             agg = PredictionAggregator()
         return agg
 
-    def _inject_signals(self, agg: PredictionAggregator, signals: List[PredictionSignal]):
+    def _inject_signals(self, agg: PredictionAggregator, signals: list[PredictionSignal]):
         for sig in signals:
             if sig.source == PredictionSource.POLYMARKET:
                 agg._polymarket._signals[sig.market_id] = sig
@@ -1086,7 +1085,7 @@ class TestArbitrageFormatting:
             agg = PredictionAggregator()
         return agg
 
-    def _inject_signals(self, agg: PredictionAggregator, signals: List[PredictionSignal]):
+    def _inject_signals(self, agg: PredictionAggregator, signals: list[PredictionSignal]):
         for sig in signals:
             if sig.source == PredictionSource.POLYMARKET:
                 agg._polymarket._signals[sig.market_id] = sig

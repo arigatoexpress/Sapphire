@@ -7,7 +7,6 @@ import argparse
 import datetime as dt
 import json
 from pathlib import Path
-from typing import Dict, List
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,7 +15,7 @@ import yfinance as yf
 from run_official_crypto_backtest import run_smart_money_backtest
 
 
-def _normalize_tickers(raw: str) -> List[str]:
+def _normalize_tickers(raw: str) -> list[str]:
     out = []
     seen = set()
     for tok in raw.split(','):
@@ -52,7 +51,7 @@ def download_daily(ticker: str, start: str, end: str) -> pd.DataFrame:
     return out
 
 
-def make_charts(out_dir: Path, price_frames: Dict[str, pd.DataFrame], equities: Dict[str, pd.Series], results_df: pd.DataFrame) -> None:
+def make_charts(out_dir: Path, price_frames: dict[str, pd.DataFrame], equities: dict[str, pd.Series], results_df: pd.DataFrame) -> None:
     chart_dir = out_dir / 'charts'
     chart_dir.mkdir(parents=True, exist_ok=True)
 
@@ -140,8 +139,8 @@ def main() -> None:
     data_dir = out_dir / 'data'
     data_dir.mkdir(parents=True, exist_ok=True)
 
-    price_frames: Dict[str, pd.DataFrame] = {}
-    equities: Dict[str, pd.Series] = {}
+    price_frames: dict[str, pd.DataFrame] = {}
+    equities: dict[str, pd.Series] = {}
     rows = []
 
     for t in tickers:

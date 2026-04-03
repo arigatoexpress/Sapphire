@@ -6,7 +6,7 @@ Implements Kelly Criterion, dynamic position sizing, and multi-layered risk cont
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -70,19 +70,19 @@ class RiskManager:
         self.confidence_level = 0.95
 
         # Risk state
-        self.portfolio_history: List[Dict[str, Any]] = []
-        self.daily_pnl: List[float] = []
+        self.portfolio_history: list[dict[str, Any]] = []
+        self.daily_pnl: list[float] = []
         self.start_of_day_value: float = settings.initial_capital if hasattr(settings, 'initial_capital') else 10000.0
         self.last_reset_date = datetime.now().date()
 
         # Position tracking
-        self.active_positions: Dict[str, PositionRisk] = {}
-        self.stop_loss_orders: Dict[str, Dict[str, Any]] = {}
+        self.active_positions: dict[str, PositionRisk] = {}
+        self.stop_loss_orders: dict[str, dict[str, Any]] = {}
 
         logger.info("RiskManager initialized with conservative Kelly fraction and multi-layered controls")
 
     async def assess_portfolio_risk(self, portfolio_state: PortfolioState,
-                                  market_data: Dict[str, pd.DataFrame]) -> RiskMetrics:
+                                  market_data: dict[str, pd.DataFrame]) -> RiskMetrics:
         """
         Comprehensive portfolio risk assessment.
         Returns detailed risk metrics for decision making.
@@ -321,7 +321,7 @@ class RiskManager:
         return multipliers.get(regime, 1.0)
 
     async def check_risk_limits(self, portfolio_state: PortfolioState,
-                               risk_metrics: RiskMetrics) -> List[str]:
+                               risk_metrics: RiskMetrics) -> list[str]:
         """
         Check all risk limits and return list of violations.
         Returns empty list if all limits are satisfied.
@@ -348,7 +348,7 @@ class RiskManager:
         return violations
 
     async def should_stop_trading(self, portfolio_state: PortfolioState,
-                                risk_metrics: RiskMetrics) -> Tuple[bool, str]:
+                                risk_metrics: RiskMetrics) -> tuple[bool, str]:
         """
         Determine if trading should be stopped due to risk limits.
         Returns (should_stop, reason)
@@ -362,7 +362,7 @@ class RiskManager:
 
         return False, ""
 
-    def _calculate_daily_returns(self, current_value: float) -> List[float]:
+    def _calculate_daily_returns(self, current_value: float) -> list[float]:
         """Calculate daily returns from portfolio history."""
         if len(self.portfolio_history) < 2:
             return [0.0]
@@ -378,14 +378,14 @@ class RiskManager:
 
         return returns
 
-    def _calculate_portfolio_volatility(self, returns: List[float]) -> float:
+    def _calculate_portfolio_volatility(self, returns: list[float]) -> float:
         """Calculate annualized portfolio volatility."""
         if len(returns) < 2:
             return 0.05  # Default 5%
 
         return np.std(returns) * np.sqrt(365)
 
-    def _calculate_sharpe_ratio(self, returns: List[float]) -> float:
+    def _calculate_sharpe_ratio(self, returns: list[float]) -> float:
         """Calculate Sharpe ratio."""
         if len(returns) < 2:
             return 0.0
@@ -411,14 +411,14 @@ class RiskManager:
 
         return (peak_value - current_value) / peak_value
 
-    def _calculate_var_95(self, returns: List[float]) -> float:
+    def _calculate_var_95(self, returns: list[float]) -> float:
         """Calculate 95% Value at Risk."""
         if len(returns) < 10:
             return 0.05  # Default 5%
 
         return abs(np.percentile(returns, 5))  # 5th percentile (worst 5%)
 
-    def _calculate_expected_shortfall(self, returns: List[float]) -> float:
+    def _calculate_expected_shortfall(self, returns: list[float]) -> float:
         """Calculate Expected Shortfall (CVaR)."""
         if len(returns) < 10:
             return 0.07  # Default 7%
@@ -448,7 +448,7 @@ class RiskManager:
 
         return max_position_value / total_value
 
-    async def _calculate_correlation_risk(self, market_data: Dict[str, pd.DataFrame]) -> float:
+    async def _calculate_correlation_risk(self, market_data: dict[str, pd.DataFrame]) -> float:
         """Calculate average correlation between positions."""
         if len(market_data) < 2:
             return 0.5  # Default moderate correlation
@@ -495,7 +495,7 @@ class RiskManager:
         """Update daily P&L tracking."""
         self.daily_pnl.append(pnl)
 
-    def get_risk_report(self) -> Dict[str, Any]:
+    def get_risk_report(self) -> dict[str, Any]:
         """Generate comprehensive risk report."""
         if not self.portfolio_history:
             return {"error": "No portfolio history available"}

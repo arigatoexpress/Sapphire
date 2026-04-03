@@ -15,9 +15,9 @@ import os
 import subprocess
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from google.cloud import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
@@ -39,7 +39,7 @@ EVENTS_COLLECTION = "control_plane_events"
 LANE_HEALTH_COLLECTION = "execution_lane_health"
 
 
-PROFILE_SETTINGS: Dict[str, Dict[str, str]] = {
+PROFILE_SETTINGS: dict[str, dict[str, str]] = {
     "luxalgo_sol_15m_safe": {
         "LIGHTER_ALLOWED_STRATEGIES": "luxalgo_msb_ob,smart_money_breakout,algoalpha_smb",
         "LIGHTER_ALLOWED_TIMEFRAMES": "15m",
@@ -90,7 +90,7 @@ PROFILE_SETTINGS: Dict[str, Dict[str, str]] = {
     },
 }
 
-PROMOTION_STAGES: Dict[str, Dict[str, Any]] = {
+PROMOTION_STAGES: dict[str, dict[str, Any]] = {
     "paper": {
         "profile": "luxalgo_sol_5m_active",
         "run_test": False,
@@ -134,7 +134,7 @@ PROMOTION_STAGES: Dict[str, Dict[str, Any]] = {
 
 
 def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _utc_now_iso() -> str:
@@ -147,8 +147,8 @@ def _short_output(text: str, limit: int = 8000) -> str:
     return text[-limit:]
 
 
-def _parse_overrides(items: List[str]) -> Dict[str, str]:
-    overrides: Dict[str, str] = {}
+def _parse_overrides(items: list[str]) -> dict[str, str]:
+    overrides: dict[str, str] = {}
     for item in items:
         if "=" not in item:
             raise ValueError(f"Invalid override '{item}'. Expected KEY=VALUE.")
@@ -189,7 +189,7 @@ def _is_truthy_flag(value: Any) -> bool:
 class CommandResult:
     ok: bool
     returncode: int
-    cmd: List[str]
+    cmd: list[str]
     stdout: str
     stderr: str
 
@@ -202,7 +202,7 @@ class CommandResult:
             parts.append(self.stderr)
         return "\n".join(parts).strip()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "ok": self.ok,
             "returncode": self.returncode,
@@ -217,7 +217,7 @@ class SapphireCtl:
         self.project = project
         self.db = firestore.Client(project=project)
 
-    def _event(self, event_type: str, payload: Dict[str, Any]) -> None:
+    def _event(self, event_type: str, payload: dict[str, Any]) -> None:
         body = {
             "timestamp": _utc_now(),
             "timestamp_iso": _utc_now_iso(),
@@ -228,7 +228,7 @@ class SapphireCtl:
         self.db.collection(EVENTS_COLLECTION).document().set(body)
 
     @staticmethod
-    def _run(cmd: List[str], *, cwd: Path, env: Dict[str, str] | None = None) -> CommandResult:
+    def _run(cmd: list[str], *, cwd: Path, env: dict[str, str] | None = None) -> CommandResult:
         proc = subprocess.run(
             cmd,
             cwd=str(cwd),
@@ -249,20 +249,20 @@ class SapphireCtl:
     def _as_utc_datetime(value: Any) -> datetime | None:
         if isinstance(value, datetime):
             if value.tzinfo is None:
-                return value.replace(tzinfo=timezone.utc)
-            return value.astimezone(timezone.utc)
+                return value.replace(tzinfo=UTC)
+            return value.astimezone(UTC)
         text = str(value or "").strip()
         if not text:
             return None
         try:
             dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
             if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
-            return dt.astimezone(timezone.utc)
+                dt = dt.replace(tzinfo=UTC)
+            return dt.astimezone(UTC)
         except ValueError:
             return None
 
-    def _fetch_runtime_status(self, *, target_host: str) -> Dict[str, Any]:
+    def _fetch_runtime_status(self, *, target_host: str) -> dict[str, Any]:
         marker = "__HTTP_STATUS__:"
         result = self._run(
             [
@@ -288,7 +288,7 @@ class SapphireCtl:
             body = body.strip()
             http_status = http_status.strip()
         healthy = result.ok and http_status == "200"
-        payload: Dict[str, Any] = {}
+        payload: dict[str, Any] = {}
         if healthy and body:
             try:
                 payload = json.loads(body)
@@ -303,11 +303,11 @@ class SapphireCtl:
         }
 
     @staticmethod
-    def _configured_failover_hosts() -> List[str]:
+    def _configured_failover_hosts() -> list[str]:
         raw = str(os.getenv("SAPPHIRECTL_FAILOVER_HOSTS", "")).strip()
         if not raw:
             return []
-        hosts: List[str] = []
+        hosts: list[str] = []
         for item in raw.split(","):
             host = item.strip()
             if host:
@@ -321,11 +321,11 @@ class SapphireCtl:
         run_test: bool,
         enforce_lane_health: bool,
         auto_failover: bool,
-    ) -> Tuple[str, Dict[str, Any]]:
+    ) -> tuple[str, dict[str, Any]]:
         lookback = int(os.getenv("SAPPHIRECTL_LANE_LOOKBACK_MINUTES", "45"))
         primary_lane = self._lane_health(target_host=requested_target_host, lookback_minutes=lookback)
         failover_hosts = [h for h in self._configured_failover_hosts() if h != requested_target_host]
-        decision: Dict[str, Any] = {
+        decision: dict[str, Any] = {
             "requested_target_host": requested_target_host,
             "selected_target_host": requested_target_host,
             "run_test": bool(run_test),
@@ -378,7 +378,7 @@ class SapphireCtl:
         decision["reason"] = "primary_lane_unhealthy_no_test_capable_failover"
         return requested_target_host, decision
 
-    def _fetch_host_trading_flags(self, *, target_host: str) -> Dict[str, Any]:
+    def _fetch_host_trading_flags(self, *, target_host: str) -> dict[str, Any]:
         cmd = (
             "python3 - <<'PY'\n"
             "import os, pathlib\n"
@@ -410,7 +410,7 @@ class SapphireCtl:
             cwd=REPO_ROOT,
             env=os.environ.copy(),
         )
-        values: Dict[str, str] = {}
+        values: dict[str, str] = {}
         if result.ok:
             for raw in (result.stdout or "").splitlines():
                 line = raw.strip()
@@ -424,13 +424,13 @@ class SapphireCtl:
             "raw": values,
         }
 
-    def _lane_health(self, *, target_host: str, lookback_minutes: int = 45) -> Dict[str, Any]:
+    def _lane_health(self, *, target_host: str, lookback_minutes: int = 45) -> dict[str, Any]:
         now = _utc_now()
         since = now - timedelta(minutes=max(1, int(lookback_minutes)))
         runtime = self._fetch_runtime_status(target_host=target_host)
         runtime_payload = runtime.get("payload") or {}
 
-        exec_rows: List[Dict[str, Any]] = []
+        exec_rows: list[dict[str, Any]] = []
         query = (
             self.db.collection("execution_verifications")
             .where(filter=FieldFilter("recorded_at", ">=", since))
@@ -502,8 +502,8 @@ class SapphireCtl:
         except (TypeError, ValueError):
             block_remaining = 0.0
 
-        reasons: List[str] = []
-        warnings: List[str] = []
+        reasons: list[str] = []
+        warnings: list[str] = []
 
         if not runtime.get("ok", False):
             reasons.append("runtime status endpoint unavailable via ssh/curl")
@@ -582,7 +582,7 @@ class SapphireCtl:
         self,
         *,
         target_host: str,
-        overrides: Dict[str, str],
+        overrides: dict[str, str],
     ) -> CommandResult:
         if not overrides:
             return CommandResult(
@@ -684,8 +684,8 @@ class SapphireCtl:
         self,
         *,
         target_host: str,
-        keys: List[str],
-    ) -> Dict[str, str]:
+        keys: list[str],
+    ) -> dict[str, str]:
         filtered = [str(k).strip() for k in keys if str(k).strip()]
         if not filtered:
             return {}
@@ -724,7 +724,7 @@ class SapphireCtl:
             cwd=REPO_ROOT,
             env=os.environ.copy(),
         )
-        values: Dict[str, str] = {}
+        values: dict[str, str] = {}
         if not result.ok:
             return values
         for raw in (result.stdout or "").splitlines():
@@ -739,13 +739,13 @@ class SapphireCtl:
         self,
         *,
         target_host: str,
-        effective_settings: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        effective_settings: dict[str, Any],
+    ) -> dict[str, Any]:
         expected = {str(k): str(v) for k, v in (effective_settings or {}).items()}
         keys = sorted(list(expected.keys()))
         actual = self._fetch_remote_env_values(target_host=target_host, keys=keys)
-        mismatches: List[Dict[str, str]] = []
-        missing: List[str] = []
+        mismatches: list[dict[str, str]] = []
+        missing: list[str] = []
         for key in keys:
             exp = expected.get(key, "")
             got = actual.get(key)
@@ -783,18 +783,18 @@ class SapphireCtl:
     @staticmethod
     def _effective_overrides_for_profile(
         profile: str,
-        effective_settings: Dict[str, str],
-    ) -> Dict[str, str]:
+        effective_settings: dict[str, str],
+    ) -> dict[str, str]:
         base = PROFILE_SETTINGS.get(profile, {})
-        overrides: Dict[str, str] = {}
+        overrides: dict[str, str] = {}
         for key, value in (effective_settings or {}).items():
             val = str(value)
             if str(base.get(key, "")) != val:
                 overrides[str(key)] = val
         return overrides
 
-    def _load_applied_history(self, *, limit: int = 50) -> List[Dict[str, Any]]:
-        rows: List[Dict[str, Any]] = []
+    def _load_applied_history(self, *, limit: int = 50) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
         for doc in self.db.collection(APPLIED_HISTORY_COLLECTION).stream():
             row = doc.to_dict() or {}
             row["_id"] = doc.id
@@ -814,10 +814,10 @@ class SapphireCtl:
         close_after_test: bool,
         test_quantity: str,
         notes: str,
-        overrides: Dict[str, str],
+        overrides: dict[str, str],
         requested_by: str,
         desired_version: str | None = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         desired_version = desired_version or f"{_utc_now().strftime('%Y%m%dT%H%M%SZ')}-{uuid.uuid4().hex[:8]}"
         base = dict(PROFILE_SETTINGS.get(profile, {}))
         effective = dict(base)
@@ -851,14 +851,14 @@ class SapphireCtl:
         close_after_test: bool,
         test_quantity: str,
         notes: str,
-        overrides: Dict[str, str],
+        overrides: dict[str, str],
         requested_by: str,
         desired_version: str | None = None,
         update_desired: bool = True,
         no_restart: bool = False,
         enforce_lane_health: bool = True,
         auto_failover: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         desired = self._build_desired_state(
             profile=profile,
             target_host=target_host,
@@ -879,7 +879,7 @@ class SapphireCtl:
             self._event("desired_state_updated", {"desired_version": desired["desired_version"], **desired})
 
         selected_target_host = target_host
-        lane_decision: Dict[str, Any] = {}
+        lane_decision: dict[str, Any] = {}
         runtime_overrides = {str(k): str(v) for k, v in overrides.items()}
         if not no_restart:
             selected_target_host, lane_decision = self._select_target_host(
@@ -937,7 +937,7 @@ class SapphireCtl:
                 stdout="skipped_no_restart",
                 stderr="",
             )
-            applied_payload: Dict[str, Any] = {
+            applied_payload: dict[str, Any] = {
                 "platform": PLATFORM,
                 "service": DEFAULT_SERVICE,
                 "target_host": target_host,
@@ -1059,7 +1059,7 @@ class SapphireCtl:
             stdout="skipped",
             stderr="",
         )
-        lane_health: Dict[str, Any] = lane_decision.get("primary_lane_health", {}) if lane_decision else {}
+        lane_health: dict[str, Any] = lane_decision.get("primary_lane_health", {}) if lane_decision else {}
         if primary_disarm_result.ok and deploy.ok and override_apply_result.ok and run_test:
             if not runtime_convergence.get("ok", False):
                 test_result = CommandResult(
@@ -1132,7 +1132,7 @@ class SapphireCtl:
             )
             else "failed"
         )
-        applied_payload: Dict[str, Any] = {
+        applied_payload: dict[str, Any] = {
             "platform": PLATFORM,
             "service": DEFAULT_SERVICE,
             "target_host": target_host,
@@ -1194,11 +1194,11 @@ class SapphireCtl:
         run_test_override: bool | None,
         close_after_test_override: bool | None,
         notes: str,
-        extra_overrides: Dict[str, str],
+        extra_overrides: dict[str, str],
         no_restart: bool,
         enforce_lane_health: bool = True,
         auto_failover: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         stage_cfg = PROMOTION_STAGES.get(to_stage)
         if not stage_cfg:
             raise ValueError(f"Unknown promotion stage: {to_stage}")
@@ -1265,7 +1265,7 @@ class SapphireCtl:
         no_restart: bool,
         enforce_lane_health: bool = True,
         auto_failover: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         steps = max(1, int(steps))
         history = [
             row for row in self._load_applied_history(limit=120)
@@ -1317,7 +1317,7 @@ class SapphireCtl:
         run_test: bool,
         enforce_lane_health: bool,
         auto_failover: bool,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         selected_target_host, lane_decision = self._select_target_host(
             requested_target_host=target_host,
             run_test=run_test,
@@ -1331,7 +1331,7 @@ class SapphireCtl:
             "lane_decision": lane_decision,
         }
 
-    def status(self) -> Dict[str, Any]:
+    def status(self) -> dict[str, Any]:
         desired = self.db.collection(DESIRED_COLLECTION).document(PLATFORM).get().to_dict() or {}
         applied = self.db.collection(APPLIED_COLLECTION).document(PLATFORM).get().to_dict() or {}
         live_position = self.db.collection("live_positions").document(PLATFORM).get().to_dict() or {}
@@ -1381,7 +1381,7 @@ class SapphireCtl:
         no_restart: bool = False,
         enforce_lane_health: bool = True,
         auto_failover: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         desired = self.db.collection(DESIRED_COLLECTION).document(PLATFORM).get().to_dict() or {}
         applied = self.db.collection(APPLIED_COLLECTION).document(PLATFORM).get().to_dict() or {}
         if not desired:
@@ -1453,7 +1453,7 @@ class SapphireCtl:
         }
 
 
-def _json_print(payload: Dict[str, Any]) -> None:
+def _json_print(payload: dict[str, Any]) -> None:
     print(json.dumps(payload, indent=2, default=str))
 
 

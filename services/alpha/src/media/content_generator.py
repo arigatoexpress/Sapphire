@@ -14,7 +14,7 @@ Quality controls:
 import os
 import re
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from loguru import logger
 
@@ -27,7 +27,7 @@ PLATFORM_LIMITS = {
 }
 
 # Phrases that signal low-quality AI-generated content
-_SLOP_PATTERNS: List[re.Pattern] = [
+_SLOP_PATTERNS: list[re.Pattern] = [
     re.compile(r"(?i)\bin this article\b"),
     re.compile(r"(?i)\blet'?s dive in\b"),
     re.compile(r"(?i)\bin conclusion\b"),
@@ -62,16 +62,16 @@ class ContentGenerator:
         self.min_post_interval = int(
             os.getenv("SAPPHIRE_MEDIA_MIN_INTERVAL_SECONDS", "3600")
         )
-        self.last_generation: Dict[str, float] = {}
+        self.last_generation: dict[str, float] = {}
         self._generation_count = 0
 
     # ── Public API ──────────────────────────────────────────────
 
     async def generate_tweet(
         self,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         topic: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate a tweet or thread from system context."""
         if not self._check_interval("twitter"):
             return {"ok": False, "reason": "min_interval_not_met"}
@@ -103,9 +103,9 @@ class ContentGenerator:
 
     async def generate_substack(
         self,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         topic: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate a Substack article from system context."""
         if not self._check_interval("substack"):
             return {"ok": False, "reason": "min_interval_not_met"}
@@ -137,9 +137,9 @@ class ContentGenerator:
 
     async def generate_linkedin(
         self,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         topic: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate a LinkedIn post from system context."""
         if not self._check_interval("linkedin"):
             return {"ok": False, "reason": "min_interval_not_met"}
@@ -172,9 +172,9 @@ class ContentGenerator:
     async def generate_for_platform(
         self,
         platform: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         topic: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Route to the correct platform generator."""
         platform = platform.lower().strip()
         if platform in ("twitter", "x"):
@@ -185,7 +185,7 @@ class ContentGenerator:
             return await self.generate_linkedin(context, topic)
         return {"ok": False, "reason": f"unknown_platform:{platform}"}
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         """Return generation statistics."""
         return {
             "generation_count": self._generation_count,
@@ -198,9 +198,9 @@ class ContentGenerator:
 
     # ── Quality scoring ─────────────────────────────────────────
 
-    def _score_quality(self, text: str, platform: str) -> Dict[str, Any]:
+    def _score_quality(self, text: str, platform: str) -> dict[str, Any]:
         """Score content quality. Returns {score: float, issues: list}."""
-        issues: List[str] = []
+        issues: list[str] = []
         score = 1.0
 
         # 1. Slop detection
@@ -254,7 +254,7 @@ class ContentGenerator:
 
     # ── Prompt builders ─────────────────────────────────────────
 
-    def _build_tweet_prompt(self, ctx: Dict[str, Any], topic: str) -> str:
+    def _build_tweet_prompt(self, ctx: dict[str, Any], topic: str) -> str:
         data_block = self._format_context_block(ctx)
         topic_line = f"Topic focus: {topic}\n" if topic else ""
         return (
@@ -270,7 +270,7 @@ class ContentGenerator:
             "Respond ONLY with the tweet text. Nothing else."
         )
 
-    def _build_substack_prompt(self, ctx: Dict[str, Any], topic: str) -> str:
+    def _build_substack_prompt(self, ctx: dict[str, Any], topic: str) -> str:
         data_block = self._format_context_block(ctx)
         topic_line = f"Topic focus: {topic}\n" if topic else ""
         return (
@@ -291,7 +291,7 @@ class ContentGenerator:
             "Respond ONLY with the article in markdown. Start with the title as a # heading."
         )
 
-    def _build_linkedin_prompt(self, ctx: Dict[str, Any], topic: str) -> str:
+    def _build_linkedin_prompt(self, ctx: dict[str, Any], topic: str) -> str:
         data_block = self._format_context_block(ctx)
         topic_line = f"Topic focus: {topic}\n" if topic else ""
         return (
@@ -307,9 +307,9 @@ class ContentGenerator:
             "Respond ONLY with the post text. Nothing else."
         )
 
-    def _format_context_block(self, ctx: Dict[str, Any]) -> str:
+    def _format_context_block(self, ctx: dict[str, Any]) -> str:
         """Format system context into a structured data block for the prompt."""
-        lines: List[str] = []
+        lines: list[str] = []
 
         # Trade metrics
         metrics = ctx.get("metrics", {})
@@ -359,7 +359,7 @@ class ContentGenerator:
 
     # ── Gemini call ─────────────────────────────────────────────
 
-    async def _call_gemini(self, prompt: str) -> Optional[str]:
+    async def _call_gemini(self, prompt: str) -> str | None:
         """Call Gemini via the guard's chat method."""
         if not self.gemini:
             logger.warning("ContentGenerator: no Gemini guard available")

@@ -19,7 +19,7 @@ class _FieldFilter:
         self.kwargs = _kwargs
 
 
-setattr(base_query_mod, "FieldFilter", _FieldFilter)
+base_query_mod.FieldFilter = _FieldFilter
 sys.modules.setdefault("google.cloud.firestore_v1.base_query", base_query_mod)
 
 SPEC = importlib.util.spec_from_file_location("sapphirectl_module", SCRIPT_PATH)

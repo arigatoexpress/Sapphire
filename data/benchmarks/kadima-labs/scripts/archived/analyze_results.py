@@ -14,7 +14,7 @@ class BenchmarkAnalyzer:
     """Analyze and compare benchmark results"""
     
     def __init__(self, results_file: str):
-        with open(results_file, 'r', encoding='utf-8') as f:
+        with open(results_file, encoding='utf-8') as f:
             self.data = json.load(f)
         self.results = self.data.get("models_tested", [])
         self.system_info = self.data.get("system_info", {})

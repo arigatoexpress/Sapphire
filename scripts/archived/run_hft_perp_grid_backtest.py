@@ -25,7 +25,6 @@ import json
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -96,7 +95,7 @@ class BacktestMetrics:
     score: float
 
 
-def _normalize_symbols(raw: str) -> List[str]:
+def _normalize_symbols(raw: str) -> list[str]:
     out, seen = [], set()
     for tok in raw.split(','):
         s = tok.strip().upper()
@@ -107,7 +106,7 @@ def _normalize_symbols(raw: str) -> List[str]:
     return out or ["BTC", "ETH", "SOL"]
 
 
-def _normalize_timeframes(raw: str) -> List[str]:
+def _normalize_timeframes(raw: str) -> list[str]:
     out, seen = [], set()
     for tok in raw.split(','):
         k = tok.strip().lower().replace(' ', '')
@@ -160,7 +159,7 @@ def _parse_zip_csv(blob: bytes) -> pd.DataFrame:
 def download_klines(symbol: str, timeframe: str, start_date: dt.date, end_date_exclusive: dt.date) -> pd.DataFrame:
     pair = f"{symbol}USDT"
     sess = requests.Session()
-    frames: List[pd.DataFrame] = []
+    frames: list[pd.DataFrame] = []
 
     for m in _month_iter(start_date, end_date_exclusive):
         ym = f"{m.year:04d}-{m.month:02d}"
@@ -220,7 +219,7 @@ def backtest_hft_grid(
     maker_fee_pct: float = 0.02,
     funding_rate_per_8h: float = 0.0001,
     liquidation_buffer: float = 0.92,
-) -> Tuple[BacktestMetrics, pd.Series]:
+) -> tuple[BacktestMetrics, pd.Series]:
     # maker_fee_pct in percent, e.g. 0.02 = 0.02%
     fee = maker_fee_pct / 100.0
     grid_step = cfg.grid_step_bps / 10_000.0
@@ -237,15 +236,15 @@ def backtest_hft_grid(
     funding_every_bars = max(1, int((8 * 60) / mins))
 
     # per-slot state
-    open_longs: Dict[int, Tuple[float, float, float]] = {}
-    open_shorts: Dict[int, Tuple[float, float, float]] = {}
+    open_longs: dict[int, tuple[float, float, float]] = {}
+    open_shorts: dict[int, tuple[float, float, float]] = {}
     # tuple: (entry, tp, liq)
 
     equity = 1.0
     eq_points = [equity]
     eq_index = [idx[0]]
 
-    trade_pnls: List[float] = []
+    trade_pnls: list[float] = []
     wins = 0
     liquidations = 0
 
@@ -411,7 +410,7 @@ def backtest_hft_grid(
     return metrics, eq
 
 
-def _build_candidate_configs(seed: int = 42, max_configs: int = 24) -> List[GridConfig]:
+def _build_candidate_configs(seed: int = 42, max_configs: int = 24) -> list[GridConfig]:
     leverage = [10, 15, 20]
     step_bps = [8, 12, 16, 24]
     levels = [3, 5]
@@ -540,8 +539,8 @@ def main() -> None:
 
     candidate_cfgs = _build_candidate_configs(seed=args.seed, max_configs=args.max_configs)
 
-    result_rows: List[Dict[str, object]] = []
-    param_rows: List[Dict[str, object]] = []
+    result_rows: list[dict[str, object]] = []
+    param_rows: list[dict[str, object]] = []
 
     for symbol in symbols:
         for tf in timeframes:

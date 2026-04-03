@@ -12,9 +12,9 @@ from __future__ import annotations
 import argparse
 import json
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from google.cloud import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
@@ -30,8 +30,8 @@ def _to_float(value: Any, default: float = 0.0) -> float:
 def _to_dt(value: Any) -> datetime | None:
     if isinstance(value, datetime):
         if value.tzinfo is None:
-            return value.replace(tzinfo=timezone.utc)
-        return value.astimezone(timezone.utc)
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
     if value is None:
         return None
     text = str(value).strip()
@@ -40,8 +40,8 @@ def _to_dt(value: Any) -> datetime | None:
     try:
         dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone(timezone.utc)
+            dt = dt.replace(tzinfo=UTC)
+        return dt.astimezone(UTC)
     except ValueError:
         return None
 
@@ -50,7 +50,7 @@ def _norm(value: Any) -> str:
     return str(value or "").strip().lower()
 
 
-def _strategy_tf_from_row(row: Dict[str, Any]) -> Tuple[str, str]:
+def _strategy_tf_from_row(row: dict[str, Any]) -> tuple[str, str]:
     metadata = row.get("metadata", {}) if isinstance(row.get("metadata"), dict) else {}
     strategy = _norm(
         row.get("strategy")
@@ -77,7 +77,7 @@ def _safe_div(numer: float, denom: float) -> float:
     return float(numer) / float(denom)
 
 
-def _lane_stage_recommendation(row: Dict[str, Any]) -> str:
+def _lane_stage_recommendation(row: dict[str, Any]) -> str:
     samples = int(row["sample_size"])
     reject_tax = float(row["reject_tax_pct"])
     hard_fail = float(row["hard_fail_pct"])
@@ -104,14 +104,14 @@ def main() -> int:
     parser.add_argument("--output-md", default="")
     args = parser.parse_args()
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     since = now - timedelta(days=max(1, int(args.days)))
     platform = _norm(args.platform)
     max_rows = max(500, min(int(args.max_rows), 10000))
 
     client = firestore.Client(project=args.project)
 
-    exec_rows: List[Dict[str, Any]] = []
+    exec_rows: list[dict[str, Any]] = []
     try:
         query = (
             client.collection("execution_verifications")
@@ -150,7 +150,7 @@ def main() -> int:
                     continue
                 exec_rows.append(row)
 
-    pnl_rows: List[Dict[str, Any]] = []
+    pnl_rows: list[dict[str, Any]] = []
     try:
         query = (
             client.collection("trade_executions")
@@ -220,7 +220,7 @@ def main() -> int:
         slot["net_realized_pnl_usd"] += _to_float(row.get("realized_pnl"), 0.0)
         slot["trade_count"] += 1
 
-    ranked: List[Dict[str, Any]] = []
+    ranked: list[dict[str, Any]] = []
     for lane in agg.values():
         sample = max(1, int(lane["sample_size"]))
         fill_pct = _safe_div(lane["filled_success_count"], sample) * 100.0

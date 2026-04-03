@@ -14,7 +14,6 @@ Run via: Cloud Scheduler (Sundays at 2 AM UTC)
 import json
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
-from typing import List, Optional
 
 from google.cloud import firestore, pubsub_v1
 
@@ -66,7 +65,7 @@ class SelfImprovementEngine:
         self.db = firestore.Client(project=PROJECT_ID)
         self.publisher = pubsub_v1.PublisherClient()
         
-    def get_weekly_metrics(self) -> Optional[TradingMetrics]:
+    def get_weekly_metrics(self) -> TradingMetrics | None:
         """Fetch metrics for the past week from Firestore"""
         # Get last 7 days of trading data
         week_ago = datetime.utcnow() - timedelta(days=7)
@@ -120,7 +119,7 @@ class SelfImprovementEngine:
             avg_loss=avg_loss
         )
     
-    def analyze_metrics(self, metrics: TradingMetrics) -> List[ImprovementTask]:
+    def analyze_metrics(self, metrics: TradingMetrics) -> list[ImprovementTask]:
         """Analyze metrics and create improvement tasks if needed"""
         tasks = []
         
@@ -177,7 +176,7 @@ class SelfImprovementEngine:
         
         return tasks
     
-    def create_tasks(self, tasks: List[ImprovementTask]):
+    def create_tasks(self, tasks: list[ImprovementTask]):
         """Store improvement tasks in Firestore"""
         for task in tasks:
             doc_ref = self.db.collection(TASKS_COLLECTION).document(task.task_id)
@@ -189,7 +188,7 @@ class SelfImprovementEngine:
             message = json.dumps(asdict(task)).encode("utf-8")
             self.publisher.publish(topic_path, message, task_id=task.task_id)
     
-    def save_review(self, metrics: TradingMetrics, tasks: List[ImprovementTask]):
+    def save_review(self, metrics: TradingMetrics, tasks: list[ImprovementTask]):
         """Save weekly review to Firestore"""
         review_id = datetime.utcnow().strftime("%Y-W%U")
         review = {

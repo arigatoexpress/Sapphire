@@ -11,7 +11,6 @@ Target: 70-80% survival probability over 24 months
 """
 
 from dataclasses import dataclass
-from typing import Dict, Optional, Tuple
 
 import numpy as np
 
@@ -60,7 +59,7 @@ class KellySizer:
     
     def calculate_kelly_fraction(self,
                                  win_prob: float,
-                                 loss_prob: Optional[float] = None,
+                                 loss_prob: float | None = None,
                                  payoff_ratio: float = 1.5) -> float:
         """
         Calculate Kelly fraction for position sizing
@@ -231,7 +230,7 @@ class KellySizer:
         except Exception as e:
             logger.error(f"[ERROR] Win probability update error: {e}")
     
-    def get_estimated_win_probability(self, strategy: Optional[str] = None) -> float:
+    def get_estimated_win_probability(self, strategy: str | None = None) -> float:
         """
         Get estimated win probability based on historical performance
         
@@ -299,7 +298,7 @@ class KellySizer:
     def validate_position(self,
                          capital: float,
                          position_size_usd: float,
-                         current_positions: int = 0) -> Tuple[bool, str]:
+                         current_positions: int = 0) -> tuple[bool, str]:
         """
         Validate if position meets risk management criteria
         
@@ -339,7 +338,7 @@ class KellySizer:
             logger.error(f"[ERROR] Position validation error: {e}")
             return False, f"Validation error: {e}"
     
-    def get_performance_stats(self) -> Dict:
+    def get_performance_stats(self) -> dict:
         """Get Kelly sizer performance statistics"""
         win_rate = self.win_count / self.total_trades if self.total_trades > 0 else 0
         loss_rate = self.loss_count / self.total_trades if self.total_trades > 0 else 0

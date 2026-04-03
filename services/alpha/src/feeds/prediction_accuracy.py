@@ -11,7 +11,7 @@ against actual crypto price outcomes. Tracks:
 import time
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .prediction_signal import PredictionSignal, PredictionSource
 
@@ -25,12 +25,12 @@ class PredictionSnapshot:
     question: str
     probability: float
     volume_usd: float
-    symbols: List[str]
+    symbols: list[str]
     was_high_conviction: bool
     snapshot_time: float  # unix timestamp
     # Outcome (filled in later)
     resolved: bool = False
-    outcome: Optional[bool] = None  # True = event happened, False = didn't
+    outcome: bool | None = None  # True = event happened, False = didn't
     resolved_time: float = 0.0
 
 
@@ -45,10 +45,10 @@ class PredictionAccuracyTracker:
     """
 
     def __init__(self, max_snapshots: int = 1000):
-        self._snapshots: Dict[str, PredictionSnapshot] = {}
+        self._snapshots: dict[str, PredictionSnapshot] = {}
         self._max_snapshots = max_snapshots
         # Per-source accuracy tracking
-        self._source_stats: Dict[str, Dict[str, int]] = defaultdict(
+        self._source_stats: dict[str, dict[str, int]] = defaultdict(
             lambda: {"total": 0, "correct": 0, "brier_sum": 0.0}
         )
 
@@ -75,7 +75,7 @@ class PredictionAccuracyTracker:
             snapshot_time=time.time(),
         )
 
-    def record_outcome(self, market_id: str, outcome: bool) -> Optional[Dict[str, Any]]:
+    def record_outcome(self, market_id: str, outcome: bool) -> dict[str, Any] | None:
         """Record whether a predicted event actually happened.
 
         Args:
@@ -122,7 +122,7 @@ class PredictionAccuracyTracker:
             ),
         }
 
-    def get_accuracy_stats(self) -> Dict[str, Any]:
+    def get_accuracy_stats(self) -> dict[str, Any]:
         """Get overall and per-source accuracy statistics."""
         total_resolved = 0
         total_correct = 0
@@ -171,7 +171,7 @@ class PredictionAccuracyTracker:
             "by_source": source_stats,
         }
 
-    def get_pending_markets(self) -> List[Dict[str, Any]]:
+    def get_pending_markets(self) -> list[dict[str, Any]]:
         """Get all unresolved prediction snapshots (awaiting outcome)."""
         pending = []
         for snap in self._snapshots.values():

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import asdict
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Protocol, Sequence, Tuple
+from datetime import UTC, datetime
+from typing import Protocol
 
 from app.config import Settings
 from app.models import ChatConfig
@@ -13,11 +14,11 @@ except Exception:  # pragma: no cover
     firestore = None
 
 
-def _merge_sent_ids(existing: Sequence[str], new_ids: Sequence[str], *, limit: int) -> List[str]:
+def _merge_sent_ids(existing: Sequence[str], new_ids: Sequence[str], *, limit: int) -> list[str]:
     combined = list(existing) + list(new_ids)
     seen: set[str] = set()
     # Keep last N unique ids (preserve recency).
-    out_rev: List[str] = []
+    out_rev: list[str] = []
     for item_id in reversed(combined):
         if not item_id or item_id in seen:
             continue
@@ -29,19 +30,19 @@ def _merge_sent_ids(existing: Sequence[str], new_ids: Sequence[str], *, limit: i
 
 
 class ChatStore(Protocol):
-    def get(self, chat_id: int) -> Optional[ChatConfig]:
+    def get(self, chat_id: int) -> ChatConfig | None:
         ...
 
     def save(self, chat: ChatConfig) -> None:
         ...
 
-    def list_subscribed(self) -> List[ChatConfig]:
+    def list_subscribed(self) -> list[ChatConfig]:
         ...
 
 
-def _unique_upper(values: List[str]) -> List[str]:
+def _unique_upper(values: list[str]) -> list[str]:
     seen = set()
-    cleaned: List[str] = []
+    cleaned: list[str] = []
     for value in values:
         normalized = value.strip().upper()
         if not normalized or normalized in seen:
@@ -75,15 +76,15 @@ def default_chat_config(chat_id: int, settings: Settings) -> ChatConfig:
 
 class InMemoryChatStore:
     def __init__(self) -> None:
-        self._items: Dict[int, ChatConfig] = {}
+        self._items: dict[int, ChatConfig] = {}
 
-    def get(self, chat_id: int) -> Optional[ChatConfig]:
+    def get(self, chat_id: int) -> ChatConfig | None:
         return self._items.get(chat_id)
 
     def save(self, chat: ChatConfig) -> None:
         self._items[chat.chat_id] = chat
 
-    def list_subscribed(self) -> List[ChatConfig]:
+    def list_subscribed(self) -> list[ChatConfig]:
         return [item for item in self._items.values() if item.subscribed]
 
     def set_last_digest_sent_at(self, *, chat_id: int, ts: datetime) -> None:
@@ -123,17 +124,17 @@ class FirestoreChatStore:
         return self._db.collection(self._collection).document(str(chat_id))
 
     @staticmethod
-    def _coerce_ts(value) -> Optional[datetime]:
+    def _coerce_ts(value) -> datetime | None:
         if not value:
             return None
         if isinstance(value, datetime):
             # Normalize to tz-aware UTC (Firestore can return naive timestamps).
             if value.tzinfo is None:
-                return value.replace(tzinfo=timezone.utc)
+                return value.replace(tzinfo=UTC)
             return value
         return None
 
-    def get(self, chat_id: int) -> Optional[ChatConfig]:
+    def get(self, chat_id: int) -> ChatConfig | None:
         snap = self._doc(chat_id).get()
         if not snap.exists:
             return None
@@ -171,11 +172,11 @@ class FirestoreChatStore:
 
     def save(self, chat: ChatConfig) -> None:
         payload = asdict(chat)
-        payload["updated_at"] = datetime.now(tz=timezone.utc)
+        payload["updated_at"] = datetime.now(tz=UTC)
         self._doc(chat.chat_id).set(payload, merge=True)
 
-    def list_subscribed(self) -> List[ChatConfig]:
-        output: List[ChatConfig] = []
+    def list_subscribed(self) -> list[ChatConfig]:
+        output: list[ChatConfig] = []
         query = self._db.collection(self._collection).where("subscribed", "==", True)
         for snap in query.stream():
             data = snap.to_dict() or {}
@@ -220,7 +221,7 @@ class FirestoreChatStore:
         chat_id: int,
         candidate_ids: Sequence[str],
         limit: int,
-    ) -> Tuple[int, List[str]]:
+    ) -> tuple[int, list[str]]:
         """
         Transactionally append sent item ids and return (newly_added_count, merged_ids).
 
@@ -249,7 +250,7 @@ class FirestoreChatStore:
             merged = _merge_sent_ids(existing, candidate_ids, limit=limit)
             transaction.set(
                 doc_ref,
-                {"sent_item_ids": merged, "updated_at": datetime.now(tz=timezone.utc)},
+                {"sent_item_ids": merged, "updated_at": datetime.now(tz=UTC)},
                 merge=True,
             )
             return len(newly_added), merged
@@ -260,28 +261,28 @@ class FirestoreChatStore:
     def set_last_digest_sent_at(self, *, chat_id: int, ts: datetime) -> None:
         """Update digest timestamp without clobbering sent-item reservations."""
         self._doc(chat_id).set(
-            {"last_digest_sent_at": ts, "updated_at": datetime.now(tz=timezone.utc)},
+            {"last_digest_sent_at": ts, "updated_at": datetime.now(tz=UTC)},
             merge=True,
         )
 
     def set_last_heartbeat_sent_at(self, *, chat_id: int, ts: datetime) -> None:
         """Update heartbeat timestamp."""
         self._doc(chat_id).set(
-            {"last_heartbeat_sent_at": ts, "updated_at": datetime.now(tz=timezone.utc)},
+            {"last_heartbeat_sent_at": ts, "updated_at": datetime.now(tz=UTC)},
             merge=True,
         )
 
     def set_last_assistant_checkin_at(self, *, chat_id: int, ts: datetime) -> None:
         """Update assistant check-in timestamp."""
         self._doc(chat_id).set(
-            {"last_assistant_checkin_at": ts, "updated_at": datetime.now(tz=timezone.utc)},
+            {"last_assistant_checkin_at": ts, "updated_at": datetime.now(tz=UTC)},
             merge=True,
         )
 
     def set_last_decision_sla_reminder_at(self, *, chat_id: int, ts: datetime) -> None:
         """Update decision SLA reminder timestamp."""
         self._doc(chat_id).set(
-            {"last_decision_sla_reminder_at": ts, "updated_at": datetime.now(tz=timezone.utc)},
+            {"last_decision_sla_reminder_at": ts, "updated_at": datetime.now(tz=UTC)},
             merge=True,
         )
 

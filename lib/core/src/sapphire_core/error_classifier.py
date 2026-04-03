@@ -6,7 +6,6 @@ Used by all trading bots and the alpha engine.
 """
 
 from enum import Enum
-from typing import Tuple
 
 
 class ErrorCategory(Enum):
@@ -53,6 +52,7 @@ ERROR_PATTERNS = {
     # Configuration errors - immediate alert
     "Environment variable": (ErrorCategory.CONFIGURATION, ErrorSeverity.CRITICAL),
     "Missing configuration": (ErrorCategory.CONFIGURATION, ErrorSeverity.CRITICAL),
+    "not available in your region": (ErrorCategory.CONFIGURATION, ErrorSeverity.CRITICAL),
     # Exchange-specific errors - expected, don't notify
     "Could not get price": (ErrorCategory.EXCHANGE, ErrorSeverity.WARNING),
     "Symbol not found": (ErrorCategory.EXCHANGE, ErrorSeverity.WARNING),
@@ -65,7 +65,7 @@ ERROR_PATTERNS = {
 }
 
 
-def classify_error(error_message: str) -> Tuple[ErrorCategory, ErrorSeverity]:
+def classify_error(error_message: str) -> tuple[ErrorCategory, ErrorSeverity]:
     """
     Classify an error message and return its category and severity.
 

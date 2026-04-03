@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from datetime import UTC, datetime
 
 from bis.models import NoteEntry, make_urn
 from bis.store import InMemoryMasterArena, PropertyQuery
@@ -64,7 +63,7 @@ def parse_property_query(text: str) -> ParsedQuery:
     return ParsedQuery(raw=text, filters=query)
 
 
-def parse_update_command(text: str) -> Optional[ParsedCommand]:
+def parse_update_command(text: str) -> ParsedCommand | None:
     normalized = text.strip()
     match = re.search(r"update\s+note\s+for\s+([^:]+):\s*(.+)$", normalized, flags=re.IGNORECASE)
     if not match:
@@ -89,11 +88,11 @@ class BISAgent:
     def __init__(self, store: InMemoryMasterArena) -> None:
         self._store = store
 
-    def query(self, text: str) -> Dict[str, object]:
+    def query(self, text: str) -> dict[str, object]:
         parsed = parse_property_query(text)
         matches = self._store.query_properties(parsed.filters)
 
-        payload_matches: List[Dict[str, object]] = []
+        payload_matches: list[dict[str, object]] = []
         for prop in matches:
             owners = self._store.owners_for_property(prop.property_urn)
             notes = self._store.notes_rollup_for_property(prop.property_urn)
@@ -127,7 +126,7 @@ class BISAgent:
             "count": len(payload_matches),
         }
 
-    def apply_command(self, text: str, *, actor: str = "broker") -> Dict[str, object]:
+    def apply_command(self, text: str, *, actor: str = "broker") -> dict[str, object]:
         parsed = parse_update_command(text)
         if not parsed:
             return {
@@ -153,7 +152,7 @@ class BISAgent:
             property_urn=property_asset.property_urn,
             tags=["nl-crud", "redo" if parsed.mark_redo else ""],
             created_by=actor,
-            created_at=datetime.now(tz=timezone.utc),
+            created_at=datetime.now(tz=UTC),
         )
         note.tags = [tag for tag in note.tags if tag]
         self._store.add_note(note)

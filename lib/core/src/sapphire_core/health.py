@@ -1,6 +1,7 @@
 import logging
 import os
-from typing import Any, Awaitable, Callable, Dict, Optional
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from aiohttp import web
 
@@ -10,7 +11,7 @@ logger = logging.getLogger(__name__)
 _CONTROL_TOKEN = os.getenv("SAPPHIRE_CONTROL_API_TOKEN", "")
 
 
-async def _check_control_token(request: web.Request) -> Optional[web.Response]:
+async def _check_control_token(request: web.Request) -> web.Response | None:
     """Validate X-Sapphire-Control-Token header for mutable endpoints.
     
     Returns None if valid or token not configured, Response if invalid.
@@ -84,26 +85,26 @@ async def control_token_middleware(request: web.Request, handler: Callable) -> w
 
 
 async def start_health_server(
-    telegram_update_handler: Optional[Callable[[dict[str, Any]], Awaitable[None]]] = None,
+    telegram_update_handler: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
     telegram_webhook_secret: str = "",
     control_api_token: str = "",
-    market_ohlc_handler: Optional[Callable[[Any, Dict[str, Any]], Awaitable[Any]]] = None,
-    platform_status_handler: Optional[Callable[[Any, Dict[str, Any]], Awaitable[Any]]] = None,
-    routing_info_handler: Optional[Callable[[Any, Dict[str, Any]], Awaitable[Any]]] = None,
-    performance_stats_handler: Optional[Callable[[Any, Dict[str, Any]], Awaitable[Any]]] = None,
-    system_logs_handler: Optional[Callable[[Any, Dict[str, Any]], Awaitable[Any]]] = None,
-    control_status_handler: Optional[Callable[[Any, Dict[str, Any]], Awaitable[Any]]] = None,
-    security_skills_status_handler: Optional[Callable[[Any, Dict[str, Any]], Awaitable[Any]]] = None,
-    security_skills_scan_handler: Optional[Callable[[Any, Dict[str, Any]], Awaitable[Any]]] = None,
-    forum_topics_handler: Optional[Callable[[Any, Dict[str, Any]], Awaitable[Any]]] = None,
-    forum_topic_detail_handler: Optional[Callable[[Any, Dict[str, Any]], Awaitable[Any]]] = None,
-    forum_create_topic_handler: Optional[Callable[[Any, Dict[str, Any]], Awaitable[Any]]] = None,
-    forum_replies_handler: Optional[Callable[[Any, Dict[str, Any]], Awaitable[Any]]] = None,
-    forum_scout_status_handler: Optional[Callable[[Any, Dict[str, Any]], Awaitable[Any]]] = None,
-    forum_scout_register_handler: Optional[Callable[[Any, Dict[str, Any]], Awaitable[Any]]] = None,
-    forum_scout_publish_handler: Optional[Callable[[Any, Dict[str, Any]], Awaitable[Any]]] = None,
-    prediction_dashboard_handler: Optional[Callable[[Any, Dict[str, Any]], Awaitable[Any]]] = None,
-    intel_feed_handler: Optional[Callable[[Any, Dict[str, Any]], Awaitable[Any]]] = None,
+    market_ohlc_handler: Callable[[Any, dict[str, Any]], Awaitable[Any]] | None = None,
+    platform_status_handler: Callable[[Any, dict[str, Any]], Awaitable[Any]] | None = None,
+    routing_info_handler: Callable[[Any, dict[str, Any]], Awaitable[Any]] | None = None,
+    performance_stats_handler: Callable[[Any, dict[str, Any]], Awaitable[Any]] | None = None,
+    system_logs_handler: Callable[[Any, dict[str, Any]], Awaitable[Any]] | None = None,
+    control_status_handler: Callable[[Any, dict[str, Any]], Awaitable[Any]] | None = None,
+    security_skills_status_handler: Callable[[Any, dict[str, Any]], Awaitable[Any]] | None = None,
+    security_skills_scan_handler: Callable[[Any, dict[str, Any]], Awaitable[Any]] | None = None,
+    forum_topics_handler: Callable[[Any, dict[str, Any]], Awaitable[Any]] | None = None,
+    forum_topic_detail_handler: Callable[[Any, dict[str, Any]], Awaitable[Any]] | None = None,
+    forum_create_topic_handler: Callable[[Any, dict[str, Any]], Awaitable[Any]] | None = None,
+    forum_replies_handler: Callable[[Any, dict[str, Any]], Awaitable[Any]] | None = None,
+    forum_scout_status_handler: Callable[[Any, dict[str, Any]], Awaitable[Any]] | None = None,
+    forum_scout_register_handler: Callable[[Any, dict[str, Any]], Awaitable[Any]] | None = None,
+    forum_scout_publish_handler: Callable[[Any, dict[str, Any]], Awaitable[Any]] | None = None,
+    prediction_dashboard_handler: Callable[[Any, dict[str, Any]], Awaitable[Any]] | None = None,
+    intel_feed_handler: Callable[[Any, dict[str, Any]], Awaitable[Any]] | None = None,
 ):
     """Start a lightweight HTTP server for Cloud Run health checks."""
     port = int(os.getenv("PORT", "8080"))

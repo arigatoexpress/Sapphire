@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from typing import List
 
 
 @dataclass(frozen=True)
@@ -29,11 +28,11 @@ def _add_years_safe(source: date, years: int) -> date:
         return source + timedelta(days=365 * years)
 
 
-def extract_field_suggestions(note_text: str, *, today: date | None = None) -> List[NoteFieldSuggestion]:
+def extract_field_suggestions(note_text: str, *, today: date | None = None) -> list[NoteFieldSuggestion]:
     text = (note_text or "").strip()
     lowered = text.lower()
     today = today or date.today()
-    suggestions: List[NoteFieldSuggestion] = []
+    suggestions: list[NoteFieldSuggestion] = []
 
     lease_years_match = re.search(r"\b(\d{1,2})\s+years?\s+left\s+on\s+the\s+lease\b", lowered)
     if not lease_years_match:
@@ -74,14 +73,14 @@ def extract_field_suggestions(note_text: str, *, today: date | None = None) -> L
     return suggestions
 
 
-def extract_follow_up_suggestions(note_text: str, *, today: date | None = None) -> List[FollowUpSuggestion]:
+def extract_follow_up_suggestions(note_text: str, *, today: date | None = None) -> list[FollowUpSuggestion]:
     text = (note_text or "").strip()
     lowered = text.lower()
     today = today or date.today()
     if not text:
         return []
 
-    suggestions: List[FollowUpSuggestion] = []
+    suggestions: list[FollowUpSuggestion] = []
     patterns = [
         r"\bfollow[\s-]*up\s+(?:on|for)?\s*(\d{1,2}/\d{1,2}/\d{2,4})\b",
         r"\bcall\s+back\s+(?:on|for)?\s*(\d{1,2}/\d{1,2}/\d{2,4})\b",

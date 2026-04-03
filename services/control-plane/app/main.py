@@ -17,7 +17,7 @@ import os
 import shutil
 from collections import Counter
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -66,7 +66,7 @@ _telegram: TelegramClient | None = None
 
 
 def _utc_now() -> datetime:
-    return datetime.now(tz=timezone.utc)
+    return datetime.now(tz=UTC)
 
 
 def _utc_iso_now() -> str:
@@ -861,8 +861,8 @@ def _build_architecture_overview_payload(*, refresh: bool = False) -> dict[str, 
     for node_id, label, subtitle, status in [
         ("mac", "Operator Workstation", "Codex workspace", "stable"),
         ("control", "Control Plane", f"{_service_name()} ({_runtime_mode()})", "stable"),
-        ("rari1", "rari1", "Pi / local execution", "stable" if any("rari1" in str((_normalized_agent_host(agent).get("host_id") or "")) and agent.get("online") for agent in agents) else "guarded"),
-        ("rari2", "rari2", "Pi / local research", "stable" if any("rari2" in str((_normalized_agent_host(agent).get("host_id") or "")) and agent.get("online") for agent in agents) else "guarded"),
+        ("rari1", "rari1", "Pi / local execution", "stable" if any("rari1" in str(_normalized_agent_host(agent).get("host_id") or "") and agent.get("online") for agent in agents) else "guarded"),
+        ("rari2", "rari2", "Pi / local research", "stable" if any("rari2" in str(_normalized_agent_host(agent).get("host_id") or "") and agent.get("online") for agent in agents) else "guarded"),
         ("telegram", "Telegram", "Operator channel", "stable"),
     ]:
         topology_nodes.append({"id": node_id, "label": label, "subtitle": subtitle, "status": status})
@@ -922,7 +922,7 @@ def _build_architecture_overview_payload(*, refresh: bool = False) -> dict[str, 
         "logs": logbook.get("timeline", []),
         "slo": overview.get("slo", {}),
         "project_charts": project_charts,
-        "project_charts_markdown_path": str((BASE_DIR / "data" / "agentic_roadmap_snapshot.md")),
+        "project_charts_markdown_path": str(BASE_DIR / "data" / "agentic_roadmap_snapshot.md"),
     }
 
 

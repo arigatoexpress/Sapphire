@@ -3,15 +3,14 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import List
 
 
-def _split_csv(raw: str) -> List[str]:
+def _split_csv(raw: str) -> list[str]:
     return [item.strip() for item in raw.split(",") if item.strip()]
 
 
-def _split_csv_int(raw: str) -> List[int]:
-    output: List[int] = []
+def _split_csv_int(raw: str) -> list[int]:
+    output: list[int] = []
     for item in _split_csv(raw):
         try:
             output.append(int(item))
@@ -41,16 +40,16 @@ class Settings:
     heartbeat_interval_minutes: int
     heartbeat_directive_max_chars: int
     timezone: str
-    default_aster_assets: List[str]
-    default_lighter_assets: List[str]
-    default_macro_keywords: List[str]
+    default_aster_assets: list[str]
+    default_lighter_assets: list[str]
+    default_macro_keywords: list[str]
     use_in_memory_store: bool
     job_shared_token: str
     control_plane_shared_token: str
     startup_register_webhook: bool
     public_base_url: str
-    allowed_telegram_user_ids: List[int]
-    allowed_telegram_chat_ids: List[int]
+    allowed_telegram_user_ids: list[int]
+    allowed_telegram_chat_ids: list[int]
     # Article snippet enrichment + de-dupe sizing.
     snippet_cache_ttl_seconds: float
     snippet_fetch_timeout_seconds: float
@@ -58,19 +57,19 @@ class Settings:
     sent_item_id_buffer_size: int
     zkpass_enabled: bool = False
     zkpass_mode: str = "advisory"
-    zkpass_required_actions: List[str] = field(default_factory=list)
-    zkpass_allowed_schema_ids: List[str] = field(default_factory=list)
-    zkpass_allowed_recipients: List[str] = field(default_factory=list)
-    zkpass_allowed_allocator_addresses: List[str] = field(default_factory=list)
-    zkpass_allowed_validator_addresses: List[str] = field(default_factory=list)
+    zkpass_required_actions: list[str] = field(default_factory=list)
+    zkpass_allowed_schema_ids: list[str] = field(default_factory=list)
+    zkpass_allowed_recipients: list[str] = field(default_factory=list)
+    zkpass_allowed_allocator_addresses: list[str] = field(default_factory=list)
+    zkpass_allowed_validator_addresses: list[str] = field(default_factory=list)
     zkpass_max_age_seconds: int = 86400
     zkpass_verify_signatures: bool = False
     zkpass_allocator_message_template: str = "I am allocator and I have allocated task {taskId} with uHash {uHash}"
     zkpass_validator_message_template: str = "I am validator and I have validated task {taskId}"
     zkpass_breakglass_enabled: bool = False
     zkpass_breakglass_token: str = ""
-    zkpass_breakglass_allowed_actions: List[str] = field(default_factory=list)
-    zkpass_breakglass_allowed_actors: List[str] = field(default_factory=list)
+    zkpass_breakglass_allowed_actions: list[str] = field(default_factory=list)
+    zkpass_breakglass_allowed_actors: list[str] = field(default_factory=list)
     zkpass_breakglass_require_reason: bool = True
 
 

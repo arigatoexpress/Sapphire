@@ -7,7 +7,6 @@ Tracks realized and unrealized P&L from actual trades
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Dict
 
 
 class PnLTracker:
@@ -19,7 +18,7 @@ class PnLTracker:
         self.state_file = self.data_dir / 'pnl_state.json'
         self.state = self._load_state()
     
-    def _load_state(self) -> Dict:
+    def _load_state(self) -> dict:
         """Load P&L state"""
         if self.state_file.exists():
             with open(self.state_file) as f:
@@ -37,7 +36,7 @@ class PnLTracker:
         with open(self.state_file, 'w') as f:
             json.dump(self.state, f, indent=2)
     
-    def process_trade(self, trade: Dict) -> Dict:
+    def process_trade(self, trade: dict) -> dict:
         """Process a trade and update P&L"""
         symbol = trade.get('symbol', 'UNKNOWN')
         side = trade.get('side', '').upper()
@@ -107,7 +106,7 @@ class PnLTracker:
             'position_realized': pos['realized_pnl']
         }
     
-    def get_position_pnl(self, symbol: str, current_price: float = None) -> Dict:
+    def get_position_pnl(self, symbol: str, current_price: float = None) -> dict:
         """Calculate unrealized P&L for a position"""
         pos = self.state['positions'].get(symbol, {'qty': 0, 'avg_cost': 0, 'realized_pnl': 0})
         
@@ -124,7 +123,7 @@ class PnLTracker:
             'total_pnl': pos['realized_pnl'] + unrealized
         }
     
-    def get_summary(self) -> Dict:
+    def get_summary(self) -> dict:
         """Get overall P&L summary"""
         total_unrealized = 0.0
         for symbol, pos in self.state['positions'].items():

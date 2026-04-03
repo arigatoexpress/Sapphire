@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any
 
 try:
     import google.auth  # type: ignore
@@ -45,7 +45,7 @@ def _range_for_tab(tab_name: str) -> str:
     return f"'{tab_name}'!A:ZZ"
 
 
-def read_sheet_rows(spreadsheet_id: str, tab_name: str) -> List[Dict[str, Any]]:
+def read_sheet_rows(spreadsheet_id: str, tab_name: str) -> list[dict[str, Any]]:
     service, _ = _service()
     resp = (
         service.spreadsheets()
@@ -57,11 +57,11 @@ def read_sheet_rows(spreadsheet_id: str, tab_name: str) -> List[Dict[str, Any]]:
     if not values:
         return []
     headers = [str(h).strip() for h in values[0]]
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     for raw in values[1:]:
         if not any(str(cell).strip() for cell in raw):
             continue
-        row: Dict[str, Any] = {}
+        row: dict[str, Any] = {}
         for i, header in enumerate(headers):
             if not header:
                 continue
@@ -70,10 +70,10 @@ def read_sheet_rows(spreadsheet_id: str, tab_name: str) -> List[Dict[str, Any]]:
     return rows
 
 
-def write_sheet_rows(spreadsheet_id: str, tab_name: str, rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+def write_sheet_rows(spreadsheet_id: str, tab_name: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
     service, _ = _service()
     if rows:
-        headers: List[str] = []
+        headers: list[str] = []
         seen = set()
         for row in rows:
             for key in row.keys():
@@ -81,7 +81,7 @@ def write_sheet_rows(spreadsheet_id: str, tab_name: str, rows: List[Dict[str, An
                 if key_str not in seen:
                     seen.add(key_str)
                     headers.append(key_str)
-        values: List[List[Any]] = [headers]
+        values: list[list[Any]] = [headers]
         for row in rows:
             values.append([row.get(h, "") for h in headers])
     else:

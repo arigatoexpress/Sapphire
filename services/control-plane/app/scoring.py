@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import math
 import re
-from datetime import datetime, timezone
-from typing import Dict, Iterable, List, Sequence, Set
+from collections.abc import Iterable, Sequence
+from datetime import UTC, datetime
 
 from app.models import ChatConfig, NewsItem, ScoredNews
 
@@ -41,7 +41,7 @@ NEGATIVE_TERMS = {
     "defaults",
 }
 
-ASSET_ALIASES: Dict[str, Set[str]] = {
+ASSET_ALIASES: dict[str, set[str]] = {
     "BTC": {"btc", "bitcoin"},
     "ETH": {"eth", "ethereum", "ether"},
     "SOL": {"sol", "solana"},
@@ -77,8 +77,8 @@ def _tokenize(text: str) -> str:
     return re.sub(r"\s+", " ", text.lower())
 
 
-def _asset_terms(assets: Sequence[str]) -> Dict[str, Set[str]]:
-    result: Dict[str, Set[str]] = {}
+def _asset_terms(assets: Sequence[str]) -> dict[str, set[str]]:
+    result: dict[str, set[str]] = {}
     for asset in assets:
         normalized = _normalize_asset(asset)
         if not normalized:
@@ -89,8 +89,8 @@ def _asset_terms(assets: Sequence[str]) -> Dict[str, Set[str]]:
     return result
 
 
-def _find_term_hits(text: str, terms: Iterable[str]) -> List[str]:
-    hits: List[str] = []
+def _find_term_hits(text: str, terms: Iterable[str]) -> list[str]:
+    hits: list[str] = []
     for term in terms:
         escaped = re.escape(term.lower())
         pattern = rf"\b{escaped}\b"
@@ -137,20 +137,20 @@ def score_news(
     min_alpha_score: int,
     max_news_age_hours: int,
     now: datetime | None = None,
-) -> List[ScoredNews]:
-    now = now or datetime.now(tz=timezone.utc)
+) -> list[ScoredNews]:
+    now = now or datetime.now(tz=UTC)
     assets = list(dict.fromkeys(chat_config.aster_assets + chat_config.lighter_assets))
     asset_map = _asset_terms(assets)
     keyword_terms = [k.strip().lower() for k in list(macro_keywords) + chat_config.extra_keywords if k.strip()]
 
-    scored: List[ScoredNews] = []
+    scored: list[ScoredNews] = []
     for item in items:
         text = _tokenize(f"{item.title} {item.summary}")
         item_age = _age_hours(now, item.published_at)
         if item_age > max_news_age_hours:
             continue
 
-        asset_hits: List[str] = []
+        asset_hits: list[str] = []
         for asset, aliases in asset_map.items():
             if _find_term_hits(text, aliases):
                 asset_hits.append(asset)
@@ -169,7 +169,7 @@ def score_news(
         if alpha_score < min_alpha_score:
             continue
 
-        details: List[str] = []
+        details: list[str] = []
         if asset_hits:
             details.append(f"assets: {', '.join(asset_hits)}")
         if keyword_hits:

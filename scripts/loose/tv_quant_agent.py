@@ -11,7 +11,6 @@ import logging
 import subprocess
 import time
 from datetime import datetime
-from typing import Dict, List
 
 from aiohttp import web
 
@@ -125,7 +124,7 @@ class TVQuantAgent:
     # TECHNICAL ANALYSIS
     # ═══════════════════════════════════════════════════════════════
     
-    async def get_chart_data(self) -> Dict:
+    async def get_chart_data(self) -> dict:
         """Extract comprehensive chart data via JavaScript"""
         js = """
         (function() {
@@ -173,7 +172,7 @@ class TVQuantAgent:
             
         return {"symbol": "", "price": 0, "indicators": {}}
         
-    async def add_indicator(self, indicator_name: str, params: Dict = None):
+    async def add_indicator(self, indicator_name: str, params: dict = None):
         """Add technical indicator to chart"""
         logger.info(f"📊 Adding indicator: {indicator_name}")
         
@@ -230,7 +229,7 @@ class TVQuantAgent:
     # NEWS & SENTIMENT
     # ═══════════════════════════════════════════════════════════════
     
-    async def fetch_news(self, symbol: str = None) -> List[Dict]:
+    async def fetch_news(self, symbol: str = None) -> list[dict]:
         """Fetch news for symbol"""
         if symbol:
             await self.change_symbol(symbol)
@@ -268,7 +267,7 @@ class TVQuantAgent:
             logger.error(f"News fetch error: {e}")
             return []
             
-    async def analyze_sentiment(self, symbol: str = None) -> Dict:
+    async def analyze_sentiment(self, symbol: str = None) -> dict:
         """Analyze sentiment from news and technicals"""
         news = await self.fetch_news(symbol) if symbol else self.news_cache
         chart = await self.get_chart_data()
@@ -305,7 +304,7 @@ class TVQuantAgent:
             "timestamp": datetime.now().isoformat()
         }
         
-    def _calculate_technical_bias(self, chart: Dict) -> str:
+    def _calculate_technical_bias(self, chart: dict) -> str:
         """Calculate technical bias from indicator data"""
         indicators = chart.get('indicators', {})
         
@@ -327,7 +326,7 @@ class TVQuantAgent:
     # STRATEGY TESTING & BENCHMARKING
     # ═══════════════════════════════════════════════════════════════
     
-    async def test_strategy(self, strategy_config: Dict) -> Dict:
+    async def test_strategy(self, strategy_config: dict) -> dict:
         """Test a strategy configuration"""
         name = strategy_config.get('name', 'Unnamed')
         logger.info(f"🧪 Testing strategy: {name}")
@@ -410,7 +409,7 @@ class TVQuantAgent:
         logger.info(f"✅ Script loaded: {result}")
         return result == 'clicked'
         
-    async def run_quantitative_benchmark(self, symbols: List[str], strategies: List[str]) -> Dict:
+    async def run_quantitative_benchmark(self, symbols: list[str], strategies: list[str]) -> dict:
         """Run comprehensive benchmark across symbols and strategies"""
         logger.info(f"📊 Running benchmark on {len(symbols)} symbols, {len(strategies)} strategies")
         
@@ -455,7 +454,7 @@ class TVQuantAgent:
         
         return benchmark_results
         
-    async def get_status(self) -> Dict:
+    async def get_status(self) -> dict:
         """Get agent status"""
         current_url = self.get_active_url()
         chart_data = await self.get_chart_data()

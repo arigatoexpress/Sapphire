@@ -9,7 +9,7 @@ All handlers are pure request-in/response-out with read access to engine state.
 """
 
 import time
-from typing import Any, Dict, List
+from typing import Any
 
 from src.execution.dispatcher import dispatcher
 from src.security.agent_permissions import Capability, gate
@@ -19,7 +19,7 @@ from src.security.agent_permissions import Capability, gate
 # ---------------------------------------------------------------------------
 
 
-async def handle_market_ohlc(engine: Any, query: Dict[str, Any]) -> Dict[str, Any]:
+async def handle_market_ohlc(engine: Any, query: dict[str, Any]) -> dict[str, Any]:
     """Return OHLC candle data for a venue/symbol pair."""
     venue = engine._normalize_platform(str(query.get("venue", "ASTER")))
     if venue not in {"ASTER", "LIGHTER"}:
@@ -54,12 +54,12 @@ async def handle_market_ohlc(engine: Any, query: Dict[str, Any]) -> Dict[str, An
 # ---------------------------------------------------------------------------
 
 
-async def handle_platform_status(engine: Any, _: Dict[str, Any]) -> Dict[str, Any]:
+async def handle_platform_status(engine: Any, _: dict[str, Any]) -> dict[str, Any]:
     """Return per-venue health status."""
     snapshot = engine.market_data.get_market_snapshot(symbol="SOL")
     control_state = dispatcher.get_control_state()
     strategy_state = engine.strategy.execution_state()
-    platforms: Dict[str, Dict[str, Any]] = {}
+    platforms: dict[str, dict[str, Any]] = {}
 
     for venue in ("ASTER", "LIGHTER"):
         venue_state = control_state.get(
@@ -111,7 +111,7 @@ async def handle_platform_status(engine: Any, _: Dict[str, Any]) -> Dict[str, An
     }
 
 
-async def handle_routing_info(engine: Any, _: Dict[str, Any]) -> Dict[str, Any]:
+async def handle_routing_info(engine: Any, _: dict[str, Any]) -> dict[str, Any]:
     """Return routing confidence and venue allocation data."""
     state = dispatcher.get_control_state()
     strategy_state = engine.strategy.execution_state()
@@ -171,7 +171,7 @@ async def handle_routing_info(engine: Any, _: Dict[str, Any]) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-async def handle_performance_stats(engine: Any, _: Dict[str, Any]) -> Dict[str, Any]:
+async def handle_performance_stats(engine: Any, _: dict[str, Any]) -> dict[str, Any]:
     """Return system performance metrics."""
     total_trades = int(engine._trade_metrics["total_trades"])
     wins = int(engine._trade_metrics["wins"])
@@ -197,7 +197,7 @@ async def handle_performance_stats(engine: Any, _: Dict[str, Any]) -> Dict[str, 
     }
 
 
-async def handle_system_logs(engine: Any, payload: Dict[str, Any]) -> List[Dict[str, Any]]:
+async def handle_system_logs(engine: Any, payload: dict[str, Any]) -> list[dict[str, Any]]:
     """Return recent system log entries."""
     limit_raw = payload.get("limit", 80)
     try:
@@ -208,7 +208,7 @@ async def handle_system_logs(engine: Any, payload: Dict[str, Any]) -> List[Dict[
     return list(engine._system_logs)[-limit:]
 
 
-async def handle_intel_feed(engine: Any, payload: Dict[str, Any]) -> Dict[str, Any]:
+async def handle_intel_feed(engine: Any, payload: dict[str, Any]) -> dict[str, Any]:
     """Return normalized intelligence feed payload."""
     intel = getattr(engine, "intel_feed", None)
     if intel is None:
@@ -240,7 +240,7 @@ async def handle_intel_feed(engine: Any, payload: Dict[str, Any]) -> Dict[str, A
     }
 
 
-async def handle_control_status(engine: Any, _: Dict[str, Any]) -> Dict[str, Any]:
+async def handle_control_status(engine: Any, _: dict[str, Any]) -> dict[str, Any]:
     """Return control plane snapshot."""
     return engine._control_snapshot()
 
@@ -253,14 +253,14 @@ async def handle_control_status(engine: Any, _: Dict[str, Any]) -> Dict[str, Any
 # ---------------------------------------------------------------------------
 
 
-async def handle_security_skills_status(engine: Any, _: Dict[str, Any]) -> Dict[str, Any]:
+async def handle_security_skills_status(engine: Any, _: dict[str, Any]) -> dict[str, Any]:
     """Return VirusTotal skill scanner status."""
     status = engine.vt_scanner.status()
     status["timestamp"] = int(time.time())
     return status
 
 
-async def handle_security_skill_scan(engine: Any, payload: Dict[str, Any]) -> Dict[str, Any]:
+async def handle_security_skill_scan(engine: Any, payload: dict[str, Any]) -> dict[str, Any]:
     """Trigger a VirusTotal skill scan."""
     requested_skill = str(payload.get("skill", "")).strip()
     upload_if_missing_raw = payload.get(
@@ -311,7 +311,7 @@ async def handle_security_skill_scan(engine: Any, payload: Dict[str, Any]) -> Di
 # ---------------------------------------------------------------------------
 
 
-async def handle_forum_topics(engine: Any, payload: Dict[str, Any]) -> Dict[str, Any]:
+async def handle_forum_topics(engine: Any, payload: dict[str, Any]) -> dict[str, Any]:
     """List forum topics."""
     board = engine.forum.list_topics(payload)
     control = engine._control_snapshot()
@@ -326,7 +326,7 @@ async def handle_forum_topics(engine: Any, payload: Dict[str, Any]) -> Dict[str,
     }
 
 
-async def handle_forum_topic_detail(engine: Any, payload: Dict[str, Any]) -> Dict[str, Any]:
+async def handle_forum_topic_detail(engine: Any, payload: dict[str, Any]) -> dict[str, Any]:
     """Get a single forum topic by ID."""
     topic_id = str(payload.get("topic_id", "")).strip()
     if not topic_id:
@@ -337,7 +337,7 @@ async def handle_forum_topic_detail(engine: Any, payload: Dict[str, Any]) -> Dic
     return {"topic": topic, "timestamp": int(time.time())}
 
 
-async def handle_forum_create_topic(engine: Any, payload: Dict[str, Any]) -> Dict[str, Any]:
+async def handle_forum_create_topic(engine: Any, payload: dict[str, Any]) -> dict[str, Any]:
     """Create a new forum topic."""
     author = str(payload.get("author", "SAPPHIRE")).strip().upper()
     gate.require(author, Capability.FORUM_WRITE, f"create_topic(author={author})")
@@ -371,7 +371,7 @@ async def handle_forum_create_topic(engine: Any, payload: Dict[str, Any]) -> Dic
     return {"topic": topic, "timestamp": int(time.time())}
 
 
-async def handle_forum_replies(engine: Any, payload: Dict[str, Any]) -> Dict[str, Any]:
+async def handle_forum_replies(engine: Any, payload: dict[str, Any]) -> dict[str, Any]:
     """Add a reply to a forum topic."""
     topic_id = str(payload.get("topic_id", "")).strip()
     if not topic_id:
@@ -405,12 +405,12 @@ async def handle_forum_replies(engine: Any, payload: Dict[str, Any]) -> Dict[str
     return {"reply": reply, "timestamp": int(time.time())}
 
 
-async def handle_forum_scout_status(engine: Any, _: Dict[str, Any]) -> Dict[str, Any]:
+async def handle_forum_scout_status(engine: Any, _: dict[str, Any]) -> dict[str, Any]:
     """Return forum scout status."""
     return engine.forum.scout_status()
 
 
-async def handle_forum_scout_register(engine: Any, payload: Dict[str, Any]) -> Dict[str, Any]:
+async def handle_forum_scout_register(engine: Any, payload: dict[str, Any]) -> dict[str, Any]:
     """Register a scout account and dispatch Telegram notification."""
     result = await engine.forum.register_scout_account(payload)
     if result.get("ok"):
@@ -455,7 +455,7 @@ async def handle_forum_scout_register(engine: Any, payload: Dict[str, Any]) -> D
     return result
 
 
-async def handle_forum_scout_publish(engine: Any, payload: Dict[str, Any]) -> Dict[str, Any]:
+async def handle_forum_scout_publish(engine: Any, payload: dict[str, Any]) -> dict[str, Any]:
     """Publish a scout note externally."""
     result = await engine.forum.publish_scout_note(payload)
     if result.get("ok"):

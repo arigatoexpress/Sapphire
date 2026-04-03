@@ -9,9 +9,10 @@ import os
 import re
 import time
 from collections import deque
-from datetime import datetime, timezone
+from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any
 from urllib.parse import urlparse
 
 import httpx
@@ -83,8 +84,8 @@ def _load_architecture_policy(path: Path = _TELEGRAM_ARCHITECTURE_POLICY_PATH) -
     return payload
 
 
-def _parse_csv(input_value: str, upper: bool = True) -> List[str]:
-    output: List[str] = []
+def _parse_csv(input_value: str, upper: bool = True) -> list[str]:
+    output: list[str] = []
     seen = set()
     for token in re.split(r"[,\s]+", input_value.strip()):
         cleaned = token.strip()
@@ -98,11 +99,11 @@ def _parse_csv(input_value: str, upper: bool = True) -> List[str]:
     return output
 
 
-def _extract_message(update: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def _extract_message(update: dict[str, Any]) -> dict[str, Any] | None:
     return update.get("message") or update.get("channel_post")
 
 
-def _parse_command(raw_text: str) -> Tuple[str, str]:
+def _parse_command(raw_text: str) -> tuple[str, str]:
     text = raw_text.strip()
     if not text:
         return "", ""
@@ -159,8 +160,8 @@ def _parse_utc_datetime(raw_text: str) -> datetime | None:
     except ValueError:
         return None
     if value.tzinfo is None:
-        value = value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
+        value = value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 def _extract_inline_decision_choice(raw_text: str) -> tuple[str, str] | None:
@@ -313,7 +314,7 @@ def _legacy_item_id(source_key: str, url: str, title: str) -> str:
     Back-compat: older versions used sha256(source|url|title)[:20].
     Keep checking it so an upgrade doesn't resend historical items.
     """
-    digest = hashlib.sha256(f"{source_key}|{url}|{title}".encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(f"{source_key}|{url}|{title}".encode()).hexdigest()
     return digest[:20]
 
 def _url_item_id(url: str) -> str:
@@ -326,7 +327,7 @@ def _url_item_id(url: str) -> str:
     - Using URL-only ids in the sent buffer helps prevent duplicate sends.
     """
     canonical = _normalize_url(url) or (url or "").strip()
-    digest = hashlib.sha256(f"url|{canonical}".encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(f"url|{canonical}".encode()).hexdigest()
     return digest[:20]
 
 
@@ -386,7 +387,7 @@ def _summarize_text(text: str, limit: int = 240) -> str:
     if len(raw) <= limit:
         return raw
     sentences = re.split(r"(?<=[.!?])\\s+", raw)
-    out: List[str] = []
+    out: list[str] = []
     total = 0
     for s in sentences:
         s = s.strip()
@@ -422,7 +423,7 @@ class AlphaBotOrchestrator:
         self._max_recent_updates = 512
 
         # Article snippet cache (normalized url -> {ts, snippet}) to avoid refetching.
-        self._snippet_cache: Dict[str, Tuple[float, str]] = {}
+        self._snippet_cache: dict[str, tuple[float, str]] = {}
         self._snippet_cache_ttl_seconds = float(settings.snippet_cache_ttl_seconds)
         self._snippet_fetch_timeout_seconds = float(settings.snippet_fetch_timeout_seconds)
         self._snippet_fetch_max_concurrency = int(settings.snippet_fetch_max_concurrency)
@@ -628,7 +629,7 @@ class AlphaBotOrchestrator:
         except Exception as exc:
             payload = {
                 "status": "error",
-                "generated_at": datetime.now(tz=timezone.utc).isoformat(),
+                "generated_at": datetime.now(tz=UTC).isoformat(),
                 "error": str(exc),
             }
         self._architecture_cache["ts"] = now_ts
@@ -966,7 +967,7 @@ class AlphaBotOrchestrator:
         return {"ok": True, "task": task, "command": cmd}
 
     def _brief_message(self, chat: ChatConfig) -> str:
-        generated_at = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        generated_at = datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M UTC")
         focus_project = chat.focus_project.strip() or "none"
         directive = chat.operator_directive.strip() or "none"
 
@@ -1238,7 +1239,7 @@ class AlphaBotOrchestrator:
         )
 
     def _decision_inbox_state(self, *, now: datetime | None = None) -> dict[str, Any]:
-        ref_now = now or datetime.now(tz=timezone.utc)
+        ref_now = now or datetime.now(tz=UTC)
         snapshot = load_autonomy_proposals()
         proposals = snapshot.get("proposals") if isinstance(snapshot.get("proposals"), list) else []
         steering_questions = (
@@ -1268,7 +1269,7 @@ class AlphaBotOrchestrator:
         now: datetime | None = None,
         include_full_control: bool = False,
     ) -> tuple[str, bool]:
-        ref_now = now or datetime.now(tz=timezone.utc)
+        ref_now = now or datetime.now(tz=UTC)
         focus_project = chat.focus_project.strip() or "none"
         directive = chat.operator_directive.strip() or "none"
         state = self._decision_inbox_state(now=ref_now)
@@ -1449,7 +1450,7 @@ class AlphaBotOrchestrator:
         return out
 
     def _state_message(self) -> str:
-        generated_at = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        generated_at = datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M UTC")
         projects = get_projects_overview(force_refresh=True)
         board = projects.get("board") if isinstance(projects.get("board"), dict) else {}
         counts = board.get("counts") if isinstance(board.get("counts"), dict) else {}
@@ -1657,7 +1658,7 @@ class AlphaBotOrchestrator:
             actor=actor,
         )
 
-    def _is_authorized_sender(self, message: Dict[str, Any], chat_id: int) -> bool:
+    def _is_authorized_sender(self, message: dict[str, Any], chat_id: int) -> bool:
         if not self._allowed_user_ids and not self._allowed_chat_ids:
             return True
         if chat_id in self._allowed_chat_ids:
@@ -1680,7 +1681,7 @@ class AlphaBotOrchestrator:
             self._recent_update_id_set.discard(old)
         return True
 
-    async def handle_update(self, update: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle_update(self, update: dict[str, Any]) -> dict[str, Any]:
         update_id = update.get("update_id")
         if isinstance(update_id, int) and not self._remember_update_id(update_id):
             return {"status": "ignored", "reason": "duplicate-update"}
@@ -1721,7 +1722,7 @@ class AlphaBotOrchestrator:
         await self._execute_command(chat_id, command, args)
         return {"status": "ok", "chat_id": chat_id, "command": command}
 
-    async def _handle_non_command_message(self, chat_id: int, text: str) -> Dict[str, Any]:
+    async def _handle_non_command_message(self, chat_id: int, text: str) -> dict[str, Any]:
         cleaned = re.sub(r"\s+", " ", text).strip()
         if len(cleaned) < 8:
             return {"status": "ignored", "reason": "not-command"}
@@ -2194,7 +2195,7 @@ class AlphaBotOrchestrator:
 
         if command == "/checkin":
             await self._send(chat_id, "Running assistant check-in...")
-            now = datetime.now(tz=timezone.utc)
+            now = datetime.now(tz=UTC)
             message, sla_breached = await asyncio.to_thread(
                 self._assistant_checkin_message,
                 chat,
@@ -2344,17 +2345,17 @@ class AlphaBotOrchestrator:
             macro_keywords=self._settings.default_macro_keywords,
             min_alpha_score=self._settings.min_alpha_score,
             max_news_age_hours=self._settings.max_news_age_hours,
-            now=datetime.now(tz=timezone.utc),
+            now=datetime.now(tz=UTC),
         )
 
     async def send_alpha_stream_to_chat(
         self,
         chat: ChatConfig,
-        cached_news: Optional[Sequence[NewsItem]] = None,
+        cached_news: Sequence[NewsItem] | None = None,
         *,
-        top_k: Optional[int] = None,
+        top_k: int | None = None,
     ) -> int:
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=UTC)
         news = list(cached_news) if cached_news is not None else await self._news.fetch(REPUTABLE_NEWS_SOURCES)
         scored = self._score_for_chat(chat, news)
         safe_top_k = max(1, min(int(top_k if top_k is not None else self._settings.digest_top_k), 15))
@@ -2409,11 +2410,11 @@ class AlphaBotOrchestrator:
         key = _normalize_url(url)
         self._snippet_cache[key] = (time.time(), snippet)
 
-    def _merge_sent_ids(self, existing: Sequence[str], new_ids: Sequence[str]) -> List[str]:
+    def _merge_sent_ids(self, existing: Sequence[str], new_ids: Sequence[str]) -> list[str]:
         combined = list(existing) + list(new_ids)
         seen: set[str] = set()
         # Keep last N unique ids (preserve recency).
-        out_rev: List[str] = []
+        out_rev: list[str] = []
         for item_id in reversed(combined):
             if not item_id or item_id in seen:
                 continue
@@ -2426,15 +2427,15 @@ class AlphaBotOrchestrator:
     async def send_digest_to_chat(
         self,
         chat: ChatConfig,
-        cached_news: Optional[Sequence[NewsItem]] = None,
+        cached_news: Sequence[NewsItem] | None = None,
         *,
         suppress_if_no_new: bool = False,
     ) -> int:
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=UTC)
         if suppress_if_no_new and self._min_digest_interval_minutes > 0 and chat.last_digest_sent_at:
             last = chat.last_digest_sent_at
             if last.tzinfo is None:
-                last = last.replace(tzinfo=timezone.utc)
+                last = last.replace(tzinfo=UTC)
             if (now - last).total_seconds() < (self._min_digest_interval_minutes * 60):
                 # Throttle scheduled digests to reduce spam/resource usage.
                 return 0
@@ -2467,7 +2468,7 @@ class AlphaBotOrchestrator:
         # digests in multi-instance deployments.
         reserved_via_store = False
         if top_items and hasattr(self._store, "reserve_sent_item_ids"):
-            candidate_ids: List[str] = []
+            candidate_ids: list[str] = []
             for scored in top_items:
                 candidate_ids.append(scored.item.id)
                 candidate_ids.append(_legacy_item_id(scored.item.source.key, scored.item.url, scored.item.title))
@@ -2491,8 +2492,8 @@ class AlphaBotOrchestrator:
                 logger.warning("failed reserving sent ids for chat=%s: %s", chat.chat_id, exc)
 
         # Best-effort snippet enrichment (only for top items; cached).
-        summary_overrides: Dict[str, str] = {}
-        to_fetch: List[Tuple[str, str]] = []  # (item_id, url)
+        summary_overrides: dict[str, str] = {}
+        to_fetch: list[tuple[str, str]] = []  # (item_id, url)
         for scored in top_items:
             base_summary = (scored.item.summary or "").strip()
             if len(base_summary) >= 90:
@@ -2547,7 +2548,7 @@ class AlphaBotOrchestrator:
         # Persist sent ids (only items actually included in the message).
         if not reserved_via_store:
             try:
-                new_ids: List[str] = []
+                new_ids: list[str] = []
                 for s in top_items:
                     new_ids.append(s.item.id)
                     new_ids.append(_legacy_item_id(s.item.source.key, s.item.url, s.item.title))
@@ -2563,16 +2564,16 @@ class AlphaBotOrchestrator:
     async def send_heartbeat_to_chat(
         self,
         chat: ChatConfig,
-        cached_news: Optional[Sequence[NewsItem]] = None,
+        cached_news: Sequence[NewsItem] | None = None,
         *,
         suppress_if_too_soon: bool = True,
     ) -> int:
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=UTC)
         interval = max(5, int(chat.heartbeat_interval_minutes or self._default_heartbeat_interval_minutes))
         if suppress_if_too_soon and chat.last_heartbeat_sent_at:
             last = chat.last_heartbeat_sent_at
             if last.tzinfo is None:
-                last = last.replace(tzinfo=timezone.utc)
+                last = last.replace(tzinfo=UTC)
             if (now - last).total_seconds() < (interval * 60):
                 return 0
 
@@ -2597,7 +2598,7 @@ class AlphaBotOrchestrator:
 
         return 1
 
-    async def broadcast_scheduled_digests(self, limit: int | None = None) -> Dict[str, int]:
+    async def broadcast_scheduled_digests(self, limit: int | None = None) -> dict[str, int]:
         chats = await asyncio.to_thread(self._store.list_subscribed)
         if limit is not None and limit > 0:
             chats = chats[:limit]
@@ -2621,7 +2622,7 @@ class AlphaBotOrchestrator:
             "digests_sent": sent,
         }
 
-    async def broadcast_scheduled_heartbeats(self, limit: int | None = None) -> Dict[str, int]:
+    async def broadcast_scheduled_heartbeats(self, limit: int | None = None) -> dict[str, int]:
         chats = await asyncio.to_thread(self._store.list_subscribed)
         if limit is not None and limit > 0:
             chats = chats[:limit]
@@ -2655,7 +2656,7 @@ class AlphaBotOrchestrator:
         limit: int | None = None,
         *,
         force: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         chat_map: dict[int, ChatConfig] = {}
         try:
             chats = await asyncio.to_thread(self._store.list_subscribed)
@@ -2708,7 +2709,7 @@ class AlphaBotOrchestrator:
                 "sla_reminders_sent": 0,
             }
 
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=UTC)
         state = self._decision_inbox_state(now=now)
         open_count = int(state.get("open_count", 0))
         age_minutes = int(state.get("age_minutes", 0))
@@ -2730,12 +2731,12 @@ class AlphaBotOrchestrator:
 
             last_checkin = chat.last_assistant_checkin_at
             if last_checkin and last_checkin.tzinfo is None:
-                last_checkin = last_checkin.replace(tzinfo=timezone.utc)
+                last_checkin = last_checkin.replace(tzinfo=UTC)
             interval_due = (last_checkin is None) or ((now - last_checkin).total_seconds() >= interval_minutes * 60)
 
             last_sla = chat.last_decision_sla_reminder_at
             if last_sla and last_sla.tzinfo is None:
-                last_sla = last_sla.replace(tzinfo=timezone.utc)
+                last_sla = last_sla.replace(tzinfo=UTC)
             sla_cooldown_minutes = max(30, min(sla_minutes, 180))
             sla_due = sla_breached and (
                 last_sla is None or (now - last_sla).total_seconds() >= sla_cooldown_minutes * 60
@@ -2791,7 +2792,7 @@ class AlphaBotOrchestrator:
             "forced": force,
         }
 
-    async def broadcast_autonomy_cycle(self, limit: int | None = None) -> Dict[str, Any]:
+    async def broadcast_autonomy_cycle(self, limit: int | None = None) -> dict[str, Any]:
         chat_ids: list[int] = []
         try:
             chats = await asyncio.to_thread(self._store.list_subscribed)

@@ -116,7 +116,7 @@ class _FakeDoc:
             from google.api_core.exceptions import AlreadyExists as GAlreadyExists
             raise GAlreadyExists("already exists")
         elif self._fail == "network":
-            raise IOError("connection refused")
+            raise OSError("connection refused")
 
 
 class _FakeCollection:
@@ -163,7 +163,7 @@ class TestIdempotencyFirestorePaths:
 
         class MockDoc:
             async def create(self, data):
-                raise IOError("network failure")
+                raise OSError("network failure")
 
         db = _FakeDb(MockDoc())
         ei = ExecutionIdempotency(platform="lighter", firestore_client=db)

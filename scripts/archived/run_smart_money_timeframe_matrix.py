@@ -33,7 +33,6 @@ import math
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -84,8 +83,8 @@ class BacktestResult:
     profit_factor: float
 
 
-def _normalize_timeframes(raw: str) -> List[str]:
-    out: List[str] = []
+def _normalize_timeframes(raw: str) -> list[str]:
+    out: list[str] = []
     seen = set()
     for item in raw.split(","):
         k = item.strip().lower().replace(" ", "")
@@ -97,8 +96,8 @@ def _normalize_timeframes(raw: str) -> List[str]:
     return out or ["1m", "15m", "1h", "4h", "1d"]
 
 
-def _normalize_symbols(raw: str) -> List[str]:
-    out: List[str] = []
+def _normalize_symbols(raw: str) -> list[str]:
+    out: list[str] = []
     seen = set()
     for item in raw.split(","):
         s = item.strip().upper()
@@ -163,7 +162,7 @@ def download_binance_vision_klines(
     timeout: int = 40,
 ) -> pd.DataFrame:
     symbol_pair = f"{symbol}USDT"
-    frames: List[pd.DataFrame] = []
+    frames: list[pd.DataFrame] = []
 
     sess = requests.Session()
     for month_start in _month_iter(start_date, end_date_exclusive):
@@ -191,7 +190,7 @@ def download_binance_vision_klines(
     return df
 
 
-def _pivot_flags(high: np.ndarray, low: np.ndarray, swing: int) -> Tuple[np.ndarray, np.ndarray]:
+def _pivot_flags(high: np.ndarray, low: np.ndarray, swing: int) -> tuple[np.ndarray, np.ndarray]:
     # Pine-like pivot with symmetric window = 2*swing + 1 and delayed confirmation.
     window = (2 * swing) + 1
     hs = pd.Series(high)
@@ -210,7 +209,7 @@ def run_smart_money_backtest(
     swing_size: int = 25,
     rr: float = 1.0,
     fee_per_side_pct: float = 0.04,
-) -> Tuple[BacktestResult, pd.Series]:
+) -> tuple[BacktestResult, pd.Series]:
     close = df["close"].to_numpy(dtype=float)
     high = df["high"].to_numpy(dtype=float)
     low = df["low"].to_numpy(dtype=float)
@@ -230,7 +229,7 @@ def run_smart_money_backtest(
     tp = np.nan
     sl = np.nan
 
-    trade_returns: List[float] = []
+    trade_returns: list[float] = []
     equity = [1.0]
     equity_index = [idx[0]]
 
@@ -386,7 +385,7 @@ def _plot_heatmap(df: pd.DataFrame, value_col: str, title: str, out_path: Path, 
     plt.close(fig)
 
 
-def _plot_equity_by_timeframe(equities: Dict[Tuple[str, str], pd.Series], out_dir: Path) -> None:
+def _plot_equity_by_timeframe(equities: dict[tuple[str, str], pd.Series], out_dir: Path) -> None:
     if not equities:
         return
     chart_dir = out_dir / "charts"
@@ -413,8 +412,8 @@ def write_report(
     out_dir: Path,
     start_date: str,
     end_date_exclusive: str,
-    symbols: List[str],
-    timeframes: List[str],
+    symbols: list[str],
+    timeframes: list[str],
     results_df: pd.DataFrame,
 ) -> None:
     report_path = out_dir / "report.md"
@@ -499,8 +498,8 @@ def main() -> None:
     data_dir.mkdir(parents=True, exist_ok=True)
     chart_dir.mkdir(parents=True, exist_ok=True)
 
-    rows: List[Dict[str, object]] = []
-    equities: Dict[Tuple[str, str], pd.Series] = {}
+    rows: list[dict[str, object]] = []
+    equities: dict[tuple[str, str], pd.Series] = {}
 
     for sym in symbols:
         for tf in timeframes:

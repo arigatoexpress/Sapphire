@@ -11,7 +11,7 @@ import subprocess
 import sys
 import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 # Try to import GPU monitoring
 try:
@@ -40,7 +40,7 @@ class LLMBenchmark:
             except:
                 pass
     
-    def _get_system_info(self) -> Dict[str, Any]:
+    def _get_system_info(self) -> dict[str, Any]:
         """Gather system hardware information"""
         info = {
             "timestamp": datetime.now().isoformat(),
@@ -79,7 +79,7 @@ class LLMBenchmark:
         
         return info
     
-    def _get_gpu_memory(self) -> Optional[int]:
+    def _get_gpu_memory(self) -> int | None:
         """Get current GPU memory usage in MB"""
         if self.gpu_handle:
             try:
@@ -89,7 +89,7 @@ class LLMBenchmark:
                 pass
         return None
     
-    def _ollama_generate(self, model: str, prompt: str, timeout: int = 600) -> Dict[str, Any]:
+    def _ollama_generate(self, model: str, prompt: str, timeout: int = 600) -> dict[str, Any]:
         """Generate text using Ollama and measure performance"""
         start_time = time.time()
         gpu_mem_before = self._get_gpu_memory()
@@ -145,7 +145,7 @@ class LLMBenchmark:
                 "error": str(e)
             }
     
-    def run_benchmark(self, model: str, warmup: bool = True) -> Dict[str, Any]:
+    def run_benchmark(self, model: str, warmup: bool = True) -> dict[str, Any]:
         """Run complete benchmark on a model"""
         print(f"\n{'='*60}")
         print(f"Benchmarking: {model}")
@@ -255,7 +255,7 @@ class LLMBenchmark:
         print(f"\nResults saved to: {filepath}")
         return filepath
     
-    def run_all_models(self, models: List[str]):
+    def run_all_models(self, models: list[str]):
         """Run benchmarks on multiple models"""
         for model in models:
             try:

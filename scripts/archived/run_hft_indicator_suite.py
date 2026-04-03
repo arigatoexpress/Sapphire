@@ -17,7 +17,6 @@ import io
 import json
 import zipfile
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -50,7 +49,7 @@ TF_CANONICAL = {
 }
 
 
-def _normalize_symbols(raw: str) -> List[str]:
+def _normalize_symbols(raw: str) -> list[str]:
     out, seen = [], set()
     for tok in raw.split(','):
         s = tok.strip().upper()
@@ -61,7 +60,7 @@ def _normalize_symbols(raw: str) -> List[str]:
     return out or ["BTC", "ETH", "SOL"]
 
 
-def _normalize_timeframes(raw: str) -> List[str]:
+def _normalize_timeframes(raw: str) -> list[str]:
     out, seen = [], set()
     for tok in raw.split(','):
         k = tok.strip().lower().replace(' ', '')
@@ -114,7 +113,7 @@ def _parse_zip_csv(blob: bytes) -> pd.DataFrame:
 def download_klines(symbol: str, timeframe: str, start_date: dt.date, end_date_exclusive: dt.date) -> pd.DataFrame:
     pair = f"{symbol}USDT"
     sess = requests.Session()
-    frames: List[pd.DataFrame] = []
+    frames: list[pd.DataFrame] = []
 
     for m in _month_iter(start_date, end_date_exclusive):
         ym = f"{m.year:04d}-{m.month:02d}"
@@ -141,7 +140,7 @@ def download_klines(symbol: str, timeframe: str, start_date: dt.date, end_date_e
     return df
 
 
-def _pivot_flags(high: np.ndarray, low: np.ndarray, left: int, right: int) -> Tuple[np.ndarray, np.ndarray]:
+def _pivot_flags(high: np.ndarray, low: np.ndarray, left: int, right: int) -> tuple[np.ndarray, np.ndarray]:
     n = len(high)
     piv_hi = np.zeros(n, dtype=bool)
     piv_lo = np.zeros(n, dtype=bool)
@@ -163,7 +162,7 @@ def _pivot_flags(high: np.ndarray, low: np.ndarray, left: int, right: int) -> Tu
     return piv_hi, piv_lo
 
 
-def _build_metrics(strategy: str, symbol: str, timeframe: str, eq: pd.Series, trade_pnls: List[float], liquidations: int) -> Dict[str, object]:
+def _build_metrics(strategy: str, symbol: str, timeframe: str, eq: pd.Series, trade_pnls: list[float], liquidations: int) -> dict[str, object]:
     if eq.empty:
         return {}
 
@@ -222,7 +221,7 @@ def _build_metrics(strategy: str, symbol: str, timeframe: str, eq: pd.Series, tr
     }
 
 
-def _apply_trade(equity: float, risk_frac: float, leverage: float, move: float, fee_pct: float) -> Tuple[float, float]:
+def _apply_trade(equity: float, risk_frac: float, leverage: float, move: float, fee_pct: float) -> tuple[float, float]:
     # move is raw price return (e.g., +0.002)
     pnl_frac = (risk_frac * leverage * move) - (2.0 * risk_frac * leverage * fee_pct)
     equity = max(1e-9, equity * (1.0 + pnl_frac))
@@ -238,7 +237,7 @@ def backtest_luxalgo_msb_ob(
     leverage: float = 12.0,
     risk_frac: float = 0.08,
     fee_pct: float = 0.0002,
-) -> Tuple[Dict[str, object], pd.Series]:
+) -> tuple[dict[str, object], pd.Series]:
     high = df["high"].to_numpy(dtype=float)
     low = df["low"].to_numpy(dtype=float)
     close = df["close"].to_numpy(dtype=float)
@@ -264,7 +263,7 @@ def backtest_luxalgo_msb_ob(
     equity = 1.0
     eq_vals = [equity]
     eq_idx = [idx[0]]
-    trade_pnls: List[float] = []
+    trade_pnls: list[float] = []
     liquidations = 0
 
     for i in range(len(df)):
@@ -330,12 +329,7 @@ def backtest_luxalgo_msb_ob(
 
             # liquidation guard
             if leverage > 0:
-                if pos > 0 and low[i] <= entry * (1 - 0.90 / leverage):
-                    equity = max(1e-9, equity * (1 - risk_frac * 0.95))
-                    trade_pnls.append(-risk_frac * 0.95)
-                    liquidations += 1
-                    pos = 0
-                elif pos < 0 and high[i] >= entry * (1 + 0.90 / leverage):
+                if pos > 0 and low[i] <= entry * (1 - 0.90 / leverage) or pos < 0 and high[i] >= entry * (1 + 0.90 / leverage):
                     equity = max(1e-9, equity * (1 - risk_frac * 0.95))
                     trade_pnls.append(-risk_frac * 0.95)
                     liquidations += 1
@@ -366,7 +360,7 @@ def backtest_chartprime_tbt(
     risk_frac: float = 0.08,
     fee_pct: float = 0.0002,
     cooldown_bars: int = 2,
-) -> Tuple[Dict[str, object], pd.Series]:
+) -> tuple[dict[str, object], pd.Series]:
     high = df["high"].to_numpy(dtype=float)
     low = df["low"].to_numpy(dtype=float)
     close = df["close"].to_numpy(dtype=float)
@@ -384,8 +378,8 @@ def backtest_chartprime_tbt(
     vol_adj = np.minimum(atr30 * 0.3, close * 0.003)
     zband = pd.Series(vol_adj).shift(20).bfill().fillna(0).to_numpy() / 2.0
 
-    high_pivots: List[Tuple[int, float]] = []
-    low_pivots: List[Tuple[int, float]] = []
+    high_pivots: list[tuple[int, float]] = []
+    low_pivots: list[tuple[int, float]] = []
 
     pos = 0
     entry = 0.0
@@ -396,7 +390,7 @@ def backtest_chartprime_tbt(
     equity = 1.0
     eq_vals = [equity]
     eq_idx = [idx[0]]
-    trade_pnls: List[float] = []
+    trade_pnls: list[float] = []
     liquidations = 0
 
     for i in range(len(df)):
@@ -466,12 +460,7 @@ def backtest_chartprime_tbt(
                 last_entry_bar = i
 
                 if leverage > 0:
-                    if pos > 0 and low[i] <= entry * (1 - 0.90 / leverage):
-                        equity = max(1e-9, equity * (1 - risk_frac * 0.95))
-                        trade_pnls.append(-risk_frac * 0.95)
-                        liquidations += 1
-                        pos = 0
-                    elif pos < 0 and high[i] >= entry * (1 + 0.90 / leverage):
+                    if pos > 0 and low[i] <= entry * (1 - 0.90 / leverage) or pos < 0 and high[i] >= entry * (1 + 0.90 / leverage):
                         equity = max(1e-9, equity * (1 - risk_frac * 0.95))
                         trade_pnls.append(-risk_frac * 0.95)
                         liquidations += 1
@@ -583,7 +572,7 @@ def main() -> None:
     (out_dir / "data").mkdir(parents=True, exist_ok=True)
     (out_dir / "charts").mkdir(parents=True, exist_ok=True)
 
-    rows: List[Dict[str, object]] = []
+    rows: list[dict[str, object]] = []
 
     for symbol in symbols:
         for tf in timeframes:

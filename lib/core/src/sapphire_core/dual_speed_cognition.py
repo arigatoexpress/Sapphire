@@ -12,9 +12,10 @@ import asyncio
 import logging
 import os
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, Optional
+from typing import Any
 
 import google.generativeai as genai
 
@@ -34,7 +35,7 @@ class CognitionRequest:
     """Request for cognitive processing."""
 
     prompt: str
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
     speed: CognitionSpeed = CognitionSpeed.DUAL
     max_latency_ms: float = 5000.0  # Max time allowed
     requires_validation: bool = True
@@ -51,8 +52,8 @@ class CognitionResult:
     latency_ms: float
 
     # Dual-speed specific
-    system1_decision: Optional[str] = None
-    system2_validation: Optional[str] = None
+    system1_decision: str | None = None
+    system2_validation: str | None = None
     was_overridden: bool = False
 
 
@@ -106,7 +107,7 @@ class DualSpeedCognition:
     async def process(
         self,
         request: CognitionRequest,
-        on_provisional_decision: Optional[Callable] = None,
+        on_provisional_decision: Callable | None = None,
     ) -> CognitionResult:
         """
         Process a cognitive request through the dual-speed pipeline.
@@ -164,7 +165,7 @@ class DualSpeedCognition:
     async def _process_dual(
         self,
         request: CognitionRequest,
-        on_provisional: Optional[Callable] = None,
+        on_provisional: Callable | None = None,
     ) -> CognitionResult:
         """
         Dual-process path - the core innovation.
@@ -205,7 +206,7 @@ class DualSpeedCognition:
             )
             s2_latency = (time.time() - start) * 1000
             self._update_system2_metrics(s2_latency - s1_latency)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("System 2 timeout - using System 1 decision")
             return CognitionResult(
                 decision=s1_decision,
@@ -363,7 +364,7 @@ ANALYSIS: [Detailed reasoning with risk factors]
         else:
             self.avg_system2_latency_ms = (self.avg_system2_latency_ms + latency_ms) / 2
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get performance metrics."""
         return {
             "system1_calls": self.system1_calls,
@@ -376,7 +377,7 @@ ANALYSIS: [Detailed reasoning with risk factors]
 
 
 # Global instance
-_cognition_instance: Optional[DualSpeedCognition] = None
+_cognition_instance: DualSpeedCognition | None = None
 
 
 def get_dual_cognition() -> DualSpeedCognition:

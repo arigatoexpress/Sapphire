@@ -5,9 +5,9 @@ import calendar
 import hashlib
 import logging
 import re
-from datetime import datetime, timezone
+from collections.abc import Sequence
+from datetime import UTC, datetime
 from html import unescape
-from typing import List, Sequence
 from urllib.parse import urlparse
 
 import feedparser
@@ -29,15 +29,15 @@ def _parse_published(entry: dict) -> datetime:
     parsed = entry.get("published_parsed") or entry.get("updated_parsed")
     if parsed:
         # Feed timestamps are UTC; using mktime introduces local timezone skew.
-        return datetime.fromtimestamp(calendar.timegm(parsed), tz=timezone.utc)
-    return datetime.now(tz=timezone.utc)
+        return datetime.fromtimestamp(calendar.timegm(parsed), tz=UTC)
+    return datetime.now(tz=UTC)
 
 
 def _stable_id(source_key: str, url: str, title: str) -> str:
     # Stable per-article id. Do NOT include title because many feeds update titles
     # in-place (which would cause duplicate sends across digests).
     canonical = _normalize_url(url) or (url or "").strip()
-    digest = hashlib.sha256(f"{source_key}|{canonical}".encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(f"{source_key}|{canonical}".encode()).hexdigest()
     return digest[:20]
 
 
@@ -55,12 +55,12 @@ class NewsFetcher:
     def __init__(self, request_timeout_seconds: float) -> None:
         self._timeout = request_timeout_seconds
 
-    async def _fetch_source(self, client: httpx.AsyncClient, source: NewsSource) -> List[NewsItem]:
+    async def _fetch_source(self, client: httpx.AsyncClient, source: NewsSource) -> list[NewsItem]:
         response = await client.get(source.rss_url)
         response.raise_for_status()
 
         parsed = feedparser.parse(response.text)
-        items: List[NewsItem] = []
+        items: list[NewsItem] = []
         for entry in parsed.entries[:40]:
             title = (entry.get("title") or "").strip()
             url = (entry.get("link") or "").strip()
@@ -81,7 +81,7 @@ class NewsFetcher:
             )
         return items
 
-    async def fetch(self, sources: Sequence[NewsSource]) -> List[NewsItem]:
+    async def fetch(self, sources: Sequence[NewsSource]) -> list[NewsItem]:
         if not sources:
             return []
 
@@ -93,7 +93,7 @@ class NewsFetcher:
             tasks = [self._fetch_source(client, source) for source in sources]
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        merged: List[NewsItem] = []
+        merged: list[NewsItem] = []
         for source, result in zip(sources, results):
             if isinstance(result, Exception):
                 logger.warning("failed source %s: %s", source.key, result)

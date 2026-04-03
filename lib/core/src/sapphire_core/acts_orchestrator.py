@@ -14,7 +14,7 @@ import asyncio
 import logging
 import signal
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 # Configure logging
 logging.basicConfig(
@@ -61,18 +61,18 @@ class ACTSOrchestrator:
         self.running = False
 
         # Core components
-        self.mesh: Optional[CognitiveMesh] = None
-        self.cognition: Optional[DualSpeedCognition] = None
-        self.memory: Optional[EnhancedMemoryBank] = None
+        self.mesh: CognitiveMesh | None = None
+        self.cognition: DualSpeedCognition | None = None
+        self.memory: EnhancedMemoryBank | None = None
 
         # Agent swarm
-        self.scouts: List[ScoutAgent] = []
-        self.snipers: List[SniperAgent] = []
-        self.oracles: List[OracleAgent] = []
-        self.executors: Dict[str, Any] = {}
+        self.scouts: list[ScoutAgent] = []
+        self.snipers: list[SniperAgent] = []
+        self.oracles: list[OracleAgent] = []
+        self.executors: dict[str, Any] = {}
 
         # Active consensus decisions
-        self.pending_consensus: Dict[str, ConsensusState] = {}
+        self.pending_consensus: dict[str, ConsensusState] = {}
 
         # Metrics
         self.decisions_made = 0
@@ -254,7 +254,7 @@ class ACTSOrchestrator:
         self,
         symbol: str,
         context: MarketContext,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Full cognitive pipeline for a trading opportunity.
 
@@ -372,7 +372,7 @@ Should we trade? If yes, BUY or SELL?
         self,
         consensus_id: str,
         state: ConsensusState,
-        result: Dict[str, Any],
+        result: dict[str, Any],
     ):
         """Execute a finalized consensus decision."""
         logger.info(f"✅ Executing consensus {consensus_id}: {result['action']}")

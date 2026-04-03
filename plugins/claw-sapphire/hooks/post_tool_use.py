@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
@@ -23,7 +23,7 @@ CODE_EDIT_TOOLS = {"edit_file", "write_file"}
 def log_event(event_type: str, message: str, data: dict | None = None) -> None:
     """Append event to Sapphire JSONL stream."""
     event = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "type": event_type,
         "message": message,
         "tags": ["agent:claw-code", "device:mac", "type:tool"],

@@ -6,8 +6,9 @@ Supports notifications and interactive commands via @mentions.
 import asyncio
 import re
 import time
+from collections.abc import Callable
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 import aiohttp
 from loguru import logger
@@ -29,7 +30,7 @@ class TelegramPlatformBot:
         self,
         bot_token: str,
         chat_id: str,
-        command_callback: Optional[Callable[[str, str, str, float], Any]] = None,
+        command_callback: Callable[[str, str, str, float], Any] | None = None,
     ):
         self.bot_token = bot_token.strip() if bot_token else None
         self.chat_id = str(chat_id).strip() if chat_id else None
@@ -40,10 +41,10 @@ class TelegramPlatformBot:
         self.command_callback = command_callback
         self.last_update_id = 0
         self.running = False
-        self.message_buffer: List[str] = []
+        self.message_buffer: list[str] = []
         self._flush_task = None
-        self._session: Optional[aiohttp.ClientSession] = None
-        self.activity_log: List[Dict[str, Any]] = []
+        self._session: aiohttp.ClientSession | None = None
+        self.activity_log: list[dict[str, Any]] = []
 
     @staticmethod
     def _agent_badge(agent_id: str) -> str:
@@ -197,7 +198,7 @@ class TelegramPlatformBot:
                 logger.error(f"Telegram listener crashed: {e}")
                 await asyncio.sleep(10)
 
-    async def _process_update(self, update: Dict[str, Any]):
+    async def _process_update(self, update: dict[str, Any]):
         message = update.get("message", {})
         text = message.get("text", "")
         chat_id = str(message.get("chat", {}).get("id", ""))
@@ -343,14 +344,14 @@ class TelegramPlatformBot:
                         else:
                             logger.error(f"Telegram listener error: {resp.status}")
                             await asyncio.sleep(10)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # Long-poll request timed out without updates; loop and poll again.
                 continue
             except Exception as e:
                 logger.error(f"Telegram listener crashed: {e}")
                 await asyncio.sleep(10)
 
-    async def _process_update(self, update: Dict[str, Any]):
+    async def _process_update(self, update: dict[str, Any]):
         message = update.get("message", {})
         text = message.get("text", "").strip()
         chat_id = str(message.get("chat", {}).get("id", ""))

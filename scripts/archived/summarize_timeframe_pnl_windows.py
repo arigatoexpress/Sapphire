@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 from pathlib import Path
-from typing import Dict, List
 
 import pandas as pd
 from run_smart_money_timeframe_matrix import run_smart_money_backtest
@@ -43,7 +42,7 @@ def _window_return(eq: pd.Series, start_ts: pd.Timestamp) -> float:
 def analyze_folder(folder: Path, swing_size: int, fee_per_side_pct: float) -> pd.DataFrame:
     data_dir = folder / 'data'
     files = sorted(data_dir.glob('*_*.csv'))
-    rows: List[Dict[str, object]] = []
+    rows: list[dict[str, object]] = []
 
     for f in files:
         stem = f.stem

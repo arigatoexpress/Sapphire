@@ -32,7 +32,7 @@ COLORS = {
 
 def load_data():
     """Load benchmark data"""
-    with open('benchmark_results_20260307_183000.json', 'r') as f:
+    with open('benchmark_results_20260307_183000.json') as f:
         return json.load(f)
 
 def get_model_color(model_name):

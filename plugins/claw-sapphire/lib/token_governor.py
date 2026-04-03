@@ -7,7 +7,7 @@ Enforces daily budgets. Auto-throttles when budgets approach limits.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 USAGE_PATH = Path.home() / ".sapphire" / "token_usage.json"
@@ -44,7 +44,7 @@ def _save(data: dict) -> None:
 
 
 def _today() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return datetime.now(UTC).strftime("%Y-%m-%d")
 
 
 def record(tier: str, prompt_tokens: int, eval_tokens: int, task: str = "") -> dict:

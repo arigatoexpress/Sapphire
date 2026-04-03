@@ -15,7 +15,7 @@ import os
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import aiohttp
 from firebase_admin import credentials, firestore, initialize_app
@@ -78,10 +78,10 @@ class HealthStatus:
     healthy: bool
     response_time_ms: float
     last_checked: str
-    error: Optional[str] = None
-    details: Optional[Dict] = None
+    error: str | None = None
+    details: dict | None = None
     
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return asdict(self)
 
 
@@ -89,7 +89,7 @@ class UnifiedHealthMonitor:
     """Unified health monitoring for Sapphire trading system"""
     
     def __init__(self):
-        self.status_history: List[HealthStatus] = []
+        self.status_history: list[HealthStatus] = []
         self.alert_state_file = Path.home() / '.sapphire_health_state.json'
         self.state = self._load_state()
         self.db = None
@@ -109,7 +109,7 @@ class UnifiedHealthMonitor:
             except Exception as e:
                 print(f"Warning: Firestore not available: {e}")
                 
-    def _load_state(self) -> Dict:
+    def _load_state(self) -> dict:
         """Load alert state to prevent spam"""
         if self.alert_state_file.exists():
             with open(self.alert_state_file) as f:
@@ -147,7 +147,7 @@ class UnifiedHealthMonitor:
         url: str,
         category: str,
         timeout: int = 10,
-        ok_statuses: Optional[List[int]] = None,
+        ok_statuses: list[int] | None = None,
     ) -> HealthStatus:
         """Check a single HTTP endpoint"""
         start = datetime.now()
@@ -177,7 +177,7 @@ class UnifiedHealthMonitor:
                     error=None if healthy else f"HTTP {response.status}",
                     details=details
                 )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return HealthStatus(
                 name=name,
                 category=category,
@@ -198,7 +198,7 @@ class UnifiedHealthMonitor:
                 details=None
             )
     
-    async def check_pi_services(self) -> List[HealthStatus]:
+    async def check_pi_services(self) -> list[HealthStatus]:
         """Check all Pi services"""
         async with aiohttp.ClientSession() as session:
             tasks = []
@@ -230,7 +230,7 @@ class UnifiedHealthMonitor:
         session: aiohttp.ClientSession,
         pi_name: str,
         ip: str,
-        service: Dict[str, Any],
+        service: dict[str, Any],
     ) -> HealthStatus:
         """Probe one Pi service using multiple candidate paths."""
         service_name = f"{pi_name}_{service['name']}"
@@ -260,7 +260,7 @@ class UnifiedHealthMonitor:
             details=None,
         )
     
-    async def check_windows_services(self) -> List[HealthStatus]:
+    async def check_windows_services(self) -> list[HealthStatus]:
         """Check Windows webhook and TV agent endpoints."""
         async with aiohttp.ClientSession() as session:
             webhook = await self.check_http_endpoint(
@@ -300,7 +300,7 @@ class UnifiedHealthMonitor:
 
             return [webhook, tv_agent]
     
-    async def check_cloud_run_services(self) -> List[HealthStatus]:
+    async def check_cloud_run_services(self) -> list[HealthStatus]:
         """Check all Cloud Run services"""
         results = []
         async with aiohttp.ClientSession() as session:
@@ -368,7 +368,7 @@ class UnifiedHealthMonitor:
                 details=None
             )
     
-    async def run_all_checks(self) -> Dict[str, Any]:
+    async def run_all_checks(self) -> dict[str, Any]:
         """Run all health checks"""
         print(f"[{datetime.now().isoformat()}] Starting health checks...")
         
@@ -439,7 +439,7 @@ class UnifiedHealthMonitor:
             return True
         return status.name in OPTIONAL_HEALTH_NAMES
 
-    async def _send_alerts(self, results: List[HealthStatus]):
+    async def _send_alerts(self, results: list[HealthStatus]):
         """Send Telegram alerts for unhealthy services"""
         unhealthy = [r for r in results if (not r.healthy and not self._is_optional_service(r))]
 
@@ -492,7 +492,7 @@ class UnifiedHealthMonitor:
         
         self._save_state()
     
-    def get_system_status(self) -> Dict:
+    def get_system_status(self) -> dict:
         """Get current system status from Firestore"""
         if not self.db:
             return {'error': 'Firestore not available'}

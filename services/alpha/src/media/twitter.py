@@ -6,7 +6,7 @@ import re
 import time
 import urllib.parse
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import requests
 import tweepy
@@ -42,8 +42,8 @@ class TwitterClient:
 
         self._load_from_secret_blob()
 
-        self.v2_client: Optional[tweepy.Client] = None
-        self.v1_api: Optional[tweepy.API] = None
+        self.v2_client: tweepy.Client | None = None
+        self.v1_api: tweepy.API | None = None
         self.ready = False
         self.handle = os.getenv("SAPPHIRE_TWITTER_HANDLE", "").strip()
 
@@ -64,9 +64,9 @@ class TwitterClient:
         self.access_secret = self.access_secret or parsed.get("access_secret", "")
         self.bearer_token = self.bearer_token or parsed.get("bearer_token", "")
 
-    def _parse_credential_blob(self, blob: str) -> Dict[str, str]:
+    def _parse_credential_blob(self, blob: str) -> dict[str, str]:
         """Parse JSON or loose key-value credential blob."""
-        out: Dict[str, str] = {}
+        out: dict[str, str] = {}
         def normalize_key(raw: str) -> str:
             return re.sub(r"[^a-z0-9]+", "_", str(raw or "").strip().lower()).strip("_")
 
@@ -105,7 +105,7 @@ class TwitterClient:
                     continue
                 out[normalize_key(k)] = v.strip()
 
-        mapped: Dict[str, str] = {}
+        mapped: dict[str, str] = {}
         aliases = {
             "api_key": ["api_key", "consumer_key", "twitter_api_key", "ck", "x_consumer_key"],
             "api_secret": ["api_secret", "consumer_secret", "twitter_api_secret", "sk", "x_consumer_secret"],
@@ -186,7 +186,7 @@ class TwitterClient:
             self.ready = False
             logger.error(f"❌ Failed to initialize TwitterClient: {exc}")
 
-    async def post(self, text: str) -> Optional[str]:
+    async def post(self, text: str) -> str | None:
         """Post a tweet/thread using v2 API."""
         if not self.ready or not self.v2_client:
             raise RuntimeError("TwitterClient not ready")
@@ -204,7 +204,7 @@ class TwitterClient:
         clear_location: bool = False,
         banner_path: str = "",
         profile_image_path: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Update profile metadata and visual branding via v1 endpoints.
         """
@@ -230,8 +230,8 @@ class TwitterClient:
         min_score: int = 2,
         delay_seconds: float = 12.0,
         dry_run: bool = True,
-        keep_handles: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        keep_handles: list[str] | None = None,
+    ) -> dict[str, Any]:
         """
         Conservative quality-prune for following list.
 
@@ -258,11 +258,11 @@ class TwitterClient:
     async def unfollow_handles(
         self,
         *,
-        handles: List[str],
+        handles: list[str],
         max_actions: int = 15,
         delay_seconds: float = 12.0,
         dry_run: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         if not self.ready or not self.v1_api:
             raise RuntimeError("TwitterClient not ready")
         normalized = [h.strip().lstrip("@") for h in handles if h and h.strip()]
@@ -274,7 +274,7 @@ class TwitterClient:
             dry_run,
         )
 
-    def _post_thread_sync(self, tweets: List[str]) -> str:
+    def _post_thread_sync(self, tweets: list[str]) -> str:
         assert self.v2_client is not None
 
         first_id = None
@@ -307,10 +307,10 @@ class TwitterClient:
         clear_location: bool,
         banner_path: str,
         profile_image_path: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         assert self.v1_api is not None
 
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "ok": True,
             "updated_profile": False,
             "updated_banner": False,
@@ -382,8 +382,8 @@ class TwitterClient:
         min_score: int,
         delay_seconds: float,
         dry_run: bool,
-        keep_handles: List[str],
-    ) -> Dict[str, Any]:
+        keep_handles: list[str],
+    ) -> dict[str, Any]:
         assert self.v1_api is not None
 
         users = []
@@ -404,7 +404,7 @@ class TwitterClient:
             else:
                 raise RuntimeError(f"list_following_failed: {exc}") from exc
 
-        candidates: List[Dict[str, Any]] = []
+        candidates: list[dict[str, Any]] = []
         for user in users:
             screen_name = str(self._field(user, "screen_name", "") or "")
             handle_norm = screen_name.lower()
@@ -427,7 +427,7 @@ class TwitterClient:
         candidates.sort(key=lambda x: (x["score"], x["followers"]))
         planned = candidates[: max(0, max_actions)]
 
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "ok": True,
             "dry_run": dry_run,
             "max_scan": max_scan,
@@ -472,7 +472,7 @@ class TwitterClient:
             result["ok"] = False
         return result
 
-    def _signal_score(self, user: Any) -> tuple[int, List[str]]:
+    def _signal_score(self, user: Any) -> tuple[int, list[str]]:
         text = " ".join(
             [
                 str(self._field(user, "name", "") or ""),
@@ -518,7 +518,7 @@ class TwitterClient:
         default_profile_image = bool(self._field(user, "default_profile_image", False))
 
         score = 0
-        reasons: List[str] = []
+        reasons: list[str] = []
 
         if verified:
             score += 2
@@ -562,15 +562,15 @@ class TwitterClient:
 
     def _unfollow_handles_sync(
         self,
-        handles: List[str],
+        handles: list[str],
         max_actions: int,
         delay_seconds: float,
         dry_run: bool,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         assert self.v1_api is not None
 
         planned = handles[: max(0, max_actions)]
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "ok": True,
             "dry_run": dry_run,
             "requested": len(handles),
@@ -615,7 +615,7 @@ class TwitterClient:
             return user.get(field, default)
         return getattr(user, field, default)
 
-    def _fetch_following_via_web_session(self, max_scan: int = 400) -> List[Dict[str, Any]]:
+    def _fetch_following_via_web_session(self, max_scan: int = 400) -> list[dict[str, Any]]:
         if browser_cookie3 is None:
             raise RuntimeError("list_following_failed: browser_cookie3_not_installed")
 
@@ -660,12 +660,12 @@ class TwitterClient:
             "responsive_web_graphql_timeline_navigation_enabled": True,
         }
 
-        users: List[Dict[str, Any]] = []
+        users: list[dict[str, Any]] = []
         seen: set[str] = set()
-        cursor: Optional[str] = None
+        cursor: str | None = None
 
         while len(users) < max_scan:
-            variables: Dict[str, Any] = {
+            variables: dict[str, Any] = {
                 "userId": user_id,
                 "count": 80,
                 "includePromotedContent": False,
@@ -696,7 +696,7 @@ class TwitterClient:
                 if isinstance(ins, dict) and isinstance(ins.get("entries"), list):
                     entries.extend(ins["entries"])
 
-            next_cursor: Optional[str] = None
+            next_cursor: str | None = None
             added = 0
             for entry in entries:
                 entry_id = str(entry.get("entryId", "") or "")
@@ -746,7 +746,7 @@ class TwitterClient:
 
         return users
 
-    def _create_web_session_and_headers(self, cookiejar: Any, ct0: str) -> tuple[requests.Session, Dict[str, str]]:
+    def _create_web_session_and_headers(self, cookiejar: Any, ct0: str) -> tuple[requests.Session, dict[str, str]]:
         session = requests.Session()
         session.cookies.update(cookiejar)
         headers = {
@@ -785,13 +785,13 @@ class TwitterClient:
             text = resp.text[:300].replace("\n", " ")
             raise RuntimeError(f"web_unfollow_status_{resp.status_code}: {text}")
 
-    def _split_thread(self, text: str, limit: int = 280) -> List[str]:
+    def _split_thread(self, text: str, limit: int = 280) -> list[str]:
         """Split long text into thread parts."""
         if len(text) <= limit:
             return [text]
 
         words = text.split()
-        tweets: List[str] = []
+        tweets: list[str] = []
         current = ""
 
         for word in words:

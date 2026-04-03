@@ -71,7 +71,7 @@ def _list_run_dirs(root: Path) -> list[dict[str, Any]]:
 
 
 def _now_epoch() -> float:
-    return dt.datetime.now(dt.timezone.utc).timestamp()
+    return dt.datetime.now(dt.UTC).timestamp()
 
 
 def _annotate_age(records: list[dict[str, Any]], now_epoch: float) -> None:
@@ -79,7 +79,7 @@ def _annotate_age(records: list[dict[str, Any]], now_epoch: float) -> None:
         age_seconds = max(0.0, now_epoch - float(r.get("mtime_epoch") or now_epoch))
         r["age_seconds"] = round(age_seconds, 3)
         r["age_days"] = round(age_seconds / 86400.0, 6)
-        r["mtime_iso"] = dt.datetime.fromtimestamp(float(r.get("mtime_epoch") or 0.0), tz=dt.timezone.utc).isoformat()
+        r["mtime_iso"] = dt.datetime.fromtimestamp(float(r.get("mtime_epoch") or 0.0), tz=dt.UTC).isoformat()
 
 
 def _plan_cleanup(
@@ -196,7 +196,7 @@ def _format_text(report: dict[str, Any]) -> str:
     if deleted:
         lines.append("Delete candidates:")
         for r in deleted[:20]:
-            reasons = ",".join((r.get("delete_reasons") or []))
+            reasons = ",".join(r.get("delete_reasons") or [])
             lines.append(
                 f"- {r.get('name')} size={_bytes_human(int(r.get('size_bytes') or 0))} age_days={r.get('age_days')} reasons={reasons}"
             )
@@ -249,7 +249,7 @@ def main() -> int:
     report: dict[str, Any] = {
         "root": str(root),
         "dry_run": dry_run,
-        "generated_at": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat(),
+        "generated_at": dt.datetime.now(dt.UTC).replace(microsecond=0).isoformat(),
         **plan,
     }
     if not dry_run and plan.get("delete"):

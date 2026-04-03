@@ -7,8 +7,8 @@ Common utility functions used across all bot services.
 import logging
 import os
 import time
-from datetime import datetime, timezone
-from typing import Any, Dict
+from datetime import UTC, datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ def get_timestamp_us() -> int:
 
 def utc_now() -> datetime:
     """Get current UTC datetime."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def format_price(price: float, decimals: int = 2) -> str:
@@ -106,7 +106,7 @@ class ServiceConfig:
         # Logging
         self.log_level = os.getenv("LOG_LEVEL", "INFO")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert config to dictionary."""
         return {
             "platform": self.platform,

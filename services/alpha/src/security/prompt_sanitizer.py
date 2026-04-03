@@ -16,7 +16,7 @@ from __future__ import annotations
 import re
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 # ── Injection Detection Patterns ────────────────────────────────────
 
@@ -58,7 +58,7 @@ _BOUNDARY_PATTERNS = [
     re.compile(r"(?i)human\s*:\s*\n|assistant\s*:\s*\n"),
 ]
 
-ALL_INJECTION_PATTERNS: List[Tuple[str, re.Pattern]] = (
+ALL_INJECTION_PATTERNS: list[tuple[str, re.Pattern]] = (
     [("role_override", p) for p in _ROLE_OVERRIDE_PATTERNS]
     + [("data_exfil", p) for p in _EXFIL_PATTERNS]
     + [("code_exec", p) for p in _CODE_EXEC_PATTERNS]
@@ -70,7 +70,7 @@ ALL_INJECTION_PATTERNS: List[Tuple[str, re.Pattern]] = (
 class InjectionDetection:
     """Result of scanning text for injection attempts."""
     is_suspicious: bool
-    findings: List[Dict[str, str]] = field(default_factory=list)
+    findings: list[dict[str, str]] = field(default_factory=list)
     risk_score: float = 0.0  # 0.0 = clean, 1.0 = definitely malicious
 
 
@@ -82,7 +82,7 @@ def detect_injection(text: str) -> InjectionDetection:
     if not text or not text.strip():
         return InjectionDetection(is_suspicious=False)
 
-    findings: List[Dict[str, str]] = []
+    findings: list[dict[str, str]] = []
     for category, pattern in ALL_INJECTION_PATTERNS:
         match = pattern.search(text)
         if match:
@@ -147,7 +147,7 @@ def sanitize_for_prompt(
     max_length: int = 2000,
     strip_obfuscation: bool = True,
     wrap_boundary: bool = True,
-) -> Tuple[str, InjectionDetection]:
+) -> tuple[str, InjectionDetection]:
     """Sanitize untrusted text before including it in an LLM prompt.
 
     Returns (sanitized_text, detection_result).
@@ -194,7 +194,7 @@ def sanitize_for_prompt(
     return (cleaned, detection)
 
 
-def sanitize_trade_data_for_prompt(data: Dict[str, Any], max_items: int = 20) -> str:
+def sanitize_trade_data_for_prompt(data: dict[str, Any], max_items: int = 20) -> str:
     """Sanitize trade data before including in LLM recap prompts.
 
     Only includes known-safe numeric/string fields. Strips any field
@@ -234,7 +234,7 @@ def sanitize_trade_data_for_prompt(data: Dict[str, Any], max_items: int = 20) ->
 
 # ── Audit Log ───────────────────────────────────────────────────────
 
-_injection_log: List[Dict[str, Any]] = []
+_injection_log: list[dict[str, Any]] = []
 _MAX_INJECTION_LOG = 200
 
 
@@ -258,13 +258,13 @@ def log_injection_attempt(
         del _injection_log[: len(_injection_log) - _MAX_INJECTION_LOG]
 
 
-def get_injection_stats() -> Dict[str, Any]:
+def get_injection_stats() -> dict[str, Any]:
     """Return injection detection statistics."""
     if not _injection_log:
         return {"total_detections": 0, "by_source": {}, "by_category": {}}
 
-    by_source: Dict[str, int] = {}
-    by_category: Dict[str, int] = {}
+    by_source: dict[str, int] = {}
+    by_category: dict[str, int] = {}
     for entry in _injection_log:
         src = entry["source"]
         by_source[src] = by_source.get(src, 0) + 1

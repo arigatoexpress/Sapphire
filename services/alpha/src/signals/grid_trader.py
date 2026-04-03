@@ -14,7 +14,7 @@ import asyncio
 import os
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from loguru import logger
 
@@ -46,11 +46,11 @@ def _env_float(name: str, default: float, minimum: float = 0.0, maximum: float =
     return max(minimum, min(maximum, value))
 
 
-def _parse_symbols(raw: str) -> List[str]:
+def _parse_symbols(raw: str) -> list[str]:
     import re as _re
     tokens = _re.split(r"[,;|\s]+", str(raw or "").strip())
     seen = set()
-    result: List[str] = []
+    result: list[str] = []
     for token in tokens:
         sym = token.strip().upper()
         if sym and sym not in seen:
@@ -59,7 +59,7 @@ def _parse_symbols(raw: str) -> List[str]:
     return result
 
 
-def _parse_venues(raw: str) -> List[str]:
+def _parse_venues(raw: str) -> list[str]:
     tokens = _parse_symbols(raw)
     return [t for t in tokens if t]
 
@@ -79,7 +79,7 @@ class GridLevel:
 class GridState:
     anchor: float
     last_price: float
-    levels: List[GridLevel]
+    levels: list[GridLevel]
     updated_at: float
 
 
@@ -92,7 +92,7 @@ class GridSignalPlanner:
         strategy: Any,
         *,
         enabled: bool = False,
-        symbols: Optional[List[str]] = None,
+        symbols: list[str] | None = None,
     ) -> None:
         self.market_data = market_data
         self.strategy = strategy
@@ -119,8 +119,8 @@ class GridSignalPlanner:
         )
         self._symbols = preferred
 
-        self._grid: Dict[str, GridState] = {}
-        self._last_symbol_signal: Dict[str, float] = {}
+        self._grid: dict[str, GridState] = {}
+        self._last_symbol_signal: dict[str, float] = {}
         self._signals_emitted = 0
         self._cycles = 0
 
@@ -128,7 +128,7 @@ class GridSignalPlanner:
     def enabled(self) -> bool:
         return self._enabled
 
-    def metrics(self) -> Dict[str, Any]:
+    def metrics(self) -> dict[str, Any]:
         return {
             "enabled": self._enabled,
             "interval_seconds": self._interval,
@@ -181,9 +181,9 @@ class GridSignalPlanner:
     def stop(self) -> None:
         self._running = False
 
-    def _scan_cycle(self) -> List[Dict[str, Any]]:
+    def _scan_cycle(self) -> list[dict[str, Any]]:
         self._cycles += 1
-        signals: List[Dict[str, Any]] = []
+        signals: list[dict[str, Any]] = []
 
         execution_state = self.strategy.execution_state()
         multiplier = float(execution_state.get("stage_multiplier", 0.0))
@@ -267,11 +267,11 @@ class GridSignalPlanner:
         return signals
 
     def _select_price(
-        self, symbol: str, snapshot: Dict[str, Dict[str, Dict[str, Any]]]
-    ) -> Optional[Tuple[str, float, Optional[int]]]:
+        self, symbol: str, snapshot: dict[str, dict[str, dict[str, Any]]]
+    ) -> tuple[str, float, int | None] | None:
         # Prefer explicitly scoped venues if provided.
         venues = self._target_venues or ["ASTER", "LIGHTER"]
-        best: Optional[Tuple[str, float, Optional[int]]] = None
+        best: tuple[str, float, int | None] | None = None
         for venue in venues:
             venue_data = snapshot.get(venue, {})
             data = venue_data.get(symbol, {})
@@ -290,7 +290,7 @@ class GridSignalPlanner:
 
     def _initialize_grid(self, anchor: float) -> GridState:
         spacing = self._spacing_pct / 100.0
-        levels: List[GridLevel] = []
+        levels: list[GridLevel] = []
         for idx in range(1, self._levels + 1):
             buy_price = anchor * (1 - spacing * idx)
             sell_price = anchor * (1 + spacing * idx)
@@ -313,12 +313,12 @@ class GridSignalPlanner:
         level: int,
         venue: str,
         stage_multiplier: float,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         base_quantity = self._base_quantity or float(self.strategy.default_quantity)
         # Quantity is a baseline size. The execution pipeline applies stage sizing once.
         quantity = float(base_quantity)
 
-        target_platforms: List[str] = []
+        target_platforms: list[str] = []
         if self._target_mode == "best":
             target_platforms = [venue.lower()]
         elif self._target_mode == "all":

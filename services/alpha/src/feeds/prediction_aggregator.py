@@ -15,8 +15,8 @@ import os
 import re
 import time
 from collections import defaultdict
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import aiohttp
 from loguru import logger
@@ -86,9 +86,9 @@ class PredictionAggregator:
             poll_interval=kalshi_interval,
             min_volume=kalshi_min_volume,
         )
-        self._feeds: List[PredictionMarketFeed] = [self._polymarket, self._kalshi]
-        self._session: Optional[aiohttp.ClientSession] = None
-        self._feed_tasks: List[asyncio.Task] = []
+        self._feeds: list[PredictionMarketFeed] = [self._polymarket, self._kalshi]
+        self._session: aiohttp.ClientSession | None = None
+        self._feed_tasks: list[asyncio.Task] = []
         self._last_forum_post_ts = 0.0
         self._forum_post_interval = max(
             300, int(os.getenv("SAPPHIRE_PM_FORUM_INTERVAL", "3600"))
@@ -134,17 +134,17 @@ class PredictionAggregator:
     # ── Signal Access ────────────────────────────────────────────
 
     def get_all_signals(
-        self, min_volume: float = 0.0, relevance: Optional[SignalRelevance] = None
-    ) -> List[PredictionSignal]:
+        self, min_volume: float = 0.0, relevance: SignalRelevance | None = None
+    ) -> list[PredictionSignal]:
         """Get all current signals across all feeds."""
-        signals: List[PredictionSignal] = []
+        signals: list[PredictionSignal] = []
         for feed in self._feeds:
             signals.extend(feed.get_signals(min_volume=min_volume))
         if relevance:
             signals = [s for s in signals if s.relevance == relevance]
         return sorted(signals, key=lambda s: s.volume_usd, reverse=True)
 
-    def get_signals_for_symbol(self, symbol: str) -> List[PredictionSignal]:
+    def get_signals_for_symbol(self, symbol: str) -> list[PredictionSignal]:
         """Get all signals relevant to a specific crypto symbol."""
         symbol_upper = symbol.strip().upper()
         results = []
@@ -154,13 +154,13 @@ class PredictionAggregator:
                     results.append(sig)
         return sorted(results, key=lambda s: s.volume_usd, reverse=True)
 
-    def get_high_conviction_signals(self) -> List[PredictionSignal]:
+    def get_high_conviction_signals(self) -> list[PredictionSignal]:
         """Get signals with strong probability skew and high volume."""
         return [s for s in self.get_all_signals() if s.is_high_conviction]
 
     # ── Consensus Detection ──────────────────────────────────────
 
-    def get_symbol_sentiment(self, symbol: str) -> Dict[str, Any]:
+    def get_symbol_sentiment(self, symbol: str) -> dict[str, Any]:
         """
         Aggregate sentiment for a symbol across all prediction markets.
 
@@ -222,7 +222,7 @@ class PredictionAggregator:
         self,
         min_spread: float = 0.02,
         min_confidence: float = 30.0,
-    ) -> List[ArbitrageOpportunity]:
+    ) -> list[ArbitrageOpportunity]:
         """Detect cross-venue price discrepancies between prediction markets.
 
         Ported from TheOddsDesk arbitrageService.ts — groups markets by
@@ -240,13 +240,13 @@ class PredictionAggregator:
             return []
 
         # Group signals by normalized question
-        groups: Dict[str, List[PredictionSignal]] = defaultdict(list)
+        groups: dict[str, list[PredictionSignal]] = defaultdict(list)
         for sig in all_signals:
             key = _normalize_market_name(sig.question)
             if key:  # Skip empty keys
                 groups[key].append(sig)
 
-        opportunities: List[ArbitrageOpportunity] = []
+        opportunities: list[ArbitrageOpportunity] = []
 
         for name_key, signals in groups.items():
             if len(signals) < 2:
@@ -426,12 +426,12 @@ class PredictionAggregator:
 
     # ── Whale & Manipulation Detection ──────────────────────────
 
-    def _detect_whale_and_manipulation(self, symbol: str = "") -> List[str]:
+    def _detect_whale_and_manipulation(self, symbol: str = "") -> list[str]:
         """Detect whale activity and manipulation patterns in prediction markets.
 
         Returns human-readable alert strings for cognition context.
         """
-        alerts: List[str] = []
+        alerts: list[str] = []
         signals = self.get_signals_for_symbol(symbol) if symbol else self.get_all_signals()
 
         for sig in signals:
@@ -491,7 +491,7 @@ class PredictionAggregator:
 
     # ── Forum Summaries ──────────────────────────────────────────
 
-    def generate_forum_summary(self) -> Optional[Dict[str, Any]]:
+    def generate_forum_summary(self) -> dict[str, Any] | None:
         """
         Generate a forum post summary of current prediction market state.
 
@@ -566,7 +566,7 @@ class PredictionAggregator:
         return {
             "lane": "trading",
             "category": "market_analysis",
-            "title": f"Prediction Market Update — {datetime.now(timezone.utc).strftime('%b %d %H:%M UTC')}",
+            "title": f"Prediction Market Update — {datetime.now(UTC).strftime('%b %d %H:%M UTC')}",
             "body": "\n".join(lines),
             "author": "SCOUT",
             "tags": ["prediction-market", "automated-insight"],
@@ -575,7 +575,7 @@ class PredictionAggregator:
 
     # ── Status & Monitoring ──────────────────────────────────────
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get aggregator status for Telegram /predictions status command."""
         feed_statuses = {feed.source.value: feed.get_status() for feed in self._feeds}
         total_signals = sum(s["market_count"] for s in feed_statuses.values())
@@ -618,7 +618,7 @@ class PredictionAggregator:
 
         return "\n".join(lines)
 
-    def format_telegram_signals(self, symbol: Optional[str] = None, limit: int = 10) -> str:
+    def format_telegram_signals(self, symbol: str | None = None, limit: int = 10) -> str:
         """Format signals for Telegram display."""
         if not self._enabled:
             return "🔮 Prediction markets: disabled"
@@ -680,7 +680,7 @@ class PredictionAggregator:
         """Format prediction accuracy stats for Telegram display."""
         return self._accuracy_tracker.format_telegram_accuracy()
 
-    def get_prediction_dashboard_data(self) -> Dict[str, Any]:
+    def get_prediction_dashboard_data(self) -> dict[str, Any]:
         """Get full prediction market data for the dashboard API.
 
         Combines status, signals, arbitrage, accuracy, and sentiment.

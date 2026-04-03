@@ -3,7 +3,7 @@ import os
 import re
 import time
 from collections import deque
-from typing import Any, Deque, Dict, List, Optional, Tuple
+from typing import Any
 
 import aiohttp
 from loguru import logger
@@ -19,8 +19,8 @@ class VenueRateLimiter:
 
     def __init__(self, default_per_minute: int = 10):
         self._default_per_minute = max(1, default_per_minute)
-        self._windows: Dict[str, Deque[float]] = {}
-        self._limits: Dict[str, int] = {}
+        self._windows: dict[str, deque[float]] = {}
+        self._limits: dict[str, int] = {}
 
     def _get_limit(self, venue: str) -> int:
         if venue not in self._limits:
@@ -45,9 +45,9 @@ class VenueRateLimiter:
         window.append(now)
         return True
 
-    def get_status(self) -> Dict[str, Dict[str, Any]]:
+    def get_status(self) -> dict[str, dict[str, Any]]:
         now = time.time()
-        result: Dict[str, Dict[str, Any]] = {}
+        result: dict[str, dict[str, Any]] = {}
         for venue, window in self._windows.items():
             # Count active in window
             active = sum(1 for t in window if t >= now - 60)
@@ -69,13 +69,13 @@ class UnconfirmedFillTracker:
     """
 
     def __init__(self, max_entries: int = 200):
-        self._entries: Deque[Dict[str, Any]] = deque(maxlen=max_entries)
+        self._entries: deque[dict[str, Any]] = deque(maxlen=max_entries)
 
     def record(
         self,
         venue: str,
         symbol: str,
-        command: Dict[str, Any],
+        command: dict[str, Any],
         timeout_seconds: float,
         attempt: int,
         retries: int,
@@ -114,10 +114,10 @@ class UnconfirmedFillTracker:
     def unreconciled_count(self) -> int:
         return sum(1 for e in self._entries if not e["reconciled"])
 
-    def get_unreconciled(self) -> List[Dict[str, Any]]:
+    def get_unreconciled(self) -> list[dict[str, Any]]:
         return [e for e in self._entries if not e["reconciled"]]
 
-    def get_all(self, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_all(self, limit: int = 50) -> list[dict[str, Any]]:
         return list(self._entries)[-limit:]
 
     def format_telegram_status(self) -> str:
@@ -142,7 +142,7 @@ class ExecutionDispatcher:
     """
 
     def __init__(self):
-        self.session: Optional[aiohttp.ClientSession] = None
+        self.session: aiohttp.ClientSession | None = None
         default_bot_urls = {
             "ASTER": os.getenv("BOT_ASTER_URL", "http://sapphire-bot-aster:8080"),
             "LIGHTER": os.getenv("BOT_LIGHTER_URL", "http://sapphire-bot-lighter:8080"),
@@ -161,13 +161,13 @@ class ExecutionDispatcher:
             }
         else:
             self.bot_urls = default_bot_urls
-        self._token_cache: Dict[str, Tuple[str, float]] = {}
-        self._venue_allocations: Dict[str, float] = {venue: 1.0 for venue in self.bot_urls}
-        self._venue_paused_until: Dict[str, float] = {}
-        self._venue_pause_reason: Dict[str, str] = {}
-        self._last_dispatch_errors: Dict[str, Dict[str, Any]] = {}
+        self._token_cache: dict[str, tuple[str, float]] = {}
+        self._venue_allocations: dict[str, float] = {venue: 1.0 for venue in self.bot_urls}
+        self._venue_paused_until: dict[str, float] = {}
+        self._venue_pause_reason: dict[str, str] = {}
+        self._last_dispatch_errors: dict[str, dict[str, Any]] = {}
         # Fill confirmation: maps (VENUE, SYMBOL) → Future resolved by Pub/Sub listener
-        self._pending_confirmations: Dict[Tuple[str, str], asyncio.Future] = {}
+        self._pending_confirmations: dict[tuple[str, str], asyncio.Future] = {}
         # Dead-letter queue for unconfirmed fills
         self._dead_letters = UnconfirmedFillTracker(
             max_entries=max(50, int(os.getenv("SAPPHIRE_DEAD_LETTER_MAX", "200")))
@@ -187,7 +187,7 @@ class ExecutionDispatcher:
         if self.session:
             await self.session.close()
 
-    async def _get_auth_header(self, url: str) -> Dict[str, str]:
+    async def _get_auth_header(self, url: str) -> dict[str, str]:
         """Fetch OIDC token with caching for low-latency performance."""
         if not os.getenv("K_SERVICE"):
             return {}
@@ -274,9 +274,9 @@ class ExecutionDispatcher:
         self._venue_pause_reason.pop(normalized, None)
         return had_pause
 
-    def resume_expired_venues(self) -> List[str]:
+    def resume_expired_venues(self) -> list[str]:
         now = time.time()
-        resumed: List[str] = []
+        resumed: list[str] = []
         for venue, paused_until in list(self._venue_paused_until.items()):
             if now >= paused_until:
                 self._venue_paused_until.pop(venue, None)
@@ -284,9 +284,9 @@ class ExecutionDispatcher:
                 resumed.append(venue)
         return resumed
 
-    def get_control_state(self) -> Dict[str, Dict[str, Any]]:
+    def get_control_state(self) -> dict[str, dict[str, Any]]:
         now = time.time()
-        snapshot: Dict[str, Dict[str, Any]] = {}
+        snapshot: dict[str, dict[str, Any]] = {}
         for venue, url in self.bot_urls.items():
             paused_until = self._venue_paused_until.get(venue)
             snapshot[venue] = {
@@ -323,10 +323,10 @@ class ExecutionDispatcher:
             "timestamp": int(time.time()),
         }
 
-    def get_last_dispatch_error(self, venue: str) -> Dict[str, Any]:
+    def get_last_dispatch_error(self, venue: str) -> dict[str, Any]:
         return dict(self._last_dispatch_errors.get(self._normalize_venue(venue), {}))
 
-    async def send_command(self, venue: str, command: Dict[str, Any]) -> bool:
+    async def send_command(self, venue: str, command: dict[str, Any]) -> bool:
         """Send a command to a specific bot."""
         if not self.session:
             logger.error("Dispatcher not started!")
@@ -413,7 +413,7 @@ class ExecutionDispatcher:
                             body=body,
                         )
                         return False
-            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+            except (TimeoutError, aiohttp.ClientError) as e:
                 if attempt < max_retries:
                     delay = 0.5 * (2 ** (attempt - 1))
                     logger.warning(
@@ -435,10 +435,10 @@ class ExecutionDispatcher:
     async def send_and_confirm(
         self,
         venue: str,
-        command: Dict[str, Any],
+        command: dict[str, Any],
         timeout_seconds: float = 30.0,
         retries: int = 1,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Send a command and wait for Pub/Sub fill confirmation.
 
         Returns the fill message_data dict on success, or a dict with
@@ -475,7 +475,7 @@ class ExecutionDispatcher:
                     f"✅ Fill confirmed for {confirm_key} in {timeout_seconds}s window"
                 )
                 return fill_data
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 if attempt < retries:
                     logger.warning(
                         f"⏳ Fill timeout for {confirm_key} (attempt {attempt}/{retries}), retrying..."
@@ -510,7 +510,7 @@ class ExecutionDispatcher:
             "symbol": raw_symbol,
         }
 
-    def resolve_fill(self, fill_data: Dict[str, Any]) -> bool:
+    def resolve_fill(self, fill_data: dict[str, Any]) -> bool:
         """Called by the Pub/Sub trade listener to resolve a pending confirmation.
 
         Returns True if a matching pending confirmation was resolved.
@@ -545,7 +545,7 @@ class ExecutionDispatcher:
     def rate_limiter(self) -> VenueRateLimiter:
         return self._rate_limiter
 
-    def get_hardening_status(self) -> Dict[str, Any]:
+    def get_hardening_status(self) -> dict[str, Any]:
         """Return combined rate-limit + dead-letter status for APIs/Telegram."""
         return {
             "rate_limiter": self._rate_limiter.get_status(),

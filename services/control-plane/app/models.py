@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import List, Optional
 
 
 @dataclass
@@ -20,9 +19,9 @@ class ChatConfig:
     assistant_checkin_interval_minutes: int = 120
     # Decision SLA reminder threshold (minutes).
     decision_sla_minutes: int = 180
-    aster_assets: List[str] = field(default_factory=list)
-    lighter_assets: List[str] = field(default_factory=list)
-    extra_keywords: List[str] = field(default_factory=list)
+    aster_assets: list[str] = field(default_factory=list)
+    lighter_assets: list[str] = field(default_factory=list)
+    extra_keywords: list[str] = field(default_factory=list)
     # Operator-provided focus that steers the bot's updates.
     operator_directive: str = ""
     # Per-chat assistant style preferences.
@@ -30,15 +29,15 @@ class ChatConfig:
     preference_risk: str = "balanced"
     preference_coding_style: str = "pragmatic"
     # Rolling de-dup buffer of recently sent NewsItem ids to prevent spam.
-    sent_item_ids: List[str] = field(default_factory=list)
+    sent_item_ids: list[str] = field(default_factory=list)
     # Best-effort throttle for scheduled digests (prevents "spammy" bursts).
-    last_digest_sent_at: Optional[datetime] = None
+    last_digest_sent_at: datetime | None = None
     # Last time an automated heartbeat was sent.
-    last_heartbeat_sent_at: Optional[datetime] = None
+    last_heartbeat_sent_at: datetime | None = None
     # Last proactive assistant check-in sent.
-    last_assistant_checkin_at: Optional[datetime] = None
+    last_assistant_checkin_at: datetime | None = None
     # Last time an SLA reminder was sent for open decisions.
-    last_decision_sla_reminder_at: Optional[datetime] = None
+    last_decision_sla_reminder_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -67,6 +66,6 @@ class ScoredNews:
     sentiment: int
     bias: str
     confidence: str
-    asset_hits: List[str]
-    keyword_hits: List[str]
+    asset_hits: list[str]
+    keyword_hits: list[str]
     rationale: str

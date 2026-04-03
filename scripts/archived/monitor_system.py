@@ -12,7 +12,6 @@ import asyncio
 import json
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, Optional
 
 import aiohttp
 
@@ -24,7 +23,7 @@ class ServiceStatus:
     status: str  # online, offline, unknown
     latency_ms: float
     last_check: str
-    details: Optional[dict] = None
+    details: dict | None = None
 
 
 class SystemMonitor:
@@ -84,8 +83,8 @@ class SystemMonitor:
     }
     
     def __init__(self):
-        self.statuses: Dict[str, ServiceStatus] = {}
-        self.session: Optional[aiohttp.ClientSession] = None
+        self.statuses: dict[str, ServiceStatus] = {}
+        self.session: aiohttp.ClientSession | None = None
     
     async def __aenter__(self):
         timeout = aiohttp.ClientTimeout(total=10)
@@ -152,7 +151,7 @@ class SystemMonitor:
                     last_check=datetime.now().isoformat()
                 )
                 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return ServiceStatus(
                 name=name,
                 url=url,
@@ -170,7 +169,7 @@ class SystemMonitor:
                 details={"error": str(e)}
             )
     
-    async def check_all(self) -> Dict[str, ServiceStatus]:
+    async def check_all(self) -> dict[str, ServiceStatus]:
         """Check all services"""
         tasks = [
             self.check_service(key, config)

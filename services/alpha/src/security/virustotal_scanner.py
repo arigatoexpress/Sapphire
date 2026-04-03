@@ -8,7 +8,7 @@ import time
 import zipfile
 from collections import deque
 from pathlib import Path
-from typing import Any, Deque, Dict, List, Optional
+from typing import Any
 
 import aiohttp
 from loguru import logger
@@ -60,8 +60,8 @@ class VirusTotalSkillScanner:
         self._ignore_suffixes = {".pyc", ".pyo", ".swp", ".tmp"}
         self._ignore_names = {".DS_Store"}
 
-        self._last_scan_snapshot: Dict[str, Any] = {}
-        self._request_timestamps: Deque[float] = deque()
+        self._last_scan_snapshot: dict[str, Any] = {}
+        self._request_timestamps: deque[float] = deque()
         self._quota_day = int(time.time() // 86400)
         self._quota_day_count = 0
 
@@ -76,7 +76,7 @@ class VirusTotalSkillScanner:
     def _now() -> int:
         return int(time.time())
 
-    def status(self) -> Dict[str, Any]:
+    def status(self) -> dict[str, Any]:
         return {
             "enabled": bool(self.enabled),
             "api_key_configured": bool(self.api_key),
@@ -95,7 +95,7 @@ class VirusTotalSkillScanner:
             "timestamp": self._now(),
         }
 
-    def _consume_quota(self) -> Optional[str]:
+    def _consume_quota(self) -> str | None:
         now = time.time()
         quota_day = int(now // 86400)
         if quota_day != self._quota_day:
@@ -128,10 +128,10 @@ class VirusTotalSkillScanner:
             raise FileNotFoundError("skill_manifest_missing")
         return skill_dir
 
-    def list_skills(self) -> List[str]:
+    def list_skills(self) -> list[str]:
         if not self.skills_dir.exists() or not self.skills_dir.is_dir():
             return []
-        skills: List[str] = []
+        skills: list[str] = []
         for entry in sorted(self.skills_dir.iterdir(), key=lambda item: item.name.lower()):
             if not entry.is_dir():
                 continue
@@ -147,8 +147,8 @@ class VirusTotalSkillScanner:
             return True
         return any(part in self._ignore_dirs for part in path.parts)
 
-    def _collect_skill_files(self, skill_dir: Path) -> List[Path]:
-        collected: List[Path] = []
+    def _collect_skill_files(self, skill_dir: Path) -> list[Path]:
+        collected: list[Path] = []
         for file_path in skill_dir.rglob("*"):
             if not file_path.is_file():
                 continue
@@ -159,7 +159,7 @@ class VirusTotalSkillScanner:
         collected.sort(key=lambda rel: rel.as_posix())
         return collected
 
-    def _build_deterministic_bundle(self, skill_name: str) -> Dict[str, Any]:
+    def _build_deterministic_bundle(self, skill_name: str) -> dict[str, Any]:
         skill_dir = self._resolve_skill_dir(skill_name)
         files = self._collect_skill_files(skill_dir)
 
@@ -209,10 +209,10 @@ class VirusTotalSkillScanner:
         method: str,
         path: str,
         *,
-        params: Optional[Dict[str, Any]] = None,
+        params: dict[str, Any] | None = None,
         payload: Any = None,
         data: Any = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         if not self.api_key:
             return {"ok": False, "status": 0, "error": "vt_api_key_missing"}
         quota_error = self._consume_quota()
@@ -252,7 +252,7 @@ class VirusTotalSkillScanner:
             return {"ok": False, "status": 0, "error": str(exc)}
 
     @staticmethod
-    def _extract_nested(obj: Dict[str, Any], path: List[str], fallback: Any = None) -> Any:
+    def _extract_nested(obj: dict[str, Any], path: list[str], fallback: Any = None) -> Any:
         current: Any = obj
         for key in path:
             if not isinstance(current, dict):
@@ -281,7 +281,7 @@ class VirusTotalSkillScanner:
             return second
         return first
 
-    def _extract_code_insight_verdict(self, payloads: List[Dict[str, Any]]) -> str:
+    def _extract_code_insight_verdict(self, payloads: list[dict[str, Any]]) -> str:
         verdict = "unknown"
 
         def walk(node: Any, key_hint: str = "") -> None:
@@ -304,9 +304,9 @@ class VirusTotalSkillScanner:
 
     def _build_verdict_summary(
         self,
-        file_report: Optional[Dict[str, Any]],
-        analysis_report: Optional[Dict[str, Any]],
-    ) -> Dict[str, Any]:
+        file_report: dict[str, Any] | None,
+        analysis_report: dict[str, Any] | None,
+    ) -> dict[str, Any]:
         file_stats = self._extract_nested(file_report or {}, ["data", "attributes", "last_analysis_stats"], {})
         analysis_stats = self._extract_nested(analysis_report or {}, ["data", "attributes", "stats"], {})
         stats = file_stats if isinstance(file_stats, dict) and file_stats else analysis_stats
@@ -344,7 +344,7 @@ class VirusTotalSkillScanner:
             "policy": policy,
         }
 
-    def evaluate_policy(self, verdict: str) -> Dict[str, Any]:
+    def evaluate_policy(self, verdict: str) -> dict[str, Any]:
         normalized = self._normalize_verdict_label(verdict)
         mode = self.enforcement_mode
         blocked = False
@@ -370,7 +370,7 @@ class VirusTotalSkillScanner:
             "reason": reason,
         }
 
-    async def _lookup_file(self, sha256: str) -> Dict[str, Any]:
+    async def _lookup_file(self, sha256: str) -> dict[str, Any]:
         response = await self._vt_request("GET", f"/files/{sha256}")
         if response.get("status") == 404:
             return {"ok": True, "found": False, "status": 404, "report": {}}
@@ -389,7 +389,7 @@ class VirusTotalSkillScanner:
             "report": response.get("json", {}),
         }
 
-    async def _upload_bundle(self, skill_name: str, bundle: bytes) -> Dict[str, Any]:
+    async def _upload_bundle(self, skill_name: str, bundle: bytes) -> dict[str, Any]:
         form = aiohttp.FormData()
         form.add_field(
             "file",
@@ -415,11 +415,11 @@ class VirusTotalSkillScanner:
             "error": "" if analysis_id else "analysis_id_missing",
         }
 
-    async def _poll_analysis(self, analysis_id: str) -> Dict[str, Any]:
+    async def _poll_analysis(self, analysis_id: str) -> dict[str, Any]:
         if not analysis_id:
             return {"ok": False, "status": "missing_analysis_id", "report": {}}
 
-        latest_report: Dict[str, Any] = {}
+        latest_report: dict[str, Any] = {}
         latest_status = ""
         for attempt in range(1, self.max_poll_attempts + 1):
             response = await self._vt_request("GET", f"/analyses/{analysis_id}")
@@ -445,7 +445,7 @@ class VirusTotalSkillScanner:
             "report": latest_report,
         }
 
-    async def scan_skill(self, skill_name: str, upload_if_missing: Optional[bool] = None) -> Dict[str, Any]:
+    async def scan_skill(self, skill_name: str, upload_if_missing: bool | None = None) -> dict[str, Any]:
         started = self._now()
         upload_enabled = self.upload_if_missing_default if upload_if_missing is None else bool(upload_if_missing)
 
@@ -472,8 +472,8 @@ class VirusTotalSkillScanner:
                 "detail": str(lookup.get("error", "")),
                 "timestamp": started,
             }
-        upload_result: Dict[str, Any] = {}
-        analysis_result: Dict[str, Any] = {}
+        upload_result: dict[str, Any] = {}
+        analysis_result: dict[str, Any] = {}
         file_report = lookup.get("report", {}) if lookup.get("found") else {}
 
         if lookup.get("ok") and not lookup.get("found") and upload_enabled:
@@ -533,7 +533,7 @@ class VirusTotalSkillScanner:
         }
         return report
 
-    async def scan_all_skills(self, upload_if_missing: Optional[bool] = None) -> Dict[str, Any]:
+    async def scan_all_skills(self, upload_if_missing: bool | None = None) -> dict[str, Any]:
         started = self._now()
         if not self.enabled:
             return {"ok": False, "error": "vt_scanning_disabled", "timestamp": started}
@@ -541,7 +541,7 @@ class VirusTotalSkillScanner:
             return {"ok": False, "error": "vt_api_key_missing", "timestamp": started}
 
         skills = self.list_skills()
-        results: List[Dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
         counts = {"benign": 0, "suspicious": 0, "malicious": 0, "unknown": 0}
         blocked = 0
         for skill in skills:

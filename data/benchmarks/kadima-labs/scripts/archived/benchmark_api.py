@@ -10,7 +10,6 @@ import subprocess
 import sys
 import time
 from datetime import datetime
-from typing import Dict, List
 
 # GPU monitoring
 try:
@@ -39,7 +38,7 @@ class OllamaAPIBenchmark:
             except Exception as e:
                 print(f"GPU monitoring: {e}")
     
-    def _get_system_info(self) -> Dict:
+    def _get_system_info(self) -> dict:
         info = {"timestamp": datetime.now().isoformat(), "platform": sys.platform}
         try:
             result = subprocess.run(
@@ -62,7 +61,7 @@ class OllamaAPIBenchmark:
                 pass
         return 0
     
-    def _run_inference(self, model: str, prompt: str, timeout: int = 120) -> Dict:
+    def _run_inference(self, model: str, prompt: str, timeout: int = 120) -> dict:
         """Run inference via Ollama API"""
         mem_before = self._get_gpu_memory()
         
@@ -106,7 +105,7 @@ class OllamaAPIBenchmark:
         except Exception as e:
             return {"success": False, "error": str(e), "duration": 0}
     
-    def benchmark_model(self, model: str) -> Dict:
+    def benchmark_model(self, model: str) -> dict:
         """Run comprehensive benchmark on a model"""
         print(f"\n{'='*70}")
         print(f"BENCHMARKING: {model}")
@@ -161,7 +160,7 @@ class OllamaAPIBenchmark:
         
         return results
     
-    def run_all(self, models: List[str]) -> List[Dict]:
+    def run_all(self, models: list[str]) -> list[dict]:
         """Run benchmarks on all models"""
         print(f"\n{'='*70}")
         print("QWEN MODEL BENCHMARK SUITE (API Mode)")
@@ -181,7 +180,7 @@ class OllamaAPIBenchmark:
         
         return all_results
     
-    def save_results(self, results: List[Dict]) -> str:
+    def save_results(self, results: list[dict]) -> str:
         filename = f"benchmark_api_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
         output = {
             "benchmark_date": datetime.now().isoformat(),
@@ -193,7 +192,7 @@ class OllamaAPIBenchmark:
         print(f"\nResults saved to: {filename}")
         return filename
     
-    def print_report(self, results: List[Dict]):
+    def print_report(self, results: list[dict]):
         print(f"\n{'='*70}")
         print("BENCHMARK REPORT")
         print(f"{'='*70}\n")

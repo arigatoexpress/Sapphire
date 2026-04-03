@@ -14,10 +14,11 @@ import asyncio
 import hashlib
 import json
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -63,18 +64,18 @@ class CognitiveMessage:
     reasoning: str
 
     # Structured data extracted from the reasoning
-    symbol: Optional[str] = None
-    suggested_action: Optional[str] = None  # BUY, SELL, HOLD, CLOSE
+    symbol: str | None = None
+    suggested_action: str | None = None  # BUY, SELL, HOLD, CLOSE
     confidence: float = 0.0
 
     # Context for consensus
-    references: List[str] = field(default_factory=list)  # IDs of messages being responded to
+    references: list[str] = field(default_factory=list)  # IDs of messages being responded to
 
     # Metadata
     timestamp: datetime = field(default_factory=datetime.utcnow)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize for transmission."""
         return {
             "message_id": self.message_id,
@@ -91,7 +92,7 @@ class CognitiveMessage:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "CognitiveMessage":
+    def from_dict(cls, data: dict[str, Any]) -> "CognitiveMessage":
         """Deserialize from transmission."""
         return cls(
             message_id=data["message_id"],
@@ -123,16 +124,16 @@ class ConsensusState:
     initiated_at: datetime
 
     # Collected votes
-    votes: Dict[str, CognitiveMessage] = field(default_factory=dict)
+    votes: dict[str, CognitiveMessage] = field(default_factory=dict)
 
     # Consensus thresholds
     required_agents: int = 2
     required_confidence: float = 0.6
 
     # Final decision
-    decision: Optional[str] = None
-    decision_reasoning: Optional[str] = None
-    finalized_at: Optional[datetime] = None
+    decision: str | None = None
+    decision_reasoning: str | None = None
+    finalized_at: datetime | None = None
 
     def add_vote(self, message: CognitiveMessage) -> None:
         """Add an agent's vote to the consensus."""
@@ -142,7 +143,7 @@ class ConsensusState:
         """Check if enough votes have been collected."""
         return len(self.votes) >= self.required_agents
 
-    def compute_consensus(self) -> Dict[str, Any]:
+    def compute_consensus(self) -> dict[str, Any]:
         """Compute the final consensus from collected votes."""
         if not self.can_finalize():
             return {"status": "pending", "votes": len(self.votes)}
@@ -212,17 +213,17 @@ class CognitiveMesh:
     """
 
     def __init__(self):
-        self.agents: Dict[str, Dict[str, Any]] = {}  # agent_id -> agent info
-        self.message_log: List[CognitiveMessage] = []
-        self.active_consensus: Dict[str, ConsensusState] = {}  # consensus_id -> state
-        self.subscribers: Dict[str, List[Callable]] = {}  # topic -> callbacks
+        self.agents: dict[str, dict[str, Any]] = {}  # agent_id -> agent info
+        self.message_log: list[CognitiveMessage] = []
+        self.active_consensus: dict[str, ConsensusState] = {}  # consensus_id -> state
+        self.subscribers: dict[str, list[Callable]] = {}  # topic -> callbacks
         self._lock = asyncio.Lock()
 
         # Pub/Sub integration
         self._pubsub_enabled = False
 
     async def register_agent(
-        self, agent_id: str, role: AgentRole, capabilities: List[str] = None
+        self, agent_id: str, role: AgentRole, capabilities: list[str] = None
     ) -> None:
         """Register an agent with the mesh."""
         async with self._lock:
@@ -326,7 +327,7 @@ class CognitiveMesh:
         self,
         consensus_id: str,
         vote_message: CognitiveMessage,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Submit a vote to an active consensus decision."""
         async with self._lock:
             if consensus_id not in self.active_consensus:
@@ -367,9 +368,9 @@ class CognitiveMesh:
     def get_recent_messages(
         self,
         limit: int = 50,
-        message_type: Optional[MessageType] = None,
-        symbol: Optional[str] = None,
-    ) -> List[CognitiveMessage]:
+        message_type: MessageType | None = None,
+        symbol: str | None = None,
+    ) -> list[CognitiveMessage]:
         """Retrieve recent messages from the mesh."""
         messages = self.message_log[-limit * 10 :]  # Get more, then filter
 
@@ -380,7 +381,7 @@ class CognitiveMesh:
 
         return messages[-limit:]
 
-    def get_reasoning_trail(self, consensus_id: str) -> List[Dict[str, Any]]:
+    def get_reasoning_trail(self, consensus_id: str) -> list[dict[str, Any]]:
         """Get the full reasoning trail for a consensus decision (for explainability)."""
         if consensus_id not in self.active_consensus:
             return []
@@ -416,7 +417,7 @@ class CognitiveMesh:
 
 
 # Global mesh instance
-_mesh_instance: Optional[CognitiveMesh] = None
+_mesh_instance: CognitiveMesh | None = None
 
 
 def get_cognitive_mesh() -> CognitiveMesh:
@@ -434,7 +435,7 @@ async def init_cognitive_mesh() -> CognitiveMesh:
     try:
         from pubsub import subscribe
 
-        async def handle_mesh_message(data: Dict[str, Any]):
+        async def handle_mesh_message(data: dict[str, Any]):
             msg = CognitiveMessage.from_dict(data)
             await mesh.broadcast(msg)
 

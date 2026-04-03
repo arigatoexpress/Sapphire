@@ -25,7 +25,7 @@ import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import numpy as np
 import optuna
@@ -50,7 +50,7 @@ class PerformanceMetrics:
     alpha: float = 0.0
     beta: float = 0.0
 
-    def to_dict(self) -> Dict[str, float]:
+    def to_dict(self) -> dict[str, float]:
         return {
             'total_return': self.total_return,
             'sharpe_ratio': self.sharpe_ratio,
@@ -115,11 +115,11 @@ class ModelVersion:
     version_id: str
     timestamp: datetime
     performance_metrics: PerformanceMetrics
-    hyperparameters: Dict[str, Any]
+    hyperparameters: dict[str, Any]
     training_data_hash: str
     model_path: str
     is_active: bool = False
-    ab_test_results: Optional[Dict[str, Any]] = None
+    ab_test_results: dict[str, Any] | None = None
 
 
 class PerformanceMonitor:
@@ -311,7 +311,7 @@ class ABTestingFramework:
         elif model_version == 'B':
             test_data['results_b'].append(actual_return)
 
-    def check_test_completion(self, test_id: str) -> Optional[Dict[str, Any]]:
+    def check_test_completion(self, test_id: str) -> dict[str, Any] | None:
         """Check if A/B test is complete and return winner"""
 
         if test_id not in self.test_results:
@@ -373,7 +373,7 @@ class HyperparameterOptimizer:
     def __init__(self, config: RetrainingConfig):
         self.config = config
 
-    def optimize_ppo_hyperparameters(self, training_data: Any) -> Dict[str, Any]:
+    def optimize_ppo_hyperparameters(self, training_data: Any) -> dict[str, Any]:
         """Optimize PPO hyperparameters"""
 
         def objective(trial):
@@ -411,7 +411,7 @@ class HyperparameterOptimizer:
 
         return best_params
 
-    def _evaluate_hyperparameters(self, params: Dict[str, Any], training_data: Any) -> float:
+    def _evaluate_hyperparameters(self, params: dict[str, Any], training_data: Any) -> float:
         """Evaluate hyperparameter combination"""
 
         # This would implement actual model training and cross-validation
@@ -613,7 +613,7 @@ class AdaptiveRetrainingSystem:
             'dones': np.random.randint(0, 2, 10000)
         }
 
-    async def _train_new_model(self, hyperparameters: Dict[str, Any], training_data: Any) -> PPOTradingModel:
+    async def _train_new_model(self, hyperparameters: dict[str, Any], training_data: Any) -> PPOTradingModel:
         """Train new model with optimized hyperparameters"""
 
         logger.info("Training new model with optimized hyperparameters...")
@@ -637,7 +637,7 @@ class AdaptiveRetrainingSystem:
 
         return model
 
-    def _create_model_version(self, model: PPOTradingModel, hyperparameters: Dict[str, Any],
+    def _create_model_version(self, model: PPOTradingModel, hyperparameters: dict[str, Any],
                             training_data: Any) -> ModelVersion:
         """Create new model version"""
 
@@ -678,7 +678,7 @@ class AdaptiveRetrainingSystem:
 
         return version
 
-    async def _handle_ab_test_completion(self, test_id: str, result: Dict[str, Any]):
+    async def _handle_ab_test_completion(self, test_id: str, result: dict[str, Any]):
         """Handle A/B test completion"""
 
         version = self.active_ab_tests.get(test_id)
@@ -785,7 +785,7 @@ class AdaptiveRetrainingSystem:
 
         self.performance_monitor.add_trade_result(prediction, actual_return, datetime.now())
 
-    def get_system_status(self) -> Dict[str, Any]:
+    def get_system_status(self) -> dict[str, Any]:
         """Get current system status"""
 
         current_metrics = self.performance_monitor.calculate_performance_metrics()
@@ -811,6 +811,6 @@ async def start_adaptive_system(system: AdaptiveRetrainingSystem):
     await system.start_monitoring()
 
 
-def get_system_status(system: AdaptiveRetrainingSystem) -> Dict[str, Any]:
+def get_system_status(system: AdaptiveRetrainingSystem) -> dict[str, Any]:
     """Get adaptive system status"""
     return system.get_system_status()

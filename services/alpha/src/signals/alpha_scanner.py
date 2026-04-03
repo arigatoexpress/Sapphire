@@ -26,7 +26,7 @@ import logging
 import os
 import time
 from collections import deque
-from typing import Any, Deque, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ class AlphaSignalScanner:
         intel_feed: Any = None,
         scan_interval_seconds: int = 0,
         enabled: bool = False,
-        scan_symbols: Optional[List[str]] = None,
+        scan_symbols: list[str] | None = None,
     ):
         self.market_data = market_data
         self.cognition = cognition
@@ -94,18 +94,18 @@ class AlphaSignalScanner:
         )
 
         # State
-        self._last_signal_at: Dict[str, float] = {}
+        self._last_signal_at: dict[str, float] = {}
         self._pending_count = 0
         self._total_scans = 0
         self._total_signals_emitted = 0
-        self._signal_history: Deque[Dict[str, Any]] = deque(maxlen=100)
+        self._signal_history: deque[dict[str, Any]] = deque(maxlen=100)
         self._running = False
 
     @property
     def enabled(self) -> bool:
         return self._enabled
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         return {
             "enabled": self._enabled,
             "scan_interval_seconds": self._scan_interval,
@@ -156,10 +156,10 @@ class AlphaSignalScanner:
     def stop(self):
         self._running = False
 
-    async def _scan_cycle(self) -> List[Dict[str, Any]]:
+    async def _scan_cycle(self) -> list[dict[str, Any]]:
         """Run one full scan cycle across all symbols."""
         self._total_scans += 1
-        signals: List[Dict[str, Any]] = []
+        signals: list[dict[str, Any]] = []
 
         if self._pending_count >= self._max_pending:
             logger.debug(f"Alpha scanner: max pending signals ({self._max_pending}), skipping")
@@ -202,8 +202,8 @@ class AlphaSignalScanner:
         return signals
 
     def _build_market_context(
-        self, symbol: str, snapshot: Dict[str, Dict[str, Dict[str, Any]]]
-    ) -> Optional[Dict[str, Any]]:
+        self, symbol: str, snapshot: dict[str, dict[str, dict[str, Any]]]
+    ) -> dict[str, Any] | None:
         """Build a market context dict for cognition evaluation."""
         venues_with_price = {}
         for venue in ("ASTER", "LIGHTER"):
@@ -260,9 +260,9 @@ class AlphaSignalScanner:
     async def _evaluate_symbol(
         self,
         symbol: str,
-        context: Dict[str, Any],
-        execution_state: Dict[str, Any],
-    ) -> Optional[Dict[str, Any]]:
+        context: dict[str, Any],
+        execution_state: dict[str, Any],
+    ) -> dict[str, Any] | None:
         """Evaluate a symbol using Dual-Speed Cognition."""
         from shared.dual_speed_cognition import CognitionRequest, CognitionSpeed
 
@@ -374,7 +374,7 @@ def _env_flag(name: str, default: bool = False) -> bool:
     return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _parse_symbols(raw: str) -> List[str]:
+def _parse_symbols(raw: str) -> list[str]:
     import re
 
     tokens = re.split(r"[,;|\s]+", str(raw or "").strip())

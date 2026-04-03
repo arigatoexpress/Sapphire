@@ -11,7 +11,6 @@ Research findings: Critical for validating $50→$500K feasibility
 """
 
 from dataclasses import dataclass
-from typing import Dict, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -61,7 +60,7 @@ class MonteCarloSimulator:
     
     def simulate_single_trade(self,
                              capital: float,
-                             win_prob: float = None) -> Tuple[float, bool]:
+                             win_prob: float = None) -> tuple[float, bool]:
         """
         Simulate a single trade outcome
         
@@ -100,7 +99,7 @@ class MonteCarloSimulator:
     
     def simulate_single_day(self,
                            capital: float,
-                           trades_per_day: int = None) -> Tuple[float, Dict]:
+                           trades_per_day: int = None) -> tuple[float, dict]:
         """
         Simulate a single day of trading
         
@@ -163,7 +162,7 @@ class MonteCarloSimulator:
     
     def simulate_single_path(self,
                             path_id: int = 0,
-                            verbose: bool = False) -> Dict:
+                            verbose: bool = False) -> dict:
         """
         Simulate a single capital growth path
         
@@ -231,7 +230,7 @@ class MonteCarloSimulator:
         
         return result
     
-    def run_simulation(self, save_paths: bool = False) -> Dict:
+    def run_simulation(self, save_paths: bool = False) -> dict:
         """
         Run full Monte Carlo simulation
         
@@ -273,7 +272,7 @@ class MonteCarloSimulator:
         
         return aggregated
     
-    def aggregate_results(self) -> Dict:
+    def aggregate_results(self) -> dict:
         """
         Aggregate simulation results
         
@@ -332,7 +331,7 @@ class MonteCarloSimulator:
         
         return aggregated
     
-    def plot_results(self, num_paths_to_plot: int = 100, save_path: Optional[str] = None):
+    def plot_results(self, num_paths_to_plot: int = 100, save_path: str | None = None):
         """
         Plot simulation results
         
@@ -410,7 +409,7 @@ class MonteCarloSimulator:
         except Exception as e:
             logger.error(f"[ERROR] Plotting error: {e}")
     
-    def get_risk_assessment(self) -> Dict:
+    def get_risk_assessment(self) -> dict:
         """
         Get comprehensive risk assessment
         
@@ -439,7 +438,7 @@ class MonteCarloSimulator:
         
         return risk_assessment
     
-    def _generate_assessment(self, aggregated: Dict) -> str:
+    def _generate_assessment(self, aggregated: dict) -> str:
         """Generate textual risk assessment"""
         success_rate = aggregated['success_rate']
         survival_rate = 1 - aggregated['wipeout_rate']
@@ -456,7 +455,7 @@ class MonteCarloSimulator:
 
 def run_quick_assessment(initial_capital: float = 50.0,
                          target_capital: float = 500000.0,
-                         win_prob: float = 0.55) -> Dict:
+                         win_prob: float = 0.55) -> dict:
     """
     Run quick Monte Carlo assessment
     

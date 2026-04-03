@@ -9,7 +9,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from aiohttp import web
 
@@ -41,10 +41,10 @@ class TradeSignal:
     strategy: str
     confidence: float = 0.0
     timeframe: str = "1H"
-    indicators: Dict[str, Any] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    indicators: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "symbol": self.symbol,
             "action": self.action,
@@ -63,9 +63,9 @@ class TradeDecision:
     """AI Agent trade decision"""
     signal: TradeSignal
     status: TradeStatus
-    approved_by: List[str] = field(default_factory=list)
-    rejected_by: List[str] = field(default_factory=list)
-    modifications: Dict[str, Any] = field(default_factory=dict)
+    approved_by: list[str] = field(default_factory=list)
+    rejected_by: list[str] = field(default_factory=list)
+    modifications: dict[str, Any] = field(default_factory=dict)
     reasoning: str = ""
     risk_score: float = 0.0
     expected_profit: float = 0.0
@@ -85,7 +85,7 @@ class RiskManagementAgent:
         self.daily_loss_limit = -500.0  # $500 daily loss limit
         self.max_position_size = 100.0  # $100 max per trade
         self.max_portfolio_heat = 0.3   # 30% of portfolio at risk
-        self.trade_history: List[Dict] = []
+        self.trade_history: list[dict] = []
         self.daily_pnl = 0.0
         self.last_reset = datetime.now().date()
         
@@ -97,7 +97,7 @@ class RiskManagementAgent:
             self.last_reset = today
             logger.info("🔄 Risk Agent: Daily limits reset")
             
-    async def evaluate(self, signal: TradeSignal, portfolio: Dict) -> Tuple[bool, Dict]:
+    async def evaluate(self, signal: TradeSignal, portfolio: dict) -> tuple[bool, dict]:
         """
         Evaluate trade against risk rules
         Returns: (approved, modifications)
@@ -149,7 +149,7 @@ class StrategyAgent:
     """
     
     def __init__(self):
-        self.strategy_performance: Dict[str, Dict] = {}
+        self.strategy_performance: dict[str, dict] = {}
         self.market_regime = "neutral"  # bullish, bearish, neutral, volatile
         self.regime_indicators = {
             "vix": 20.0,
@@ -157,7 +157,7 @@ class StrategyAgent:
             "trend_strength": 0.5
         }
         
-    async def evaluate(self, signal: TradeSignal) -> Tuple[bool, Dict]:
+    async def evaluate(self, signal: TradeSignal) -> tuple[bool, dict]:
         """Evaluate signal quality based on strategy performance"""
         
         approval_reasons = []
@@ -193,7 +193,7 @@ class StrategyAgent:
             "strategy_stats": strategy_stats
         }
         
-    def update_performance(self, strategy: str, trade_result: Dict):
+    def update_performance(self, strategy: str, trade_result: dict):
         """Update strategy performance metrics"""
         if strategy not in self.strategy_performance:
             self.strategy_performance[strategy] = {
@@ -232,7 +232,7 @@ class SentimentAgent:
         self.fear_greed_index = 50  # 0-100
         self.cache_timeout = timedelta(minutes=15)
         
-    async def fetch_sentiment(self, symbol: str) -> Dict:
+    async def fetch_sentiment(self, symbol: str) -> dict:
         """Fetch sentiment data for symbol"""
         
         # Check cache
@@ -260,7 +260,7 @@ class SentimentAgent:
         self.sentiment_cache[symbol] = (datetime.now(), sentiment_data)
         return sentiment_data
         
-    async def evaluate(self, signal: TradeSignal) -> Tuple[bool, Dict]:
+    async def evaluate(self, signal: TradeSignal) -> tuple[bool, dict]:
         """Evaluate signal against market sentiment"""
         
         sentiment = await self.fetch_sentiment(signal.symbol)
@@ -309,7 +309,7 @@ class ExecutionAgent:
         }
         self.slippage_tolerance = 0.001  # 0.1%
         
-    async def optimize_execution(self, signal: TradeSignal) -> Dict:
+    async def optimize_execution(self, signal: TradeSignal) -> dict:
         """Optimize order execution parameters"""
         
         # Determine best exchange based on symbol
@@ -354,8 +354,8 @@ class AIOrchestrator:
         self.sentiment_agent = SentimentAgent()
         self.execution_agent = ExecutionAgent()
         
-        self.pending_trades: Dict[str, TradeDecision] = {}
-        self.executed_trades: List[TradeDecision] = []
+        self.pending_trades: dict[str, TradeDecision] = {}
+        self.executed_trades: list[TradeDecision] = []
         
     async def process_signal(self, signal: TradeSignal) -> TradeDecision:
         """
@@ -446,7 +446,7 @@ class AIOrchestrator:
         
         return True
         
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """Get orchestrator statistics"""
         total = len(self.executed_trades) + len([t for t in self.pending_trades.values()])
         executed = len([t for t in self.executed_trades if t.status == TradeStatus.EXECUTED])

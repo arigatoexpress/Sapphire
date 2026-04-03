@@ -22,7 +22,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from enum import IntEnum
-from typing import Any, Dict, Generic, List, Optional, Tuple, TypeVar
+from typing import Any, Generic, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +139,7 @@ class TradePacket:
         )
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TradePacket":
+    def from_dict(cls, data: dict[str, Any]) -> "TradePacket":
         """Create from dictionary (for converting legacy data)."""
         # Parse timestamp
         ts = data.get("timestamp")
@@ -180,7 +180,7 @@ class TradePacket:
             trade_id=str(data.get("trade_id") or data.get("id") or ""),
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert back to dictionary."""
         return {
             "timestamp": datetime.fromtimestamp(self.timestamp).isoformat(),
@@ -227,7 +227,7 @@ class PacketBuffer:
         return header + bytes(self.buffer)
 
     @classmethod
-    def from_wire_format(cls, data: bytes) -> List[TradePacket]:
+    def from_wire_format(cls, data: bytes) -> list[TradePacket]:
         """Parse packets from wire format."""
         if len(data) < 9:
             return []
@@ -278,7 +278,7 @@ class EvictionPolicy(ABC):
     """Abstract eviction policy."""
 
     @abstractmethod
-    def select_victim(self, cache: Dict[str, "CacheEntry"]) -> Optional[str]:
+    def select_victim(self, cache: dict[str, "CacheEntry"]) -> str | None:
         """Select a cache entry to evict."""
         pass
 
@@ -286,7 +286,7 @@ class EvictionPolicy(ABC):
 class LRUPolicy(EvictionPolicy):
     """Classic LRU eviction."""
 
-    def select_victim(self, cache: Dict[str, CacheEntry]) -> Optional[str]:
+    def select_victim(self, cache: dict[str, CacheEntry]) -> str | None:
         if not cache:
             return None
         return min(cache.items(), key=lambda x: x[1].last_accessed)[0]
@@ -295,7 +295,7 @@ class LRUPolicy(EvictionPolicy):
 class LFUPolicy(EvictionPolicy):
     """Least Frequently Used eviction."""
 
-    def select_victim(self, cache: Dict[str, CacheEntry]) -> Optional[str]:
+    def select_victim(self, cache: dict[str, CacheEntry]) -> str | None:
         if not cache:
             return None
         return min(cache.items(), key=lambda x: x[1].access_count)[0]
@@ -309,7 +309,7 @@ class NeuralEvictionPolicy(EvictionPolicy):
     Evict the entry with lowest score.
     """
 
-    def select_victim(self, cache: Dict[str, CacheEntry]) -> Optional[str]:
+    def select_victim(self, cache: dict[str, CacheEntry]) -> str | None:
         if not cache:
             return None
 
@@ -355,14 +355,14 @@ class NeuralKVCache(Generic[T]):
         self.max_size = max_size
         self.policy = policy or NeuralEvictionPolicy()
         self.name = name
-        self.cache: Dict[str, CacheEntry[T]] = {}
+        self.cache: dict[str, CacheEntry[T]] = {}
 
         # Metrics
         self.hits = 0
         self.misses = 0
         self.evictions = 0
 
-    def get(self, key: str) -> Optional[T]:
+    def get(self, key: str) -> T | None:
         """Get value by key."""
         entry = self.cache.get(key)
 
@@ -409,7 +409,7 @@ class NeuralKVCache(Generic[T]):
             return True
         return False
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
         total_requests = self.hits + self.misses
         hit_rate = self.hits / total_requests if total_requests > 0 else 0.0
@@ -424,7 +424,7 @@ class NeuralKVCache(Generic[T]):
             "evictions": self.evictions,
         }
 
-    def update_prefetch_hints(self, hints: Dict[str, float]) -> None:
+    def update_prefetch_hints(self, hints: dict[str, float]) -> None:
         """Bulk update prefetch hints (from prediction engine)."""
         for key, hint in hints.items():
             if key in self.cache:
@@ -438,12 +438,12 @@ class MemoryExpert(ABC):
     """Abstract expert specializing in a type of memory."""
 
     @abstractmethod
-    def can_handle(self, query: Dict[str, Any]) -> float:
+    def can_handle(self, query: dict[str, Any]) -> float:
         """Return confidence (0-1) that this expert can handle the query."""
         pass
 
     @abstractmethod
-    async def query(self, query: Dict[str, Any]) -> Any:
+    async def query(self, query: dict[str, Any]) -> Any:
         """Handle the query and return result."""
         pass
 
@@ -453,9 +453,9 @@ class TradeHistoryExpert(MemoryExpert):
 
     def __init__(self):
         self.cache = NeuralKVCache[TradePacket](max_size=50000, name="trade_history")
-        self.trades_by_symbol: Dict[str, List[str]] = {}  # symbol -> [trade_keys]
+        self.trades_by_symbol: dict[str, list[str]] = {}  # symbol -> [trade_keys]
 
-    def can_handle(self, query: Dict[str, Any]) -> float:
+    def can_handle(self, query: dict[str, Any]) -> float:
         query_type = query.get("type", "")
         if query_type in ("trade", "trade_history", "recent_trades"):
             return 0.95
@@ -463,7 +463,7 @@ class TradeHistoryExpert(MemoryExpert):
             return 0.6
         return 0.0
 
-    async def query(self, query: Dict[str, Any]) -> Any:
+    async def query(self, query: dict[str, Any]) -> Any:
         symbol = query.get("symbol")
         limit = query.get("limit", 50)
 
@@ -494,10 +494,10 @@ class MarketRegimeExpert(MemoryExpert):
     """Expert for market regime and pattern queries."""
 
     def __init__(self):
-        self.cache = NeuralKVCache[Dict](max_size=1000, name="market_regime")
-        self.current_regime: Dict[str, str] = {}  # symbol -> regime
+        self.cache = NeuralKVCache[dict](max_size=1000, name="market_regime")
+        self.current_regime: dict[str, str] = {}  # symbol -> regime
 
-    def can_handle(self, query: Dict[str, Any]) -> float:
+    def can_handle(self, query: dict[str, Any]) -> float:
         query_type = query.get("type", "")
         if query_type in ("regime", "market_regime", "pattern"):
             return 0.95
@@ -505,7 +505,7 @@ class MarketRegimeExpert(MemoryExpert):
             return 0.7
         return 0.0
 
-    async def query(self, query: Dict[str, Any]) -> Any:
+    async def query(self, query: dict[str, Any]) -> Any:
         symbol = query.get("symbol")
 
         if symbol:
@@ -513,7 +513,7 @@ class MarketRegimeExpert(MemoryExpert):
 
         return self.current_regime
 
-    def update_regime(self, symbol: str, regime: str, metadata: Dict = None) -> None:
+    def update_regime(self, symbol: str, regime: str, metadata: dict = None) -> None:
         """Update the current regime for a symbol."""
         self.current_regime[symbol] = regime
 
@@ -533,10 +533,10 @@ class AgentMemoryExpert(MemoryExpert):
     """Expert for agent reasoning and decision history."""
 
     def __init__(self):
-        self.cache = NeuralKVCache[Dict](max_size=5000, name="agent_memory")
-        self.decisions_by_agent: Dict[str, List[str]] = {}
+        self.cache = NeuralKVCache[dict](max_size=5000, name="agent_memory")
+        self.decisions_by_agent: dict[str, list[str]] = {}
 
-    def can_handle(self, query: Dict[str, Any]) -> float:
+    def can_handle(self, query: dict[str, Any]) -> float:
         query_type = query.get("type", "")
         if query_type in ("agent", "decision", "reasoning", "consensus"):
             return 0.95
@@ -544,7 +544,7 @@ class AgentMemoryExpert(MemoryExpert):
             return 0.6
         return 0.0
 
-    async def query(self, query: Dict[str, Any]) -> Any:
+    async def query(self, query: dict[str, Any]) -> Any:
         agent_id = query.get("agent_id")
         limit = query.get("limit", 20)
 
@@ -561,7 +561,7 @@ class AgentMemoryExpert(MemoryExpert):
 
         return [e.value for e in all_entries]
 
-    def record_decision(self, agent_id: str, decision: Dict) -> None:
+    def record_decision(self, agent_id: str, decision: dict) -> None:
         """Record an agent's decision."""
         key = f"{agent_id}:{int(time.time() * 1000)}"
         self.cache.put(key, decision, prefetch_hint=0.8)
@@ -580,7 +580,7 @@ class MemoryMoE:
     """
 
     def __init__(self):
-        self.experts: List[MemoryExpert] = [
+        self.experts: list[MemoryExpert] = [
             TradeHistoryExpert(),
             MarketRegimeExpert(),
             AgentMemoryExpert(),
@@ -588,13 +588,13 @@ class MemoryMoE:
 
         # Query routing metrics
         self.query_count = 0
-        self.routing_distribution: Dict[str, int] = {}
+        self.routing_distribution: dict[str, int] = {}
 
     async def query(
         self,
-        query: Dict[str, Any],
+        query: dict[str, Any],
         top_k: int = 1,
-    ) -> List[Any]:
+    ) -> list[Any]:
         """
         Route a query to the most appropriate expert(s).
 
@@ -626,14 +626,14 @@ class MemoryMoE:
 
         return results
 
-    def get_expert(self, expert_type: str) -> Optional[MemoryExpert]:
+    def get_expert(self, expert_type: str) -> MemoryExpert | None:
         """Get a specific expert by type name."""
         for expert in self.experts:
             if expert.__class__.__name__ == expert_type:
                 return expert
         return None
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get MoE statistics."""
         return {
             "total_queries": self.query_count,
@@ -660,8 +660,8 @@ class PrefetchPredictor:
 
     def __init__(self, window_size: int = 10):
         self.window_size = window_size
-        self.access_sequence: List[str] = []
-        self.co_access: Dict[Tuple[str, str], int] = {}  # (key1, key2) -> count
+        self.access_sequence: list[str] = []
+        self.co_access: dict[tuple[str, str], int] = {}  # (key1, key2) -> count
 
     def record_access(self, key: str) -> None:
         """Record a key access for pattern learning."""
@@ -677,7 +677,7 @@ class PrefetchPredictor:
         if len(self.access_sequence) > 10000:
             self.access_sequence = self.access_sequence[-5000:]
 
-    def predict_next(self, current_key: str, top_k: int = 5) -> List[Tuple[str, float]]:
+    def predict_next(self, current_key: str, top_k: int = 5) -> list[tuple[str, float]]:
         """Predict which keys are likely to be accessed next."""
         candidates = []
 
@@ -716,12 +716,12 @@ class SapphireNeuralCache:
 
         logger.info("💎 Sapphire Neural Cache initialized")
 
-    async def query(self, query: Dict[str, Any]) -> Any:
+    async def query(self, query: dict[str, Any]) -> Any:
         """Query the memory system."""
         results = await self.moe.query(query)
         return results[0] if len(results) == 1 else results
 
-    def ingest_trade(self, trade_data: Dict[str, Any]) -> None:
+    def ingest_trade(self, trade_data: dict[str, Any]) -> None:
         """Ingest a trade into the system."""
         packet = TradePacket.from_dict(trade_data)
 
@@ -729,7 +729,7 @@ class SapphireNeuralCache:
         if trade_expert:
             trade_expert.ingest(packet)
 
-    def record_decision(self, agent_id: str, decision: Dict) -> None:
+    def record_decision(self, agent_id: str, decision: dict) -> None:
         """Record an agent decision."""
         agent_expert = self.moe.get_expert("AgentMemoryExpert")
         if agent_expert:
@@ -741,7 +741,7 @@ class SapphireNeuralCache:
         if regime_expert:
             regime_expert.update_regime(symbol, regime)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get comprehensive system stats."""
         return {
             "moe": self.moe.get_stats(),
@@ -751,7 +751,7 @@ class SapphireNeuralCache:
 
 
 # Global instance
-_snc_instance: Optional[SapphireNeuralCache] = None
+_snc_instance: SapphireNeuralCache | None = None
 
 
 def get_neural_cache() -> SapphireNeuralCache:

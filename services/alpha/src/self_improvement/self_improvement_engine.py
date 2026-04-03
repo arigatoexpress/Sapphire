@@ -13,7 +13,7 @@ import os
 import pickle
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import lightgbm as lgb
 import numpy as np
@@ -54,7 +54,7 @@ class StrategyPerformance:
 class OptimizationResult:
     """Results from genetic algorithm optimization"""
     strategy_name: str
-    best_parameters: Dict[str, Any]
+    best_parameters: dict[str, Any]
     performance_improvement: float
     validation_score: float
     optimization_date: datetime
@@ -69,7 +69,7 @@ class GeneticOptimizer:
         self.crossover_rate = 0.8
         self.elite_size = 5
         
-    def optimize_strategy(self, strategy_class, parameter_ranges: Dict[str, Tuple[float, float]], 
+    def optimize_strategy(self, strategy_class, parameter_ranges: dict[str, tuple[float, float]], 
                          historical_data: pd.DataFrame, performance_metric: str = 'sharpe_ratio') -> OptimizationResult:
         """Optimize strategy parameters using genetic algorithm"""
         
@@ -135,7 +135,7 @@ class GeneticOptimizer:
             optimization_date=datetime.now()
         )
     
-    def _initialize_population(self, parameter_ranges: Dict[str, Tuple[float, float]]) -> List[Dict[str, float]]:
+    def _initialize_population(self, parameter_ranges: dict[str, tuple[float, float]]) -> list[dict[str, float]]:
         """Initialize population with random parameters"""
         population = []
         for _ in range(self.population_size):
@@ -145,7 +145,7 @@ class GeneticOptimizer:
             population.append(individual)
         return population
     
-    def _evaluate_individual(self, individual: Dict[str, float], strategy_class, 
+    def _evaluate_individual(self, individual: dict[str, float], strategy_class, 
                            historical_data: pd.DataFrame, performance_metric: str) -> float:
         """Evaluate fitness of an individual parameter set"""
         try:
@@ -175,7 +175,7 @@ class GeneticOptimizer:
             logger.warning(f"Error evaluating individual: {e}")
             return float('-inf')
     
-    def _simulate_strategy(self, strategy, historical_data: pd.DataFrame) -> List[Dict[str, Any]]:
+    def _simulate_strategy(self, strategy, historical_data: pd.DataFrame) -> list[dict[str, Any]]:
         """Simulate strategy execution on historical data"""
         trades = []
         position = 0
@@ -203,7 +203,7 @@ class GeneticOptimizer:
         
         return trades
     
-    def _selection(self, population: List[Dict[str, float]], fitness_scores: List[float]) -> List[Dict[str, float]]:
+    def _selection(self, population: list[dict[str, float]], fitness_scores: list[float]) -> list[dict[str, float]]:
         """Tournament selection for parents"""
         parents = []
         for _ in range(len(population)):
@@ -215,7 +215,7 @@ class GeneticOptimizer:
             parents.append(population[winner_idx])
         return parents
     
-    def _crossover(self, parent1: Dict[str, float], parent2: Dict[str, float]) -> Tuple[Dict[str, float], Dict[str, float]]:
+    def _crossover(self, parent1: dict[str, float], parent2: dict[str, float]) -> tuple[dict[str, float], dict[str, float]]:
         """Uniform crossover between two parents"""
         child1 = {}
         child2 = {}
@@ -230,7 +230,7 @@ class GeneticOptimizer:
         
         return child1, child2
     
-    def _mutate(self, individual: Dict[str, float], parameter_ranges: Dict[str, Tuple[float, float]]):
+    def _mutate(self, individual: dict[str, float], parameter_ranges: dict[str, tuple[float, float]]):
         """Mutate individual parameters"""
         for param, (min_val, max_val) in parameter_ranges.items():
             if np.random.random() < 0.1:  # 10% chance to mutate each parameter
@@ -246,7 +246,7 @@ class ModelRetrainer:
         os.makedirs(models_dir, exist_ok=True)
         
     async def retrain_models(self, historical_data: pd.DataFrame, 
-                           performance_data: pd.DataFrame) -> Dict[str, Any]:
+                           performance_data: pd.DataFrame) -> dict[str, Any]:
         """Retrain all AI models with recent data"""
         
         logger.info("Starting weekly model retraining")
@@ -316,7 +316,7 @@ class ModelRetrainer:
         return results
     
     def _prepare_training_data(self, historical_data: pd.DataFrame, 
-                             performance_data: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
+                             performance_data: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
         """Prepare features and targets for model training"""
         
         # Create features from historical data
@@ -359,7 +359,7 @@ class ModelRetrainer:
 class SelfImprovementEngine:
     """Main self-improvement engine that orchestrates all learning components"""
     
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         self.config = config
         self.genetic_optimizer = GeneticOptimizer()
         self.model_retrainer = ModelRetrainer()
@@ -386,7 +386,7 @@ class SelfImprovementEngine:
         }
         
     async def run_weekly_improvement_cycle(self, historical_data: pd.DataFrame, 
-                                         performance_data: pd.DataFrame) -> Dict[str, Any]:
+                                         performance_data: pd.DataFrame) -> dict[str, Any]:
         """Run the complete weekly improvement cycle"""
         
         logger.info("Starting weekly self-improvement cycle")
@@ -517,7 +517,7 @@ class SelfImprovementEngine:
         }
         return strategy_classes.get(strategy_name)
     
-    async def _save_improvement_results(self, results: Dict[str, Any]):
+    async def _save_improvement_results(self, results: dict[str, Any]):
         """Save improvement results to file"""
         
         results_path = os.path.join(self.model_retrainer.models_dir, 'improvement_results.json')
@@ -541,19 +541,19 @@ class SelfImprovementEngine:
         else:
             return obj
     
-    def get_strategy_weights(self) -> Dict[str, float]:
+    def get_strategy_weights(self) -> dict[str, float]:
         """Get current strategy weights"""
         weights_path = os.path.join(self.model_retrainer.models_dir, 'strategy_weights.json')
         
         if os.path.exists(weights_path):
-            with open(weights_path, 'r') as f:
+            with open(weights_path) as f:
                 return json.load(f)
         else:
             # Default equal weights
             strategies = list(self.strategy_parameter_ranges.keys())
             return {strategy: 1.0 / len(strategies) for strategy in strategies}
     
-    def get_optimized_parameters(self, strategy_name: str) -> Dict[str, Any]:
+    def get_optimized_parameters(self, strategy_name: str) -> dict[str, Any]:
         """Get optimized parameters for a strategy"""
         if strategy_name in self.optimization_results:
             return self.optimization_results[strategy_name].best_parameters

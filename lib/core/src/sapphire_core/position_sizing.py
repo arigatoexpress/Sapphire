@@ -20,7 +20,6 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, Optional
 
 # ---------------------------------------------------------------------------
 # Configuration — every parameter is env-overridable
@@ -67,7 +66,7 @@ class SizingConfig:
     moderate_dd_multiplier: float = _env_float("SIZING_MOD_DD_MULT", 0.75)
 
     # Stage multipliers (paper → staged → full_live)
-    stage_multipliers: Dict[str, float] = field(default_factory=lambda: {
+    stage_multipliers: dict[str, float] = field(default_factory=lambda: {
         "paper": _env_float("SIZING_STAGE_PAPER", 0.0),
         "staged_live": _env_float("SIZING_STAGE_STAGED", 0.25),
         "full_live": _env_float("SIZING_STAGE_FULL", 1.0),
@@ -98,7 +97,7 @@ class MarketRegime(str, Enum):
 
 
 # Regime multiplier table
-REGIME_MULTIPLIERS: Dict[MarketRegime, float] = {
+REGIME_MULTIPLIERS: dict[MarketRegime, float] = {
     MarketRegime.TRENDING_UP: 1.2,
     MarketRegime.TRENDING_DOWN: 1.2,
     MarketRegime.VOLATILE: 0.7,
@@ -289,7 +288,7 @@ def compute_position_size(
 def apply_stage_multiplier(
     base_qty: float,
     stage: str,
-    multiplier_override: Optional[float] = None,
+    multiplier_override: float | None = None,
     cfg: SizingConfig = DEFAULT_CONFIG,
 ) -> float:
     """

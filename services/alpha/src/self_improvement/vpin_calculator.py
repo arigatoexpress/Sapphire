@@ -15,7 +15,7 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numba
 import numpy as np
@@ -273,7 +273,7 @@ class GPUVPINCalculator:
             return await self._calculate_vpin_cpu_fallback(trades_df, order_book_df)
 
     async def _classify_bulk_volume_gpu(self, trades_df: pd.DataFrame,
-                                       order_book_df: pd.DataFrame) -> Dict[str, Any]:
+                                       order_book_df: pd.DataFrame) -> dict[str, Any]:
         """Classify bulk volume using GPU-accelerated neural network"""
 
         # Extract features for classification
@@ -495,15 +495,15 @@ class RealTimeVPINProcessor:
         self.vpin_calculator = GPUVPINCalculator(config)
 
         # Data buffers
-        self.trade_buffer: List[Dict[str, Any]] = []
-        self.order_book_buffer: Dict[str, pd.DataFrame] = {}
+        self.trade_buffer: list[dict[str, Any]] = []
+        self.order_book_buffer: dict[str, pd.DataFrame] = {}
 
         # Results cache
-        self.vpin_cache: Dict[str, VPINResult] = {}
-        self.last_update: Dict[str, datetime] = {}
+        self.vpin_cache: dict[str, VPINResult] = {}
+        self.last_update: dict[str, datetime] = {}
 
         # Alert system
-        self.alerts: List[Dict[str, Any]] = []
+        self.alerts: list[dict[str, Any]] = []
 
         # Monitoring
         self.processing_stats = {
@@ -535,7 +535,7 @@ class RealTimeVPINProcessor:
                 logger.error(f"Real-time processing error: {str(e)}")
                 await asyncio.sleep(1.0)
 
-    async def add_trade_data(self, symbol: str, trade_data: Dict[str, Any]):
+    async def add_trade_data(self, symbol: str, trade_data: dict[str, Any]):
         """Add real-time trade data"""
 
         self.trade_buffer.append({
@@ -548,7 +548,7 @@ class RealTimeVPINProcessor:
         if len(self.trade_buffer) > 10000:
             self.trade_buffer = self.trade_buffer[-5000:]  # Keep last 5000 trades
 
-    async def add_order_book_data(self, symbol: str, order_book_data: Dict[str, Any]):
+    async def add_order_book_data(self, symbol: str, order_book_data: dict[str, Any]):
         """Add real-time order book data"""
 
         # Convert to DataFrame for processing
@@ -627,17 +627,17 @@ class RealTimeVPINProcessor:
         else:
             self._latency_measurements = []
 
-    def get_vpin_data(self, symbol: str) -> Optional[VPINResult]:
+    def get_vpin_data(self, symbol: str) -> VPINResult | None:
         """Get latest VPIN data for symbol"""
 
         return self.vpin_cache.get(symbol)
 
-    def get_alerts(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_alerts(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get recent alerts"""
 
         return self.alerts[-limit:] if self.alerts else []
 
-    def get_processing_stats(self) -> Dict[str, Any]:
+    def get_processing_stats(self) -> dict[str, Any]:
         """Get processing statistics"""
 
         return self.processing_stats.copy()

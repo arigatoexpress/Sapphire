@@ -1,19 +1,18 @@
 from __future__ import annotations
 
 import re
-from typing import Dict, Optional
 
 from bis.models import OMExtractionRecord, make_urn
 
 
-def _search(pattern: str, text: str) -> Optional[str]:
+def _search(pattern: str, text: str) -> str | None:
     match = re.search(pattern, text, flags=re.IGNORECASE | re.MULTILINE)
     if not match:
         return None
     return match.group(1).strip()
 
 
-def _to_clean_number(raw: str) -> Optional[float]:
+def _to_clean_number(raw: str) -> float | None:
     cleaned = raw.replace(",", "").replace("$", "").replace("%", "").strip()
     try:
         return float(cleaned)
@@ -21,7 +20,7 @@ def _to_clean_number(raw: str) -> Optional[float]:
         return None
 
 
-def _confidence(raw: Optional[str], numeric: bool = False) -> float:
+def _confidence(raw: str | None, numeric: bool = False) -> float:
     if raw is None:
         return 0.0
     if numeric:
@@ -32,11 +31,11 @@ def _confidence(raw: Optional[str], numeric: bool = False) -> float:
     return 0.0
 
 
-def extract_om_fields(*, source_name: str, document_text: str, property_urn: Optional[str] = None) -> OMExtractionRecord:
+def extract_om_fields(*, source_name: str, document_text: str, property_urn: str | None = None) -> OMExtractionRecord:
     text = document_text or ""
 
-    extracted: Dict[str, str] = {}
-    confidences: Dict[str, float] = {}
+    extracted: dict[str, str] = {}
+    confidences: dict[str, float] = {}
 
     noi_raw = _search(r"\bNOI\b[^\d$]*([$\d,]+(?:\.\d+)?)", text)
     cap_rate_raw = _search(r"\bCap(?:italization)?\s*Rate\b[^\d]*([\d.]+%?)", text)

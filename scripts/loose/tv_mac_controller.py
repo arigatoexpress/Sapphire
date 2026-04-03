@@ -8,7 +8,6 @@ import asyncio
 import logging
 import sys
 from datetime import datetime
-from typing import Dict, Optional
 
 logging.basicConfig(
     level=logging.INFO,
@@ -27,8 +26,8 @@ class TradingViewMacController:
     """Full autonomous controller for TradingView Web on Mac"""
     
     def __init__(self):
-        self.browser: Optional[Browser] = None
-        self.page: Optional[Page] = None
+        self.browser: Browser | None = None
+        self.page: Page | None = None
         self.playwright = None
         self.tv_url = "https://www.tradingview.com/chart/"
         self.connected = False
@@ -141,7 +140,7 @@ class TradingViewMacController:
             
         return 0.0
         
-    async def get_indicators(self) -> Dict[str, str]:
+    async def get_indicators(self) -> dict[str, str]:
         """Get indicator values"""
         values = {}
         if not self.page:
@@ -194,7 +193,7 @@ class TradingViewMacController:
                 logger.error(f"Monitor error: {e}")
                 await asyncio.sleep(5)
                 
-    async def get_status(self) -> Dict:
+    async def get_status(self) -> dict:
         return {
             "connected": self.connected,
             "symbol": self.current_symbol,

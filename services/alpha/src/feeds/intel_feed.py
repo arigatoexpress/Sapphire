@@ -17,9 +17,9 @@ import os
 import re
 import time
 import xml.etree.ElementTree as ET
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 from urllib.parse import quote_plus
 
 import aiohttp
@@ -38,29 +38,29 @@ def _env_flag(name: str, default: bool = False) -> bool:
 
 
 def _now_utc() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _to_iso(dt: datetime | None) -> str:
     if dt is None:
         return _now_utc().isoformat()
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc).isoformat()
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC).isoformat()
 
 
-def _parse_ts(value: Any) -> Optional[datetime]:
+def _parse_ts(value: Any) -> datetime | None:
     if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
     text = str(value or "").strip()
     if not text:
         return None
     try:
-        return datetime.fromisoformat(text.replace("Z", "+00:00")).astimezone(timezone.utc)
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).astimezone(UTC)
     except ValueError:
         pass
     try:
-        return parsedate_to_datetime(text).astimezone(timezone.utc)
+        return parsedate_to_datetime(text).astimezone(UTC)
     except Exception:
         return None
 
@@ -74,7 +74,7 @@ def _clean_text(value: Any, limit: int = 320) -> str:
 
 
 def _item_id(source: str, title: str, url: str) -> str:
-    digest = hashlib.sha1(f"{source}|{title}|{url}".encode("utf-8")).hexdigest()
+    digest = hashlib.sha1(f"{source}|{title}|{url}".encode()).hexdigest()
     return f"{source}:{digest[:14]}"
 
 
@@ -153,12 +153,12 @@ class IntelFeedAggregator:
             os.getenv("SAPPHIRE_ENV", os.getenv("ENVIRONMENT", "production"))
         ).strip().lower()
 
-        self._session: Optional[aiohttp.ClientSession] = None
-        self._loop_task: Optional[asyncio.Task[Any]] = None
+        self._session: aiohttp.ClientSession | None = None
+        self._loop_task: asyncio.Task[Any] | None = None
         self._running = False
         self._last_refresh_ts = 0.0
-        self._items: List[Dict[str, Any]] = []
-        self._source_status: Dict[str, Dict[str, Any]] = {
+        self._items: list[dict[str, Any]] = []
+        self._source_status: dict[str, dict[str, Any]] = {
             "google_news_crypto": self._blank_source_status("google_news_crypto"),
             "google_news_ai": self._blank_source_status("google_news_ai"),
             "hn_crypto": self._blank_source_status("hn_crypto"),
@@ -175,7 +175,7 @@ class IntelFeedAggregator:
     def enabled(self) -> bool:
         return self._enabled
 
-    def _blank_source_status(self, name: str) -> Dict[str, Any]:
+    def _blank_source_status(self, name: str) -> dict[str, Any]:
         return {
             "name": name,
             "healthy": False,
@@ -223,7 +223,7 @@ class IntelFeedAggregator:
                 logger.warning(f"Intel feed refresh failed: {type(exc).__name__}: {exc}")
             await asyncio.sleep(self._poll_interval_seconds)
 
-    async def refresh_once(self, force: bool = False) -> Dict[str, Any]:
+    async def refresh_once(self, force: bool = False) -> dict[str, Any]:
         if not self._enabled:
             return self.get_status()
         if not self._session:
@@ -253,19 +253,19 @@ class IntelFeedAggregator:
             ("fear_greed_index", self._pull_fear_greed_optional),
         ]
 
-        merged: List[Dict[str, Any]] = []
+        merged: list[dict[str, Any]] = []
         for source_name, job_factory in jobs:
             source_items = await self._execute_source_job(source_name, job_factory)
             if source_items:
                 merged.extend(source_items)
 
         async with self._lock:
-            deduped: Dict[str, Dict[str, Any]] = {}
+            deduped: dict[str, dict[str, Any]] = {}
             for item in merged:
                 deduped[item["id"]] = item
             ordered = sorted(
                 deduped.values(),
-                key=lambda row: (_parse_ts(row.get("published_at")) or datetime.min.replace(tzinfo=timezone.utc), float(row.get("score", 0))),
+                key=lambda row: (_parse_ts(row.get("published_at")) or datetime.min.replace(tzinfo=UTC), float(row.get("score", 0))),
                 reverse=True,
             )
             self._items = ordered[: self._max_items]
@@ -275,7 +275,7 @@ class IntelFeedAggregator:
 
     async def _execute_source_job(
         self, source_name: str, job_factory: Any
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         started = time.time()
         status = self._source_status.setdefault(
             source_name, self._blank_source_status(source_name)
@@ -311,7 +311,7 @@ class IntelFeedAggregator:
                 raise RuntimeError(f"http_{resp.status}")
             return await resp.text()
 
-    async def _fetch_json(self, url: str, timeout: float = 12.0) -> Dict[str, Any]:
+    async def _fetch_json(self, url: str, timeout: float = 12.0) -> dict[str, Any]:
         assert self._session is not None
         async with self._session.get(url, timeout=timeout) as resp:
             if resp.status != 200:
@@ -328,10 +328,10 @@ class IntelFeedAggregator:
         summary: str,
         url: str,
         published_at: datetime | None,
-        tags: List[str],
+        tags: list[str],
         confidence: str,
         score: float,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         clean_title = _clean_text(title, limit=220)
         clean_summary = _clean_text(summary, limit=360)
         safe_url = str(url or "").strip()
@@ -348,12 +348,12 @@ class IntelFeedAggregator:
             "score": round(float(score), 3),
         }
 
-    async def _pull_google_news(self, query: str, category: str) -> List[Dict[str, Any]]:
+    async def _pull_google_news(self, query: str, category: str) -> list[dict[str, Any]]:
         q = quote_plus(query)
         url = f"https://news.google.com/rss/search?q={q}&hl=en-US&gl=US&ceid=US:en"
         xml_text = await self._fetch_text(url)
         root = ET.fromstring(xml_text)
-        items: List[Dict[str, Any]] = []
+        items: list[dict[str, Any]] = []
         for node in root.findall("./channel/item")[:20]:
             title = node.findtext("title", default="")
             link = node.findtext("link", default="")
@@ -375,7 +375,7 @@ class IntelFeedAggregator:
             )
         return items
 
-    async def _pull_hn(self, query: str, category: str) -> List[Dict[str, Any]]:
+    async def _pull_hn(self, query: str, category: str) -> list[dict[str, Any]]:
         q = quote_plus(query)
         url = (
             "https://hn.algolia.com/api/v1/search_by_date"
@@ -383,7 +383,7 @@ class IntelFeedAggregator:
         )
         payload = await self._fetch_json(url)
         hits = payload.get("hits", []) if isinstance(payload.get("hits"), list) else []
-        items: List[Dict[str, Any]] = []
+        items: list[dict[str, Any]] = []
         for row in hits:
             if not isinstance(row, dict):
                 continue
@@ -411,7 +411,7 @@ class IntelFeedAggregator:
             )
         return items
 
-    async def _pull_github_ai_repos(self) -> List[Dict[str, Any]]:
+    async def _pull_github_ai_repos(self) -> list[dict[str, Any]]:
         since = (_now_utc() - timedelta(days=14)).date().isoformat()
         query = quote_plus(f"topic:artificial-intelligence pushed:>{since}")
         url = (
@@ -420,7 +420,7 @@ class IntelFeedAggregator:
         )
         payload = await self._fetch_json(url)
         repos = payload.get("items", []) if isinstance(payload.get("items"), list) else []
-        items: List[Dict[str, Any]] = []
+        items: list[dict[str, Any]] = []
         for repo in repos:
             if not isinstance(repo, dict):
                 continue
@@ -448,7 +448,7 @@ class IntelFeedAggregator:
             )
         return items
 
-    async def _pull_glint_feed_optional(self) -> List[Dict[str, Any]]:
+    async def _pull_glint_feed_optional(self) -> list[dict[str, Any]]:
         status = self._source_status["glint_feed_scrape"]
         if not self._glint_scrape_enabled:
             status["healthy"] = True
@@ -478,7 +478,7 @@ class IntelFeedAggregator:
 
         return await self._pull_glint_feed_direct()
 
-    async def _pull_glint_feed_from_scout_sandbox(self) -> List[Dict[str, Any]]:
+    async def _pull_glint_feed_from_scout_sandbox(self) -> list[dict[str, Any]]:
         if not self._session:
             raise RuntimeError("session_unavailable")
         if not self._scout_sandbox_url:
@@ -517,7 +517,7 @@ class IntelFeedAggregator:
         if not isinstance(rows, list):
             return []
 
-        items: List[Dict[str, Any]] = []
+        items: list[dict[str, Any]] = []
         for row in rows:
             if not isinstance(row, dict):
                 continue
@@ -549,10 +549,10 @@ class IntelFeedAggregator:
                 break
         return items
 
-    async def _pull_glint_feed_direct(self) -> List[Dict[str, Any]]:
+    async def _pull_glint_feed_direct(self) -> list[dict[str, Any]]:
         html = await self._fetch_text(self._glint_source_url, timeout=10.0)
         candidates = [match.strip() for match in _GLINT_TITLE_RE.findall(html)]
-        unique_titles: List[str] = []
+        unique_titles: list[str] = []
         for title in candidates:
             cleaned = _clean_text(title, limit=200)
             if len(cleaned) < 24:
@@ -563,7 +563,7 @@ class IntelFeedAggregator:
             if len(unique_titles) >= 12:
                 break
 
-        items: List[Dict[str, Any]] = []
+        items: list[dict[str, Any]] = []
         now = _now_utc()
         for idx, title in enumerate(unique_titles):
             items.append(
@@ -581,7 +581,7 @@ class IntelFeedAggregator:
             )
         return items
 
-    async def _pull_scrapling_intel_optional(self) -> List[Dict[str, Any]]:
+    async def _pull_scrapling_intel_optional(self) -> list[dict[str, Any]]:
         status = self._source_status["scrapling_web_intel"]
         if not self._scrapling_intel_enabled:
             status["healthy"] = True
@@ -634,7 +634,7 @@ class IntelFeedAggregator:
             return []
 
         limit = max(1, min(self._scrapling_limit_per_selector * len(self._scrapling_selectors), 80))
-        items: List[Dict[str, Any]] = []
+        items: list[dict[str, Any]] = []
         for row in rows:
             if not isinstance(row, dict):
                 continue
@@ -666,7 +666,7 @@ class IntelFeedAggregator:
                 break
         return items
 
-    async def _pull_coingecko_trending_optional(self) -> List[Dict[str, Any]]:
+    async def _pull_coingecko_trending_optional(self) -> list[dict[str, Any]]:
         status = self._source_status["coingecko_trending"]
         if not self._coingecko_trending_enabled:
             status["healthy"] = True
@@ -683,7 +683,7 @@ class IntelFeedAggregator:
         if not isinstance(rows, list):
             return []
 
-        out: List[Dict[str, Any]] = []
+        out: list[dict[str, Any]] = []
         for idx, row in enumerate(rows):
             item = row.get("item", row) if isinstance(row, dict) else {}
             if not isinstance(item, dict):
@@ -719,7 +719,7 @@ class IntelFeedAggregator:
                 break
         return out
 
-    async def _pull_fear_greed_optional(self) -> List[Dict[str, Any]]:
+    async def _pull_fear_greed_optional(self) -> list[dict[str, Any]]:
         status = self._source_status["fear_greed_index"]
         if not self._fear_greed_enabled:
             status["healthy"] = True
@@ -736,7 +736,7 @@ class IntelFeedAggregator:
         if not isinstance(rows, list):
             return []
 
-        out: List[Dict[str, Any]] = []
+        out: list[dict[str, Any]] = []
         for row in rows:
             if not isinstance(row, dict):
                 continue
@@ -750,12 +750,12 @@ class IntelFeedAggregator:
             published_at = _parse_ts(ts_value) if ts_value is not None else _now_utc()
             if isinstance(ts_value, str) and ts_value.isdigit():
                 try:
-                    published_at = datetime.fromtimestamp(float(ts_value), tz=timezone.utc)
+                    published_at = datetime.fromtimestamp(float(ts_value), tz=UTC)
                 except Exception:
                     published_at = _now_utc()
             if isinstance(ts_value, (int, float)):
                 try:
-                    published_at = datetime.fromtimestamp(float(ts_value), tz=timezone.utc)
+                    published_at = datetime.fromtimestamp(float(ts_value), tz=UTC)
                 except Exception:
                     published_at = _now_utc()
 
@@ -792,7 +792,7 @@ class IntelFeedAggregator:
         limit: int = 60,
         category: str = "",
         query: str = "",
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         capped = max(1, min(int(limit or 60), 200))
         category_lower = str(category or "").strip().lower()
         query_lower = str(query or "").strip().lower()
@@ -848,7 +848,7 @@ class IntelFeedAggregator:
             )
         return "\n".join(lines)
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         healthy_sources = sum(
             1 for source in self._source_status.values() if source.get("healthy", False)
         )
@@ -859,7 +859,7 @@ class IntelFeedAggregator:
             "poll_interval_seconds": self._poll_interval_seconds,
             "last_refresh_ts": self._last_refresh_ts,
             "last_refresh_iso": (
-                datetime.fromtimestamp(self._last_refresh_ts, tz=timezone.utc).isoformat()
+                datetime.fromtimestamp(self._last_refresh_ts, tz=UTC).isoformat()
                 if self._last_refresh_ts
                 else None
             ),

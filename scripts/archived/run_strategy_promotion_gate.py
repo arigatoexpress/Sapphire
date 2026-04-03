@@ -14,9 +14,9 @@ from __future__ import annotations
 import argparse
 import json
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from google.api_core.exceptions import PermissionDenied
 from google.cloud import firestore
@@ -30,21 +30,21 @@ def _to_float(value: Any, default: float = 0.0) -> float:
         return float(default)
 
 
-def _to_dt(value: Any) -> Optional[datetime]:
+def _to_dt(value: Any) -> datetime | None:
     if value is None:
         return None
     if isinstance(value, datetime):
         if value.tzinfo is None:
-            return value.replace(tzinfo=timezone.utc)
-        return value.astimezone(timezone.utc)
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
     text = str(value).strip()
     if not text:
         return None
     try:
         dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone(timezone.utc)
+            dt = dt.replace(tzinfo=UTC)
+        return dt.astimezone(UTC)
     except ValueError:
         return None
 
@@ -53,7 +53,7 @@ def _normalized(value: Any) -> str:
     return str(value or "").strip().lower()
 
 
-def _extract_strategy_tf(row: Dict[str, Any]) -> tuple[str, str]:
+def _extract_strategy_tf(row: dict[str, Any]) -> tuple[str, str]:
     metadata = row.get("metadata", {}) if isinstance(row.get("metadata"), dict) else {}
     strategy = _normalized(
         row.get("strategy")
@@ -96,8 +96,8 @@ def _query_execution_metrics(
     timeframe: str,
     since: datetime,
     limit: int = 3000,
-) -> Dict[str, Any]:
-    rows: List[Dict[str, Any]] = []
+) -> dict[str, Any]:
+    rows: list[dict[str, Any]] = []
     try:
         query = (
             client.collection("execution_verifications")
@@ -171,8 +171,8 @@ def _query_realized_pnl(
     timeframe: str,
     since: datetime,
     limit: int = 3000,
-) -> Dict[str, Any]:
-    rows: List[Dict[str, Any]] = []
+) -> dict[str, Any]:
+    rows: list[dict[str, Any]] = []
     try:
         query = (
             client.collection("trade_executions")
@@ -257,7 +257,7 @@ def _query_max_drawdown_pct(
     return round(float(worst_dd), 6)
 
 
-def _load_backtest_metrics(path: Optional[str]) -> Dict[str, Any]:
+def _load_backtest_metrics(path: str | None) -> dict[str, Any]:
     if not path:
         return {}
     p = Path(path).expanduser().resolve()
@@ -268,7 +268,7 @@ def _load_backtest_metrics(path: Optional[str]) -> Dict[str, Any]:
     return metrics if isinstance(metrics, dict) else {}
 
 
-def _gate(pass_ok: bool, reasons: List[str]) -> Dict[str, Any]:
+def _gate(pass_ok: bool, reasons: list[str]) -> dict[str, Any]:
     return {"pass": bool(pass_ok), "reasons": reasons}
 
 
@@ -302,7 +302,7 @@ def main() -> int:
     strategy = _normalized(args.strategy)
     timeframe = _normalized(args.timeframe)
     platform = _normalized(args.platform)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     paper_since = now - timedelta(days=max(1, int(args.lookback_days_paper)))
     live_since = now - timedelta(days=max(1, int(args.lookback_days_live)))
     thresholds = Thresholds(
@@ -363,7 +363,7 @@ def main() -> int:
         _to_float(backtest.get("max_drawdown_pct", backtest.get("drawdown_pct", 999.0)), 999.0)
     )
 
-    bt_reasons: List[str] = []
+    bt_reasons: list[str] = []
     if backtest_trades < thresholds.backtest_min_trades:
         bt_reasons.append(f"backtest_trades {backtest_trades} < {thresholds.backtest_min_trades}")
     if backtest_expectancy_pct < thresholds.backtest_min_expectancy_pct:
@@ -375,7 +375,7 @@ def main() -> int:
             f"backtest_drawdown {backtest_max_dd:.3f}% > {thresholds.backtest_max_drawdown_pct:.3f}%"
         )
 
-    paper_reasons: List[str] = []
+    paper_reasons: list[str] = []
     if int(paper_exec["sample_size"]) < thresholds.paper_min_samples:
         paper_reasons.append(f"paper_samples {paper_exec['sample_size']} < {thresholds.paper_min_samples}")
     if float(paper_exec["reject_tax_pct"]) > thresholds.paper_max_reject_tax_pct:
@@ -391,7 +391,7 @@ def main() -> int:
             f"paper_fill_success {paper_exec['filled_success_pct']:.2f}% < {thresholds.paper_min_fill_success_pct:.2f}%"
         )
 
-    capped_reasons: List[str] = []
+    capped_reasons: list[str] = []
     if int(live_exec["sample_size"]) < thresholds.capped_live_min_samples:
         capped_reasons.append(f"live_samples {live_exec['sample_size']} < {thresholds.capped_live_min_samples}")
     if float(live_pnl["net_realized_pnl_usd"]) < thresholds.capped_live_min_net_pnl_usd:
@@ -403,7 +403,7 @@ def main() -> int:
             f"equity_drawdown {abs(equity_drawdown_pct):.3f}% > {thresholds.capped_live_max_drawdown_pct:.3f}%"
         )
 
-    scale_reasons: List[str] = []
+    scale_reasons: list[str] = []
     if int(live_exec["sample_size"]) < thresholds.scale_min_samples:
         scale_reasons.append(f"scale_samples {live_exec['sample_size']} < {thresholds.scale_min_samples}")
     if float(live_pnl["net_realized_pnl_usd"]) < thresholds.scale_min_net_pnl_usd:

@@ -11,7 +11,6 @@ from collections import deque
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import psutil
 
@@ -23,9 +22,9 @@ class MetricSnapshot:
     memory_percent: float
     memory_mb: float
     disk_percent: float
-    load_avg: List[float]
-    kimi_response_time: Optional[float] = None
-    telegram_latency: Optional[float] = None
+    load_avg: list[float]
+    kimi_response_time: float | None = None
+    telegram_latency: float | None = None
 
 
 class PerformanceMonitor:
@@ -39,10 +38,10 @@ class PerformanceMonitor:
             'disk_percent': 90.0,
             'kimi_response_time': 30.0,  # seconds
         }
-        self.alerts: List[Dict] = []
+        self.alerts: list[dict] = []
         self.log_file = Path("performance.log")
         
-    def get_system_metrics(self) -> Dict:
+    def get_system_metrics(self) -> dict:
         """Get current system metrics."""
         cpu_percent = psutil.cpu_percent(interval=1)
         memory = psutil.virtual_memory()
@@ -57,7 +56,7 @@ class PerformanceMonitor:
             'load_avg': load_avg,
         }
     
-    async def test_kimi_response_time(self) -> Optional[float]:
+    async def test_kimi_response_time(self) -> float | None:
         """Test Kimi CLI response time."""
         start = time.time()
         try:
@@ -69,7 +68,7 @@ class PerformanceMonitor:
             stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=60)
             elapsed = time.time() - start
             return elapsed if proc.returncode == 0 else None
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return None
         except Exception as e:
             print(f"Error testing Kimi: {e}")
@@ -106,7 +105,7 @@ class PerformanceMonitor:
         with open(self.log_file, 'a') as f:
             f.write(json.dumps(asdict(metrics)) + '\n')
     
-    def get_stats(self, minutes: int = 10) -> Dict:
+    def get_stats(self, minutes: int = 10) -> dict:
         """Get statistics for the last N minutes."""
         cutoff = time.time() - (minutes * 60)
         recent = [m for m in self.metrics_history if m.timestamp > cutoff]

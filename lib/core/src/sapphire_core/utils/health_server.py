@@ -7,7 +7,7 @@ Background workers (bots, scanners) need this to pass health checks.
 
 import logging
 import os
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from aiohttp import web
 
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class HealthServer:
     """Minimal HTTP server for health checks in background workers."""
 
-    def __init__(self, service_name: str, get_status: Optional[Callable] = None):
+    def __init__(self, service_name: str, get_status: Callable | None = None):
         self.service_name = service_name
         self.get_status = get_status
         self.port = int(os.getenv("PORT", 8080))
@@ -63,7 +63,7 @@ class HealthServer:
 
 
 async def run_with_health_server(
-    service_name: str, main_coroutine: Callable, get_status: Optional[Callable] = None
+    service_name: str, main_coroutine: Callable, get_status: Callable | None = None
 ):
     """
     Run a background worker with an HTTP health server.

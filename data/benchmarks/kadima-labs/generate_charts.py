@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Load data
-with open('final_qwen_results.json', 'r') as f:
+with open('final_qwen_results.json') as f:
     data = json.load(f)
 
 models = list(data['models'].keys())

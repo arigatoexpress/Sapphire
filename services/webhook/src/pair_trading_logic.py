@@ -6,7 +6,6 @@ Converts pair chart signals (ETHBTC) into actionable trades on individual assets
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Tuple
 
 
 class PairSignal(Enum):
@@ -23,8 +22,8 @@ class TradeRecommendation:
     """Recommended trade based on pair signal"""
     primary_action: str  # "buy" or "sell"
     primary_symbol: str  # The main symbol to trade
-    secondary_action: Optional[str]  # Hedge action (optional)
-    secondary_symbol: Optional[str]
+    secondary_action: str | None  # Hedge action (optional)
+    secondary_symbol: str | None
     confidence: float
     reasoning: str
 
@@ -152,7 +151,7 @@ def get_tradable_symbol(pair_signal: str) -> str:
         return PAIR_SYMBOLS[pair]['base']
     
     # Check if it's already a tradable symbol
-    for symbol in TRADABLE_SYMBOLS.keys():
+    for symbol in TRADABLE_SYMBOLS:
         if pair.startswith(symbol):
             return symbol
     
@@ -160,7 +159,7 @@ def get_tradable_symbol(pair_signal: str) -> str:
     return pair
 
 
-def validate_trade_symbol(symbol: str) -> Tuple[bool, str, str]:
+def validate_trade_symbol(symbol: str) -> tuple[bool, str, str]:
     """
     Validate that a symbol is tradable
     

@@ -9,7 +9,6 @@ import subprocess
 import sys
 import time
 from datetime import datetime
-from typing import Dict, List
 
 # Try importing GPU monitoring
 try:
@@ -39,7 +38,7 @@ class ComprehensiveBenchmark:
             except Exception as e:
                 print(f"GPU monitoring not available: {e}")
     
-    def _get_system_info(self) -> Dict:
+    def _get_system_info(self) -> dict:
         info = {"timestamp": datetime.now().isoformat(), "platform": sys.platform}
         try:
             result = subprocess.run(
@@ -62,7 +61,7 @@ class ComprehensiveBenchmark:
                 pass
         return 0
     
-    def _run_inference(self, model: str, prompt: str, timeout: int = 240) -> Dict:
+    def _run_inference(self, model: str, prompt: str, timeout: int = 240) -> dict:
         """Run inference with extended timeout for model loading"""
         mem_before = self._get_gpu_memory()
         start = time.time()
@@ -94,7 +93,7 @@ class ComprehensiveBenchmark:
         except Exception as e:
             return {"success": False, "error": str(e), "duration_seconds": 0}
     
-    def benchmark_model(self, model: str) -> Dict:
+    def benchmark_model(self, model: str) -> dict:
         """Run complete benchmark on a single model"""
         print(f"\n{'='*70}")
         print(f"BENCHMARKING: {model}")
@@ -148,7 +147,7 @@ class ComprehensiveBenchmark:
         
         return results
     
-    def run_benchmarks(self, models: List[str]) -> List[Dict]:
+    def run_benchmarks(self, models: list[str]) -> list[dict]:
         """Run benchmarks on all models"""
         all_results = []
         
@@ -172,7 +171,7 @@ class ComprehensiveBenchmark:
         
         return all_results
     
-    def save_results(self, results: List[Dict]) -> str:
+    def save_results(self, results: list[dict]) -> str:
         """Save results to JSON"""
         filename = f"benchmark_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
         
@@ -188,7 +187,7 @@ class ComprehensiveBenchmark:
         print(f"\nResults saved to: {filename}")
         return filename
     
-    def generate_report(self, results: List[Dict]):
+    def generate_report(self, results: list[dict]):
         """Generate and print final report"""
         print(f"\n{'='*70}")
         print("BENCHMARK REPORT")

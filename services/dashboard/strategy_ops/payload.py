@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from firebase_admin import firestore
 
@@ -13,31 +13,31 @@ def _coerce_datetime(value):
     if value is None:
         return None
     if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
     if isinstance(value, str):
         val = value.strip()
         if not val:
             return None
         if val.endswith("Z"):
             try:
-                return datetime.fromisoformat(val[:-1]).replace(tzinfo=timezone.utc)
+                return datetime.fromisoformat(val[:-1]).replace(tzinfo=UTC)
             except Exception:
                 pass
         for fmt in ("%Y-%m-%dT%H:%M:%S.%f%z", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%d %H:%M:%S%z"):
             try:
                 dt = datetime.strptime(val, fmt)
-                return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+                return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
             except Exception:
                 pass
         try:
             dt = datetime.fromisoformat(val)
-            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+            return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
         except Exception:
             return None
     if hasattr(value, "to_datetime"):
         try:
             dt = value.to_datetime()
-            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+            return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
         except Exception:
             return None
     return None
@@ -119,7 +119,7 @@ def build_strategy_scorecard(
 ) -> dict:
     if db_client is None:
         return {
-            'generated_at': datetime.now(timezone.utc).isoformat(),
+            'generated_at': datetime.now(UTC).isoformat(),
             'platform': str(platform or 'lighter').strip().lower(),
             'window': {'days': max(1, int(days or 7))},
             'totals': {'sample_size': 0, 'lanes': 0, 'error': 'firestore_unavailable'},
@@ -129,7 +129,7 @@ def build_strategy_scorecard(
     safe_days = max(1, min(int(days or 7), 30))
     safe_limit = max(300, min(int(limit or 1800), 4000))
     platform_norm = str(platform or 'lighter').strip().lower()
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     since = now_utc - timedelta(days=safe_days)
 
     def _to_float(value, default=0.0):
@@ -549,7 +549,7 @@ def build_signal_outcome_attribution(
     platform: str = "lighter",
     limit: int = 2200,
 ) -> dict:
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     safe_days = max(1, min(int(days or 7), 30))
     safe_limit = max(200, min(int(limit or 2200), 5000))
     platform_norm = str(platform or "lighter").strip().lower()
@@ -942,7 +942,7 @@ def build_data_quality_snapshot(
     market_payload: dict,
     intel_summary_payload: dict,
 ) -> dict:
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
 
     def _age_minutes(timestamp_value) -> float | None:
         ts = _coerce_datetime(timestamp_value)

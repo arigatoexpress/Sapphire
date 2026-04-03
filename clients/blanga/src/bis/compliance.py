@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List
 
 
 @dataclass(frozen=True)
@@ -15,7 +14,7 @@ class SourcePolicy:
 
 
 # mode values are intentional and user-facing.
-SOURCE_POLICIES: List[SourcePolicy] = [
+SOURCE_POLICIES: list[SourcePolicy] = [
     SourcePolicy(
         source_key="google_sheets",
         source_name="Google Sheets",
@@ -120,7 +119,7 @@ SOURCE_POLICIES: List[SourcePolicy] = [
 ]
 
 
-def policies_as_dicts() -> List[Dict[str, object]]:
+def policies_as_dicts() -> list[dict[str, object]]:
     return [
         {
             "source_key": p.source_key,

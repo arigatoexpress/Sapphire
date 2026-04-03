@@ -13,7 +13,7 @@ import sys
 import threading
 import time
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -82,7 +82,7 @@ class GPUProfiler:
         if self.thread:
             self.thread.join(timeout=2)
     
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get profiling summary"""
         if not self.samples:
             return {}
@@ -145,7 +145,7 @@ class ComprehensiveQwenTester:
         self.profiler = GPUProfiler()
         self.system_info = self._get_system_info()
     
-    def _get_system_info(self) -> Dict:
+    def _get_system_info(self) -> dict:
         """Get system information"""
         info = {
             "timestamp": datetime.now().isoformat(),
@@ -176,7 +176,7 @@ class ComprehensiveQwenTester:
             except:
                 pass
     
-    def _run_inference(self, model: str, prompt: str, timeout: int = 300) -> Dict:
+    def _run_inference(self, model: str, prompt: str, timeout: int = 300) -> dict:
         """Run inference with GPU profiling"""
         self._clear_gpu()
         
@@ -232,7 +232,7 @@ class ComprehensiveQwenTester:
                 "gpu_profile": self.profiler.get_summary()
             }
     
-    def test_speed_benchmarks(self, model: str) -> Dict:
+    def test_speed_benchmarks(self, model: str) -> dict:
         """Test pure speed benchmarks"""
         print("  Testing Speed Benchmarks...")
         
@@ -257,7 +257,7 @@ class ComprehensiveQwenTester:
         
         return results
     
-    def test_quality_metrics(self, model: str) -> Dict:
+    def test_quality_metrics(self, model: str) -> dict:
         """Test output quality with scoring"""
         print("  Testing Quality Metrics...")
         
@@ -333,7 +333,7 @@ Must include: color blue, number 7, moment of surprise.""",
         
         return results
     
-    def test_moe_functionality(self, model: str) -> Dict:
+    def test_moe_functionality(self, model: str) -> dict:
         """Test Mixture of Experts behavior (for 27B MoE model)"""
         print("  Testing MoE Functionality...")
         
@@ -371,7 +371,7 @@ Must include: color blue, number 7, moment of surprise.""",
         
         return results
     
-    def test_long_context(self, model: str) -> Dict:
+    def test_long_context(self, model: str) -> dict:
         """Test long context handling"""
         print("  Testing Long Context (32K tokens)...")
         
@@ -402,7 +402,7 @@ Must include: color blue, number 7, moment of surprise.""",
         
         return results
     
-    def run_full_test_suite(self, models: List[str]) -> Dict:
+    def run_full_test_suite(self, models: list[str]) -> dict:
         """Run complete test suite on all models"""
         print("="*70)
         print("COMPREHENSIVE QWEN 3.5 TESTING SUITE")
@@ -459,7 +459,7 @@ Must include: color blue, number 7, moment of surprise.""",
         
         return all_results
     
-    def generate_visualizations(self, results: Dict):
+    def generate_visualizations(self, results: dict):
         """Generate comprehensive visualizations"""
         print("\n" + "="*70)
         print("Generating Visualizations...")
@@ -480,7 +480,7 @@ Must include: color blue, number 7, moment of surprise.""",
         # 5. Comprehensive dashboard
         self._plot_comprehensive_dashboard(results)
     
-    def _plot_speed_comparison(self, results: Dict):
+    def _plot_speed_comparison(self, results: dict):
         """Plot speed comparison"""
         fig, ax = plt.subplots(figsize=(12, 6))
         
@@ -510,7 +510,7 @@ Must include: color blue, number 7, moment of surprise.""",
         plt.close()
         print("  Saved: viz_speed_comparison.png")
     
-    def _plot_quality_comparison(self, results: Dict):
+    def _plot_quality_comparison(self, results: dict):
         """Plot quality comparison"""
         fig, ax = plt.subplots(figsize=(12, 6))
         
@@ -540,7 +540,7 @@ Must include: color blue, number 7, moment of surprise.""",
         plt.close()
         print("  Saved: viz_quality_comparison.png")
     
-    def _plot_moe_analysis(self, results: Dict):
+    def _plot_moe_analysis(self, results: dict):
         """Plot MoE expert activation analysis"""
         fig, ax = plt.subplots(figsize=(10, 6))
         
@@ -577,7 +577,7 @@ Must include: color blue, number 7, moment of surprise.""",
         plt.close()
         print("  Saved: viz_moe_analysis.png")
     
-    def _plot_memory_comparison(self, results: Dict):
+    def _plot_memory_comparison(self, results: dict):
         """Plot memory usage comparison"""
         fig, ax = plt.subplots(figsize=(10, 6))
         
@@ -625,7 +625,7 @@ Must include: color blue, number 7, moment of surprise.""",
         plt.close()
         print("  Saved: viz_memory_comparison.png")
     
-    def _plot_comprehensive_dashboard(self, results: Dict):
+    def _plot_comprehensive_dashboard(self, results: dict):
         """Create comprehensive dashboard"""
         fig = plt.figure(figsize=(16, 12))
         gs = fig.add_gridspec(3, 3, hspace=0.3, wspace=0.3)
@@ -685,7 +685,7 @@ Must include: color blue, number 7, moment of surprise.""",
                 ax.bar(range(len(cat_data)), list(cat_data.values()),
                       color=['#E74C3C', '#3498DB', '#2ECC71'][:len(cat_data)])
                 ax.set_xticks(range(len(cat_data)))
-                ax.set_xticklabels([m.replace(':', ' ') for m in cat_data.keys()], 
+                ax.set_xticklabels([m.replace(':', ' ') for m in cat_data], 
                                   fontsize=8, rotation=45)
                 ax.set_title(f'{cat.title()} Tests', fontsize=11, fontweight='bold')
                 ax.grid(axis='y', alpha=0.3)
@@ -714,7 +714,7 @@ Must include: color blue, number 7, moment of surprise.""",
         plt.close()
         print("  Saved: viz_comprehensive_dashboard.png")
     
-    def save_results(self, results: Dict, filename: str = None):
+    def save_results(self, results: dict, filename: str = None):
         """Save results to file"""
         if not filename:
             filename = f"comprehensive_test_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"

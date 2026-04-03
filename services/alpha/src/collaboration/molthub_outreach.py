@@ -17,13 +17,13 @@ content sanitization before influencing consensus.
 import hashlib
 import threading
 import time
-from typing import Any, Dict, List
+from typing import Any
 
 from loguru import logger
 
 # ── Outreach template library ──────────────────────────────────────
 
-_OUTREACH_TEMPLATES: Dict[str, Dict[str, str]] = {
+_OUTREACH_TEMPLATES: dict[str, dict[str, str]] = {
     "general_invite": {
         "title": "Sapphire Swarm — Contribute Trade Ideas",
         "body": (
@@ -119,7 +119,7 @@ class MolthubOutreach:
 
     def __init__(self):
         self._lock = threading.Lock()
-        self._history: List[Dict[str, Any]] = []
+        self._history: list[dict[str, Any]] = []
         self._last_outreach_at: float = 0.0
 
     def compose_outreach(
@@ -129,7 +129,7 @@ class MolthubOutreach:
         custom_body: str = "",
         total_ideas: int = 0,
         win_rate: float = 0.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Compose an outreach post from a template.
 
         Args:
@@ -207,9 +207,9 @@ class MolthubOutreach:
 
     def record_dispatch(
         self,
-        post: Dict[str, Any],
-        dispatch_result: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        post: dict[str, Any],
+        dispatch_result: dict[str, Any],
+    ) -> dict[str, Any]:
         """Record that an outreach post was dispatched.
 
         Args:
@@ -242,7 +242,7 @@ class MolthubOutreach:
             )
             return {"ok": True, "record": record}
 
-    def can_post(self) -> Dict[str, Any]:
+    def can_post(self) -> dict[str, Any]:
         """Check if an outreach post is allowed (cooldown check).
 
         Returns:
@@ -259,7 +259,7 @@ class MolthubOutreach:
                 }
             return {"allowed": True, "wait_seconds": 0}
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         """Return outreach statistics."""
         with self._lock:
             total = len(self._history)
@@ -273,7 +273,7 @@ class MolthubOutreach:
                 }
 
             successful = sum(1 for r in self._history if r.get("dispatch_ok"))
-            templates_used: Dict[str, int] = {}
+            templates_used: dict[str, int] = {}
             symbols: set = set()
             for r in self._history:
                 tpl = r.get("template", "unknown")
@@ -293,7 +293,7 @@ class MolthubOutreach:
                 "last_outreach_at": self._last_outreach_at,
             }
 
-    def available_templates(self) -> List[Dict[str, str]]:
+    def available_templates(self) -> list[dict[str, str]]:
         """List available outreach templates."""
         return [
             {
@@ -306,7 +306,7 @@ class MolthubOutreach:
         ]
 
     @staticmethod
-    def _sanitize_outbound(text: str) -> Dict[str, Any]:
+    def _sanitize_outbound(text: str) -> dict[str, Any]:
         """Sanitize outbound content — block sensitive data leaks.
 
         This is the critical security gate: no credentials, platform
@@ -344,7 +344,7 @@ class MolthubOutreach:
 
         return {"text": clean, "blocked": False, "redactions": redactions}
 
-    def validate_inbound_idea(self, idea: Dict[str, Any]) -> Dict[str, Any]:
+    def validate_inbound_idea(self, idea: dict[str, Any]) -> dict[str, Any]:
         """Validate an inbound trade idea from an external bot.
 
         Ensures the idea contains only trade-relevant fields and no
@@ -363,7 +363,7 @@ class MolthubOutreach:
         }
 
         # Extract only whitelisted fields
-        clean_idea: Dict[str, Any] = {}
+        clean_idea: dict[str, Any] = {}
         for key in allowed_fields:
             if key in idea:
                 value = idea[key]

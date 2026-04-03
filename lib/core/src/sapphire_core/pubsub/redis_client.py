@@ -15,9 +15,10 @@ import asyncio
 import json
 import logging
 import os
+from collections.abc import Callable
 from dataclasses import asdict, is_dataclass
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -57,8 +58,8 @@ class RedisPubSubClient:
     def __init__(self, url: str = "") -> None:
         self._url = url or REDIS_URL
         self._redis: Any = None
-        self._handlers: Dict[str, List[Callable]] = {}
-        self._pull_tasks: List[asyncio.Task] = []
+        self._handlers: dict[str, list[Callable]] = {}
+        self._pull_tasks: list[asyncio.Task] = []
         self._closing = False
         self._initialized = False
         self._service_name = self._resolve_service_name()
@@ -92,7 +93,7 @@ class RedisPubSubClient:
             logger.error("❌ Redis connection failed (%s): %s", self._url, exc)
             self._initialized = True  # Don't crash — mock mode
 
-    async def publish(self, topic: str, message: Any) -> Optional[str]:
+    async def publish(self, topic: str, message: Any) -> str | None:
         if not self._initialized:
             await self.initialize()
         if self._redis is None:
@@ -116,8 +117,8 @@ class RedisPubSubClient:
     async def subscribe(
         self,
         topic: str,
-        handler: Callable[[Dict[str, Any]], Any],
-        subscription_name: Optional[str] = None,
+        handler: Callable[[dict[str, Any]], Any],
+        subscription_name: str | None = None,
     ) -> None:
         if not self._initialized:
             await self.initialize()

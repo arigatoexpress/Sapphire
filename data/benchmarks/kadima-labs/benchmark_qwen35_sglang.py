@@ -9,7 +9,7 @@ import statistics
 import subprocess
 import time
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any
 
 # Try to import sglang
 try:
@@ -52,7 +52,7 @@ class SGLangBenchmark:
             ))
             print("Using native SGLang backend")
     
-    def benchmark_prompt(self, prompt: str, num_runs: int = 3) -> Dict[str, Any]:
+    def benchmark_prompt(self, prompt: str, num_runs: int = 3) -> dict[str, Any]:
         """Benchmark a single prompt"""
         times = []
         token_counts = []
@@ -102,7 +102,7 @@ class SGLangBenchmark:
         
         return {"success": False, "error": "All runs failed"}
     
-    def run_full_benchmark(self) -> Dict[str, Any]:
+    def run_full_benchmark(self) -> dict[str, Any]:
         """Run complete benchmark suite"""
         print(f"\n{'='*70}")
         print("QWEN 3.5 SGLang BENCHMARK")
@@ -147,7 +147,7 @@ class SGLangBenchmark:
         
         return results
     
-    def save_results(self, results: Dict, filename: str = None):
+    def save_results(self, results: dict, filename: str = None):
         """Save benchmark results"""
         if filename is None:
             filename = f"qwen35_sglang_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"

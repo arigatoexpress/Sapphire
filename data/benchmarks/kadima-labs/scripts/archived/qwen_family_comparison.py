@@ -11,7 +11,6 @@ import statistics
 import subprocess
 import time
 from datetime import datetime
-from typing import Dict, List
 
 try:
     import pynvml as nvml
@@ -49,7 +48,7 @@ class QwenFamilyBenchmark:
         gc.collect()
         time.sleep(3)
     
-    def _run_test(self, model: str, prompt: str, timeout: int = 180) -> Dict:
+    def _run_test(self, model: str, prompt: str, timeout: int = 180) -> dict:
         """Run single test with GPU isolation"""
         self._clear_gpu()
         mem_before = self._get_gpu_memory()
@@ -81,7 +80,7 @@ class QwenFamilyBenchmark:
         except Exception as e:
             return {"success": False, "error": str(e), "duration": timeout}
     
-    def test_reasoning_quality(self, model: str) -> Dict:
+    def test_reasoning_quality(self, model: str) -> dict:
         """Test multi-step reasoning"""
         prompt = """Solve this step-by-step:
 A farmer has 17 sheep. All but 9 die. How many sheep does the farmer have left?
@@ -113,7 +112,7 @@ Explain your reasoning clearly."""
         
         return result
     
-    def test_code_quality(self, model: str) -> Dict:
+    def test_code_quality(self, model: str) -> dict:
         """Test code generation quality"""
         prompt = """Write a Python function `is_prime(n)` that checks if a number is prime.
 
@@ -157,7 +156,7 @@ Provide only the code."""
         
         return result
     
-    def test_instruction_following(self, model: str) -> Dict:
+    def test_instruction_following(self, model: str) -> dict:
         """Test precise instruction following"""
         prompt = """Follow these instructions EXACTLY:
 
@@ -200,7 +199,7 @@ Your response:"""
         
         return result
     
-    def test_creativity(self, model: str) -> Dict:
+    def test_creativity(self, model: str) -> dict:
         """Test creative writing"""
         prompt = """Write a creative story (exactly 50 words) about an AI learning to paint.
 Must include: the color blue, the number 7, and a moment of surprise."""
@@ -244,7 +243,7 @@ Must include: the color blue, the number 7, and a moment of surprise."""
         
         return result
     
-    def run_full_comparison(self, models: List[str]) -> Dict:
+    def run_full_comparison(self, models: list[str]) -> dict:
         """Run complete comparison"""
         print("="*70)
         print("QWEN FAMILY COMPREHENSIVE COMPARISON")
@@ -308,7 +307,7 @@ Must include: the color blue, the number 7, and a moment of surprise."""
         
         return results
     
-    def save_and_report(self, results: Dict, filename: str = None):
+    def save_and_report(self, results: dict, filename: str = None):
         """Save results and generate report"""
         if not filename:
             filename = f"qwen_comparison_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"

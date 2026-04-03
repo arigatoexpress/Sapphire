@@ -20,7 +20,6 @@ import math
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -139,7 +138,7 @@ def run_smart_money_backtest(
     swing_size: int = 25,
     rr: float = 1.0,
     fee_per_side_pct: float = 0.04,
-) -> Tuple[BacktestResult, pd.Series]:
+) -> tuple[BacktestResult, pd.Series]:
     """
     Simplified port of the Smart Money Breakout mechanics:
     - BOS on close break of active pivot
@@ -162,7 +161,7 @@ def run_smart_money_backtest(
     entry = 0.0
     tp = np.nan
     sl = np.nan
-    trade_returns: List[float] = []
+    trade_returns: list[float] = []
     equity = [1.0]
     equity_index = [idx[0]]
 
@@ -288,8 +287,8 @@ def run_smart_money_backtest(
 
 def make_visuals(
     out_dir: Path,
-    price_frames: Dict[str, pd.DataFrame],
-    equities: Dict[str, pd.Series],
+    price_frames: dict[str, pd.DataFrame],
+    equities: dict[str, pd.Series],
     results_df: pd.DataFrame,
 ) -> None:
     chart_dir = out_dir / "charts"
@@ -415,9 +414,9 @@ def main() -> None:
     top_symbols_df = fetch_top_crypto_symbols(args.top_n)
     top_symbols_df.to_csv(data_dir / "top_symbols.csv", index=False)
 
-    price_frames: Dict[str, pd.DataFrame] = {}
-    equity_curves: Dict[str, pd.Series] = {}
-    rows: List[Dict[str, object]] = []
+    price_frames: dict[str, pd.DataFrame] = {}
+    equity_curves: dict[str, pd.Series] = {}
+    rows: list[dict[str, object]] = []
     end_date = (dt.date.today() + dt.timedelta(days=1)).isoformat()
 
     for _, row in top_symbols_df.iterrows():

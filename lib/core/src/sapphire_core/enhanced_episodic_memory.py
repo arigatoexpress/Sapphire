@@ -17,9 +17,9 @@ import logging
 import os
 import statistics
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import google.generativeai as genai
 
@@ -39,27 +39,27 @@ class MarketSnapshot:
     timestamp: datetime
 
     # Price data
-    prices: Dict[str, float] = field(default_factory=dict)  # symbol -> price
+    prices: dict[str, float] = field(default_factory=dict)  # symbol -> price
 
     # Volume (24h)
-    volumes: Dict[str, float] = field(default_factory=dict)  # symbol -> volume
+    volumes: dict[str, float] = field(default_factory=dict)  # symbol -> volume
 
     # Volatility (realized, 1h)
-    volatility: Dict[str, float] = field(default_factory=dict)  # symbol -> vol
+    volatility: dict[str, float] = field(default_factory=dict)  # symbol -> vol
 
     # Order book imbalance (-1 to 1)
-    order_book_imbalance: Dict[str, float] = field(default_factory=dict)
+    order_book_imbalance: dict[str, float] = field(default_factory=dict)
 
     # Funding rates (for perps)
-    funding_rates: Dict[str, float] = field(default_factory=dict)
+    funding_rates: dict[str, float] = field(default_factory=dict)
 
     # Open interest
-    open_interest: Dict[str, float] = field(default_factory=dict)
+    open_interest: dict[str, float] = field(default_factory=dict)
 
     # Correlation matrix (key = "SYM1:SYM2")
-    correlations: Dict[str, float] = field(default_factory=dict)
+    correlations: dict[str, float] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "timestamp": self.timestamp.isoformat(),
             "prices": self.prices,
@@ -72,7 +72,7 @@ class MarketSnapshot:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "MarketSnapshot":
+    def from_dict(cls, data: dict[str, Any]) -> "MarketSnapshot":
         return cls(
             timestamp=datetime.fromisoformat(data["timestamp"]),
             prices=data.get("prices", {}),
@@ -84,7 +84,7 @@ class MarketSnapshot:
             correlations=data.get("correlations", {}),
         )
 
-    def get_regime_indicators(self) -> Dict[str, float]:
+    def get_regime_indicators(self) -> dict[str, float]:
         """Extract numerical indicators for regime classification."""
         avg_volatility = statistics.mean(self.volatility.values()) if self.volatility else 0
         avg_imbalance = (
@@ -120,9 +120,9 @@ class MarketRegime(str, Enum):
 
 def auto_detect_regime(
     snapshot: MarketSnapshot,
-    price_change_1h: Dict[str, float] = None,
-    price_change_24h: Dict[str, float] = None,
-) -> Tuple[MarketRegime, float]:
+    price_change_1h: dict[str, float] = None,
+    price_change_24h: dict[str, float] = None,
+) -> tuple[MarketRegime, float]:
     """
     Automatically detect market regime from snapshot data.
 
@@ -175,13 +175,13 @@ class CausalEvent:
     timestamp: datetime
     event_type: str  # "market", "action", "outcome"
     description: str
-    data: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
 
     # Links to other events
-    caused_by: Optional[str] = None  # ID of preceding event
-    led_to: Optional[str] = None  # ID of resulting event
+    caused_by: str | None = None  # ID of preceding event
+    led_to: str | None = None  # ID of resulting event
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "timestamp": self.timestamp.isoformat(),
             "event_type": self.event_type,
@@ -197,17 +197,17 @@ class CausalChain:
     """A chain of causally-linked events."""
 
     chain_id: str
-    events: List[CausalEvent] = field(default_factory=list)
+    events: list[CausalEvent] = field(default_factory=list)
 
     def add_event(
         self,
         event_type: str,
         description: str,
-        data: Dict = None,
+        data: dict = None,
     ) -> CausalEvent:
         """Add an event to the chain."""
         event = CausalEvent(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             event_type=event_type,
             description=description,
             data=data or {},
@@ -234,7 +234,7 @@ class CausalChain:
 
         return "\n".join(parts)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "chain_id": self.chain_id,
             "events": [e.to_dict() for e in self.events],
@@ -256,13 +256,13 @@ class MultiFacetedLesson:
     - Counter-factual: What could have been done differently
     """
 
-    tactical: Optional[str] = None  # "Close 50% at first resistance"
-    strategic: Optional[str] = None  # "In uptrends, trail stops rather than fixed TP"
-    psychological: Optional[str] = None  # "Overconfidence after 3 wins led to oversizing"
-    counter_factual: Optional[str] = None  # "Had we waited 5 min, entry would be 2% better"
+    tactical: str | None = None  # "Close 50% at first resistance"
+    strategic: str | None = None  # "In uptrends, trail stops rather than fixed TP"
+    psychological: str | None = None  # "Overconfidence after 3 wins led to oversizing"
+    counter_factual: str | None = None  # "Had we waited 5 min, entry would be 2% better"
     confidence: float = 0.5  # How reliable is this lesson?
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "tactical": self.tactical,
             "strategic": self.strategic,
@@ -272,7 +272,7 @@ class MultiFacetedLesson:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "MultiFacetedLesson":
+    def from_dict(cls, data: dict[str, Any]) -> "MultiFacetedLesson":
         return cls(
             tactical=data.get("tactical"),
             strategic=data.get("strategic"),
@@ -317,7 +317,7 @@ class TemporalPattern:
             return 0.0
         return self.wins / self.trades_taken
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "hour_of_day": self.hour_of_day,
             "day_of_week": self.day_of_week,
@@ -343,24 +343,24 @@ class EnhancedEpisode:
 
     # Time bounds
     start_time: datetime
-    end_time: Optional[datetime] = None
+    end_time: datetime | None = None
 
     # Rich market context
-    start_snapshot: Optional[MarketSnapshot] = None
-    end_snapshot: Optional[MarketSnapshot] = None
+    start_snapshot: MarketSnapshot | None = None
+    end_snapshot: MarketSnapshot | None = None
 
     # Auto-detected regime (with confidence)
     regime: MarketRegime = MarketRegime.UNKNOWN
     regime_confidence: float = 0.5
 
     # Symbols and assets involved
-    symbols_involved: List[str] = field(default_factory=list)
+    symbols_involved: list[str] = field(default_factory=list)
 
     # Causal chain of events
     causal_chain: CausalChain = field(default_factory=lambda: CausalChain(""))
 
     # Trades with richer context
-    trades: List[Dict[str, Any]] = field(default_factory=list)
+    trades: list[dict[str, Any]] = field(default_factory=list)
 
     # Outcomes
     total_pnl: float = 0.0
@@ -369,19 +369,19 @@ class EnhancedEpisode:
     sharpe_ratio: float = 0.0
 
     # Multi-faceted lessons
-    lessons: Optional[MultiFacetedLesson] = None
+    lessons: MultiFacetedLesson | None = None
 
     # Tags for categorization
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
 
     # Temporal context
     hour_of_day: int = 0
     day_of_week: int = 0
 
     # Embedding for semantic similarity
-    embedding: Optional[List[float]] = None
+    embedding: list[float] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "episode_id": self.episode_id,
             "name": self.name,
@@ -405,7 +405,7 @@ class EnhancedEpisode:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "EnhancedEpisode":
+    def from_dict(cls, data: dict[str, Any]) -> "EnhancedEpisode":
         ep = cls(
             episode_id=data["episode_id"],
             name=data["name"],
@@ -456,13 +456,13 @@ class EnhancedMemoryBank:
     Enhanced episodic memory with auto-detection, causal chains, and multi-faceted lessons.
     """
 
-    def __init__(self, storage_path: Optional[str] = None):
-        self.episodes: Dict[str, EnhancedEpisode] = {}
+    def __init__(self, storage_path: str | None = None):
+        self.episodes: dict[str, EnhancedEpisode] = {}
         self.storage_path = storage_path or "/tmp/sapphire_enhanced_memory.json"
-        self.current_episode: Optional[EnhancedEpisode] = None
+        self.current_episode: EnhancedEpisode | None = None
 
         # Temporal pattern tracking
-        self.temporal_patterns: Dict[Tuple[int, int], TemporalPattern] = {}
+        self.temporal_patterns: dict[tuple[int, int], TemporalPattern] = {}
 
         # AI for lesson extraction
         api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
@@ -478,7 +478,7 @@ class EnhancedMemoryBank:
         """Load enhanced episodes from storage."""
         try:
             if os.path.exists(self.storage_path):
-                with open(self.storage_path, "r") as f:
+                with open(self.storage_path) as f:
                     data = json.load(f)
                     for ep_data in data.get("episodes", []):
                         ep = EnhancedEpisode.from_dict(ep_data)
@@ -492,7 +492,7 @@ class EnhancedMemoryBank:
         try:
             data = {
                 "episodes": [ep.to_dict() for ep in self.episodes.values()],
-                "saved_at": datetime.now(timezone.utc).isoformat(),
+                "saved_at": datetime.now(UTC).isoformat(),
                 "version": "2.0",
             }
             with open(self.storage_path, "w") as f:
@@ -504,12 +504,12 @@ class EnhancedMemoryBank:
         self,
         name: str,
         snapshot: MarketSnapshot,
-        symbols: List[str] = None,
-        price_change_1h: Dict[str, float] = None,
-        price_change_24h: Dict[str, float] = None,
+        symbols: list[str] = None,
+        price_change_1h: dict[str, float] = None,
+        price_change_24h: dict[str, float] = None,
     ) -> EnhancedEpisode:
         """Start a new episode with auto-detected regime."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         episode_id = f"ep-{now.strftime('%Y%m%d-%H%M%S')}"
 
         # Auto-detect regime
@@ -538,22 +538,22 @@ class EnhancedMemoryBank:
         logger.info(f"📝 Started enhanced episode: {name} | Regime: {regime.value}")
         return self.current_episode
 
-    def record_market_event(self, description: str, data: Dict = None) -> None:
+    def record_market_event(self, description: str, data: dict = None) -> None:
         """Record a market event in the causal chain."""
         if self.current_episode:
             self.current_episode.causal_chain.add_event("market", description, data)
 
-    def record_action(self, description: str, data: Dict = None) -> None:
+    def record_action(self, description: str, data: dict = None) -> None:
         """Record an action (trade decision) in the causal chain."""
         if self.current_episode:
             self.current_episode.causal_chain.add_event("action", description, data)
 
-    def record_outcome(self, description: str, data: Dict = None) -> None:
+    def record_outcome(self, description: str, data: dict = None) -> None:
         """Record an outcome in the causal chain."""
         if self.current_episode:
             self.current_episode.causal_chain.add_event("outcome", description, data)
 
-    def record_trade(self, trade_data: Dict[str, Any]) -> None:
+    def record_trade(self, trade_data: dict[str, Any]) -> None:
         """Record a trade with causal chain entry."""
         if not self.current_episode:
             return
@@ -574,13 +574,13 @@ class EnhancedMemoryBank:
     def end_episode(
         self,
         end_snapshot: MarketSnapshot = None,
-    ) -> Optional[EnhancedEpisode]:
+    ) -> EnhancedEpisode | None:
         """End the current episode with rich outcome calculation."""
         if not self.current_episode:
             return None
 
         ep = self.current_episode
-        ep.end_time = datetime.now(timezone.utc)
+        ep.end_time = datetime.now(UTC)
         ep.end_snapshot = end_snapshot
 
         # Calculate outcomes
@@ -716,11 +716,11 @@ Format as JSON:
     def find_similar_episodes(
         self,
         regime: MarketRegime = None,
-        symbols: List[str] = None,
+        symbols: list[str] = None,
         hour_of_day: int = None,
         min_confidence: float = 0.0,
         limit: int = 5,
-    ) -> List[EnhancedEpisode]:
+    ) -> list[EnhancedEpisode]:
         """Find similar episodes with multiple matching criteria."""
         scored = []
 
@@ -752,7 +752,7 @@ Format as JSON:
         scored.sort(key=lambda x: x[0], reverse=True)
         return [ep for _, ep in scored[:limit]]
 
-    def get_temporal_insights(self) -> Dict[str, Any]:
+    def get_temporal_insights(self) -> dict[str, Any]:
         """Get insights about best/worst times to trade."""
         if not self.temporal_patterns:
             return {"message": "Not enough data yet"}
@@ -802,7 +802,7 @@ Format as JSON:
         similar = self.find_similar_episodes(
             regime=regime,
             symbols=[symbol],
-            hour_of_day=datetime.now(timezone.utc).hour,
+            hour_of_day=datetime.now(UTC).hour,
             min_confidence=0.5,
             limit=3,
         )
@@ -823,7 +823,7 @@ Format as JSON:
 
         # Get temporal insight
         temporal = self.get_temporal_insights()
-        current_hour = datetime.now(timezone.utc).hour
+        current_hour = datetime.now(UTC).hour
         temporal_warning = ""
         if temporal.get("worst_hour") == current_hour:
             temporal_warning = (
@@ -860,7 +860,7 @@ Provide ONE synthesized recommendation (2-3 sentences) that combines these lesso
 
         return "\n".join(lessons) + temporal_warning
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get comprehensive memory statistics."""
         total_pnl = sum(ep.total_pnl for ep in self.episodes.values())
         total_trades = sum(len(ep.trades) for ep in self.episodes.values())
@@ -893,7 +893,7 @@ Provide ONE synthesized recommendation (2-3 sentences) that combines these lesso
 
 
 # Global instance
-_enhanced_memory: Optional[EnhancedMemoryBank] = None
+_enhanced_memory: EnhancedMemoryBank | None = None
 
 
 def get_enhanced_memory() -> EnhancedMemoryBank:
@@ -910,7 +910,7 @@ async def demo_enhanced_memory():
 
     # Create a snapshot
     snapshot = MarketSnapshot(
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         prices={"SOL": 145.00, "BTC": 48000.00},
         volumes={"SOL": 800_000_000, "BTC": 35_000_000_000},
         volatility={"SOL": 0.045, "BTC": 0.025},
@@ -947,7 +947,7 @@ async def demo_enhanced_memory():
 
     # End episode
     end_snapshot = MarketSnapshot(
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         prices={"SOL": 148.50, "BTC": 48100.00},
         volumes={"SOL": 1_200_000_000, "BTC": 36_000_000_000},
         volatility={"SOL": 0.055, "BTC": 0.028},

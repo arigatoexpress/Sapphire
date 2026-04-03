@@ -76,7 +76,7 @@ async def fetch_from_gateway(endpoint, timeout=10):
                 if resp.status == 200:
                     return await resp.json()
                 return {"error": f"HTTP {resp.status}", "status": "error"}
-    except asyncio.TimeoutError:
+    except TimeoutError:
         return {"error": "Timeout", "status": "offline"}
     except Exception as e:
         return {"error": str(e), "status": "error"}

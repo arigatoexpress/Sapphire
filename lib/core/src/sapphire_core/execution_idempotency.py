@@ -23,7 +23,7 @@ Document fields:
 
 import logging
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +136,7 @@ class ExecutionIdempotency:
         if self._db is None:
             return 0
         try:
-            cutoff = datetime.now(timezone.utc) - timedelta(seconds=self._ttl_seconds)
+            cutoff = datetime.now(UTC) - timedelta(seconds=self._ttl_seconds)
             # Use FieldFilter keyword form (Firestore SDK ≥ 2.11) to avoid
             # positional-argument deprecation warnings; fall back for older SDKs.
             try:
@@ -190,7 +190,7 @@ class ExecutionIdempotency:
             # Firestore not available — degrade gracefully
             return True
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         doc_ref = self._db.collection(_COLLECTION).document(self._doc_id(signal_id))
         try:
             await doc_ref.create(

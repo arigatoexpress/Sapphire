@@ -22,7 +22,7 @@ import json
 import re
 import time
 from decimal import Decimal
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 from urllib.parse import urlencode
 
 import httpx
@@ -109,28 +109,28 @@ class Ticker(BaseModel):
 class Order(BaseModel):
     orderId: int
     symbol: str
-    price: Optional[float] = None
+    price: float | None = None
     origQty: float
     executedQty: float
     status: str
     side: str
     type: str
     # Additional Aster-specific fields
-    clientOrderId: Optional[str] = None
-    cumQty: Optional[float] = None
-    cumQuote: Optional[float] = None
-    avgPrice: Optional[float] = None
-    positionSide: Optional[str] = None
-    reduceOnly: Optional[bool] = None
-    closePosition: Optional[bool] = None
-    stopPrice: Optional[float] = None
-    workingType: Optional[str] = None
-    priceProtect: Optional[bool] = None
-    origType: Optional[str] = None
-    activatePrice: Optional[float] = None
-    priceRate: Optional[float] = None  # callback rate for trailing stops
-    timeInForce: Optional[str] = None
-    updateTime: Optional[int] = None
+    clientOrderId: str | None = None
+    cumQty: float | None = None
+    cumQuote: float | None = None
+    avgPrice: float | None = None
+    positionSide: str | None = None
+    reduceOnly: bool | None = None
+    closePosition: bool | None = None
+    stopPrice: float | None = None
+    workingType: str | None = None
+    priceProtect: bool | None = None
+    origType: str | None = None
+    activatePrice: float | None = None
+    priceRate: float | None = None  # callback rate for trailing stops
+    timeInForce: str | None = None
+    updateTime: int | None = None
 
 
 class Execution(BaseModel):
@@ -144,7 +144,7 @@ class Trade(BaseModel):
     qty: float
     isBuyerMaker: bool
     time: int
-    quoteQty: Optional[float] = None
+    quoteQty: float | None = None
 
 
 class Position(BaseModel):
@@ -153,15 +153,15 @@ class Position(BaseModel):
     entryPrice: float
     markPrice: float
     unRealizedProfit: float
-    liquidationPrice: Optional[float] = None
+    liquidationPrice: float | None = None
     leverage: float
     maxNotional: float
     marginType: str
-    isolatedMargin: Optional[float] = None
+    isolatedMargin: float | None = None
     isAutoAddMargin: bool = False
     positionSide: str
-    notional: Optional[float] = None
-    isolatedWallet: Optional[float] = None
+    notional: float | None = None
+    isolatedWallet: float | None = None
     updateTime: int
 
 
@@ -211,14 +211,14 @@ class FundingRate(BaseModel):
 class AsterClient:
     def __init__(
         self,
-        credentials: Optional[Credentials] = None,
+        credentials: Credentials | None = None,
         base_url: str = "https://fapi.asterdex.com",
     ):
         self._credentials = credentials
         self._base_url = base_url
         self._client = httpx.AsyncClient(base_url=self._base_url, timeout=10.0)
-        self._filter_cache: Dict[str, Dict[str, Any]] = {}
-        self._filter_cache_time: Dict[str, float] = {}
+        self._filter_cache: dict[str, dict[str, Any]] = {}
+        self._filter_cache_time: dict[str, float] = {}
 
     def _normalize_symbol(self, symbol: str) -> str:
         """Centralized robust normalization for Aster API (Strip non-alphanumeric + USDC -> USDT)."""
@@ -238,7 +238,7 @@ class AsterClient:
     async def close(self) -> None:
         await self._client.aclose()
 
-    def _sign_request(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    def _sign_request(self, params: dict[str, Any]) -> dict[str, Any]:
         if not self._credentials or not self._credentials.api_secret:
             raise ValueError("API secret is not configured")
         params["timestamp"] = int(time.time() * 1000)
@@ -257,9 +257,9 @@ class AsterClient:
         self,
         method: str,
         endpoint: str,
-        params: Optional[Dict[str, Any]] = None,
+        params: dict[str, Any] | None = None,
         signed: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         params = params or {}
 
         # ⚠️ CENTRALIZED FIX: Normalize symbols in params before sending
@@ -419,7 +419,7 @@ class AsterClient:
 
     async def get_klines(
         self, symbol: str, interval: str, limit: int = 100
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         return await self._make_request(
             "GET",
             "/fapi/v1/klines",
@@ -428,7 +428,7 @@ class AsterClient:
 
     async def get_historical_klines(
         self, symbol: str, interval: str = "1h", limit: int = 100
-    ) -> Optional[List[List[Any]]]:
+    ) -> list[list[Any]] | None:
         """Alias for get_klines to maintain compatibility."""
         try:
             result = await self.get_klines(symbol, interval, limit)
@@ -455,7 +455,7 @@ class AsterClient:
         except Exception:
             return None
 
-    async def get_ticker(self, symbol: str) -> Dict[str, Any]:
+    async def get_ticker(self, symbol: str) -> dict[str, Any]:
         """Get 24hr ticker price change statistics."""
         params = {"symbol": symbol}
         tickers = await self._make_request("GET", "/fapi/v1/ticker/24hr", params=params)
@@ -466,49 +466,49 @@ class AsterClient:
             return tickers[0]
         return tickers if isinstance(tickers, dict) else {}
 
-    async def get_ticker_price(self, symbol: str) -> Dict[str, Any]:
+    async def get_ticker_price(self, symbol: str) -> dict[str, Any]:
         return await self._make_request("GET", "/fapi/v1/ticker/price", params={"symbol": symbol})
 
-    async def get_all_tickers(self) -> List[Dict[str, Any]]:
+    async def get_all_tickers(self) -> list[dict[str, Any]]:
         return await self._make_request("GET", "/fapi/v1/ticker/24hr")
 
-    async def get_order_book(self, symbol: str, limit: int = 100) -> Dict[str, Any]:
+    async def get_order_book(self, symbol: str, limit: int = 100) -> dict[str, Any]:
         """Get order book depth."""
         return await self._make_request(
             "GET", "/fapi/v1/depth", params={"symbol": symbol, "limit": limit}
         )
 
-    async def get_recent_trades(self, symbol: str, limit: int = 500) -> List[Dict[str, Any]]:
+    async def get_recent_trades(self, symbol: str, limit: int = 500) -> list[dict[str, Any]]:
         """Get recent trades."""
         return await self._make_request(
             "GET", "/fapi/v1/trades", params={"symbol": symbol, "limit": limit}
         )
 
-    async def get_all_prices(self) -> List[Dict[str, Any]]:
+    async def get_all_prices(self) -> list[dict[str, Any]]:
         """Get all symbol prices."""
         return await self._make_request("GET", "/fapi/v1/ticker/price")
 
-    async def get_all_book_tickers(self) -> List[Dict[str, Any]]:
+    async def get_all_book_tickers(self) -> list[dict[str, Any]]:
         """Get all book tickers."""
         return await self._make_request("GET", "/fapi/v1/ticker/bookTicker")
 
-    async def get_account_balance(self) -> List[Dict[str, Any]]:
+    async def get_account_balance(self) -> list[dict[str, Any]]:
         """Get account balance V2."""
         return await self._make_request("GET", "/fapi/v2/balance", signed=True)
 
-    async def get_all_symbols(self) -> List[Dict[str, Any]]:
+    async def get_all_symbols(self) -> list[dict[str, Any]]:
         """Get all trading symbols from exchange info."""
         exchange_info = await self._make_request("GET", "/fapi/v1/exchangeInfo")
         return exchange_info.get("symbols", [])
 
-    async def get_exchange_info(self) -> Dict[str, Any]:
+    async def get_exchange_info(self) -> dict[str, Any]:
         """Get full exchange information."""
         return await self._make_request("GET", "/fapi/v1/exchangeInfo")
 
-    async def get_account_info(self) -> Dict[str, Any]:
+    async def get_account_info(self) -> dict[str, Any]:
         return await self._make_request("GET", "/fapi/v4/account", signed=True)
 
-    async def get_symbol_info(self, symbol: str) -> Dict[str, Any]:
+    async def get_symbol_info(self, symbol: str) -> dict[str, Any]:
         data = await self._make_request(
             "GET", "/fapi/v1/exchangeInfo", params={"symbol": symbol.upper()}
         )
@@ -517,7 +517,7 @@ class AsterClient:
             raise ValueError(f"Exchange info not found for symbol {symbol}")
         return symbols[0]
 
-    async def get_symbol_filters(self, symbol: str) -> Dict[str, Any]:
+    async def get_symbol_filters(self, symbol: str) -> dict[str, Any]:
         """Fetch symbol filters with caching (1h TTL)."""
         symbol = symbol.upper()
         now = time.time()
@@ -569,7 +569,7 @@ class AsterClient:
 
         return result
 
-    async def get_position_risk(self) -> List[Dict[str, Any]]:
+    async def get_position_risk(self) -> list[dict[str, Any]]:
         return await self._make_request("GET", "/fapi/v2/positionRisk", signed=True)
 
     async def place_order(
@@ -577,20 +577,20 @@ class AsterClient:
         symbol: str,
         side: str,
         order_type: OrderType,
-        quantity: Optional[float] = None,
-        price: Optional[float] = None,
-        position_side: Optional[PositionSide] = None,
-        time_in_force: Optional[TimeInForce] = None,
-        reduce_only: Optional[bool] = None,
-        new_client_order_id: Optional[str] = None,
-        stop_price: Optional[float] = None,
-        close_position: Optional[bool] = None,
-        activation_price: Optional[float] = None,
-        callback_rate: Optional[float] = None,
-        working_type: Optional[WorkingType] = None,
-        price_protect: Optional[bool] = None,
-        new_order_resp_type: Optional[ResponseType] = None,
-    ) -> Dict[str, Any]:
+        quantity: float | None = None,
+        price: float | None = None,
+        position_side: PositionSide | None = None,
+        time_in_force: TimeInForce | None = None,
+        reduce_only: bool | None = None,
+        new_client_order_id: str | None = None,
+        stop_price: float | None = None,
+        close_position: bool | None = None,
+        activation_price: float | None = None,
+        callback_rate: float | None = None,
+        working_type: WorkingType | None = None,
+        price_protect: bool | None = None,
+        new_order_resp_type: ResponseType | None = None,
+    ) -> dict[str, Any]:
         """Place an order with full Aster API support."""
         params = {
             "symbol": symbol,
@@ -639,10 +639,10 @@ class AsterClient:
         symbol: str,
         side: str,
         quantity: float,
-        position_side: Optional[PositionSide] = None,
-        new_client_order_id: Optional[str] = None,
-        reduce_only: Optional[bool] = None,
-    ) -> Dict[str, Any]:
+        position_side: PositionSide | None = None,
+        new_client_order_id: str | None = None,
+        reduce_only: bool | None = None,
+    ) -> dict[str, Any]:
         """Convenience method to place a market order."""
         return await self.place_order(
             symbol=symbol,
@@ -661,10 +661,10 @@ class AsterClient:
         quantity: float,
         price: float,
         time_in_force: TimeInForce = TimeInForce.GTC,
-        position_side: Optional[PositionSide] = None,
-        new_client_order_id: Optional[str] = None,
-        reduce_only: Optional[bool] = None,
-    ) -> Dict[str, Any]:
+        position_side: PositionSide | None = None,
+        new_client_order_id: str | None = None,
+        reduce_only: bool | None = None,
+    ) -> dict[str, Any]:
         """Convenience method to place a limit order."""
         return await self.place_order(
             symbol=symbol,
@@ -681,9 +681,9 @@ class AsterClient:
     async def get_order(
         self,
         symbol: str,
-        order_id: Optional[str] = None,
-        orig_client_order_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        order_id: str | None = None,
+        orig_client_order_id: str | None = None,
+    ) -> dict[str, Any]:
         """Check an order's status."""
         params = {"symbol": symbol}
         if order_id:
@@ -692,15 +692,15 @@ class AsterClient:
             params["origClientOrderId"] = orig_client_order_id
         return await self._make_request("GET", "/fapi/v1/order", params=params, signed=True)
 
-    async def get_open_orders(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def get_open_orders(self, symbol: str | None = None) -> list[dict[str, Any]]:
         params = {"symbol": symbol} if symbol else {}
         return await self._make_request("GET", "/fapi/v1/openOrders", params=params, signed=True)
 
-    async def cancel_order(self, symbol: str, order_id: str) -> Dict[str, Any]:
+    async def cancel_order(self, symbol: str, order_id: str) -> dict[str, Any]:
         params = {"symbol": symbol, "orderId": order_id}
         return await self._make_request("DELETE", "/fapi/v1/order", params=params, signed=True)
 
-    async def cancel_all_orders(self, symbol: str) -> Dict[str, Any]:
+    async def cancel_all_orders(self, symbol: str) -> dict[str, Any]:
         """Cancel all open orders for a symbol."""
         try:
             # Get all open orders for this symbol
@@ -726,45 +726,45 @@ class AsterClient:
             return {"status": "error", "error": str(e)}
 
     # Position Mode Management
-    async def change_position_mode(self, dual_side_position: bool) -> Dict[str, Any]:
+    async def change_position_mode(self, dual_side_position: bool) -> dict[str, Any]:
         """Change position mode (Hedge Mode or One-way Mode)."""
         params = {"dualSidePosition": "true" if dual_side_position else "false"}
         return await self._make_request(
             "POST", "/fapi/v1/positionSide/dual", params=params, signed=True
         )
 
-    async def get_position_mode(self) -> Dict[str, Any]:
+    async def get_position_mode(self) -> dict[str, Any]:
         """Get current position mode."""
         return await self._make_request("GET", "/fapi/v1/positionSide/dual", signed=True)
 
     # Multi-Assets Mode
-    async def change_multi_assets_mode(self, multi_assets_margin: bool) -> Dict[str, Any]:
+    async def change_multi_assets_mode(self, multi_assets_margin: bool) -> dict[str, Any]:
         """Change Multi-Asset Mode."""
         params = {"multiAssetsMargin": "true" if multi_assets_margin else "false"}
         return await self._make_request(
             "POST", "/fapi/v1/multiAssetsMargin", params=params, signed=True
         )
 
-    async def get_multi_assets_mode(self) -> Dict[str, Any]:
+    async def get_multi_assets_mode(self) -> dict[str, Any]:
         """Get current Multi-Asset Mode."""
         return await self._make_request("GET", "/fapi/v1/multiAssetsMargin", signed=True)
 
     # Leverage Management
-    async def change_leverage(self, symbol: str, leverage: int) -> Dict[str, Any]:
+    async def change_leverage(self, symbol: str, leverage: int) -> dict[str, Any]:
         """Change initial leverage for a symbol."""
         params = {"symbol": symbol, "leverage": leverage}
         return await self._make_request("POST", "/fapi/v1/leverage", params=params, signed=True)
 
     # Margin Type Management
-    async def change_margin_type(self, symbol: str, margin_type: MarginType) -> Dict[str, Any]:
+    async def change_margin_type(self, symbol: str, margin_type: MarginType) -> dict[str, Any]:
         """Change margin type for a symbol."""
         params = {"symbol": symbol, "marginType": margin_type.value}
         return await self._make_request("POST", "/fapi/v1/marginType", params=params, signed=True)
 
     # Position Margin Modification
     async def modify_position_margin(
-        self, symbol: str, amount: float, type_: int, position_side: Optional[PositionSide] = None
-    ) -> Dict[str, Any]:
+        self, symbol: str, amount: float, type_: int, position_side: PositionSide | None = None
+    ) -> dict[str, Any]:
         """Modify isolated position margin."""
         params = {"symbol": symbol, "amount": amount, "type": type_}
         if position_side:
@@ -776,11 +776,11 @@ class AsterClient:
     async def get_position_margin_history(
         self,
         symbol: str,
-        type_: Optional[int] = None,
-        start_time: Optional[int] = None,
-        end_time: Optional[int] = None,
+        type_: int | None = None,
+        start_time: int | None = None,
+        end_time: int | None = None,
         limit: int = 500,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get position margin change history."""
         params = {"symbol": symbol, "limit": limit}
         if type_ is not None:
@@ -794,7 +794,7 @@ class AsterClient:
         )
 
     # Batch Orders
-    async def place_batch_orders(self, batch_orders: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    async def place_batch_orders(self, batch_orders: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Place multiple orders in a batch."""
         params = {"batchOrders": batch_orders}
         return await self._make_request("POST", "/fapi/v1/batchOrders", params=params, signed=True)
@@ -802,9 +802,9 @@ class AsterClient:
     async def cancel_batch_orders(
         self,
         symbol: str,
-        order_id_list: Optional[List[int]] = None,
-        orig_client_order_id_list: Optional[List[str]] = None,
-    ) -> List[Dict[str, Any]]:
+        order_id_list: list[int] | None = None,
+        orig_client_order_id_list: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
         """Cancel multiple orders."""
         params = {"symbol": symbol}
         if order_id_list:
@@ -816,7 +816,7 @@ class AsterClient:
         )
 
     # Auto-Cancel Orders
-    async def auto_cancel_orders(self, symbol: str, countdown_time: int) -> Dict[str, Any]:
+    async def auto_cancel_orders(self, symbol: str, countdown_time: int) -> dict[str, Any]:
         """Auto-cancel all open orders after countdown."""
         params = {"symbol": symbol, "countdownTime": countdown_time}
         return await self._make_request(
@@ -824,29 +824,29 @@ class AsterClient:
         )
 
     # Enhanced Account Information
-    async def get_account_info_v2(self) -> Dict[str, Any]:
+    async def get_account_info_v2(self) -> dict[str, Any]:
         """Get account balance V2."""
         return await self._make_request("GET", "/fapi/v2/balance", signed=True)
 
-    async def get_account_info_v4(self) -> Dict[str, Any]:
+    async def get_account_info_v4(self) -> dict[str, Any]:
         """Get current account information V4."""
         return await self._make_request("GET", "/fapi/v4/account", signed=True)
 
     # Mark Price and Funding
     async def get_mark_price(
-        self, symbol: Optional[str] = None
-    ) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
+        self, symbol: str | None = None
+    ) -> dict[str, Any] | list[dict[str, Any]]:
         """Get mark price and funding rate."""
         params = {"symbol": symbol} if symbol else {}
         return await self._make_request("GET", "/fapi/v1/premiumIndex", params=params)
 
     async def get_funding_rate_history(
         self,
-        symbol: Optional[str] = None,
-        start_time: Optional[int] = None,
-        end_time: Optional[int] = None,
+        symbol: str | None = None,
+        start_time: int | None = None,
+        end_time: int | None = None,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get funding rate history."""
         params = {"limit": limit}
         if symbol:
@@ -878,9 +878,9 @@ class AsterClient:
         pair: str,
         interval: str,
         limit: int = 500,
-        start_time: Optional[int] = None,
-        end_time: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
+        start_time: int | None = None,
+        end_time: int | None = None,
+    ) -> list[dict[str, Any]]:
         """Get index price kline data."""
         params = {"pair": pair, "interval": interval, "limit": limit}
         if start_time:
@@ -894,9 +894,9 @@ class AsterClient:
         symbol: str,
         interval: str,
         limit: int = 500,
-        start_time: Optional[int] = None,
-        end_time: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
+        start_time: int | None = None,
+        end_time: int | None = None,
+    ) -> list[dict[str, Any]]:
         """Get mark price kline data."""
         params = {"symbol": symbol, "interval": interval, "limit": limit}
         if start_time:
@@ -909,11 +909,11 @@ class AsterClient:
     async def get_account_trades(
         self,
         symbol: str,
-        start_time: Optional[int] = None,
-        end_time: Optional[int] = None,
-        from_id: Optional[int] = None,
+        start_time: int | None = None,
+        end_time: int | None = None,
+        from_id: int | None = None,
         limit: int = 500,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get account trade list."""
         params = {"symbol": symbol, "limit": limit}
         if start_time:
@@ -926,12 +926,12 @@ class AsterClient:
 
     async def get_income_history(
         self,
-        symbol: Optional[str] = None,
-        income_type: Optional[str] = None,
-        start_time: Optional[int] = None,
-        end_time: Optional[int] = None,
+        symbol: str | None = None,
+        income_type: str | None = None,
+        start_time: int | None = None,
+        end_time: int | None = None,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get income history."""
         params = {"limit": limit}
         if symbol:
@@ -946,27 +946,27 @@ class AsterClient:
 
     # Leverage and Risk Management
     async def get_leverage_brackets(
-        self, symbol: Optional[str] = None
-    ) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
+        self, symbol: str | None = None
+    ) -> dict[str, Any] | list[dict[str, Any]]:
         """Get notional and leverage brackets."""
         params = {"symbol": symbol} if symbol else {}
         return await self._make_request(
             "GET", "/fapi/v1/leverageBracket", params=params, signed=True
         )
 
-    async def get_adl_quantile(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def get_adl_quantile(self, symbol: str | None = None) -> list[dict[str, Any]]:
         """Get position ADL quantile estimation."""
         params = {"symbol": symbol} if symbol else {}
         return await self._make_request("GET", "/fapi/v1/adlQuantile", params=params, signed=True)
 
     async def get_force_orders(
         self,
-        symbol: Optional[str] = None,
-        auto_close_type: Optional[str] = None,
-        start_time: Optional[int] = None,
-        end_time: Optional[int] = None,
+        symbol: str | None = None,
+        auto_close_type: str | None = None,
+        start_time: int | None = None,
+        end_time: int | None = None,
         limit: int = 50,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get user's force orders (liquidations)."""
         params = {"limit": limit}
         if symbol:
@@ -979,7 +979,7 @@ class AsterClient:
             params["endTime"] = end_time
         return await self._make_request("GET", "/fapi/v1/forceOrders", params=params, signed=True)
 
-    async def get_commission_rate(self, symbol: str) -> Dict[str, Any]:
+    async def get_commission_rate(self, symbol: str) -> dict[str, Any]:
         """Get user's commission rate."""
         params = {"symbol": symbol}
         return await self._make_request(
@@ -992,8 +992,8 @@ class AsterWebSocketClient:
 
     def __init__(self, base_url: str = "wss://fstream.asterdex.com"):
         self.base_url = base_url
-        self._websocket: Optional[Any] = None
-        self._subscriptions: Dict[str, Any] = {}
+        self._websocket: Any | None = None
+        self._subscriptions: dict[str, Any] = {}
         self._running = False
 
     async def connect(self) -> None:
@@ -1013,7 +1013,7 @@ class AsterWebSocketClient:
             await self._websocket.close()
             self._websocket = None
 
-    async def subscribe(self, streams: List[str]) -> None:
+    async def subscribe(self, streams: list[str]) -> None:
         """Subscribe to streams."""
         if not self._websocket:
             raise RuntimeError("WebSocket not connected")
@@ -1029,7 +1029,7 @@ class AsterWebSocketClient:
         if data.get("error"):
             raise RuntimeError(f"Subscription failed: {data['error']}")
 
-    async def unsubscribe(self, streams: List[str]) -> None:
+    async def unsubscribe(self, streams: list[str]) -> None:
         """Unsubscribe from streams."""
         if not self._websocket:
             raise RuntimeError("WebSocket not connected")
@@ -1100,7 +1100,7 @@ class AsterWebSocketClient:
 
     # Combined streams
     @staticmethod
-    def combined_stream(streams: List[str]) -> str:
+    def combined_stream(streams: list[str]) -> str:
         """Create combined stream URL."""
         stream_list = "/".join(streams)
         return f"/stream?streams={stream_list}"
@@ -1138,7 +1138,7 @@ class TrailingStop:
     def __init__(self, symbol: str, trail_percent: float):
         self.symbol = symbol
         self.trail_percent = trail_percent
-        self.high_water_mark: Optional[float] = None
+        self.high_water_mark: float | None = None
         self.is_active = False
 
     def __repr__(self) -> str:
@@ -1341,8 +1341,8 @@ async def test_api_connection():
 
 def create_exchange_clients(
     settings: Any,
-    live_credentials: Optional[Credentials] = None,
-) -> Tuple[AsterClient, Optional[AsterClient]]:
+    live_credentials: Credentials | None = None,
+) -> tuple[AsterClient, AsterClient | None]:
     """
     Factory function to create live and paper trading exchange clients.
 
@@ -1394,21 +1394,21 @@ class AsterSpotClient(AsterClient):
 
     def __init__(
         self,
-        credentials: Optional[Credentials] = None,
+        credentials: Credentials | None = None,
         base_url: str = "https://api.asterdex.com",  # Spot API URL
     ):
         super().__init__(credentials, base_url)
 
-    async def get_exchange_info(self) -> Dict[str, Any]:
+    async def get_exchange_info(self) -> dict[str, Any]:
         """Get full exchange information (Spot)."""
         return await self._make_request("GET", "/api/v3/exchangeInfo")
 
-    async def get_ticker(self, symbol: str) -> Dict[str, Any]:
+    async def get_ticker(self, symbol: str) -> dict[str, Any]:
         """Get 24hr ticker price change statistics (Spot)."""
         params = {"symbol": symbol}
         return await self._make_request("GET", "/api/v3/ticker/24hr", params=params)
 
-    async def get_account_info(self) -> Dict[str, Any]:
+    async def get_account_info(self) -> dict[str, Any]:
         """Get current account information (Spot)."""
         return await self._make_request("GET", "/api/v3/account", signed=True)
 
@@ -1417,14 +1417,14 @@ class AsterSpotClient(AsterClient):
         symbol: str,
         side: str,
         order_type: OrderType,
-        quantity: Optional[float] = None,
-        price: Optional[float] = None,
-        time_in_force: Optional[TimeInForce] = None,
-        new_client_order_id: Optional[str] = None,
-        stop_price: Optional[float] = None,
-        quote_order_qty: Optional[float] = None,  # Spot specific
+        quantity: float | None = None,
+        price: float | None = None,
+        time_in_force: TimeInForce | None = None,
+        new_client_order_id: str | None = None,
+        stop_price: float | None = None,
+        quote_order_qty: float | None = None,  # Spot specific
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Place a Spot order."""
         params = {
             "symbol": symbol,

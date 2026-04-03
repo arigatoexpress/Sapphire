@@ -13,7 +13,7 @@ All Gemini/genai calls are mocked — no API keys needed.
 import os
 import sys
 import tempfile
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 import pytest
@@ -725,13 +725,13 @@ class TestMarketRegimeEnum:
 
 class TestMarketSnapshot:
     def test_defaults(self):
-        snap = MarketSnapshot(timestamp=datetime.now(timezone.utc))
+        snap = MarketSnapshot(timestamp=datetime.now(UTC))
         assert snap.prices == {}
         assert snap.volumes == {}
         assert snap.volatility == {}
 
     def test_serialization_roundtrip(self):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         snap = MarketSnapshot(
             timestamp=now,
             prices={"SOL": 150.0, "BTC": 48000.0},
@@ -749,7 +749,7 @@ class TestMarketSnapshot:
         assert snap2.timestamp.year == now.year
 
     def test_regime_indicators_empty(self):
-        snap = MarketSnapshot(timestamp=datetime.now(timezone.utc))
+        snap = MarketSnapshot(timestamp=datetime.now(UTC))
         indicators = snap.get_regime_indicators()
         assert indicators["avg_volatility"] == 0
         assert indicators["avg_imbalance"] == 0
@@ -757,7 +757,7 @@ class TestMarketSnapshot:
 
     def test_regime_indicators_with_data(self):
         snap = MarketSnapshot(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             volatility={"SOL": 0.05, "BTC": 0.04},
             order_book_imbalance={"SOL": 0.2, "BTC": 0.1},
             funding_rates={"SOL": 0.002},
@@ -771,7 +771,7 @@ class TestMarketSnapshot:
 class TestAutoDetectRegime:
     def test_high_volatility_breakout(self):
         snap = MarketSnapshot(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             volatility={"SOL": 0.05},
             order_book_imbalance={"SOL": 0.2},
         )
@@ -781,7 +781,7 @@ class TestAutoDetectRegime:
 
     def test_high_volatility_bearish(self):
         snap = MarketSnapshot(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             volatility={"SOL": 0.05},
             order_book_imbalance={"SOL": -0.2},
         )
@@ -791,7 +791,7 @@ class TestAutoDetectRegime:
 
     def test_high_volatility_neutral(self):
         snap = MarketSnapshot(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             volatility={"SOL": 0.05},
             order_book_imbalance={"SOL": 0.05},
         )
@@ -801,7 +801,7 @@ class TestAutoDetectRegime:
 
     def test_trending_up_by_price_change(self):
         snap = MarketSnapshot(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             volatility={"SOL": 0.02},
             order_book_imbalance={"SOL": 0.0},
         )
@@ -811,7 +811,7 @@ class TestAutoDetectRegime:
 
     def test_trending_down_by_price_change(self):
         snap = MarketSnapshot(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             volatility={"SOL": 0.02},
             order_book_imbalance={"SOL": 0.0},
         )
@@ -821,7 +821,7 @@ class TestAutoDetectRegime:
 
     def test_ranging_low_vol_neutral_imbalance(self):
         snap = MarketSnapshot(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             volatility={"SOL": 0.01},
             order_book_imbalance={"SOL": 0.02},
         )
@@ -831,7 +831,7 @@ class TestAutoDetectRegime:
 
     def test_low_volatility(self):
         snap = MarketSnapshot(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             volatility={"SOL": 0.01},
             order_book_imbalance={"SOL": 0.08},
         )
@@ -841,7 +841,7 @@ class TestAutoDetectRegime:
 
     def test_bullish_pressure(self):
         snap = MarketSnapshot(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             volatility={"SOL": 0.02},
             order_book_imbalance={"SOL": 0.15},
         )
@@ -851,7 +851,7 @@ class TestAutoDetectRegime:
 
     def test_bearish_pressure(self):
         snap = MarketSnapshot(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             volatility={"SOL": 0.02},
             order_book_imbalance={"SOL": -0.15},
         )
@@ -975,7 +975,7 @@ class TestEnhancedEpisode:
         ep = EnhancedEpisode(
             episode_id="ep-test",
             name="Test",
-            start_time=datetime.now(timezone.utc),
+            start_time=datetime.now(UTC),
         )
         assert ep.regime == MarketRegime.UNKNOWN
         assert ep.regime_confidence == 0.5
@@ -983,7 +983,7 @@ class TestEnhancedEpisode:
         assert ep.lessons is None
 
     def test_serialization_roundtrip(self):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         snap = MarketSnapshot(
             timestamp=now,
             prices={"SOL": 150.0},
@@ -1018,7 +1018,7 @@ class TestEnhancedEpisode:
         assert ep2.lessons.confidence == 0.8
 
     def test_get_summary(self):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         lesson = MultiFacetedLesson(tactical="Use stops")
         ep = EnhancedEpisode(
             episode_id="ep-test",
@@ -1051,7 +1051,7 @@ class TestEnhancedMemoryBank:
 
     def _make_snapshot(self, vol=0.03, imbalance=0.1, prices=None):
         return MarketSnapshot(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             prices=prices or {"SOL": 150.0},
             volumes={"SOL": 1e9},
             volatility={"SOL": vol},
@@ -1151,7 +1151,7 @@ class TestEnhancedMemoryBank:
             ep = EnhancedEpisode(
                 episode_id=f"ep-regime-{i}",
                 name=f"Test {i}",
-                start_time=datetime(2026, 1, 15, 10 + i, 0, tzinfo=timezone.utc),
+                start_time=datetime(2026, 1, 15, 10 + i, 0, tzinfo=UTC),
                 regime=regime,
                 regime_confidence=conf,
                 symbols_involved=["SOL"],
@@ -1166,7 +1166,7 @@ class TestEnhancedMemoryBank:
             ep = EnhancedEpisode(
                 episode_id=f"ep-limit-{i}",
                 name=f"EP {i}",
-                start_time=datetime(2026, 1, 15, i, 0, tzinfo=timezone.utc),
+                start_time=datetime(2026, 1, 15, i, 0, tzinfo=UTC),
                 symbols_involved=["SOL"],
             )
             self.bank.episodes[ep.episode_id] = ep
@@ -1203,7 +1203,7 @@ class TestEnhancedMemoryBank:
         ep = EnhancedEpisode(
             episode_id="ep-test",
             name="Mock Test",
-            start_time=datetime.now(timezone.utc),
+            start_time=datetime.now(UTC),
             causal_chain=CausalChain("ep-test"),
         )
         lessons = await self.bank.extract_multi_faceted_lessons(ep)

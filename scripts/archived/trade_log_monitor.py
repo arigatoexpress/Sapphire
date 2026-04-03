@@ -11,7 +11,6 @@ import re
 from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional
 
 
 class TradeLogMonitor:
@@ -19,13 +18,13 @@ class TradeLogMonitor:
     
     def __init__(self, log_dir: str = "~/trading-logs"):
         self.log_dir = Path(log_dir).expanduser()
-        self.trades: List[Dict] = []
+        self.trades: list[dict] = []
         self.daily_stats = defaultdict(lambda: {
             'trades': 0, 'buy_volume': 0.0, 'sell_volume': 0.0,
             'buy_count': 0, 'sell_count': 0, 'pnl': 0.0
         })
         
-    def parse_log_line(self, line: str) -> Optional[Dict]:
+    def parse_log_line(self, line: str) -> dict | None:
         """Extract trade from log line"""
         # Extract timestamp from log line (e.g., "2026-02-25 12:35:22")
         ts_match = re.match(r'(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})', line)
@@ -53,7 +52,7 @@ class TradeLogMonitor:
         
         return None
     
-    def scan_logs(self, days: int = 1) -> List[Dict]:
+    def scan_logs(self, days: int = 1) -> list[dict]:
         """Scan log files for trades"""
         self.trades = []
         self.daily_stats.clear()
@@ -74,7 +73,7 @@ class TradeLogMonitor:
         
         for log_file in log_files:
             if log_file.exists():
-                with open(log_file, 'r') as f:
+                with open(log_file) as f:
                     for line in f:
                         trade = self.parse_log_line(line)
                         if trade:
@@ -86,7 +85,7 @@ class TradeLogMonitor:
         
         return self.trades
     
-    def calculate_daily_stats(self) -> Dict:
+    def calculate_daily_stats(self) -> dict:
         """Calculate statistics by day"""
         for trade in self.trades:
             date = trade['timestamp'][:10]  # YYYY-MM-DD
@@ -102,7 +101,7 @@ class TradeLogMonitor:
         
         return dict(self.daily_stats)
     
-    def get_position_summary(self) -> Dict:
+    def get_position_summary(self) -> dict:
         """Calculate current positions from trade history"""
         positions = defaultdict(lambda: {'qty': 0.0, 'cost_basis': 0.0, 'trades': 0})
         
@@ -180,7 +179,7 @@ class TradeLogMonitor:
         
         return "\n".join(lines)
     
-    def check_anomalies(self) -> List[str]:
+    def check_anomalies(self) -> list[str]:
         """Check for unusual trading activity"""
         alerts = []
         

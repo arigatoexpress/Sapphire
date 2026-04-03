@@ -12,7 +12,7 @@ import subprocess
 import sys
 import time
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
 # GPU monitoring
 try:
@@ -38,7 +38,7 @@ class AccurateBenchmark:
             except Exception as e:
                 print(f"NVML init error: {e}")
     
-    def _get_system_info(self) -> Dict[str, Any]:
+    def _get_system_info(self) -> dict[str, Any]:
         """Gather system hardware information"""
         info = {
             "timestamp": datetime.now().isoformat(),
@@ -69,7 +69,7 @@ class AccurateBenchmark:
         
         return info
     
-    def _get_gpu_memory(self) -> Optional[int]:
+    def _get_gpu_memory(self) -> int | None:
         """Get current GPU memory usage in MB"""
         if self.gpu_handle:
             try:
@@ -106,7 +106,7 @@ class AccurateBenchmark:
             print("OK")
     
     def _run_single_test(self, model: str, prompt: str, test_name: str, 
-                         timeout: int = 180) -> Dict[str, Any]:
+                         timeout: int = 180) -> dict[str, Any]:
         """Run a single test with full GPU isolation"""
         
         # Clear GPU before test
@@ -175,7 +175,7 @@ class AccurateBenchmark:
                 "error": str(e)
             }
     
-    def run_quality_tests(self, model: str, warmup: bool = True) -> Dict[str, Any]:
+    def run_quality_tests(self, model: str, warmup: bool = True) -> dict[str, Any]:
         """Run comprehensive quality-focused tests"""
         print(f"\n{'='*70}")
         print(f"Testing: {model}")

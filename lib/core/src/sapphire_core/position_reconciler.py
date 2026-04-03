@@ -28,7 +28,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Awaitable, Callable, Dict, List
+from collections.abc import Awaitable, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ class PositionReconciler:
         self._stale_threshold = stale_threshold_seconds
         self._reconcile_interval = reconcile_interval
         # platform → {received_at: float, count: int, positions: list}
-        self._snapshots: Dict[str, dict] = {}
+        self._snapshots: dict[str, dict] = {}
 
     # ── Pub/Sub feed ──────────────────────────────────────────────────
 
@@ -90,7 +90,7 @@ class PositionReconciler:
 
     # ── Reconciliation logic ─────────────────────────────────────────
 
-    async def run_check(self) -> List[str]:
+    async def run_check(self) -> list[str]:
         """
         Run one reconciliation pass.
 
@@ -99,7 +99,7 @@ class PositionReconciler:
         list[str]
             Human-readable drift descriptions (empty list = all clear).
         """
-        drifts: List[str] = []
+        drifts: list[str] = []
         now = time.monotonic()
 
         # ── 1. Pub/Sub freshness check ─────────────────────────────

@@ -138,19 +138,7 @@ def infer_parameter_values(intent: str, cap: dict[str, Any], recipe: dict[str, A
                 val = symbols[0]
             elif quoted:
                 val = quoted[0]
-        elif lname in {"query", "indicator", "indicator_query", "text"}:
-            if quoted:
-                val = quoted[0]
-                used_quote = True
-            else:
-                val = _strip_noise_for_placeholder(tail, lname)
-        elif lname in {"layout_name", "layout"}:
-            if quoted:
-                val = quoted[0]
-                used_quote = True
-            else:
-                val = _strip_noise_for_placeholder(tail, lname)
-        elif lname in {"alert_name", "name"}:
+        elif lname in {"query", "indicator", "indicator_query", "text"} or lname in {"layout_name", "layout"} or lname in {"alert_name", "name"}:
             if quoted:
                 val = quoted[0]
                 used_quote = True

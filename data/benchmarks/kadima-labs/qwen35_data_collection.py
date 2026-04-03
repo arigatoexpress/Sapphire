@@ -8,14 +8,14 @@ import json
 import statistics
 import time
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any
 
 import requests
 
 API_URL = "http://localhost:11434/api/generate"
 
 
-def run_test(model: str, prompt: str, test_name: str, timeout: int = 300) -> Dict[str, Any]:
+def run_test(model: str, prompt: str, test_name: str, timeout: int = 300) -> dict[str, Any]:
     """Run a single test and collect detailed metrics"""
     payload = {
         'model': model,

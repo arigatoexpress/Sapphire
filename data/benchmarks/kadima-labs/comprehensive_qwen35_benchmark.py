@@ -96,7 +96,7 @@ def main():
     for model in models:
         print(f"{model:<15}", end="")
         speeds = []
-        for test in test_suite.keys():
+        for test in test_suite:
             tps = results[model].get(test, {}).get('tps', 0)
             speeds.append(tps)
             if tps > 0:
@@ -120,7 +120,7 @@ def main():
     for model in models:
         print(f"{model:<15}", end="")
         durations = []
-        for test in test_suite.keys():
+        for test in test_suite:
             dur = results[model].get(test, {}).get('duration', 0)
             durations.append(dur)
             if dur > 0:

@@ -2,7 +2,7 @@ import asyncio
 import os
 import time
 from collections import deque
-from typing import Any, Deque, Dict, List, Optional
+from typing import Any
 
 from loguru import logger
 
@@ -30,13 +30,13 @@ class MediaManager:
         self.poll_seconds = max(5, int(os.getenv("SAPPHIRE_MEDIA_POLL_SECONDS", "20")))
 
         # State
-        self.queue: Deque[Dict[str, Any]] = deque(maxlen=200)
-        self.pending_approvals: Dict[str, Dict[str, Any]] = {}
-        self.recent_results: Deque[Dict[str, Any]] = deque(maxlen=50)
-        self.last_publish: Dict[str, Any] = {}
+        self.queue: deque[dict[str, Any]] = deque(maxlen=200)
+        self.pending_approvals: dict[str, dict[str, Any]] = {}
+        self.recent_results: deque[dict[str, Any]] = deque(maxlen=50)
+        self.last_publish: dict[str, Any] = {}
         self.publish_sequence = 0
         self.running = False
-        self._loop_task: Optional[asyncio.Task] = None
+        self._loop_task: asyncio.Task | None = None
 
     async def stop(self):
         """Stop the background media loop."""
@@ -82,7 +82,7 @@ class MediaManager:
             
             await self._execute_publish(item)
 
-    async def _execute_publish(self, item: Dict[str, Any]):
+    async def _execute_publish(self, item: dict[str, Any]):
         """Execute publish for a single item."""
         item["attempts"] = item.get("attempts", 0) + 1
         item["updated_at"] = int(time.time())
@@ -184,7 +184,7 @@ class MediaManager:
                         priority="high"
                     )
 
-    def request_publish(self, topic: str, title: str, body: str, targets: List[str], source: str = "manual") -> Dict[str, Any]:
+    def request_publish(self, topic: str, title: str, body: str, targets: list[str], source: str = "manual") -> dict[str, Any]:
         """Enqueue a new publish request."""
         request_id = self._next_id()
         item = {
@@ -233,7 +233,7 @@ class MediaManager:
         self.mode = self._normalize_mode(mode)
         return self.mode
 
-    def get_status_snapshot(self) -> Dict[str, Any]:
+    def get_status_snapshot(self) -> dict[str, Any]:
         """Return structured status for snapshotting."""
         return {
             "mode": self.mode,
@@ -284,7 +284,7 @@ class MediaManager:
         if "draft" in mode: return "draft_only"
         return "owner_approval"
         
-    def _normalize_targets(self, targets: List[str]) -> List[str]:
+    def _normalize_targets(self, targets: list[str]) -> list[str]:
         # Simplified normalization
         clean = []
         for t in targets:

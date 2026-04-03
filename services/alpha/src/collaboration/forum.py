@@ -6,7 +6,7 @@ import tempfile
 import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 from urllib.parse import urlparse
 
 import aiohttp
@@ -94,18 +94,18 @@ class SapphireForumService:
     def __init__(self):
         self._lock = threading.RLock()
         self._state_path = self._resolve_state_path()
-        self._topics: List[Dict[str, Any]] = []
-        self._replies: Dict[str, List[Dict[str, Any]]] = {}
+        self._topics: list[dict[str, Any]] = []
+        self._replies: dict[str, list[dict[str, Any]]] = {}
         self._next_topic_seq = 1
         self._next_reply_seq = 1
-        self._scout_registration: Dict[str, Any] = {
+        self._scout_registration: dict[str, Any] = {
             "registered": False,
             "username": "",
             "display_name": "",
             "registered_at": 0,
             "last_dispatch": {},
         }
-        self._serverless_token_cache: Dict[str, Dict[str, Any]] = {}
+        self._serverless_token_cache: dict[str, dict[str, Any]] = {}
 
         self._load_or_bootstrap()
 
@@ -214,8 +214,8 @@ class SapphireForumService:
         return value
 
     @staticmethod
-    def _normalize_tags(raw: Any) -> List[str]:
-        tokens: List[str] = []
+    def _normalize_tags(raw: Any) -> list[str]:
+        tokens: list[str] = []
         if isinstance(raw, list):
             source = raw
         else:
@@ -229,7 +229,7 @@ class SapphireForumService:
             if clean:
                 tokens.append(clean[:28])
 
-        deduped: List[str] = []
+        deduped: list[str] = []
         seen = set()
         for token in tokens:
             if token in seen:
@@ -241,7 +241,7 @@ class SapphireForumService:
         return deduped
 
     @classmethod
-    def _sanitize_text(cls, value: Any, max_len: int = 2000) -> Dict[str, Any]:
+    def _sanitize_text(cls, value: Any, max_len: int = 2000) -> dict[str, Any]:
         text = str(value or "").replace("\r", "").strip()
         if not text:
             return {"text": "", "redactions": 0, "blocked": False}
@@ -305,7 +305,7 @@ class SapphireForumService:
         self._next_reply_seq += 1
         return reply_id
 
-    def _topic_summary_locked(self, topic: Dict[str, Any]) -> Dict[str, Any]:
+    def _topic_summary_locked(self, topic: dict[str, Any]) -> dict[str, Any]:
         topic_id = str(topic.get("topic_id", ""))
         replies = self._replies.get(topic_id, [])
         body = str(topic.get("body", ""))
@@ -330,7 +330,7 @@ class SapphireForumService:
             else int(topic.get("created_at", 0)),
         }
 
-    def _topic_detail_locked(self, topic_id: str) -> Optional[Dict[str, Any]]:
+    def _topic_detail_locked(self, topic_id: str) -> dict[str, Any] | None:
         topic = next((item for item in self._topics if item.get("topic_id") == topic_id), None)
         if not topic:
             return None
@@ -355,7 +355,7 @@ class SapphireForumService:
         tag: str = "",
         query: str = "",
         limit: int = 80,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         lane = str(lane or "").strip().lower()
         state = str(state or "").strip().lower()
         tag = str(tag or "").strip().lower()
@@ -387,8 +387,8 @@ class SapphireForumService:
             reverse=True,
         )
 
-        lanes: Dict[str, int] = {}
-        states: Dict[str, int] = {}
+        lanes: dict[str, int] = {}
+        states: dict[str, int] = {}
         for item in summaries:
             lanes[item["lane"]] = lanes.get(item["lane"], 0) + 1
             states[item["state"]] = states.get(item["state"], 0) + 1
@@ -491,7 +491,7 @@ class SapphireForumService:
         for seed in seeds:
             self._create_topic_locked(seed, persist=False)
 
-    def _create_topic_locked(self, payload: Dict[str, Any], persist: bool = True) -> Dict[str, Any]:
+    def _create_topic_locked(self, payload: dict[str, Any], persist: bool = True) -> dict[str, Any]:
         title_safe = self._sanitize_text(payload.get("title", ""), max_len=140)
         body_safe = self._sanitize_text(payload.get("body", ""), max_len=8000)
         title = title_safe["text"].strip()
@@ -541,7 +541,7 @@ class SapphireForumService:
         summary["redactions"] = topic["redactions"]
         return summary
 
-    def _add_reply_locked(self, topic_id: str, payload: Dict[str, Any], persist: bool = True) -> Dict[str, Any]:
+    def _add_reply_locked(self, topic_id: str, payload: dict[str, Any], persist: bool = True) -> dict[str, Any]:
         topic = next((item for item in self._topics if item.get("topic_id") == topic_id), None)
         if not topic:
             raise ValueError("topic_not_found")
@@ -590,7 +590,7 @@ class SapphireForumService:
             self._save_locked()
         return reply
 
-    def list_topics(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def list_topics(self, payload: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
             limit_raw = payload.get("limit", 80)
             try:
@@ -605,17 +605,17 @@ class SapphireForumService:
                 limit=limit,
             )
 
-    def get_topic_detail(self, topic_id: str) -> Optional[Dict[str, Any]]:
+    def get_topic_detail(self, topic_id: str) -> dict[str, Any] | None:
         with self._lock:
             return self._topic_detail_locked(topic_id)
 
-    def create_topic(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def create_topic(self, payload: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
             return self._create_topic_locked(payload, persist=True)
 
     # ── Phase 3: Voting, Quality, Agent Profiles ───────────────────
 
-    def vote_topic(self, topic_id: str, voter_id: str, direction: str) -> Dict[str, Any]:
+    def vote_topic(self, topic_id: str, voter_id: str, direction: str) -> dict[str, Any]:
         """Upvote or downvote a topic. Each agent can vote once."""
         with self._lock:
             topic = next((t for t in self._topics if t.get("topic_id") == topic_id), None)
@@ -635,7 +635,7 @@ class SapphireForumService:
             self._save_locked()
             return {"ok": True, "score": topic["score"], "upvotes": topic["upvotes"], "downvotes": topic["downvotes"]}
 
-    def vote_reply(self, reply_id: str, voter_id: str, direction: str) -> Dict[str, Any]:
+    def vote_reply(self, reply_id: str, voter_id: str, direction: str) -> dict[str, Any]:
         """Upvote or downvote a reply."""
         with self._lock:
             for bucket in self._replies.values():
@@ -651,7 +651,7 @@ class SapphireForumService:
                         return {"ok": True, "upvotes": reply.get("upvotes", 0), "downvotes": reply.get("downvotes", 0)}
             return {"ok": False, "error": "reply_not_found"}
 
-    def rate_reply_quality(self, reply_id: str, rater_id: str, helpfulness: float, accuracy: float) -> Dict[str, Any]:
+    def rate_reply_quality(self, reply_id: str, rater_id: str, helpfulness: float, accuracy: float) -> dict[str, Any]:
         """Rate a reply's quality (0.0–1.0 scale). Rolling average."""
         with self._lock:
             for bucket in self._replies.values():
@@ -669,16 +669,16 @@ class SapphireForumService:
                         return {"ok": True, "quality": q}
             return {"ok": False, "error": "reply_not_found"}
 
-    def get_agent_profile(self, agent_id: str) -> Optional[Dict[str, Any]]:
+    def get_agent_profile(self, agent_id: str) -> dict[str, Any] | None:
         """Return the personality profile for an agent."""
         key = str(agent_id or "").strip().upper()
         return self.AGENT_PROFILES.get(key)
 
-    def list_agent_profiles(self) -> Dict[str, Dict[str, Any]]:
+    def list_agent_profiles(self) -> dict[str, dict[str, Any]]:
         """Return all agent personality profiles."""
         return dict(self.AGENT_PROFILES)
 
-    def get_thread(self, topic_id: str, parent_reply_id: str = "") -> List[Dict[str, Any]]:
+    def get_thread(self, topic_id: str, parent_reply_id: str = "") -> list[dict[str, Any]]:
         """Return threaded replies for a topic, optionally under a parent reply."""
         with self._lock:
             all_replies = self._replies.get(topic_id, [])
@@ -687,7 +687,7 @@ class SapphireForumService:
             # Top-level replies (no parent)
             return [r for r in all_replies if not r.get("parent_reply_id")]
 
-    def get_top_topics(self, limit: int = 10, category: str = "") -> List[Dict[str, Any]]:
+    def get_top_topics(self, limit: int = 10, category: str = "") -> list[dict[str, Any]]:
         """Return topics sorted by score, optionally filtered by category."""
         with self._lock:
             filtered = list(self._topics)
@@ -709,7 +709,7 @@ class SapphireForumService:
         session_key: str,
         author: str = "SAPPHIRE",
         category: str = "platform",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create a forum topic for an approval workflow.
 
         The topic is tagged with 'approval' and stores the session_key in metadata.
@@ -742,7 +742,7 @@ class SapphireForumService:
             self._save_locked()
         return topic
 
-    def resolve_approval(self, topic_id: str) -> Dict[str, Any]:
+    def resolve_approval(self, topic_id: str) -> dict[str, Any]:
         """Check if an approval topic has reached a decision threshold.
 
         Returns the current state: pending, approved, rejected, or the vote tally.
@@ -798,7 +798,7 @@ class SapphireForumService:
                 "downvotes": downvotes,
             }
 
-    def list_pending_approvals(self) -> List[Dict[str, Any]]:
+    def list_pending_approvals(self) -> list[dict[str, Any]]:
         """Return all pending approval topics."""
         with self._lock:
             results = []
@@ -817,12 +817,12 @@ class SapphireForumService:
                     })
             return results
 
-    def add_reply(self, topic_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def add_reply(self, topic_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
             return self._add_reply_locked(topic_id, payload, persist=True)
 
     @staticmethod
-    def _scout_profile() -> Dict[str, Any]:
+    def _scout_profile() -> dict[str, Any]:
         return {
             "agent_id": str(os.getenv("SAPPHIRE_SCOUT_AGENT_ID", "SAPPHIRE_SCOUT")).strip()
             or "SAPPHIRE_SCOUT",
@@ -844,7 +844,7 @@ class SapphireForumService:
             ],
         }
 
-    async def _dispatch_external(self, url: str, payload: Dict[str, Any], token: str = "") -> Dict[str, Any]:
+    async def _dispatch_external(self, url: str, payload: dict[str, Any], token: str = "") -> dict[str, Any]:
         if not url:
             return {"dispatched": False, "reason": "external_url_not_configured"}
 
@@ -865,7 +865,7 @@ class SapphireForumService:
             max_retries = 3
 
         timeout = aiohttp.ClientTimeout(total=timeout_value)
-        last_result: Dict[str, Any] = {"dispatched": False, "reason": "request_failed:unknown"}
+        last_result: dict[str, Any] = {"dispatched": False, "reason": "request_failed:unknown"}
         for attempt in range(1, max_retries + 1):
             try:
                 async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -873,7 +873,7 @@ class SapphireForumService:
                         response_text = await response.text()
                         safe_excerpt = self._sanitize_text(response_text, max_len=600)["text"]
 
-                        parsed: Dict[str, Any] = {}
+                        parsed: dict[str, Any] = {}
                         try:
                             maybe = json.loads(response_text)
                             if isinstance(maybe, dict):
@@ -885,7 +885,7 @@ class SapphireForumService:
                         ok = 200 <= response.status < 300 and (
                             not isinstance(api_success, bool) or bool(api_success)
                         )
-                        metadata: Dict[str, Any] = {}
+                        metadata: dict[str, Any] = {}
                         if parsed:
                             if "success" in parsed:
                                 metadata["success"] = bool(parsed.get("success"))
@@ -1060,7 +1060,7 @@ class SapphireForumService:
         return f"{parsed.scheme}://{parsed.netloc}/api/v1/verify"
 
     @staticmethod
-    def _compute_challenge_result(left: float, operator: str, right: float) -> Optional[float]:
+    def _compute_challenge_result(left: float, operator: str, right: float) -> float | None:
         op = str(operator or "").strip().lower()
         if op in {"x", "×"}:
             op = "*"
@@ -1115,7 +1115,7 @@ class SapphireForumService:
         return value
 
     @classmethod
-    def _words_to_number(cls, tokens: List[str]) -> Optional[float]:
+    def _words_to_number(cls, tokens: list[str]) -> float | None:
         units = {
             "zero": 0,
             "one": 1,
@@ -1208,7 +1208,7 @@ class SapphireForumService:
         return value
 
     @classmethod
-    def _solve_moltbook_challenge(cls, challenge: str) -> Optional[str]:
+    def _solve_moltbook_challenge(cls, challenge: str) -> str | None:
         raw = str(challenge or "").strip().lower()
         if not raw:
             return None
@@ -1260,7 +1260,7 @@ class SapphireForumService:
         if not tokens:
             return None
 
-        parsed_tokens: List[Any] = []
+        parsed_tokens: list[Any] = []
         number_words = {
             "zero",
             "one",
@@ -1368,7 +1368,7 @@ class SapphireForumService:
         challenge: str,
         token: str = "",
         timeout_seconds: int = 15,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         url = str(verify_url or "").strip()
         code = str(verification_code or "").strip()
         if not url or not code:
@@ -1390,7 +1390,7 @@ class SapphireForumService:
                     response_text = await response.text()
                     safe_excerpt = self._sanitize_text(response_text, max_len=300)["text"]
 
-                    parsed: Dict[str, Any] = {}
+                    parsed: dict[str, Any] = {}
                     try:
                         maybe = json.loads(response_text)
                         if isinstance(maybe, dict):
@@ -1436,7 +1436,7 @@ class SapphireForumService:
                 "answer": answer,
             }
 
-    def _openclaw_fallback_config(self) -> Dict[str, str]:
+    def _openclaw_fallback_config(self) -> dict[str, str]:
         hook_url = str(
             os.getenv(
                 "SAPPHIRE_SCOUT_OPENCLAW_HOOK_URL",
@@ -1476,7 +1476,7 @@ class SapphireForumService:
             "agent_id": agent_id,
         }
 
-    async def _get_serverless_auth_headers(self, hook_url: str) -> Dict[str, str]:
+    async def _get_serverless_auth_headers(self, hook_url: str) -> dict[str, str]:
         if not os.getenv("K_SERVICE"):
             return {}
 
@@ -1534,9 +1534,9 @@ class SapphireForumService:
     async def _dispatch_openclaw_fallback(
         self,
         action: str,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
         note: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         config = self._openclaw_fallback_config()
         hook_url = config["hook_url"]
         hook_token = config["hook_token"]
@@ -1596,7 +1596,7 @@ class SapphireForumService:
         }
 
     @staticmethod
-    def _scout_sandbox_config() -> Dict[str, Any]:
+    def _scout_sandbox_config() -> dict[str, Any]:
         sandbox_url = str(os.getenv("SAPPHIRE_SCOUT_SANDBOX_URL", "")).strip()
         sandbox_token = str(os.getenv("SAPPHIRE_SCOUT_SANDBOX_TOKEN", "")).strip()
         sandbox_enforce = (
@@ -1614,10 +1614,10 @@ class SapphireForumService:
         self,
         *,
         action: str,
-        outbound_payload: Dict[str, Any],
+        outbound_payload: dict[str, Any],
         external_url: str,
         note: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         config = self._scout_sandbox_config()
         sandbox_url = str(config.get("url", "")).strip()
         sandbox_token = str(config.get("token", "")).strip()
@@ -1655,7 +1655,7 @@ class SapphireForumService:
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.post(endpoint, json=payload, headers=headers) as response:
                     body = await response.text()
-                    parsed: Dict[str, Any] = {}
+                    parsed: dict[str, Any] = {}
                     try:
                         maybe = json.loads(body)
                         if isinstance(maybe, dict):
@@ -1694,11 +1694,11 @@ class SapphireForumService:
         self,
         *,
         action: str,
-        outbound_payload: Dict[str, Any],
+        outbound_payload: dict[str, Any],
         external_url: str,
         external_token: str,
         note: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         url = str(external_url or "").strip()
         token = str(external_token or "").strip()
 
@@ -1771,7 +1771,7 @@ class SapphireForumService:
             "fallback": fallback_result,
         }
 
-    def scout_status(self) -> Dict[str, Any]:
+    def scout_status(self) -> dict[str, Any]:
         external_register_url = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL", "")).strip()
         external_post_url = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_POST_URL", "")).strip()
         external_token_set = bool(str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN", "")).strip())
@@ -1784,9 +1784,7 @@ class SapphireForumService:
         )
         external_ready = bool(external_register_url and external_post_url and external_token_set)
         dispatch_mode = "scout_sandbox" if sandbox.get("url") else ("external_http" if external_register_url or external_post_url else "openclaw_hook")
-        if sandbox_enforce and not sandbox_ready:
-            dispatch_mode = "none"
-        elif dispatch_mode == "openclaw_hook" and not fallback_ready:
+        if sandbox_enforce and not sandbox_ready or dispatch_mode == "openclaw_hook" and not fallback_ready:
             dispatch_mode = "none"
         provider = (
             "moltbook"
@@ -1874,7 +1872,7 @@ class SapphireForumService:
                 "timestamp": self._now(),
             }
 
-    async def register_scout_account(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def register_scout_account(self, payload: dict[str, Any]) -> dict[str, Any]:
         username = str(payload.get("username", "")).strip()
         display_name = str(payload.get("display_name", "Sapphire Scout")).strip() or "Sapphire Scout"
         bio_safe = self._sanitize_text(payload.get("bio", ""), max_len=1000)
@@ -1887,7 +1885,7 @@ class SapphireForumService:
             }
 
         profile = self._scout_profile()
-        outbound_payload: Dict[str, Any] = {
+        outbound_payload: dict[str, Any] = {
             "requested_at": self._now(),
             "username": username,
             "display_name": display_name[:60],
@@ -1903,7 +1901,7 @@ class SapphireForumService:
         register_url = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL", "")).strip()
         token = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN", "")).strip()
         token_for_dispatch = token
-        dispatch_result: Dict[str, Any]
+        dispatch_result: dict[str, Any]
         if self._is_moltbook_api_url(register_url):
             outbound_payload = {
                 "name": display_name[:60] or username,
@@ -2004,7 +2002,7 @@ class SapphireForumService:
             "timestamp": self._now(),
         }
 
-    async def publish_scout_note(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def publish_scout_note(self, payload: dict[str, Any]) -> dict[str, Any]:
         topic_id = str(payload.get("topic_id", "")).strip()
         external_post_id = str(
             payload.get("post_id", payload.get("external_post_id", payload.get("moltbook_post_id", "")))

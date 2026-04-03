@@ -11,7 +11,7 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from decimal import ROUND_DOWN, Decimal
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -45,9 +45,9 @@ class PrecisionNormalizer:
 
     def __init__(self):
         # Cache: {platform: {symbol: ExchangeInfo}}
-        self._cache: Dict[str, Dict[str, ExchangeInfo]] = {}
+        self._cache: dict[str, dict[str, ExchangeInfo]] = {}
         self._cache_ttl = 3600  # 1 hour
-        self._cache_timestamps: Dict[str, float] = {}
+        self._cache_timestamps: dict[str, float] = {}
         self._lock = asyncio.Lock()
 
         # Default fallbacks when exchange info unavailable
@@ -76,7 +76,7 @@ class PrecisionNormalizer:
 
     async def normalize_order(
         self, symbol: str, platform: str, price: float, quantity: float, side: str = "BUY"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Normalize an order to meet exchange requirements.
 
@@ -293,7 +293,7 @@ class PrecisionNormalizer:
 
 
 # Global instance
-_normalizer: Optional[PrecisionNormalizer] = None
+_normalizer: PrecisionNormalizer | None = None
 
 
 def get_precision_normalizer() -> PrecisionNormalizer:
@@ -306,7 +306,7 @@ def get_precision_normalizer() -> PrecisionNormalizer:
 
 async def normalize_order(
     symbol: str, platform: str, price: float, quantity: float, side: str = "BUY"
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Convenience function to normalize an order."""
     normalizer = get_precision_normalizer()
     return await normalizer.normalize_order(symbol, platform, price, quantity, side)

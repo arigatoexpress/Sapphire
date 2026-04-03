@@ -17,7 +17,6 @@ import datetime as dt
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -35,7 +34,7 @@ class ParamSet:
     cooldown_bars: int
 
 
-def _normalize_symbols(raw: str) -> List[str]:
+def _normalize_symbols(raw: str) -> list[str]:
     out, seen = [], set()
     for tok in raw.split(","):
         s = tok.strip().upper()
@@ -46,7 +45,7 @@ def _normalize_symbols(raw: str) -> List[str]:
     return out or ["BTC", "ETH", "SOL"]
 
 
-def _normalize_timeframes(raw: str) -> List[str]:
+def _normalize_timeframes(raw: str) -> list[str]:
     aliases = {"60m": "1h", "1H": "1h", "1h": "1h", "15m": "15m"}
     out, seen = [], set()
     for tok in raw.split(","):
@@ -61,7 +60,7 @@ def _normalize_timeframes(raw: str) -> List[str]:
     return out or ["15m", "1h"]
 
 
-def _parse_float_list(raw: str, default: List[float]) -> List[float]:
+def _parse_float_list(raw: str, default: list[float]) -> list[float]:
     vals = []
     for tok in raw.split(","):
         tok = tok.strip()
@@ -74,7 +73,7 @@ def _parse_float_list(raw: str, default: List[float]) -> List[float]:
     return vals or default
 
 
-def _parse_int_list(raw: str, default: List[int]) -> List[int]:
+def _parse_int_list(raw: str, default: list[int]) -> list[int]:
     vals = []
     for tok in raw.split(","):
         tok = tok.strip()
@@ -87,7 +86,7 @@ def _parse_int_list(raw: str, default: List[int]) -> List[int]:
     return vals or default
 
 
-def _score(metrics: Dict[str, float]) -> float:
+def _score(metrics: dict[str, float]) -> float:
     # Higher better. Penalize drawdown heavily.
     return (
         float(metrics.get("total_return_pct", 0.0))
@@ -97,7 +96,7 @@ def _score(metrics: Dict[str, float]) -> float:
     )
 
 
-def _passes_validation_gate(metrics: Dict[str, float], min_return_pct: float, max_drawdown_pct: float) -> bool:
+def _passes_validation_gate(metrics: dict[str, float], min_return_pct: float, max_drawdown_pct: float) -> bool:
     return (
         float(metrics.get("total_return_pct", -9999.0)) >= min_return_pct
         and float(metrics.get("max_drawdown_pct", -9999.0)) >= max_drawdown_pct
@@ -112,7 +111,7 @@ def _run_strategy(
     timeframe: str,
     p: ParamSet,
     fee_pct: float,
-) -> Tuple[Dict[str, object], pd.Series]:
+) -> tuple[dict[str, object], pd.Series]:
     if strategy == "luxalgo_msb_ob":
         return backtest_luxalgo_msb_ob(
             df=df,
@@ -135,7 +134,7 @@ def _run_strategy(
     raise ValueError(f"Unknown strategy: {strategy}")
 
 
-def _plot_shortlist_curves(out_dir: Path, curve_rows: List[Tuple[str, str, str, pd.Series]]) -> None:
+def _plot_shortlist_curves(out_dir: Path, curve_rows: list[tuple[str, str, str, pd.Series]]) -> None:
     cdir = out_dir / "charts"
     cdir.mkdir(parents=True, exist_ok=True)
     for strategy, symbol, timeframe, eq in curve_rows:
@@ -186,9 +185,9 @@ def main() -> None:
     (out_dir / "charts").mkdir(parents=True, exist_ok=True)
 
     strategies = ["luxalgo_msb_ob", "chartprime_tbt"]
-    all_rows: List[Dict[str, object]] = []
-    shortlist_rows: List[Dict[str, object]] = []
-    shortlist_curves: List[Tuple[str, str, str, pd.Series]] = []
+    all_rows: list[dict[str, object]] = []
+    shortlist_rows: list[dict[str, object]] = []
+    shortlist_curves: list[tuple[str, str, str, pd.Series]] = []
 
     for symbol in symbols:
         for tf in timeframes:
@@ -210,7 +209,7 @@ def main() -> None:
             for strat in strategies:
                 best_param = None
                 best_val_score = -1e18
-                best_val_metrics: Dict[str, object] | None = None
+                best_val_metrics: dict[str, object] | None = None
                 best_val_pass = False
 
                 for lev in leverages:
@@ -228,9 +227,7 @@ def main() -> None:
 
                             if val_pass and not best_val_pass:
                                 best_param, best_val_score, best_val_metrics, best_val_pass = p, val_sc, val_m, True
-                            elif val_pass and best_val_pass and val_sc > best_val_score:
-                                best_param, best_val_score, best_val_metrics = p, val_sc, val_m
-                            elif not best_val_pass and val_sc > best_val_score:
+                            elif val_pass and best_val_pass and val_sc > best_val_score or not best_val_pass and val_sc > best_val_score:
                                 best_param, best_val_score, best_val_metrics = p, val_sc, val_m
 
                 if best_param is None or best_val_metrics is None:

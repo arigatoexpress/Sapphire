@@ -10,7 +10,7 @@ import os
 import sys
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict
+from typing import Any
 
 # Optional Firestore import - only available when running with GCP credentials
 try:
@@ -44,7 +44,7 @@ class FirestoreLogHandler:
                 print(f"Firestore logging disabled: {e}")
                 self.enabled = False
     
-    def write_log(self, entry: Dict[str, Any]):
+    def write_log(self, entry: dict[str, Any]):
         """Write log entry to Firestore (fire-and-forget)"""
         if not self.enabled or not self.db:
             return
@@ -81,7 +81,7 @@ class SapphireLogger:
             SapphireLogger._firestore_handler = FirestoreLogHandler()
         self.firestore = SapphireLogger._firestore_handler
     
-    def _format_log(self, level: LogLevel, message: str, **kwargs) -> Dict[str, Any]:
+    def _format_log(self, level: LogLevel, message: str, **kwargs) -> dict[str, Any]:
         """Format structured log entry"""
         entry = {
             "timestamp": datetime.utcnow().isoformat() + "Z",

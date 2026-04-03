@@ -24,7 +24,7 @@ import subprocess
 import uuid
 from contextlib import asynccontextmanager
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Optional
 
 import httpx
@@ -100,11 +100,11 @@ class TradingViewAlert:
     message: str = ""
     exchange: str = ""
     interval: str = ""
-    z_score: Optional[float] = None
-    confidence: Optional[float] = None
-    regime_score: Optional[float] = None
-    quantity: Optional[float] = None
-    ai_verdict: Optional[str] = None  # Ollama enrichment
+    z_score: float | None = None
+    confidence: float | None = None
+    regime_score: float | None = None
+    quantity: float | None = None
+    ai_verdict: str | None = None  # Ollama enrichment
 
     def to_dict(self):
         return asdict(self)
@@ -118,7 +118,7 @@ class TradingViewAlert:
             symbol=symbol,
             action=data.get("action", "").lower(),
             price=float(data.get("price", 0)),
-            timestamp=data.get("time", datetime.now(timezone.utc).isoformat()),
+            timestamp=data.get("time", datetime.now(UTC).isoformat()),
             message=data.get("message", ""),
             exchange=data.get("exchange", ""),
             interval=data.get("interval", ""),
@@ -140,7 +140,7 @@ stats = {"total": 0, "published": 0, "errors": 0, "ai_enriched": 0,
 
 _publisher: Optional["pubsub_v1.PublisherClient"] = None  # type: ignore
 _firestore_client = None
-_capability_sync_task: Optional[asyncio.Task[Any]] = None
+_capability_sync_task: asyncio.Task[Any] | None = None
 _capability_snapshot: dict[str, Any] = {
     "available": False,
     "last_sync": None,
@@ -211,18 +211,18 @@ def _detect_gpu_inventory() -> list[dict]:
 
 
 async def _probe_local_service(url: str) -> dict:
-    started = datetime.now(timezone.utc)
+    started = datetime.now(UTC)
     try:
         async with httpx.AsyncClient(timeout=LOCAL_SERVICE_PROBE_TIMEOUT_SECONDS) as client:
             response = await client.get(url)
-            latency_ms = int((datetime.now(timezone.utc) - started).total_seconds() * 1000)
+            latency_ms = int((datetime.now(UTC) - started).total_seconds() * 1000)
             return {
                 "healthy": response.status_code == 200,
                 "status_code": response.status_code,
                 "latency_ms": latency_ms,
             }
     except Exception as exc:
-        latency_ms = int((datetime.now(timezone.utc) - started).total_seconds() * 1000)
+        latency_ms = int((datetime.now(UTC) - started).total_seconds() * 1000)
         return {
             "healthy": False,
             "status_code": None,
@@ -233,7 +233,7 @@ async def _probe_local_service(url: str) -> dict:
 
 async def _collect_windows_lab_snapshot() -> dict:
     """Collect local workstation capabilities and service health."""
-    started = datetime.now(timezone.utc)
+    started = datetime.now(UTC)
     ollama_models = await _fetch_ollama_models()
     gpu_rows = await asyncio.to_thread(_detect_gpu_inventory)
     webhook_probe, tv_probe, ollama_probe = await asyncio.gather(
@@ -243,7 +243,7 @@ async def _collect_windows_lab_snapshot() -> dict:
     )
     snapshot = {
         "available": True,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(UTC).isoformat(),
         "host": {
             "hostname": socket.gethostname(),
             "os": platform.platform(),
@@ -273,7 +273,7 @@ async def _collect_windows_lab_snapshot() -> dict:
         "source": "windows_webhook_receiver",
     }
     snapshot["collection_latency_ms"] = int(
-        (datetime.now(timezone.utc) - started).total_seconds() * 1000
+        (datetime.now(UTC) - started).total_seconds() * 1000
     )
     return snapshot
 
@@ -300,7 +300,7 @@ async def _capability_sync_loop():
         except Exception as exc:
             _capability_snapshot = {
                 "available": False,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(UTC).isoformat(),
                 "error": str(exc)[:240],
                 "source": "windows_webhook_receiver",
             }
@@ -313,10 +313,10 @@ def write_system_log(
     level: str,
     message: str,
     event_type: str,
-    signal_id: Optional[str] = None,
-    symbol: Optional[str] = None,
-    action: Optional[str] = None,
-    metadata: Optional[dict] = None,
+    signal_id: str | None = None,
+    symbol: str | None = None,
+    action: str | None = None,
+    metadata: dict | None = None,
 ):
     """Best-effort Firestore log emit used by unified operator frontend."""
     client = _get_firestore_client()
@@ -324,7 +324,7 @@ def write_system_log(
         return
 
     payload = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "level": str(level or "INFO").upper(),
         "service": "windows_webhook",
         "message": str(message or "")[:500],
@@ -439,7 +439,7 @@ async def forward_to_gateway(signal: dict) -> dict:
 
 # ─── Ollama enrichment ────────────────────────────────────────────────────────
 
-async def ollama_enrich(alert: TradingViewAlert) -> Optional[str]:
+async def ollama_enrich(alert: TradingViewAlert) -> str | None:
     """Ask local Ollama (gemma3:27b) for a one-sentence signal verdict."""
     prompt = (
         f"Trading signal received: {alert.action.upper()} {alert.symbol} "
@@ -587,7 +587,7 @@ async def health():
     return {
         "status": "healthy" if webhook_ok else "degraded",
         "service": "windows_webhook",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
 
@@ -598,7 +598,7 @@ async def webhook_health():
         "status": "healthy",
         "service": "windows_webhook",
         "version": "2.0.0",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "services": services,
         "stats": stats,
         "capabilities": {
@@ -615,7 +615,7 @@ async def windows_capabilities():
     snapshot = dict(_capability_snapshot or {})
     if not snapshot:
         snapshot = {"available": False, "error": "capabilities_not_ready"}
-    snapshot["timestamp"] = datetime.now(timezone.utc).isoformat()
+    snapshot["timestamp"] = datetime.now(UTC).isoformat()
     return snapshot
 
 
@@ -704,7 +704,7 @@ async def receive_tradingview(request: Request, background_tasks: BackgroundTask
 
     # Step 4 — Store in local history
     entry = {
-        "received_at": datetime.now(timezone.utc).isoformat(),
+        "received_at": datetime.now(UTC).isoformat(),
         "alert": alert.to_dict(),
         "published": pub_result.get("published", False),
         "channel": pub_result.get("channel", "none"),

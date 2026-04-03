@@ -215,7 +215,7 @@ def _parse_iso_dt(value: Any) -> dt.datetime | None:
     except ValueError:
         return None
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=dt.timezone.utc)
+        parsed = parsed.replace(tzinfo=dt.UTC)
     return parsed
 
 
@@ -429,7 +429,7 @@ def merge_capabilities(inputs: list[tuple[Path, str, list[dict[str, Any]], dict[
     return {
         "schema_version": 1,
         "generator": "tv_registry_merge.py",
-        "generated_at": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat(),
+        "generated_at": dt.datetime.now(dt.UTC).replace(microsecond=0).isoformat(),
         "provenance": provenance,
         "capabilities": merged_caps,
         "clusters": cluster_list,

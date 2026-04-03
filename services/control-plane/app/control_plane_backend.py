@@ -3,9 +3,10 @@ from __future__ import annotations
 import importlib.util
 import os
 import sqlite3
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 _SUPPORTED_BACKENDS = {"sqlite", "postgres"}
 
@@ -171,7 +172,7 @@ class PostgresConnectionCompat:
     def close(self) -> None:
         self._raw_connection.close()
 
-    def __enter__(self) -> "PostgresConnectionCompat":
+    def __enter__(self) -> PostgresConnectionCompat:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> bool:

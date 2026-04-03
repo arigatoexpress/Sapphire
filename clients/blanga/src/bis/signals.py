@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from datetime import UTC, datetime
 
 import httpx
 
@@ -25,7 +24,7 @@ class PermitSourceConfig:
     notes: str = ""
 
 
-PERMIT_SOURCE_REGISTRY: List[PermitSourceConfig] = [
+PERMIT_SOURCE_REGISTRY: list[PermitSourceConfig] = [
     PermitSourceConfig(
         source_key="coa_open_data",
         source_name="City of Austin Open Data (Permits)",
@@ -82,7 +81,7 @@ PERMIT_SOURCE_REGISTRY: List[PermitSourceConfig] = [
 ]
 
 
-def permit_source_registry() -> List[Dict[str, object]]:
+def permit_source_registry() -> list[dict[str, object]]:
     return [
         {
             "source_key": src.source_key,
@@ -101,29 +100,29 @@ def permit_source_registry() -> List[Dict[str, object]]:
 
 def _parse_dt(raw: str) -> datetime:
     if not raw:
-        return datetime.now(tz=timezone.utc)
+        return datetime.now(tz=UTC)
     candidate = raw.replace("Z", "+00:00")
     try:
         dt = datetime.fromisoformat(candidate)
     except ValueError:
-        return datetime.now(tz=timezone.utc)
+        return datetime.now(tz=UTC)
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
+        return dt.replace(tzinfo=UTC)
     return dt
 
 
 def _parse_date_slash(raw: str) -> datetime:
     if not raw:
-        return datetime.now(tz=timezone.utc)
+        return datetime.now(tz=UTC)
     for fmt in ("%m/%d/%Y", "%m/%d/%y"):
         try:
-            return datetime.strptime(raw.strip(), fmt).replace(tzinfo=timezone.utc)
+            return datetime.strptime(raw.strip(), fmt).replace(tzinfo=UTC)
         except ValueError:
             continue
     return _parse_dt(raw)
 
 
-def _parse_float(raw: object) -> Optional[float]:
+def _parse_float(raw: object) -> float | None:
     if raw is None:
         return None
     try:
@@ -132,7 +131,7 @@ def _parse_float(raw: object) -> Optional[float]:
         return None
 
 
-def _address_from_row(row: Dict[str, object]) -> str:
+def _address_from_row(row: dict[str, object]) -> str:
     candidates = [
         row.get("original_address1"),
         row.get("street_number") and row.get("street_name"),
@@ -151,7 +150,7 @@ def _address_from_row(row: Dict[str, object]) -> str:
     return ""
 
 
-def permit_row_to_signal(row: Dict[str, object]) -> ProgressSignal:
+def permit_row_to_signal(row: dict[str, object]) -> ProgressSignal:
     valuation = _parse_float(row.get("total_valuation") or row.get("valuation"))
     address = _address_from_row(row)
     permit_class = str(row.get("permit_class_mapped") or row.get("work_class") or "").strip()
@@ -171,8 +170,8 @@ def permit_row_to_signal(row: Dict[str, object]) -> ProgressSignal:
     )
 
 
-def _county_portal_datatables_payload(*, start: int, length: int) -> Dict[str, str]:
-    payload: Dict[str, str] = {
+def _county_portal_datatables_payload(*, start: int, length: int) -> dict[str, str]:
+    payload: dict[str, str] = {
         "draw": "1",
         "start": str(max(0, start)),
         "length": str(max(1, min(100, length))),
@@ -200,7 +199,7 @@ def _county_portal_datatables_payload(*, start: int, length: int) -> Dict[str, s
     return payload
 
 
-def _county_portal_row_to_signal(row: Dict[str, object], *, source_key: str, county: str) -> ProgressSignal:
+def _county_portal_row_to_signal(row: dict[str, object], *, source_key: str, county: str) -> ProgressSignal:
     return ProgressSignal(
         signal_urn=make_urn("signal"),
         source=source_key,
@@ -227,8 +226,8 @@ async def _fetch_county_portal_permit_signals(
     api_url: str,
     county: str,
     limit: int = 50,
-    client: Optional[httpx.AsyncClient] = None,
-) -> List[ProgressSignal]:
+    client: httpx.AsyncClient | None = None,
+) -> list[ProgressSignal]:
     own_client = client is None
     if own_client:
         client = httpx.AsyncClient(timeout=20)
@@ -246,7 +245,7 @@ async def _fetch_county_portal_permit_signals(
             await client.aclose()
 
     rows = payload.get("data", []) if isinstance(payload, dict) else []
-    output: List[ProgressSignal] = []
+    output: list[ProgressSignal] = []
     for row in rows:
         if not isinstance(row, dict):
             continue
@@ -259,8 +258,8 @@ async def fetch_austin_permit_signals(
     *,
     limit: int = 50,
     min_valuation: float = 50000.0,
-    client: Optional[httpx.AsyncClient] = None,
-) -> List[ProgressSignal]:
+    client: httpx.AsyncClient | None = None,
+) -> list[ProgressSignal]:
     own_client = client is None
     if own_client:
         client = httpx.AsyncClient(timeout=15)
@@ -280,7 +279,7 @@ async def fetch_austin_permit_signals(
         if own_client:
             await client.aclose()
 
-    output: List[ProgressSignal] = []
+    output: list[ProgressSignal] = []
     for row in rows:
         if not isinstance(row, dict):
             continue
@@ -300,11 +299,11 @@ def _norm_county(value: str) -> str:
 
 async def fetch_county_permit_signals(
     *,
-    counties: Optional[List[str]] = None,
+    counties: list[str] | None = None,
     limit_per_source: int = 50,
     min_valuation: float = 50000.0,
-    client: Optional[httpx.AsyncClient] = None,
-) -> List[ProgressSignal]:
+    client: httpx.AsyncClient | None = None,
+) -> list[ProgressSignal]:
     requested = {_norm_county(c) for c in (counties or []) if _norm_county(c)}
     if not requested:
         requested = {"travis", "williamson", "hays"}
@@ -314,7 +313,7 @@ async def fetch_county_permit_signals(
         client = httpx.AsyncClient(timeout=20)
     assert client is not None
 
-    collected: List[ProgressSignal] = []
+    collected: list[ProgressSignal] = []
     try:
         if "travis" in requested:
             collected.extend(
@@ -350,8 +349,8 @@ async def fetch_county_permit_signals(
     return collected
 
 
-def attach_signals_to_properties(store: InMemoryMasterArena, signals: List[ProgressSignal]) -> List[ProgressSignal]:
-    attached: List[ProgressSignal] = []
+def attach_signals_to_properties(store: InMemoryMasterArena, signals: list[ProgressSignal]) -> list[ProgressSignal]:
+    attached: list[ProgressSignal] = []
     for signal in signals:
         if signal.property_address_hint:
             property_asset = store.find_property_by_address(signal.property_address_hint)

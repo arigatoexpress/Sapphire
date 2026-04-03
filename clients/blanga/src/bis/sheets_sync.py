@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from bis.models import ListingStatus
 from bis.store import InMemoryMasterArena
 
-SHEETS_TAB_CONTRACT: Dict[str, Dict[str, Any]] = {
+SHEETS_TAB_CONTRACT: dict[str, dict[str, Any]] = {
     "properties_new_input": {
         "description": "Append-only broker tab for brand new properties. BIS rejects accidental duplicates and writes canonical data to master/writeback tabs.",
         "required_columns": ["address_line1", "owner_name"],
@@ -179,16 +179,16 @@ class NormalizedPropertiesRow:
     occupancy_status: str = ""
     submarket: str = ""
     corridor: str = ""
-    building_sqft: Optional[float] = None
-    land_acres: Optional[float] = None
-    asking_price: Optional[float] = None
-    close_price: Optional[float] = None
-    listing_status: Optional[ListingStatus] = None
-    listed_at: Optional[date] = None
-    sold_at: Optional[date] = None
+    building_sqft: float | None = None
+    land_acres: float | None = None
+    asking_price: float | None = None
+    close_price: float | None = None
+    listing_status: ListingStatus | None = None
+    listed_at: date | None = None
+    sold_at: date | None = None
     note_text: str = ""
-    dnc: Optional[bool] = None
-    redo: Optional[bool] = None
+    dnc: bool | None = None
+    redo: bool | None = None
     source_label: str = "google-sheets"
 
 
@@ -200,8 +200,8 @@ class NormalizedNotesRow:
     owner_name: str = ""
     entered_by: str = "broker"
     source_label: str = "google-sheets"
-    created_at: Optional[date] = None
-    tags: List[str] = field(default_factory=list)
+    created_at: date | None = None
+    tags: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -216,7 +216,7 @@ class NormalizedPropertyUpdateRow:
     source_label: str = "google-sheets"
 
 
-def sheet_contract() -> Dict[str, Any]:
+def sheet_contract() -> dict[str, Any]:
     return {"tabs": SHEETS_TAB_CONTRACT}
 
 
@@ -230,7 +230,7 @@ def _as_str(value: Any) -> str:
     return str(value).strip()
 
 
-def _as_float(value: Any) -> Optional[float]:
+def _as_float(value: Any) -> float | None:
     if value is None:
         return None
     if isinstance(value, (int, float)):
@@ -244,7 +244,7 @@ def _as_float(value: Any) -> Optional[float]:
         return None
 
 
-def _as_bool(value: Any) -> Optional[bool]:
+def _as_bool(value: Any) -> bool | None:
     if value is None:
         return None
     if isinstance(value, bool):
@@ -257,7 +257,7 @@ def _as_bool(value: Any) -> Optional[bool]:
     return None
 
 
-def _as_date(value: Any) -> Optional[date]:
+def _as_date(value: Any) -> date | None:
     if value is None:
         return None
     if isinstance(value, date):
@@ -271,7 +271,7 @@ def _as_date(value: Any) -> Optional[date]:
         return None
 
 
-def _as_listing_status(value: Any) -> Optional[ListingStatus]:
+def _as_listing_status(value: Any) -> ListingStatus | None:
     raw = _as_str(value).lower()
     if not raw:
         return None
@@ -282,7 +282,7 @@ def _as_listing_status(value: Any) -> Optional[ListingStatus]:
         return None
 
 
-def normalize_properties_row(row: Dict[str, Any]) -> NormalizedPropertiesRow:
+def normalize_properties_row(row: dict[str, Any]) -> NormalizedPropertiesRow:
     normalized = {_norm_key(k): v for k, v in row.items()}
     address_line1 = _as_str(normalized.get("address_line1") or normalized.get("address"))
     owner_name = _as_str(normalized.get("owner_name") or normalized.get("owner"))
@@ -313,7 +313,7 @@ def normalize_properties_row(row: Dict[str, Any]) -> NormalizedPropertiesRow:
     )
 
 
-def _parse_tags(value: Any) -> List[str]:
+def _parse_tags(value: Any) -> list[str]:
     if value is None:
         return []
     if isinstance(value, list):
@@ -328,7 +328,7 @@ def _parse_tags(value: Any) -> List[str]:
     return [raw]
 
 
-def normalize_notes_row(row: Dict[str, Any]) -> NormalizedNotesRow:
+def normalize_notes_row(row: dict[str, Any]) -> NormalizedNotesRow:
     normalized = {_norm_key(k): v for k, v in row.items()}
     note_text = _as_str(normalized.get("note_text") or normalized.get("note"))
     if not note_text:
@@ -346,7 +346,7 @@ def normalize_notes_row(row: Dict[str, Any]) -> NormalizedNotesRow:
     )
 
 
-def normalize_property_update_row(row: Dict[str, Any]) -> NormalizedPropertyUpdateRow:
+def normalize_property_update_row(row: dict[str, Any]) -> NormalizedPropertyUpdateRow:
     normalized = {_norm_key(k): v for k, v in row.items()}
     field_name = _as_str(normalized.get("field_name"))
     if not field_name:
@@ -370,9 +370,9 @@ def normalize_property_update_row(row: Dict[str, Any]) -> NormalizedPropertyUpda
     )
 
 
-def writeback_preview_rows(arena: InMemoryMasterArena, *, tab: str) -> List[Dict[str, Any]]:
+def writeback_preview_rows(arena: InMemoryMasterArena, *, tab: str) -> list[dict[str, Any]]:
     if tab == "properties_computed":
-        rows: List[Dict[str, Any]] = []
+        rows: list[dict[str, Any]] = []
         for prop in sorted(arena.list_properties(), key=lambda p: (p.city.lower(), p.address_line1.lower())):
             rows.append(
                 {
@@ -399,7 +399,7 @@ def writeback_preview_rows(arena: InMemoryMasterArena, *, tab: str) -> List[Dict
         return rows
 
     if tab == "properties_master_view":
-        rows: List[Dict[str, Any]] = []
+        rows: list[dict[str, Any]] = []
         for prop in sorted(arena.list_properties(), key=lambda p: (p.city.lower(), p.address_line1.lower())):
             owners = [owner.full_name for owner in arena.owners_for_property(prop.property_urn)]
             rows.append(

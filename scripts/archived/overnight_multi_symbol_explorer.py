@@ -20,9 +20,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from collections import deque
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Deque, Dict, List, Optional, Tuple
+from typing import Any
 
 
 def _env(name: str, default: str = "") -> str:
@@ -119,13 +119,13 @@ COINCAP_ASSET_MAP = {
 CRYPTOCOMPARE_API = "https://min-api.cryptocompare.com/data/pricemulti?fsyms={symbols}&tsyms=USD"
 
 RUNNING = True
-LAST_SENT: Dict[str, Tuple[str, float]] = {}
-PRICE_HISTORY: Dict[str, Deque[float]] = {}
-LANE_CONFIG: Dict[str, Dict[str, str]] = {}
+LAST_SENT: dict[str, tuple[str, float]] = {}
+PRICE_HISTORY: dict[str, deque[float]] = {}
+LANE_CONFIG: dict[str, dict[str, str]] = {}
 FETCH_ERROR_STREAK: int = 0
 CYCLE_COUNT = 0
-LAST_PROVIDER_STATUS: Dict[str, int] = {}
-LAST_GATEWAY_STATUS: Dict[str, int] = {}
+LAST_PROVIDER_STATUS: dict[str, int] = {}
+LAST_GATEWAY_STATUS: dict[str, int] = {}
 SHUTDOWN_POLL_SECONDS = 0.25
 
 
@@ -138,7 +138,7 @@ def _coerce_str(value: Any, default: str = "") -> str:
         return default
 
 
-def _normalize_provider_config(raw: str) -> List[str]:
+def _normalize_provider_config(raw: str) -> list[str]:
     providers = []
     for value in (raw or "").split(","):
         provider = value.strip().lower()
@@ -172,7 +172,7 @@ LIVE_EXEC_TIMEFRAMES = _csv_set(LIVE_EXEC_TIMEFRAMES_RAW, upper=False)
 LIVE_EXEC_STRATEGIES = _csv_set(LIVE_EXEC_STRATEGIES_RAW, upper=False)
 
 if STRICT_LIVE_MODE and LIVE_EXEC_SYMBOLS:
-    strict_symbols: List[str] = []
+    strict_symbols: list[str] = []
     strict_seen: set[str] = set()
     for symbol in SYMBOLS:
         symbol_norm = _coerce_str(symbol).upper().replace("/", "")
@@ -183,7 +183,7 @@ if STRICT_LIVE_MODE and LIVE_EXEC_SYMBOLS:
         strict_symbols = sorted(LIVE_EXEC_SYMBOLS)
     if strict_symbols != SYMBOLS:
         print(
-            f"[{datetime.now(timezone.utc).isoformat()}] strict live mode active | symbols={','.join(strict_symbols)}",
+            f"[{datetime.now(UTC).isoformat()}] strict live mode active | symbols={','.join(strict_symbols)}",
             flush=True,
         )
     SYMBOLS = strict_symbols
@@ -192,7 +192,7 @@ PRICE_HISTORY = {s: deque(maxlen=HISTORY_LIMIT) for s in SYMBOLS}
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _log(msg: str) -> None:
@@ -206,7 +206,7 @@ def _normalize_symbol(value: str) -> str:
     return text.upper().replace("/", "")
 
 
-def _load_lane_config(raw: str) -> Dict[str, Dict[str, str]]:
+def _load_lane_config(raw: str) -> dict[str, dict[str, str]]:
     text = _coerce_str(raw)
     if not text:
         return {}
@@ -232,14 +232,14 @@ def _load_lane_config(raw: str) -> Dict[str, Dict[str, str]]:
         _log("invalid SPARK_LANE_CONFIG: expected JSON object")
         return {}
 
-    out: Dict[str, Dict[str, str]] = {}
+    out: dict[str, dict[str, str]] = {}
     for raw_symbol, raw_cfg in parsed.items():
         if not isinstance(raw_cfg, dict):
             continue
         symbol = _normalize_symbol(raw_symbol)
         if not symbol:
             continue
-        cfg: Dict[str, str] = {}
+        cfg: dict[str, str] = {}
         for field in ("strategy", "timeframe", "source"):
             val = _coerce_str(raw_cfg.get(field))
             if val:
@@ -253,8 +253,8 @@ def _safe_http_json(
     url: str,
     timeout: int,
     provider: str,
-    headers: Optional[Dict[str, str]] = None,
-) -> Tuple[Any, int]:
+    headers: dict[str, str] | None = None,
+) -> tuple[Any, int]:
     attempts = max(1, PROVIDER_MAX_RETRIES + 1)
     for attempt in range(attempts):
         try:
@@ -281,9 +281,9 @@ def _safe_http_json(
             raise
 
 
-def _fetch_from_coingecko(symbols: List[str]) -> Tuple[Dict[str, float], List[str], bool]:
-    ids: List[str] = []
-    reverse: Dict[str, str] = {}
+def _fetch_from_coingecko(symbols: list[str]) -> tuple[dict[str, float], list[str], bool]:
+    ids: list[str] = []
+    reverse: dict[str, str] = {}
     for sym in symbols:
         coin_id = COINGECKO_SYMBOL_MAP.get(sym)
         if not coin_id:
@@ -294,7 +294,7 @@ def _fetch_from_coingecko(symbols: List[str]) -> Tuple[Dict[str, float], List[st
         return {}, [s for s in symbols if s not in COINGECKO_SYMBOL_MAP], False
     params = urllib.parse.urlencode({"ids": ",".join(ids), "vs_currencies": "usd"})
     url = f"{COINGECKO_API}?{params}"
-    extra_headers: Dict[str, str] = {}
+    extra_headers: dict[str, str] = {}
     if COINGECKO_API_KEY:
         extra_headers["x-cg-pro-api-key"] = COINGECKO_API_KEY
 
@@ -304,7 +304,7 @@ def _fetch_from_coingecko(symbols: List[str]) -> Tuple[Dict[str, float], List[st
         "coingecko",
         headers=extra_headers if extra_headers else None,
     )
-    out: Dict[str, float] = {}
+    out: dict[str, float] = {}
     for coin_id, payload in data.items():
         sym = reverse.get(coin_id)
         if not sym:
@@ -315,20 +315,20 @@ def _fetch_from_coingecko(symbols: List[str]) -> Tuple[Dict[str, float], List[st
             px = 0.0
         if px > 0:
             out[sym] = px
-    missing: List[str] = []
+    missing: list[str] = []
     for sym in symbols:
         if sym not in out:
             missing.append(sym)
     return out, missing, True
 
 
-def _fetch_from_binance(symbols: List[str]) -> Tuple[Dict[str, float], List[str], bool]:
+def _fetch_from_binance(symbols: list[str]) -> tuple[dict[str, float], list[str], bool]:
     url = "https://api.binance.com/api/v3/ticker/price"
     rows, _ = _safe_http_json(url, PROVIDER_TIMEOUT, "binance")
     if not isinstance(rows, list):
         return {}, [s for s in symbols], False
     requested = {_normalize_symbol(s) for s in symbols}
-    out: Dict[str, float] = {}
+    out: dict[str, float] = {}
     for row in rows:
         if not isinstance(row, dict):
             continue
@@ -345,13 +345,13 @@ def _fetch_from_binance(symbols: List[str]) -> Tuple[Dict[str, float], List[str]
     return out, missing, True
 
 
-def _fetch_from_coinbase(symbols: List[str]) -> Tuple[Dict[str, float], List[str], bool]:
+def _fetch_from_coinbase(symbols: list[str]) -> tuple[dict[str, float], list[str], bool]:
     requested = [_normalize_symbol(sym) for sym in symbols]
     requested = [sym for sym in requested if sym.endswith("USDT")]
     if not requested:
         return {}, [s for s in symbols], False
 
-    out: Dict[str, float] = {}
+    out: dict[str, float] = {}
     for sym in requested:
         base = sym[:-4]
         pair = f"{base}-USD"
@@ -371,9 +371,9 @@ def _fetch_from_coinbase(symbols: List[str]) -> Tuple[Dict[str, float], List[str
     return out, missing, True
 
 
-def _fetch_from_kraken(symbols: List[str]) -> Tuple[Dict[str, float], List[str], bool]:
+def _fetch_from_kraken(symbols: list[str]) -> tuple[dict[str, float], list[str], bool]:
     requested = [_normalize_symbol(sym) for sym in symbols if _normalize_symbol(sym).endswith("USDT")]
-    pair_lookup: Dict[str, str] = {}
+    pair_lookup: dict[str, str] = {}
     for sym in requested:
         pair = KRAKEN_PAIR_MAP.get(sym)
         if not pair:
@@ -388,7 +388,7 @@ def _fetch_from_kraken(symbols: List[str]) -> Tuple[Dict[str, float], List[str],
     if not isinstance(data, dict) or data.get("error"):
         return {}, requested, True
 
-    out: Dict[str, float] = {}
+    out: dict[str, float] = {}
     result = data.get("result") or {}
     if not isinstance(result, dict):
         return {}, requested, True
@@ -415,10 +415,10 @@ def _fetch_from_kraken(symbols: List[str]) -> Tuple[Dict[str, float], List[str],
     return out, missing, True
 
 
-def _fetch_from_coincap(symbols: List[str]) -> Tuple[Dict[str, float], List[str], bool]:
+def _fetch_from_coincap(symbols: list[str]) -> tuple[dict[str, float], list[str], bool]:
     requested = [_normalize_symbol(sym) for sym in symbols]
-    ids: List[str] = []
-    reverse: Dict[str, str] = {}
+    ids: list[str] = []
+    reverse: dict[str, str] = {}
     for sym in requested:
         aid = COINCAP_ASSET_MAP.get(sym)
         if not aid:
@@ -435,7 +435,7 @@ def _fetch_from_coincap(symbols: List[str]) -> Tuple[Dict[str, float], List[str]
     if not isinstance(rows, list):
         return {}, requested, True
 
-    out: Dict[str, float] = {}
+    out: dict[str, float] = {}
     for row in rows:
         if not isinstance(row, dict):
             continue
@@ -453,9 +453,9 @@ def _fetch_from_coincap(symbols: List[str]) -> Tuple[Dict[str, float], List[str]
     return out, missing, True
 
 
-def _fetch_from_cryptocompare(symbols: List[str]) -> Tuple[Dict[str, float], List[str], bool]:
+def _fetch_from_cryptocompare(symbols: list[str]) -> tuple[dict[str, float], list[str], bool]:
     requested = [_normalize_symbol(sym) for sym in symbols]
-    base_map: Dict[str, str] = {}
+    base_map: dict[str, str] = {}
     for sym in requested:
         if not sym.endswith("USDT"):
             continue
@@ -471,7 +471,7 @@ def _fetch_from_cryptocompare(symbols: List[str]) -> Tuple[Dict[str, float], Lis
     if not isinstance(data, dict):
         return {}, requested, True
 
-    out: Dict[str, float] = {}
+    out: dict[str, float] = {}
     for base, payload in data.items():
         if not isinstance(payload, dict):
             continue
@@ -488,12 +488,12 @@ def _fetch_from_cryptocompare(symbols: List[str]) -> Tuple[Dict[str, float], Lis
     return out, missing, True
 
 
-def _lane_for_symbol(symbol: str) -> Tuple[str, Dict[str, str]]:
+def _lane_for_symbol(symbol: str) -> tuple[str, dict[str, str]]:
     if not SPARK_MODE or not LANE_CONFIG:
         return "default", {}
 
     normalized = _normalize_symbol(symbol)
-    normalized_lookup: Dict[str, Dict[str, str]] = {}
+    normalized_lookup: dict[str, dict[str, str]] = {}
     for key, cfg in LANE_CONFIG.items():
         key_norm = _normalize_symbol(key)
         if key_norm:
@@ -510,7 +510,7 @@ def _lane_for_symbol(symbol: str) -> Tuple[str, Dict[str, str]]:
     return "default", {}
 
 
-def _ema(values: List[float], period: int) -> List[float]:
+def _ema(values: list[float], period: int) -> list[float]:
     if not values:
         return []
     alpha = 2.0 / (period + 1.0)
@@ -520,17 +520,17 @@ def _ema(values: List[float], period: int) -> List[float]:
     return out
 
 
-def _fetch_spot_prices(symbols: List[str]) -> Tuple[Dict[str, float], Dict[str, str]]:
+def _fetch_spot_prices(symbols: list[str]) -> tuple[dict[str, float], dict[str, str]]:
     global FETCH_ERROR_STREAK
-    requested: List[str] = [_normalize_symbol(sym) for sym in symbols]
+    requested: list[str] = [_normalize_symbol(sym) for sym in symbols]
     requested = [s for s in requested if s]
     if not requested:
         FETCH_ERROR_STREAK = 0
         return {}, {}
 
     remaining = list(requested)
-    prices: Dict[str, float] = {}
-    provider_by_symbol: Dict[str, str] = {}
+    prices: dict[str, float] = {}
+    provider_by_symbol: dict[str, str] = {}
 
     for provider in _PROVIDERS:
         if not remaining:
@@ -658,7 +658,7 @@ def _fetch_spot_prices(symbols: List[str]) -> Tuple[Dict[str, float], Dict[str, 
         FETCH_ERROR_STREAK = 0
 
     # Preserve original symbol keys when available, keeping request order where possible.
-    normalized_out: Dict[str, float] = {}
+    normalized_out: dict[str, float] = {}
     for requested_symbol in requested:
         if requested_symbol in prices:
             normalized_out[requested_symbol] = prices[requested_symbol]
@@ -666,7 +666,7 @@ def _fetch_spot_prices(symbols: List[str]) -> Tuple[Dict[str, float], Dict[str, 
     return normalized_out, provider_by_symbol
 
 
-def _signal_from_prices(closes: List[float]) -> Tuple[Optional[str], float, float, Dict[str, float]]:
+def _signal_from_prices(closes: list[float]) -> tuple[str | None, float, float, dict[str, float]]:
     """
     Returns: (action, confidence, edge_pct, diagnostics)
     action: "buy", "sell", or None
@@ -697,7 +697,7 @@ def _signal_from_prices(closes: List[float]) -> Tuple[Optional[str], float, floa
         "cross_down": 1.0 if cross_down else 0.0,
     }
 
-    action: Optional[str] = None
+    action: str | None = None
     if cross_up:
         action = "buy"
     elif cross_down:
@@ -725,7 +725,7 @@ def _publish_signal(
     action: str,
     confidence: float,
     edge_pct: float,
-    diagnostics: Optional[Dict[str, float]] = None,
+    diagnostics: dict[str, float] | None = None,
     price_provider: str = "coingecko",
 ) -> str:
     lane_name, lane_cfg = _lane_for_symbol(symbol)
@@ -800,7 +800,7 @@ def _publish_signal(
         return "skipped"
 
     live_lane = True
-    dry_run_reasons: List[str] = []
+    dry_run_reasons: list[str] = []
     if LIVE_EXEC_SYMBOLS and symbol_norm not in LIVE_EXEC_SYMBOLS:
         live_lane = False
         dry_run_reasons.append("symbol_not_in_live_scope")
@@ -956,7 +956,7 @@ def _should_send(symbol: str, action: str) -> bool:
     return (now - prev_ts) >= SYMBOL_COOLDOWN_SECONDS
 
 
-def _active_symbols() -> List[str]:
+def _active_symbols() -> list[str]:
     if LOCKED_SYMBOL:
         return [LOCKED_SYMBOL]
     return list(SYMBOLS)

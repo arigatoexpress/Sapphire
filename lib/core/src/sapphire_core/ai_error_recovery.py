@@ -9,8 +9,9 @@ Part of the AI-Powered Resilience Layer for ACTS.
 
 import logging
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,7 @@ class RecoveryAction:
     error_type: str
     recoverable: bool
     action: str  # "retry", "adjust", "skip", "escalate"
-    corrections: Dict[str, Any]  # Suggested corrections to apply
+    corrections: dict[str, Any]  # Suggested corrections to apply
     reason: str
     confidence: float
 
@@ -78,7 +79,7 @@ class AIErrorRecoveryAgent:
     ]
 
     def __init__(self):
-        self._recovery_handlers: Dict[str, Callable] = {
+        self._recovery_handlers: dict[str, Callable] = {
             "precision": self._handle_precision_error,
             "symbol": self._handle_symbol_error,
             "funds": self._handle_funds_error,
@@ -89,10 +90,10 @@ class AIErrorRecoveryAgent:
         }
 
         # Track error frequency for adaptive behavior
-        self._error_counts: Dict[str, int] = {}
-        self._consecutive_failures: Dict[str, int] = {}
+        self._error_counts: dict[str, int] = {}
+        self._consecutive_failures: dict[str, int] = {}
 
-    async def handle_error(self, error_message: str, context: Dict[str, Any]) -> RecoveryAction:
+    async def handle_error(self, error_message: str, context: dict[str, Any]) -> RecoveryAction:
         """
         Analyze an error and return recommended recovery action.
 
@@ -150,8 +151,8 @@ class AIErrorRecoveryAgent:
         return ("unknown", "escalate", 0.3)
 
     async def _handle_precision_error(
-        self, error_message: str, context: Dict[str, Any]
-    ) -> Optional[RecoveryAction]:
+        self, error_message: str, context: dict[str, Any]
+    ) -> RecoveryAction | None:
         """Handle precision-related errors by adjusting order parameters."""
         from .precision_normalizer import get_precision_normalizer
 
@@ -189,8 +190,8 @@ class AIErrorRecoveryAgent:
             return None
 
     async def _handle_symbol_error(
-        self, error_message: str, context: Dict[str, Any]
-    ) -> Optional[RecoveryAction]:
+        self, error_message: str, context: dict[str, Any]
+    ) -> RecoveryAction | None:
         """Handle symbol-related errors by re-resolving the symbol."""
         from .ai_symbol_resolver import get_symbol_resolver
 
@@ -224,8 +225,8 @@ class AIErrorRecoveryAgent:
         return None
 
     async def _handle_funds_error(
-        self, error_message: str, context: Dict[str, Any]
-    ) -> Optional[RecoveryAction]:
+        self, error_message: str, context: dict[str, Any]
+    ) -> RecoveryAction | None:
         """Handle insufficient funds errors."""
         signal = context.get("signal")
 
@@ -254,8 +255,8 @@ class AIErrorRecoveryAgent:
         )
 
     async def _handle_rate_limit(
-        self, error_message: str, context: Dict[str, Any]
-    ) -> Optional[RecoveryAction]:
+        self, error_message: str, context: dict[str, Any]
+    ) -> RecoveryAction | None:
         """Handle rate limiting by suggesting delay."""
         attempt = context.get("attempt", 0)
 
@@ -274,8 +275,8 @@ class AIErrorRecoveryAgent:
         )
 
     async def _handle_network_error(
-        self, error_message: str, context: Dict[str, Any]
-    ) -> Optional[RecoveryAction]:
+        self, error_message: str, context: dict[str, Any]
+    ) -> RecoveryAction | None:
         """Handle network errors with retry."""
         attempt = context.get("attempt", 0)
 
@@ -301,8 +302,8 @@ class AIErrorRecoveryAgent:
         )
 
     async def _handle_auth_error(
-        self, error_message: str, context: Dict[str, Any]
-    ) -> Optional[RecoveryAction]:
+        self, error_message: str, context: dict[str, Any]
+    ) -> RecoveryAction | None:
         """Handle authentication errors."""
         return RecoveryAction(
             error_type="auth",
@@ -314,8 +315,8 @@ class AIErrorRecoveryAgent:
         )
 
     async def _handle_market_error(
-        self, error_message: str, context: Dict[str, Any]
-    ) -> Optional[RecoveryAction]:
+        self, error_message: str, context: dict[str, Any]
+    ) -> RecoveryAction | None:
         """Handle market condition errors."""
         return RecoveryAction(
             error_type="market",
@@ -327,8 +328,8 @@ class AIErrorRecoveryAgent:
         )
 
     async def _llm_analyze_error(
-        self, error_message: str, context: Dict[str, Any]
-    ) -> Optional[RecoveryAction]:
+        self, error_message: str, context: dict[str, Any]
+    ) -> RecoveryAction | None:
         """Use LLM to analyze unknown errors."""
         try:
             from .vertex_ai_client import get_vertex_client
@@ -379,13 +380,13 @@ Only respond with valid JSON, no other text.
             logger.warning(f"LLM error analysis failed: {e}")
             return None
 
-    def get_error_stats(self) -> Dict[str, int]:
+    def get_error_stats(self) -> dict[str, int]:
         """Get error frequency statistics."""
         return dict(self._error_counts)
 
 
 # Global instance
-_agent: Optional[AIErrorRecoveryAgent] = None
+_agent: AIErrorRecoveryAgent | None = None
 
 
 def get_error_recovery_agent() -> AIErrorRecoveryAgent:
@@ -396,7 +397,7 @@ def get_error_recovery_agent() -> AIErrorRecoveryAgent:
     return _agent
 
 
-async def recover_from_error(error_message: str, context: Dict[str, Any]) -> RecoveryAction:
+async def recover_from_error(error_message: str, context: dict[str, Any]) -> RecoveryAction:
     """Convenience function to handle an error."""
     agent = get_error_recovery_agent()
     return await agent.handle_error(error_message, context)

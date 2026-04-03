@@ -11,7 +11,6 @@ import asyncio
 import logging
 import re
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Set
 
 logger = logging.getLogger(__name__)
 
@@ -41,10 +40,10 @@ class AISymbolResolver:
 
     def __init__(self):
         # Cache: {platform: {generic_symbol: resolved_symbol}}
-        self._cache: Dict[str, Dict[str, str]] = {}
+        self._cache: dict[str, dict[str, str]] = {}
 
         # Exchange-specific symbol lists (populated on first use)
-        self._exchange_symbols: Dict[str, Set[str]] = {}
+        self._exchange_symbols: dict[str, set[str]] = {}
 
         # Known symbol mappings (common transformations)
         self._known_mappings = {
@@ -215,7 +214,7 @@ class AISymbolResolver:
         symbols = await self._get_exchange_symbols(platform)
         return symbol in symbols or symbol.lower() in {s.lower() for s in symbols}
 
-    async def _get_exchange_symbols(self, platform: str) -> Set[str]:
+    async def _get_exchange_symbols(self, platform: str) -> set[str]:
         """Get list of supported symbols from exchange."""
         if platform in self._exchange_symbols:
             return self._exchange_symbols[platform]
@@ -235,7 +234,7 @@ class AISymbolResolver:
             logger.warning(f"Failed to fetch symbols for {platform}: {e}")
             return set()
 
-    async def _fetch_lighter_symbols(self) -> Set[str]:
+    async def _fetch_lighter_symbols(self) -> set[str]:
         """Fetch supported symbols from Lighter."""
         import httpx
 
@@ -251,7 +250,7 @@ class AISymbolResolver:
             logger.warning(f"Failed to fetch HL symbols: {e}")
             return set()
 
-    async def _fetch_aster_symbols(self) -> Set[str]:
+    async def _fetch_aster_symbols(self) -> set[str]:
         """Fetch supported symbols from Aster."""
         import httpx
 
@@ -266,7 +265,7 @@ class AISymbolResolver:
             logger.warning(f"Failed to fetch Aster symbols: {e}")
             return set()
 
-    async def _fuzzy_match(self, symbol: str, platform: str) -> Optional[str]:
+    async def _fuzzy_match(self, symbol: str, platform: str) -> str | None:
         """Perform fuzzy matching against exchange symbols."""
         symbols = await self._get_exchange_symbols(platform)
         base = self._extract_base(symbol)
@@ -283,7 +282,7 @@ class AISymbolResolver:
 
         return None
 
-    async def _llm_resolve(self, symbol: str, platform: str) -> Optional[str]:
+    async def _llm_resolve(self, symbol: str, platform: str) -> str | None:
         """Use LLM to resolve complex symbol mappings."""
         try:
             # Import lightweight bridge to avoid hard coupling to legacy monolith modules.
@@ -324,7 +323,7 @@ Respond with ONLY the resolved symbol, nothing else. If you cannot determine the
             self._cache[platform] = {}
         self._cache[platform][original] = resolved
 
-    async def warm_cache(self, symbols: List[str], platforms: List[str]) -> None:
+    async def warm_cache(self, symbols: list[str], platforms: list[str]) -> None:
         """Pre-resolve a list of symbols for given platforms."""
         logger.info(
             f"🔥 Warming symbol cache for {len(symbols)} symbols on {len(platforms)} platforms"
@@ -340,7 +339,7 @@ Respond with ONLY the resolved symbol, nothing else. If you cannot determine the
 
 
 # Global instance
-_resolver: Optional[AISymbolResolver] = None
+_resolver: AISymbolResolver | None = None
 
 
 def get_symbol_resolver() -> AISymbolResolver:

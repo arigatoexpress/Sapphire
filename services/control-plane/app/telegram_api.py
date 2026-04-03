@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
 import httpx
 
@@ -17,7 +17,7 @@ class TelegramClient:
     def _url(self, method: str) -> str:
         return f"https://api.telegram.org/bot{self._bot_token}/{method}"
 
-    async def _post(self, method: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def _post(self, method: str, payload: dict[str, Any]) -> dict[str, Any]:
         if not self.enabled:
             raise RuntimeError("TELEGRAM_BOT_TOKEN is not configured")
         async with httpx.AsyncClient(timeout=self._timeout) as client:
@@ -39,7 +39,7 @@ class TelegramClient:
             },
         )
 
-    async def set_webhook(self, webhook_url: str, secret_token: str) -> Dict[str, Any]:
+    async def set_webhook(self, webhook_url: str, secret_token: str) -> dict[str, Any]:
         payload = {
             "url": webhook_url,
             "secret_token": secret_token,

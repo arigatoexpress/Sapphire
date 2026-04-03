@@ -8,7 +8,7 @@ Returns True if the action was handled, False otherwise.
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 from src.execution.dispatcher import dispatcher
@@ -32,7 +32,7 @@ except Exception:
 
 # ── Media Management ──────────────────────────────────────────────────
 
-async def handle_media_commands(engine: "AlphaEngine", target: str, action: str, value: float) -> bool:
+async def handle_media_commands(engine: AlphaEngine, target: str, action: str, value: float) -> bool:
     """Handle MEDIA_* control commands."""
     normalized = action.upper()
 
@@ -156,7 +156,7 @@ async def handle_media_commands(engine: "AlphaEngine", target: str, action: str,
 
 # ── Security & VirusTotal ─────────────────────────────────────────────
 
-async def handle_security_commands(engine: "AlphaEngine", target: str, action: str, value: float) -> bool:
+async def handle_security_commands(engine: AlphaEngine, target: str, action: str, value: float) -> bool:
     """Handle SECURITY_*, VT_*, SKILL_AUDIT_*, GATE_STATS commands."""
     normalized = action.upper()
 
@@ -292,7 +292,7 @@ async def handle_security_commands(engine: "AlphaEngine", target: str, action: s
 
 # ── Forum Collaboration ───────────────────────────────────────────────
 
-async def handle_forum_commands(engine: "AlphaEngine", target: str, action: str, value: float) -> bool:
+async def handle_forum_commands(engine: AlphaEngine, target: str, action: str, value: float) -> bool:
     """Handle FORUM_* control commands."""
     if getattr(engine, "forum", None) is None:
         return False
@@ -450,7 +450,7 @@ async def handle_forum_commands(engine: "AlphaEngine", target: str, action: str,
 
 # ── Bot Reputation & Points ───────────────────────────────────────────
 
-async def handle_reputation_commands(engine: "AlphaEngine", target: str, action: str, value: float) -> bool:
+async def handle_reputation_commands(engine: AlphaEngine, target: str, action: str, value: float) -> bool:
     """Handle REP_* control commands."""
     if getattr(engine, "reputation", None) is None:
         return False
@@ -564,7 +564,7 @@ async def handle_reputation_commands(engine: "AlphaEngine", target: str, action:
 
 # ── Swarm Intelligence ────────────────────────────────────────────────
 
-async def handle_swarm_commands(engine: "AlphaEngine", target: str, action: str, value: float) -> bool:
+async def handle_swarm_commands(engine: AlphaEngine, target: str, action: str, value: float) -> bool:
     """Handle SWARM_* control commands."""
     if getattr(engine, "swarm", None) is None:
         return False
@@ -668,7 +668,7 @@ async def handle_swarm_commands(engine: "AlphaEngine", target: str, action: str,
 
 # ── Collaborative Learning & Outreach ─────────────────────────────────
 
-async def handle_learning_commands(engine: "AlphaEngine", target: str, action: str, value: float) -> bool:
+async def handle_learning_commands(engine: AlphaEngine, target: str, action: str, value: float) -> bool:
     """Handle LEARN_* and OUTREACH_* control commands."""
     if getattr(engine, "learning", None) is None:
         return False
@@ -818,7 +818,7 @@ async def handle_learning_commands(engine: "AlphaEngine", target: str, action: s
 
 # ── Task Management ───────────────────────────────────────────────────
 
-async def handle_task_commands(engine: "AlphaEngine", target: str, action: str, value: float) -> bool:
+async def handle_task_commands(engine: AlphaEngine, target: str, action: str, value: float) -> bool:
     """Handle TASK_* control commands."""
     if getattr(engine, "tasks", None) is None:
         return False
@@ -975,7 +975,7 @@ async def handle_task_commands(engine: "AlphaEngine", target: str, action: str, 
 
 # ── Scout/Forum Publishing ────────────────────────────────────────────
 
-async def handle_scout_commands(engine: "AlphaEngine", target: str, action: str, value: float) -> bool:
+async def handle_scout_commands(engine: AlphaEngine, target: str, action: str, value: float) -> bool:
     """Handle SCOUT_* and FORUM_SCOUT_* control commands."""
     if getattr(engine, "forum", None) is None:
         return False
@@ -1097,7 +1097,7 @@ async def handle_scout_commands(engine: "AlphaEngine", target: str, action: str,
 
 # ── Execution & Trading Configuration ─────────────────────────────────
 
-async def handle_execution_commands(engine: "AlphaEngine", target: str, action: str, value: float) -> bool:
+async def handle_execution_commands(engine: AlphaEngine, target: str, action: str, value: float) -> bool:
     """Handle execution stage, TradingView config, autonomy session, and venue allocation commands."""
     normalized = action.upper()
 
@@ -1139,7 +1139,7 @@ async def handle_execution_commands(engine: "AlphaEngine", target: str, action: 
             return True
         enable_execution = mode in {"ON", "TRUE", "1"}
         quantity_value = max(0.0, float(value or 0.0))
-        quantity_result: Dict[str, Any] | None = None
+        quantity_result: dict[str, Any] | None = None
         engine._tradingview_execution_enabled = enable_execution
         if enable_execution:
             if quantity_value > 0:
@@ -1209,7 +1209,7 @@ async def handle_execution_commands(engine: "AlphaEngine", target: str, action: 
             await engine.telegram.send_message("ℹ️ No pending autonomy sessions to approve.", priority="high")
             return True
         success_count = 0
-        failed: List[str] = []
+        failed: list[str] = []
         for session_key in pending_keys:
             result = await engine._apply_autonomy_session_decision(
                 session_key=session_key, decision="APPROVE", note=note, source="owner_bulk",
@@ -1324,7 +1324,7 @@ async def handle_execution_commands(engine: "AlphaEngine", target: str, action: 
 
 # ── Core Control (kill switch, status, portfolio, etc.) ───────────────
 
-async def handle_core_control_commands(engine: "AlphaEngine", target: str, action: str, value: float) -> bool:
+async def handle_core_control_commands(engine: AlphaEngine, target: str, action: str, value: float) -> bool:
     """Handle core control commands: kill switch, status, portfolio, memory, focus, promotion, autonomy, owner chat."""
     normalized = action.upper()
 
@@ -1520,7 +1520,7 @@ async def handle_core_control_commands(engine: "AlphaEngine", target: str, actio
 
 # ── Prediction Market Intelligence ────────────────────────────────────
 
-async def handle_prediction_commands(engine: "AlphaEngine", target: str, action: str, value: float) -> bool:
+async def handle_prediction_commands(engine: AlphaEngine, target: str, action: str, value: float) -> bool:
     """Handle /predictions and /prediction commands (Phase 8)."""
     if getattr(engine, "prediction_aggregator", None) is None:
         return False
@@ -1588,7 +1588,7 @@ async def handle_prediction_commands(engine: "AlphaEngine", target: str, action:
 
 # ── Proposal & Operations Commands ─────────────────────────────────────
 
-async def handle_proposal_commands(engine: "AlphaEngine", target: str, action: str, value: float) -> bool:
+async def handle_proposal_commands(engine: AlphaEngine, target: str, action: str, value: float) -> bool:
     """Handle proposal, health, roadmap, and CI commands.
 
     Commands:
@@ -1649,7 +1649,7 @@ async def handle_proposal_commands(engine: "AlphaEngine", target: str, action: s
             return True
         # Compact diff — truncate for Telegram readability
         diff_lines = diff_text.splitlines()
-        file_stats: Dict[str, Dict[str, int]] = {}
+        file_stats: dict[str, dict[str, int]] = {}
         for line in diff_lines:
             if line.startswith("diff --git") or line.startswith("--- ") or line.startswith("+++ "):
                 continue
@@ -1889,7 +1889,7 @@ CONTROL_HANDLER_CHAIN = [
 ]
 
 
-async def dispatch_control_command(engine: "AlphaEngine", target: str, action: str, value: float) -> None:
+async def dispatch_control_command(engine: AlphaEngine, target: str, action: str, value: float) -> None:
     """
     Master dispatcher for all control commands.
     Replaces AlphaEngine._handle_control_command.

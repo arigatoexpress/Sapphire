@@ -29,7 +29,7 @@ COLORS = {
 
 def load_data(filepath='benchmark_results_20260307_183000.json'):
     """Load benchmark data"""
-    with open(filepath, 'r') as f:
+    with open(filepath) as f:
         return json.load(f)
 
 def get_model_color(model_name):

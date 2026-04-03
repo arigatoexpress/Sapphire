@@ -18,7 +18,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 STATE_PATH = Path.home() / ".sapphire" / "factory_state.json"
@@ -43,7 +43,7 @@ def _save(state: dict) -> None:
 
 
 def _today() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return datetime.now(UTC).strftime("%Y-%m-%d")
 
 
 def _issue_id(repo: str, issue_type: str, file: str, description: str) -> str:
@@ -63,7 +63,7 @@ def record_issue(repo: str, issue_type: str, file: str, description: str) -> dic
             "type": issue_type,
             "file": file,
             "description": description[:500],
-            "first_seen": datetime.now(timezone.utc).isoformat(),
+            "first_seen": datetime.now(UTC).isoformat(),
             "status": "open",
             "attempts": [],
             "backoff_until": None,
@@ -82,7 +82,7 @@ def record_attempt(issue_id: str, tier: str, result: str, reason: str = "") -> d
 
     issue = state["issues"][issue_id]
     issue["attempts"].append({
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "tier": tier,
         "result": result,
         "reason": reason[:200],
@@ -95,7 +95,7 @@ def record_attempt(issue_id: str, tier: str, result: str, reason: str = "") -> d
         failed_count = sum(1 for a in issue["attempts"] if a["result"] == "failed")
         if failed_count >= MAX_ATTEMPTS_BEFORE_BACKOFF:
             hours = failed_count * BACKOFF_HOURS_PER_ATTEMPT
-            backoff = datetime.now(timezone.utc) + timedelta(hours=hours)
+            backoff = datetime.now(UTC) + timedelta(hours=hours)
             issue["backoff_until"] = backoff.isoformat()
 
     # Track daily metrics
@@ -121,7 +121,7 @@ def should_skip(issue_id: str) -> dict:
 
     if issue.get("backoff_until"):
         backoff = datetime.fromisoformat(issue["backoff_until"])
-        if datetime.now(timezone.utc) < backoff:
+        if datetime.now(UTC) < backoff:
             return {"skip": True, "reason": f"in backoff until {issue['backoff_until']}", "attempts": len(issue["attempts"])}
 
     return {"skip": False, "reason": "ready for retry", "attempts": len(issue["attempts"])}
@@ -137,7 +137,7 @@ def get_metrics() -> dict:
     open_issues = sum(1 for i in state["issues"].values() if i["status"] == "open")
     fixed_issues = sum(1 for i in state["issues"].values() if i["status"] == "fixed")
     in_backoff = sum(1 for i in state["issues"].values() if i.get("backoff_until") and
-                     datetime.fromisoformat(i["backoff_until"]) > datetime.now(timezone.utc))
+                     datetime.fromisoformat(i["backoff_until"]) > datetime.now(UTC))
 
     return {
         "today": today_metrics,

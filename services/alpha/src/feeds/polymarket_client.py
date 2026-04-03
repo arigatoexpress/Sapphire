@@ -12,7 +12,7 @@ Endpoints:
 
 import re
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import aiohttp
 
@@ -72,7 +72,7 @@ _SYMBOL_EXTRACTION = {
 GAMMA_API_BASE = "https://gamma-api.polymarket.com"
 
 
-def _classify_relevance(question: str, category: str) -> Optional[SignalRelevance]:
+def _classify_relevance(question: str, category: str) -> SignalRelevance | None:
     """Classify how relevant a market is to crypto trading."""
     text = f"{question} {category}".lower()
     if _CRYPTO_DIRECT_PATTERNS.search(text):
@@ -84,7 +84,7 @@ def _classify_relevance(question: str, category: str) -> Optional[SignalRelevanc
     return None
 
 
-def _extract_symbols(question: str) -> List[str]:
+def _extract_symbols(question: str) -> list[str]:
     """Extract crypto symbols from a market question."""
     symbols = []
     text = question.lower()
@@ -108,9 +108,9 @@ class PolymarketClient(PredictionMarketFeed):
         self.max_markets = max_markets
         self._api_base = GAMMA_API_BASE
 
-    async def _fetch_markets(self, session: aiohttp.ClientSession) -> List[PredictionSignal]:
+    async def _fetch_markets(self, session: aiohttp.ClientSession) -> list[PredictionSignal]:
         """Fetch active Polymarket markets and filter for crypto relevance."""
-        signals: List[PredictionSignal] = []
+        signals: list[PredictionSignal] = []
 
         try:
             params = {
@@ -147,7 +147,7 @@ class PolymarketClient(PredictionMarketFeed):
 
         return signals
 
-    def _parse_market(self, raw: Dict[str, Any]) -> Optional[PredictionSignal]:
+    def _parse_market(self, raw: dict[str, Any]) -> PredictionSignal | None:
         """Parse a Polymarket market into a PredictionSignal if crypto-relevant."""
         question = str(raw.get("question", "")).strip()
         category = str(raw.get("category", "")).strip()
@@ -211,7 +211,7 @@ class PolymarketClient(PredictionMarketFeed):
         )
 
     @staticmethod
-    def _extract_probability(raw: Dict[str, Any]) -> Optional[float]:
+    def _extract_probability(raw: dict[str, Any]) -> float | None:
         """Extract YES probability from market data."""
         # outcomePrices is an array of string floats: ["0.72", "0.28"]
         prices = raw.get("outcomePrices")

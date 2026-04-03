@@ -13,9 +13,9 @@ import signal
 # Add shared library to path
 import sys
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import ROUND_DOWN, Decimal
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -67,12 +67,12 @@ class AsterBot:
         self.client = None
 
         # Position tracking
-        self.positions: Dict[str, Position] = {}
+        self.positions: dict[str, Position] = {}
         self.balance: float = 0.0
 
         # Order management
-        self.open_orders: Dict[str, Dict] = {}
-        self.trailing_stops: Dict[str, Dict] = {}
+        self.open_orders: dict[str, dict] = {}
+        self.trailing_stops: dict[str, dict] = {}
 
         # Performance
         self.trades_executed = 0
@@ -83,7 +83,7 @@ class AsterBot:
         self._db = None
         # Signal idempotency guard: Firestore-backed (durable across restarts) with
         # in-memory fast path.
-        self._idempotency: Optional[ExecutionIdempotency] = None
+        self._idempotency: ExecutionIdempotency | None = None
         self._signal_dedupe_ttl_seconds = max(
             60, int(os.getenv("SIGNAL_DEDUPE_TTL_SECONDS", "900"))
         )
@@ -113,7 +113,7 @@ class AsterBot:
         )
 
         # Cache leverage set per-symbol to avoid spamming the exchange API.
-        self._last_leverage_by_symbol: Dict[str, int] = {}
+        self._last_leverage_by_symbol: dict[str, int] = {}
 
     async def initialize(self):
         """Initialize Aster client connection."""
@@ -295,7 +295,7 @@ class AsterBot:
         logger.info("🔌 Gateway Loop Ended")
         await self.user_stream.stop()
 
-    def _build_signal_from_gateway_command(self, command: Dict[str, Any]) -> Optional[TradeSignal]:
+    def _build_signal_from_gateway_command(self, command: dict[str, Any]) -> TradeSignal | None:
         """Normalize legacy and action-style gateway payloads into TradeSignal objects."""
         command_type = str(command.get("type", "")).strip().upper()
         action = str(command.get("action", "")).strip().upper()
@@ -434,7 +434,7 @@ class AsterBot:
     async def _position_publish_loop(self):
         """Periodically publish a snapshot of positions for the realtime dashboard."""
         from dataclasses import asdict
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         while self.running:
             try:
@@ -462,7 +462,7 @@ class AsterBot:
                                 "platform": PLATFORM.value,
                                 "position_count": len(positions_payload),
                                 "positions": positions_payload,
-                                "updated_at": datetime.now(timezone.utc),
+                                "updated_at": datetime.now(UTC),
                             }
                         )
                     except Exception as _fs_err:
@@ -472,7 +472,7 @@ class AsterBot:
                 logger.error(f"Position publish error: {e}")
             await asyncio.sleep(self._position_publish_interval_seconds)
 
-    async def _handle_user_event(self, event: Dict[str, Any]):
+    async def _handle_user_event(self, event: dict[str, Any]):
         """Handle incoming user data stream event."""
         try:
             event_type = event.get("e")
@@ -530,7 +530,7 @@ class AsterBot:
         except Exception as e:
             logger.error(f"Error handling user event: {e}")
 
-    async def _handle_signal(self, signal_data: Dict[str, Any]):
+    async def _handle_signal(self, signal_data: dict[str, Any]):
         """Handle incoming trading signal."""
         try:
             payload = self._sanitize_trade_signal_payload(signal_data)
@@ -618,7 +618,7 @@ class AsterBot:
         self._processed_signal_ids[signal_id] = time.time()
 
     @staticmethod
-    def _sanitize_trade_signal_payload(signal_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _sanitize_trade_signal_payload(signal_data: dict[str, Any]) -> dict[str, Any]:
         """Drop unknown keys so malformed debug payloads don't break signal handling."""
         if not isinstance(signal_data, dict):
             return {}
@@ -629,7 +629,7 @@ class AsterBot:
             logger.warning("Ignoring unsupported signal keys on %s: %s", PLATFORM.value, ",".join(dropped))
         return payload
 
-    async def _derive_auto_quantity(self, signal: TradeSignal) -> Optional[float]:
+    async def _derive_auto_quantity(self, signal: TradeSignal) -> float | None:
         """Best-effort quantity derivation for trusted edge execution paths."""
         if self._auto_size_notional_usd <= 0:
             return None
@@ -656,7 +656,7 @@ class AsterBot:
             return self._auto_size_fallback_quantity
         return None
 
-    async def _handle_risk_alert(self, alert_data: Dict[str, Any]):
+    async def _handle_risk_alert(self, alert_data: dict[str, Any]):
         """Handle risk alerts."""
         action = alert_data.get("action", "none")
         logger.warning(f"⚠️ Risk alert: {alert_data.get('message')}")
@@ -713,7 +713,7 @@ class AsterBot:
             qty = Decimal("0")
         return float(qty)
 
-    async def _prepare_aster_order(self, symbol: str, requested_quantity: float) -> Tuple[str, float]:
+    async def _prepare_aster_order(self, symbol: str, requested_quantity: float) -> tuple[str, float]:
         """Normalize symbol/quantity and enforce exchange notional constraints before submit."""
         normalized_symbol = (
             self.client._normalize_symbol(symbol)
@@ -852,7 +852,7 @@ class AsterBot:
                         },
                     )
 
-            desired_leverage: Optional[int] = None
+            desired_leverage: int | None = None
             if signal.leverage is not None:
                 try:
                     desired_leverage = int(float(signal.leverage))
@@ -1201,7 +1201,7 @@ class AsterBot:
             logger.warning("Close-all ignored: Aster client not initialized")
             return
 
-        exchange_positions: Dict[str, float] = {}
+        exchange_positions: dict[str, float] = {}
         try:
             raw_positions = await self.client.get_position_risk()
             for row in raw_positions or []:
@@ -1251,7 +1251,7 @@ class AsterBot:
 
         logger.info(f"Close-all complete | closed={closed} failed={failed}")
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get bot status."""
         return {
             "service": SERVICE_NAME,

@@ -15,7 +15,7 @@ import os
 import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 from loguru import logger
 
@@ -55,7 +55,7 @@ class BotReputationService:
             str(Path(__file__).parent / "reputation_store.json"),
         )
         self._lock = threading.Lock()
-        self._bots: Dict[str, Dict[str, Any]] = {}
+        self._bots: dict[str, dict[str, Any]] = {}
         self._load()
 
     def _load(self) -> None:
@@ -79,7 +79,7 @@ class BotReputationService:
         except Exception as exc:
             logger.warning(f"Reputation store save failed: {exc}")
 
-    def _ensure_bot(self, bot_id: str) -> Dict[str, Any]:
+    def _ensure_bot(self, bot_id: str) -> dict[str, Any]:
         """Get or create a bot reputation record."""
         key = str(bot_id or "").strip().upper()
         if key not in self._bots:
@@ -104,7 +104,7 @@ class BotReputationService:
             }
         return self._bots[key]
 
-    def _record_history(self, bot: Dict[str, Any], action: str, points: float) -> None:
+    def _record_history(self, bot: dict[str, Any], action: str, points: float) -> None:
         """Append to score history (max 50 entries)."""
         history = bot.setdefault("history", [])
         history.append({
@@ -115,7 +115,7 @@ class BotReputationService:
         if len(history) > 50:
             bot["history"] = history[-50:]
 
-    def _compute_composite_score(self, bot: Dict[str, Any]) -> float:
+    def _compute_composite_score(self, bot: dict[str, Any]) -> float:
         """Compute the weighted composite reputation score."""
         total_ideas = bot.get("ideas_submitted", 0)
         if total_ideas == 0:
@@ -149,7 +149,7 @@ class BotReputationService:
 
     # ── Public API ─────────────────────────────────────────────────
 
-    def get_reputation(self, bot_id: str) -> Dict[str, Any]:
+    def get_reputation(self, bot_id: str) -> dict[str, Any]:
         """Get a bot's full reputation record."""
         with self._lock:
             key = str(bot_id or "").strip().upper()
@@ -180,7 +180,7 @@ class BotReputationService:
                 "last_activity_at": bot.get("last_activity_at", 0),
             }
 
-    def record_idea(self, bot_id: str, idea_id: str = "") -> Dict[str, Any]:
+    def record_idea(self, bot_id: str, idea_id: str = "") -> dict[str, Any]:
         """Record that a bot submitted a trade idea."""
         with self._lock:
             bot = self._ensure_bot(bot_id)
@@ -195,7 +195,7 @@ class BotReputationService:
 
     def record_outcome(
         self, bot_id: str, accurate: bool, profitable: bool, pnl: float = 0.0
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Record the outcome of a trade idea (after execution/validation)."""
         with self._lock:
             bot = self._ensure_bot(bot_id)
@@ -233,7 +233,7 @@ class BotReputationService:
                 "composite": self._compute_composite_score(bot),
             }
 
-    def record_quality(self, bot_id: str, quality_score: float) -> Dict[str, Any]:
+    def record_quality(self, bot_id: str, quality_score: float) -> dict[str, Any]:
         """Record a quality rating (0.0–1.0) for a bot's contribution."""
         with self._lock:
             bot = self._ensure_bot(bot_id)
@@ -258,7 +258,7 @@ class BotReputationService:
                 "quality_avg": bot["quality_sum"] / bot["quality_count"],
             }
 
-    def penalize(self, bot_id: str, reason: str, points: float = 0.0) -> Dict[str, Any]:
+    def penalize(self, bot_id: str, reason: str, points: float = 0.0) -> dict[str, Any]:
         """Apply a penalty to a bot."""
         with self._lock:
             bot = self._ensure_bot(bot_id)
@@ -277,7 +277,7 @@ class BotReputationService:
             self._save_locked()
             return {"ok": True, "score": bot["score"], "status": bot["status"]}
 
-    def ban(self, bot_id: str, reason: str) -> Dict[str, Any]:
+    def ban(self, bot_id: str, reason: str) -> dict[str, Any]:
         """Permanently ban a bot."""
         with self._lock:
             bot = self._ensure_bot(bot_id)
@@ -289,7 +289,7 @@ class BotReputationService:
             self._save_locked()
             return {"ok": True, "score": bot["score"], "status": "banned", "reason": reason}
 
-    def leaderboard(self, limit: int = 20) -> List[Dict[str, Any]]:
+    def leaderboard(self, limit: int = 20) -> list[dict[str, Any]]:
         """Return top bots sorted by composite reputation score."""
         with self._lock:
             entries = []
@@ -331,10 +331,10 @@ class BotReputationService:
             bot = self._bots.get(key)
             return bot.get("status") == "banned" if bot else False
 
-    def bot_count(self) -> Dict[str, int]:
+    def bot_count(self) -> dict[str, int]:
         """Return count of bots by status."""
         with self._lock:
-            counts: Dict[str, int] = {"active": 0, "warned": 0, "banned": 0}
+            counts: dict[str, int] = {"active": 0, "warned": 0, "banned": 0}
             for bot in self._bots.values():
                 status = bot.get("status", "active")
                 counts[status] = counts.get(status, 0) + 1

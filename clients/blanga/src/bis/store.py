@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any
 
 from bis.models import (
     FieldObservation,
@@ -29,7 +30,7 @@ def _norm(text: str) -> str:
 
 
 def _now() -> datetime:
-    return datetime.now(tz=timezone.utc)
+    return datetime.now(tz=UTC)
 
 
 def _encode_snapshot_value(value: Any) -> Any:
@@ -46,7 +47,7 @@ def _encode_snapshot_value(value: Any) -> Any:
     return value
 
 
-def _decode_snapshot_datetime(value: Any) -> Optional[datetime]:
+def _decode_snapshot_datetime(value: Any) -> datetime | None:
     if value in (None, ""):
         return None
     if isinstance(value, dict) and value.get("__type__") == "datetime":
@@ -56,7 +57,7 @@ def _decode_snapshot_datetime(value: Any) -> Optional[datetime]:
     return datetime.fromisoformat(value)
 
 
-def _decode_snapshot_date(value: Any) -> Optional[date]:
+def _decode_snapshot_date(value: Any) -> date | None:
     if value in (None, ""):
         return None
     if isinstance(value, dict) and value.get("__type__") == "date":
@@ -79,13 +80,13 @@ class PropertyQuery:
     county: str = ""
     corridor: str = ""
     submarket: str = ""
-    max_land_psf: Optional[float] = None
-    max_building_psf: Optional[float] = None
-    max_building_sqft: Optional[float] = None
-    min_cap_rate: Optional[float] = None
-    max_cap_rate: Optional[float] = None
+    max_land_psf: float | None = None
+    max_building_psf: float | None = None
+    max_building_sqft: float | None = None
+    min_cap_rate: float | None = None
+    max_cap_rate: float | None = None
     occupancy_status: str = ""
-    lease_expiring_within_years: Optional[int] = None
+    lease_expiring_within_years: int | None = None
     only_active_outreach: bool = False
 
 
@@ -98,21 +99,21 @@ class InMemoryMasterArena:
     """
 
     def __init__(self) -> None:
-        self.people: Dict[str, Person] = {}
-        self.llcs: Dict[str, LlcEntity] = {}
-        self.properties: Dict[str, PropertyAsset] = {}
-        self.notes: Dict[str, NoteEntry] = {}
-        self.signals: Dict[str, ProgressSignal] = {}
-        self.om_extractions: Dict[str, OMExtractionRecord] = {}
-        self.documents: Dict[str, GeneratedDocument] = {}
-        self.market_events: Dict[str, MarketEvent] = {}
-        self.field_observations: Dict[str, FieldObservation] = {}
-        self.review_tasks: Dict[str, ReviewTask] = {}
-        self.canonical_field_values: Dict[tuple[str, str, str], str] = {}
+        self.people: dict[str, Person] = {}
+        self.llcs: dict[str, LlcEntity] = {}
+        self.properties: dict[str, PropertyAsset] = {}
+        self.notes: dict[str, NoteEntry] = {}
+        self.signals: dict[str, ProgressSignal] = {}
+        self.om_extractions: dict[str, OMExtractionRecord] = {}
+        self.documents: dict[str, GeneratedDocument] = {}
+        self.market_events: dict[str, MarketEvent] = {}
+        self.field_observations: dict[str, FieldObservation] = {}
+        self.review_tasks: dict[str, ReviewTask] = {}
+        self.canonical_field_values: dict[tuple[str, str, str], str] = {}
 
-        self._address_to_property_urn: Dict[str, str] = {}
-        self._notes_by_property: Dict[str, List[str]] = {}
-        self._notes_by_owner: Dict[str, List[str]] = {}
+        self._address_to_property_urn: dict[str, str] = {}
+        self._notes_by_property: dict[str, list[str]] = {}
+        self._notes_by_owner: dict[str, list[str]] = {}
 
     def reset(self) -> None:
         self.people.clear()
@@ -130,8 +131,8 @@ class InMemoryMasterArena:
         self._notes_by_property.clear()
         self._notes_by_owner.clear()
 
-    def snapshot(self) -> Dict[str, Any]:
-        def encode_items(items: Sequence[Any]) -> List[Dict[str, Any]]:
+    def snapshot(self) -> dict[str, Any]:
+        def encode_items(items: Sequence[Any]) -> list[dict[str, Any]]:
             return [_encode_snapshot_value(asdict(item)) for item in items]
 
         return {
@@ -170,7 +171,7 @@ class InMemoryMasterArena:
             ],
         }
 
-    def restore_snapshot(self, payload: Dict[str, Any]) -> Dict[str, int]:
+    def restore_snapshot(self, payload: dict[str, Any]) -> dict[str, int]:
         self.reset()
 
         for row in payload.get("people", []):
@@ -388,7 +389,7 @@ class InMemoryMasterArena:
         self._sync_property_compliance(property_asset.property_urn)
         return property_asset
 
-    def find_property_by_address(self, address_line1: str) -> Optional[PropertyAsset]:
+    def find_property_by_address(self, address_line1: str) -> PropertyAsset | None:
         urn = self._address_to_property_urn.get(_norm(address_line1))
         if not urn:
             return None
@@ -417,10 +418,10 @@ class InMemoryMasterArena:
     def list_documents(
         self,
         *,
-        property_urn: Optional[str] = None,
-        owner_person_urn: Optional[str] = None,
+        property_urn: str | None = None,
+        owner_person_urn: str | None = None,
         doc_type: str = "",
-    ) -> List[GeneratedDocument]:
+    ) -> list[GeneratedDocument]:
         docs = list(self.documents.values())
         if property_urn:
             docs = [doc for doc in docs if doc.property_urn == property_urn]
@@ -431,7 +432,7 @@ class InMemoryMasterArena:
         docs.sort(key=lambda doc: doc.created_at, reverse=True)
         return docs
 
-    def latest_document_for_property(self, *, property_urn: str, doc_type: str = "") -> Optional[GeneratedDocument]:
+    def latest_document_for_property(self, *, property_urn: str, doc_type: str = "") -> GeneratedDocument | None:
         docs = self.list_documents(property_urn=property_urn, doc_type=doc_type)
         return docs[0] if docs else None
 
@@ -452,9 +453,9 @@ class InMemoryMasterArena:
         self,
         *,
         status: str = "",
-        entity_urn: Optional[str] = None,
+        entity_urn: str | None = None,
         field_name: str = "",
-    ) -> List[ReviewTask]:
+    ) -> list[ReviewTask]:
         tasks = list(self.review_tasks.values())
         if status:
             normalized = _norm(status)
@@ -467,10 +468,10 @@ class InMemoryMasterArena:
         tasks.sort(key=lambda task: task.created_at, reverse=True)
         return tasks
 
-    def get_review_task(self, review_urn: str) -> Optional[ReviewTask]:
+    def get_review_task(self, review_urn: str) -> ReviewTask | None:
         return self.review_tasks.get(review_urn)
 
-    def get_field_observation(self, observation_urn: str) -> Optional[FieldObservation]:
+    def get_field_observation(self, observation_urn: str) -> FieldObservation | None:
         return self.field_observations.get(observation_urn)
 
     def approve_review_task(self, *, review_urn: str, reviewed_by: str, review_note: str = "") -> ReviewTask:
@@ -501,11 +502,11 @@ class InMemoryMasterArena:
     def list_market_events(
         self,
         *,
-        property_urn: Optional[str] = None,
-        owner_person_urn: Optional[str] = None,
+        property_urn: str | None = None,
+        owner_person_urn: str | None = None,
         event_type: str = "",
-        since_days: Optional[int] = None,
-    ) -> List[MarketEvent]:
+        since_days: int | None = None,
+    ) -> list[MarketEvent]:
         events = list(self.market_events.values())
         if property_urn:
             events = [event for event in events if event.property_urn == property_urn]
@@ -520,22 +521,22 @@ class InMemoryMasterArena:
         events.sort(key=lambda event: event.observed_at, reverse=True)
         return events
 
-    def get_person(self, person_urn: str) -> Optional[Person]:
+    def get_person(self, person_urn: str) -> Person | None:
         return self.people.get(person_urn)
 
-    def get_llc(self, llc_urn: str) -> Optional[LlcEntity]:
+    def get_llc(self, llc_urn: str) -> LlcEntity | None:
         return self.llcs.get(llc_urn)
 
-    def get_property(self, property_urn: str) -> Optional[PropertyAsset]:
+    def get_property(self, property_urn: str) -> PropertyAsset | None:
         return self.properties.get(property_urn)
 
-    def get_note(self, note_urn: str) -> Optional[NoteEntry]:
+    def get_note(self, note_urn: str) -> NoteEntry | None:
         return self.notes.get(note_urn)
 
-    def list_properties(self) -> List[PropertyAsset]:
+    def list_properties(self) -> list[PropertyAsset]:
         return list(self.properties.values())
 
-    def list_signals(self, *, property_urn: Optional[str] = None, since_days: Optional[int] = None) -> List[ProgressSignal]:
+    def list_signals(self, *, property_urn: str | None = None, since_days: int | None = None) -> list[ProgressSignal]:
         items = list(self.signals.values())
         if property_urn:
             items = [item for item in items if item.property_urn == property_urn]
@@ -545,17 +546,17 @@ class InMemoryMasterArena:
         items.sort(key=lambda item: item.observed_at, reverse=True)
         return items
 
-    def owners_for_property(self, property_urn: str) -> List[Person]:
+    def owners_for_property(self, property_urn: str) -> list[Person]:
         prop = self.properties.get(property_urn)
         if not prop:
             return []
-        owner_urns: List[str] = []
+        owner_urns: list[str] = []
         for llc_urn in prop.owner_llc_urns:
             llc = self.llcs.get(llc_urn)
             if not llc:
                 continue
             owner_urns.extend(llc.officer_person_urns)
-        owners: List[Person] = []
+        owners: list[Person] = []
         seen = set()
         for owner_urn in owner_urns:
             if owner_urn in seen:
@@ -566,17 +567,17 @@ class InMemoryMasterArena:
                 seen.add(owner_urn)
         return owners
 
-    def notes_rollup_for_property(self, property_urn: str) -> List[NoteEntry]:
+    def notes_rollup_for_property(self, property_urn: str) -> list[NoteEntry]:
         prop = self.properties.get(property_urn)
         if not prop:
             return []
 
-        collected_ids: List[str] = []
+        collected_ids: list[str] = []
         collected_ids.extend(self._notes_by_property.get(property_urn, []))
         for owner in self.owners_for_property(property_urn):
             collected_ids.extend(self._notes_by_owner.get(owner.person_urn, []))
 
-        unique_ids: List[str] = []
+        unique_ids: list[str] = []
         seen = set()
         for note_id in collected_ids:
             if note_id in seen:
@@ -612,7 +613,7 @@ class InMemoryMasterArena:
         person.updated_at = _now()
         self._sync_property_compliance_for_person(person_urn)
 
-    def mark_listed(self, *, property_urn: str, listed_at: Optional[date] = None, list_price: Optional[float] = None) -> None:
+    def mark_listed(self, *, property_urn: str, listed_at: date | None = None, list_price: float | None = None) -> None:
         prop = self.properties.get(property_urn)
         if not prop:
             raise KeyError(f"property not found: {property_urn}")
@@ -630,7 +631,7 @@ class InMemoryMasterArena:
         prop.listing_status = ListingStatus.UNDER_CONTRACT
         prop.updated_at = _now()
 
-    def mark_sold(self, *, property_urn: str, sold_at: Optional[date] = None, close_price: Optional[float] = None) -> None:
+    def mark_sold(self, *, property_urn: str, sold_at: date | None = None, close_price: float | None = None) -> None:
         prop = self.properties.get(property_urn)
         if not prop:
             raise KeyError(f"property not found: {property_urn}")
@@ -644,7 +645,7 @@ class InMemoryMasterArena:
         prop.outreach_state = OutreachState.PAUSED
         prop.updated_at = _now()
 
-    def days_on_market(self, property_urn: str, *, as_of: Optional[date] = None) -> Optional[int]:
+    def days_on_market(self, property_urn: str, *, as_of: date | None = None) -> int | None:
         prop = self.properties.get(property_urn)
         if not prop or not prop.listed_at:
             return None
@@ -652,7 +653,7 @@ class InMemoryMasterArena:
         days = (endpoint - prop.listed_at).days
         return max(0, days)
 
-    def query_properties(self, query: PropertyQuery) -> List[PropertyAsset]:
+    def query_properties(self, query: PropertyQuery) -> list[PropertyAsset]:
         now_date = date.today()
         tenant_brand = _norm(query.tenant_brand)
         city = _norm(query.city)
@@ -661,7 +662,7 @@ class InMemoryMasterArena:
         submarket = _norm(query.submarket)
         occupancy_status = _norm(query.occupancy_status)
 
-        matches: List[PropertyAsset] = []
+        matches: list[PropertyAsset] = []
         for item in self.properties.values():
             if tenant_brand and tenant_brand not in _norm(item.tenant_brand):
                 continue
@@ -724,13 +725,13 @@ class InMemoryMasterArena:
         return matches
 
     @staticmethod
-    def rent_psf(item: PropertyAsset) -> Optional[float]:
+    def rent_psf(item: PropertyAsset) -> float | None:
         if item.current_rent_psf is None:
             return None
         return round(item.current_rent_psf, 2)
 
     @staticmethod
-    def sale_price_per_building_sf(item: PropertyAsset) -> Optional[float]:
+    def sale_price_per_building_sf(item: PropertyAsset) -> float | None:
         if item.asking_price is None or not item.building_sqft:
             return None
         if item.building_sqft <= 0:
@@ -738,7 +739,7 @@ class InMemoryMasterArena:
         return round(item.asking_price / item.building_sqft, 2)
 
     @staticmethod
-    def sale_price_per_land_sf(item: PropertyAsset) -> Optional[float]:
+    def sale_price_per_land_sf(item: PropertyAsset) -> float | None:
         if item.asking_price is None or not item.land_acres:
             return None
         if item.land_acres <= 0:
@@ -747,13 +748,13 @@ class InMemoryMasterArena:
         return round(item.asking_price / land_sf, 2)
 
     @staticmethod
-    def list_to_close_delta(*, list_price: Optional[float], close_price: Optional[float]) -> Optional[float]:
+    def list_to_close_delta(*, list_price: float | None, close_price: float | None) -> float | None:
         if list_price is None or close_price is None or list_price <= 0:
             return None
         return round(((close_price - list_price) / list_price) * 100.0, 2)
 
     @staticmethod
-    def cap_rate(*, noi: Optional[float], price: Optional[float]) -> Optional[float]:
+    def cap_rate(*, noi: float | None, price: float | None) -> float | None:
         if noi is None or price is None or price <= 0:
             return None
         return round((noi / price) * 100.0, 2)

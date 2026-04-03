@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import html
 import re
+from collections.abc import Mapping, Sequence
 from datetime import datetime
-from typing import Mapping, Sequence
 
 from app.models import ChatConfig, ScoredNews
 

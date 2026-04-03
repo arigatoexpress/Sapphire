@@ -21,7 +21,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Any, Dict, FrozenSet, List, Optional
+from typing import Any
 
 
 class Capability(Enum):
@@ -80,7 +80,7 @@ class Capability(Enum):
 # ── Agent Role Definitions ──────────────────────────────────────────
 
 # Sapphire 💎: Trading & execution ops — full access to execution and market
-SAPPHIRE_CAPABILITIES: FrozenSet[Capability] = frozenset({
+SAPPHIRE_CAPABILITIES: frozenset[Capability] = frozenset({
     Capability.TRADE_EXECUTE,
     Capability.TRADE_READ,
     Capability.PORTFOLIO_READ,
@@ -108,7 +108,7 @@ SAPPHIRE_CAPABILITIES: FrozenSet[Capability] = frozenset({
 })
 
 # Obsidian 🖤: Infrastructure & deployments — system control, no direct trading
-OBSIDIAN_CAPABILITIES: FrozenSet[Capability] = frozenset({
+OBSIDIAN_CAPABILITIES: frozenset[Capability] = frozenset({
     Capability.TRADE_READ,
     Capability.PORTFOLIO_READ,
     Capability.VENUE_CONTROL,
@@ -133,7 +133,7 @@ OBSIDIAN_CAPABILITIES: FrozenSet[Capability] = frozenset({
 })
 
 # Emerald 💚: Strategy & improvement — cognition, memory, auditing, no secrets
-EMERALD_CAPABILITIES: FrozenSet[Capability] = frozenset({
+EMERALD_CAPABILITIES: frozenset[Capability] = frozenset({
     Capability.TRADE_READ,
     Capability.PORTFOLIO_READ,
     Capability.COGNITION_READ,
@@ -157,7 +157,7 @@ EMERALD_CAPABILITIES: FrozenSet[Capability] = frozenset({
 })
 
 # Scout 🔍: External-facing — MOST RESTRICTED, Forum-only communication
-SCOUT_CAPABILITIES: FrozenSet[Capability] = frozenset({
+SCOUT_CAPABILITIES: frozenset[Capability] = frozenset({
     Capability.FORUM_READ,
     Capability.FORUM_WRITE,
     Capability.MOLTBOOK_READ,
@@ -169,7 +169,7 @@ SCOUT_CAPABILITIES: FrozenSet[Capability] = frozenset({
 })
 
 # Mapping from agent ID to capabilities
-AGENT_CAPABILITY_MAP: Dict[str, FrozenSet[Capability]] = {
+AGENT_CAPABILITY_MAP: dict[str, frozenset[Capability]] = {
     "SAPPHIRE": SAPPHIRE_CAPABILITIES,
     "OBSIDIAN": OBSIDIAN_CAPABILITIES,
     "EMERALD": EMERALD_CAPABILITIES,
@@ -180,7 +180,7 @@ AGENT_CAPABILITY_MAP: Dict[str, FrozenSet[Capability]] = {
 # ── Risk Tier Mapping ─────────────────────────────────────────────
 # Controls graduated escalation: which operations auto-execute vs. require owner approval.
 
-CAPABILITY_RISK_TIER: Dict[Capability, str] = {
+CAPABILITY_RISK_TIER: dict[Capability, str] = {
     # Tier "low": auto-approve — read-only, no side effects
     Capability.CODE_READ: "low",
     Capability.HEALTH_MONITOR: "low",
@@ -233,7 +233,7 @@ class ApprovalPolicy:
         self,
         agent_id: str,
         capability: Capability,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> str:
         """Return the approval policy for a given agent + capability combination.
 
@@ -284,9 +284,9 @@ class AgentGate:
 
     def __init__(self, max_audit_log: int = 500):
         self._capabilities = dict(AGENT_CAPABILITY_MAP)
-        self._audit_log: List[PermissionCheckRecord] = []
+        self._audit_log: list[PermissionCheckRecord] = []
         self._max_audit_log = max(50, max_audit_log)
-        self._denied_count: Dict[str, int] = {}
+        self._denied_count: dict[str, int] = {}
 
     def check(self, agent_id: str, capability: Capability) -> bool:
         """Return True if the agent has the capability, False otherwise."""
@@ -304,19 +304,19 @@ class AgentGate:
             self._denied_count[key] = self._denied_count.get(key, 0) + 1
             raise PermissionDenied(agent_key, capability, detail)
 
-    def agent_capabilities(self, agent_id: str) -> FrozenSet[Capability]:
+    def agent_capabilities(self, agent_id: str) -> frozenset[Capability]:
         """Return the set of capabilities for an agent."""
         agent_key = str(agent_id or "").strip().upper()
         return self._capabilities.get(agent_key, frozenset())
 
-    def register_agent(self, agent_id: str, capabilities: FrozenSet[Capability]) -> None:
+    def register_agent(self, agent_id: str, capabilities: frozenset[Capability]) -> None:
         """Register or override capabilities for an agent."""
         agent_key = str(agent_id or "").strip().upper()
         if not agent_key:
             raise ValueError("agent_id must be non-empty")
         self._capabilities[agent_key] = frozenset(capabilities)
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         """Return permission check statistics."""
         total = len(self._audit_log)
         granted = sum(1 for r in self._audit_log if r.granted)
@@ -329,7 +329,7 @@ class AgentGate:
             "registered_agents": sorted(self._capabilities.keys()),
         }
 
-    def recent_denials(self, limit: int = 20) -> List[Dict[str, Any]]:
+    def recent_denials(self, limit: int = 20) -> list[dict[str, Any]]:
         """Return recent denial records."""
         denials = [r for r in self._audit_log if not r.granted]
         return [

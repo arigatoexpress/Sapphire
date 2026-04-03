@@ -6,7 +6,6 @@ Analyzes correctness, coherence, and reasoning quality
 
 import json
 from datetime import datetime
-from typing import Dict
 
 
 class QualityEvaluator:
@@ -15,7 +14,7 @@ class QualityEvaluator:
     def __init__(self):
         self.results = {}
     
-    def evaluate_math_reasoning(self, output: str) -> Dict[str, any]:
+    def evaluate_math_reasoning(self, output: str) -> dict[str, any]:
         """Evaluate math problem solution"""
         score = 0
         feedback = []
@@ -54,7 +53,7 @@ class QualityEvaluator:
             "has_correct_answer": '$65.32' in output or '65.32' in output
         }
     
-    def evaluate_logic_deduction(self, output: str) -> Dict[str, any]:
+    def evaluate_logic_deduction(self, output: str) -> dict[str, any]:
         """Evaluate logic puzzle solution"""
         score = 0
         feedback = []
@@ -100,7 +99,7 @@ class QualityEvaluator:
             "correct_assignments": correct_count
         }
     
-    def evaluate_code_analysis(self, output: str) -> Dict[str, any]:
+    def evaluate_code_analysis(self, output: str) -> dict[str, any]:
         """Evaluate code debugging response"""
         score = 0
         feedback = []
@@ -143,7 +142,7 @@ class QualityEvaluator:
             "suggested_fix": has_fix
         }
     
-    def evaluate_complex_coding(self, output: str) -> Dict[str, any]:
+    def evaluate_complex_coding(self, output: str) -> dict[str, any]:
         """Evaluate LRU cache implementation"""
         score = 0
         feedback = []
@@ -188,7 +187,7 @@ class QualityEvaluator:
             "methods_implemented": methods_found
         }
     
-    def evaluate_instruction_following(self, output: str) -> Dict[str, any]:
+    def evaluate_instruction_following(self, output: str) -> dict[str, any]:
         """Evaluate multi-part instruction following"""
         score = 0
         feedback = []
@@ -234,7 +233,7 @@ class QualityEvaluator:
             "format_adherence": format_score
         }
     
-    def evaluate_context_retention(self, output: str) -> Dict[str, any]:
+    def evaluate_context_retention(self, output: str) -> dict[str, any]:
         """Evaluate context retention test"""
         score = 0
         feedback = []
@@ -276,7 +275,7 @@ class QualityEvaluator:
             "correct_answer": '57' in output
         }
     
-    def evaluate_comparison(self, output: str) -> Dict[str, any]:
+    def evaluate_comparison(self, output: str) -> dict[str, any]:
         """Evaluate comparative analysis"""
         score = 0
         feedback = []
@@ -321,7 +320,7 @@ class QualityEvaluator:
             "types_covered": types_found
         }
     
-    def evaluate_all_outputs(self, benchmark_data: Dict) -> Dict:
+    def evaluate_all_outputs(self, benchmark_data: dict) -> dict:
         """Evaluate all model outputs"""
         print("Evaluating output quality...\n")
         
@@ -372,7 +371,7 @@ class QualityEvaluator:
         
         return results
     
-    def generate_report(self, results: Dict, output_file: str = "quality_evaluation.json"):
+    def generate_report(self, results: dict, output_file: str = "quality_evaluation.json"):
         """Generate quality evaluation report"""
         
         with open(output_file, 'w', encoding='utf-8') as f:
@@ -415,11 +414,11 @@ def main():
     
     # Load benchmark data
     try:
-        with open('accurate_benchmark_20260307_000000.json', 'r') as f:
+        with open('accurate_benchmark_20260307_000000.json') as f:
             data = json.load(f)
     except FileNotFoundError:
         print("Accurate benchmark data not found. Using original data...")
-        with open('benchmark_results_20260307_183000.json', 'r') as f:
+        with open('benchmark_results_20260307_183000.json') as f:
             data = json.load(f)
     
     # Run evaluation

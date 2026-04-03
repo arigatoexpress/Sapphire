@@ -45,7 +45,7 @@ class HyperliquidClient:
         self.base_url = TESTNET_URL if testnet else BASE_URL
         self._http: httpx.AsyncClient | None = None
 
-    async def __aenter__(self) -> "HyperliquidClient":
+    async def __aenter__(self) -> HyperliquidClient:
         self._http = httpx.AsyncClient(base_url=self.base_url, timeout=15.0)
         return self
 

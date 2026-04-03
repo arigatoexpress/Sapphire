@@ -17,7 +17,6 @@ import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, List, Optional
 
 from cognitive_agent import CognitiveAgent, MarketContext
 from cognitive_mesh import (
@@ -38,13 +37,13 @@ class ExecutionRequest:
     side: str  # BUY, SELL, LONG, SHORT
     quantity: float
     order_type: str = "MARKET"  # MARKET, LIMIT
-    limit_price: Optional[float] = None
-    stop_loss: Optional[float] = None
-    take_profit: Optional[float] = None
+    limit_price: float | None = None
+    stop_loss: float | None = None
+    take_profit: float | None = None
 
     # Cognitive context
-    consensus_id: Optional[str] = None
-    reasoning: Optional[str] = None
+    consensus_id: str | None = None
+    reasoning: str | None = None
 
 
 @dataclass
@@ -52,15 +51,15 @@ class ExecutionReport:
     """Report of execution result."""
 
     success: bool
-    trade_id: Optional[str] = None
+    trade_id: str | None = None
     filled_quantity: float = 0.0
     avg_price: float = 0.0
     platform: str = ""
     execution_time_ms: float = 0.0
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
     # Cognitive reflection
-    reflection: Optional[str] = None
+    reflection: str | None = None
 
 
 class ExecutorAgent(CognitiveAgent, ABC):
@@ -82,7 +81,7 @@ class ExecutorAgent(CognitiveAgent, ABC):
         self.execution_count = 0
         self.success_count = 0
 
-    def get_capabilities(self) -> List[str]:
+    def get_capabilities(self) -> list[str]:
         return [
             f"execute_{self.platform}",
             "order_placement",
@@ -459,7 +458,7 @@ class LighterExecutorAgent(ExecutorAgent):
 
 
 # Factory function to create all executor agents
-async def create_executor_swarm() -> Dict[str, ExecutorAgent]:
+async def create_executor_swarm() -> dict[str, ExecutorAgent]:
     """Create and initialize all executor agents."""
     executors = {
         "aster": AsterExecutorAgent(),

@@ -10,7 +10,6 @@ import logging
 import re
 import sys
 from datetime import datetime
-from typing import Dict, Optional
 
 import aiohttp
 
@@ -32,7 +31,7 @@ class MacStrategyBridge:
         self.alert_history = []
         self.webhook_url = WINDOWS_WEBHOOK
         
-    def parse_alert(self, message: str) -> Optional[Dict]:
+    def parse_alert(self, message: str) -> dict | None:
         """Parse TradingView alert"""
         try:
             # JSON format
@@ -78,7 +77,7 @@ class MacStrategyBridge:
             return "exit_short"
         return action
         
-    async def forward_to_webhook(self, alert: Dict) -> bool:
+    async def forward_to_webhook(self, alert: dict) -> bool:
         """Forward alert to Windows webhook"""
         try:
             async with aiohttp.ClientSession() as session:

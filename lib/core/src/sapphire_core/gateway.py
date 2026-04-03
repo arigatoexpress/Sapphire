@@ -2,8 +2,9 @@ import asyncio
 import inspect
 import logging
 import os
-from datetime import datetime, timezone
-from typing import Any, Callable, Dict, Optional
+from collections.abc import Callable
+from datetime import UTC, datetime
+from typing import Any
 
 from aiohttp import web
 
@@ -16,7 +17,7 @@ class ExecutionGateway:
     Replaces rudimentary health.py
     """
 
-    def __init__(self, status_provider: Optional[Callable[[], Dict[str, Any]]] = None):
+    def __init__(self, status_provider: Callable[[], dict[str, Any]] | None = None):
         self.app = web.Application()
         self.app.router.add_get("/", self.health_check)
         self.app.router.add_get("/health", self.health_check)
@@ -28,7 +29,7 @@ class ExecutionGateway:
 
         # Command Buffer
         self.command_queue: asyncio.Queue = asyncio.Queue()
-        self.runner: Optional[web.AppRunner] = None
+        self.runner: web.AppRunner | None = None
         self._http_session = None
         self.status_provider = status_provider
         self.legacy_tv_forward_url = str(
@@ -45,12 +46,12 @@ class ExecutionGateway:
             self._http_session = aiohttp.ClientSession(timeout=timeout)
         return self._http_session
 
-    async def _status_payload(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
+    async def _status_payload(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "status": "ok",
             "service": "execution-gateway",
             "ready": True,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         if self.status_provider is None:
             return payload
@@ -97,7 +98,7 @@ class ExecutionGateway:
 
     async def handle_legacy_tradingview(self, request):
         """Accept legacy TV webhook posts; optionally forward to canonical cloud ingress."""
-        data: Dict[str, Any] = {}
+        data: dict[str, Any] = {}
         try:
             payload = await request.json()
             if isinstance(payload, dict):
@@ -196,7 +197,7 @@ gateway = ExecutionGateway()
 
 
 async def start_gateway_server(
-    status_provider: Optional[Callable[[], Dict[str, Any]]] = None,
+    status_provider: Callable[[], dict[str, Any]] | None = None,
 ) -> asyncio.Queue:
     if status_provider is not None:
         gateway.status_provider = status_provider

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -35,7 +35,7 @@ def _fmt_num(value: Any, digits: int = 2) -> str:
 
 
 def _build_markdown(base_url: str, strategy_ops: dict[str, Any], intel_summary: dict[str, Any], librarian: dict[str, Any]) -> str:
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     brief = strategy_ops.get("operator_brief", {}) if isinstance(strategy_ops.get("operator_brief"), dict) else {}
     kpis = brief.get("kpis", {}) if isinstance(brief.get("kpis"), dict) else {}
     blockers = brief.get("hard_blockers", []) if isinstance(brief.get("hard_blockers"), list) else []
@@ -157,7 +157,7 @@ def main() -> int:
     parser.add_argument("--out", default="", help="Output markdown path")
     args = parser.parse_args()
 
-    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     default_out = Path("/Users/aribs/Sapphire/output/lumo") / f"lumo_research_pack_{ts}.md"
     out_path = Path(args.out).expanduser() if args.out else default_out
     out_path.parent.mkdir(parents=True, exist_ok=True)

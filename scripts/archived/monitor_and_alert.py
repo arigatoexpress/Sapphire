@@ -12,7 +12,6 @@ import json
 import time
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from typing import Dict, List, Optional
 
 import aiohttp
 
@@ -70,10 +69,10 @@ class ServiceMonitor:
     
     def __init__(self, check_interval: int = 60):
         self.check_interval = check_interval
-        self.statuses: Dict[str, ServiceCheck] = {}
-        self.alert_history: List[dict] = []
-        self.consecutive_failures: Dict[str, int] = {}
-        self.session: Optional[aiohttp.ClientSession] = None
+        self.statuses: dict[str, ServiceCheck] = {}
+        self.alert_history: list[dict] = []
+        self.consecutive_failures: dict[str, int] = {}
+        self.session: aiohttp.ClientSession | None = None
         
     async def __aenter__(self):
         timeout = aiohttp.ClientTimeout(total=10)
@@ -101,7 +100,7 @@ class ServiceMonitor:
                     status = "degraded"
                     self.consecutive_failures[key] = self.consecutive_failures.get(key, 0) + 1
                     
-        except asyncio.TimeoutError:
+        except TimeoutError:
             status = "timeout"
             latency = 9999
             self.consecutive_failures[key] = self.consecutive_failures.get(key, 0) + 1

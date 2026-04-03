@@ -109,7 +109,7 @@ def main():
     
     for model, data in results.items():
         speeds = []
-        for test in tests.keys():
+        for test in tests:
             tps = data.get(test, {}).get('tokens_per_sec', 0)
             speeds.append(f"{tps:.1f}" if tps > 0 else "N/A")
         print(f"{model:<25} {speeds[0]:<10} {speeds[1]:<10} {speeds[2]:<10} {speeds[3]:<10}")

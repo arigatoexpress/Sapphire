@@ -9,7 +9,7 @@ States:
 
 import logging
 import time
-from typing import Callable, Optional
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +46,8 @@ class CircuitBreaker:
         *,
         fail_max: int = 5,
         reset_timeout: float = 120.0,
-        on_open: Optional[Callable[[str], None]] = None,
-        on_close: Optional[Callable[[str], None]] = None,
+        on_open: Callable[[str], None] | None = None,
+        on_close: Callable[[str], None] | None = None,
     ) -> None:
         self.name = name
         self.fail_max = fail_max
@@ -87,7 +87,7 @@ class CircuitBreaker:
             logger.info("✅ CircuitBreaker[%s] → CLOSED (recovered)", self.name)
             self._notify(self._on_close)
 
-    def record_failure(self, error: Optional[Exception] = None) -> None:
+    def record_failure(self, error: Exception | None = None) -> None:
         self._failure_count += 1
         self._last_failure_time = time.monotonic()
         logger.warning(
@@ -140,7 +140,7 @@ class CircuitBreaker:
             else 0.0,
         }
 
-    def _notify(self, callback: Optional[Callable[[str], None]]) -> None:
+    def _notify(self, callback: Callable[[str], None] | None) -> None:
         if callback is None:
             return
         try:

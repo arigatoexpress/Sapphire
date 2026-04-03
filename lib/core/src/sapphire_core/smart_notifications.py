@@ -9,7 +9,6 @@ import re
 import time
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Dict, List
 
 from error_classifier import ErrorCategory, ErrorSeverity
 from loguru import logger
@@ -43,7 +42,7 @@ class SmartNotificationManager:
             digest_interval: Seconds between digest emails (default: 1 hour)
         """
         # Track recent errors by signature
-        self.recent_errors: Dict[str, ErrorOccurrence] = {}
+        self.recent_errors: dict[str, ErrorOccurrence] = {}
 
         # Configuration
         self.dedup_window = dedup_window
@@ -51,7 +50,7 @@ class SmartNotificationManager:
         self.last_digest = time.time()
 
         # Errors for digest
-        self.digest_errors: List[str] = []
+        self.digest_errors: list[str] = []
 
     def should_notify(
         self, error_message: str, error_category: ErrorCategory, error_severity: ErrorSeverity

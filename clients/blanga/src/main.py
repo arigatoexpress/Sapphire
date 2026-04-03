@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from html import escape
 
 from bis.api import router as bis_router
@@ -24,7 +24,7 @@ def _meta_payload() -> dict:
         "product": "Blanga Intelligence System",
         "environment": settings.environment,
         "auth_required": settings.require_auth,
-        "generated_at": datetime.now(tz=timezone.utc).isoformat(),
+        "generated_at": datetime.now(tz=UTC).isoformat(),
         "api_prefix": "/api/bis",
     }
 

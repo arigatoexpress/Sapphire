@@ -540,7 +540,7 @@ def watchlist_field_workflow(
 
 
 def now_iso() -> str:
-    return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat()
+    return dt.datetime.now(dt.UTC).replace(microsecond=0).isoformat()
 
 
 def default_layout_config(layout_name: str = "default") -> dict[str, Any]:

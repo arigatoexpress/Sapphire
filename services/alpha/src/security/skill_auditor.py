@@ -19,7 +19,7 @@ import re
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from loguru import logger
 
@@ -138,7 +138,7 @@ class ThreatFinding:
     evidence: str         # The matched text/line
     line_number: int = 0  # Line where found (0 = unknown)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "category": self.category.value,
             "severity": self.severity.value,
@@ -159,7 +159,7 @@ class IsnadLink:
     confidence: float
     notes: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "agent_id": self.agent_id,
             "role": self.role,
@@ -176,14 +176,14 @@ class SkillAuditReport:
 
     skill_name: str
     skill_hash: str             # SHA256 of content
-    findings: List[ThreatFinding] = field(default_factory=list)
-    isnad_chain: List[IsnadLink] = field(default_factory=list)
+    findings: list[ThreatFinding] = field(default_factory=list)
+    isnad_chain: list[IsnadLink] = field(default_factory=list)
     overall_severity: ThreatSeverity = ThreatSeverity.CLEAN
-    permission_manifest: Dict[str, bool] = field(default_factory=dict)
+    permission_manifest: dict[str, bool] = field(default_factory=dict)
     audited_at: float = 0.0
     auditor_id: str = "SAPPHIRE_SCOUT"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "skill_name": self.skill_name,
             "skill_hash": self.skill_hash,
@@ -215,7 +215,7 @@ class SkillAuditReport:
         ]
 
         # Group findings by category
-        categories: Dict[str, int] = {}
+        categories: dict[str, int] = {}
         for f in self.findings:
             cat = f.category.value
             categories[cat] = categories.get(cat, 0) + 1
@@ -256,10 +256,10 @@ class SkillAuditor:
 
     def __init__(self, auditor_id: str = "SAPPHIRE_SCOUT") -> None:
         self.auditor_id = auditor_id
-        self._compiled_patterns: List[tuple] = []
+        self._compiled_patterns: list[tuple] = []
         self._compile_all_patterns()
         # Audit history for dedup and stats
-        self._audit_history: List[SkillAuditReport] = []
+        self._audit_history: list[SkillAuditReport] = []
         self._max_history = 200
 
     def _compile_all_patterns(self) -> None:
@@ -284,8 +284,8 @@ class SkillAuditor:
         self,
         skill_name: str,
         content: str,
-        author_id: Optional[str] = None,
-        existing_isnad: Optional[List[IsnadLink]] = None,
+        author_id: str | None = None,
+        existing_isnad: list[IsnadLink] | None = None,
     ) -> SkillAuditReport:
         """
         Audit a skill's content for security threats.
@@ -368,7 +368,7 @@ class SkillAuditor:
         )
         return report
 
-    def _extract_permissions(self, content: str) -> Dict[str, bool]:
+    def _extract_permissions(self, content: str) -> dict[str, bool]:
         """Detect what permissions a skill implicitly requests."""
         lower = content.lower()
         return {
@@ -412,7 +412,7 @@ class SkillAuditor:
                 evidence=f"{zwc} zero-width chars found",
             ))
 
-    def _compute_overall_severity(self, findings: List[ThreatFinding]) -> ThreatSeverity:
+    def _compute_overall_severity(self, findings: list[ThreatFinding]) -> ThreatSeverity:
         """Determine overall severity from individual findings."""
         if not findings:
             return ThreatSeverity.CLEAN
@@ -447,13 +447,13 @@ class SkillAuditor:
 
     # ── Queries & Stats ───────────────────────────────────────────
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Return audit statistics."""
         if not self._audit_history:
             return {"total_audits": 0, "threat_breakdown": {}}
 
-        severity_counts: Dict[str, int] = {}
-        category_counts: Dict[str, int] = {}
+        severity_counts: dict[str, int] = {}
+        category_counts: dict[str, int] = {}
         for report in self._audit_history:
             sev = report.overall_severity.value
             severity_counts[sev] = severity_counts.get(sev, 0) + 1

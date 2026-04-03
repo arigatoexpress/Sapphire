@@ -1,5 +1,4 @@
 import os
-from typing import Optional
 
 from loguru import logger
 
@@ -30,7 +29,7 @@ class LinkedInClient:
         else:
             logger.warning("⚠️ LinkedIn credentials missing.")
 
-    async def post(self, text: str, image_url: Optional[str] = None) -> Optional[str]:
+    async def post(self, text: str, image_url: str | None = None) -> str | None:
         """
         Post text and optionally an image to LinkedIn.
         

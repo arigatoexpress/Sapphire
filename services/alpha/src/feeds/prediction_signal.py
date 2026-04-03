@@ -10,9 +10,9 @@ import asyncio
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from loguru import logger
 
@@ -41,20 +41,20 @@ class PredictionSignal:
     volume_usd: float            # Total traded volume in USD
     liquidity_usd: float         # Current available liquidity
     relevance: SignalRelevance
-    symbols: List[str]           # Crypto symbols this market affects
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    symbols: list[str]           # Crypto symbols this market affects
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     # Optional enrichment
-    probability_1h_ago: Optional[float] = None
-    probability_24h_ago: Optional[float] = None
-    volume_1h_ago: Optional[float] = None
-    end_date: Optional[datetime] = None
+    probability_1h_ago: float | None = None
+    probability_24h_ago: float | None = None
+    volume_1h_ago: float | None = None
+    end_date: datetime | None = None
     category: str = ""
-    tags: List[str] = field(default_factory=list)
-    raw_data: Dict[str, Any] = field(default_factory=dict)
+    tags: list[str] = field(default_factory=list)
+    raw_data: dict[str, Any] = field(default_factory=dict)
 
     @property
-    def momentum(self) -> Optional[float]:
+    def momentum(self) -> float | None:
         """Probability change over last hour (-1.0 to 1.0)."""
         if self.probability_1h_ago is not None:
             return self.probability - self.probability_1h_ago
@@ -74,7 +74,7 @@ class PredictionSignal:
         return "neutral"
 
     @property
-    def volume_change(self) -> Optional[float]:
+    def volume_change(self) -> float | None:
         """Volume change over last hour (ratio). >2.0 = doubled."""
         if self.volume_1h_ago is not None and self.volume_1h_ago > 0:
             return self.volume_usd / self.volume_1h_ago
@@ -132,7 +132,7 @@ class PredictionSignal:
             self.probability >= 0.70 or self.probability <= 0.30
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "market_id": self.market_id,
             "source": self.source.value,
@@ -196,8 +196,8 @@ class ArbitrageOpportunity:
     spread: float             # Absolute difference (0.0-1.0)
     spread_pct: float         # Spread as percentage (e.g., 5.2)
     confidence: float         # 0-100, based on volume and data freshness
-    symbols: List[str]        # Affected crypto symbols
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    symbols: list[str]        # Affected crypto symbols
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     @property
     def direction(self) -> str:
@@ -206,7 +206,7 @@ class ArbitrageOpportunity:
             return f"{self.venue_a} > {self.venue_b}"
         return f"{self.venue_b} > {self.venue_a}"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "market_name": self.market_name,
@@ -238,9 +238,9 @@ class PredictionMarketFeed(ABC):
         self.source = source
         self.poll_interval = max(10.0, poll_interval)
         self.running = False
-        self._signals: Dict[str, PredictionSignal] = {}
-        self._history: Dict[str, List[float]] = {}  # market_id → [prob_t-1, prob_t-2, ...]
-        self._volume_history: Dict[str, List[float]] = {}  # market_id → [vol_t-1, vol_t-2, ...]
+        self._signals: dict[str, PredictionSignal] = {}
+        self._history: dict[str, list[float]] = {}  # market_id → [prob_t-1, prob_t-2, ...]
+        self._volume_history: dict[str, list[float]] = {}  # market_id → [vol_t-1, vol_t-2, ...]
         self._last_fetch_ts = 0.0
         self._consecutive_errors = 0
         self._max_consecutive_errors = 10
@@ -248,7 +248,7 @@ class PredictionMarketFeed(ABC):
         self._last_error_ts = 0.0
 
     @abstractmethod
-    async def _fetch_markets(self, session: "aiohttp.ClientSession") -> List[PredictionSignal]:
+    async def _fetch_markets(self, session: "aiohttp.ClientSession") -> list[PredictionSignal]:
         """Fetch current prediction market data. Implement per platform."""
         ...
 
@@ -289,17 +289,17 @@ class PredictionMarketFeed(ABC):
         self.running = False
         logger.info(f"🔮 {self.source.value} prediction feed stopped")
 
-    def get_signals(self, min_volume: float = 0.0) -> List[PredictionSignal]:
+    def get_signals(self, min_volume: float = 0.0) -> list[PredictionSignal]:
         """Get all current signals, optionally filtered by volume."""
         signals = list(self._signals.values())
         if min_volume > 0:
             signals = [s for s in signals if s.volume_usd >= min_volume]
         return sorted(signals, key=lambda s: s.volume_usd, reverse=True)
 
-    def get_signal(self, market_id: str) -> Optional[PredictionSignal]:
+    def get_signal(self, market_id: str) -> PredictionSignal | None:
         return self._signals.get(market_id)
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         return {
             "source": self.source.value,
             "running": self.running,

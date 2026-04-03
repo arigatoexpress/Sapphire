@@ -17,10 +17,11 @@ import sys
 import tempfile
 import time
 from collections import defaultdict, deque
-from datetime import datetime, timezone
+from collections.abc import Callable
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 # Load .env file if present (for local/Pi deployment)
 try:
@@ -125,7 +126,7 @@ class LighterBot:
         self.running = False
         self._init_complete = False
         self._shutdown_event = asyncio.Event()
-        self._tasks: List[asyncio.Task] = []
+        self._tasks: list[asyncio.Task] = []
         self._cleanup_complete = False
 
         # Lighter SDK components
@@ -163,30 +164,30 @@ class LighterBot:
                 continue
 
         # Account tracking
-        self.account_index: Optional[int] = None
+        self.account_index: int | None = None
         self.balance: float = 0.0
 
         # Position tracking
-        self.positions: Dict[str, Position] = {}
-        self.market_info: Dict[str, Dict] = {}
+        self.positions: dict[str, Position] = {}
+        self.market_info: dict[str, dict] = {}
 
         # Performance metrics
         self.trades_executed = 0
         self.trades_failed = 0
         self.avg_latency_ms = 0.0
-        self._execution_block_reason: Optional[str] = None
+        self._execution_block_reason: str | None = None
 
         # Firestore client shared by idempotency guard + position persistence.
         self._db = None
         # Signal idempotency guard: Firestore-backed (durable across restarts) with
         # in-memory fast path.  Initialized without a Firestore client; warm() is
         # called after initialize() connects to GCP.
-        self._idempotency: Optional[ExecutionIdempotency] = None
+        self._idempotency: ExecutionIdempotency | None = None
         self._pubsub_initialized = False
         self._signal_dedupe_ttl_seconds = max(
             60, int(os.getenv("SIGNAL_DEDUPE_TTL_SECONDS", "900"))
         )
-        self._processed_signal_ids: Dict[str, float] = {}
+        self._processed_signal_ids: dict[str, float] = {}
 
         # Circuit breaker: open after 5 consecutive venue API failures, reset after 120s.
         self._circuit_breaker = CircuitBreaker(
@@ -339,7 +340,7 @@ class LighterBot:
             0.0,
             self._env_float(("LIGHTER_ENTRY_COOLDOWN_SECONDS",), default=0.0),
         )
-        self._last_entry_ts: Dict[str, float] = {}
+        self._last_entry_ts: dict[str, float] = {}
         self._allowed_strategies = {
             s.strip().lower()
             for s in str(os.getenv("LIGHTER_ALLOWED_STRATEGIES", "")).split(",")
@@ -381,7 +382,7 @@ class LighterBot:
             0.0,
             1.0,
         )
-        self._strategy_perf_history: Dict[str, deque] = defaultdict(
+        self._strategy_perf_history: dict[str, deque] = defaultdict(
             lambda: deque(maxlen=self._perf_guard_window)
         )
         self._size_ramp_enabled = self._env_flag(
@@ -447,10 +448,10 @@ class LighterBot:
             self._size_ramp_min_margin_usd,
             self._size_ramp_max_margin_usd,
         )
-        self._size_ramp_margin_by_key: Dict[str, float] = defaultdict(
+        self._size_ramp_margin_by_key: dict[str, float] = defaultdict(
             lambda: self._size_ramp_default_margin_usd
         )
-        self._size_ramp_last_adjust_ts: Dict[str, float] = {}
+        self._size_ramp_last_adjust_ts: dict[str, float] = {}
         self._strategy_require_metadata = self._env_flag(
             "LIGHTER_STRATEGY_REQUIRE_METADATA",
             default=False,
@@ -475,8 +476,8 @@ class LighterBot:
             0.0,
             self._env_float(("LIGHTER_MAX_POSITION_HOLD_SECONDS",), default=0.0),
         )
-        self._risk_exit_attempted_at: Dict[str, float] = {}
-        self._risk_exit_reconcile_hold_until: Dict[str, float] = {}
+        self._risk_exit_attempted_at: dict[str, float] = {}
+        self._risk_exit_reconcile_hold_until: dict[str, float] = {}
         self._dynamic_risk_enabled = self._env_flag(
             "LIGHTER_DYNAMIC_RISK_ENABLED",
             default=True,
@@ -510,7 +511,7 @@ class LighterBot:
             self._env_float(("LIGHTER_OPPORTUNITY_COOLDOWN_SECONDS",), default=180.0),
         )
         self._last_opportunity_rotation_ts: float = 0.0
-        self._last_dynamic_risk_update_ts: Dict[str, float] = {}
+        self._last_dynamic_risk_update_ts: dict[str, float] = {}
         self._progress_verify_interval_seconds = max(
             30,
             int(self._env_float(("LIGHTER_PROGRESS_VERIFY_INTERVAL_SECONDS",), default=180.0)),
@@ -587,9 +588,9 @@ class LighterBot:
             1.0,
             self._env_float(("LIGHTER_MAX_RISK_LEVEL_DEVIATION_PCT",), default=20.0),
         )
-        self._equity_baseline: Optional[float] = None
-        self._equity_peak: Optional[float] = None
-        self._equity_trough: Optional[float] = None
+        self._equity_baseline: float | None = None
+        self._equity_peak: float | None = None
+        self._equity_trough: float | None = None
         self._last_drawdown_alert_ts: float = 0.0
         self._last_sync_stale_alert_ts: float = 0.0
         self._last_balance_sync_ts: float = 0.0
@@ -677,19 +678,19 @@ class LighterBot:
             1.0,
             self._env_float(("LIGHTER_PLATFORM_DECISION_TIMEOUT_SECONDS",), default=3.0),
         )
-        self._cached_reject_tax_metrics: Dict[str, Any] = {}
+        self._cached_reject_tax_metrics: dict[str, Any] = {}
         self._last_reject_tax_fetch_ts: float = 0.0
-        self._cached_reject_tax_window_metrics: Dict[str, Dict[str, Any]] = {}
-        self._last_reject_tax_fetch_by_window: Dict[str, float] = {}
-        self._cached_go_no_go: Dict[str, Any] = {}
+        self._cached_reject_tax_window_metrics: dict[str, dict[str, Any]] = {}
+        self._last_reject_tax_fetch_by_window: dict[str, float] = {}
+        self._cached_go_no_go: dict[str, Any] = {}
         self._last_go_no_go_eval_ts: float = 0.0
-        self._cached_platform_decision: Dict[str, Any] = {}
+        self._cached_platform_decision: dict[str, Any] = {}
         self._last_platform_decision_fetch_ts: float = 0.0
         self._equity_snapshot_cache_ttl_seconds = max(
             3.0,
             self._env_float(("LIGHTER_EQUITY_SNAPSHOT_CACHE_TTL_SECONDS",), default=10.0),
         )
-        self._cached_equity_snapshot: Dict[str, Any] = {}
+        self._cached_equity_snapshot: dict[str, Any] = {}
         self._last_equity_snapshot_ts: float = 0.0
         self._recent_execution_outcomes: deque = deque(maxlen=3000)
         self._last_telegram_digest_ts: float = 0.0
@@ -754,10 +755,10 @@ class LighterBot:
             30,
             int(self._env_float(("LIGHTER_PRICE_HISTORY_POINTS",), default=90.0)),
         )
-        self._price_history: Dict[str, deque] = defaultdict(
+        self._price_history: dict[str, deque] = defaultdict(
             lambda: deque(maxlen=self._price_history_limit)
         )
-        self._stop_gateway_server: Optional[Callable[[], Any]] = None
+        self._stop_gateway_server: Callable[[], Any] | None = None
         self._http_session = None
         # Serialize exchange order submission to avoid nonce collisions when
         # concurrent signals/risk exits attempt to place orders at the same time.
@@ -901,7 +902,7 @@ class LighterBot:
         exponent = int(norm.as_tuple().exponent)
         return max(0, -exponent)
 
-    def _market_size_decimals(self, market: Dict[str, Any]) -> int:
+    def _market_size_decimals(self, market: dict[str, Any]) -> int:
         if not isinstance(market, dict):
             return 0
         try:
@@ -962,7 +963,7 @@ class LighterBot:
         except ImportError:
             pass
 
-        last_exc: Optional[Exception] = None
+        last_exc: Exception | None = None
         for attempt in range(1, 4):  # attempts 1, 2, 3
             if self._shutdown_event.is_set():
                 raise asyncio.CancelledError()
@@ -1127,7 +1128,7 @@ class LighterBot:
             self._init_complete = False
             return False
 
-    async def _gateway_status_payload(self) -> Dict[str, Any]:
+    async def _gateway_status_payload(self) -> dict[str, Any]:
         now_ts = time.time()
         snapshot = await self._get_equity_snapshot_cached()
         go_nogo = await self._evaluate_go_no_go(now_ts=now_ts)
@@ -1138,7 +1139,7 @@ class LighterBot:
         position_age = snapshot.get("position_check_age_sec")
         block_remaining = max(0.0, self._jurisdiction_block_until_ts - now_ts)
         failsafe_remaining = max(0.0, self._execution_failsafe_until_ts - now_ts)
-        ready_reasons: List[str] = []
+        ready_reasons: list[str] = []
 
         if not self._init_complete:
             ready_reasons.append("initialization_incomplete")
@@ -1179,7 +1180,7 @@ class LighterBot:
             "last_position_check_error": self._last_position_check_error,
             "go_no_go": go_nogo,
             "reject_tax": reject_tax,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
     async def _load_market_info(self):
@@ -1315,7 +1316,7 @@ class LighterBot:
         except Exception:
             return False
 
-    async def _discover_account_index_by_api_key(self) -> Optional[int]:
+    async def _discover_account_index_by_api_key(self) -> int | None:
         """
         Discover account index in two passes:
         1) strict match against configured API public key
@@ -1418,7 +1419,7 @@ class LighterBot:
                 await publish("trade-executed", result)
                 await self._send_trade_telegram_alert(signal, result, channel="hub")
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 continue  # No command arrived; loop back and recheck self.running
             except asyncio.CancelledError:
                 break
@@ -1430,7 +1431,7 @@ class LighterBot:
                     self.command_queue.task_done()
 
     # Alias map: route common TradingView symbols to Lighter's native asset names
-    _COIN_ALIASES: Dict[str, str] = {
+    _COIN_ALIASES: dict[str, str] = {
         "ETH": "WETH",
         "BTC": "WBTC",
     }
@@ -1451,7 +1452,7 @@ class LighterBot:
         symbol = symbol.replace("-", "").replace("_", "")
         return symbol or "WETH"
 
-    def _build_signal_from_gateway_command(self, command: Dict[str, Any]) -> Optional[TradeSignal]:
+    def _build_signal_from_gateway_command(self, command: dict[str, Any]) -> TradeSignal | None:
         """Normalize legacy and action-style gateway payloads into TradeSignal objects."""
         command_type = str(command.get("type", "")).strip().upper()
         action = str(command.get("action", "")).strip().upper()
@@ -1551,7 +1552,7 @@ class LighterBot:
                 self._shutdown_event.wait(),
                 timeout=float(timeout_seconds),
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return
 
     async def _close_clients(self) -> None:
@@ -1597,7 +1598,7 @@ class LighterBot:
             except Exception:
                 _aio = None
 
-            candidates: List[Any] = [obj]
+            candidates: list[Any] = [obj]
             for attr in ("session", "_session", "client_session", "_client_session", "rest_client"):
                 try:
                     candidate = getattr(obj, attr, None)
@@ -1796,7 +1797,7 @@ class LighterBot:
     async def _position_publish_loop(self):
         """Periodically publish a snapshot of positions for the realtime dashboard."""
         from dataclasses import asdict
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         while self.running:
             try:
@@ -1824,7 +1825,7 @@ class LighterBot:
                                 "platform": PLATFORM.value,
                                 "position_count": len(positions_payload),
                                 "positions": positions_payload,
-                                "updated_at": datetime.now(timezone.utc),
+                                "updated_at": datetime.now(UTC),
                             }
                         )
                     except Exception as _fs_err:
@@ -1834,7 +1835,7 @@ class LighterBot:
                 logger.error(f"Position publish error: {e}")
             await self._sleep_or_stop(self._position_publish_interval_seconds)
 
-    async def _handle_signal(self, signal_data: Dict[str, Any]):
+    async def _handle_signal(self, signal_data: dict[str, Any]):
         """Handle incoming trading signal."""
         try:
             payload = self._sanitize_trade_signal_payload(signal_data)
@@ -2035,7 +2036,7 @@ class LighterBot:
             and fill_qty > 0
             and (entry > 0 or fill_price > 0 or mark > 0)
         ):
-            chart_path: Optional[Path] = None
+            chart_path: Path | None = None
             try:
                 chart_path = self._build_trade_chart_card(
                     symbol=symbol,
@@ -2065,7 +2066,7 @@ class LighterBot:
         self,
         text: str,
         *,
-        parse_mode: Optional[str] = None,
+        parse_mode: str | None = None,
     ) -> None:
         if not self._telegram_bot_token or not self._telegram_chat_id:
             return
@@ -2101,7 +2102,7 @@ class LighterBot:
         image_path: Path,
         *,
         caption: str = "",
-        parse_mode: Optional[str] = None,
+        parse_mode: str | None = None,
     ) -> None:
         if not self._telegram_bot_token or not self._telegram_chat_id or not image_path.exists():
             return
@@ -2157,10 +2158,10 @@ class LighterBot:
         coin = self._normalize_coin_symbol(symbol)
         self._price_history[coin].append((time.time(), px))
 
-    def _recent_prices(self, symbol: str) -> List[float]:
+    def _recent_prices(self, symbol: str) -> list[float]:
         coin = self._normalize_coin_symbol(symbol)
         points = list(self._price_history.get(coin, []))
-        prices: List[float] = []
+        prices: list[float] = []
         for item in points:
             if isinstance(item, tuple) and len(item) >= 2:
                 prices.append(self._to_float(item[1], 0.0))
@@ -2169,10 +2170,10 @@ class LighterBot:
         return [p for p in prices if p > 0]
 
     @staticmethod
-    def _compact_reasoning(metadata: Dict[str, Any]) -> str:
+    def _compact_reasoning(metadata: dict[str, Any]) -> str:
         if not isinstance(metadata, dict):
             return ""
-        candidates: List[str] = []
+        candidates: list[str] = []
         for key in (
             "reason",
             "message",
@@ -2222,7 +2223,7 @@ class LighterBot:
                 pass
         return 0.0
 
-    def _market_stats_for_symbol(self, symbol: str) -> Dict[str, float]:
+    def _market_stats_for_symbol(self, symbol: str) -> dict[str, float]:
         prices = self._recent_prices(symbol)
         if len(prices) < 6:
             return {"drift_pct": 0.0, "vol_pct": 0.0, "samples": float(len(prices))}
@@ -2231,7 +2232,7 @@ class LighterBot:
         if first <= 0 or last <= 0:
             return {"drift_pct": 0.0, "vol_pct": 0.0, "samples": float(len(prices))}
         drift_pct = ((last - first) / first) * 100.0
-        returns: List[float] = []
+        returns: list[float] = []
         for idx in range(1, len(prices)):
             prev = prices[idx - 1]
             cur = prices[idx]
@@ -2294,7 +2295,7 @@ class LighterBot:
         *,
         notional_usd: float,
         vol_pct: float,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         taker_ratio = self._clamp(float(self._ev_expected_taker_ratio), 0.0, 1.0)
         weighted_fee_bps = (
             (taker_ratio * float(self._ev_taker_fee_bps))
@@ -2331,7 +2332,7 @@ class LighterBot:
         reference_price: float,
         portfolio_notional_usd: float,
         drawdown_pct: float,
-    ) -> tuple[float, Dict[str, float]]:
+    ) -> tuple[float, dict[str, float]]:
         """
         First-principles dynamic sizing:
         - confidence/EV increase size
@@ -2400,7 +2401,7 @@ class LighterBot:
         requested_notional: float,
         mark_price: float,
         portfolio_notional_now: float,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         current = self.positions.get(coin)
         current_qty = float(getattr(current, "quantity", 0.0) or 0.0) if current else 0.0
         current_notional = abs(current_qty * float(mark_price)) if mark_price > 0 else 0.0
@@ -2434,7 +2435,7 @@ class LighterBot:
         coin: str,
         is_buy: bool,
         reference_price: float,
-        expected_notional_usd: Optional[float] = None,
+        expected_notional_usd: float | None = None,
     ) -> float:
         """
         Expected-value estimate (percent) using:
@@ -2523,10 +2524,10 @@ class LighterBot:
         side: str,
         entry_price: float,
         mark_price: float,
-        tp_price: Optional[float],
-        sl_price: Optional[float],
+        tp_price: float | None,
+        sl_price: float | None,
         signal_id: str,
-    ) -> Optional[Path]:
+    ) -> Path | None:
         try:
             from PIL import Image, ImageDraw, ImageFont
         except Exception:
@@ -2537,7 +2538,7 @@ class LighterBot:
         if len(series) < 24 and anchor > 0:
             start = self._to_float(entry_price, anchor) or anchor
             steps = 32
-            synthetic: List[float] = []
+            synthetic: list[float] = []
             for i in range(steps):
                 t = i / max(steps - 1, 1)
                 synthetic.append(start + (anchor - start) * t)
@@ -2650,7 +2651,7 @@ class LighterBot:
         img.save(out_path, format="PNG")
         return out_path
 
-    async def _maybe_send_portfolio_digest(self, snapshot: Dict[str, Any]) -> None:
+    async def _maybe_send_portfolio_digest(self, snapshot: dict[str, Any]) -> None:
         if not self._telegram_bot_token or not self._telegram_chat_id:
             return
         now_ts = time.time()
@@ -2667,7 +2668,7 @@ class LighterBot:
             return float(value)
         if isinstance(value, datetime):
             try:
-                return float(value.replace(tzinfo=timezone.utc).timestamp() if value.tzinfo is None else value.timestamp())
+                return float(value.replace(tzinfo=UTC).timestamp() if value.tzinfo is None else value.timestamp())
             except Exception:
                 return 0.0
         if isinstance(value, str):
@@ -2677,19 +2678,19 @@ class LighterBot:
             try:
                 dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
                 if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=timezone.utc)
+                    dt = dt.replace(tzinfo=UTC)
                 return float(dt.timestamp())
             except Exception:
                 return 0.0
         return 0.0
 
     @staticmethod
-    def _rollup_reject_tax_buckets(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def _rollup_reject_tax_buckets(rows: list[dict[str, Any]]) -> dict[str, Any]:
         def _bucket_key(value: Any) -> str:
             text = str(value or "").strip().lower()
             return text or "unknown"
 
-        def _new_bucket() -> Dict[str, int]:
+        def _new_bucket() -> dict[str, int]:
             return {
                 "total": 0,
                 "reject_skip": 0,
@@ -2697,10 +2698,10 @@ class LighterBot:
                 "hard_failed": 0,
             }
 
-        by_source: Dict[str, Dict[str, int]] = defaultdict(_new_bucket)
-        by_strategy: Dict[str, Dict[str, int]] = defaultdict(_new_bucket)
-        by_timeframe: Dict[str, Dict[str, int]] = defaultdict(_new_bucket)
-        reason_counter: Dict[str, int] = defaultdict(int)
+        by_source: dict[str, dict[str, int]] = defaultdict(_new_bucket)
+        by_strategy: dict[str, dict[str, int]] = defaultdict(_new_bucket)
+        by_timeframe: dict[str, dict[str, int]] = defaultdict(_new_bucket)
+        reason_counter: dict[str, int] = defaultdict(int)
 
         total = 0
         reject_skip = 0
@@ -2758,8 +2759,8 @@ class LighterBot:
             if reject_like and reason:
                 reason_counter[reason] += 1
 
-        def _bucket_rows(src: Dict[str, Dict[str, int]]) -> List[Dict[str, Any]]:
-            out: List[Dict[str, Any]] = []
+        def _bucket_rows(src: dict[str, dict[str, int]]) -> list[dict[str, Any]]:
+            out: list[dict[str, Any]] = []
             for key, bucket in src.items():
                 b_total = max(1, int(bucket["total"]))
                 out.append(
@@ -2804,8 +2805,8 @@ class LighterBot:
         self,
         *,
         force_refresh: bool = False,
-        window_hours: Optional[float] = None,
-    ) -> Dict[str, Any]:
+        window_hours: float | None = None,
+    ) -> dict[str, Any]:
         now_ts = time.time()
         requested_window = (
             float(window_hours)
@@ -2824,7 +2825,7 @@ class LighterBot:
             return dict(cached_window)
 
         since_ts = now_ts - (requested_window * 3600.0)
-        rows: List[Dict[str, Any]] = []
+        rows: list[dict[str, Any]] = []
 
         if self._db is not None:
             try:
@@ -2834,7 +2835,7 @@ class LighterBot:
                 query = (
                     self._db.collection("execution_verifications")
                     .where(filter=FieldFilter("platform", "==", PLATFORM.value))
-                    .where(filter=FieldFilter("recorded_at", ">=", datetime.fromtimestamp(since_ts, tz=timezone.utc)))
+                    .where(filter=FieldFilter("recorded_at", ">=", datetime.fromtimestamp(since_ts, tz=UTC)))
                     .order_by("recorded_at", direction=_fs.Query.DESCENDING)
                     .limit(1500)
                 )
@@ -2869,7 +2870,7 @@ class LighterBot:
 
         rolled = self._rollup_reject_tax_buckets(rows)
         rolled["window_hours"] = round(requested_window, 2)
-        rolled["computed_at"] = datetime.now(timezone.utc).isoformat()
+        rolled["computed_at"] = datetime.now(UTC).isoformat()
         rolled["alert_threshold_pct"] = round(float(self._reject_tax_alert_pct), 2)
         rolled["alert"] = (
             bool(rolled.get("sample_size", 0) >= self._go_nogo_min_sample_size)
@@ -2883,13 +2884,13 @@ class LighterBot:
             self._last_reject_tax_fetch_ts = now_ts
         return dict(rolled)
 
-    async def _collect_reject_tax_deltas(self, *, force_refresh: bool = False) -> Dict[str, Any]:
+    async def _collect_reject_tax_deltas(self, *, force_refresh: bool = False) -> dict[str, Any]:
         windows = [1.0, 6.0, 24.0, float(self._reject_tax_window_hours)]
-        uniq_windows: List[float] = []
+        uniq_windows: list[float] = []
         for value in windows:
             if value not in uniq_windows:
                 uniq_windows.append(value)
-        result: Dict[str, Any] = {}
+        result: dict[str, Any] = {}
         for value in uniq_windows:
             key = f"{int(value)}h" if abs(value - int(value)) < 1e-6 else f"{value:.2f}h"
             metrics = await self._collect_reject_tax_metrics(
@@ -2910,13 +2911,13 @@ class LighterBot:
     def _build_go_no_go_assessment(
         self,
         *,
-        snapshot: Dict[str, Any],
-        reject_tax: Dict[str, Any],
-        now_ts: Optional[float] = None,
-    ) -> Dict[str, Any]:
+        snapshot: dict[str, Any],
+        reject_tax: dict[str, Any],
+        now_ts: float | None = None,
+    ) -> dict[str, Any]:
         ts = float(now_ts if now_ts is not None else time.time())
-        reasons: List[str] = []
-        reason_details: List[str] = []
+        reasons: list[str] = []
+        reason_details: list[str] = []
 
         if not self._trading_enabled:
             reasons.append("trading_disabled")
@@ -2984,7 +2985,7 @@ class LighterBot:
             "sample_size": sample_size,
             "reject_tax_pct": round(reject_tax_pct, 2),
             "hard_fail_pct": round(hard_fail_pct, 2),
-            "evaluated_at": datetime.now(timezone.utc).isoformat(),
+            "evaluated_at": datetime.now(UTC).isoformat(),
             "thresholds": {
                 "max_reject_tax_pct": round(float(self._go_nogo_max_reject_tax_pct), 2),
                 "max_hard_fail_pct": round(float(self._go_nogo_max_hard_fail_pct), 2),
@@ -2992,7 +2993,7 @@ class LighterBot:
             },
         }
 
-    async def _get_equity_snapshot_cached(self, *, force_refresh: bool = False) -> Dict[str, Any]:
+    async def _get_equity_snapshot_cached(self, *, force_refresh: bool = False) -> dict[str, Any]:
         now_ts = time.time()
         if (
             not force_refresh
@@ -3005,7 +3006,7 @@ class LighterBot:
         self._last_equity_snapshot_ts = now_ts
         return dict(snapshot)
 
-    async def _fetch_platform_decision(self, *, force_refresh: bool = False) -> Dict[str, Any]:
+    async def _fetch_platform_decision(self, *, force_refresh: bool = False) -> dict[str, Any]:
         now_ts = time.time()
         if (
             not force_refresh
@@ -3016,7 +3017,7 @@ class LighterBot:
         if not self._platform_decision_url:
             return {}
 
-        def _request() -> Dict[str, Any]:
+        def _request() -> dict[str, Any]:
             resp = requests.get(
                 self._platform_decision_url,
                 timeout=float(self._platform_decision_timeout_seconds),
@@ -3054,8 +3055,8 @@ class LighterBot:
         self,
         *,
         force_refresh: bool = False,
-        now_ts: Optional[float] = None,
-    ) -> Dict[str, Any]:
+        now_ts: float | None = None,
+    ) -> dict[str, Any]:
         ts = float(now_ts if now_ts is not None else time.time())
         if (
             not force_refresh
@@ -3098,7 +3099,7 @@ class LighterBot:
         self._last_go_no_go_eval_ts = ts
         return dict(go_nogo)
 
-    async def _send_portfolio_digest(self, snapshot: Dict[str, Any]) -> None:
+    async def _send_portfolio_digest(self, snapshot: dict[str, Any]) -> None:
         equity = self._to_float(snapshot.get("equity_estimate"), 0.0)
         cash = self._to_float(snapshot.get("cash_balance"), 0.0)
         upnl = self._to_float(snapshot.get("unrealized_pnl"), 0.0)
@@ -3196,10 +3197,10 @@ class LighterBot:
                 sl = self._to_float(getattr(pos, "stop_loss", 0.0), 0.0)
                 regime, detail = self._market_condition_for_symbol(symbol)
                 lines.append(
-                    (
+                    
                         f"• <b>{html.escape(symbol)}</b> {html.escape(side)} {qty:g} @ {entry:,.4f} | "
                         f"mark {mark:,.4f} | {pnl:+.4f} ({pnl_pct:+.2f}%)"
-                    )
+                    
                 )
                 if tp > 0 or sl > 0:
                     lines.append(f"  TP {tp:,.4f} · SL {sl:,.4f}")
@@ -3208,7 +3209,7 @@ class LighterBot:
         await self._send_telegram_message("\n".join(lines), parse_mode="HTML")
 
     @staticmethod
-    def _sanitize_trade_signal_payload(signal_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _sanitize_trade_signal_payload(signal_data: dict[str, Any]) -> dict[str, Any]:
         """Drop unknown keys so malformed debug payloads don't break signal handling."""
         if not isinstance(signal_data, dict):
             return {}
@@ -3289,7 +3290,7 @@ class LighterBot:
         signal: TradeSignal,
         *,
         reason: str,
-        symbol: Optional[str] = None,
+        symbol: str | None = None,
     ) -> TradeResult:
         return TradeResult(
             trade_id="noop",
@@ -3816,7 +3817,7 @@ class LighterBot:
 
         max_dev = max(0.1, float(self._max_risk_level_deviation_pct))
 
-        def _maybe_drop(level_name: str, level_value: Optional[float]) -> Optional[float]:
+        def _maybe_drop(level_name: str, level_value: float | None) -> float | None:
             if level_value is None or level_value <= 0:
                 return level_value
             dev_pct = abs((float(level_value) - float(reference_price)) / float(reference_price)) * 100.0
@@ -3863,13 +3864,13 @@ class LighterBot:
         except (TypeError, ValueError):
             return float(default)
 
-    async def _estimate_equity_snapshot(self) -> Dict[str, Any]:
+    async def _estimate_equity_snapshot(self) -> dict[str, Any]:
         """
         Build a lightweight equity snapshot from current balance + tracked positions.
         Uses current_price when available, otherwise falls back to entry_price.
         """
         now_ts = time.time()
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = datetime.now(UTC).isoformat()
         cash_balance = self._to_float(self.balance, 0.0)
         unrealized_pnl = 0.0
         position_notional = 0.0
@@ -3932,12 +3933,12 @@ class LighterBot:
             "balance_sync_stale": bool(balance_sync_stale),
             "position_check_stale": bool(position_check_stale),
             "last_balance_sync_at": (
-                datetime.fromtimestamp(self._last_balance_sync_ts, tz=timezone.utc).isoformat()
+                datetime.fromtimestamp(self._last_balance_sync_ts, tz=UTC).isoformat()
                 if self._last_balance_sync_ts > 0
                 else None
             ),
             "last_position_check_at": (
-                datetime.fromtimestamp(self._last_position_check_ts, tz=timezone.utc).isoformat()
+                datetime.fromtimestamp(self._last_position_check_ts, tz=UTC).isoformat()
                 if self._last_position_check_ts > 0
                 else None
             ),
@@ -3949,12 +3950,12 @@ class LighterBot:
             "hard_risk_block_remaining_sec": float(hard_risk.get("blocked_for_sec", 0.0) or 0.0),
         }
 
-    async def _persist_equity_snapshot(self, snapshot: Dict[str, Any], reason: str) -> None:
+    async def _persist_equity_snapshot(self, snapshot: dict[str, Any], reason: str) -> None:
         if self._db is None:
             return
         payload = dict(snapshot)
         payload["reason"] = str(reason)
-        payload["recorded_at"] = datetime.now(timezone.utc)
+        payload["recorded_at"] = datetime.now(UTC)
         payload["service"] = SERVICE_NAME
         snapshot_id = f"{PLATFORM.value}_{int(time.time() * 1000)}"
         try:
@@ -3963,7 +3964,7 @@ class LighterBot:
         except Exception as exc:
             logger.debug("Equity snapshot write error: %s", exc)
 
-    async def _maybe_publish_assistant_brief(self, snapshot: Dict[str, Any]) -> None:
+    async def _maybe_publish_assistant_brief(self, snapshot: dict[str, Any]) -> None:
         """
         Publish a compact operational brief for Kimi/OpenClaw assistant consumption.
         """
@@ -3974,7 +3975,7 @@ class LighterBot:
             return
         self._last_assistant_brief_ts = now_ts
 
-        positions_payload: List[Dict[str, Any]] = []
+        positions_payload: list[dict[str, Any]] = []
         for symbol, pos in sorted(self.positions.items()):
             qty = self._to_float(getattr(pos, "quantity", 0.0), 0.0)
             if qty <= 0:
@@ -3998,7 +3999,7 @@ class LighterBot:
                 }
             )
 
-        advice: List[str] = []
+        advice: list[str] = []
         if not positions_payload:
             advice.append("Flat book: wait for high-confidence entry matching allowed strategy/timeframe.")
         else:
@@ -4018,7 +4019,7 @@ class LighterBot:
         brief = {
             "service": SERVICE_NAME,
             "platform": PLATFORM.value,
-            "generated_at": datetime.now(timezone.utc),
+            "generated_at": datetime.now(UTC),
             "snapshot": snapshot,
             "positions": positions_payload,
             "policy": {
@@ -4054,7 +4055,7 @@ class LighterBot:
                 "entry_cooldown_seconds": self._entry_cooldown_seconds,
                 "sync_before_entry": self._sync_before_entry,
                 "jurisdiction_block_until": (
-                    datetime.fromtimestamp(self._jurisdiction_block_until_ts, timezone.utc).isoformat()
+                    datetime.fromtimestamp(self._jurisdiction_block_until_ts, UTC).isoformat()
                     if self._jurisdiction_block_until_ts > 0
                     else ""
                 ),
@@ -4100,7 +4101,7 @@ class LighterBot:
         else:
             outcome = "hard_failed"
 
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "service": SERVICE_NAME,
             "platform": PLATFORM.value,
             "channel": channel,
@@ -4134,7 +4135,7 @@ class LighterBot:
             "signal_metadata": (signal.metadata or {}),
             "result_metadata": result_meta,
             "metadata": (signal.metadata or {}),
-            "recorded_at": datetime.now(timezone.utc),
+            "recorded_at": datetime.now(UTC),
         }
         risk_event = self._hard_risk_kernel.record_execution_outcome(
             outcome=outcome,
@@ -4206,7 +4207,7 @@ class LighterBot:
         self._execution_watchdog_alert_streak = 0
         return True
 
-    def _activate_execution_failsafe(self, reason: str, *, now_ts: Optional[float] = None) -> bool:
+    def _activate_execution_failsafe(self, reason: str, *, now_ts: float | None = None) -> bool:
         """Activate (or extend) execution failsafe hold window."""
         if not self._execution_failsafe_enabled:
             return False
@@ -4217,7 +4218,7 @@ class LighterBot:
         self._execution_failsafe_reason = str(reason or self._execution_failsafe_reason or "").strip()[:280]
         return changed
 
-    async def _maybe_send_lane_heartbeat(self, snap: Dict[str, Any], now_ts: Optional[float] = None) -> None:
+    async def _maybe_send_lane_heartbeat(self, snap: dict[str, Any], now_ts: float | None = None) -> None:
         """Periodic concise lane-status heartbeat for operators."""
         if not self._lane_heartbeat_enabled:
             return
@@ -4417,13 +4418,13 @@ class LighterBot:
                     ):
                         self._last_sync_stale_alert_ts = now_ts
                         await self._send_telegram_message(
-                            (
+                            
                                 "LIGHTER DATA FRESHNESS ALERT\n"
                                 f"balance_sync_age={snap.get('balance_sync_age_sec')}s "
                                 f"position_check_age={snap.get('position_check_age_sec')}s\n"
                                 f"balance_error={snap.get('last_balance_sync_error') or 'none'}\n"
                                 f"position_error={snap.get('last_position_check_error') or 'none'}"
-                            )
+                            
                         )
 
                 if (
@@ -4433,11 +4434,11 @@ class LighterBot:
                 ):
                     self._last_drawdown_alert_ts = now_ts
                     await self._send_telegram_message(
-                        (
+                        
                             "LIGHTER DRAWDOWN ALERT\n"
                             f"equity={equity:.4f} baseline={baseline:.4f} peak={peak:.4f}\n"
                             f"progress={progress_pct:.2f}% drawdown={drawdown_pct:.2f}%"
-                        )
+                        
                     )
 
                 if self._execution_watchdog_enabled and self._trading_enabled and self._allow_live_trading:
@@ -4462,14 +4463,14 @@ class LighterBot:
                         self._last_execution_watchdog_alert_ts = now_ts
                         self._execution_watchdog_alert_streak += 1
                         await self._send_telegram_message(
-                            (
+                            
                                 "LIGHTER EXECUTION WATCHDOG ALERT\n"
                                 f"streak={self._execution_watchdog_alert_streak} threshold={self._execution_failsafe_alert_threshold}\n"
                                 f"no successful fill for {attempt_age:.0f}s after latest execution attempt\n"
                                 f"last_error={self._last_execution_error_message or 'unknown'}\n"
                                 f"lane_ready={bool(not snap.get('balance_sync_stale') and not snap.get('position_check_stale'))} "
                                 f"jurisdiction_block={max(0.0, self._jurisdiction_block_until_ts - now_ts):.0f}s"
-                            )
+                            
                         )
                         if (
                             self._execution_failsafe_enabled
@@ -4502,7 +4503,7 @@ class LighterBot:
 
             await self._sleep_or_stop(self._progress_verify_interval_seconds)
 
-    def _resolve_market(self, symbol: str) -> Dict[str, Any]:
+    def _resolve_market(self, symbol: str) -> dict[str, Any]:
         """
         Resolve a market row from any symbol style:
         - raw order-book symbol (ex: SOL-USDC)
@@ -4550,7 +4551,7 @@ class LighterBot:
 
         return {}
 
-    async def _handle_risk_alert(self, alert_data: Dict[str, Any]):
+    async def _handle_risk_alert(self, alert_data: dict[str, Any]):
         """Handle risk alerts."""
         platform = str(alert_data.get("platform", "") or "").strip().lower()
         if platform and platform not in {PLATFORM.value, "lighter"}:
@@ -4855,7 +4856,7 @@ class LighterBot:
             ):
                 base_target_margin_usd = float(self._target_margin_for_signal(strategy, timeframe))
                 effective_target_margin_usd = float(base_target_margin_usd)
-                dynamic_factors: Dict[str, float] = {}
+                dynamic_factors: dict[str, float] = {}
                 if self._dynamic_sizing_enabled:
                     multiplier, dynamic_factors = self._dynamic_entry_size_multiplier(
                         signal=signal,
@@ -5382,7 +5383,7 @@ class LighterBot:
                             reference_price=float(fill_price if fill_price > 0 else current_price),
                         ),
                         "reasoning": self._compact_reasoning(signal.metadata or {}),
-                        "opened_at": datetime.now(timezone.utc).isoformat(),
+                        "opened_at": datetime.now(UTC).isoformat(),
                     }
                     self.positions[coin] = Position(
                         position_id=str(result.get("order_id", "")),
@@ -5501,7 +5502,7 @@ class LighterBot:
             ((), {"api_key_index": 0}),
             ((0,), {}),
         ]
-        last_error: Optional[Exception] = None
+        last_error: Exception | None = None
         for args, kwargs in attempts:
             try:
                 return await self._call_lighter_api(self.transaction_api.next_nonce, *args, **kwargs)
@@ -5512,7 +5513,7 @@ class LighterBot:
             raise last_error
         raise RuntimeError("Unable to resolve Lighter nonce signature")
 
-    def _sign_transaction(self, tx_body: Dict) -> str:
+    def _sign_transaction(self, tx_body: dict) -> str:
         """Sign a transaction using the private key."""
         try:
             if hasattr(lighter, "Signer"):
@@ -5538,8 +5539,8 @@ class LighterBot:
         is_buy: bool,
         reduce_only: bool,
         signal_id: str,
-        market_meta: Optional[Dict[str, Any]] = None,
-    ) -> Optional[Dict[str, Any]]:
+        market_meta: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
         """Submit via SignerClient (preferred for lighter-sdk with tx_info send_tx)."""
         if not self.signer_client:
             return None
@@ -5635,10 +5636,10 @@ class LighterBot:
     async def _submit_order_legacy_send_tx(
         self,
         *,
-        order_params: Dict[str, Any],
+        order_params: dict[str, Any],
         signature: str,
         signal_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Fallback sender for older SDK method signatures."""
         tx_info = json.dumps(
             {"body": order_params, "signature": signature},
@@ -5652,7 +5653,7 @@ class LighterBot:
             ((0, tx_info), {}),
         ]
 
-        last_error: Optional[Exception] = None
+        last_error: Exception | None = None
         for args, kwargs in attempts:
             try:
                 raw = await self._call_lighter_api(self.transaction_api.send_tx, *args, **kwargs)
@@ -5693,7 +5694,7 @@ class LighterBot:
             raise last_error
         raise RuntimeError("No compatible send_tx signature succeeded")
 
-    async def _get_ticker(self, symbol: str) -> Optional[float]:
+    async def _get_ticker(self, symbol: str) -> float | None:
         """Get current price for a symbol."""
         if not self.order_api:
             return None
@@ -5712,7 +5713,7 @@ class LighterBot:
                 ((), {"order_book_id": order_book_id}),
                 ((order_book_id,), {}),
             ]
-            last_error: Optional[Exception] = None
+            last_error: Exception | None = None
             for args, kwargs in attempts:
                 try:
                     details = await self._call_lighter_api(
@@ -5877,7 +5878,7 @@ class LighterBot:
                 "favorable": bool(favorable),
                 "tp_factor": round(tp_factor, 4),
                 "sl_factor": round(sl_factor, 4),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(UTC).isoformat(),
             }
             self._last_dynamic_risk_update_ts[symbol] = now_ts
             logger.info(
@@ -5946,7 +5947,7 @@ class LighterBot:
                 if not raw_positions and hasattr(account, "positions"):
                     raw_positions = getattr(account, "positions", None) or []
 
-            next_positions: Dict[str, Position] = {}
+            next_positions: dict[str, Position] = {}
 
             for pos in raw_positions:
                 getv = pos.get if isinstance(pos, dict) else lambda k, d=None: getattr(pos, k, d)
@@ -6018,7 +6019,7 @@ class LighterBot:
                     existing.metadata.setdefault("source", "exchange_sync")
                 if not isinstance(existing.metadata, dict):
                     existing.metadata = {}
-                existing.metadata.setdefault("opened_at", datetime.now(timezone.utc).isoformat())
+                existing.metadata.setdefault("opened_at", datetime.now(UTC).isoformat())
 
                 if current_price > 0:
                     existing.current_price = current_price
@@ -6091,7 +6092,7 @@ class LighterBot:
                 self._empty_position_snapshot_streak = 0
 
             self.positions = next_positions
-            for symbol in next_positions.keys():
+            for symbol in next_positions:
                 self._risk_exit_reconcile_hold_until.pop(symbol, None)
 
         except asyncio.CancelledError:
@@ -6331,7 +6332,7 @@ class LighterBot:
                     hold_for,
                 )
 
-    async def _close_all_positions(self) -> Dict[str, int]:
+    async def _close_all_positions(self) -> dict[str, int]:
         """Close all positions on Lighter."""
         summary = {"requested": 0, "closed": 0, "failed": 0}
         try:
@@ -6394,7 +6395,7 @@ class LighterBot:
             summary["failed"] = max(summary["failed"], 1)
         return summary
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get bot status."""
         return {
             "service": SERVICE_NAME,

@@ -6,7 +6,7 @@ import signal
 import sys
 import time
 from collections import defaultdict, deque
-from typing import Any, Deque, Dict, List, Optional, Set
+from typing import Any
 
 import uvloop
 
@@ -96,7 +96,7 @@ class TelegramRateLimiter:
     })
 
     def __init__(self):
-        self._windows: Dict[str, Deque[float]] = defaultdict(deque)
+        self._windows: dict[str, deque[float]] = defaultdict(deque)
         self._limits = {
             "critical": 3,   # 3/min for trading-critical
             "default": 10,   # 10/min for standard
@@ -234,20 +234,20 @@ class AlphaEngine:
         self._autonomy_session_history_max = max(
             20, int(os.getenv("SAPPHIRE_AUTONOMY_SESSION_HISTORY_MAX", "200"))
         )
-        self._autonomy_sessions: Dict[str, Dict[str, Any]] = {}
+        self._autonomy_sessions: dict[str, dict[str, Any]] = {}
         self._latest_autonomy_session_key = ""
         # Multi-agent dispatch history (last N dispatches per agent)
-        self._agent_dispatch_history: Dict[str, list] = {
+        self._agent_dispatch_history: dict[str, list] = {
             "OBSIDIAN": [], "EMERALD": [], "SAPPHIRE": [],
         }
         self._agent_dispatch_history_max = 50
         # Graduated escalation: risk-based approval routing
         self._approval_policy = ApprovalPolicy()
-        self._proposals: Dict[str, Dict[str, Any]] = {}
+        self._proposals: dict[str, dict[str, Any]] = {}
         self._proposal_counter = 0
         self._started_at = time.time()
         self._system_log_max_entries = max(100, int(os.getenv("SYSTEM_LOG_MAX_ENTRIES", "500")))
-        self._system_logs: Deque[Dict[str, Any]] = deque(maxlen=self._system_log_max_entries)
+        self._system_logs: deque[dict[str, Any]] = deque(maxlen=self._system_log_max_entries)
         self.forum = SapphireForumService()
         self.reputation = BotReputationService()
         self.swarm = SwarmAggregator(reputation=self.reputation)
@@ -260,7 +260,7 @@ class AlphaEngine:
         from src.media.manager import MediaManager
         self.media_manager = MediaManager(telegram_bot=self.telegram)
         self.content_generator = ContentGenerator(gemini_guard=self.ai)
-        self._media_publish_task: Optional[asyncio.Task[Any]] = None
+        self._media_publish_task: asyncio.Task[Any] | None = None
         # Phase 9: OpenClaw Autonomous Operations
         from src.ci_feedback import CIFeedbackProcessor
         from src.openclaw_dispatch import OpenClawDispatcher
@@ -273,8 +273,8 @@ class AlphaEngine:
         from src.feeds.prediction_aggregator import PredictionAggregator
         self.prediction_aggregator = PredictionAggregator()
         self.swarm._prediction_aggregator = self.prediction_aggregator
-        self._prediction_market_task: Optional[asyncio.Task[Any]] = None
-        self._prediction_forum_task: Optional[asyncio.Task[Any]] = None
+        self._prediction_market_task: asyncio.Task[Any] | None = None
+        self._prediction_forum_task: asyncio.Task[Any] | None = None
         # Glint-style intel feed aggregator (public source-first).
         from src.feeds.intel_feed import IntelFeedAggregator
         self.intel_feed = IntelFeedAggregator()
@@ -287,21 +287,21 @@ class AlphaEngine:
             prediction_aggregator=self.prediction_aggregator,
             intel_feed=self.intel_feed,
         )
-        self._alpha_scanner_task: Optional[asyncio.Task[Any]] = None
+        self._alpha_scanner_task: asyncio.Task[Any] | None = None
         # Grid trader — leveraged grid-style signal generator
         self.grid_trader = GridSignalPlanner(
             market_data=self.market_data,
             strategy=self.strategy,
         )
-        self._grid_trader_task: Optional[asyncio.Task[Any]] = None
+        self._grid_trader_task: asyncio.Task[Any] | None = None
 
-        self._trade_metrics: Dict[str, float] = {
+        self._trade_metrics: dict[str, float] = {
             "total_trades": 0.0,
             "wins": 0.0,
             "losses": 0.0,
             "realized_pnl": 0.0,
         }
-        self._min_notional_by_venue: Dict[str, float] = {
+        self._min_notional_by_venue: dict[str, float] = {
             "ASTER": max(0.0, float(os.getenv("SAPPHIRE_MIN_NOTIONAL_ASTER", "5.0"))),
             "LIGHTER": max(0.0, float(os.getenv("SAPPHIRE_MIN_NOTIONAL_LIGHTER", "10.0"))),
         }
@@ -311,13 +311,13 @@ class AlphaEngine:
         self._min_trade_quantity_floor = max(
             0.0, float(os.getenv("SAPPHIRE_MIN_TRADE_QUANTITY_FLOOR", "0.0001"))
         )
-        self._failure_counts: Dict[str, int] = defaultdict(int)
+        self._failure_counts: dict[str, int] = defaultdict(int)
         self._owner_directive: str = os.getenv("SAPPHIRE_OWNER_DIRECTIVE", "").strip()
         self._trading_gate_max_failure_pressure = max(1, int(os.getenv("SAPPHIRE_TRADING_GATE_MAX_FAILURE_PRESSURE", "3")))
         self._trading_gate_min_active_venues = max(1, int(os.getenv("SAPPHIRE_TRADING_GATE_MIN_ACTIVE_VENUES", "1")))
         self._hard_failure_cooldown_seconds = max(60, int(os.getenv("HARD_FAILURE_COOLDOWN_SECONDS", "3600")))
-        self._manual_review_venues: Set[str] = set()
-        self._auto_deallocated: Set[str] = set()
+        self._manual_review_venues: set[str] = set()
+        self._auto_deallocated: set[str] = set()
         self._owner_directive_updated_at: int = 0
         # TradingView integration attributes (disabled by default, wired by TradingViewAutonomyPlugin if enabled)
         self._tradingview_integration_enabled = self._env_flag(
@@ -331,13 +331,13 @@ class AlphaEngine:
         self._tradingview_enforce_strategy_rules = self._env_flag(
             "TRADINGVIEW_ENFORCE_STRATEGY_RULES", default=False
         )
-        self._tradingview_strategy_rules: Dict[str, Dict[str, Any]] = {}
-        self._tradingview_allowed_symbols: Set[str] = set()
-        self._tradingview_allowed_symbols_by_venue: Dict[str, Set[str]] = {}
-        self._tradingview_max_quantity_by_venue: Dict[str, float] = {}
+        self._tradingview_strategy_rules: dict[str, dict[str, Any]] = {}
+        self._tradingview_allowed_symbols: set[str] = set()
+        self._tradingview_allowed_symbols_by_venue: dict[str, set[str]] = {}
+        self._tradingview_max_quantity_by_venue: dict[str, float] = {}
         self._tradingview_max_quantity_default: float = 0.0
         self._tradingview_default_quantity: float = 0.0
-        self._tradingview_signal_seen_at: Dict[str, float] = {}
+        self._tradingview_signal_seen_at: dict[str, float] = {}
         self._tradingview_idempotency_window_seconds = max(
             30, int(os.getenv("SAPPHIRE_TRADINGVIEW_IDEMPOTENCY_WINDOW_SECONDS", "300"))
         )
@@ -353,7 +353,7 @@ class AlphaEngine:
         return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
     @staticmethod
-    def _as_float(value: Any) -> Optional[float]:
+    def _as_float(value: Any) -> float | None:
         try:
             number = float(value)
         except (TypeError, ValueError):
@@ -366,8 +366,8 @@ class AlphaEngine:
         self,
         message: str,
         level: str = "info",
-        tags: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        tags: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         text = str(message or "").strip()
         if not text:
@@ -381,7 +381,7 @@ class AlphaEngine:
         }
         self._system_logs.append(event)
 
-    def _extract_trade_pnl(self, payload: Dict[str, Any]) -> Optional[float]:
+    def _extract_trade_pnl(self, payload: dict[str, Any]) -> float | None:
         for key in ("realized_pnl", "pnl", "net_pnl", "profit", "realizedPnl", "netPnl"):
             value = self._as_float(payload.get(key))
             if value is not None:
@@ -428,7 +428,7 @@ class AlphaEngine:
         return aliases.get(value, "")
 
 
-    def _set_execution_stage(self, stage: str, source: str = "manual", agent_id: str = "OBSIDIAN") -> Dict[str, Any]:
+    def _set_execution_stage(self, stage: str, source: str = "manual", agent_id: str = "OBSIDIAN") -> dict[str, Any]:
         gate.require(agent_id, Capability.SYSTEM_CONFIG, f"set_execution_stage({stage!r})")
         previous = self._dex_execution_stage
         applied = self.strategy.set_execution_stage(stage)
@@ -449,7 +449,7 @@ class AlphaEngine:
         return applied
 
     @staticmethod
-    def _parse_tradingview_message(message: str) -> Dict[str, Any]:
+    def _parse_tradingview_message(message: str) -> dict[str, Any]:
         message = str(message or "").strip()
         if not message:
             return {}
@@ -462,7 +462,7 @@ class AlphaEngine:
             pass
 
         # Lightweight parser for key=value,key2=value2 style alert bodies.
-        parsed: Dict[str, Any] = {}
+        parsed: dict[str, Any] = {}
         chunks = [chunk.strip() for chunk in message.replace("\n", ",").split(",") if chunk.strip()]
         for chunk in chunks:
             if "=" in chunk:
@@ -475,7 +475,7 @@ class AlphaEngine:
         return parsed
 
     @staticmethod
-    def _extract_float_value(data: Dict[str, Any], keys: List[str], default: float = 0.0) -> float:
+    def _extract_float_value(data: dict[str, Any], keys: list[str], default: float = 0.0) -> float:
         for key in keys:
             value = data.get(key)
             if value is None:
@@ -487,7 +487,7 @@ class AlphaEngine:
         return default
 
     @staticmethod
-    def _extract_text_value(data: Dict[str, Any], keys: List[str], default: str = "") -> str:
+    def _extract_text_value(data: dict[str, Any], keys: list[str], default: str = "") -> str:
         for key in keys:
             value = data.get(key)
             if isinstance(value, str) and value.strip():
@@ -495,7 +495,7 @@ class AlphaEngine:
         return default
 
     @staticmethod
-    def _parse_symbol_set(value: str) -> Set[str]:
+    def _parse_symbol_set(value: str) -> set[str]:
         if not value:
             return set()
         tokens = [token.strip().upper() for token in value.replace("|", ",").replace(";", ",").split(",")]
@@ -547,7 +547,7 @@ class AlphaEngine:
             return fallback
         return 0.0
 
-    def _apply_min_notional_guard(self, venue: str, symbol: str, quantity: float) -> Dict[str, Any]:
+    def _apply_min_notional_guard(self, venue: str, symbol: str, quantity: float) -> dict[str, Any]:
         venue_key = self._normalize_platform(venue)
         base_qty = max(0.0, float(quantity or 0.0))
         min_notional = float(self._min_notional_by_venue.get(venue_key, 0.0))
@@ -616,7 +616,7 @@ class AlphaEngine:
         }
 
     def _effective_trade_quantity_cap(self) -> float | None:
-        caps: List[float] = []
+        caps: list[float] = []
         for venue in dispatcher.bot_urls.keys():
             venue_cap = self._max_quantity_for_venue(venue)
             if venue_cap is not None and venue_cap > 0:
@@ -636,7 +636,7 @@ class AlphaEngine:
             return base
         return round(max(0.001, min(base, float(cap))), 8)
 
-    def _set_tradingview_default_quantity(self, requested_quantity: float, agent_id: str = "SAPPHIRE") -> Dict[str, Any]:
+    def _set_tradingview_default_quantity(self, requested_quantity: float, agent_id: str = "SAPPHIRE") -> dict[str, Any]:
         gate.require(agent_id, Capability.SYSTEM_CONFIG, f"set_tv_quantity({requested_quantity})")
         requested = max(0.0, float(requested_quantity))
         if requested <= 0:
@@ -663,7 +663,7 @@ class AlphaEngine:
             "cap": cap,
         }
 
-    def _parse_strategy_rules(self, raw_value: str) -> Dict[str, Dict[str, Any]]:
+    def _parse_strategy_rules(self, raw_value: str) -> dict[str, dict[str, Any]]:
         if not raw_value:
             return {}
 
@@ -677,7 +677,7 @@ class AlphaEngine:
             logger.error("TRADINGVIEW_STRATEGY_RULES_JSON must be a JSON object.")
             return {}
 
-        rules: Dict[str, Dict[str, Any]] = {}
+        rules: dict[str, dict[str, Any]] = {}
         for name, rule in payload.items():
             if not isinstance(name, str) or not name.strip():
                 continue
@@ -687,17 +687,17 @@ class AlphaEngine:
             venues_raw = rule.get("venues", [])
             symbols_raw = rule.get("symbols", [])
 
-            venues: Set[str] = set()
+            venues: set[str] = set()
             if isinstance(venues_raw, list):
                 venues = {self._normalize_platform(item) for item in venues_raw if isinstance(item, str)}
 
-            symbols: Set[str] = set()
+            symbols: set[str] = set()
             if isinstance(symbols_raw, list):
                 symbols = {
                     str(item).strip().upper() for item in symbols_raw if isinstance(item, str) and str(item).strip()
                 }
 
-            max_quantity: Optional[float] = None
+            max_quantity: float | None = None
             max_quantity_raw = rule.get("max_quantity")
             if max_quantity_raw is not None:
                 try:
@@ -831,9 +831,9 @@ class AlphaEngine:
 
     def _build_signal_key(
         self,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
         action: str,
-        targets: List[str],
+        targets: list[str],
         symbol: str,
         quantity: float,
     ) -> str:
@@ -882,7 +882,7 @@ class AlphaEngine:
                 self._tradingview_signal_seen_at.pop(old_key, None)
         return False
 
-    async def _handle_tradingview_signal(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_tradingview_signal(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Handle an execution signal and publish it to the bot fleet via Pub/Sub.
 
         TradingView webhook ingress is intentionally disabled. The name is kept for
@@ -920,7 +920,7 @@ class AlphaEngine:
         # - explicit venue hint wins
         # - otherwise choose the best active venue (avoid duplicating across venues by default)
         targets_raw = payload.get("target_platforms") or payload.get("targets") or payload.get("target") or []
-        targets: List[str] = []
+        targets: list[str] = []
         if isinstance(targets_raw, str):
             import re as _re
 
@@ -940,7 +940,7 @@ class AlphaEngine:
             # Pick a single best venue to prevent accidental cross-venue duplication.
             control = dispatcher.get_control_state()
             snapshot = self.market_data.get_market_snapshot(symbol=symbol)
-            candidates: List[tuple[float, str]] = []
+            candidates: list[tuple[float, str]] = []
             for venue in dispatcher.bot_urls.keys():
                 venue_state = control.get(venue, {})
                 if bool(venue_state.get("paused")):
@@ -998,7 +998,7 @@ class AlphaEngine:
 
         # Per-venue notional guard (use the strictest required sizing among targets).
         guarded_quantity = dispatch_quantity
-        guard_notes: Dict[str, Any] = {}
+        guard_notes: dict[str, Any] = {}
         for target in targets:
             venue = self._normalize_platform(target)
             guard = self._apply_min_notional_guard(venue, symbol, guarded_quantity)
@@ -1038,8 +1038,8 @@ class AlphaEngine:
         # ─── TP / SL ───────────────────────────────────────────────────────────
         # Honor explicit values from the payload first; fall back to env-var
         # percentage defaults if neither the payload nor the caller specified them.
-        _tp_price: Optional[float] = self._as_float(payload.get("take_profit"))
-        _sl_price: Optional[float] = self._as_float(payload.get("stop_loss"))
+        _tp_price: float | None = self._as_float(payload.get("take_profit"))
+        _sl_price: float | None = self._as_float(payload.get("stop_loss"))
 
         if _tp_price is None or _sl_price is None:
             _tp_pct = self._as_float(os.getenv("SAPPHIRE_TV_TAKE_PROFIT_PCT"))
@@ -1128,8 +1128,8 @@ class AlphaEngine:
         message: str,
         severity: str = "warning",
         alert_type: str = "manual_control",
-        platforms: List[str] | None = None,
-        metadata: Dict[str, Any] | None = None,
+        platforms: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         from models import RiskAlert
         from pubsub.client import publish
@@ -1457,7 +1457,7 @@ class AlphaEngine:
 
         await self.telegram.send_as(EMERALD, "\n".join(lines))
 
-    def _control_snapshot(self) -> Dict[str, Any]:
+    def _control_snapshot(self) -> dict[str, Any]:
         state = dispatcher.get_control_state()
         strategy_state = self.strategy.execution_state()
         media_snapshot = self.media_manager.get_status_snapshot()
@@ -1478,7 +1478,7 @@ class AlphaEngine:
             if str(item.get("session_key", "")).strip()
         ]
 
-        venues: Dict[str, Dict[str, Any]] = {}
+        venues: dict[str, dict[str, Any]] = {}
         for venue, venue_state in state.items():
             venues[venue] = {
                 "allocation": float(venue_state.get("allocation", 0.0)),
@@ -1551,7 +1551,7 @@ class AlphaEngine:
 
 
 
-    def _collect_media_context(self) -> Dict[str, Any]:
+    def _collect_media_context(self) -> dict[str, Any]:
         """Collect system context for AI content generation."""
         snapshot = self._control_snapshot()
         return {
@@ -1582,7 +1582,7 @@ class AlphaEngine:
             ],
         }
 
-    def _build_media_draft(self, topic: str) -> Dict[str, Any]:
+    def _build_media_draft(self, topic: str) -> dict[str, Any]:
         normalized_topic = str(topic or "").strip() or "weekly operations update"
         snapshot = self._control_snapshot()
         timestamp = int(time.time())
@@ -1630,7 +1630,7 @@ class AlphaEngine:
             "mode": self.media_manager.mode,
         }
 
-    def _resolve_media_draft_for_publish(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def _resolve_media_draft_for_publish(self, payload: dict[str, Any]) -> dict[str, Any]:
         requested_topic = str(payload.get("topic", "")).strip()
         if requested_topic:
             return self._build_media_draft(requested_topic)
@@ -1765,7 +1765,7 @@ class AlphaEngine:
         ]
         await self.telegram.send_message("\n".join(lines), priority="medium")
 
-    def _autonomy_context_snapshot(self) -> Dict[str, Any]:
+    def _autonomy_context_snapshot(self) -> dict[str, Any]:
         state = dispatcher.get_control_state()
         strategy_state = self.strategy.execution_state()
         active_venues = [
@@ -1802,11 +1802,11 @@ class AlphaEngine:
             "preferred_symbols": strategy_state.get("preferred_symbols", []),
         }
 
-    def _autonomy_trigger_reason(self, context: Dict[str, Any]) -> str:
+    def _autonomy_trigger_reason(self, context: dict[str, Any]) -> str:
         """Legacy string-only trigger (callers that need just the string)."""
         return self._autonomy_trigger_info(context)["trigger"]
 
-    def _autonomy_trigger_info(self, context: Dict[str, Any]) -> Dict[str, str]:
+    def _autonomy_trigger_info(self, context: dict[str, Any]) -> dict[str, str]:
         """Return structured trigger info with multi-agent routing.
 
         Returns ``{"trigger": str, "agent": str, "category": str}``.
@@ -1837,7 +1837,7 @@ class AlphaEngine:
         else:
             return {"trigger": "scheduled_review", "agent": "SAPPHIRE", "category": "review"}
 
-    def _autonomy_request_brief(self, trigger: str, context: Dict[str, Any]) -> Dict[str, str]:
+    def _autonomy_request_brief(self, trigger: str, context: dict[str, Any]) -> dict[str, str]:
         trigger_key = str(trigger or "").strip().lower()
         active_count = len(context.get("active_venues", []))
         failure_pressure = int(context.get("total_failure_pressure", 0))
@@ -1915,7 +1915,7 @@ class AlphaEngine:
         self,
         session_key: str,
         trigger: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         approval_required: bool,
     ) -> str:
         brief = self._autonomy_request_brief(trigger, context)
@@ -2029,7 +2029,7 @@ class AlphaEngine:
         pending.sort(key=lambda item: int(item.get("created_at", 0)), reverse=True)
         return str(pending[0].get("session_key", "")).strip()
 
-    def _pending_autonomy_session_keys(self) -> List[str]:
+    def _pending_autonomy_session_keys(self) -> list[str]:
         pending = [
             item
             for item in self._autonomy_sessions.values()
@@ -2045,7 +2045,7 @@ class AlphaEngine:
         decision: str,
         note: str = "",
         source: str = "owner",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         normalized_decision = str(decision or "").strip().upper()
         if normalized_decision not in {"APPROVE", "REJECT"}:
             return {"dispatched": False, "reason": "invalid_decision", "session_key": ""}
@@ -2113,9 +2113,9 @@ class AlphaEngine:
         agent_id: str,
         capability: Capability,
         description: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         diff: str = "",
-        files_changed: Optional[List[str]] = None,
+        files_changed: list[str] | None = None,
     ) -> str:
         """Record a pending proposal for owner review. Returns proposal key."""
         self._proposal_counter += 1
@@ -2148,7 +2148,7 @@ class AlphaEngine:
         decision: str,
         note: str = "",
         source: str = "owner",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Apply an owner decision to a pending proposal."""
         normalized = decision.strip().upper()
         if normalized not in ("APPROVE", "REJECT"):
@@ -2170,7 +2170,7 @@ class AlphaEngine:
         )
         return {"ok": True, "decision": entry["decision"], "proposal_key": proposal_key}
 
-    def _pending_proposals(self) -> List[Dict[str, Any]]:
+    def _pending_proposals(self) -> list[dict[str, Any]]:
         """Return all pending proposals sorted by creation time."""
         return sorted(
             [p for p in self._proposals.values() if p["decision"] == "pending"],
@@ -2182,8 +2182,8 @@ class AlphaEngine:
         agent_id: str,
         capability: Capability,
         description: str,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Route an operation through graduated approval based on risk tier.
 
         Returns ``{'executed': True, 'policy': ...}`` for auto/notify,
@@ -2219,9 +2219,9 @@ class AlphaEngine:
 
     # ── Health Diagnostics ───────────────────────────────────────────
 
-    async def _run_health_diagnostics(self) -> Dict[str, Any]:
+    async def _run_health_diagnostics(self) -> dict[str, Any]:
         """Run health checks and return detected issues."""
-        issues: List[Dict[str, Any]] = []
+        issues: list[dict[str, Any]] = []
         # Check venue health
         try:
             state = dispatcher.get_control_state()
@@ -2257,7 +2257,7 @@ class AlphaEngine:
         return {"issues": issues, "checked_at": int(time.time())}
 
     @staticmethod
-    def _parse_session_decision_payload(payload_text: str) -> Dict[str, str]:
+    def _parse_session_decision_payload(payload_text: str) -> dict[str, str]:
         text = str(payload_text or "").strip()
         if not text:
             return {"session_key": "", "note": ""}
@@ -2279,7 +2279,7 @@ class AlphaEngine:
         return {"session_key": text, "note": ""}
 
     @staticmethod
-    def _parse_json_payload(payload_text: str) -> Dict[str, Any]:
+    def _parse_json_payload(payload_text: str) -> dict[str, Any]:
         text = str(payload_text or "").strip()
         if not text:
             return {}
@@ -2314,7 +2314,7 @@ class AlphaEngine:
         ),
     }
 
-    async def _dispatch_full_autonomy_cycle(self, trigger: str, force: bool = False, agent_id: str = "OBSIDIAN") -> Dict[str, Any]:
+    async def _dispatch_full_autonomy_cycle(self, trigger: str, force: bool = False, agent_id: str = "OBSIDIAN") -> dict[str, Any]:
         gate.require(agent_id, Capability.AUTONOMY_DISPATCH, f"autonomy_cycle({trigger!r})")
         if not self._full_autonomy_enabled:
             return {"dispatched": False, "reason": "full_autonomy_disabled"}
@@ -2495,7 +2495,7 @@ class AlphaEngine:
         """Dispatch control commands to extracted handlers in telegram_handlers.py."""
         await dispatch_control_command(self, target, action, value)
 
-    async def _handle_alpha_scanner_signal(self, signal: Dict[str, Any]) -> None:
+    async def _handle_alpha_scanner_signal(self, signal: dict[str, Any]) -> None:
         """Callback for internal alpha scanner — feeds signals into the execution pipeline."""
         source = signal.get("source", "alpha_scanner")
         symbol = signal.get("symbol", "")
@@ -2543,7 +2543,7 @@ class AlphaEngine:
             logger.error(f"Alpha scanner pipeline error: {exc}")
             self.alpha_scanner.resolve_signal("", False)
 
-    async def _handle_grid_trader_signal(self, signal: Dict[str, Any]) -> None:
+    async def _handle_grid_trader_signal(self, signal: dict[str, Any]) -> None:
         """Callback for grid trader signals — feeds signals into the execution pipeline."""
         source = signal.get("source", "grid_trader")
         symbol = signal.get("symbol", "")
@@ -3342,57 +3342,57 @@ class AlphaEngine:
 
         await subscribe("trade-executed", handle_trade)
 
-    async def _handle_market_ohlc_request(self, query: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_market_ohlc_request(self, query: dict[str, Any]) -> dict[str, Any]:
         return await handle_market_ohlc(self, query)
 
-    async def _handle_platform_status_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_platform_status_request(self, _: dict[str, Any]) -> dict[str, Any]:
         return await handle_platform_status(self, _)
 
-    async def _handle_control_status_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_control_status_request(self, _: dict[str, Any]) -> dict[str, Any]:
         return await handle_control_status(self, _)
 
-    async def _handle_routing_info_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_routing_info_request(self, _: dict[str, Any]) -> dict[str, Any]:
         return await handle_routing_info(self, _)
 
-    async def _handle_performance_stats_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_performance_stats_request(self, _: dict[str, Any]) -> dict[str, Any]:
         return await handle_performance_stats(self, _)
 
-    async def _handle_system_logs_request(self, payload: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def _handle_system_logs_request(self, payload: dict[str, Any]) -> list[dict[str, Any]]:
         return await handle_system_logs(self, payload)
 
 
 
-    async def _handle_security_skills_status_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_security_skills_status_request(self, _: dict[str, Any]) -> dict[str, Any]:
         return await handle_security_skills_status(self, _)
 
-    async def _handle_security_skill_scan_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_security_skill_scan_request(self, payload: dict[str, Any]) -> dict[str, Any]:
         return await handle_security_skill_scan(self, payload)
 
-    async def _handle_forum_topics_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_forum_topics_request(self, payload: dict[str, Any]) -> dict[str, Any]:
         return await handle_forum_topics(self, payload)
 
-    async def _handle_forum_topic_detail_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_forum_topic_detail_request(self, payload: dict[str, Any]) -> dict[str, Any]:
         return await handle_forum_topic_detail(self, payload)
 
-    async def _handle_forum_create_topic_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_forum_create_topic_request(self, payload: dict[str, Any]) -> dict[str, Any]:
         return await handle_forum_create_topic(self, payload)
 
-    async def _handle_forum_replies_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_forum_replies_request(self, payload: dict[str, Any]) -> dict[str, Any]:
         return await handle_forum_replies(self, payload)
 
-    async def _handle_forum_scout_status_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_forum_scout_status_request(self, _: dict[str, Any]) -> dict[str, Any]:
         return await handle_forum_scout_status(self, _)
 
-    async def _handle_forum_scout_register_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_forum_scout_register_request(self, payload: dict[str, Any]) -> dict[str, Any]:
         return await handle_forum_scout_register(self, payload)
 
-    async def _handle_forum_scout_publish_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_forum_scout_publish_request(self, payload: dict[str, Any]) -> dict[str, Any]:
         return await handle_forum_scout_publish(self, payload)
 
-    async def _handle_prediction_dashboard_request(self, _: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_prediction_dashboard_request(self, _: dict[str, Any]) -> dict[str, Any]:
         return self.prediction_aggregator.get_prediction_dashboard_data()
 
-    async def _handle_intel_feed_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_intel_feed_request(self, payload: dict[str, Any]) -> dict[str, Any]:
         return await handle_intel_feed(self, payload)
 
     async def stop(self):

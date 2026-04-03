@@ -9,7 +9,6 @@ import asyncio
 import json
 import logging
 import subprocess
-from typing import Dict, Optional
 
 logging.basicConfig(
     level=logging.INFO,
@@ -44,7 +43,7 @@ class BackgroundTVAgent:
             logger.error(f"AppleScript error: {e}")
             return ""
             
-    def find_tv_tab(self) -> Optional[int]:
+    def find_tv_tab(self) -> int | None:
         """Find TradingView tab index WITHOUT activating"""
         script = '''
         tell application "Google Chrome"
@@ -101,7 +100,7 @@ class BackgroundTVAgent:
         
         return self.run_applescript_silent(script)
         
-    async def change_symbol_background(self, symbol: str) -> Dict:
+    async def change_symbol_background(self, symbol: str) -> dict:
         """Change symbol WITHOUT interrupting your work"""
         logger.info(f"📊 [BACKGROUND] Changing symbol to: {symbol}")
         
@@ -146,7 +145,7 @@ class BackgroundTVAgent:
             "result": result
         }
         
-    async def add_to_watchlist_background(self, symbol: str) -> Dict:
+    async def add_to_watchlist_background(self, symbol: str) -> dict:
         """Add to watchlist WITHOUT interrupting work"""
         logger.info(f"⭐ [BACKGROUND] Adding {symbol} to watchlist")
         
@@ -197,7 +196,7 @@ class BackgroundTVAgent:
             "result": result
         }
         
-    async def get_price_background(self) -> Dict:
+    async def get_price_background(self) -> dict:
         """Get price WITHOUT activating window"""
         js = '''
         (function() {
@@ -239,7 +238,7 @@ class BackgroundTVAgent:
             pass
         return {"price": 0, "symbol": ""}
         
-    async def get_status(self) -> Dict:
+    async def get_status(self) -> dict:
         tv_tab = self.find_tv_tab()
         price_data = await self.get_price_background()
         

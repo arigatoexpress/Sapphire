@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
-from typing import Dict, List
+from datetime import UTC, date, datetime
 
 from bis.models import GeneratedDocument, ListingStatus, NoteEntry, make_urn
 from bis.scoring import compute_propensity_score
@@ -105,12 +104,12 @@ def auto_generate_documents_for_property(
     *,
     property_urn: str,
     force: bool = False,
-) -> List[GeneratedDocument]:
+) -> list[GeneratedDocument]:
     prop = store.get_property(property_urn)
     if not prop:
         return []
 
-    generated: List[GeneratedDocument] = []
+    generated: list[GeneratedDocument] = []
     for doc_type, builder in [
         ("property_summary", generate_property_summary_doc),
         ("call_brief", generate_call_brief_doc),
@@ -129,7 +128,7 @@ def run_automation_tick(
     store: InMemoryMasterArena,
     *,
     stale_listing_days: int = 45,
-) -> Dict[str, int]:
+) -> dict[str, int]:
     generated_docs = 0
     listing_age_alerts = 0
 
@@ -150,7 +149,7 @@ def run_automation_tick(
                             property_urn=prop.property_urn,
                             tags=["auto-aging", marker],
                             created_by="bis-automation",
-                            created_at=datetime.now(tz=timezone.utc),
+                            created_at=datetime.now(tz=UTC),
                         )
                     )
                     listing_age_alerts += 1

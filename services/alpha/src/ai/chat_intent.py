@@ -3,7 +3,7 @@ import json
 import logging
 import re
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any
 
 # We will use the existing GeminiGuard or a lightweight client
 from src.ai.gemini_guard import GeminiGuard
@@ -73,7 +73,7 @@ class ChatIntentEngine:
         self.ai = ai_guard
         self._system_prompt = _SYSTEM_PROMPT
 
-    async def analyze(self, text: str) -> Dict[str, Any]:
+    async def analyze(self, text: str) -> dict[str, Any]:
         """Classify a natural language message into a structured intent.
 
         Returns a dict with 'intent' and 'parameters' keys.
@@ -118,7 +118,7 @@ class ChatIntentEngine:
 
     # ── Fast local classifier ─────────────────────────────────────────
 
-    def _fast_classify(self, text: str) -> Optional[Dict[str, Any]]:
+    def _fast_classify(self, text: str) -> dict[str, Any] | None:
         """Match common conversational phrases without hitting the LLM."""
         cleaned = text.strip()
         if not cleaned:

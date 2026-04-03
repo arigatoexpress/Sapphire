@@ -16,7 +16,7 @@ import json
 import subprocess
 import sys
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 REPOS = {
@@ -89,7 +89,7 @@ def scan_repo(name: str, path: Path) -> RepoHealth:
     if ts:
         try:
             commit_time = datetime.fromisoformat(ts)
-            age = datetime.now(timezone.utc) - commit_time
+            age = datetime.now(UTC) - commit_time
             h.last_commit_age_hours = age.total_seconds() / 3600
         except Exception:
             pass
@@ -174,7 +174,7 @@ def scan_all(repo_filter: str | None = None) -> dict:
     total_score = sum(r.score for r in results) // len(results) if results else 0
 
     return {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "total_repos": len(results),
         "avg_score": total_score,
         "total_lint_errors": sum(r.lint_errors for r in results),

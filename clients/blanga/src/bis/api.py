@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -55,9 +55,9 @@ router = APIRouter(prefix="/api/bis", tags=["bis"], dependencies=[Depends(requir
 master_arena = InMemoryMasterArena()
 agent = BISAgent(master_arena)
 settings = get_settings()
-audit_events: List[Dict[str, Any]] = []
-saved_comp_searches: Dict[str, Dict[str, Any]] = {}
-broker_followup_tasks: Dict[str, Dict[str, Any]] = {}
+audit_events: list[dict[str, Any]] = []
+saved_comp_searches: dict[str, dict[str, Any]] = {}
+broker_followup_tasks: dict[str, dict[str, Any]] = {}
 
 
 def _new_ui_urn(prefix: str) -> str:
@@ -71,8 +71,8 @@ def _record_audit_event(
     summary: str,
     entity_type: str = "",
     entity_urn: str = "",
-    details: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    details: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     event = {
         "audit_urn": _new_ui_urn("audit"),
         "action": action,
@@ -81,14 +81,14 @@ def _record_audit_event(
         "entity_type": entity_type,
         "entity_urn": entity_urn,
         "details": details or {},
-        "created_at": datetime.now(tz=timezone.utc).isoformat(),
+        "created_at": datetime.now(tz=UTC).isoformat(),
     }
     audit_events.insert(0, event)
     del audit_events[500:]
     return event
 
 
-def _serialize_followup_task(task: Dict[str, Any]) -> Dict[str, Any]:
+def _serialize_followup_task(task: dict[str, Any]) -> dict[str, Any]:
     return {
         "task_urn": task.get("task_urn"),
         "action_urn": task.get("action_urn"),
@@ -112,20 +112,20 @@ def _serialize_followup_task(task: Dict[str, Any]) -> Dict[str, Any]:
 def _create_followup_tasks_from_note(
     *,
     note: NoteEntry,
-    property_urn: Optional[str],
-    owner_person_urn: Optional[str],
+    property_urn: str | None,
+    owner_person_urn: str | None,
     source_label: str,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     suggestions = extract_follow_up_suggestions(note.note_text)
     if not suggestions:
         return []
 
     prop = master_arena.get_property(property_urn) if property_urn else None
     owner = master_arena.get_person(owner_person_urn) if owner_person_urn else None
-    created: List[Dict[str, Any]] = []
+    created: list[dict[str, Any]] = []
     for suggestion in suggestions:
         task_urn = _new_ui_urn("followup")
-        now_iso = datetime.now(tz=timezone.utc).isoformat()
+        now_iso = datetime.now(tz=UTC).isoformat()
         title = "Follow up with owner"
         if suggestion.intent == "seller_follow_up":
             title = "Follow up: potential seller"
@@ -159,7 +159,7 @@ def _create_followup_tasks_from_note(
     return created
 
 
-def _update_followup_task_outcome(*, action_urn: str, outcome: str, note: str) -> Optional[Dict[str, Any]]:
+def _update_followup_task_outcome(*, action_urn: str, outcome: str, note: str) -> dict[str, Any] | None:
     task = broker_followup_tasks.get(action_urn)
     if not task:
         return None
@@ -177,13 +177,13 @@ def _update_followup_task_outcome(*, action_urn: str, outcome: str, note: str) -
     elif outcome in {"done", "ignored"}:
         task["status"] = outcome
         task.setdefault("metadata", {})["resolution_note"] = note or ""
-    task["updated_at"] = datetime.now(tz=timezone.utc).isoformat()
+    task["updated_at"] = datetime.now(tz=UTC).isoformat()
     return task
 
 
-def _next_best_actions(limit: int = 20) -> List[Dict[str, Any]]:
-    actions: List[Dict[str, Any]] = []
-    now = datetime.now(tz=timezone.utc)
+def _next_best_actions(limit: int = 20) -> list[dict[str, Any]]:
+    actions: list[dict[str, Any]] = []
+    now = datetime.now(tz=UTC)
     today = now.date()
 
     # 0) Broker follow-up tasks parsed from notes (dated work should be obvious)
@@ -343,7 +343,7 @@ def _next_best_actions(limit: int = 20) -> List[Dict[str, Any]]:
 
     # Deduplicate by category+entity+review for readability
     seen = set()
-    deduped: List[Dict[str, Any]] = []
+    deduped: list[dict[str, Any]] = []
     for item in sorted(actions, key=lambda x: (-x["priority_score"], x.get("created_at", "")), reverse=False):
         key = (item["category"], item.get("entity_urn"), item.get("review_urn"))
         if key in seen:
@@ -365,11 +365,11 @@ def _backup_file_path() -> Path:
     return _backup_dir() / "master_arena_snapshot.latest.json"
 
 
-def _snapshot_status() -> Dict[str, Any]:
+def _snapshot_status() -> dict[str, Any]:
     path = _backup_file_path()
     exists = path.exists()
     size = path.stat().st_size if exists else 0
-    modified = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).isoformat() if exists else None
+    modified = datetime.fromtimestamp(path.stat().st_mtime, tz=UTC).isoformat() if exists else None
     local_status = {
         "storage_mode": "local_ephemeral_filesystem",
         "warning": "Cloud Run local filesystem is ephemeral; export/download snapshots for durable backup.",
@@ -386,12 +386,12 @@ def _snapshot_status() -> Dict[str, Any]:
     }
 
 
-def _application_snapshot_payload() -> Dict[str, Any]:
+def _application_snapshot_payload() -> dict[str, Any]:
     arena_snapshot = master_arena.snapshot()
     return {
         "snapshot_kind": "bis_application",
         "version": 2,
-        "generated_at": datetime.now(tz=timezone.utc).isoformat(),
+        "generated_at": datetime.now(tz=UTC).isoformat(),
         "master_arena": arena_snapshot,
         "ui_state": {
             "audit_events": audit_events,
@@ -407,7 +407,7 @@ def _application_snapshot_payload() -> Dict[str, Any]:
     }
 
 
-def _restore_application_snapshot(payload: Dict[str, Any]) -> Dict[str, int]:
+def _restore_application_snapshot(payload: dict[str, Any]) -> dict[str, int]:
     # Backward compatibility: old snapshots were raw master_arena payloads
     arena_payload = payload.get("master_arena") if isinstance(payload.get("master_arena"), dict) else payload
     counts = master_arena.restore_snapshot(arena_payload)
@@ -432,7 +432,7 @@ def _restore_application_snapshot(payload: Dict[str, Any]) -> Dict[str, int]:
     return counts
 
 
-def _save_snapshot_to_disk() -> Dict[str, Any]:
+def _save_snapshot_to_disk() -> dict[str, Any]:
     snapshot = _application_snapshot_payload()
     path = _backup_file_path()
     path.write_text(json.dumps(snapshot, indent=2, sort_keys=True), encoding="utf-8")
@@ -441,10 +441,10 @@ def _save_snapshot_to_disk() -> Dict[str, Any]:
     return status
 
 
-def _save_snapshot() -> Dict[str, Any]:
+def _save_snapshot() -> dict[str, Any]:
     disk_status = _save_snapshot_to_disk()
     snapshot = _application_snapshot_payload()
-    gcs_result: Dict[str, Any]
+    gcs_result: dict[str, Any]
     try:
         if settings.gcs_snapshot_bucket:
             gcs_result = save_snapshot_to_gcs(snapshot, settings)
@@ -494,24 +494,24 @@ def _add_years_safe(source: date, years: int) -> date:
 
 
 class PersonUpsertRequest(BaseModel):
-    person_urn: Optional[str] = None
+    person_urn: str | None = None
     full_name: str
-    phones: List[str] = Field(default_factory=list)
-    emails: List[str] = Field(default_factory=list)
+    phones: list[str] = Field(default_factory=list)
+    emails: list[str] = Field(default_factory=list)
     dnc: bool = False
     notes: str = ""
 
 
 class LlcUpsertRequest(BaseModel):
-    llc_urn: Optional[str] = None
+    llc_urn: str | None = None
     legal_name: str
     state: str = "TX"
     sos_file_number: str = ""
-    officer_person_urns: List[str] = Field(default_factory=list)
+    officer_person_urns: list[str] = Field(default_factory=list)
 
 
 class PropertyUpsertRequest(BaseModel):
-    property_urn: Optional[str] = None
+    property_urn: str | None = None
     address_line1: str
     city: str
     county: str
@@ -521,21 +521,21 @@ class PropertyUpsertRequest(BaseModel):
     corridor: str = ""
     asset_type: str = "stnl_retail"
     tenant_brand: str = ""
-    building_sqft: Optional[float] = None
-    land_acres: Optional[float] = None
-    year_built: Optional[int] = None
-    asking_price: Optional[float] = None
-    noi: Optional[float] = None
-    cap_rate: Optional[float] = None
-    current_rent_psf: Optional[float] = None
-    submarket_avg_rent_psf: Optional[float] = None
-    lease_expiration: Optional[date] = None
-    ownership_start: Optional[date] = None
-    owner_llc_urns: List[str] = Field(default_factory=list)
+    building_sqft: float | None = None
+    land_acres: float | None = None
+    year_built: int | None = None
+    asking_price: float | None = None
+    noi: float | None = None
+    cap_rate: float | None = None
+    current_rent_psf: float | None = None
+    submarket_avg_rent_psf: float | None = None
+    lease_expiration: date | None = None
+    ownership_start: date | None = None
+    owner_llc_urns: list[str] = Field(default_factory=list)
     listing_status: ListingStatus = ListingStatus.DRAFT
-    listed_at: Optional[date] = None
-    sold_at: Optional[date] = None
-    close_price: Optional[float] = None
+    listed_at: date | None = None
+    sold_at: date | None = None
+    close_price: float | None = None
     listing_broker: str = ""
     redo: bool = False
     potential_listing: bool = False
@@ -543,9 +543,9 @@ class PropertyUpsertRequest(BaseModel):
 
 class NoteCreateRequest(BaseModel):
     note_text: str
-    owner_person_urn: Optional[str] = None
-    property_urn: Optional[str] = None
-    tags: List[str] = Field(default_factory=list)
+    owner_person_urn: str | None = None
+    property_urn: str | None = None
+    tags: list[str] = Field(default_factory=list)
     created_by: str = "broker"
 
 
@@ -560,14 +560,14 @@ class CommandRequest(BaseModel):
 
 class OMExtractRequest(BaseModel):
     source_name: str = "om.pdf"
-    property_urn: Optional[str] = None
+    property_urn: str | None = None
     document_text: str
 
 
 class PermitPullRequest(BaseModel):
     limit: int = 50
     min_valuation: float = 50000.0
-    counties: List[str] = Field(default_factory=lambda: ["Travis", "Williamson", "Hays"])
+    counties: list[str] = Field(default_factory=lambda: ["Travis", "Williamson", "Hays"])
 
 
 class IntakeDropRequest(BaseModel):
@@ -580,14 +580,14 @@ class IntakeDropRequest(BaseModel):
     occupancy_status: str = ""
     submarket: str = ""
     corridor: str = ""
-    building_sqft: Optional[float] = None
-    land_acres: Optional[float] = None
-    asking_price: Optional[float] = None
-    close_price: Optional[float] = None
+    building_sqft: float | None = None
+    land_acres: float | None = None
+    asking_price: float | None = None
+    close_price: float | None = None
     note_text: str = ""
-    listing_status: Optional[ListingStatus] = None
-    listed_at: Optional[date] = None
-    sold_at: Optional[date] = None
+    listing_status: ListingStatus | None = None
+    listed_at: date | None = None
+    sold_at: date | None = None
     source_label: str = "intake-drop"
     auto_generate_docs: bool = True
 
@@ -597,41 +597,41 @@ class AutomationRunRequest(BaseModel):
     pull_permit_signals: bool = False
     permit_limit: int = 50
     permit_min_valuation: float = 50000.0
-    permit_counties: List[str] = Field(default_factory=lambda: ["Travis", "Williamson", "Hays"])
+    permit_counties: list[str] = Field(default_factory=lambda: ["Travis", "Williamson", "Hays"])
     refresh_news_intel: bool = False
     news_max_queries: int = 12
     news_per_query_limit: int = 5
     news_lookback_days: int = 21
-    news_preferred_publications: List[str] = Field(default_factory=list)
+    news_preferred_publications: list[str] = Field(default_factory=list)
     sync_google_sheets_pull: bool = False
     sync_google_sheets_push: bool = False
-    google_sheets_push_targets: List[str] = Field(default_factory=lambda: ["properties_computed", "reviews_pending"])
+    google_sheets_push_targets: list[str] = Field(default_factory=lambda: ["properties_computed", "reviews_pending"])
     auto_approve_reviews: bool = False
     review_auto_min_confidence: float = 0.90
-    review_auto_only_fields: List[str] = Field(default_factory=list)
+    review_auto_only_fields: list[str] = Field(default_factory=list)
 
 
 class MarketEventIngestRequest(BaseModel):
     event_type: str
     title: str
-    observed_at: Optional[datetime] = None
-    property_urn: Optional[str] = None
+    observed_at: datetime | None = None
+    property_urn: str | None = None
     property_address_hint: str = ""
     city: str = "Austin"
     county: str = "Travis"
     create_property_if_missing: bool = True
-    owner_person_urn: Optional[str] = None
+    owner_person_urn: str | None = None
     owner_name_hint: str = ""
     company_name: str = ""
     source_url: str = ""
     summary: str = ""
-    list_price: Optional[float] = None
-    close_price: Optional[float] = None
+    list_price: float | None = None
+    close_price: float | None = None
 
 
 class NewsIntelRefreshRequest(BaseModel):
-    queries: List[str] = Field(default_factory=list)
-    preferred_publications: List[str] = Field(default_factory=list)
+    queries: list[str] = Field(default_factory=list)
+    preferred_publications: list[str] = Field(default_factory=list)
     max_queries: int = 12
     per_query_limit: int = 5
     lookback_days: int = 21
@@ -646,19 +646,19 @@ class ReviewAutoApproveRequest(BaseModel):
     reviewed_by: str = "bis-auto-review"
     review_note: str = "Auto-approved by BIS threshold policy"
     min_confidence: float = 0.90
-    field_thresholds: Dict[str, float] = Field(default_factory=dict)
-    only_fields: List[str] = Field(default_factory=list)
+    field_thresholds: dict[str, float] = Field(default_factory=dict)
+    only_fields: list[str] = Field(default_factory=list)
     max_items: int = 50
     dry_run: bool = False
 
 
 class SnapshotImportRequest(BaseModel):
-    snapshot: Dict[str, Any]
+    snapshot: dict[str, Any]
 
 
 class SheetImportRequest(BaseModel):
     tab: str = "properties_input"
-    rows: List[Dict[str, Any]] = Field(default_factory=list)
+    rows: list[dict[str, Any]] = Field(default_factory=list)
     dry_run: bool = False
     auto_generate_docs: bool = True
 
@@ -683,13 +683,13 @@ class UICompsSearchRequest(BaseModel):
     tenant_brand: str = ""
     corridor: str = ""
     submarket: str = ""
-    max_land_psf: Optional[float] = None
-    max_building_psf: Optional[float] = None
-    max_building_sqft: Optional[float] = None
-    min_cap_rate: Optional[float] = None
-    max_cap_rate: Optional[float] = None
+    max_land_psf: float | None = None
+    max_building_psf: float | None = None
+    max_building_sqft: float | None = None
+    min_cap_rate: float | None = None
+    max_cap_rate: float | None = None
     occupancy_status: str = ""
-    lease_expiring_within_years: Optional[int] = None
+    lease_expiring_within_years: int | None = None
     only_active_outreach: bool = False
     limit: int = 15
 
@@ -712,7 +712,7 @@ def _norm(text: str) -> str:
     return " ".join((text or "").strip().lower().split())
 
 
-def _find_person_by_name(full_name: str) -> Optional[Person]:
+def _find_person_by_name(full_name: str) -> Person | None:
     target = _norm(full_name)
     if not target:
         return None
@@ -723,7 +723,7 @@ def _find_person_by_name(full_name: str) -> Optional[Person]:
     return None
 
 
-def _find_llc_by_name(legal_name: str) -> Optional[LlcEntity]:
+def _find_llc_by_name(legal_name: str) -> LlcEntity | None:
     target = _norm(legal_name)
     if not target:
         return None
@@ -761,10 +761,10 @@ def _resolve_sheet_tab_from_target(target: str, explicit_tab: str = "") -> tuple
     return normalized, mapping[normalized]
 
 
-def _writeback_preview_for_tab(tab: str) -> List[Dict[str, Any]]:
+def _writeback_preview_for_tab(tab: str) -> list[dict[str, Any]]:
     normalized = _norm(tab).replace("-", "_")
     if normalized in {"change_log_view"}:
-        rows: List[Dict[str, Any]] = []
+        rows: list[dict[str, Any]] = []
         for event in audit_events[:200]:
             rows.append(
                 {
@@ -796,7 +796,7 @@ def _writeback_preview_for_tab(tab: str) -> List[Dict[str, Any]]:
     return writeback_preview_rows(master_arena, tab=normalized)
 
 
-def _default_review_thresholds() -> Dict[str, float]:
+def _default_review_thresholds() -> dict[str, float]:
     return {
         "occupancy_status": 0.85,
         "lease_expiration": 0.93,
@@ -809,17 +809,17 @@ def _auto_approve_pending_reviews(
     reviewed_by: str,
     review_note: str,
     min_confidence: float,
-    field_thresholds: Dict[str, float],
-    only_fields: List[str],
+    field_thresholds: dict[str, float],
+    only_fields: list[str],
     max_items: int,
     dry_run: bool,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     tasks = master_arena.list_review_tasks(status="pending")
     allowed_fields = {_norm(field) for field in only_fields if _norm(field)}
     thresholds = {**_default_review_thresholds(), **{_norm(k): float(v) for k, v in field_thresholds.items()}}
 
-    candidates: List[ReviewTask] = []
-    skipped: List[Dict[str, Any]] = []
+    candidates: list[ReviewTask] = []
+    skipped: list[dict[str, Any]] = []
     for task in tasks:
         obs = master_arena.get_field_observation(task.observation_urn)
         if obs is None:
@@ -845,7 +845,7 @@ def _auto_approve_pending_reviews(
         if len(candidates) >= max(1, max_items):
             break
 
-    approved: List[Dict[str, Any]] = []
+    approved: list[dict[str, Any]] = []
     if not dry_run:
         for task in candidates:
             try:
@@ -873,11 +873,11 @@ def _auto_approve_pending_reviews(
     }
 
 
-def _readiness_summary() -> Dict[str, Any]:
+def _readiness_summary() -> dict[str, Any]:
     sheets_status = sheets_client_status()
     snapshot = _snapshot_status()
-    recommendations: List[str] = []
-    checks: List[Dict[str, Any]] = []
+    recommendations: list[str] = []
+    checks: list[dict[str, Any]] = []
 
     auth_ok = settings.require_auth and bool(settings.app_password)
     checks.append({"name": "auth_password", "ok": auth_ok, "detail": "BIS basic auth enabled" if auth_ok else "Auth/password not configured"})
@@ -950,11 +950,11 @@ def _readiness_summary() -> Dict[str, Any]:
             "pending_reviews": pending_reviews,
             "documents": len(master_arena.documents),
         },
-        "generated_at": datetime.now(tz=timezone.utc).isoformat(),
+        "generated_at": datetime.now(tz=UTC).isoformat(),
     }
 
 
-def _serialize_person(person: Person) -> Dict[str, Any]:
+def _serialize_person(person: Person) -> dict[str, Any]:
     return {
         "person_urn": person.person_urn,
         "full_name": person.full_name,
@@ -967,7 +967,7 @@ def _serialize_person(person: Person) -> Dict[str, Any]:
     }
 
 
-def _serialize_llc(llc: LlcEntity) -> Dict[str, Any]:
+def _serialize_llc(llc: LlcEntity) -> dict[str, Any]:
     return {
         "llc_urn": llc.llc_urn,
         "legal_name": llc.legal_name,
@@ -979,7 +979,7 @@ def _serialize_llc(llc: LlcEntity) -> Dict[str, Any]:
     }
 
 
-def _serialize_property(item: PropertyAsset) -> Dict[str, Any]:
+def _serialize_property(item: PropertyAsset) -> dict[str, Any]:
     days_on_market = master_arena.days_on_market(item.property_urn)
     list_to_close_delta = master_arena.list_to_close_delta(
         list_price=item.asking_price,
@@ -1026,7 +1026,7 @@ def _serialize_property(item: PropertyAsset) -> Dict[str, Any]:
     }
 
 
-def _serialize_note(note: NoteEntry) -> Dict[str, Any]:
+def _serialize_note(note: NoteEntry) -> dict[str, Any]:
     return {
         "note_urn": note.note_urn,
         "note_text": note.note_text,
@@ -1038,7 +1038,7 @@ def _serialize_note(note: NoteEntry) -> Dict[str, Any]:
     }
 
 
-def _serialize_document(document: GeneratedDocument) -> Dict[str, Any]:
+def _serialize_document(document: GeneratedDocument) -> dict[str, Any]:
     return {
         "document_urn": document.document_urn,
         "doc_type": document.doc_type,
@@ -1051,7 +1051,7 @@ def _serialize_document(document: GeneratedDocument) -> Dict[str, Any]:
     }
 
 
-def _serialize_market_event(event: MarketEvent) -> Dict[str, Any]:
+def _serialize_market_event(event: MarketEvent) -> dict[str, Any]:
     return {
         "event_urn": event.event_urn,
         "event_type": event.event_type.value,
@@ -1067,7 +1067,7 @@ def _serialize_market_event(event: MarketEvent) -> Dict[str, Any]:
     }
 
 
-def _serialize_observation(observation: FieldObservation) -> Dict[str, Any]:
+def _serialize_observation(observation: FieldObservation) -> dict[str, Any]:
     return {
         "observation_urn": observation.observation_urn,
         "entity_type": observation.entity_type,
@@ -1083,7 +1083,7 @@ def _serialize_observation(observation: FieldObservation) -> Dict[str, Any]:
     }
 
 
-def _serialize_review_task(task: ReviewTask) -> Dict[str, Any]:
+def _serialize_review_task(task: ReviewTask) -> dict[str, Any]:
     observation = master_arena.get_field_observation(task.observation_urn)
     return {
         "review_urn": task.review_urn,
@@ -1100,8 +1100,8 @@ def _serialize_review_task(task: ReviewTask) -> Dict[str, Any]:
     }
 
 
-def _extract_note_to_review_tasks(note: NoteEntry) -> List[ReviewTask]:
-    created: List[ReviewTask] = []
+def _extract_note_to_review_tasks(note: NoteEntry) -> list[ReviewTask]:
+    created: list[ReviewTask] = []
     entity_urn = note.property_urn or ""
     if not entity_urn:
         return created
@@ -1135,7 +1135,7 @@ def _extract_note_to_review_tasks(note: NoteEntry) -> List[ReviewTask]:
     return created
 
 
-def _coerce_date_value(raw: str) -> Optional[date]:
+def _coerce_date_value(raw: str) -> date | None:
     text = (raw or "").strip()
     if not text:
         return None
@@ -1149,7 +1149,7 @@ def _coerce_date_value(raw: str) -> Optional[date]:
     raise ValueError(f"invalid date value: {raw}")
 
 
-def _coerce_float_value(raw: str) -> Optional[float]:
+def _coerce_float_value(raw: str) -> float | None:
     text = (raw or "").strip().replace("$", "").replace(",", "")
     if not text:
         return None
@@ -1165,11 +1165,11 @@ def _coerce_bool_value(raw: str) -> bool:
     raise ValueError(f"invalid boolean value: {raw}")
 
 
-def _import_note_row_impl(row: Dict[str, Any]) -> Dict[str, Any]:
+def _import_note_row_impl(row: dict[str, Any]) -> dict[str, Any]:
     normalized = normalize_notes_row(row)
     linked_property = None
     linked_owner = None
-    link_status: List[str] = []
+    link_status: list[str] = []
 
     if normalized.property_urn:
         linked_property = master_arena.get_property(normalized.property_urn)
@@ -1234,7 +1234,7 @@ def _import_note_row_impl(row: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _apply_property_update_row_impl(row: Dict[str, Any]) -> Dict[str, Any]:
+def _apply_property_update_row_impl(row: dict[str, Any]) -> dict[str, Any]:
     normalized = normalize_property_update_row(row)
     prop = master_arena.get_property(normalized.property_urn) if normalized.property_urn else None
     if prop is None and normalized.address_line1:
@@ -1314,7 +1314,7 @@ def _apply_property_update_row_impl(row: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _intake_drop_impl(payload: IntakeDropRequest) -> Dict[str, Any]:
+def _intake_drop_impl(payload: IntakeDropRequest) -> dict[str, Any]:
     owner = _find_person_by_name(payload.owner_name)
     if owner is None:
         owner = master_arena.upsert_person(
@@ -1402,8 +1402,8 @@ def _intake_drop_impl(payload: IntakeDropRequest) -> Dict[str, Any]:
         master_arena.upsert_property(property_asset)
 
     created_note = None
-    review_tasks: List[ReviewTask] = []
-    followup_tasks: List[Dict[str, Any]] = []
+    review_tasks: list[ReviewTask] = []
+    followup_tasks: list[dict[str, Any]] = []
     if payload.note_text.strip():
         created_note = master_arena.add_note(
             NoteEntry(
@@ -1423,7 +1423,7 @@ def _intake_drop_impl(payload: IntakeDropRequest) -> Dict[str, Any]:
             source_label=payload.source_label,
         )
 
-    generated_docs: List[GeneratedDocument] = []
+    generated_docs: list[GeneratedDocument] = []
     if payload.auto_generate_docs:
         generated_docs = auto_generate_documents_for_property(
             master_arena,
@@ -1454,11 +1454,11 @@ def _intake_drop_impl(payload: IntakeDropRequest) -> Dict[str, Any]:
 
 
 @router.get("/health")
-async def bis_health() -> Dict[str, Any]:
+async def bis_health() -> dict[str, Any]:
     return {
         "status": "ok",
         "service": "bis",
-        "generated_at": datetime.now(tz=timezone.utc).isoformat(),
+        "generated_at": datetime.now(tz=UTC).isoformat(),
         "people": len(master_arena.people),
         "llcs": len(master_arena.llcs),
         "properties": len(master_arena.properties),
@@ -1472,7 +1472,7 @@ async def bis_health() -> Dict[str, Any]:
 
 
 @router.get("/compliance/sources")
-async def list_source_policies() -> Dict[str, Any]:
+async def list_source_policies() -> dict[str, Any]:
     return {
         "status": "ok",
         "policies": policies_as_dicts(),
@@ -1480,7 +1480,7 @@ async def list_source_policies() -> Dict[str, Any]:
 
 
 @router.get("/system/backup/status")
-async def backup_status() -> Dict[str, Any]:
+async def backup_status() -> dict[str, Any]:
     snapshot = _application_snapshot_payload()
     return {
         "status": "ok",
@@ -1490,12 +1490,12 @@ async def backup_status() -> Dict[str, Any]:
 
 
 @router.get("/system/readiness")
-async def system_readiness() -> Dict[str, Any]:
+async def system_readiness() -> dict[str, Any]:
     return _readiness_summary()
 
 
 @router.get("/ui/overview")
-async def ui_overview() -> Dict[str, Any]:
+async def ui_overview() -> dict[str, Any]:
     readiness = _readiness_summary()
     pending_reviews = master_arena.list_review_tasks(status="pending")
     recent_properties = sorted(master_arena.list_properties(), key=lambda p: p.updated_at, reverse=True)[:20]
@@ -1504,7 +1504,7 @@ async def ui_overview() -> Dict[str, Any]:
 
     return {
         "status": "ok",
-        "generated_at": datetime.now(tz=timezone.utc).isoformat(),
+        "generated_at": datetime.now(tz=UTC).isoformat(),
         "counts": {
             "people": len(master_arena.people),
             "llcs": len(master_arena.llcs),
@@ -1545,7 +1545,7 @@ async def ui_overview() -> Dict[str, Any]:
 
 
 @router.post("/ui/comps/search")
-async def ui_comps_search(payload: UICompsSearchRequest) -> Dict[str, Any]:
+async def ui_comps_search(payload: UICompsSearchRequest) -> dict[str, Any]:
     query = PropertyQuery(
         tenant_brand=payload.tenant_brand,
         city=payload.city,
@@ -1570,7 +1570,7 @@ async def ui_comps_search(payload: UICompsSearchRequest) -> Dict[str, Any]:
     cap_rates = [row["cap_rate"] for row in rows if row.get("cap_rate") is not None]
     dom_values = [row["days_on_market"] for row in rows if row.get("days_on_market") is not None]
 
-    def _avg(values: List[float]) -> Optional[float]:
+    def _avg(values: list[float]) -> float | None:
         if not values:
             return None
         return round(sum(values) / len(values), 2)
@@ -1621,7 +1621,7 @@ async def ui_comps_search(payload: UICompsSearchRequest) -> Dict[str, Any]:
 
 
 @router.get("/ui/audit")
-async def ui_audit(limit: int = 50) -> Dict[str, Any]:
+async def ui_audit(limit: int = 50) -> dict[str, Any]:
     n = max(1, min(limit, 200))
     return {
         "status": "ok",
@@ -1631,7 +1631,7 @@ async def ui_audit(limit: int = 50) -> Dict[str, Any]:
 
 
 @router.get("/ui/next-actions")
-async def ui_next_actions(limit: int = 20) -> Dict[str, Any]:
+async def ui_next_actions(limit: int = 20) -> dict[str, Any]:
     rows = _next_best_actions(limit=limit)
     return {
         "status": "ok",
@@ -1644,7 +1644,7 @@ async def ui_next_actions(limit: int = 20) -> Dict[str, Any]:
 
 
 @router.post("/ui/next-actions/log")
-async def ui_next_actions_log(payload: NextActionLogRequest) -> Dict[str, Any]:
+async def ui_next_actions_log(payload: NextActionLogRequest) -> dict[str, Any]:
     outcome = (payload.outcome or "done").strip().lower()
     if outcome not in {"done", "snoozed", "ignored"}:
         raise HTTPException(status_code=400, detail="outcome must be one of: done, snoozed, ignored")
@@ -1663,15 +1663,15 @@ async def ui_next_actions_log(payload: NextActionLogRequest) -> Dict[str, Any]:
 
 
 @router.post("/ui/comps/saved")
-async def save_comp_search(payload: SavedCompSearchRequest) -> Dict[str, Any]:
+async def save_comp_search(payload: SavedCompSearchRequest) -> dict[str, Any]:
     saved_urn = _new_ui_urn("compsearch")
     record = {
         "saved_search_urn": saved_urn,
         "name": payload.name.strip(),
         "notes": payload.notes.strip(),
         "created_by": payload.created_by,
-        "created_at": datetime.now(tz=timezone.utc).isoformat(),
-        "updated_at": datetime.now(tz=timezone.utc).isoformat(),
+        "created_at": datetime.now(tz=UTC).isoformat(),
+        "updated_at": datetime.now(tz=UTC).isoformat(),
         "filters": payload.filters.model_dump(),
     }
     if not record["name"]:
@@ -1688,13 +1688,13 @@ async def save_comp_search(payload: SavedCompSearchRequest) -> Dict[str, Any]:
 
 
 @router.get("/ui/comps/saved")
-async def list_saved_comp_searches() -> Dict[str, Any]:
+async def list_saved_comp_searches() -> dict[str, Any]:
     rows = sorted(saved_comp_searches.values(), key=lambda x: x["updated_at"], reverse=True)
     return {"status": "ok", "count": len(rows), "saved_searches": rows}
 
 
 @router.delete("/ui/comps/saved/{saved_search_urn}")
-async def delete_saved_comp_search(saved_search_urn: str) -> Dict[str, Any]:
+async def delete_saved_comp_search(saved_search_urn: str) -> dict[str, Any]:
     record = saved_comp_searches.pop(saved_search_urn, None)
     if not record:
         raise HTTPException(status_code=404, detail="saved comp search not found")
@@ -1709,11 +1709,11 @@ async def delete_saved_comp_search(saved_search_urn: str) -> Dict[str, Any]:
 
 
 @router.post("/ui/comps/saved/{saved_search_urn}/run")
-async def run_saved_comp_search(saved_search_urn: str) -> Dict[str, Any]:
+async def run_saved_comp_search(saved_search_urn: str) -> dict[str, Any]:
     record = saved_comp_searches.get(saved_search_urn)
     if not record:
         raise HTTPException(status_code=404, detail="saved comp search not found")
-    record["updated_at"] = datetime.now(tz=timezone.utc).isoformat()
+    record["updated_at"] = datetime.now(tz=UTC).isoformat()
     payload = UICompsSearchRequest(**record["filters"])
     result = await ui_comps_search(payload)
     _record_audit_event(
@@ -1730,7 +1730,7 @@ async def run_saved_comp_search(saved_search_urn: str) -> Dict[str, Any]:
 
 
 @router.get("/system/backup/export")
-async def export_backup_snapshot() -> Dict[str, Any]:
+async def export_backup_snapshot() -> dict[str, Any]:
     return {
         "status": "ok",
         "snapshot": _application_snapshot_payload(),
@@ -1739,7 +1739,7 @@ async def export_backup_snapshot() -> Dict[str, Any]:
 
 
 @router.post("/system/backup/save")
-async def save_backup_snapshot() -> Dict[str, Any]:
+async def save_backup_snapshot() -> dict[str, Any]:
     result = {
         "status": "ok",
         **_save_snapshot(),
@@ -1749,7 +1749,7 @@ async def save_backup_snapshot() -> Dict[str, Any]:
 
 
 @router.post("/system/backup/load")
-async def load_backup_snapshot() -> Dict[str, Any]:
+async def load_backup_snapshot() -> dict[str, Any]:
     try:
         payload = load_snapshot_from_gcs(settings)
         source = "gcs"
@@ -1773,7 +1773,7 @@ async def load_backup_snapshot() -> Dict[str, Any]:
 
 
 @router.post("/system/backup/import")
-async def import_backup_snapshot(payload: SnapshotImportRequest) -> Dict[str, Any]:
+async def import_backup_snapshot(payload: SnapshotImportRequest) -> dict[str, Any]:
     try:
         counts = _restore_application_snapshot(payload.snapshot)
     except Exception as exc:
@@ -1788,7 +1788,7 @@ async def import_backup_snapshot(payload: SnapshotImportRequest) -> Dict[str, An
 
 
 @router.get("/sheets/contract")
-async def get_sheets_contract() -> Dict[str, Any]:
+async def get_sheets_contract() -> dict[str, Any]:
     return {
         "status": "ok",
         "contract": sheet_contract(),
@@ -1814,7 +1814,7 @@ async def get_sheets_contract() -> Dict[str, Any]:
 
 
 @router.get("/sheets/writeback/preview")
-async def sheets_writeback_preview(tab: str = "properties_computed") -> Dict[str, Any]:
+async def sheets_writeback_preview(tab: str = "properties_computed") -> dict[str, Any]:
     try:
         rows = _writeback_preview_for_tab(tab)
     except ValueError as exc:
@@ -1828,7 +1828,7 @@ async def sheets_writeback_preview(tab: str = "properties_computed") -> Dict[str
 
 
 @router.post("/sheets/import")
-async def sheets_import(payload: SheetImportRequest) -> Dict[str, Any]:
+async def sheets_import(payload: SheetImportRequest) -> dict[str, Any]:
     tab = _norm(payload.tab).replace("-", "_")
     supported_import_tabs = {"properties_input", "properties_new_input", "property_updates_input", "notes_input"}
     if tab not in supported_import_tabs:
@@ -1838,9 +1838,9 @@ async def sheets_import(payload: SheetImportRequest) -> Dict[str, Any]:
         )
 
     imported = 0
-    errors: List[Dict[str, Any]] = []
-    previews: List[Dict[str, Any]] = []
-    results: List[Dict[str, Any]] = []
+    errors: list[dict[str, Any]] = []
+    previews: list[dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
 
     for idx, row in enumerate(payload.rows, start=1):
         try:
@@ -1979,7 +1979,7 @@ async def sheets_import(payload: SheetImportRequest) -> Dict[str, Any]:
 
 
 @router.get("/sheets/google/status")
-async def google_sheets_status() -> Dict[str, Any]:
+async def google_sheets_status() -> dict[str, Any]:
     status = sheets_client_status()
     return {
         "status": "ok",
@@ -2006,7 +2006,7 @@ async def google_sheets_status() -> Dict[str, Any]:
 
 
 @router.post("/sheets/google/pull")
-async def google_sheets_pull(payload: GoogleSheetsPullRequest) -> Dict[str, Any]:
+async def google_sheets_pull(payload: GoogleSheetsPullRequest) -> dict[str, Any]:
     spreadsheet_id = _resolve_spreadsheet_id(payload.spreadsheet_id)
     import_target = _norm(payload.import_tab).replace("-", "_") or "properties_input"
     _, source_tab = _resolve_sheet_tab_from_target(import_target, payload.source_tab)
@@ -2033,7 +2033,7 @@ async def google_sheets_pull(payload: GoogleSheetsPullRequest) -> Dict[str, Any]
 
 
 @router.post("/sheets/google/push")
-async def google_sheets_push(payload: GoogleSheetsPushRequest) -> Dict[str, Any]:
+async def google_sheets_push(payload: GoogleSheetsPushRequest) -> dict[str, Any]:
     spreadsheet_id = _resolve_spreadsheet_id(payload.spreadsheet_id)
     target, target_tab = _resolve_sheet_tab_from_target(payload.target, payload.target_tab)
     try:
@@ -2057,7 +2057,7 @@ async def google_sheets_push(payload: GoogleSheetsPushRequest) -> Dict[str, Any]
 
 
 @router.post("/seed")
-async def bis_seed() -> Dict[str, Any]:
+async def bis_seed() -> dict[str, Any]:
     if master_arena.properties:
         return {"status": "ok", "seeded": False, "reason": "already_seeded"}
 
@@ -2123,7 +2123,7 @@ async def bis_seed() -> Dict[str, Any]:
 
 
 @router.post("/persons")
-async def upsert_person(payload: PersonUpsertRequest) -> Dict[str, Any]:
+async def upsert_person(payload: PersonUpsertRequest) -> dict[str, Any]:
     person = Person(
         person_urn=payload.person_urn or make_urn("person"),
         full_name=payload.full_name,
@@ -2138,7 +2138,7 @@ async def upsert_person(payload: PersonUpsertRequest) -> Dict[str, Any]:
 
 
 @router.post("/llcs")
-async def upsert_llc(payload: LlcUpsertRequest) -> Dict[str, Any]:
+async def upsert_llc(payload: LlcUpsertRequest) -> dict[str, Any]:
     for person_urn in payload.officer_person_urns:
         if not master_arena.get_person(person_urn):
             raise HTTPException(status_code=404, detail=f"person not found: {person_urn}")
@@ -2156,7 +2156,7 @@ async def upsert_llc(payload: LlcUpsertRequest) -> Dict[str, Any]:
 
 
 @router.post("/llcs/{llc_urn}/officers/{person_urn}")
-async def attach_officer(llc_urn: str, person_urn: str) -> Dict[str, Any]:
+async def attach_officer(llc_urn: str, person_urn: str) -> dict[str, Any]:
     if not master_arena.get_person(person_urn):
         raise HTTPException(status_code=404, detail=f"person not found: {person_urn}")
     if not master_arena.get_llc(llc_urn):
@@ -2169,7 +2169,7 @@ async def attach_officer(llc_urn: str, person_urn: str) -> Dict[str, Any]:
 
 
 @router.post("/properties")
-async def upsert_property(payload: PropertyUpsertRequest) -> Dict[str, Any]:
+async def upsert_property(payload: PropertyUpsertRequest) -> dict[str, Any]:
     for llc_urn in payload.owner_llc_urns:
         if not master_arena.get_llc(llc_urn):
             raise HTTPException(status_code=404, detail=f"llc not found: {llc_urn}")
@@ -2210,15 +2210,15 @@ async def upsert_property(payload: PropertyUpsertRequest) -> Dict[str, Any]:
 
 
 @router.post("/intake/drop")
-async def intake_drop(payload: IntakeDropRequest) -> Dict[str, Any]:
+async def intake_drop(payload: IntakeDropRequest) -> dict[str, Any]:
     result = _intake_drop_impl(payload)
     _autosave_snapshot()
     return result
 
 
 @router.post("/automation/run")
-async def run_automation(payload: AutomationRunRequest) -> Dict[str, Any]:
-    review_auto_result: Dict[str, Any] = {"attempted": False}
+async def run_automation(payload: AutomationRunRequest) -> dict[str, Any]:
+    review_auto_result: dict[str, Any] = {"attempted": False}
     if payload.auto_approve_reviews:
         review_auto_result["attempted"] = True
         review_auto_result = _auto_approve_pending_reviews(
@@ -2231,7 +2231,7 @@ async def run_automation(payload: AutomationRunRequest) -> Dict[str, Any]:
             dry_run=False,
         )
 
-    sheets_pull: Dict[str, Any] = {"attempted": False}
+    sheets_pull: dict[str, Any] = {"attempted": False}
     if payload.sync_google_sheets_pull:
         sheets_pull["attempted"] = True
         try:
@@ -2264,7 +2264,7 @@ async def run_automation(payload: AutomationRunRequest) -> Dict[str, Any]:
 
     permit_ingested = 0
     permit_linked = 0
-    permit_source_breakdown: Dict[str, int] = {}
+    permit_source_breakdown: dict[str, int] = {}
     if payload.pull_permit_signals:
         signals = await fetch_county_permit_signals(
             counties=payload.permit_counties,
@@ -2288,7 +2288,7 @@ async def run_automation(payload: AutomationRunRequest) -> Dict[str, Any]:
         )
         news_events_created = len(events)
 
-    sheets_push_results: List[Dict[str, Any]] = []
+    sheets_push_results: list[dict[str, Any]] = []
     if payload.sync_google_sheets_push:
         try:
             spreadsheet_id = _resolve_spreadsheet_id("")
@@ -2358,10 +2358,10 @@ async def run_automation(payload: AutomationRunRequest) -> Dict[str, Any]:
 
 @router.get("/documents")
 async def list_documents(
-    property_urn: Optional[str] = None,
-    owner_person_urn: Optional[str] = None,
+    property_urn: str | None = None,
+    owner_person_urn: str | None = None,
     doc_type: str = "",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     documents = master_arena.list_documents(
         property_urn=property_urn,
         owner_person_urn=owner_person_urn,
@@ -2375,7 +2375,7 @@ async def list_documents(
 
 
 @router.post("/market-events")
-async def create_market_event(payload: MarketEventIngestRequest) -> Dict[str, Any]:
+async def create_market_event(payload: MarketEventIngestRequest) -> dict[str, Any]:
     person_urn = payload.owner_person_urn
     if not person_urn and payload.owner_name_hint.strip():
         person = _find_person_by_name(payload.owner_name_hint)
@@ -2402,7 +2402,7 @@ async def create_market_event(payload: MarketEventIngestRequest) -> Dict[str, An
             )
             property_urn = created.property_urn
 
-    attributes: Dict[str, str] = {}
+    attributes: dict[str, str] = {}
     if payload.list_price is not None:
         attributes["list_price"] = str(payload.list_price)
     if payload.close_price is not None:
@@ -2426,7 +2426,7 @@ async def create_market_event(payload: MarketEventIngestRequest) -> Dict[str, An
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    generated_docs: List[GeneratedDocument] = []
+    generated_docs: list[GeneratedDocument] = []
     if event.property_urn:
         generated_docs = auto_generate_documents_for_property(
             master_arena,
@@ -2452,11 +2452,11 @@ async def create_market_event(payload: MarketEventIngestRequest) -> Dict[str, An
 
 @router.get("/market-events")
 async def list_market_events(
-    property_urn: Optional[str] = None,
-    owner_person_urn: Optional[str] = None,
+    property_urn: str | None = None,
+    owner_person_urn: str | None = None,
     event_type: str = "",
     since_days: int = 120,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     events = master_arena.list_market_events(
         property_urn=property_urn,
         owner_person_urn=owner_person_urn,
@@ -2471,7 +2471,7 @@ async def list_market_events(
 
 
 @router.post("/intel/news/refresh")
-async def refresh_news(payload: NewsIntelRefreshRequest) -> Dict[str, Any]:
+async def refresh_news(payload: NewsIntelRefreshRequest) -> dict[str, Any]:
     events = refresh_news_intelligence(
         master_arena,
         queries=payload.queries or None,
@@ -2480,7 +2480,7 @@ async def refresh_news(payload: NewsIntelRefreshRequest) -> Dict[str, Any]:
         per_query_limit=payload.per_query_limit,
         lookback_days=payload.lookback_days,
     )
-    publication_breakdown: Dict[str, int] = {}
+    publication_breakdown: dict[str, int] = {}
     address_extracted = 0
     research_queue = 0
     for event in events:
@@ -2501,7 +2501,7 @@ async def refresh_news(payload: NewsIntelRefreshRequest) -> Dict[str, Any]:
 
 
 @router.get("/intel/news/sources")
-async def list_news_sources() -> Dict[str, Any]:
+async def list_news_sources() -> dict[str, Any]:
     return {
         "status": "ok",
         "sources": news_source_preferences_as_dicts(),
@@ -2514,12 +2514,12 @@ async def list_news_sources() -> Dict[str, Any]:
 
 
 @router.get("/intel/clients")
-async def get_client_intel(owner_person_urn: Optional[str] = None, since_days: int = 90) -> Dict[str, Any]:
+async def get_client_intel(owner_person_urn: str | None = None, since_days: int = 90) -> dict[str, Any]:
     return client_intel_summary(master_arena, owner_person_urn=owner_person_urn, since_days=since_days)
 
 
 @router.post("/properties/{property_urn}/redo")
-async def set_property_redo(property_urn: str, value: bool = True) -> Dict[str, Any]:
+async def set_property_redo(property_urn: str, value: bool = True) -> dict[str, Any]:
     if not master_arena.get_property(property_urn):
         raise HTTPException(status_code=404, detail="property not found")
     master_arena.apply_redo(property_urn, redo=value)
@@ -2528,7 +2528,7 @@ async def set_property_redo(property_urn: str, value: bool = True) -> Dict[str, 
 
 
 @router.get("/properties/{property_urn}")
-async def get_property(property_urn: str) -> Dict[str, Any]:
+async def get_property(property_urn: str) -> dict[str, Any]:
     prop = master_arena.get_property(property_urn)
     if not prop:
         raise HTTPException(status_code=404, detail="property not found")
@@ -2536,7 +2536,7 @@ async def get_property(property_urn: str) -> Dict[str, Any]:
 
 
 @router.get("/properties/{property_urn}/listing-duration")
-async def get_listing_duration(property_urn: str) -> Dict[str, Any]:
+async def get_listing_duration(property_urn: str) -> dict[str, Any]:
     prop = master_arena.get_property(property_urn)
     if not prop:
         raise HTTPException(status_code=404, detail="property not found")
@@ -2551,7 +2551,7 @@ async def get_listing_duration(property_urn: str) -> Dict[str, Any]:
 
 
 @router.get("/properties/{property_urn}/brief")
-async def get_property_brief(property_urn: str) -> Dict[str, Any]:
+async def get_property_brief(property_urn: str) -> dict[str, Any]:
     prop = master_arena.get_property(property_urn)
     if not prop:
         raise HTTPException(status_code=404, detail="property not found")
@@ -2578,7 +2578,7 @@ async def get_property_brief(property_urn: str) -> Dict[str, Any]:
 
 
 @router.get("/properties/{property_urn}/score")
-async def get_property_score(property_urn: str) -> Dict[str, Any]:
+async def get_property_score(property_urn: str) -> dict[str, Any]:
     prop = master_arena.get_property(property_urn)
     if not prop:
         raise HTTPException(status_code=404, detail="property not found")
@@ -2596,7 +2596,7 @@ async def get_property_score(property_urn: str) -> Dict[str, Any]:
 
 
 @router.post("/notes")
-async def create_note(payload: NoteCreateRequest) -> Dict[str, Any]:
+async def create_note(payload: NoteCreateRequest) -> dict[str, Any]:
     if payload.owner_person_urn and not master_arena.get_person(payload.owner_person_urn):
         raise HTTPException(status_code=404, detail=f"person not found: {payload.owner_person_urn}")
     if payload.property_urn and not master_arena.get_property(payload.property_urn):
@@ -2619,7 +2619,7 @@ async def create_note(payload: NoteCreateRequest) -> Dict[str, Any]:
         source_label="api-note",
     )
 
-    generated_docs: List[GeneratedDocument] = []
+    generated_docs: list[GeneratedDocument] = []
     if payload.property_urn:
         generated_docs = auto_generate_documents_for_property(
             master_arena,
@@ -2637,7 +2637,7 @@ async def create_note(payload: NoteCreateRequest) -> Dict[str, Any]:
 
 
 @router.post("/notes/{note_urn}/extract-fields")
-async def extract_note_fields(note_urn: str) -> Dict[str, Any]:
+async def extract_note_fields(note_urn: str) -> dict[str, Any]:
     note = master_arena.get_note(note_urn)
     if not note:
         raise HTTPException(status_code=404, detail="note not found")
@@ -2651,7 +2651,7 @@ async def extract_note_fields(note_urn: str) -> Dict[str, Any]:
 
 
 @router.get("/reviews")
-async def list_reviews(status: str = "", entity_urn: Optional[str] = None, field_name: str = "") -> Dict[str, Any]:
+async def list_reviews(status: str = "", entity_urn: str | None = None, field_name: str = "") -> dict[str, Any]:
     tasks = master_arena.list_review_tasks(status=status, entity_urn=entity_urn, field_name=field_name)
     return {
         "status": "ok",
@@ -2661,7 +2661,7 @@ async def list_reviews(status: str = "", entity_urn: Optional[str] = None, field
 
 
 @router.post("/reviews/auto-approve")
-async def auto_approve_reviews(payload: ReviewAutoApproveRequest) -> Dict[str, Any]:
+async def auto_approve_reviews(payload: ReviewAutoApproveRequest) -> dict[str, Any]:
     result = _auto_approve_pending_reviews(
         reviewed_by=payload.reviewed_by,
         review_note=payload.review_note,
@@ -2688,7 +2688,7 @@ async def auto_approve_reviews(payload: ReviewAutoApproveRequest) -> Dict[str, A
 
 
 @router.post("/reviews/{review_urn}/approve")
-async def approve_review(review_urn: str, payload: ReviewDecisionRequest) -> Dict[str, Any]:
+async def approve_review(review_urn: str, payload: ReviewDecisionRequest) -> dict[str, Any]:
     try:
         task = master_arena.approve_review_task(
             review_urn=review_urn,
@@ -2710,7 +2710,7 @@ async def approve_review(review_urn: str, payload: ReviewDecisionRequest) -> Dic
 
 
 @router.post("/reviews/{review_urn}/reject")
-async def reject_review(review_urn: str, payload: ReviewDecisionRequest) -> Dict[str, Any]:
+async def reject_review(review_urn: str, payload: ReviewDecisionRequest) -> dict[str, Any]:
     try:
         task = master_arena.reject_review_task(
             review_urn=review_urn,
@@ -2732,12 +2732,12 @@ async def reject_review(review_urn: str, payload: ReviewDecisionRequest) -> Dict
 
 
 @router.post("/query")
-async def run_query(payload: QueryRequest) -> Dict[str, Any]:
+async def run_query(payload: QueryRequest) -> dict[str, Any]:
     return {"status": "ok", **agent.query(payload.query)}
 
 
 @router.post("/command")
-async def run_command(payload: CommandRequest) -> Dict[str, Any]:
+async def run_command(payload: CommandRequest) -> dict[str, Any]:
     result = agent.apply_command(payload.command, actor=payload.actor)
     status = result.get("status")
     if status == "error":
@@ -2753,7 +2753,7 @@ async def run_command(payload: CommandRequest) -> Dict[str, Any]:
 
 
 @router.post("/om/extract")
-async def parse_om(payload: OMExtractRequest) -> Dict[str, Any]:
+async def parse_om(payload: OMExtractRequest) -> dict[str, Any]:
     extraction = extract_om_fields(
         source_name=payload.source_name,
         property_urn=payload.property_urn,
@@ -2785,7 +2785,7 @@ async def parse_om(payload: OMExtractRequest) -> Dict[str, Any]:
 
 
 @router.post("/signals/permits/pull")
-async def pull_permit_signals(payload: PermitPullRequest) -> Dict[str, Any]:
+async def pull_permit_signals(payload: PermitPullRequest) -> dict[str, Any]:
     signals = await fetch_county_permit_signals(
         counties=payload.counties,
         limit_per_source=payload.limit,
@@ -2794,8 +2794,8 @@ async def pull_permit_signals(payload: PermitPullRequest) -> Dict[str, Any]:
     attached = attach_signals_to_properties(master_arena, signals)
 
     linked = sum(1 for signal in attached if signal.property_urn)
-    source_breakdown: Dict[str, int] = {}
-    county_breakdown: Dict[str, int] = {}
+    source_breakdown: dict[str, int] = {}
+    county_breakdown: dict[str, int] = {}
     for signal in attached:
         source_breakdown[signal.source] = source_breakdown.get(signal.source, 0) + 1
         county = str(signal.attributes.get("county") or ("Travis" if signal.source == "coa_open_data" else ""))
@@ -2812,7 +2812,7 @@ async def pull_permit_signals(payload: PermitPullRequest) -> Dict[str, Any]:
 
 
 @router.get("/signals/permit-sources")
-async def list_permit_sources() -> Dict[str, Any]:
+async def list_permit_sources() -> dict[str, Any]:
     return {
         "status": "ok",
         "sources": permit_source_registry(),
@@ -2826,7 +2826,7 @@ async def list_permit_sources() -> Dict[str, Any]:
 
 
 @router.get("/signals")
-async def list_signals(property_urn: Optional[str] = None, since_days: int = 60) -> Dict[str, Any]:
+async def list_signals(property_urn: str | None = None, since_days: int = 60) -> dict[str, Any]:
     signals = master_arena.list_signals(property_urn=property_urn, since_days=since_days)
     return {
         "status": "ok",
@@ -2854,15 +2854,15 @@ async def search_properties(
     county: str = "",
     corridor: str = "",
     submarket: str = "",
-    max_land_psf: Optional[float] = None,
-    max_building_psf: Optional[float] = None,
-    max_building_sqft: Optional[float] = None,
-    min_cap_rate: Optional[float] = None,
-    max_cap_rate: Optional[float] = None,
+    max_land_psf: float | None = None,
+    max_building_psf: float | None = None,
+    max_building_sqft: float | None = None,
+    min_cap_rate: float | None = None,
+    max_cap_rate: float | None = None,
     occupancy_status: str = "",
-    lease_expiring_within_years: Optional[int] = None,
+    lease_expiring_within_years: int | None = None,
     only_active_outreach: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     query = PropertyQuery(
         tenant_brand=tenant_brand,
         city=city,
@@ -2887,8 +2887,8 @@ async def search_properties(
 
 
 @router.get("/dashboard/submarkets")
-async def dashboard_submarkets() -> Dict[str, Any]:
-    stats: Dict[str, Dict[str, Any]] = {}
+async def dashboard_submarkets() -> dict[str, Any]:
+    stats: dict[str, dict[str, Any]] = {}
     for prop in master_arena.list_properties():
         key = prop.submarket or "unassigned"
         if key not in stats:
@@ -2907,7 +2907,7 @@ async def dashboard_submarkets() -> Dict[str, Any]:
         row["paused_outreach_count"] += int(prop.outreach_state.value == "paused")
         row["_score_total"] += score.score
 
-    output: List[Dict[str, Any]] = []
+    output: list[dict[str, Any]] = []
     for row in stats.values():
         count = max(1, row["property_count"])
         avg = round(row["_score_total"] / count, 2)
@@ -2924,13 +2924,13 @@ async def dashboard_submarkets() -> Dict[str, Any]:
     output.sort(key=lambda row: row["submarket"])
     return {
         "status": "ok",
-        "generated_at": datetime.now(tz=timezone.utc).isoformat(),
+        "generated_at": datetime.now(tz=UTC).isoformat(),
         "submarkets": output,
     }
 
 
 @router.post("/persons/{person_urn}/dnc")
-async def set_person_dnc(person_urn: str, value: bool = True) -> Dict[str, Any]:
+async def set_person_dnc(person_urn: str, value: bool = True) -> dict[str, Any]:
     person = master_arena.get_person(person_urn)
     if not person:
         raise HTTPException(status_code=404, detail="person not found")

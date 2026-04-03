@@ -16,12 +16,12 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 
 def _utc_day(ts: float) -> str:
-    return datetime.fromtimestamp(float(ts), tz=timezone.utc).strftime("%Y-%m-%d")
+    return datetime.fromtimestamp(float(ts), tz=UTC).strftime("%Y-%m-%d")
 
 
 @dataclass
@@ -29,9 +29,9 @@ class RiskKernelEvent:
     triggered: bool
     reason: str
     blocked_until_ts: float
-    metrics: Dict[str, Any]
+    metrics: dict[str, Any]
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         return {
             "triggered": bool(self.triggered),
             "reason": str(self.reason),
@@ -108,7 +108,7 @@ class HardRiskKernel:
         self,
         now_ts: float,
         reason: str,
-        metrics: Optional[Dict[str, Any]] = None,
+        metrics: dict[str, Any] | None = None,
     ) -> RiskKernelEvent:
         self._clear_hold_if_elapsed(now_ts)
         hold_until = now_ts + self.hold_seconds
@@ -123,7 +123,7 @@ class HardRiskKernel:
             metrics=metrics or {},
         )
 
-    def can_open_entry(self, now_ts: Optional[float] = None) -> tuple[bool, str]:
+    def can_open_entry(self, now_ts: float | None = None) -> tuple[bool, str]:
         """
         Hard gate for entry-like orders.
         """
@@ -141,10 +141,10 @@ class HardRiskKernel:
 
     def ingest_equity_snapshot(
         self,
-        snapshot: Dict[str, Any],
+        snapshot: dict[str, Any],
         *,
-        now_ts: Optional[float] = None,
-    ) -> Optional[RiskKernelEvent]:
+        now_ts: float | None = None,
+    ) -> RiskKernelEvent | None:
         """
         Feed latest equity snapshot and trigger hard-halt if a core risk limit trips.
         """
@@ -229,8 +229,8 @@ class HardRiskKernel:
         *,
         outcome: str,
         equity_estimate: float = 0.0,
-        now_ts: Optional[float] = None,
-    ) -> Optional[RiskKernelEvent]:
+        now_ts: float | None = None,
+    ) -> RiskKernelEvent | None:
         """
         Update risk counters from execution outcomes.
         """
@@ -291,7 +291,7 @@ class HardRiskKernel:
             )
         return None
 
-    def status(self, now_ts: Optional[float] = None) -> Dict[str, Any]:
+    def status(self, now_ts: float | None = None) -> dict[str, Any]:
         ts = float(now_ts if now_ts is not None else time.time())
         self._clear_hold_if_elapsed(ts)
         return {

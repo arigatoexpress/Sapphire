@@ -14,7 +14,7 @@ signal by the bot's reputation score.  Supports:
 import threading
 import time
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from loguru import logger
 
@@ -48,7 +48,7 @@ class SwarmAggregator:
         self._prediction_aggregator = prediction_aggregator
         self._lock = threading.Lock()
         # {symbol: [idea_dict, ...]}
-        self._ideas: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+        self._ideas: dict[str, list[dict[str, Any]]] = defaultdict(list)
         self._idea_counter = 0
 
     def submit_idea(
@@ -61,7 +61,7 @@ class SwarmAggregator:
         rationale: str = "",
         target_price: float = 0.0,
         stop_loss: float = 0.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Submit a trade idea from a bot.
 
         Args:
@@ -141,7 +141,7 @@ class SwarmAggregator:
                 "weighted_score": idea["weighted_score"],
             }
 
-    def aggregate(self, symbol: str) -> Dict[str, Any]:
+    def aggregate(self, symbol: str) -> dict[str, Any]:
         """Aggregate all open ideas for a symbol into a consensus signal.
 
         Returns a weighted consensus with conviction level.
@@ -264,7 +264,7 @@ class SwarmAggregator:
                 "pm_adjustment": pm_adjustment,
             }
 
-    def get_idea(self, idea_id: str) -> Optional[Dict[str, Any]]:
+    def get_idea(self, idea_id: str) -> dict[str, Any] | None:
         """Look up a specific idea by ID."""
         with self._lock:
             for ideas in self._ideas.values():
@@ -279,7 +279,7 @@ class SwarmAggregator:
         accurate: bool,
         profitable: bool,
         pnl: float = 0.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Record the outcome of a trade idea and update bot reputation.
 
         This closes the feedback loop — after a trade idea is executed and
@@ -322,7 +322,7 @@ class SwarmAggregator:
                 "new_status": result.get("status", "active"),
             }
 
-    def open_ideas(self, symbol: str = "") -> List[Dict[str, Any]]:
+    def open_ideas(self, symbol: str = "") -> list[dict[str, Any]]:
         """List open ideas, optionally filtered by symbol."""
         with self._lock:
             result = []
@@ -340,7 +340,7 @@ class SwarmAggregator:
                             result.append(dict(idea))
             return result
 
-    def active_symbols(self) -> List[str]:
+    def active_symbols(self) -> list[str]:
         """Return symbols with at least one open idea."""
         with self._lock:
             symbols = []
@@ -350,7 +350,7 @@ class SwarmAggregator:
                     symbols.append(sym)
             return sorted(symbols)
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         """Return aggregation statistics."""
         with self._lock:
             total_open = 0
@@ -376,7 +376,7 @@ class SwarmAggregator:
                 "active_symbols": symbols_active,
             }
 
-    def _get_pm_adjustment(self, symbol: str) -> Optional[Dict[str, Any]]:
+    def _get_pm_adjustment(self, symbol: str) -> dict[str, Any] | None:
         """Derive a virtual vote from prediction market sentiment.
 
         Translates PM consensus (probability-based) into a directional

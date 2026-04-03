@@ -19,7 +19,7 @@ Features:
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import numpy as np
 import torch
@@ -43,8 +43,8 @@ class EnsemblePrediction:
     volatility: float  # Expected volatility
     stop_loss: float  # Recommended stop loss level
     take_profit: float  # Recommended take profit level
-    models_used: List[str]  # Which models contributed
-    model_weights: Dict[str, float]  # Weight of each model
+    models_used: list[str]  # Which models contributed
+    model_weights: dict[str, float]  # Weight of each model
     risk_score: float  # Overall risk assessment
 
 
@@ -53,7 +53,7 @@ class EnsembleConfig:
     """Configuration for ensemble system"""
 
     # Model selection
-    enabled_models: List[str] = field(default_factory=lambda: [
+    enabled_models: list[str] = field(default_factory=lambda: [
         'ppo', 'trend_following', 'mean_reversion', 'volatility',
         'order_flow', 'ml_classifier', 'vpin_based'
     ])
@@ -181,7 +181,7 @@ class EnsembleTradingSystem:
         # Initialize with equal weights
         self.model_weights = {name: 1.0 / num_models for name in self.models.keys()}
 
-    async def predict(self, market_data: Dict[str, Any], symbol: str) -> EnsemblePrediction:
+    async def predict(self, market_data: dict[str, Any], symbol: str) -> EnsemblePrediction:
         """
         Generate ensemble prediction combining all models
 
@@ -259,7 +259,7 @@ class EnsembleTradingSystem:
                 risk_score=1.0
             )
 
-    async def _get_model_prediction(self, model, market_data: Dict[str, Any], symbol: str) -> Dict[str, float]:
+    async def _get_model_prediction(self, model, market_data: dict[str, Any], symbol: str) -> dict[str, float]:
         """Get prediction from individual model"""
 
         if hasattr(model, 'predict_async'):
@@ -273,8 +273,8 @@ class EnsembleTradingSystem:
                 'confidence': 0.5
             }
 
-    def _compute_dynamic_weights(self, predictions: Dict[str, float],
-                               confidences: Dict[str, float]) -> Dict[str, float]:
+    def _compute_dynamic_weights(self, predictions: dict[str, float],
+                               confidences: dict[str, float]) -> dict[str, float]:
         """Compute dynamic weights using meta-learner"""
 
         # Prepare input tensors
@@ -292,8 +292,8 @@ class EnsembleTradingSystem:
 
         return weights_dict
 
-    def _combine_predictions(self, predictions: Dict[str, float], confidences: Dict[str, float],
-                           weights: Dict[str, float]) -> Tuple[float, float]:
+    def _combine_predictions(self, predictions: dict[str, float], confidences: dict[str, float],
+                           weights: dict[str, float]) -> tuple[float, float]:
         """Combine predictions using weighted average"""
 
         # Apply correlation filtering
@@ -328,7 +328,7 @@ class EnsembleTradingSystem:
 
         return ensemble_direction, min(ensemble_confidence, 1.0)
 
-    def _filter_correlated_predictions(self, predictions: Dict[str, float]) -> Dict[str, float]:
+    def _filter_correlated_predictions(self, predictions: dict[str, float]) -> dict[str, float]:
         """Filter out highly correlated predictions to reduce overfitting"""
 
         if len(predictions) <= self.config.min_models_required:
@@ -397,7 +397,7 @@ class EnsembleTradingSystem:
                     except:
                         pass
 
-    def _calculate_risk_metrics(self, market_data: Dict[str, Any], direction: float) -> Dict[str, float]:
+    def _calculate_risk_metrics(self, market_data: dict[str, Any], direction: float) -> dict[str, float]:
         """Calculate risk metrics for the prediction"""
 
         # Extract market data
@@ -528,8 +528,8 @@ class EnsembleTradingSystem:
 
         logger.debug(f"Meta-learner adaptation completed, loss: {loss.item():.4f}")
 
-    async def get_portfolio_allocation(self, predictions: Dict[str, EnsemblePrediction],
-                                     total_capital: float) -> Dict[str, float]:
+    async def get_portfolio_allocation(self, predictions: dict[str, EnsemblePrediction],
+                                     total_capital: float) -> dict[str, float]:
         """Calculate optimal portfolio allocation based on ensemble predictions"""
 
         allocations = {}
@@ -564,7 +564,7 @@ class EnsembleTradingSystem:
 
         return allocations
 
-    def get_performance_metrics(self) -> Dict[str, float]:
+    def get_performance_metrics(self) -> dict[str, float]:
         """Get current ensemble performance metrics"""
 
         if len(self.prediction_history) < 10:
@@ -591,7 +591,7 @@ class EnsembleTradingSystem:
 class TrendFollowingModel:
     """Classic trend-following model using MACD and moving averages"""
 
-    def predict(self, market_data: Dict[str, Any]) -> Dict[str, float]:
+    def predict(self, market_data: dict[str, Any]) -> dict[str, float]:
         """Generate trend-following prediction"""
 
         close = market_data.get('close', [])
@@ -617,7 +617,7 @@ class TrendFollowingModel:
 
         return {'direction': direction, 'confidence': confidence}
 
-    def _ema(self, data: List[float], period: int) -> float:
+    def _ema(self, data: list[float], period: int) -> float:
         """Calculate exponential moving average"""
         if len(data) < period:
             return np.mean(data) if data else 0.0
@@ -634,7 +634,7 @@ class TrendFollowingModel:
 class MeanReversionModel:
     """Mean reversion model using Bollinger Bands and RSI"""
 
-    def predict(self, market_data: Dict[str, Any]) -> Dict[str, float]:
+    def predict(self, market_data: dict[str, Any]) -> dict[str, float]:
         """Generate mean reversion prediction"""
 
         close = market_data.get('close', [])
@@ -669,7 +669,7 @@ class MeanReversionModel:
 
         return {'direction': direction, 'confidence': confidence}
 
-    def _rsi(self, prices: List[float], period: int = 14) -> float:
+    def _rsi(self, prices: list[float], period: int = 14) -> float:
         """Calculate RSI"""
         if len(prices) < period + 1:
             return 50.0
@@ -701,7 +701,7 @@ class MeanReversionModel:
 class VolatilityModel:
     """Volatility-based trading model"""
 
-    def predict(self, market_data: Dict[str, Any]) -> Dict[str, float]:
+    def predict(self, market_data: dict[str, Any]) -> dict[str, float]:
         """Generate volatility-based prediction"""
 
         close = market_data.get('close', [])
@@ -741,7 +741,7 @@ class VolatilityModel:
 class OrderFlowModel:
     """Order flow and market microstructure model"""
 
-    def predict(self, market_data: Dict[str, Any]) -> Dict[str, float]:
+    def predict(self, market_data: dict[str, Any]) -> dict[str, float]:
         """Generate order flow-based prediction"""
 
         # This would use order book data, but for now use volume profile
@@ -777,7 +777,7 @@ class MLTradingClassifier:
         self.scaler = StandardScaler()
         self.is_trained = False
 
-    def predict(self, market_data: Dict[str, Any]) -> Dict[str, float]:
+    def predict(self, market_data: dict[str, Any]) -> dict[str, float]:
         """Generate ML-based prediction"""
 
         if not self.is_trained:
@@ -808,7 +808,7 @@ class MLTradingClassifier:
 
         return {'direction': direction, 'confidence': confidence}
 
-    def _extract_features(self, market_data: Dict[str, Any]) -> List[float]:
+    def _extract_features(self, market_data: dict[str, Any]) -> list[float]:
         """Extract features for ML model"""
 
         close = market_data.get('close', [])
@@ -846,7 +846,7 @@ class MLTradingClassifier:
             np.kurtosis(returns[-20:])  # Return kurtosis
         ]
 
-    def _calculate_rsi(self, prices: List[float], period: int) -> float:
+    def _calculate_rsi(self, prices: list[float], period: int) -> float:
         """Calculate RSI"""
         if len(prices) < period + 1:
             return 50.0
@@ -872,7 +872,7 @@ class MLTradingClassifier:
         rs = avg_gain / avg_loss
         return 100 - (100 / (1 + rs))
 
-    def _ema(self, data: List[float], period: int) -> float:
+    def _ema(self, data: list[float], period: int) -> float:
         """Calculate EMA"""
         if len(data) < period:
             return np.mean(data) if data else 0.0
@@ -892,7 +892,7 @@ class VPINBasedModel:
     def __init__(self):
         self.vpin_calculator = VPINCalculator()
 
-    def predict(self, market_data: Dict[str, Any]) -> Dict[str, float]:
+    def predict(self, market_data: dict[str, Any]) -> dict[str, float]:
         """Generate VPIN-based prediction"""
 
         # This would use actual VPIN calculation
@@ -907,12 +907,12 @@ def create_ensemble_system(config: EnsembleConfig = None) -> EnsembleTradingSyst
 
 
 async def get_ensemble_prediction(system: EnsembleTradingSystem,
-                                market_data: Dict[str, Any],
+                                market_data: dict[str, Any],
                                 symbol: str) -> EnsemblePrediction:
     """Get ensemble prediction for symbol"""
     return await system.predict(market_data, symbol)
 
 
-def get_ensemble_performance_metrics(system: EnsembleTradingSystem) -> Dict[str, float]:
+def get_ensemble_performance_metrics(system: EnsembleTradingSystem) -> dict[str, float]:
     """Get ensemble performance metrics"""
     return system.get_performance_metrics()

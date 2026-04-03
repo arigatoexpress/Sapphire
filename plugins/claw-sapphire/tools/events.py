@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 DEFAULT_EVENTS_PATH = Path.home() / "Code" / "Sapphire" / "data" / "system_events.jsonl"
@@ -40,7 +40,7 @@ def publish_event(
         The published event dict.
     """
     event = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "type": event_type,
         "message": message,
         "tags": tags or [],

@@ -22,7 +22,7 @@ import json
 import logging
 import os
 import time
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ class OpenClawDispatcher:
     def _build_system_context(
         self,
         agent_id: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         allow_code_changes: bool = False,
         allow_gcloud_changes: bool = False,
         trigger: str = "",
@@ -97,11 +97,11 @@ class OpenClawDispatcher:
         self,
         agent_id: str,
         instruction: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         allow_code_changes: bool = False,
         allow_gcloud_changes: bool = False,
         trigger: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Send an instruction to an OpenClaw agent via the gateway.
 
         Uses ``POST /v1/chat/completions`` with the ``x-openclaw-agent-id``
@@ -156,7 +156,7 @@ class OpenClawDispatcher:
         self,
         agent_id: str,
         session_key: str,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
         trigger: str,
     ) -> None:
         """Background task: POST to the gateway and log the result."""
@@ -198,7 +198,7 @@ class OpenClawDispatcher:
         session_key: str,
         decision: str,
         note: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Forward a session approval/rejection to the gateway.
 
         Encodes the decision as a chat completion with a system message
@@ -250,7 +250,7 @@ class OpenClawDispatcher:
 
     # ── status ───────────────────────────────────────────────────────────
 
-    def status(self) -> Dict[str, Any]:
+    def status(self) -> dict[str, Any]:
         """Return dispatcher status for health checks and Telegram."""
         return {
             "enabled": self.enabled,

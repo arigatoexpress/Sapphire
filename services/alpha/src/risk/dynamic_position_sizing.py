@@ -21,9 +21,10 @@ Features:
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 from mcp_trader.ai.ensemble_trading_system import EnsemblePrediction
@@ -40,8 +41,8 @@ class Position:
     entry_price: float
     current_price: float
     timestamp: datetime
-    stop_loss: Optional[float] = None
-    take_profit: Optional[float] = None
+    stop_loss: float | None = None
+    take_profit: float | None = None
     unrealized_pnl: float = 0.0
 
     @property
@@ -101,8 +102,8 @@ class PositionSizingConfig:
 
     # Drawdown management
     drawdown_scaling: bool = True
-    drawdown_levels: List[float] = field(default_factory=lambda: [0.05, 0.1, 0.15, 0.2])
-    drawdown_multipliers: List[float] = field(default_factory=lambda: [0.8, 0.6, 0.4, 0.2])
+    drawdown_levels: list[float] = field(default_factory=lambda: [0.05, 0.1, 0.15, 0.2])
+    drawdown_multipliers: list[float] = field(default_factory=lambda: [0.8, 0.6, 0.4, 0.2])
 
     # Diversification
     max_correlation: float = 0.7
@@ -117,8 +118,8 @@ class PositionSizingConfig:
 
     # Conviction scaling
     conviction_scaling: bool = True
-    conviction_levels: List[float] = field(default_factory=lambda: [0.4, 0.6, 0.8, 0.9])
-    conviction_multipliers: List[float] = field(default_factory=lambda: [0.5, 0.75, 1.0, 1.25])
+    conviction_levels: list[float] = field(default_factory=lambda: [0.4, 0.6, 0.8, 0.9])
+    conviction_multipliers: list[float] = field(default_factory=lambda: [0.5, 0.75, 1.0, 1.25])
 
     # Real-time updates
     update_interval: float = 1.0  # Seconds
@@ -248,8 +249,8 @@ class RiskManager:
         self.daily_pnl_history = []
         self.kill_switch_activated = False
 
-    def calculate_portfolio_risk(self, positions: Dict[str, Position],
-                               market_data: Dict[str, Any]) -> RiskMetrics:
+    def calculate_portfolio_risk(self, positions: dict[str, Position],
+                               market_data: dict[str, Any]) -> RiskMetrics:
         """Calculate comprehensive portfolio risk metrics"""
 
         portfolio_value = sum(pos.market_value for pos in positions.values())
@@ -345,7 +346,7 @@ class RiskManager:
 
         return risk_metrics
 
-    def check_emergency_conditions(self, risk_metrics: RiskMetrics) -> List[str]:
+    def check_emergency_conditions(self, risk_metrics: RiskMetrics) -> list[str]:
         """Check for emergency conditions that require action"""
 
         alerts = []
@@ -426,7 +427,7 @@ class DynamicPositionSizer:
         self.emergency_callbacks.append(callback)
 
     async def calculate_position_size(self, prediction: EnsemblePrediction,
-                                    market_data: Dict[str, Any],
+                                    market_data: dict[str, Any],
                                     portfolio_value: float) -> float:
         """
         Calculate optimal position size for a trade
@@ -517,7 +518,7 @@ class DynamicPositionSizer:
 
         return kelly_size
 
-    def _calculate_asset_volatility(self, symbol: str, market_data: Dict[str, Any]) -> float:
+    def _calculate_asset_volatility(self, symbol: str, market_data: dict[str, Any]) -> float:
         """Calculate asset volatility"""
 
         if symbol not in market_data or 'close' not in market_data[symbol]:
@@ -564,7 +565,7 @@ class DynamicPositionSizer:
 
         return base_size
 
-    def _check_emergency_stop(self, prediction: EnsemblePrediction, market_data: Dict[str, Any]) -> bool:
+    def _check_emergency_stop(self, prediction: EnsemblePrediction, market_data: dict[str, Any]) -> bool:
         """Check for emergency stop conditions"""
 
         # Circuit breaker for extreme market moves
@@ -579,7 +580,7 @@ class DynamicPositionSizer:
 
         return False
 
-    async def update_positions(self, market_data: Dict[str, Any]):
+    async def update_positions(self, market_data: dict[str, Any]):
         """Update all positions with latest market data"""
 
         try:
@@ -608,7 +609,7 @@ class DynamicPositionSizer:
         except Exception as e:
             logger.error(f"Position update failed: {str(e)}")
 
-    async def _handle_emergency_conditions(self, alerts: List[str], risk_metrics: RiskMetrics):
+    async def _handle_emergency_conditions(self, alerts: list[str], risk_metrics: RiskMetrics):
         """Handle emergency conditions"""
 
         for alert in alerts:
@@ -671,7 +672,7 @@ class DynamicPositionSizer:
             await self._reduce_positions(reduction)
 
     def add_position(self, symbol: str, size: float, entry_price: float,
-                    stop_loss: Optional[float] = None, take_profit: Optional[float] = None):
+                    stop_loss: float | None = None, take_profit: float | None = None):
         """Add new position"""
 
         position = Position(
@@ -696,7 +697,7 @@ class DynamicPositionSizer:
             self.portfolio_value += realized_pnl
             logger.info(f"Closed position: {symbol}, P&L: ${realized_pnl:.2f}")
 
-    def get_portfolio_status(self) -> Dict[str, Any]:
+    def get_portfolio_status(self) -> dict[str, Any]:
         """Get current portfolio status"""
 
         total_value = self.portfolio_value
@@ -729,11 +730,11 @@ def create_position_sizer(config: PositionSizingConfig = None) -> DynamicPositio
 
 
 async def calculate_optimal_size(sizer: DynamicPositionSizer, prediction: EnsemblePrediction,
-                               market_data: Dict[str, Any], portfolio_value: float) -> float:
+                               market_data: dict[str, Any], portfolio_value: float) -> float:
     """Calculate optimal position size"""
     return await sizer.calculate_position_size(prediction, market_data, portfolio_value)
 
 
-def get_portfolio_status(sizer: DynamicPositionSizer) -> Dict[str, Any]:
+def get_portfolio_status(sizer: DynamicPositionSizer) -> dict[str, Any]:
     """Get portfolio status"""
     return sizer.get_portfolio_status()
