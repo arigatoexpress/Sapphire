@@ -23,7 +23,7 @@ from position_reconciler import PositionReconciler
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _run(coro):
-    return asyncio.get_event_loop().run_until_complete(coro)
+    return asyncio.run(coro)
 
 
 def _make(db=None, stale_threshold=120, interval=900) -> PositionReconciler:

@@ -1,5 +1,8 @@
+import asyncio
+import json
 import logging
 import os
+import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -9,6 +12,13 @@ logger = logging.getLogger(__name__)
 
 # Control token for protecting mutable endpoints
 _CONTROL_TOKEN = os.getenv("SAPPHIRE_CONTROL_API_TOKEN", "")
+
+# ---------------------------------------------------------------------------
+# WebSocket dashboard constants
+# ---------------------------------------------------------------------------
+
+_WS_MAX_CLIENTS: int = 50
+_WS_PUSH_INTERVAL: float = 5.0  # seconds between push broadcasts
 
 
 async def _check_control_token(request: web.Request) -> web.Response | None:
@@ -73,6 +83,172 @@ async def telegram_webhook(request):
             logger.error(f"Telegram webhook handler error: {exc}")
 
     return web.Response(text="OK", status=200)
+
+
+@web.middleware
+async def cors_middleware(request: web.Request, handler: Callable) -> web.Response:
+    """CORS middleware that validates Origin against app['cors_allowlist']."""
+    origin = request.headers.get("Origin", "")
+    allowlist: set[str] = request.app.get("cors_allowlist", set())
+
+    response = await handler(request)
+
+    if origin and allowlist and origin in allowlist:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Headers"] = (
+            "Content-Type, X-Sapphire-Control-Token, Authorization"
+        )
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    return response
+
+
+# ---------------------------------------------------------------------------
+# WebSocket dashboard
+# ---------------------------------------------------------------------------
+
+async def _build_dashboard_snapshot(app: web.Application) -> dict[str, Any]:
+    """Build a snapshot dict from registered handler callbacks."""
+    snapshot: dict[str, Any] = {"timestamp": time.time()}
+    for key in ("control", "performance", "platforms"):
+        handler_key = f"{key}_status_handler" if key != "performance" else "performance_stats_handler"
+        if key == "control":
+            handler_key = "control_status_handler"
+        elif key == "platforms":
+            handler_key = "platform_status_handler"
+        handler = app.get(handler_key)
+        if handler is None:
+            snapshot[key] = None
+            continue
+        try:
+            snapshot[key] = await handler({})
+        except Exception:
+            snapshot[key] = None
+    return snapshot
+
+
+async def _ws_dashboard_handler(request: web.Request) -> web.WebSocketResponse:
+    """WebSocket endpoint for the live dashboard."""
+    origin = request.headers.get("Origin", "")
+    allowlist: set[str] = request.app.get("cors_allowlist", set())
+
+    # Origin check: reject if origin is present and not in allowlist
+    if origin and allowlist and origin not in allowlist:
+        return web.Response(text="Forbidden origin", status=403)
+
+    # Max clients check
+    clients: list = request.app.get("_ws_clients", [])
+    if len(clients) >= _WS_MAX_CLIENTS:
+        return web.Response(text="Too many clients", status=503)
+
+    ws = web.WebSocketResponse()
+    await ws.prepare(request)
+    clients.append(ws)
+
+    try:
+        # Send init message with snapshot
+        snapshot = await _build_dashboard_snapshot(request.app)
+        snapshot["type"] = "init"
+        await ws.send_json(snapshot)
+
+        async for msg in ws:
+            if msg.type == web.WSMsgType.TEXT:
+                if msg.data == "ping":
+                    await ws.send_str("pong")
+            elif msg.type == web.WSMsgType.ERROR:
+                break
+    finally:
+        if ws in clients:
+            clients.remove(ws)
+
+    return ws
+
+
+async def _ws_push_loop(app: web.Application) -> None:
+    """Periodically push snapshots to all connected WS clients."""
+    try:
+        while True:
+            await asyncio.sleep(_WS_PUSH_INTERVAL)
+            clients: list = app.get("_ws_clients", [])
+            if not clients:
+                continue
+            snapshot = await _build_dashboard_snapshot(app)
+            snapshot["type"] = "snapshot"
+            payload = json.dumps(snapshot)
+            dead: list = []
+            for ws in clients:
+                try:
+                    await ws.send_str(payload)
+                except Exception:
+                    dead.append(ws)
+            for ws in dead:
+                if ws in clients:
+                    clients.remove(ws)
+    except asyncio.CancelledError:
+        return
+
+
+async def _start_ws_push(app: web.Application) -> None:
+    """Lifecycle hook: start the WS push background task."""
+    app["_ws_push_task"] = asyncio.create_task(_ws_push_loop(app))
+
+
+async def _stop_ws_push(app: web.Application) -> None:
+    """Lifecycle hook: stop the WS push background task."""
+    task = app.get("_ws_push_task")
+    if task and not task.done():
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+
+# ---------------------------------------------------------------------------
+# Forum API handlers (CORS + token guarded)
+# ---------------------------------------------------------------------------
+
+def _is_authorized(request: web.Request) -> bool:
+    """Check if request is authorized via CORS origin or control token."""
+    origin = request.headers.get("Origin", "")
+    allowlist: set[str] = request.app.get("cors_allowlist", set())
+    if origin and allowlist and origin in allowlist:
+        return True
+
+    # Check control token in header
+    control_token = request.app.get("control_api_token", "")
+    if control_token:
+        # Check X-Sapphire-Control-Token header
+        if request.headers.get("X-Sapphire-Control-Token", "") == control_token:
+            return True
+        # Check Authorization: Bearer <token>
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer ") and auth[7:] == control_token:
+            return True
+
+    return False
+
+
+async def forum_topics(request: web.Request) -> web.Response:
+    """GET /api/v2/forum/topics — list forum topics."""
+    if not _is_authorized(request):
+        return web.Response(text='{"error":"forbidden"}', status=403, content_type="application/json")
+    handler = request.app.get("forum_topics_handler")
+    if handler is None:
+        return web.json_response({"error": "not configured"}, status=501)
+    result = await handler(dict(request.query))
+    return web.json_response(result)
+
+
+async def forum_topic_detail(request: web.Request) -> web.Response:
+    """GET /api/v2/forum/topics/{topic_id} — get single topic."""
+    if not _is_authorized(request):
+        return web.Response(text='{"error":"forbidden"}', status=403, content_type="application/json")
+    handler = request.app.get("forum_topic_detail_handler")
+    if handler is None:
+        return web.json_response({"error": "not configured"}, status=501)
+    topic_id = request.match_info.get("topic_id", "")
+    result = await handler({"topic_id": topic_id})
+    return web.json_response(result)
 
 
 @web.middleware

@@ -18,9 +18,9 @@ from unittest.mock import patch
 
 import pytest
 
-# Add alpha-engine shared to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "services", "alpha-engine"))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "services", "alpha-engine", "shared"))
+# Add sapphire_core to path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "lib", "core", "src", "sapphire_core"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "lib", "core", "src"))
 
 import health
 from aiohttp import web

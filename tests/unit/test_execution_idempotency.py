@@ -26,50 +26,54 @@ class TestIdempotencyMemoryMode:
 
     def test_first_claim_returns_true(self):
         ei = self._make()
-        result = asyncio.get_event_loop().run_until_complete(ei.claim("sig-001", "BTCUSDT"))
+        result = asyncio.run(ei.claim("sig-001", "BTCUSDT"))
         assert result is True
 
     def test_duplicate_claim_returns_false(self):
         ei = self._make()
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(ei.claim("sig-002", "ETHUSDT"))
-        result = loop.run_until_complete(ei.claim("sig-002", "ETHUSDT"))
+        async def _test():
+            await ei.claim("sig-002", "ETHUSDT")
+            return await ei.claim("sig-002", "ETHUSDT")
+        result = asyncio.run(_test())
         assert result is False
 
     def test_different_signals_both_claim(self):
         ei = self._make()
-        loop = asyncio.get_event_loop()
-        r1 = loop.run_until_complete(ei.claim("sig-A", "SOLUSDT"))
-        r2 = loop.run_until_complete(ei.claim("sig-B", "SOLUSDT"))
+        async def _test():
+            r1 = await ei.claim("sig-A", "SOLUSDT")
+            r2 = await ei.claim("sig-B", "SOLUSDT")
+            return r1, r2
+        r1, r2 = asyncio.run(_test())
         assert r1 is True
         assert r2 is True
 
     def test_stale_entry_evicted_and_reclaimed(self):
         ei = self._make(ttl=1)  # 1-second TTL
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(ei.claim("sig-evict", "SYM"))
-        # Backdate the cache entry to be stale
-        ei._cache["sig-evict"] = time.time() - 2
-        result = loop.run_until_complete(ei.claim("sig-evict", "SYM"))
+        async def _test():
+            await ei.claim("sig-evict", "SYM")
+            # Backdate the cache entry to be stale
+            ei._cache["sig-evict"] = time.time() - 2
+            return await ei.claim("sig-evict", "SYM")
+        result = asyncio.run(_test())
         assert result is True  # re-claimed after eviction
 
     def test_mark_failed_removes_from_cache_and_allows_retry(self):
         ei = self._make()
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(ei.claim("sig-retry", "SYM"))
-        loop.run_until_complete(ei.mark_failed("sig-retry", "network error"))
-        result = loop.run_until_complete(ei.claim("sig-retry", "SYM"))
+        async def _test():
+            await ei.claim("sig-retry", "SYM")
+            await ei.mark_failed("sig-retry", "network error")
+            return await ei.claim("sig-retry", "SYM")
+        result = asyncio.run(_test())
         assert result is True  # retry allowed after mark_failed
 
     def test_mark_executed_does_not_error_without_firestore(self):
         ei = self._make()
-        loop = asyncio.get_event_loop()
         # Should complete silently with no Firestore client
-        loop.run_until_complete(ei.mark_executed("sig-done", "order-123"))
+        asyncio.run(ei.mark_executed("sig-done", "order-123"))
 
     def test_warm_from_firestore_returns_zero_without_client(self):
         ei = self._make()
-        count = asyncio.get_event_loop().run_until_complete(ei.warm_from_firestore())
+        count = asyncio.run(ei.warm_from_firestore())
         assert count == 0
 
 
@@ -150,7 +154,7 @@ class TestIdempotencyFirestorePaths:
 
         db = _FakeDb(MockDoc())
         ei = ExecutionIdempotency(platform="lighter", firestore_client=db)
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             ei._firestore_claim("sig-dup", "BTCUSDT")
         )
         assert result is False
@@ -167,7 +171,7 @@ class TestIdempotencyFirestorePaths:
 
         db = _FakeDb(MockDoc())
         ei = ExecutionIdempotency(platform="lighter", firestore_client=db)
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             ei._firestore_claim("sig-net", "BTCUSDT")
         )
         assert result is True  # fail-open → allow execution

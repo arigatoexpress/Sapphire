@@ -9,13 +9,11 @@ SCOUT_SANDBOX_PATH = ROOT_DIR / "services/scout-sandbox/app.py"
 
 
 def _load_scout_module():
-    pytest.importorskip("aiohttp")
-    pytest.importorskip("fastapi")
-    pytest.importorskip("pydantic")
-    pytest.importorskip("loguru")
     spec = importlib.util.spec_from_file_location("scout_sandbox_app", SCOUT_SANDBOX_PATH)
     module = importlib.util.module_from_spec(spec)
     assert spec and spec.loader
+    import sys as _sys
+    _sys.modules["scout_sandbox_app"] = module
     spec.loader.exec_module(module)
     return module
 

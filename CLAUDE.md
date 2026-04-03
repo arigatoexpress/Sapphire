@@ -19,7 +19,9 @@ Autonomous trading + project management + intelligence system. Telegram-first, a
 | `pine/` | pine | TradingView indicators and strategies (v1-v3 Ultra) |
 | `skills/` | skills | Agent-executable capabilities (10 skills) |
 | `tools/claude-analytics/` | tool | MCP server for Claude Code usage metrics (TypeScript) |
-| `tools/pm-commander/` | tool | macOS Swift companion app |
+| `tools/pm-commander/` | tool | Sapphire Command — SwiftUI desktop app (7-tab command center) |
+| `services/telegram-bot/` | service | NemotronRariBot — thin Telegram webhook, delegates to plugin tools |
+| `data/benchmarks/kadima-labs/` | data | Kadima Labs AI benchmark suite (v1-v3, 70 charts, 30 JSON results) |
 | `infra/cloudflare/` | infra | Cloudflare Tunnel config — public ingress (no GCP) |
 | `infra/pi/` | infra | Raspberry Pi systemd services + deploy scripts |
 
