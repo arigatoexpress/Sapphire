@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Quick Qwen 3.5 test - all sizes"""
-import requests
-import time
 import json
+import time
 from datetime import datetime
+
+import requests
 
 models = ['qwen3.5:0.8b', 'qwen3.5:4b', 'qwen3.5:9b']
 prompt = 'What is 2+2? Answer briefly.'

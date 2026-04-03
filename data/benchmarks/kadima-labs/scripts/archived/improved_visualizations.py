@@ -5,11 +5,10 @@ Better label positioning, spacing, and clarity
 """
 
 import json
-import matplotlib.pyplot as plt
+
 import matplotlib.patches as mpatches
-from matplotlib.patches import FancyBboxPatch
+import matplotlib.pyplot as plt
 import numpy as np
-from pathlib import Path
 import seaborn as sns
 
 # Set style

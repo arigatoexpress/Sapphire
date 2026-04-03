@@ -4,9 +4,8 @@ Qwen 3.5 Benchmark - Terminal Version
 """
 
 import json
-import time
 import subprocess
-import sys
+import time
 from datetime import datetime
 
 

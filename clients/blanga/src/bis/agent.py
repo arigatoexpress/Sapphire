@@ -5,10 +5,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
-from bis.models import NoteEntry
-from bis.models import make_urn
-from bis.store import InMemoryMasterArena
-from bis.store import PropertyQuery
+from bis.models import NoteEntry, make_urn
+from bis.store import InMemoryMasterArena, PropertyQuery
 
 
 def _norm(text: str) -> str:

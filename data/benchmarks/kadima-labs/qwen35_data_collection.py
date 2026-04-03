@@ -4,12 +4,13 @@ Qwen 3.5 Comprehensive Data Collection
 Collects detailed metrics for all model sizes
 """
 
-import requests
-import time
 import json
 import statistics
+import time
 from datetime import datetime
-from typing import Dict, List, Any
+from typing import Any, Dict
+
+import requests
 
 API_URL = "http://localhost:11434/api/generate"
 
@@ -194,7 +195,7 @@ def main():
         json.dump(output, f, indent=2, ensure_ascii=False)
     
     print(f"\n\n{'='*80}")
-    print(f"DATA COLLECTION COMPLETE")
+    print("DATA COLLECTION COMPLETE")
     print(f"{'='*80}")
     print(f"Results saved to: {filename}")
     print(f"End Time: {datetime.now().isoformat()}")

@@ -4,8 +4,9 @@ Quick GPU verification test - runs a model and monitors GPU utilization
 """
 
 import subprocess
-import time
 import sys
+import time
+
 
 def monitor_gpu(duration=30):
     """Monitor GPU during inference"""
@@ -45,7 +46,7 @@ def test_model(model_name="qwen2.5:14b"):
     monitor_thread.daemon = True
     
     print("\n2. Running inference test...")
-    print(f"   Prompt: 'What is 2+2? Answer in one word.'")
+    print("   Prompt: 'What is 2+2? Answer in one word.'")
     print("   (Watch GPU utilization above)")
     print("-" * 60)
     
@@ -58,13 +59,13 @@ def test_model(model_name="qwen2.5:14b"):
         )
         duration = time.time() - start
         
-        print(f"\n3. Results:")
+        print("\n3. Results:")
         print(f"   Duration: {duration:.1f}s")
         print(f"   Return code: {result.returncode}")
         print(f"   Output: {result.stdout.strip()[:100]}")
         
         if result.returncode == 0:
-            print(f"\n   ✓ Model responded successfully!")
+            print("\n   ✓ Model responded successfully!")
             tokens = len(result.stdout) // 4
             tps = tokens / duration if duration > 0 else 0
             print(f"   ✓ Speed: ~{tps:.1f} tokens/sec")

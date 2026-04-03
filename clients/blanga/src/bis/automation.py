@@ -3,10 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from typing import Dict, List
 
-from bis.models import GeneratedDocument
-from bis.models import ListingStatus
-from bis.models import NoteEntry
-from bis.models import make_urn
+from bis.models import GeneratedDocument, ListingStatus, NoteEntry, make_urn
 from bis.scoring import compute_propensity_score
 from bis.store import InMemoryMasterArena
 

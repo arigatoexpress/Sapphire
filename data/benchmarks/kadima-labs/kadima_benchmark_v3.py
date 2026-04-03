@@ -8,14 +8,13 @@ Hardware: AMD Ryzen 9 9900X3D | NVIDIA RTX 5070 Ti 16GB | 64GB DDR5
 Platform: ASUS ROG STRIX B850-A | Windows 11 Pro | Ollama
 """
 
-import json
-import time
 import datetime
+import json
 import subprocess
 import sys
-import os
-import urllib.request
+import time
 import urllib.error
+import urllib.request
 
 # Fix Windows console encoding
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
@@ -210,11 +209,11 @@ def benchmark_model(model_info, tests):
     print(f"  Family: {model_info['family']}  |  Model: {model_name}")
     print(f"{'='*60}")
 
-    print(f"  Clearing VRAM...", end=" ", flush=True)
+    print("  Clearing VRAM...", end=" ", flush=True)
     clear_gpu()
     print("done.")
 
-    print(f"  Loading model...", end=" ", flush=True)
+    print("  Loading model...", end=" ", flush=True)
     warmup_model(model_name, use_chat=use_chat)
     print("done.")
 
@@ -302,15 +301,15 @@ def main():
         sys.exit(1)
 
     print(f"\n{'='*60}")
-    print(f"  KADIMA DIGITAL LABORATORIES")
-    print(f"  Local LLM Benchmark Suite v3.0")
+    print("  KADIMA DIGITAL LABORATORIES")
+    print("  Local LLM Benchmark Suite v3.0")
     print(f"{'='*60}")
     print(f"  {HARDWARE_SPEC['cpu']}  |  {HARDWARE_SPEC['gpu']}")
     print(f"  {HARDWARE_SPEC['ram']}  |  {HARDWARE_SPEC['motherboard']}")
     print(f"  {HARDWARE_SPEC['os']}  |  {HARDWARE_SPEC['inference_engine']}")
     print(f"  {datetime.datetime.now().strftime('%B %d, %Y %I:%M %p')}")
     print(f"  Models: {len(available_models)}  |  Tests: {len(TESTS)}")
-    print(f"  Method: GPU-isolated, VRAM cleared between models")
+    print("  Method: GPU-isolated, VRAM cleared between models")
     print(f"{'='*60}")
 
     all_results = []
@@ -344,7 +343,7 @@ def main():
 
     # Print leaderboard
     print(f"\n{'='*60}")
-    print(f"  LEADERBOARD")
+    print("  LEADERBOARD")
     print(f"{'='*60}")
     print(f"  {'#':<3} {'Model':<25} {'Score':>7} {'Speed':>8} {'Size':>6}")
     print(f"  {'-'*3} {'-'*25} {'-'*7} {'-'*8} {'-'*6}")

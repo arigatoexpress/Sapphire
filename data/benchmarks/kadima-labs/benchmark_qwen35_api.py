@@ -5,11 +5,12 @@ Works with terminal-based Ollama
 """
 
 import json
-import time
-import requests
-from datetime import datetime
-from typing import Dict, List, Any
 import statistics
+import time
+from datetime import datetime
+from typing import Any, Dict
+
+import requests
 
 OLLAMA_API = "http://localhost:11434/api/generate"
 

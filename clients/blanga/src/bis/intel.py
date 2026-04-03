@@ -8,10 +8,7 @@ from urllib.parse import quote_plus
 
 import feedparser
 
-from bis.models import MarketEvent
-from bis.models import MarketEventType
-from bis.models import Person
-from bis.models import make_urn
+from bis.models import MarketEvent, MarketEventType, Person, make_urn
 from bis.store import InMemoryMasterArena
 
 

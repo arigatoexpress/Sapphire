@@ -8,14 +8,12 @@ Hardware: AMD Ryzen 9 9900X3D | NVIDIA RTX 5070 Ti 16GB | 64GB DDR5
 Platform: ASUS ROG STRIX B850-A | Windows 11 Pro | Ollama
 """
 
-import json
-import time
 import datetime
+import json
 import subprocess
-import sys
-import os
-import urllib.request
+import time
 import urllib.error
+import urllib.request
 
 # ── Configuration ──────────────────────────────────────────────────────────
 
@@ -242,17 +240,17 @@ def benchmark_model(model_info, tests):
     print(f"{'='*70}")
 
     # Step 1: Clear GPU
-    print(f"  [1/3] Clearing GPU VRAM...")
+    print("  [1/3] Clearing GPU VRAM...")
     clear_gpu()
 
     # Step 2: Warm up model
-    print(f"  [2/3] Loading model into VRAM...")
+    print("  [2/3] Loading model into VRAM...")
     warmup_model(model_name)
 
     # Step 3: Run tests
     disable_think = model_info.get("think", None) is False
     if disable_think:
-        print(f"  [!] Thinking mode disabled for this model")
+        print("  [!] Thinking mode disabled for this model")
     print(f"  [3/3] Running {len(tests)} tests...")
     results = []
     correct = 0
@@ -377,13 +375,13 @@ def main():
         json.dump(output, f, indent=2, ensure_ascii=False)
 
     print(f"\n{'='*70}")
-    print(f"  BENCHMARK COMPLETE")
+    print("  BENCHMARK COMPLETE")
     print(f"  Results saved to: {output_file}")
     print(f"{'='*70}")
 
     # Print leaderboard
     print(f"\n{'='*70}")
-    print(f"  KADIMA DIGITAL LABORATORIES - LEADERBOARD")
+    print("  KADIMA DIGITAL LABORATORIES - LEADERBOARD")
     print(f"{'='*70}")
     print(f"  {'Rank':<5} {'Model':<30} {'Acc':>6} {'Avg t/s':>8} {'Avg Time':>9}")
     print(f"  {'-'*5} {'-'*30} {'-'*6} {'-'*8} {'-'*9}")

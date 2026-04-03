@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Final Qwen Benchmark - All Models"""
 
-import subprocess
 import json
+import subprocess
 import time
 from datetime import datetime
 

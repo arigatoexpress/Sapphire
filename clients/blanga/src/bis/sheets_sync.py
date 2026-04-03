@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from dataclasses import field
+from dataclasses import dataclass, field
 from datetime import date
 from typing import Any, Dict, List, Optional
 
 from bis.models import ListingStatus
 from bis.store import InMemoryMasterArena
-
 
 SHEETS_TAB_CONTRACT: Dict[str, Dict[str, Any]] = {
     "properties_new_input": {

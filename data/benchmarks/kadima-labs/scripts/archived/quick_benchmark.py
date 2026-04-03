@@ -5,10 +5,10 @@ Tests key models with shorter prompts for faster results
 """
 
 import json
-import time
 import subprocess
-import sys
+import time
 from datetime import datetime
+
 
 def run_model_test(model, prompt, timeout=120):
     """Test a single model with a prompt"""

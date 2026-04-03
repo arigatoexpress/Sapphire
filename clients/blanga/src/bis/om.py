@@ -3,8 +3,7 @@ from __future__ import annotations
 import re
 from typing import Dict, Optional
 
-from bis.models import OMExtractionRecord
-from bis.models import make_urn
+from bis.models import OMExtractionRecord, make_urn
 
 
 def _search(pattern: str, text: str) -> Optional[str]:

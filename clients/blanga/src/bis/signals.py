@@ -6,9 +6,7 @@ from typing import Dict, List, Optional
 
 import httpx
 
-from bis.models import ProgressSignal
-from bis.models import SignalType
-from bis.models import make_urn
+from bis.models import ProgressSignal, SignalType, make_urn
 from bis.store import InMemoryMasterArena
 
 AUSTIN_PERMIT_DATASET_URL = "https://data.austintexas.gov/resource/3syk-w9eu.json"

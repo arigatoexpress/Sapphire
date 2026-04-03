@@ -4,13 +4,12 @@ Full Qwen Benchmark Suite - Comprehensive testing with visualizations
 """
 
 import json
-import time
+import statistics
 import subprocess
 import sys
-import os
+import time
 from datetime import datetime
-from typing import Dict, List, Any
-import statistics
+from typing import Dict, List
 
 # Try importing GPU monitoring
 try:

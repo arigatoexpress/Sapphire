@@ -6,14 +6,14 @@ Generates comprehensive comparison charts
 
 import json
 import os
-import sys
 
 os.environ["PYTHONIOENCODING"] = "utf-8"
 
 import matplotlib
+
 matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
 import numpy as np
 
 # Load benchmark data
@@ -152,6 +152,7 @@ heatmap_arr = np.array(heatmap_data)
 
 # Custom colormap
 from matplotlib.colors import LinearSegmentedColormap
+
 cmap = LinearSegmentedColormap.from_list('custom', ['#1a1a2e', '#76B900', '#FFD700'], N=256)
 
 im = ax.imshow(heatmap_arr, cmap=cmap, aspect='auto', interpolation='nearest')

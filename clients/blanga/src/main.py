@@ -2,19 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from html import escape
-from pathlib import Path
 
-from fastapi import Depends
-from fastapi import FastAPI
-from fastapi import Request
-from fastapi.responses import HTMLResponse
-
-from bis.api import master_arena
 from bis.api import router as bis_router
 from bis.auth import require_bis_auth
-from bis.compliance import policies_as_dicts
 from bis.settings import get_settings
-
+from fastapi import Depends, FastAPI, Request
+from fastapi.responses import HTMLResponse
 
 app = FastAPI(
     title="Blanga Intelligence System API",

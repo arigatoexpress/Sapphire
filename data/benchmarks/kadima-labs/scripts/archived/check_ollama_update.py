@@ -3,8 +3,8 @@
 Check if Ollama update is needed for Qwen 3.5 support
 """
 
-import subprocess
 import re
+import subprocess
 import sys
 
 

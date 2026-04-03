@@ -5,9 +5,9 @@ Analyzes correctness, coherence, and reasoning quality
 """
 
 import json
-import re
 from datetime import datetime
-from typing import Dict, List, Tuple
+from typing import Dict
+
 
 class QualityEvaluator:
     """Evaluates the quality of model outputs"""

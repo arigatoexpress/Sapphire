@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import secrets
 
-from fastapi import Depends
-from fastapi import HTTPException
-from fastapi.security import HTTPBasic
-from fastapi.security import HTTPBasicCredentials
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 from bis.settings import get_settings
 

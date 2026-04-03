@@ -5,22 +5,18 @@ Tests: Speed, Quality, MoE Functionality, Inference Operations
 Includes real-time visualization of GPU operations
 """
 
+import gc
 import json
-import time
+import statistics
 import subprocess
 import sys
-import os
-import gc
 import threading
-import queue
+import time
 from datetime import datetime
-from typing import Dict, List, Any, Optional, Tuple
-import statistics
+from typing import Any, Dict, List
+
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-from matplotlib.animation import FuncAnimation
 import numpy as np
-from collections import deque
 
 # GPU monitoring
 try:

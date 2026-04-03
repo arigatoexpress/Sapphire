@@ -1,26 +1,27 @@
 from __future__ import annotations
 
-from dataclasses import asdict
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import date, datetime, timedelta, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional, Sequence
 
-from bis.models import FieldObservation
-from bis.models import GeneratedDocument
-from bis.models import LlcEntity
-from bis.models import ListingStatus
-from bis.models import MarketEvent
-from bis.models import MarketEventType
-from bis.models import NoteEntry
-from bis.models import OMExtractionRecord
-from bis.models import OutreachState
-from bis.models import Person
-from bis.models import ProgressSignal
-from bis.models import PropertyAsset
-from bis.models import ReviewStatus
-from bis.models import ReviewTask
-from bis.models import SignalType
+from bis.models import (
+    FieldObservation,
+    GeneratedDocument,
+    ListingStatus,
+    LlcEntity,
+    MarketEvent,
+    MarketEventType,
+    NoteEntry,
+    OMExtractionRecord,
+    OutreachState,
+    Person,
+    ProgressSignal,
+    PropertyAsset,
+    ReviewStatus,
+    ReviewTask,
+    SignalType,
+)
 
 
 def _norm(text: str) -> str:

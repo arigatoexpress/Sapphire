@@ -5,14 +5,13 @@ Comprehensive analysis of Qwen 2.5 vs Qwen 3.0
 With framework ready for Qwen 3.5 testing
 """
 
-import json
-import time
-import subprocess
-import sys
 import gc
-from datetime import datetime
-from typing import Dict, List, Any
+import json
 import statistics
+import subprocess
+import time
+from datetime import datetime
+from typing import Dict, List
 
 try:
     import pynvml as nvml

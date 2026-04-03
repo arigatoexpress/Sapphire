@@ -8,7 +8,6 @@ import json
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any
 
 
 class BenchmarkAnalyzer:
@@ -92,13 +91,13 @@ class BenchmarkAnalyzer:
             
             lines.append(f"\n📊 {model}")
             lines.append("="*40)
-            lines.append(f"  Overall Performance:")
+            lines.append("  Overall Performance:")
             lines.append(f"    • Average Speed: {summary['avg_tokens_per_second']} tokens/sec")
             lines.append(f"    • Average Response Time: {summary['avg_duration_seconds']}s")
             lines.append(f"    • Total Test Time: {summary['total_duration_seconds']}s")
             lines.append(f"    • Success Rate: {summary['successful_tests']}/{summary['total_tests']}")
             
-            lines.append(f"\n  Individual Test Results:")
+            lines.append("\n  Individual Test Results:")
             for test_name, test_result in tests.items():
                 status = "✓" if test_result["success"] else "✗"
                 tps = test_result.get("tokens_per_second", 0)
@@ -115,7 +114,7 @@ class BenchmarkAnalyzer:
             slowest = by_speed[-1]
             speed_ratio = fastest["summary"]["avg_tokens_per_second"] / max(slowest["summary"]["avg_tokens_per_second"], 0.001)
             
-            lines.append(f"\n🚀 Speed Comparison:")
+            lines.append("\n🚀 Speed Comparison:")
             lines.append(f"    Fastest: {fastest['model']} ({fastest['summary']['avg_tokens_per_second']} t/s)")
             lines.append(f"    Slowest: {slowest['model']} ({slowest['summary']['avg_tokens_per_second']} t/s)")
             lines.append(f"    Speed Ratio: {speed_ratio:.1f}x faster")
@@ -123,7 +122,7 @@ class BenchmarkAnalyzer:
             # Qwen-specific analysis
             qwen_models = [r for r in successful if "qwen" in r["model"].lower()]
             if qwen_models:
-                lines.append(f"\n🤖 Qwen Models Analysis:")
+                lines.append("\n🤖 Qwen Models Analysis:")
                 for qm in qwen_models:
                     lines.append(f"    • {qm['model']}: {qm['summary']['avg_tokens_per_second']} t/s")
         
@@ -160,7 +159,7 @@ class BenchmarkAnalyzer:
             if model_size:
                 lines.append(f"     Estimated Size: ~{model_size}GB")
                 if model_size > 16:
-                    lines.append(f"     ⚠️ Model requires offloading to system RAM")
+                    lines.append("     ⚠️ Model requires offloading to system RAM")
         
         # Recommendations
         lines.append("\n" + "-"*80)

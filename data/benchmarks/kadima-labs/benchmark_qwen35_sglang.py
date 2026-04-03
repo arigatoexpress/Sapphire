@@ -5,17 +5,16 @@ SGLang is the recommended framework for running Qwen 3.5 models
 """
 
 import json
-import time
-import subprocess
-import sys
-from datetime import datetime
-from typing import Dict, List, Any
 import statistics
+import subprocess
+import time
+from datetime import datetime
+from typing import Any, Dict
 
 # Try to import sglang
 try:
     import sglang as sgl
-    from sglang import function, system, user, assistant, gen
+    from sglang import assistant, function, gen, system, user
     HAS_SGLANG = True
 except ImportError as e:
     print(f"SGLang not available: {e}")
@@ -49,9 +48,9 @@ class SGLangBenchmark:
         else:
             # Native SGLang backend (requires model in SGLang format)
             sgl.set_default_backend(sgl.RuntimeEndpoint(
-                f"http://localhost:30000"
+                "http://localhost:30000"
             ))
-            print(f"Using native SGLang backend")
+            print("Using native SGLang backend")
     
     def benchmark_prompt(self, prompt: str, num_runs: int = 3) -> Dict[str, Any]:
         """Benchmark a single prompt"""
@@ -63,7 +62,7 @@ class SGLangBenchmark:
             try:
                 start = time.time()
                 # Run prompt using SGLang
-                from sglang import function, system, user, assistant, gen
+                from sglang import assistant, function, gen, system, user
                 
                 @function
                 def run_prompt(s, p):
@@ -106,7 +105,7 @@ class SGLangBenchmark:
     def run_full_benchmark(self) -> Dict[str, Any]:
         """Run complete benchmark suite"""
         print(f"\n{'='*70}")
-        print(f"QWEN 3.5 SGLang BENCHMARK")
+        print("QWEN 3.5 SGLang BENCHMARK")
         print(f"Model: {self.model_name}")
         print(f"Backend: {self.backend_type}")
         print(f"{'='*70}\n")
@@ -163,7 +162,7 @@ class SGLangBenchmark:
 def simple_ollama_benchmark(model: str = "qwen3.5:9b"):
     """Simple benchmark using direct Ollama calls with extended timeouts"""
     print(f"\n{'='*70}")
-    print(f"QWEN 3.5 BENCHMARK (Direct Ollama with Extended Timeouts)")
+    print("QWEN 3.5 BENCHMARK (Direct Ollama with Extended Timeouts)")
     print(f"Model: {model}")
     print(f"{'='*70}\n")
     
@@ -180,7 +179,7 @@ def simple_ollama_benchmark(model: str = "qwen3.5:9b"):
     for test_name, prompt in tests.items():
         print(f"\n{test_name.upper()}:")
         print(f"  Prompt: {prompt[:50]}...")
-        print(f"  Running (may take 60-180s for first load)...")
+        print("  Running (may take 60-180s for first load)...")
         
         start = time.time()
         try:
@@ -208,7 +207,7 @@ def simple_ollama_benchmark(model: str = "qwen3.5:9b"):
                 print(f"  ❌ Error: {result.stderr[:100]}")
         except subprocess.TimeoutExpired:
             results["tests"][test_name] = {"success": False, "error": "Timeout after 300s"}
-            print(f"  ❌ Timeout after 300s")
+            print("  ❌ Timeout after 300s")
         except Exception as e:
             results["tests"][test_name] = {"success": False, "error": str(e)}
             print(f"  ❌ Error: {e}")

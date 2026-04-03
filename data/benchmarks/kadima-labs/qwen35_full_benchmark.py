@@ -4,11 +4,12 @@ Qwen 3.5 Full Benchmark - Smallest to Largest
 Tests: 0.8b -> 4b -> 9b
 """
 
-import requests
-import time
 import json
 import statistics
+import time
 from datetime import datetime
+
+import requests
 
 OLLAMA_API = "http://localhost:11434/api/generate"
 

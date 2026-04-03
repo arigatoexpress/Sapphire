@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-import requests
 import time
-from datetime import datetime
+
+import requests
 
 models = ['qwen3.5:9b', 'qwen3:14b', 'qwen2.5:14b']
 prompt = 'What is 2+2? Answer briefly.'

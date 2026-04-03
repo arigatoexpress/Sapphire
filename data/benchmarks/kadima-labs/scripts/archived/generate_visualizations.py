@@ -3,11 +3,8 @@
 Generate visualizations from available data
 """
 
-import json
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 import numpy as np
-from datetime import datetime
 
 # Data from our tests
 data = {
@@ -61,6 +58,7 @@ plt.style.use('seaborn-v0_8-whitegrid')
 
 # Create output directory
 import os
+
 os.makedirs('qwen35_visualizations', exist_ok=True)
 
 # 1. Speed Comparison

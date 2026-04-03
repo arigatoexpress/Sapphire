@@ -2,9 +2,9 @@
 """Generate visualization charts from benchmark results"""
 
 import json
+
 import matplotlib.pyplot as plt
 import numpy as np
-from datetime import datetime
 
 # Load data
 with open('final_qwen_results.json', 'r') as f:

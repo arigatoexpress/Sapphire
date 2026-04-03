@@ -3,10 +3,10 @@
 Test GPU utilization during inference
 """
 
-import subprocess
-import time
-import threading
 import json
+import subprocess
+import threading
+import time
 
 gpu_readings = []
 
@@ -22,7 +22,7 @@ def monitor_gpu(duration=60):
             )
             gpu, mem = result.stdout.strip().split(", ")
             gpu_readings.append((time.time(), float(gpu.strip()), float(mem.strip())))
-        except Exception as e:
+        except Exception:
             pass
         time.sleep(0.5)
 
@@ -64,7 +64,7 @@ def test_inference():
     # Parse response
     try:
         response = json.loads(result.stdout)
-        print(f"\nInference Results:")
+        print("\nInference Results:")
         print(f"  Duration: {duration:.1f}s")
         print(f"  Model load time: {response.get('load_duration', 0)/1e9:.1f}s")
         print(f"  Prompt eval: {response.get('prompt_eval_duration', 0)/1e9:.1f}s")
@@ -77,7 +77,7 @@ def test_inference():
         print(f"Raw response: {result.stdout[:500]}")
     
     # Analyze GPU readings
-    print(f"\nGPU Utilization during inference:")
+    print("\nGPU Utilization during inference:")
     print("-" * 50)
     print(f"{'Time':<8} {'GPU%':<10} {'VRAM MB':<12} {'Status'}")
     print("-" * 50)
@@ -96,17 +96,17 @@ def test_inference():
         max_mem = max(r[2] for r in gpu_readings)
         
         print("-" * 50)
-        print(f"\nSummary:")
+        print("\nSummary:")
         print(f"  Avg GPU utilization: {avg_gpu:.1f}%")
         print(f"  Max GPU utilization: {max_gpu:.1f}%")
         print(f"  Avg VRAM: {avg_mem:.0f} MB")
         print(f"  Max VRAM: {max_mem:.0f} MB")
         
         if max_gpu < 50:
-            print(f"\nWARNING: Low GPU utilization detected!")
-            print(f"   GPU may not be properly utilized for inference.")
+            print("\nWARNING: Low GPU utilization detected!")
+            print("   GPU may not be properly utilized for inference.")
         else:
-            print(f"\nGPU is being utilized correctly!")
+            print("\nGPU is being utilized correctly!")
 
 if __name__ == "__main__":
     test_inference()

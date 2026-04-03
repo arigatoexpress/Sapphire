@@ -5,11 +5,11 @@ Tests all 4 Qwen models one by one
 """
 
 import json
-import time
+import statistics
 import subprocess
 import sys
+import time
 from datetime import datetime
-import statistics
 
 # GPU monitoring
 try:
@@ -187,7 +187,7 @@ class QwenBenchmark:
                 all_results.append({"model": model, "error": str(e)})
             
             if i < len(models):
-                print(f"\n  Cooling down before next model...")
+                print("\n  Cooling down before next model...")
                 time.sleep(10)
         
         return all_results

@@ -4,11 +4,12 @@ Comprehensive Qwen 3.5 Benchmark Suite
 Tests all sizes with multiple scenarios
 """
 
-import requests
-import time
 import json
 import statistics
+import time
 from datetime import datetime
+
+import requests
 
 API_URL = "http://localhost:11434/api/generate"
 
@@ -32,7 +33,7 @@ def test_model(model, prompt, timeout=180):
                 'duration': round(duration, 2),
                 'tokens': tokens
             }
-    except Exception as e:
+    except Exception:
         pass
     
     return {'success': False}

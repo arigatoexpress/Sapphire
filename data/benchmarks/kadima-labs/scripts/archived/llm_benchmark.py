@@ -6,13 +6,12 @@ Measures: tokens/sec, latency, memory usage, quality scores
 """
 
 import json
-import time
+import statistics
 import subprocess
 import sys
-import os
+import time
 from datetime import datetime
-from typing import Dict, List, Any, Optional
-import statistics
+from typing import Any, Dict, List, Optional
 
 # Try to import GPU monitoring
 try:

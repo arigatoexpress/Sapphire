@@ -6,11 +6,11 @@ Creates beautiful charts and comprehensive analysis
 
 import json
 import statistics
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-import numpy as np
 from datetime import datetime
 from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 def load_data(filename):
@@ -515,7 +515,6 @@ Complete results available in: `{system_info.get('timestamp', 'data_file')}.json
 
 
 def main():
-    import sys
     
     # Find the most recent data file
     data_files = sorted(Path('.').glob('qwen35_complete_data_*.json'))

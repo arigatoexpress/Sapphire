@@ -3,10 +3,11 @@
 Qwen 3.5 Working Benchmark - Using Ollama API
 """
 
-import requests
-import time
 import json
+import time
 from datetime import datetime
+
+import requests
 
 OLLAMA_API = "http://localhost:11434/api/generate"
 
@@ -32,7 +33,7 @@ def benchmark_model(model, prompt, timeout=300):
             tokens = data.get('eval_count', 0)
             tps = tokens / duration if duration > 0 else 0
             
-            print(f"OK")
+            print("OK")
             print(f"    Duration: {duration:.1f}s")
             print(f"    Tokens: {tokens}")
             print(f"    Speed: {tps:.1f} t/s")

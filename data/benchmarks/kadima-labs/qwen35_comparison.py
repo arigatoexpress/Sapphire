@@ -5,12 +5,10 @@ Compare Qwen 2.5 vs 3.0 vs 3.5
 """
 
 import json
-import time
 import subprocess
-import sys
-import gc
+import time
 from datetime import datetime
-import statistics
+
 
 # Test if Qwen 3.5 is available
 def check_qwen35_available():

@@ -6,10 +6,10 @@ Generates comparison rankings by category
 """
 
 import json
-import time
+import os
 import subprocess
 import sys
-import os
+import time
 from datetime import datetime
 
 # Fix Windows encoding
@@ -127,7 +127,7 @@ def main():
             print(f"  [SKIP] {model} - not installed")
 
     print(f"\n{'='*70}")
-    print(f"COMPREHENSIVE MODEL COMPARISON BENCHMARK")
+    print("COMPREHENSIVE MODEL COMPARISON BENCHMARK")
     print(f"Models: {len(available)} | Tests: {len(TESTS)} | Total runs: {len(available) * len(TESTS)}")
     print(f"{'='*70}\n")
 

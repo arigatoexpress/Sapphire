@@ -5,13 +5,12 @@ Reliable GPU-accelerated inference
 """
 
 import json
-import time
+import statistics
 import subprocess
 import sys
-import threading
+import time
 from datetime import datetime
-from typing import Dict, List, Any
-import statistics
+from typing import Dict, List
 
 # GPU monitoring
 try:

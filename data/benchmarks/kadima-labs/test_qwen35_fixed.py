@@ -4,9 +4,8 @@ Fixed Qwen 3.5 Benchmark - Handles slow first-load times
 """
 
 import json
-import time
 import subprocess
-import sys
+import time
 from datetime import datetime
 
 
@@ -79,7 +78,7 @@ def main():
         for test_name, prompt in tests.items():
             print(f"\n{test_name.upper()} TEST:")
             print(f"Prompt: {prompt[:50]}...")
-            print(f"Running (timeout: 5 min for first load)...")
+            print("Running (timeout: 5 min for first load)...")
             
             result = run_with_long_timeout(model, prompt, timeout=300)
             model_results[test_name] = result

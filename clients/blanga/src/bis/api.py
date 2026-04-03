@@ -6,53 +6,50 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-from fastapi import APIRouter
-from fastapi import Depends
-from fastapi import HTTPException
-from pydantic import BaseModel
-from pydantic import Field
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 
-from bis.auth import require_bis_auth
-from bis.compliance import policies_as_dicts
-from bis.gcs_persistence import gcs_status
-from bis.gcs_persistence import load_snapshot_from_gcs
-from bis.gcs_persistence import save_snapshot_to_gcs
-from bis.google_sheets_api import read_sheet_rows
-from bis.google_sheets_api import sheets_client_status
-from bis.google_sheets_api import write_sheet_rows
 from bis.agent import BISAgent
-from bis.automation import auto_generate_documents_for_property
-from bis.automation import run_automation_tick
-from bis.intel import client_intel_summary
-from bis.intel import ingest_market_event
-from bis.intel import news_source_preferences_as_dicts
-from bis.intel import refresh_news_intelligence
-from bis.note_extraction import extract_field_suggestions
-from bis.note_extraction import extract_follow_up_suggestions
-from bis.models import GeneratedDocument
-from bis.models import FieldObservation
-from bis.models import LlcEntity
-from bis.models import ListingStatus
-from bis.models import MarketEvent
-from bis.models import NoteEntry
-from bis.models import Person
-from bis.models import PropertyAsset
-from bis.models import ReviewTask
-from bis.models import make_urn
+from bis.auth import require_bis_auth
+from bis.automation import auto_generate_documents_for_property, run_automation_tick
+from bis.compliance import policies_as_dicts
+from bis.gcs_persistence import gcs_status, load_snapshot_from_gcs, save_snapshot_to_gcs
+from bis.google_sheets_api import read_sheet_rows, sheets_client_status, write_sheet_rows
+from bis.intel import (
+    client_intel_summary,
+    ingest_market_event,
+    news_source_preferences_as_dicts,
+    refresh_news_intelligence,
+)
+from bis.models import (
+    FieldObservation,
+    GeneratedDocument,
+    ListingStatus,
+    LlcEntity,
+    MarketEvent,
+    NoteEntry,
+    Person,
+    PropertyAsset,
+    ReviewTask,
+    make_urn,
+)
+from bis.note_extraction import extract_field_suggestions, extract_follow_up_suggestions
 from bis.om import extract_om_fields
 from bis.scoring import compute_propensity_score
 from bis.settings import get_settings
-from bis.signals import attach_signals_to_properties
-from bis.signals import fetch_county_permit_signals
-from bis.signals import fetch_austin_permit_signals
-from bis.signals import permit_source_registry
-from bis.sheets_sync import normalize_properties_row
-from bis.sheets_sync import normalize_notes_row
-from bis.sheets_sync import normalize_property_update_row
-from bis.sheets_sync import sheet_contract
-from bis.sheets_sync import writeback_preview_rows
-from bis.store import InMemoryMasterArena
-from bis.store import PropertyQuery
+from bis.sheets_sync import (
+    normalize_notes_row,
+    normalize_properties_row,
+    normalize_property_update_row,
+    sheet_contract,
+    writeback_preview_rows,
+)
+from bis.signals import (
+    attach_signals_to_properties,
+    fetch_county_permit_signals,
+    permit_source_registry,
+)
+from bis.store import InMemoryMasterArena, PropertyQuery
 
 router = APIRouter(prefix="/api/bis", tags=["bis"], dependencies=[Depends(require_bis_auth)])
 master_arena = InMemoryMasterArena()

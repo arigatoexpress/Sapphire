@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Quick data collection for Qwen 3.5"""
-import requests
-import time
 import json
+import time
 from datetime import datetime
+
+import requests
 
 API_URL = "http://localhost:11434/api/generate"
 

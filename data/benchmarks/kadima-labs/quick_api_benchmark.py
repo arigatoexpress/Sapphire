@@ -2,10 +2,11 @@
 """Quick benchmark of 14B Qwen models"""
 
 import json
-import time
-import subprocess
-from datetime import datetime
 import statistics
+import subprocess
+import time
+from datetime import datetime
+
 
 def run_inference(model, prompt, timeout=60):
     payload = {"model": model, "prompt": prompt, "stream": False}

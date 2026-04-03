@@ -5,15 +5,14 @@ Tests models individually with proper cleanup between runs
 Focuses on quality metrics, not just speed
 """
 
+import gc
 import json
-import time
+import statistics
 import subprocess
 import sys
-import os
-import gc
+import time
 from datetime import datetime
-from typing import Dict, List, Any, Optional
-import statistics
+from typing import Any, Dict, Optional
 
 # GPU monitoring
 try:
@@ -343,10 +342,10 @@ def compare_qwen_generations():
     print("COMPREHENSIVE QWEN BENCHMARK SUITE")
     print("GPU Isolation Enabled | Quality-Focused Tests")
     print("="*70)
-    print(f"Hardware: RTX 5070 Ti 16GB")
+    print("Hardware: RTX 5070 Ti 16GB")
     print(f"Testing: {len(models)} Qwen models with 8 quality tests each")
-    print(f"Models: qwen3:14b (NEW!), qwen2.5-coder:14b, qwen2.5:14b, qwen2.5:32b")
-    print(f"GPU memory will be cleared between EACH test\n")
+    print("Models: qwen3:14b (NEW!), qwen2.5-coder:14b, qwen2.5:14b, qwen2.5:32b")
+    print("GPU memory will be cleared between EACH test\n")
     
     benchmark = AccurateBenchmark()
     

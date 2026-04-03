@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-import requests
 import time
+
+import requests
 
 model = 'qwen3.5:9b'
 prompt = 'Say hello'

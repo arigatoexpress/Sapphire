@@ -3,9 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Iterable
 
-from bis.models import ProgressSignal
-from bis.models import PropensityScore
-from bis.models import PropertyAsset
+from bis.models import ProgressSignal, PropensityScore, PropertyAsset
 
 
 def _clamp(value: float, minimum: float = 0.0, maximum: float = 1.0) -> float:

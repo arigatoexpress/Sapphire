@@ -6,19 +6,19 @@ Lighter is a decentralized L2 order book exchange built on ZK-rollups.
 """
 
 import asyncio
-import math
-import json
+import html
 import inspect
+import json
 import logging
+import math
 import os
 import signal
 import sys
-import time
 import tempfile
-import html
-from decimal import Decimal, InvalidOperation
-from datetime import datetime, timezone
+import time
 from collections import defaultdict, deque
+from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
@@ -39,8 +39,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))  # For Sapp
 
 # Try imports - support both direct and nested package structure
 try:
-    from shared.pubsub import get_pubsub_client, publish, subscribe
-    from shared.utils import ServiceConfig, format_percent, format_price, setup_logging, utc_now
+    from shared.circuit_breaker import CircuitBreaker, CircuitBreakerOpen
+    from shared.execution_idempotency import ExecutionIdempotency
     from shared.models import (
         BalanceUpdate,
         Platform,
@@ -50,12 +50,12 @@ try:
         TradeSide,
         TradeSignal,
     )
-    from shared.circuit_breaker import CircuitBreaker, CircuitBreakerOpen
-    from shared.execution_idempotency import ExecutionIdempotency
+    from shared.pubsub import get_pubsub_client, publish, subscribe
     from shared.risk_kernel import HardRiskKernel
+    from shared.utils import ServiceConfig, format_percent, format_price, setup_logging, utc_now
 except ImportError:
-    from pubsub import get_pubsub_client, publish, subscribe
-    from utils import ServiceConfig, format_percent, format_price, setup_logging, utc_now
+    from circuit_breaker import CircuitBreaker, CircuitBreakerOpen
+    from execution_idempotency import ExecutionIdempotency
     from models import (
         BalanceUpdate,
         Platform,
@@ -65,9 +65,9 @@ except ImportError:
         TradeSide,
         TradeSignal,
     )
-    from circuit_breaker import CircuitBreaker, CircuitBreakerOpen
-    from execution_idempotency import ExecutionIdempotency
+    from pubsub import get_pubsub_client, publish, subscribe
     from risk_kernel import HardRiskKernel
+    from utils import ServiceConfig, setup_logging, utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,9 @@ try:
     import platform as _plat
     if _plat.machine().lower() == "aarch64":
         try:
-            import os as _os, ctypes as _ct
+            import ctypes as _ct
+            import os as _os
+
             import lighter.signer_client as _lsc
             for _k, _v in list(vars(_lsc).items()):
                 if callable(_v) and "shared_library" in _k:
@@ -1664,8 +1666,9 @@ class LighterBot:
 
         # Last-chance sweep: close any leaked aiohttp sessions left by SDK internals.
         try:
-            import aiohttp as _aio
             import gc as _gc
+
+            import aiohttp as _aio
 
             leaked = 0
             for obj in _gc.get_objects():
@@ -6434,7 +6437,7 @@ async def main():
     )
 
     logger.info("=" * 50)
-    logger.info(f"LIGHTER BOT SERVICE (L2 Order Book)")
+    logger.info("LIGHTER BOT SERVICE (L2 Order Book)")
     logger.info(f"{datetime.now().isoformat()}")
     logger.info("=" * 50)
 

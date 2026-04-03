@@ -5,16 +5,18 @@ Generates LinkedIn-ready charts from benchmark results.
 Clean, professional design with proper branding.
 """
 
-import json
-import sys
-import os
 import glob
+import json
+import os
+import sys
+
 import matplotlib
+
 matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-from matplotlib.gridspec import GridSpec
+import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.gridspec import GridSpec
 
 # ── Kadima Brand Colors ──────────────────────────────────────────────────
 
@@ -563,8 +565,8 @@ def main():
     output_dir = os.path.dirname(filepath)
 
     print(f"\n{'='*60}")
-    print(f"  KADIMA DIGITAL LABORATORIES")
-    print(f"  Generating Publication Visualizations")
+    print("  KADIMA DIGITAL LABORATORIES")
+    print("  Generating Publication Visualizations")
     print(f"{'='*60}")
     print(f"  Source: {filepath}")
     print(f"  Models: {len(data['results'])}")
@@ -579,7 +581,7 @@ def main():
     chart6_speed_by_category(data, hardware, output_dir)
 
     print(f"\n{'='*60}")
-    print(f"  All 6 charts generated!")
+    print("  All 6 charts generated!")
     print(f"  Location: {output_dir}/kadima_*.png")
     print(f"{'='*60}")
 
