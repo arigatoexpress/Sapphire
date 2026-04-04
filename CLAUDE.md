@@ -1,6 +1,38 @@
 # Sapphire OS
 
-Autonomous trading + project management + intelligence system. Telegram-first, agent-driven.
+Autonomous trading + project management + intelligence system. Telegram-first, agent-driven. Python 3.11+.
+
+## Commands
+
+```bash
+# Test
+pytest tests/unit/ --tb=short -q           # 1,088 tests (use /usr/local/bin/python3 on Mac)
+pytest plugins/claw-sapphire/tests/ -q     # 13 plugin tests
+
+# Lint
+ruff check .                               # Uses pyproject.toml rules (E501 ignored)
+ruff check --fix .                         # Auto-fix
+
+# Services (Mac — all have LaunchAgents)
+uvicorn app.main:app --port 8082           # Control-plane (run from services/control-plane/)
+AUTH_PASSWORD=sapphire python3 app.py       # Dashboard (run from services/dashboard/)
+python3 services/telegram-bot/app.py --poll # Telegram bot
+python3 -m uvicorn src.signal_logger:app --port 18081  # Signal logger (from services/alpha/)
+
+# TradingView MCP (requires TV Desktop with --remote-debugging-port=9222)
+tv status                                  # Check CDP connection
+tv quote                                   # Live price
+tv pine compile                            # Compile Pine Script in editor
+tv stream all                              # Stream all panes as JSONL
+
+# OpenBB
+curl "http://localhost:6900/api/v1/equity/price/quote?symbol=AAPL&provider=yfinance"
+
+# Sapphire plugin tools
+echo '{"action":"quote","symbol":"AAPL"}' | python3 plugins/claw-sapphire/tools/market.py
+echo '{"all": true}' | python3 plugins/claw-sapphire/tools/verify.py
+python3 plugins/claw-sapphire/tools/budget.py < /dev/null
+```
 
 ## Module Map
 
@@ -9,123 +41,86 @@ Autonomous trading + project management + intelligence system. Telegram-first, a
 | `lib/core/` | library | Shared: risk kernel, circuit breaker, position sizing, models, logging |
 | `lib/telegram/` | library | Telegram bot framework + handlers |
 | `lib/agents/` | library | OpenClaw/NemoClaw dispatch, orchestrator, runtime policy |
-| `services/aster/` | service | Aster DEX trading bot — Solana perps, Shield HFT strategy [rari2] |
-| `services/hyperliquid/` | service | Hyperliquid L1 trading bot — EIP-712 signed orders [rari2, stub] |
-| `services/alpha/` | service | Trading engine: signals, risk, execution [rari1+rari2:18081] |
-| `services/dashboard/` | service | sapphirealpha.xyz Flask dashboard [rari1:8080] |
-| `services/control-plane/` | service | PM hub: projects, tasks, events, Kimi bridge [rari1:8082] |
-| `services/webhook/` | service | TradingView webhook receiver [windows-pc:9090 + Cloudflare Tunnel] |
-| `clients/blanga/` | client | BIS: brokerage intelligence for Joseph Blanga |
-| `pine/` | pine | TradingView indicators and strategies (v1-v3 Ultra) |
+| `services/alpha/` | service | Trading engine + signal logger [Mac:18081] |
+| `services/aster/` | service | Aster DEX trading bot — Solana perps [paused, needs Pi] |
+| `services/hyperliquid/` | service | Hyperliquid L1 trading bot [stub, needs Pi] |
+| `services/dashboard/` | service | Flask dashboard [Mac:8080, auth: sapphire] |
+| `services/control-plane/` | service | PM hub: projects, tasks, events, Kimi bridge [Mac:8082] |
+| `services/webhook/` | service | TradingView webhook receiver [Windows:9090] |
+| `services/telegram-bot/` | service | NemotronRariBot — thin service, delegates to plugin tools |
+| `clients/blanga/` | client | BIS: brokerage intelligence |
+| `plugins/claw-sapphire/` | plugin | Claw-code plugin: 7 tools, 2 hooks, 4 libs, 13 tests |
+| `pine/` | pine | TradingView strategies (v1-v3 Ultra, 80%+ win rate target) |
 | `skills/` | skills | Agent-executable capabilities (10 skills) |
-| `tools/claude-analytics/` | tool | MCP server for Claude Code usage metrics (TypeScript) |
 | `tools/pm-commander/` | tool | Sapphire Command — SwiftUI desktop app (7-tab command center) |
-| `services/telegram-bot/` | service | NemotronRariBot — thin Telegram webhook, delegates to plugin tools |
-| `data/benchmarks/kadima-labs/` | data | Kadima Labs AI benchmark suite (v1-v3, 70 charts, 30 JSON results) |
-| `infra/cloudflare/` | infra | Cloudflare Tunnel config — public ingress (no GCP) |
-| `infra/pi/` | infra | Raspberry Pi systemd services + deploy scripts |
+| `data/benchmarks/kadima-labs/` | data | Kadima Labs AI benchmark (v1-v3, 70 charts, 30 JSON) |
+| `infra/` | infra | Cloudflare Tunnel, Pi systemd, Windows setup |
 
-## Devices
+## Infrastructure (Pi-less since 2026-04-03)
 
-| Device | Tailscale IP | Role |
-|--------|-------------|------|
-| Mac | 100.67.171.79 | Commander, dev, git |
-| Windows PC | 100.71.10.48 | RTX 5070 Ti, NemoClaw inference |
-| rari1 | 100.120.191.1 | Controller Pi, Telegram bot, Kimi agent |
-| rari2 | 100.87.225.89 | Trading Pi, Aster + Hyperliquid, ProtonVPN |
+**Mac (100.67.171.79) — runs everything:**
+- control-plane:8082, dashboard:8080, signal-logger:18081
+- telegram-bot, OpenBB:6900, Redis:6379, Ollama:11434
+- Claude Code, claw-code, all MCPs
 
-## Agent Coordination
+**Windows PC (100.71.10.48) — GPU + webhook:**
+- Ollama:11434 (26 models, RTX 5070 Ti, OLLAMA_HOST=0.0.0.0)
+- webhook:9090 (TradingView signal receiver)
 
-- **Claude Code** (Mac): Architecture, refactors, planning
-- **Claude Dispatch** (Cloud): Scheduled tasks — daily briefing, CI monitor, weekly review, self-improvement loop
-- **Claw Code** (All devices): Rust-based local agent runtime — per-device profiles in `~/.claw/profiles/`
-- **Kimi Claw** (rari1): Telegram ops, monitoring, quick tasks [offline — Pis down since 2026-03-28]
-- **NemoClaw** (Windows): GPU compute, backtesting, inference via Ollama over Tailscale
-- **OpenClaw workers** (Mac): Background automation via LaunchAgents
-
-## Satellite Repos (orchestrated, not absorbed)
-
-| Repo | Path | GitHub | Role |
-|------|------|--------|------|
-| claw-code | `~/Code/claw-code` | instructkr/claw-code | Local coding agent runtime (all devices) |
-| Project-Go-Forward | `~/Code/Project-Go-Forward` | arigatoexpress/Project-Go-Forward | Client PM system (THO) |
-| kimi-tools | `~/Code/kimi-tools` | arigatoexpress/kimi-tools | Distributed agent infra, Nemotron |
-| regional-intel-workbench | `~/Code/regional-intel-workbench` | arigatoexpress/regional-intel-workbench | Intelligence platform |
-| tradingview-mcp | `~/Code/tradingview-mcp` | arigatoexpress/tradingview-mcp | TradingView MCP server |
-| Cointracker | `~/Code/Cointracker` | arigatoexpress/crypto-tax-tracker | Crypto tax engine |
+**Pis (rari1/rari2) — DECOMMISSIONED.** Pi OS WiFi incompatible. Trading execution paused.
 
 ## Code Style
 
 - Python: ruff format, type hints, Google-style docstrings
 - TypeScript: strict mode, no `any`
 - Every module has a SKILL.md — read it before working on that module
-- Services never import from other services — only from lib/
+- Services never import from other services — only from `lib/`
 - PnL is king. Sortino/Calmar over Sharpe. 80%+ win rate target.
 
-## Exchanges
+## Satellite Repos (orchestrated, not absorbed)
 
-| Service | Exchange | Chain | Status | Deploy |
-|---------|----------|-------|--------|--------|
-| `services/aster/` | Aster DEX | Solana | Active | rari2 |
-| `services/hyperliquid/` | Hyperliquid L1 | Hyperliquid L1 | Stub | rari2 |
+| Repo | GitHub | Role |
+|------|--------|------|
+| `~/Code/claw-code` | instructkr/claw-code | Rust agent runtime |
+| `~/Code/Project-Go-Forward` | arigatoexpress/Project-Go-Forward | THO client PM |
+| `~/Code/kimi-tools` | arigatoexpress/kimi-tools | Distributed agent infra |
+| `~/Code/regional-intel-workbench` | arigatoexpress/regional-intel-workbench | Intelligence platform |
+| `~/Code/tradingview-mcp` | arigatoexpress/tradingview-mcp | TradingView MCP |
+| `~/Code/Cointracker` | arigatoexpress/crypto-tax-tracker | Crypto tax engine |
 
-All bots receive signals from `services/alpha/` via direct HTTP over Tailscale (no GCP Pub/Sub).
+## Sapphire Plugin (v0.3.0, claw-code native)
 
-## Infrastructure (Pi-less since 2026-04-03)
-
-**Mac (100.67.171.79) — runs everything:**
-- control-plane:8082 (FastAPI, LaunchAgent)
-- dashboard:8080 (Flask, LaunchAgent, auth: sapphire)
-- telegram-bot (NemotronRariBot, LaunchAgent)
-- OpenBB API:6900 (LaunchAgent)
-- Redis:6379 (Homebrew service)
-- Ollama:11434 (4 local models)
-- Claude Code, claw-code, all MCPs
-
-**Windows PC (100.71.10.48) — GPU + webhook:**
-- Ollama:11434 (26 models, auto-start, OLLAMA_HOST=0.0.0.0)
-- webhook:9090 (TradingView signal receiver, scheduled task)
-
-**Pis — DECOMMISSIONED:**
-- rari1/rari2 offline. Pi OS Bookworm + 6GHz WiFi incompatible. Need ethernet for setup.
-- Trading execution (Aster DEX, Hyperliquid) paused.
-
-**Public ingress**: Cloudflare Tunnel (see `infra/cloudflare/SETUP.md`) — no port forwarding needed.
-
-## Event System
-
-Control-plane publishes events tagged with: `project:`, `agent:`, `priority:`, `type:`
-Tag namespaces: `project:` `agent:` `priority:` `type:` `service:` `device:`
-Events stored in JSONL file at `SAPPHIRE_EVENTS_PATH` (default: `app/data/system_events.jsonl`).
-Agents subscribe to relevant tags. Telegram notifications filtered by subscription.
-`data/connectors.json` — registry of all connectors, MCPs, LaunchAgents, exchanges, satellite repos.
-`data/device_topology.json` — canonical device mesh topology with status, tools, services.
-`plugins/claw-sapphire/` — Sapphire integration plugin for claw-code (status, tasks, notify, inference, events).
-
-## Inference Fallback Chain
-
-1. **Windows PC GPU** (100.71.10.48:11434) — RTX 5070 Ti, Nemotron/llama3.3:70b
-2. **Mac local Ollama** (localhost:11434) — llama3.3:70b, llama3.2:3b
-3. **Cloud API** (Anthropic) — claude-sonnet-4
-
-## Trading Intelligence Stack
-
-| System | Port/CLI | Data |
-|--------|----------|------|
-| TradingView MCP (tradesdontlie) | `tv` CLI, 78 tools via CDP:9222 | Live chart, Pine Script, indicator levels, strategy tester |
-| OpenBB | REST API :6900 | Equity, crypto, options, macro from 32 providers (yfinance, FRED, SEC...) |
-
-**TradingView**: `tv status`, `tv quote`, `tv pine compile`, `tv stream all`, `tv data lines`
-**OpenBB**: `curl http://localhost:6900/api/v1/equity/price/quote?symbol=AAPL&provider=yfinance`
-**Sapphire Market Tool**: `echo '{"action":"quote","symbol":"AAPL"}' | python3 plugins/claw-sapphire/tools/market.py`
-
-## Sapphire Plugin (v0.3.0)
-
-Claw-code plugin at `plugins/claw-sapphire/` with hooks + 7 tools:
-- `sapphire_dispatch` — multi-tier task routing (T0→T1→T3)
+`plugins/claw-sapphire/` — hooks + tools + libs + tests:
+- `sapphire_dispatch` — multi-tier routing (T0 Nemotron free → T1 Kimi → T3 Claude)
 - `sapphire_verify` — post-fix lint + test verification
 - `sapphire_budget` — real token tracking per tier
-- `sapphire_state` — persistent factory memory (issue tracking + backoff)
+- `sapphire_state` — persistent factory memory (backoff on failed fixes)
 - `sapphire_status` — mesh device + inference status
 - `sapphire_notify` — Telegram via NemotronRariBot
 - `sapphire_market` — unified OpenBB + TradingView data
+
+## Inference Fallback Chain
+
+1. **Windows GPU** (100.71.10.48:11434) — Nemotron 3 Nano 196 t/s, Cascade-2 31.6B
+2. **Mac Ollama** (localhost:11434) — llama3.3:70b fallback
+3. **Cloud API** — claude-sonnet-4 (expensive, architecture only)
+
+## Trading Pipeline
+
+TradingView → webhook (Windows :9090) → signal logger (Mac :18081) → Telegram
+Signals logged to `data/trading_signals.jsonl`. Execution paused (needs Pis).
+
+## Event System
+
+JSONL at `data/system_events.jsonl`. Tags: `project:` `agent:` `priority:` `type:` `service:` `device:`
+Registries: `data/connectors.json`, `data/device_topology.json`
+
+## Gotchas
+
+- Tests use `importlib` with hardcoded paths — moved from `services/alpha-engine/` to `services/alpha/` (fixed)
+- `conftest.py` patches `sys.path` for legacy imports — don't remove it
+- Dashboard requires `AUTH_PASSWORD` env var or it crashes on startup
+- OpenBB SDK has broken auto-generated package files — use REST API (:6900) instead
+- Kimi CLI auth tokens expire in ~1 hour — need frequent `kimi login`
+- macOS `python3` may resolve to brew 3.14 (missing pytest) — use `/usr/local/bin/python3` for tests
+- GPU Ollama needs SSH restart with `OLLAMA_HOST=0.0.0.0` if Windows reboots before scheduled task runs
