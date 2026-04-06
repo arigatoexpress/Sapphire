@@ -65,11 +65,25 @@
     "rari2": {
       "hostname": "rari2",
       "tailscaleIp": "100.87.225.89",
-      "os": "Linux (Raspberry Pi OS)",
-      "role": "DECOMMISSIONED — trading execution paused until re-provisioned",
-      "status": "offline",
-      "decommissionReason": "Same as rari1. Trading execution (Aster, Hyperliquid) on hold.",
-      "servicesMovedTo": "pending"
+      "lanIp": "192.168.1.21",
+      "os": "Linux (Raspberry Pi OS Bookworm, aarch64)",
+      "role": "Trading Pi — signal logger, future Aster/Hyperliquid execution",
+      "status": "online",
+      "onlineSince": "2026-04-07",
+      "connection": "ethernet",
+      "clawProfile": "rari2-trader",
+      "agents": ["signal-logger"],
+      "services": [
+        {"name": "signal-logger", "port": 18081, "status": "active"}
+      ],
+      "system": {
+        "cpu": "aarch64 (Raspberry Pi)",
+        "ram": "3.8GB",
+        "disk": "116GB (85GB free)",
+        "python": "3.13.5",
+        "docker": "26.1.5",
+        "redis": "installed"
+      }
     }
   },
 
