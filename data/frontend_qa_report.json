@@ -1,0 +1,105 @@
+{
+  "report_date": "2026-04-06",
+  "total_frontends": 6,
+  "avg_ux_score": 5.7,
+
+  "frontends": {
+    "sapphire-control-plane": {
+      "path": "services/control-plane/app/frontend/",
+      "tech": "Vanilla JS + CSS SPA",
+      "port": 8082,
+      "status": "live",
+      "ux_score": 8,
+      "pages": ["/", "/architecture", "/logbook", "/organization", "/projects", "/secops"],
+      "all_routes_200": true,
+      "screenshot_ready": true,
+      "strengths": ["Premium design (Space Grotesk + Unbounded)", "Live data polling", "6 themed sub-pages", "Responsive", "SVG charts"],
+      "issues": ["No frontend auth", "No loading skeleton", "CSS duplication across sub-pages"],
+      "factory_priority": "low"
+    },
+
+    "sapphire-dashboard": {
+      "path": "services/dashboard/",
+      "tech": "Flask + Jinja2 + vanilla JS",
+      "port": 8080,
+      "status": "broken",
+      "ux_score": 4,
+      "pages": ["/ (500)", "/health (200)"],
+      "all_routes_200": false,
+      "screenshot_ready": false,
+      "strengths": ["Stunning CRT/terminal design system", "14 page templates exist", "Responsive CSS"],
+      "issues": [
+        "CRITICAL: / returns 500 (template path: dashboard.html not found, should be pages/overview.html)",
+        "No Flask routes for nav pages (/architecture, /intelligence, /organization, /activity, /sapphire-book)",
+        "API calls to dead Pi IPs (10.0.0.1/10.0.0.2)",
+        "platform-api.js references non-existent /api/platform/* endpoints"
+      ],
+      "factory_priority": "critical"
+    },
+
+    "project-go-forward": {
+      "path": "~/Code/Project-Go-Forward/frontend/",
+      "tech": "React 19 + Vite + Tailwind CSS",
+      "port": 8080,
+      "status": "built_not_running",
+      "ux_score": 7,
+      "pages": ["inventory", "chat", "contact", "appointments", "documents", "crm", "chat-history", "adstudio", "analytics"],
+      "all_routes_200": "needs_backend",
+      "screenshot_ready": true,
+      "strengths": ["Modern React 19 stack", "Code-splitting", "Dark mode", "Admin PIN gating", "9 pages", "Customer search (1,963 records)"],
+      "issues": ["Requires GCP ADK backend", "No mock/demo mode", "No component tests", "No SEO meta tags"],
+      "factory_priority": "medium"
+    },
+
+    "cointracker": {
+      "path": "~/Code/Cointracker/src/dashboard/",
+      "tech": "FastAPI + Jinja2 + Chart.js + Alpine.js + Tailwind CDN",
+      "port": 8050,
+      "status": "live",
+      "ux_score": 7,
+      "pages": ["/ (200)", "/wallets (200)", "/transactions (200)", "/tax (200)", "/pnl (500)", "/discover (200)", "/settings (200)"],
+      "all_routes_200": false,
+      "screenshot_ready": true,
+      "strengths": ["7 pages with sidebar nav", "Real on-chain data (9 chains)", "Chart.js visualizations", "CSV export", "Auto-refresh"],
+      "issues": ["/pnl returns 500", "No auth", "Fixed sidebar breaks mobile (ml-56)", "Tailwind via CDN"],
+      "factory_priority": "medium"
+    },
+
+    "regional-intel-workbench": {
+      "path": "~/Code/regional-intel-workbench/app/",
+      "tech": "FastAPI + Jinja2 + custom JS (86KB)",
+      "port": 8060,
+      "status": "live",
+      "ux_score": 7,
+      "pages": ["/ (200)", "/intel (200)", "/vote-monitor (200)"],
+      "all_routes_200": true,
+      "screenshot_ready": true,
+      "strengths": ["Deep intelligence features (watchlists, bundles, monitors, graph, briefing packs)", "Professional dark theme", "Ethics guardrails", "Client view system"],
+      "issues": ["No auth", "/blanga/austin link broken", "Monolithic intel.js (86KB)", "No LaunchAgent", "No map despite intel_map.js existing"],
+      "factory_priority": "medium"
+    },
+
+    "kimi-tools": {
+      "path": "~/Code/kimi-tools/dashboard/",
+      "tech": "Flask (bare)",
+      "port": null,
+      "status": "dead",
+      "ux_score": 1,
+      "pages": ["/ (bare HTML)"],
+      "all_routes_200": false,
+      "screenshot_ready": false,
+      "strengths": [],
+      "issues": ["No CSS/design", "References decommissioned Pis", "67 lines total", "Uses local IPs not Tailscale", "Essentially abandoned"],
+      "factory_priority": "delete_or_rewrite"
+    }
+  },
+
+  "global_priorities": [
+    {"rank": 1, "action": "Fix Sapphire Dashboard / route (500) + add nav page routes", "impact": "critical"},
+    {"rank": 2, "action": "Add auth to Cointracker + Regional Intel", "impact": "security"},
+    {"rank": 3, "action": "Fix Cointracker /pnl 500 + mobile sidebar", "impact": "medium"},
+    {"rank": 4, "action": "Add Regional Intel LaunchAgent + fix /blanga route", "impact": "medium"},
+    {"rank": 5, "action": "Add demo/mock mode to Project-Go-Forward", "impact": "medium"},
+    {"rank": 6, "action": "Delete or rewrite kimi-tools dashboard", "impact": "low"}
+  ]
+}
