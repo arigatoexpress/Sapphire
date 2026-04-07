@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-04-01",
+  "updated": "2026-04-06",
   "connectors": [
     {
       "id": "openclaw-gateway",
@@ -11,7 +11,10 @@
       "device": "mac",
       "launchagent": "ai.openclaw.gateway",
       "status": "active",
-      "tags": ["agent:openclaw", "device:mac"],
+      "tags": [
+        "agent:openclaw",
+        "device:mac"
+      ],
       "description": "Local AI gateway routing requests to NemoClaw, Kimi, Claude, Codex workers"
     },
     {
@@ -22,8 +25,11 @@
       "endpoint": "http://100.71.10.48:18789",
       "device": "windows-pc",
       "status": "planned",
-      "tags": ["agent:nemoclaw", "device:windows-pc"],
-      "description": "Sandboxed NVIDIA NemoClaw runtime on RTX 5070 Ti — GPU compute, backtesting, inference"
+      "tags": [
+        "agent:nemoclaw",
+        "device:windows-pc"
+      ],
+      "description": "Sandboxed NVIDIA NemoClaw runtime on RTX 5070 Ti \u2014 GPU compute, backtesting, inference"
     },
     {
       "id": "kimi-claw",
@@ -33,8 +39,11 @@
       "endpoint": "rari1:telegram",
       "device": "rari1",
       "status": "active",
-      "tags": ["agent:kimi", "device:rari1"],
-      "description": "Kimi agent on rari1 — Telegram ops, monitoring, quick tasks"
+      "tags": [
+        "agent:kimi",
+        "device:rari1"
+      ],
+      "description": "Kimi agent on rari1 \u2014 Telegram ops, monitoring, quick tasks"
     },
     {
       "id": "asana-mcp",
@@ -44,8 +53,11 @@
       "mcp_id": "3d0ce0f5-c112-4db8-8c10-19fea2625fc9",
       "device": "mac",
       "status": "active",
-      "tags": ["type:pm", "device:mac"],
-      "description": "Asana project management — get/create/update tasks, portfolios, projects"
+      "tags": [
+        "type:pm",
+        "device:mac"
+      ],
+      "description": "Asana project management \u2014 get/create/update tasks, portfolios, projects"
     },
     {
       "id": "tradingview-mcp",
@@ -58,8 +70,11 @@
       "status": "active",
       "tools": 78,
       "cli": "tv",
-      "tags": ["type:trading", "device:mac"],
-      "description": "78-tool MCP bridge via Chrome DevTools Protocol — live chart data, Pine Script AI-in-the-loop, OHLCV streaming, indicator readings, strategy tester"
+      "tags": [
+        "type:trading",
+        "device:mac"
+      ],
+      "description": "78-tool MCP bridge via Chrome DevTools Protocol \u2014 live chart data, Pine Script AI-in-the-loop, OHLCV streaming, indicator readings, strategy tester"
     },
     {
       "id": "openbb",
@@ -68,9 +83,25 @@
       "protocol": "mcp",
       "device": "mac",
       "status": "active",
-      "tags": ["type:trading", "type:data", "device:mac"],
-      "providers": ["yfinance", "alpha_vantage", "fred", "sec", "nasdaq", "cboe", "fmp", "benzinga", "intrinio", "tiingo", "deribit"],
-      "description": "Unified financial data — equity, crypto, options, macro, news from 32 providers via Python SDK + MCP server"
+      "tags": [
+        "type:trading",
+        "type:data",
+        "device:mac"
+      ],
+      "providers": [
+        "yfinance",
+        "alpha_vantage",
+        "fred",
+        "sec",
+        "nasdaq",
+        "cboe",
+        "fmp",
+        "benzinga",
+        "intrinio",
+        "tiingo",
+        "deribit"
+      ],
+      "description": "Unified financial data \u2014 equity, crypto, options, macro, news from 32 providers via Python SDK + MCP server"
     },
     {
       "id": "figma-mcp",
@@ -79,8 +110,11 @@
       "protocol": "mcp",
       "device": "mac",
       "status": "active",
-      "tags": ["type:design", "device:mac"],
-      "description": "Figma design context — get metadata, screenshots, variable defs, code connect maps"
+      "tags": [
+        "type:design",
+        "device:mac"
+      ],
+      "description": "Figma design context \u2014 get metadata, screenshots, variable defs, code connect maps"
     },
     {
       "id": "huggingface-mcp",
@@ -90,8 +124,11 @@
       "mcp_id": "144a4e0e-c7f9-42d0-9205-b1d54f2f1a2a",
       "device": "mac",
       "status": "active",
-      "tags": ["type:ml", "device:mac"],
-      "description": "HuggingFace Hub — search models/datasets/spaces, fetch docs, paper search"
+      "tags": [
+        "type:ml",
+        "device:mac"
+      ],
+      "description": "HuggingFace Hub \u2014 search models/datasets/spaces, fetch docs, paper search"
     },
     {
       "id": "google-drive-mcp",
@@ -101,8 +138,11 @@
       "mcp_id": "c1fc4002-5f49-5f9d-a4e5-93c4ef5d6a75",
       "device": "mac",
       "status": "active",
-      "tags": ["type:storage", "device:mac"],
-      "description": "Google Drive — search and fetch documents"
+      "tags": [
+        "type:storage",
+        "device:mac"
+      ],
+      "description": "Google Drive \u2014 search and fetch documents"
     },
     {
       "id": "claude-in-chrome",
@@ -111,8 +151,11 @@
       "protocol": "chrome-devtools",
       "device": "mac",
       "status": "active",
-      "tags": ["type:browser", "device:mac"],
-      "description": "Chrome extension — navigate, screenshot, form fill, JS execution, network inspection"
+      "tags": [
+        "type:browser",
+        "device:mac"
+      ],
+      "description": "Chrome extension \u2014 navigate, screenshot, form fill, JS execution, network inspection"
     },
     {
       "id": "claude-analytics-mcp",
@@ -122,8 +165,12 @@
       "path": "tools/claude-analytics/",
       "device": "mac",
       "status": "built",
-      "tags": ["type:analytics", "device:mac", "agent:claude"],
-      "description": "Claude Code usage metrics — token spend, session cost, model breakdown"
+      "tags": [
+        "type:analytics",
+        "device:mac",
+        "agent:claude"
+      ],
+      "description": "Claude Code usage metrics \u2014 token spend, session cost, model breakdown"
     },
     {
       "id": "tailscale",
@@ -132,7 +179,9 @@
       "protocol": "wireguard",
       "device": "all",
       "status": "active",
-      "tags": ["type:network"],
+      "tags": [
+        "type:network"
+      ],
       "nodes": {
         "mac": "100.67.171.79",
         "windows-pc": "100.71.10.48",
@@ -148,8 +197,11 @@
       "protocol": "rest",
       "device": "rari2",
       "status": "production",
-      "tags": ["type:trading", "device:rari2"],
-      "description": "Onchain perpetuals exchange — live pair trading via rari2 + ProtonVPN Switzerland"
+      "tags": [
+        "type:trading",
+        "device:rari2"
+      ],
+      "description": "Onchain perpetuals exchange \u2014 live pair trading via rari2 + ProtonVPN Switzerland"
     },
     {
       "id": "gcp-firestore",
@@ -159,7 +211,10 @@
       "project": "sapphire-479610",
       "device": "cloud",
       "status": "active",
-      "tags": ["type:storage", "device:cloud"],
+      "tags": [
+        "type:storage",
+        "device:cloud"
+      ],
       "description": "Firestore: event log, project state, task queue (sapphire-479610)"
     },
     {
@@ -169,8 +224,11 @@
       "protocol": "telegram-api",
       "device": "rari1",
       "status": "active",
-      "tags": ["type:messaging", "device:rari1"],
-      "description": "Primary human-agent interface — Telegram-first command and status channel"
+      "tags": [
+        "type:messaging",
+        "device:rari1"
+      ],
+      "description": "Primary human-agent interface \u2014 Telegram-first command and status channel"
     },
     {
       "id": "claw-code",
@@ -182,8 +240,11 @@
       "github": "instructkr/claw-code",
       "path": "~/Code/claw-code",
       "binary": "~/.local/bin/claw",
-      "tags": ["agent:claw-code", "type:runtime"],
-      "description": "Rust-based local coding agent runtime — deployed per-device with role-specific profiles"
+      "tags": [
+        "agent:claw-code",
+        "type:runtime"
+      ],
+      "description": "Rust-based local coding agent runtime \u2014 deployed per-device with role-specific profiles"
     },
     {
       "id": "claw-sapphire-plugin",
@@ -193,8 +254,11 @@
       "device": "all",
       "status": "active",
       "path": "plugins/claw-sapphire/",
-      "tags": ["agent:claw-code", "type:plugin"],
-      "description": "Sapphire integration for claw-code — mesh status, PM tasks, Telegram, inference routing"
+      "tags": [
+        "agent:claw-code",
+        "type:plugin"
+      ],
+      "description": "Sapphire integration for claw-code \u2014 mesh status, PM tasks, Telegram, inference routing"
     },
     {
       "id": "satellite-project-go-forward",
@@ -203,18 +267,11 @@
       "path": "~/Code/Project-Go-Forward",
       "github": "arigatoexpress/Project-Go-Forward",
       "status": "active",
-      "tags": ["type:pm", "project:tho"],
-      "description": "Client PM system for Texas Home Outlet — ADK/FastAPI, doc generation, CRM"
-    },
-    {
-      "id": "satellite-kimi-tools",
-      "name": "Kimi Tools",
-      "type": "satellite-repo",
-      "path": "~/Code/kimi-tools",
-      "github": "arigatoexpress/kimi-tools",
-      "status": "active",
-      "tags": ["agent:kimi", "type:agent"],
-      "description": "Distributed agent infrastructure — master-slave orchestration, Nemotron integration"
+      "tags": [
+        "type:pm",
+        "project:tho"
+      ],
+      "description": "Client PM system for Texas Home Outlet \u2014 ADK/FastAPI, doc generation, CRM"
     },
     {
       "id": "satellite-regional-intel",
@@ -223,8 +280,10 @@
       "path": "~/Code/regional-intel-workbench",
       "github": "arigatoexpress/regional-intel-workbench",
       "status": "active",
-      "tags": ["type:intelligence"],
-      "description": "Intelligence platform — relationship graphs, analytics, watch lists"
+      "tags": [
+        "type:intelligence"
+      ],
+      "description": "Intelligence platform \u2014 relationship graphs, analytics, watch lists"
     },
     {
       "id": "satellite-tradingview-mcp",
@@ -233,8 +292,11 @@
       "path": "~/Code/tradingview-mcp",
       "github": "arigatoexpress/tradingview-mcp",
       "status": "active",
-      "tags": ["type:trading", "type:mcp"],
-      "description": "TypeScript MCP server for TradingView Premium — charts, alerts, Pine tools"
+      "tags": [
+        "type:trading",
+        "type:mcp"
+      ],
+      "description": "TypeScript MCP server for TradingView Premium \u2014 charts, alerts, Pine tools"
     },
     {
       "id": "satellite-cointracker",
@@ -243,18 +305,53 @@
       "path": "~/Code/Cointracker",
       "github": "arigatoexpress/crypto-tax-tracker",
       "status": "active",
-      "tags": ["type:tax", "type:crypto"],
-      "description": "Multi-chain crypto tax engine — HIFO cost basis, tax-loss harvesting, Form 8949"
+      "tags": [
+        "type:tax",
+        "type:crypto"
+      ],
+      "description": "Multi-chain crypto tax engine \u2014 HIFO cost basis, tax-loss harvesting, Form 8949"
     }
   ],
   "launchagents": [
-    {"id": "ai.openclaw.gateway", "description": "OpenClaw gateway port 18789", "status": "active"},
-    {"id": "com.aribs.agentic.control-api", "description": "Control plane API server", "status": "active"},
-    {"id": "com.aribs.agentic.worker.claude", "description": "Claude worker", "status": "active"},
-    {"id": "com.aribs.agentic.worker.codex", "description": "Codex worker", "status": "active"},
-    {"id": "com.aribs.agentic.worker.kimi", "description": "Kimi worker", "status": "active"},
-    {"id": "com.aribs.agentic.worker.antigravity", "description": "Antigravity worker", "status": "active"},
-    {"id": "com.aribs.agentic.worker.openclaw-main", "description": "OpenClaw main worker", "status": "active"},
-    {"id": "com.sapphire.sync-eu-proxy-firewall", "description": "EU proxy firewall sync", "status": "active"}
+    {
+      "id": "ai.openclaw.gateway",
+      "description": "OpenClaw gateway port 18789",
+      "status": "active"
+    },
+    {
+      "id": "com.aribs.agentic.control-api",
+      "description": "Control plane API server",
+      "status": "active"
+    },
+    {
+      "id": "com.aribs.agentic.worker.claude",
+      "description": "Claude worker",
+      "status": "active"
+    },
+    {
+      "id": "com.aribs.agentic.worker.codex",
+      "description": "Codex worker",
+      "status": "active"
+    },
+    {
+      "id": "com.aribs.agentic.worker.kimi",
+      "description": "Kimi worker",
+      "status": "active"
+    },
+    {
+      "id": "com.aribs.agentic.worker.antigravity",
+      "description": "Antigravity worker",
+      "status": "active"
+    },
+    {
+      "id": "com.aribs.agentic.worker.openclaw-main",
+      "description": "OpenClaw main worker",
+      "status": "active"
+    },
+    {
+      "id": "com.sapphire.sync-eu-proxy-firewall",
+      "description": "EU proxy firewall sync",
+      "status": "active"
+    }
   ]
 }

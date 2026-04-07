@@ -83,7 +83,6 @@ python3 plugins/claw-sapphire/tools/budget.py < /dev/null
 |------|--------|------|
 | `~/Code/claw-code` | instructkr/claw-code | Rust agent runtime |
 | `~/Code/Project-Go-Forward` | arigatoexpress/Project-Go-Forward | THO client PM |
-| `~/Code/kimi-tools` | arigatoexpress/kimi-tools | Distributed agent infra |
 | `~/Code/regional-intel-workbench` | arigatoexpress/regional-intel-workbench | Intelligence platform |
 | `~/Code/tradingview-mcp` | arigatoexpress/tradingview-mcp | TradingView MCP |
 | `~/Code/Cointracker` | arigatoexpress/crypto-tax-tracker | Crypto tax engine |

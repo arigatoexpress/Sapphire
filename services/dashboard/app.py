@@ -16,8 +16,9 @@ from flask import Flask, Response, jsonify, render_template, request
 app = Flask(__name__)
 
 # Configuration
-RARI1_IP = os.environ.get('RARI1_IP', '10.0.0.1')
-RARI2_IP = os.environ.get('RARI2_IP', '10.0.0.2')
+# Pi-less mode: services run on Mac (localhost) and rari2 (Tailscale)
+RARI1_IP = os.environ.get('RARI1_IP', '127.0.0.1')  # control-plane on Mac
+RARI2_IP = os.environ.get('RARI2_IP', '100.87.225.89')  # rari2 via Tailscale
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
 
 # Auth configuration — credentials required via environment variables
@@ -100,8 +101,56 @@ def fetch_sync(url):
 @app.route('/')
 @requires_auth
 def index():
-    """Main dashboard page"""
-    return render_template('dashboard.html')
+    """Main dashboard — overview page"""
+    return render_template('pages/overview.html', current_page='overview', page_title='System Overview')
+
+
+@app.route('/architecture')
+@requires_auth
+def architecture():
+    return render_template('pages/architecture.html', current_page='architecture', page_title='Architecture')
+
+
+@app.route('/intelligence')
+@requires_auth
+def intelligence():
+    return render_template('pages/intelligence.html', current_page='intelligence', page_title='Intelligence')
+
+
+@app.route('/organization')
+@requires_auth
+def organization():
+    return render_template('pages/organization.html', current_page='organization', page_title='Organization')
+
+
+@app.route('/activity')
+@requires_auth
+def activity():
+    return render_template('pages/activity.html', current_page='activity', page_title='Activity')
+
+
+@app.route('/sapphire-book')
+@requires_auth
+def sapphire_book():
+    return render_template('pages/sapphire_book.html', current_page='sapphire_book', page_title='Sapphire Book')
+
+
+@app.route('/infrastructure')
+@requires_auth
+def infrastructure():
+    return render_template('pages/infrastructure.html', current_page='infrastructure', page_title='Infrastructure')
+
+
+@app.route('/control')
+@requires_auth
+def control():
+    return render_template('pages/control.html', current_page='control', page_title='Control')
+
+
+@app.route('/settings')
+@requires_auth
+def settings():
+    return render_template('pages/settings.html', current_page='settings', page_title='Settings')
 
 @app.route('/api/status')
 @requires_auth
