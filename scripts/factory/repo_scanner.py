@@ -22,7 +22,6 @@ from pathlib import Path
 REPOS = {
     "Sapphire": Path.home() / "Code" / "Sapphire",
     "Project-Go-Forward": Path.home() / "Code" / "Project-Go-Forward",
-    "kimi-tools": Path.home() / "Code" / "kimi-tools",
     "regional-intel-workbench": Path.home() / "Code" / "regional-intel-workbench",
     "tradingview-mcp": Path.home() / "Code" / "tradingview-mcp",
     "Cointracker": Path.home() / "Code" / "Cointracker",
