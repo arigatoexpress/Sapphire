@@ -72,8 +72,9 @@ def _get_price(symbol: str) -> float | None:
         return None
 
 
-def action_execute(symbol: str, side: str, price: float, atr: float = None, confidence: float = 0.5) -> dict:
-    """Execute a paper trade."""
+def action_execute(symbol: str, side: str, price: float, atr: float = None,
+                    confidence: float = 0.5, kelly_size_pct: float = None, edge: float = None) -> dict:
+    """Execute a paper trade with optional Half-Kelly sizing from signal generator."""
     pf = _load_portfolio()
 
     # Check for existing position in same symbol
@@ -81,8 +82,17 @@ def action_execute(symbol: str, side: str, price: float, atr: float = None, conf
         if pos["symbol"] == symbol:
             return {"error": f"Already have open position in {symbol}. Close it first."}
 
-    # Calculate position size
-    size_usd = pf["capital"] * POSITION_SIZE_PCT
+    # Calculate position size — use Half-Kelly if provided, else default
+    if kelly_size_pct and kelly_size_pct > 0:
+        size_pct = min(kelly_size_pct / 100, 0.04)  # Cap at 4%
+    elif edge and edge > 0:
+        win_prob = 0.5 + edge
+        kelly_frac = max(0, (win_prob * 2 - 1)) / 2
+        size_pct = min(kelly_frac / 2, 0.04)
+    else:
+        size_pct = POSITION_SIZE_PCT
+
+    size_usd = pf["capital"] * size_pct
     qty = size_usd / price
 
     # ATR-based stops (default to 3% of price if no ATR)
@@ -101,10 +111,16 @@ def action_execute(symbol: str, side: str, price: float, atr: float = None, conf
         "side": side.upper(),
         "entry_price": price,
         "qty": qty,
+        "original_qty": qty,
         "size_usd": size_usd,
         "stop_loss": round(stop_loss, 2),
         "take_profit": round(take_profit, 2),
+        "partial_tp": round(price + atr * 1.0 if side.upper() == "BUY" else price - atr * 1.0, 2),  # Partial at 1 ATR
+        "peak_price": price,
+        "trailing_active": False,
+        "partial_taken": False,
         "atr": atr,
+        "edge": edge,
         "confidence": confidence,
         "opened_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -123,9 +139,10 @@ def action_execute(symbol: str, side: str, price: float, atr: float = None, conf
 
 
 def action_check_stops() -> dict:
-    """Check all open positions against current prices, close if stops hit."""
+    """Check positions: partial profit, trailing stops, SL/TP. Inspired by Polymarket strategies."""
     pf = _load_portfolio()
     closed = []
+    partial_exits = []
 
     remaining = []
     for pos in pf["positions"]:
@@ -134,20 +151,68 @@ def action_check_stops() -> dict:
             remaining.append(pos)
             continue
 
-        hit_stop = False
-        hit_tp = False
+        is_long = pos["side"] == "BUY"
+        entry = pos["entry_price"]
+        pnl_bps = ((current - entry) / entry * 10000) if is_long else ((entry - current) / entry * 10000)
 
-        if pos["side"] == "BUY":
-            hit_stop = current <= pos["stop_loss"]
-            hit_tp = current >= pos["take_profit"]
+        # Update peak price for trailing stop
+        if is_long:
+            pos["peak_price"] = max(pos.get("peak_price", entry), current)
         else:
-            hit_stop = current >= pos["stop_loss"]
-            hit_tp = current <= pos["take_profit"]
+            pos["peak_price"] = min(pos.get("peak_price", entry), current)
+
+        # ─── Partial profit taking: exit 50% at 1 ATR profit ───
+        partial_tp = pos.get("partial_tp")
+        if partial_tp and not pos.get("partial_taken", False):
+            hit_partial = (current >= partial_tp) if is_long else (current <= partial_tp)
+            if hit_partial:
+                half_qty = pos["qty"] * 0.5
+                partial_pnl = (current - entry) * half_qty if is_long else (entry - current) * half_qty
+                pos["qty"] -= half_qty
+                pos["partial_taken"] = True
+                pf["capital"] += partial_pnl
+                partial_exits.append({
+                    "symbol": pos["symbol"], "pnl": round(partial_pnl, 2),
+                    "reason": "partial_50pct", "remaining_qty": pos["qty"]
+                })
+
+        # ─── Trailing stop: activate at +60 bps from entry, trail 40 bps from peak ───
+        TRAILING_ACTIVATE_BPS = 60
+        TRAILING_DISTANCE_BPS = 40
+
+        if pnl_bps >= TRAILING_ACTIVATE_BPS:
+            pos["trailing_active"] = True
+
+        if pos.get("trailing_active"):
+            peak = pos["peak_price"]
+            if is_long:
+                trail_level = peak * (1 - TRAILING_DISTANCE_BPS / 10000)
+                if current <= trail_level:
+                    pnl = (current - entry) * pos["qty"]
+                    trade = {**pos, "exit_price": current, "pnl": round(pnl, 2),
+                             "exit_reason": "trailing_stop", "closed_at": datetime.now(timezone.utc).isoformat()}
+                    pf["history"].append(trade)
+                    pf["capital"] += pnl
+                    closed.append(trade)
+                    continue
+            else:
+                trail_level = peak * (1 + TRAILING_DISTANCE_BPS / 10000)
+                if current >= trail_level:
+                    pnl = (entry - current) * pos["qty"]
+                    trade = {**pos, "exit_price": current, "pnl": round(pnl, 2),
+                             "exit_reason": "trailing_stop", "closed_at": datetime.now(timezone.utc).isoformat()}
+                    pf["history"].append(trade)
+                    pf["capital"] += pnl
+                    closed.append(trade)
+                    continue
+
+        # ─── Hard stop loss / take profit ───
+        hit_stop = (current <= pos["stop_loss"]) if is_long else (current >= pos["stop_loss"])
+        hit_tp = (current >= pos["take_profit"]) if is_long else (current <= pos["take_profit"])
 
         if hit_stop or hit_tp:
-            exit_price = pos["stop_loss"] if hit_stop else pos["take_profit"]
-            pnl = (exit_price - pos["entry_price"]) * pos["qty"] if pos["side"] == "BUY" else (pos["entry_price"] - exit_price) * pos["qty"]
-
+            exit_price = current  # Use actual price, not the level
+            pnl = (exit_price - entry) * pos["qty"] if is_long else (entry - exit_price) * pos["qty"]
             trade = {**pos, "exit_price": exit_price, "pnl": round(pnl, 2),
                      "exit_reason": "stop_loss" if hit_stop else "take_profit",
                      "closed_at": datetime.now(timezone.utc).isoformat()}
@@ -160,9 +225,16 @@ def action_check_stops() -> dict:
     pf["positions"] = remaining
     _save_portfolio(pf)
 
-    return {"closed": len(closed), "details": [{
-        "symbol": t["symbol"], "pnl": f"${t['pnl']:+,.2f}", "reason": t["exit_reason"]
-    } for t in closed]}
+    return {
+        "closed": len(closed),
+        "partial_exits": len(partial_exits),
+        "details": [{
+            "symbol": t["symbol"], "pnl": f"${t['pnl']:+,.2f}", "reason": t["exit_reason"]
+        } for t in closed],
+        "partials": [{
+            "symbol": p["symbol"], "pnl": f"${p['pnl']:+,.2f}", "remaining": p["remaining_qty"]
+        } for p in partial_exits],
+    }
 
 
 def action_positions() -> dict:
@@ -285,6 +357,8 @@ def main():
             params.get("price", 0),
             params.get("atr"),
             params.get("confidence", 0.5),
+            params.get("kelly_size_pct"),
+            params.get("edge"),
         )
     elif action == "check_stops":
         result = action_check_stops()

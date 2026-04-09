@@ -12,7 +12,8 @@
       "take_profit": 78053.5,
       "atr": 2265,
       "confidence": 0.85,
-      "opened_at": "2026-04-09T21:51:42.676305+00:00"
+      "opened_at": "2026-04-09T21:51:42.676305+00:00",
+      "peak_price": 72391
     },
     {
       "symbol": "ETHUSDT",
