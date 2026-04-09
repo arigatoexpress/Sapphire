@@ -3,158 +3,214 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sapphire OS — System Status</title>
-<meta http-equiv="refresh" content="120">
+<title>Sapphire OS — Command Center</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'SF Mono', 'Fira Code', monospace; background: #0a0a0f; color: #e0e0e0; padding: 20px; }
-  h1 { color: #00aaff; font-size: 24px; margin-bottom: 4px; }
-  .subtitle { color: #666; font-size: 12px; margin-bottom: 20px; }
-  .overall { font-size: 18px; padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; font-weight: bold; }
-  .overall.GREEN { background: rgba(34,197,94,0.15); color: #22c55e; border: 1px solid #22c55e; }
-  .overall.YELLOW { background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid #f59e0b; }
-  .overall.RED { background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid #ef4444; }
-  .overall.LOADING { background: rgba(100,100,100,0.1); color: #888; border: 1px solid #444; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; }
-  .section { background: #111118; border: 1px solid #222; border-radius: 10px; padding: 16px; }
-  .section h2 { color: #888; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
-  .item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #1a1a1a; font-size: 13px; }
-  .item:last-child { border-bottom: none; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .dot.green { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
-  .dot.yellow { background: #f59e0b; box-shadow: 0 0 6px #f59e0b; }
-  .dot.red { background: #ef4444; box-shadow: 0 0 6px #ef4444; }
-  .dot.grey { background: #555; }
-  .name { flex: 1; color: #ccc; }
-  .detail { color: #666; font-size: 11px; max-width: 220px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .schedule { margin-top: 20px; }
-  .schedule h2 { color: #888; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
-  .task-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; }
-  .task { background: #111118; border: 1px solid #1a1a1a; border-radius: 6px; padding: 8px 12px; font-size: 12px; }
-  .task .time { color: #00aaff; font-weight: bold; }
-  .task .desc { color: #888; }
-  .stats { display: flex; gap: 16px; margin: 12px 0; flex-wrap: wrap; }
-  .stat { background: #111118; border: 1px solid #222; border-radius: 8px; padding: 10px 14px; text-align: center; min-width: 80px; }
-  .stat .num { font-size: 24px; font-weight: bold; color: #00aaff; }
-  .stat .label { font-size: 10px; color: #666; margin-top: 2px; }
-  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
-  .loading-pulse { animation: pulse 1.5s infinite; }
+  body { font-family: 'SF Mono', 'Fira Code', monospace; background: #0a0a0f; color: #e0e0e0; padding: 16px; font-size: 13px; }
+  h1 { color: #00aaff; font-size: 22px; margin-bottom: 2px; }
+  .sub { color: #555; font-size: 11px; margin-bottom: 16px; }
+  .banner { padding: 10px 16px; border-radius: 8px; margin-bottom: 16px; font-weight: bold; font-size: 15px; }
+  .banner.GREEN { background: rgba(34,197,94,0.12); color: #22c55e; border: 1px solid rgba(34,197,94,0.3); }
+  .banner.YELLOW { background: rgba(245,158,11,0.12); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }
+  .banner.RED { background: rgba(239,68,68,0.12); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
+  .banner.LOADING { background: rgba(100,100,100,0.08); color: #666; border: 1px solid #333; }
+  .metrics { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+  .metric { background: #111118; border: 1px solid #1e1e2a; border-radius: 8px; padding: 10px 14px; min-width: 90px; text-align: center; }
+  .metric .v { font-size: 22px; font-weight: bold; color: #00aaff; }
+  .metric .l { font-size: 10px; color: #555; margin-top: 2px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .card { background: #111118; border: 1px solid #1e1e2a; border-radius: 10px; padding: 14px; }
+  .card h2 { color: #666; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px; }
+  .row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid #151520; font-size: 12px; }
+  .row:last-child { border-bottom: none; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .dot.g { background: #22c55e; box-shadow: 0 0 5px rgba(34,197,94,0.5); }
+  .dot.y { background: #f59e0b; box-shadow: 0 0 5px rgba(245,158,11,0.5); }
+  .dot.r { background: #ef4444; box-shadow: 0 0 5px rgba(239,68,68,0.5); }
+  .dot.x { background: #444; }
+  .lbl { flex: 1; color: #bbb; }
+  .val { color: #555; font-size: 11px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
+  .price-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #151520; }
+  .price-row:last-child { border-bottom: none; }
+  .price-sym { color: #ccc; font-weight: bold; }
+  .price-val { color: #00aaff; }
+  .price-chg { font-size: 11px; }
+  .price-chg.up { color: #22c55e; }
+  .price-chg.dn { color: #ef4444; }
+  .task-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 6px; }
+  .task { background: #0d0d14; border: 1px solid #1a1a24; border-radius: 6px; padding: 6px 10px; font-size: 11px; }
+  .task .t { color: #00aaff; font-weight: bold; min-width: 55px; display: inline-block; }
+  .task .d { color: #666; }
+  .section-title { color: #666; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; margin: 16px 0 8px; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .loading { animation: pulse 1.5s infinite; }
 </style>
 </head>
 <body>
-<h1>🔷 Sapphire OS — System Status</h1>
-<div class="subtitle">Updated: <span id="ts">loading</span></div>
 
-<div id="overall" class="overall LOADING loading-pulse">⏳ Checking 20 health endpoints...</div>
+<h1>🔷 Sapphire OS — Command Center</h1>
+<div class="sub" id="ts">loading...</div>
+<div class="banner LOADING loading" id="banner">⏳ Checking systems...</div>
 
-<div class="stats">
-  <div class="stat"><div class="num">11</div><div class="label">Plugin Tools</div></div>
-  <div class="stat"><div class="num">19</div><div class="label">Tasks</div></div>
-  <div class="stat"><div class="num">1,211+</div><div class="label">Tests</div></div>
-  <div class="stat"><div class="num">8</div><div class="label">Repos</div></div>
-  <div class="stat" id="stat-green"><div class="num">—</div><div class="label">Green</div></div>
-  <div class="stat" id="stat-red"><div class="num">—</div><div class="label">Red</div></div>
+<div class="metrics" id="metrics">
+  <div class="metric"><div class="v">—</div><div class="l">Services</div></div>
+  <div class="metric"><div class="v">—</div><div class="l">Tests</div></div>
+  <div class="metric"><div class="v">—</div><div class="l">Tasks</div></div>
+  <div class="metric"><div class="v">—</div><div class="l">Tools</div></div>
+  <div class="metric"><div class="v">—</div><div class="l">Models</div></div>
+  <div class="metric"><div class="v">—</div><div class="l">Repos</div></div>
 </div>
 
 <div class="grid" id="grid"></div>
 
-<div class="schedule">
-  <h2>Autonomous Schedule (19 tasks, 24/7)</h2>
-  <div class="task-grid" id="tasks"></div>
-</div>
+<div class="section-title">Autonomous Schedule — 19 Tasks</div>
+<div class="task-list" id="tasks"></div>
 
 <script>
-// Render static content IMMEDIATELY (no API call needed)
+// ─── Render static schedule immediately ───
 const tasks = [
-  { time: '2:00 AM', desc: 'Creative Experimenter — nightly R&D' },
-  { time: '3:41 AM', desc: 'Test Guardian — full suite (1,211+ tests)' },
-  { time: '5:42 AM', desc: 'Trading Research — predict + score' },
-  { time: '6:27 AM', desc: 'Threat Intel — CISA/NVD/MITRE' },
-  { time: '7:19 AM', desc: 'GitHub Discovery — stars + trending' },
-  { time: '8:03 AM', desc: 'Morning Briefing — 6-section digest' },
-  { time: '8:37 AM', desc: 'Market Pulse — pre-market (M-F)' },
-  { time: '10:11 AM', desc: 'Client Delivery — THO production' },
-  { time: '11:07 AM', desc: 'THO Test Writer — coverage growth' },
-  { time: '12:37 PM', desc: 'Market Pulse — midday (M-F)' },
-  { time: '1:03 PM', desc: 'Code Quality — lint + cleanup' },
-  { time: '2:27 PM', desc: 'Threat Intel — afternoon update' },
-  { time: '3:41 PM', desc: 'Test Guardian — afternoon run' },
-  { time: '4:37 PM', desc: 'Market Pulse — close (M-F)' },
-  { time: '5:53 PM', desc: 'Evening Digest — daily summary' },
-  { time: '8:53 PM', desc: 'Self-Improvement — priorities' },
-  { time: '11:07 PM', desc: 'THO Test Writer — evening' },
-  { time: '*/2h', desc: 'THO Production Health Check' },
-  { time: '*/3h', desc: 'CI Monitor — all repos' },
-  { time: '*/4h', desc: 'Vote Monitor Collector' },
-  { time: '*/6h', desc: 'Factory Repo Fixer' },
+  {t:'2 AM',d:'Creative Lab — R&D experiments'},{t:'3:41 AM',d:'Test Guardian — 1,130+ tests'},
+  {t:'5:42 AM',d:'Trading Research — TA predictions'},{t:'6:27 AM',d:'Threat Intel — CISA/NVD/MITRE'},
+  {t:'7:19 AM',d:'GitHub Discovery — trending repos'},{t:'8:03 AM',d:'Morning Briefing → Telegram'},
+  {t:'8:37 AM',d:'Market Pulse (M-F pre-market)'},{t:'10:11 AM',d:'Client Delivery — THO check'},
+  {t:'11:07 AM',d:'THO Test Writer'},{t:'12:37 PM',d:'Market Pulse (M-F midday)'},
+  {t:'1:03 PM',d:'Code Quality Sweep'},{t:'2:27 PM',d:'Threat Intel — afternoon'},
+  {t:'3:41 PM',d:'Test Guardian — afternoon'},{t:'4:37 PM',d:'Market Pulse (M-F close)'},
+  {t:'5:53 PM',d:'Evening Digest → Telegram'},{t:'8:53 PM',d:'Self-Improvement → priorities'},
+  {t:'11:07 PM',d:'THO Test Writer — evening'},{t:'*/2h',d:'Watchdog Health Alerts → Telegram'},
+  {t:'*/3h',d:'CI Monitor — all repos'},{t:'*/4h',d:'Vote Monitor — pool snapshots'},
+  {t:'*/6h',d:'Factory Repo Fixer'},
 ];
-
 document.getElementById('tasks').innerHTML = tasks.map(t =>
-  `<div class="task"><span class="time">${t.time}</span> <span class="desc">${t.desc}</span></div>`
+  `<div class="task"><span class="t">${t.t}</span> <span class="d">${t.d}</span></div>`
 ).join('');
+document.getElementById('ts').textContent = new Date().toLocaleString() + ' — auto-refresh 60s';
 
-document.getElementById('ts').textContent = new Date().toLocaleString();
-
-// Show placeholder grid while health loads
-function renderSection(title, items) {
-  return `<div class="section"><h2>${title}</h2>` +
-    items.map(i => `<div class="item"><span class="dot ${i.s || 'grey'}"></span><span class="name">${i.n}</span><span class="detail">${i.d || ''}</span></div>`).join('') +
-    '</div>';
+// ─── Helper: render a card with rows ───
+function card(title, rows) {
+  return `<div class="card"><h2>${title}</h2>${rows.map(r =>
+    `<div class="row"><span class="dot ${r.s||'x'}"></span><span class="lbl">${r.n}</span><span class="val">${r.v||''}</span></div>`
+  ).join('')}</div>`;
 }
 
-document.getElementById('grid').innerHTML =
-  renderSection('Services', [
-    {n:'Control Plane',s:'green',d:'This page'},{n:'Dashboard',d:'checking...'},{n:'Signal Logger',d:'checking...'},
-    {n:'OpenBB API',d:'checking...'},{n:'Redis',d:'checking...'},{n:'Regional Intel',d:'checking...'},{n:'THO Cloud Run',d:'checking...'},
-  ]) +
-  renderSection('Repositories', [
-    {n:'Sapphire',d:'checking...'},{n:'Project-Go-Forward',d:'checking...'},{n:'cyber-threat-bot',d:'checking...'},
-    {n:'regional-intel-workbench',d:'checking...'},{n:'Cointracker',d:'checking...'},{n:'claw-code',d:'checking...'},
-  ]) +
-  renderSection('Data Pipelines', [
-    {n:'Trading Signals',d:'checking...'},{n:'Predictions',d:'checking...'},{n:'Threat Intel',d:'checking...'},
-    {n:'Starred Repos',d:'checking...'},{n:'Market Pulse',d:'checking...'},
-  ]) +
-  renderSection('Inference', [
-    {n:'Mac Ollama',d:'checking...'},{n:'Windows GPU Ollama',d:'checking...'},
-  ]);
+function priceCard(title, coins) {
+  return `<div class="card"><h2>${title}</h2>${coins.map(c => {
+    const cls = c.chg >= 0 ? 'up' : 'dn';
+    const sign = c.chg >= 0 ? '+' : '';
+    return `<div class="price-row"><span class="price-sym">${c.sym}</span><span class="price-val">$${c.price.toLocaleString(undefined,{minimumFractionDigits:c.price<100?2:0})}</span><span class="price-chg ${cls}">${sign}${c.chg.toFixed(1)}%</span></div>`;
+  }).join('')}</div>`;
+}
 
-// THEN fetch live health data in the background
-fetch('/api/ecosystem-health')
-  .then(r => r.json())
-  .then(eco => {
-    function toItems(section) {
-      return Object.entries(section || {}).map(([name, info]) => ({
-        n: name.replace(/-/g, ' ').replace(/_/g, ' '),
-        s: info.status || 'green',
-        d: (info.detail || '').substring(0, 80),
+// ─── Fetch live data from all APIs ───
+async function refresh() {
+  const grid = document.getElementById('grid');
+  const cards = [];
+
+  // 1. Ecosystem health (async, slow ~6s)
+  const healthP = fetch('/api/ecosystem-health').then(r=>r.json()).catch(()=>null);
+
+  // 2. Live crypto prices (fast)
+  const priceP = fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true')
+    .then(r=>r.json()).catch(()=>null);
+
+  // 3. Control plane events
+  const eventsP = fetch('/api/events?limit=8').then(r=>r.json()).catch(()=>null);
+
+  // Wait for prices first (fast)
+  const prices = await priceP;
+  if (prices) {
+    cards.push(priceCard('Live Markets', [
+      {sym:'BTC', price:prices.bitcoin?.usd||0, chg:prices.bitcoin?.usd_24h_change||0},
+      {sym:'ETH', price:prices.ethereum?.usd||0, chg:prices.ethereum?.usd_24h_change||0},
+      {sym:'SOL', price:prices.solana?.usd||0, chg:prices.solana?.usd_24h_change||0},
+    ]));
+  }
+
+  // Placeholder cards while health loads
+  cards.push(card('Services', [{n:'Loading...',s:'x',v:'checking endpoints'}]));
+  cards.push(card('Repositories', [{n:'Loading...',s:'x',v:''}]));
+  cards.push(card('Data Pipelines', [{n:'Loading...',s:'x',v:''}]));
+  cards.push(card('Inference', [{n:'Loading...',s:'x',v:''}]));
+
+  // Show events if available
+  const events = await eventsP;
+  if (events?.events?.length) {
+    const evRows = events.events.slice(0,6).map(e => ({
+      n: `${(e.type||'event').substring(0,20)}`,
+      v: (e.message||'').substring(0,40),
+      s: 'x',
+    }));
+    cards.push(card('Recent Events', evRows));
+  }
+
+  grid.innerHTML = cards.join('');
+
+  // Now wait for health (slow)
+  const eco = await healthP;
+  if (eco) {
+    function toRows(section) {
+      return Object.entries(section||{}).map(([n,info]) => ({
+        n: n.replace(/-/g,' ').replace(/_/g,' '),
+        s: {green:'g',yellow:'y',red:'r'}[info.status]||'x',
+        v: (info.detail||'').substring(0,60),
       }));
     }
 
-    document.getElementById('grid').innerHTML =
-      renderSection('Services', toItems(eco.services)) +
-      renderSection('Repositories', toItems(eco.repos)) +
-      renderSection('Data Pipelines', toItems(eco.data_freshness)) +
-      renderSection('Inference', toItems(eco.inference));
+    const svc = toRows(eco.services);
+    const repos = toRows(eco.repos);
+    const data = toRows(eco.data_freshness);
+    const inf = toRows(eco.inference);
+    const all = [...svc,...repos,...data,...inf];
 
-    const el = document.getElementById('overall');
-    el.classList.remove('LOADING', 'loading-pulse');
-    el.className = 'overall ' + eco.overall;
-    const icon = eco.overall === 'GREEN' ? '✅' : eco.overall === 'YELLOW' ? '⚠️' : '🔴';
-    el.textContent = `${icon} ${eco.overall} — ${eco.summary}`;
+    // Update banner
+    const b = document.getElementById('banner');
+    b.classList.remove('LOADING','loading');
+    b.className = 'banner ' + eco.overall;
+    const icon = eco.overall==='GREEN'?'✅':eco.overall==='YELLOW'?'⚠️':'🔴';
+    b.textContent = `${icon} ${eco.overall} — ${eco.summary}`;
 
-    const all = [...toItems(eco.services), ...toItems(eco.repos), ...toItems(eco.data_freshness), ...toItems(eco.inference)];
-    document.getElementById('stat-green').querySelector('.num').textContent = all.filter(i => i.s === 'green').length;
-    document.getElementById('stat-red').querySelector('.num').textContent = all.filter(i => i.s !== 'green').length;
+    // Update metrics
+    const g = all.filter(i=>i.s==='g').length;
+    document.getElementById('metrics').innerHTML = `
+      <div class="metric"><div class="v">${g}/${all.length}</div><div class="l">Healthy</div></div>
+      <div class="metric"><div class="v">8</div><div class="l">Services</div></div>
+      <div class="metric"><div class="v">1,130+</div><div class="l">Tests</div></div>
+      <div class="metric"><div class="v">19</div><div class="l">Tasks</div></div>
+      <div class="metric"><div class="v">13</div><div class="l">Tools</div></div>
+      <div class="metric"><div class="v">26</div><div class="l">GPU Models</div></div>
+    `;
 
-    document.getElementById('ts').textContent = new Date().toLocaleString() + ' • Live';
-  })
-  .catch(err => {
-    const el = document.getElementById('overall');
-    el.classList.remove('loading-pulse');
-    el.className = 'overall RED';
-    el.textContent = '🔴 Health check failed: ' + err.message;
-  });
+    // Rebuild grid with real data
+    const realCards = [];
+    if (prices) {
+      realCards.push(priceCard('Live Markets', [
+        {sym:'BTC', price:prices.bitcoin?.usd||0, chg:prices.bitcoin?.usd_24h_change||0},
+        {sym:'ETH', price:prices.ethereum?.usd||0, chg:prices.ethereum?.usd_24h_change||0},
+        {sym:'SOL', price:prices.solana?.usd||0, chg:prices.solana?.usd_24h_change||0},
+      ]));
+    }
+    realCards.push(card('Services', svc));
+    realCards.push(card('Repositories', repos));
+    realCards.push(card('Data Pipelines', data));
+    realCards.push(card('Inference', inf));
+
+    if (events?.events?.length) {
+      const evRows = events.events.slice(0,6).map(e => ({
+        n: `${(e.type||'event').substring(0,20)}`,
+        v: (e.message||'').substring(0,40),
+        s: 'x',
+      }));
+      realCards.push(card('Recent Events', evRows));
+    }
+
+    grid.innerHTML = realCards.join('');
+  }
+
+  document.getElementById('ts').textContent = new Date().toLocaleString() + ' — auto-refresh 60s';
+}
+
+refresh();
+setInterval(refresh, 60000);
 </script>
 </body>
 </html>
