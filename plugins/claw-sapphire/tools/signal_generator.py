@@ -63,82 +63,149 @@ def scan_for_signals(symbols: list[str] = None) -> dict:
         if profile is None:
             continue
 
-        triggers = []
+        # ─── Multi-Factor Ensemble (inspired by Polymarket AI Forecast) ───
+        # 6 independent factors, require 3+ agreement for signal
+        factors = []  # (direction: "BUY"/"SELL"/"NEUTRAL", strength: 0-1, name: str)
 
-        # RSI signals
+        # Factor 1: MA Trend (EMA/SMA crossover)
+        if profile.ma_trend == "bullish":
+            ma_gap = abs(profile.sma_7 - profile.sma_20) / profile.sma_20 if profile.sma_20 else 0
+            factors.append(("BUY", min(1.0, ma_gap * 20), "MA↑"))
+        elif profile.ma_trend == "bearish":
+            ma_gap = abs(profile.sma_7 - profile.sma_20) / profile.sma_20 if profile.sma_20 else 0
+            factors.append(("SELL", min(1.0, ma_gap * 20), "MA↓"))
+
+        # Factor 2: RSI — contrarian at extremes, confirming in middle
         if profile.rsi_14 < 30:
-            triggers.append(("BUY", f"RSI oversold ({profile.rsi_14:.0f})", "rsi_oversold"))
+            factors.append(("BUY", min(1.0, (30 - profile.rsi_14) / 20), f"RSI{profile.rsi_14:.0f}"))
         elif profile.rsi_14 > 70:
-            triggers.append(("SELL", f"RSI overbought ({profile.rsi_14:.0f})", "rsi_overbought"))
+            factors.append(("SELL", min(1.0, (profile.rsi_14 - 70) / 20), f"RSI{profile.rsi_14:.0f}"))
+        elif 40 < profile.rsi_14 < 60:
+            pass  # Neutral zone — no factor
+        elif profile.rsi_14 <= 40:
+            factors.append(("SELL", 0.3, f"RSI{profile.rsi_14:.0f}"))
+        else:  # 60-70
+            factors.append(("BUY", 0.3, f"RSI{profile.rsi_14:.0f}"))
 
-        # MACD cross signals
+        # Factor 3: MACD cross
         if profile.macd_cross == "bullish_cross":
-            triggers.append(("BUY", "MACD bullish cross", "macd_bull"))
+            factors.append(("BUY", 0.8, "MACD↑"))
         elif profile.macd_cross == "bearish_cross":
-            triggers.append(("SELL", "MACD bearish cross", "macd_bear"))
+            factors.append(("SELL", 0.8, "MACD↓"))
 
-        # Bollinger Band signals
+        # Factor 4: Bollinger position (mean reversion)
         if profile.bb_position == "below_lower":
-            triggers.append(("BUY", f"Price below lower BB (${profile.price:,.0f})", "bb_oversold"))
+            factors.append(("BUY", 0.7, "BB<low"))
         elif profile.bb_position == "above_upper":
-            triggers.append(("SELL", f"Price above upper BB (${profile.price:,.0f})", "bb_overbought"))
+            factors.append(("SELL", 0.7, "BB>high"))
 
-        # Strong multi-signal alignment
-        if profile.net_signal == "strong_bullish" and profile.signal_count_bullish >= 4:
-            triggers.append(("BUY", f"Strong bullish alignment ({profile.signal_count_bullish} signals)", "strong_bull"))
-        elif profile.net_signal == "strong_bearish" and profile.signal_count_bearish >= 4:
-            triggers.append(("SELL", f"Strong bearish alignment ({profile.signal_count_bearish} signals)", "strong_bear"))
+        # Factor 5: Volume confirmation
+        if profile.volume_ratio > 1.5:
+            # High volume confirms direction of price move
+            if profile.change_24h_pct > 0:
+                factors.append(("BUY", min(1.0, profile.volume_ratio / 3), "Vol↑"))
+            elif profile.change_24h_pct < 0:
+                factors.append(("SELL", min(1.0, profile.volume_ratio / 3), "Vol↑"))
+        elif profile.volume_ratio < 0.5:
+            # Low volume = exhaustion, expect reversal
+            if profile.change_24h_pct > 1:
+                factors.append(("SELL", 0.4, "VolExhaust"))
+            elif profile.change_24h_pct < -1:
+                factors.append(("BUY", 0.4, "VolExhaust"))
 
-        # MA trend reversal (only when it just happened — check if 7 and 20 are very close)
-        ma_gap_pct = abs(profile.sma_7 - profile.sma_20) / profile.sma_20 * 100 if profile.sma_20 else 0
-        if ma_gap_pct < 0.5 and profile.ma_trend == "bullish":
-            triggers.append(("BUY", f"MA7 crossing above MA20 (gap {ma_gap_pct:.1f}%)", "ma_cross_bull"))
-        elif ma_gap_pct < 0.5 and profile.ma_trend == "bearish":
-            triggers.append(("SELL", f"MA7 crossing below MA20 (gap {ma_gap_pct:.1f}%)", "ma_cross_bear"))
+        # Factor 6: 7-day momentum (price acceleration)
+        if profile.change_7d_pct > 5:
+            factors.append(("BUY", min(1.0, profile.change_7d_pct / 15), "7d↑"))
+        elif profile.change_7d_pct < -5:
+            factors.append(("SELL", min(1.0, abs(profile.change_7d_pct) / 15), "7d↓"))
 
-        for action, reason, trigger_type in triggers:
-            confidence = 0.6
-            if "strong" in trigger_type:
-                confidence = 0.85
-            elif "rsi" in trigger_type:
-                confidence = 0.75
-            elif "macd" in trigger_type:
-                confidence = 0.70
+        # ─── Agreement Gate: require 3+ factors in same direction ───
+        buy_factors = [(s, n) for d, s, n in factors if d == "BUY"]
+        sell_factors = [(s, n) for d, s, n in factors if d == "SELL"]
 
-            signal = {
-                "timestamp": now.isoformat(),
-                "symbol": f"{sym}USDT",
-                "action": action,
-                "strategy": trigger_type,
-                "price": profile.price,
-                "confidence": confidence,
-                "signal_id": str(uuid.uuid4()),
-                "source": "sapphire-ta-scanner",
-                "execution": "LOGGED_ONLY",
-                "raw": {
-                    "trigger": trigger_type,
-                    "reason": reason,
-                    "rsi": profile.rsi_14,
-                    "macd_cross": profile.macd_cross,
-                    "ma_trend": profile.ma_trend,
-                    "bb_position": profile.bb_position,
-                    "net_signal": profile.net_signal,
-                    "signals_bullish": profile.signal_count_bullish,
-                    "signals_bearish": profile.signal_count_bearish,
-                    "atr_pct": profile.atr_pct,
-                    "volume_signal": profile.volume_signal,
-                    "source": "sapphire-ta-scanner",
-                },
-            }
+        buy_count = len(buy_factors)
+        sell_count = len(sell_factors)
+        buy_strength = sum(s for s, _ in buy_factors) / max(buy_count, 1)
+        sell_strength = sum(s for s, _ in sell_factors) / max(sell_count, 1)
 
-            _log_signal(signal)
-            signals_generated.append({
-                "symbol": f"{sym}USDT",
-                "action": action,
+        MIN_FACTORS = 3  # Require 3+ agreement
+        action = None
+        reason_parts = []
+
+        if buy_count >= MIN_FACTORS and buy_count > sell_count:
+            action = "BUY"
+            reason_parts = [n for _, n in buy_factors]
+            avg_strength = buy_strength
+            agreement = buy_count / max(len(factors), 1)
+        elif sell_count >= MIN_FACTORS and sell_count > buy_count:
+            action = "SELL"
+            reason_parts = [n for _, n in sell_factors]
+            avg_strength = sell_strength
+            agreement = sell_count / max(len(factors), 1)
+
+        if action is None:
+            continue  # No consensus — skip this symbol
+
+        # ─── Confidence: agreement ratio + strength ───
+        # Adapted from AI Forecast: min(0.90, 0.3 + agreement*0.3 + strength*0.2)
+        confidence = min(0.90, 0.30 + agreement * 0.30 + avg_strength * 0.20)
+
+        # ─── Volatility regime adjustment ───
+        if profile.volatility_regime == "high":
+            confidence *= 0.7  # Reduce in volatile markets
+        elif profile.volatility_regime == "low":
+            confidence *= 1.1  # Boost in calm markets
+
+        confidence = round(min(0.90, max(0.35, confidence)), 2)
+
+        # ─── Edge + Half-Kelly sizing hint ───
+        edge = min(0.06, avg_strength * agreement * 0.1)
+        win_prob = 0.5 + edge
+        kelly_frac = max(0, (win_prob * 2 - 1)) / 2
+        suggested_size_pct = round(min(kelly_frac / 2, 0.03) * 100, 1)  # % of capital
+
+        reason = f"{len(reason_parts)}F ensemble: {' '.join(reason_parts)}"
+
+        signal = {
+            "timestamp": now.isoformat(),
+            "symbol": f"{sym}USDT",
+            "action": action,
+            "strategy": "multi_factor_ensemble",
+            "price": profile.price,
+            "confidence": confidence,
+            "signal_id": str(uuid.uuid4()),
+            "source": "sapphire-ta-scanner-v2",
+            "execution": "LOGGED_ONLY",
+            "raw": {
+                "factors": len(factors),
+                "agreeing": max(buy_count, sell_count),
+                "agreement_ratio": round(agreement, 2),
+                "avg_strength": round(avg_strength, 2),
+                "edge": round(edge, 4),
+                "kelly_size_pct": suggested_size_pct,
+                "volatility_regime": profile.volatility_regime,
                 "reason": reason,
-                "confidence": confidence,
-                "price": profile.price,
-            })
+                "factor_names": reason_parts,
+                "rsi": profile.rsi_14,
+                "macd_cross": profile.macd_cross,
+                "ma_trend": profile.ma_trend,
+                "bb_position": profile.bb_position,
+                "volume_ratio": profile.volume_ratio,
+                "change_7d_pct": profile.change_7d_pct,
+                "source": "sapphire-ta-scanner-v2",
+            },
+        }
+
+        _log_signal(signal)
+        signals_generated.append({
+            "symbol": f"{sym}USDT",
+            "action": action,
+            "reason": reason,
+            "confidence": confidence,
+            "price": profile.price,
+            "edge": round(edge, 4),
+            "kelly_size": f"{suggested_size_pct}%",
+        })
 
     # Send Telegram notification if any signals
     if signals_generated:
