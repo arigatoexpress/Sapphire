@@ -11,8 +11,9 @@ import urllib.request
 from dataclasses import dataclass
 
 ENDPOINTS = [
-    ("gpu", "http://100.71.10.48:11434"),
-    ("local", "http://localhost:11434"),
+    ("proxy", "http://127.0.0.1:11435"),  # Inference proxy: Windows GPU → Mac fallback
+    ("gpu", "http://100.71.10.48:11434"),  # Direct Windows (if proxy is down)
+    ("local", "http://localhost:11434"),    # Direct Mac (last resort)
 ]
 
 # Benchmarked model selection
