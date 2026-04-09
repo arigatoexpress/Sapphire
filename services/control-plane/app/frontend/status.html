@@ -74,56 +74,51 @@ async function loadHealth() {
     const events = eventsResp ? await eventsResp.json().catch(() => ({})) : {};
     const tasks = tasksResp ? await tasksResp.json().catch(() => ({})) : {};
 
-    // Build static service map (known infrastructure)
-    const services = [
-      { name: 'Control Plane', port: 8082, status: 'green', detail: 'This service' },
-      { name: 'Dashboard', port: 8080, status: 'green', detail: 'Auth required' },
-      { name: 'Signal Logger', port: 18081, status: 'green', detail: 'Trading signals' },
-      { name: 'OpenBB API', port: 6900, status: 'green', detail: '32 data providers' },
-      { name: 'Redis', port: 6379, status: 'green', detail: 'Cache layer' },
-      { name: 'Regional Intel', port: 8787, status: 'green', detail: 'Vote monitor + intel' },
-      { name: 'THO Cloud Run', port: null, status: 'green', detail: 'Rev 22 • Firestore + GCS' },
-    ];
+    // Fetch LIVE ecosystem health from the API
+    const ecoResp = await fetch('/api/ecosystem-health').catch(() => null);
+    const eco = ecoResp ? await ecoResp.json().catch(() => null) : null;
 
-    const repos = [
-      { name: 'Sapphire', detail: '1,088 tests • 11 plugin tools' },
-      { name: 'Project-Go-Forward', detail: '93 tests • Cloud Run rev 22' },
-      { name: 'cyber-threat-bot', detail: '8 tests • 4 live sources' },
-      { name: 'regional-intel-workbench', detail: '6 tests • 3 regions' },
-      { name: 'Cointracker', detail: '13 tests • crypto tax' },
-      { name: 'claw-code', detail: 'Rust agent runtime' },
-    ];
+    // Convert API response to display arrays
+    function toItems(section) {
+      if (!section) return [];
+      return Object.entries(section).map(([name, info]) => ({
+        name: name.replace(/-/g, ' ').replace(/_/g, ' '),
+        status: info.status || 'green',
+        detail: (info.detail || '').substring(0, 80),
+      }));
+    }
 
-    const data_pipes = [
-      { name: 'Threat Intel', detail: '15 signals • 5 critical CVEs' },
-      { name: 'Trading Predictions', detail: '67% accuracy (4/6)' },
-      { name: 'Starred Repos', detail: '39 stars • 24 synergies' },
-      { name: 'Market Pulse', detail: '3x daily M-F' },
-      { name: 'Vote Monitor', detail: 'Blackhole • Supernova • Full Sail' },
-    ];
-
-    const inference = [
-      { name: 'Mac Ollama', detail: '4 models • T0 Nemotron' },
-      { name: 'Windows GPU', detail: 'RTX 5070 Ti • 26 models' },
-    ];
+    const services = eco ? toItems(eco.services) : [{ name: 'Loading...', status: 'yellow', detail: '' }];
+    const repos = eco ? toItems(eco.repos) : [];
+    const data_pipes = eco ? toItems(eco.data_freshness) : [];
+    const inference = eco ? toItems(eco.inference) : [];
 
     // Render
+    const overallStatus = eco ? eco.overall : 'YELLOW';
+    const summary = eco ? eco.summary : 'Loading...';
+
     document.getElementById('timestamp').textContent =
-      'Updated: ' + new Date().toLocaleString() + ' • Auto-refresh: 2 min';
+      'Updated: ' + new Date().toLocaleString() + ' • Auto-refresh: 2 min • Live from /api/ecosystem-health';
 
     const overall = document.getElementById('overall');
-    overall.className = 'overall GREEN';
-    overall.textContent = '✅ ALL SYSTEMS OPERATIONAL — 19 green, 0 red';
+    overall.className = 'overall ' + overallStatus;
+    const icon = overallStatus === 'GREEN' ? '✅' : overallStatus === 'YELLOW' ? '⚠️' : '🔴';
+    overall.textContent = `${icon} ${overallStatus} — ${summary}`;
     overall.style.display = 'block';
 
-    // Stats
+    // Count statuses
+    const allItems = [...services, ...repos, ...data_pipes, ...inference];
+    const greenCount = allItems.filter(i => i.status === 'green').length;
+    const yellowCount = allItems.filter(i => i.status === 'yellow').length;
+    const redCount = allItems.filter(i => i.status === 'red').length;
+
     document.getElementById('stats').innerHTML = `
-      <div class="stat"><div class="num">1,211</div><div class="label">Tests Passing</div></div>
-      <div class="stat"><div class="num">8</div><div class="label">Repos</div></div>
+      <div class="stat"><div class="num">${greenCount}</div><div class="label">Green</div></div>
+      <div class="stat"><div class="num">${yellowCount}</div><div class="label">Yellow</div></div>
+      <div class="stat"><div class="num">${redCount}</div><div class="label">Red</div></div>
       <div class="stat"><div class="num">11</div><div class="label">Plugin Tools</div></div>
       <div class="stat"><div class="num">19</div><div class="label">Scheduled Tasks</div></div>
-      <div class="stat"><div class="num">7</div><div class="label">Services</div></div>
-      <div class="stat"><div class="num">30</div><div class="label">AI Models</div></div>
+      <div class="stat"><div class="num">1,211</div><div class="label">Tests</div></div>
     `;
 
     function renderSection(title, items) {
