@@ -56,26 +56,94 @@ def action_predict() -> dict:
         if profile is None:
             continue
 
-        # Direction based on net signal
-        direction_map = {
-            "strong_bullish": ("bullish", 0.85),
-            "bullish": ("bullish", 0.70),
-            "neutral": ("neutral", 0.50),
-            "bearish": ("bearish", 0.70),
-            "strong_bearish": ("bearish", 0.85),
-        }
-        direction, base_conf = direction_map.get(profile.net_signal, ("neutral", 0.50))
+        # ─── Multi-factor confidence scoring ───
+        # Each factor contributes independently. Direction comes from consensus.
+        bull_score = 0.0
+        bear_score = 0.0
+        factors = []
 
-        # Adjust confidence based on signal agreement
-        signal_agreement = abs(profile.signal_count_bullish - profile.signal_count_bearish)
-        conf = min(0.95, base_conf + signal_agreement * 0.03)
+        # 1. MA trend (strongest directional signal)
+        if profile.ma_trend == "bullish":
+            bull_score += 2.0
+            factors.append("MA↑")
+        elif profile.ma_trend == "bearish":
+            bear_score += 2.0
+            factors.append("MA↓")
 
-        # Target: entry ± ATR (1 ATR move in predicted direction)
+        # 2. RSI (contrarian near extremes, confirming in middle)
+        if profile.rsi_14 < 30:
+            bull_score += 1.5  # Oversold bounce
+            factors.append(f"RSI{profile.rsi_14:.0f}↑")
+        elif profile.rsi_14 < 45:
+            bear_score += 0.5  # Weak
+            factors.append(f"RSI{profile.rsi_14:.0f}")
+        elif profile.rsi_14 < 55:
+            pass  # Neutral
+        elif profile.rsi_14 < 70:
+            bull_score += 0.5  # Mildly bullish momentum
+            factors.append(f"RSI{profile.rsi_14:.0f}")
+        else:
+            bear_score += 1.0  # Overbought, likely pullback
+            factors.append(f"RSI{profile.rsi_14:.0f}↓")
+
+        # 3. MACD cross
+        if profile.macd_cross == "bullish_cross":
+            bull_score += 1.5
+            factors.append("MACD↑")
+        elif profile.macd_cross == "bearish_cross":
+            bear_score += 1.5
+            factors.append("MACD↓")
+
+        # 4. Bollinger position
+        if profile.bb_position == "below_lower":
+            bull_score += 1.0
+            factors.append("BB<low")
+        elif profile.bb_position == "above_upper":
+            bear_score += 1.0
+            factors.append("BB>high")
+
+        # 5. Volume confirmation (amplifies existing signal)
+        if profile.volume_ratio > 1.5:
+            if bull_score > bear_score:
+                bull_score += 0.5
+            elif bear_score > bull_score:
+                bear_score += 0.5
+            factors.append("Vol↑")
+        elif profile.volume_ratio < 0.5:
+            # Low volume = weak conviction, dampen both
+            bull_score *= 0.8
+            bear_score *= 0.8
+            factors.append("Vol↓")
+
+        # 6. 7-day momentum
+        if profile.change_7d_pct > 5:
+            bull_score += 0.5
+        elif profile.change_7d_pct < -5:
+            bear_score += 0.5
+
+        # ─── Direction decision ───
+        net = bull_score - bear_score
+        if net > 1.5:
+            direction = "bullish"
+        elif net < -1.5:
+            direction = "bearish"
+        else:
+            direction = "neutral"
+
+        # ─── Confidence: based on how strong the consensus is ───
+        total_score = bull_score + bear_score
+        if total_score > 0:
+            dominance = max(bull_score, bear_score) / total_score
+        else:
+            dominance = 0.5
+        conf = round(min(0.90, 0.40 + dominance * 0.4 + abs(net) * 0.05), 2)
+
+        # ─── Target: entry ± 0.5 ATR (conservative) ───
         atr_move = profile.atr_14
         if direction == "bullish":
-            target = profile.price + atr_move * 0.7
+            target = profile.price + atr_move * 0.5
         elif direction == "bearish":
-            target = profile.price - atr_move * 0.7
+            target = profile.price - atr_move * 0.5
         else:
             target = profile.price
 
@@ -98,9 +166,9 @@ def action_predict() -> dict:
             "signals_bearish": profile.signal_count_bearish,
             "net_signal": profile.net_signal,
             "reasoning": (
-                f"{profile.net_signal}: {profile.signal_count_bullish} bull / {profile.signal_count_bearish} bear signals. "
-                f"RSI {profile.rsi_14:.0f} ({profile.rsi_zone}), MA trend {profile.ma_trend}, "
-                f"BB {profile.bb_position}, vol {profile.volume_signal}."
+                f"{direction} (net={net:+.1f}): {' '.join(factors)}. "
+                f"Bull={bull_score:.1f} Bear={bear_score:.1f}. "
+                f"RSI {profile.rsi_14:.0f}, MA {profile.ma_trend}, BB {profile.bb_position}."
             ),
             "actual_price": None,
             "correct": None,
