@@ -148,30 +148,52 @@ def action_discover(industry: str = None, region: str = "houston_tx",
                     "region": region,
                 })
 
-        # Also check permits for new construction (hot leads)
-        for permit in permits[:50]:
-            desc = permit.get("description", "")
-            if industry and industry.lower() in desc.lower():
+        # Check permits — search ALL text fields against ALL keywords
+        all_terms = [t.lower() for t in (keywords or [])]
+        if industry:
+            all_terms.extend(industry.lower().split())
+        # Add common related terms
+        all_terms = list(set(all_terms))
+
+        for permit in permits:
+            searchable = " ".join(str(v) for v in permit.values()).lower()
+            if not all_terms or any(t in searchable for t in all_terms):
                 leads.append({
                     "type": "permit",
-                    "name": permit.get("applicant", permit.get("contractor", "Unknown")),
-                    "category": "new construction",
-                    "description": desc[:100],
+                    "name": permit.get("applicant", permit.get("contractor", permit.get("address", "Unknown"))),
+                    "category": permit.get("permit_type", permit.get("work_type", "construction")),
+                    "description": permit.get("description", permit.get("address", ""))[:120],
                     "source": "permits",
                     "region": region,
                 })
 
-        # Organizations
-        for org in orgs[:50]:
-            name = org.get("name", "")
-            searchable = f"{name} {org.get('description', '')}".lower()
-            if industry and industry.lower() in searchable:
+        # Organizations — search broadly
+        for org in orgs:
+            searchable = " ".join(filter(None, [
+                org.get("name", ""),
+                str(org.get("categories", "")),
+                org.get("description", ""),
+                org.get("address", ""),
+            ])).lower()
+            if not all_terms or any(t in searchable for t in all_terms):
                 leads.append({
                     "type": "organization",
-                    "name": name,
+                    "name": org.get("name", "Unknown"),
+                    "category": str(org.get("categories", ""))[:50],
                     "source": "regional-intel",
                     "region": region,
-                    "data": org,
+                })
+
+        # Contacts (potential decision makers)
+        for contact in contacts:
+            searchable = " ".join(str(v) for v in contact.values()).lower()
+            if not all_terms or any(t in searchable for t in all_terms):
+                leads.append({
+                    "type": "contact",
+                    "name": contact.get("name", "Unknown"),
+                    "category": contact.get("title", contact.get("organization", "")),
+                    "source": "regional-intel",
+                    "region": region,
                 })
 
     return {
@@ -199,7 +221,7 @@ Our business: {business_context or 'Kadima Digital Strategies - AI operations, t
 Goal: Introduce our services and schedule a brief call.
 Tone: Professional, warm, concise. No fluff. Reference something specific about them."""
 
-        msg = _infer_with_ollama(prompt, model="nemotron-mini:4b")  # Fast model for drafts
+        msg = _infer_with_ollama(prompt, model="hermes3:8b")  # Reliable model for outreach drafts
         messages.append({
             "lead": name,
             "category": category,

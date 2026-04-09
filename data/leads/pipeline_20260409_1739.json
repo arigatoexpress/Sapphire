@@ -1,0 +1,106 @@
+{
+  "timestamp": "20260409_1739",
+  "icp": {
+    "raw_analysis": "{\n  \"business_name\": \"Texas Home Outlet\",\n  \"industry\": \" Manufactured and Modular Homes\",\n  \"services\": [\n    \"Selling affordable manufactured and modular homes\",\n    \"Delivery and installation of purchased homes\"\n  ],\n  \"target_customers\": {\n    \"personas\": [\n      {\n        \"name\": \"John and Sarah Thompson\",\n        \"age\": \"35-50\",\n        \"family_status\": \"Married with children\",\n        \"income_level\": \"Middle-class\",\n        \"needs\": \"A comfortable, affordable family home in the Houston metro area\" \n      }\n    ],\n    \"overarching_characteristics\": [\n      \"Value-conscious buyers looking for a move-in ready home\",\n      \"First-time homeowners seeking an affordable entry-point into the housing market\",\n      \"Young families looking to upgrade from rental homes or cramped quarters\"\n    ]\n  },\n  \"geography\": \"Primarily focused on serving customers in the Houston, TX metro area. Potential expansion to surrounding counties if successful.\",\n  \"keywords\": [\n    \"affordable homes houston\", \n    \"modular homes under $100K\",\n    \"manufactured home dealers near me\",\n    \"new mobile homes for sale cheap\"\n  ],\n  \"outreach_angle\": [\n    \"Emphasize the value, speed and convenience of purchasing a move-in ready manufactured or modular home directly from Texas Home Outlet. \n    Highlight competitive pricing vs. new construction options under $100K.\n    Showcase happy customer testimonials featuring families moving into their new homes within weeks of purchase.\n    Utilize highly targeted online advertising geographically focused on Houston metro area. Partner with local realtors, financial institutions and community groups.\"  \n  ]\n}"
+  },
+  "leads_found": 10,
+  "leads": [
+    {
+      "type": "business",
+      "name": "24 Hour Fitness",
+      "category": "business",
+      "address": "5070 Richmond Avenue Houston",
+      "source": "regional-intel",
+      "region": "houston_tx"
+    },
+    {
+      "type": "business",
+      "name": "Academy Sports + Outdoors",
+      "category": "shop:sports",
+      "address": "Address not provided",
+      "source": "regional-intel",
+      "region": "houston_tx"
+    },
+    {
+      "type": "business",
+      "name": "AT&T",
+      "category": "shop:mobile_phone",
+      "address": "232 Houston",
+      "source": "regional-intel",
+      "region": "houston_tx"
+    },
+    {
+      "type": "business",
+      "name": "Barnaby's Cafe",
+      "category": "amenity:restaurant",
+      "address": "Address not provided",
+      "source": "regional-intel",
+      "region": "houston_tx"
+    },
+    {
+      "type": "business",
+      "name": "Batteries Plus Bulbs",
+      "category": "shop:electronics",
+      "address": "4774 Beechnut Street Houston",
+      "source": "regional-intel",
+      "region": "houston_tx"
+    },
+    {
+      "type": "business",
+      "name": "Becks Prime",
+      "category": "amenity:fast_food",
+      "address": "708 Meyerland Plaza Houston",
+      "source": "regional-intel",
+      "region": "houston_tx"
+    },
+    {
+      "type": "business",
+      "name": "Bikram Yoga Meyerland Plaza",
+      "category": "business",
+      "address": "410 Houston",
+      "source": "regional-intel",
+      "region": "houston_tx"
+    },
+    {
+      "type": "business",
+      "name": "Black Friday Deals",
+      "category": "shop:variety_store",
+      "address": "3719 Avenue H Rosenberg",
+      "source": "regional-intel",
+      "region": "houston_tx"
+    },
+    {
+      "type": "business",
+      "name": "Burger Guys",
+      "category": "amenity:restaurant",
+      "address": "12225 Westheimer Road",
+      "source": "regional-intel",
+      "region": "houston_tx"
+    },
+    {
+      "type": "business",
+      "name": "Burger King",
+      "category": "amenity:fast_food",
+      "address": "1750 Crabb River Road Richmond",
+      "source": "regional-intel",
+      "region": "houston_tx"
+    }
+  ],
+  "outreach": [
+    {
+      "lead": "24 Hour Fitness",
+      "category": "business",
+      "message": "Inference unavailable: HTTP Error 503: Service Unavailable"
+    },
+    {
+      "lead": "Academy Sports + Outdoors",
+      "category": "shop:sports",
+      "message": "Inference unavailable: HTTP Error 503: Service Unavailable"
+    },
+    {
+      "lead": "AT&T",
+      "category": "shop:mobile_phone",
+      "message": "Inference unavailable: HTTP Error 503: Service Unavailable"
+    }
+  ]
+}

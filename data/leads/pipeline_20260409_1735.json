@@ -1,0 +1,61 @@
+{
+  "timestamp": "20260409_1735",
+  "icp": {
+    "business_name": "Texas Home Outlet",
+    "industry": "Manufactured and Modular Homes Sales, Financing, Delivery, and Installation",
+    "services": [
+      "Sales of manufactured and modular homes",
+      "Financing options for home purchases",
+      "Delivery and installation services within the Houston Texas metro area"
+    ],
+    "target_customers": {
+      "personality_traits": [
+        "Seeking an affordable housing solution",
+        "Preference for quick and easy home setup process",
+        "Value peace of mind with professional delivery and installation",
+        "Desire to own a quality, move-in ready home",
+        "Looking for financial assistance options"
+      ],
+      "age_ranges": [
+        {
+          "range": "30-50 years old",
+          "reasoning": "Typically first-time homebuyers or families looking to upgrade their living situation"
+        },
+        {
+          "range": "51-70 years old",
+          "reasoning": "Empty-nesters or retirees seeking a smaller, maintenance-free home"
+        }
+      ],
+      "income_brackets": [
+        {
+          "bracket": "$50,000 - $100,000 per year",
+          "reasoning": "Can afford the payments for a financed manufactured or modular home"
+        },
+        {
+          "bracket": "$75,000 - $150,000 per year",
+          "reasoning": "Able to comfortably cover the mortgage for a modest-sized home"
+        }
+      ]
+    },
+    "geography": "Houston Texas metro area and surrounding regions",
+    "keywords": [
+      "affordable homes",
+      "manufactured homes",
+      "modular homes",
+      "home financing",
+      "quick move-in",
+      "professional delivery",
+      "easy installation",
+      "maintenance-free living"
+    ],
+    "outreach_angle": {
+      "personalized_approach": "Highlighting the benefits of owning a manufactured or modular home and how it can fit their unique lifestyle and financial situation.",
+      "value_proposition": "Emphasizing the affordability, speed of setup, lower maintenance requirements, and professional services offered by Texas Home Outlet.",
+      "trust_building": "Demonstrating industry expertise through educational content and showcasing satisfied customer testimonials.",
+      "community_engagement": "Participating in local home shows, partnering with real estate agents, and sponsoring community events to increase brand visibility and build relationships within the Houston metro area."
+    }
+  },
+  "leads_found": 0,
+  "leads": [],
+  "outreach": []
+}
