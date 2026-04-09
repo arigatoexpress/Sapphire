@@ -1,0 +1,66 @@
+{
+  "timestamp": "20260409_1630",
+  "icp": {
+    "raw_analysis": "Inference unavailable: timed out"
+  },
+  "leads_found": 5,
+  "leads": [
+    {
+      "type": "business",
+      "name": "24 Hour Fitness",
+      "category": "business",
+      "address": "5070 Richmond Avenue Houston",
+      "source": "regional-intel",
+      "region": "houston_tx"
+    },
+    {
+      "type": "business",
+      "name": "Academy Sports + Outdoors",
+      "category": "shop:sports",
+      "address": "Address not provided",
+      "source": "regional-intel",
+      "region": "houston_tx"
+    },
+    {
+      "type": "business",
+      "name": "AT&T",
+      "category": "shop:mobile_phone",
+      "address": "232 Houston",
+      "source": "regional-intel",
+      "region": "houston_tx"
+    },
+    {
+      "type": "business",
+      "name": "Barnaby's Cafe",
+      "category": "amenity:restaurant",
+      "address": "Address not provided",
+      "source": "regional-intel",
+      "region": "houston_tx"
+    },
+    {
+      "type": "business",
+      "name": "Batteries Plus Bulbs",
+      "category": "shop:electronics",
+      "address": "4774 Beechnut Street Houston",
+      "source": "regional-intel",
+      "region": "houston_tx"
+    }
+  ],
+  "outreach": [
+    {
+      "lead": "24 Hour Fitness",
+      "category": "business",
+      "message": "Inference unavailable: timed out"
+    },
+    {
+      "lead": "Academy Sports + Outdoors",
+      "category": "shop:sports",
+      "message": "Inference unavailable: timed out"
+    },
+    {
+      "lead": "AT&T",
+      "category": "shop:mobile_phone",
+      "message": "Inference unavailable: timed out"
+    }
+  ]
+}
