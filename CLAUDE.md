@@ -86,6 +86,7 @@ python3 plugins/claw-sapphire/tools/budget.py < /dev/null
 | `~/Code/regional-intel-workbench` | arigatoexpress/regional-intel-workbench | Intelligence platform |
 | `~/Code/tradingview-mcp` | arigatoexpress/tradingview-mcp | TradingView MCP |
 | `~/Code/Cointracker` | arigatoexpress/crypto-tax-tracker | Crypto tax engine |
+| `~/Code/cyber-threat-bot` | — | Threat intel: CISA KEV, NVD, MITRE ATT&CK, revenue synthesis |
 
 ## Sapphire Plugin (v0.3.0, claw-code native)
 
@@ -97,6 +98,7 @@ python3 plugins/claw-sapphire/tools/budget.py < /dev/null
 - `sapphire_status` — mesh device + inference status
 - `sapphire_notify` — Telegram via NemotronRariBot
 - `sapphire_market` — unified OpenBB + TradingView data
+- `threat_intel` — CISA KEV + NVD + MITRE ATT&CK signals (via cyber-threat-bot)
 
 ## Inference Fallback Chain
 
