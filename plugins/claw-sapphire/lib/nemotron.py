@@ -15,13 +15,14 @@ ENDPOINTS = [
     ("local", "http://localhost:11434"),
 ]
 
-# Benchmarked model selection (Kadima Benchmark v3, RTX 5070 Ti)
+# Benchmarked model selection
+# Models are pulled on both Mac (local) and Windows GPU
 MODELS = {
-    "classify": "nemotron-3-nano:4b",  # 196 t/s, 100% accuracy — fast classifier
-    "analyze": "nemotron-cascade-2:latest",  # 31.6B MoE — deep reasoning
-    "quick": "nemotron-mini:4b",  # 242 t/s — autocomplete, low accuracy
-    "accurate": "phi4:latest",  # 14B, 100% accuracy, 86 t/s
-    "tiny": "granite3.3:2b",  # 1.5GB, 100% accuracy — edge fallback
+    "classify": "nemotron-mini",  # 2.7B, fast classifier, on both endpoints
+    "analyze": "hermes3:8b",  # 8B, tool calling + reasoning, on both endpoints
+    "quick": "nemotron-mini",  # Alias for classify
+    "accurate": "hermes3:8b",  # Best available on both
+    "tiny": "llama3.2:3b",  # Small, fast, on both endpoints
 }
 
 

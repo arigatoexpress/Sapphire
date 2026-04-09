@@ -149,6 +149,46 @@ def handle_command(cmd: str, args: str, chat_id: str) -> str:
         symbols = [s.strip().upper() for s in args.split(",")]
         return run_tool_direct("market.py", {"action": "snapshot", "symbols": symbols})
 
+    # Threat intelligence
+    elif cmd == "/threats":
+        send_message("🔍 Scanning threat sources...", chat_id)
+        return run_tool_direct("threat_intel.py", {"action": "scan"})
+    elif cmd == "/threat" and args:
+        send_message(f"📋 Generating brief for {args.strip().upper()}...", chat_id)
+        result = run_tool_direct("threat_intel.py", {"action": "brief", "target": args.strip()})
+        try:
+            data = json.loads(result)
+            return data.get("output", result)[:4000]
+        except Exception:
+            return result
+    elif cmd == "/offers":
+        send_message("💰 Analyzing threat revenue opportunities...", chat_id)
+        result = run_tool_direct("threat_intel.py", {"action": "offers", "profile": str(Path.home() / "Code/cyber-threat-bot/profiles/kadima-digital.json")})
+        try:
+            data = json.loads(result)
+            return data.get("output", result)[:4000]
+        except Exception:
+            return result
+
+    # System health
+    elif cmd == "/health":
+        send_message("🔬 Running 20-point health check...", chat_id)
+        result = run_tool_direct("health_check.py")
+        try:
+            data = json.loads(result)
+            lines = [f"*{data['overall']}* — {data['summary']}\n"]
+            for section in ["services", "repos", "data_freshness", "inference"]:
+                for name, info in data.get(section, {}).items():
+                    icon = {"green": "🟢", "yellow": "🟡", "red": "🔴"}.get(info.get("status"), "⚪")
+                    lines.append(f"{icon} `{name}`: {info.get('detail', '')[:50]}")
+            return "\n".join(lines)
+        except Exception:
+            return result
+
+    # GitHub discovery
+    elif cmd == "/repos":
+        return run_tool_direct("starred_repos.py", {"action": "sync"})
+
     # Commands that use claw-code (more capable but slower)
     elif cmd == "/scan":
         send_message("🔍 Scanning all repos...", chat_id)
@@ -203,10 +243,9 @@ def handle_command(cmd: str, args: str, chat_id: str) -> str:
   /price AAPL — Equity quote (OpenBB)
   /btc — BTC recent bars
   /chart — Live TradingView quote
-  /levels [filter] — Indicator levels from chart
-  /strategy — Strategy tester results
+  /levels [filter] — Indicator levels
   /news [query] — Financial news
-  /snapshot AAPL,MSFT,NVDA — Multi-symbol
+  /snapshot AAPL,MSFT — Multi-symbol
 
 *Factory:*
   /dispatch <task> — Auto-route to best tier
@@ -221,12 +260,19 @@ def handle_command(cmd: str, args: str, chat_id: str) -> str:
   /kimi <task> — Force Kimi CLI
   /escalate <task> — Force Claude
 
+*Security:*
+  /threats — Live threat scan (CISA/NVD)
+  /threat CVE-2026-1340 — Deep brief
+  /offers — Revenue opportunities
+
 *System:*
+  /health — 20-point ecosystem check
   /status — Mesh + inference
   /events — Event stream
+  /repos — GitHub starred sync
   /help — This message
 
-_Free text → Nemotron inference_"""
+_Free text → GPU inference (RTX 5070 Ti)_"""
     else:
         return None  # Not a recognized command
 
