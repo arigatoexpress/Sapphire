@@ -272,7 +272,7 @@ def handle_command(cmd: str, args: str, chat_id: str) -> str:
   /repos — GitHub starred sync
   /help — This message
 
-_Free text → GPU inference (RTX 5070 Ti)_"""
+💬 *Just type naturally* — Sapphire AI responds using Hermes 3 on RTX 5070 Ti with full conversation memory."""
     else:
         return None  # Not a recognized command
 
@@ -298,17 +298,93 @@ def handle_message(msg: dict) -> None:
         else:
             send_message(f"Unknown command: `{cmd}`. Use /help.", chat_id)
     else:
-        # Free text → Nemotron inference
-        sys.path.insert(0, str(PLUGIN_DIR / "lib"))
-        from nemotron import MODELS, generate
-        result = generate(text, model=MODELS["classify"], timeout=30)
-        if result.success:
-            send_message(
-                f"{result.response}\n\n_({result.endpoint} • {result.tokens_per_second} t/s)_",
-                chat_id,
+        # Free text → Hermes 3 conversational AI on Windows GPU
+        send_message("🧠", chat_id)  # Thinking indicator
+        response = chat_with_hermes(text, chat_id)
+        send_message(response, chat_id)
+
+
+# ─── Conversational AI (Hermes 3 on Windows GPU) ────────────────────────────
+
+# Per-user conversation history (last N messages)
+_chat_history: dict[str, list[dict]] = {}
+_MAX_HISTORY = 10
+
+SAPPHIRE_SYSTEM_PROMPT = """You are Sapphire, the AI assistant for Kadima Digital Strategies. You run on a dual-node system: Mac (commander) + Windows PC (RTX 5070 Ti GPU).
+
+Your personality: sharp, concise, technically deep but accessible. You're a trusted advisor, not a chatbot. If you don't know something, say so.
+
+What you know about the system:
+- Sapphire OS: autonomous AI operations platform spanning trading, cybersecurity, real estate tech, and intelligence
+- 8 code repositories, 1,211+ automated tests, 19 scheduled tasks running 24/7
+- Trading pipeline: TradingView → Windows webhook → Mac signal logger, prediction scoring at 67% accuracy
+- THO (Texas Home Outlet): client app on Google Cloud Run with 1,963 customers in Firestore, 63 PDF templates
+- Cyber-threat-bot: live CISA KEV, NVD, MITRE ATT&CK intelligence with revenue synthesis
+- Regional Intel Workbench: business intelligence for Austin/Houston/Gunnison regions
+- Inference: Hermes 3 (8B, tool calling), Nemotron Mini (2.7B, fast), Llama 3.2 (3B) on RTX 5070 Ti
+
+When users ask about markets, threats, system status, or projects — give real, actionable answers based on what you know. For specific data queries, suggest they use slash commands like /threats, /health, /price.
+
+Keep responses under 300 words unless the topic warrants depth."""
+
+
+def chat_with_hermes(user_text: str, chat_id: str) -> str:
+    """Send a conversational message to Hermes 3 on Windows GPU."""
+    import urllib.error
+
+    # Maintain conversation history per user
+    history = _chat_history.get(chat_id, [])
+    history.append({"role": "user", "content": user_text})
+
+    # Trim to last N messages
+    if len(history) > _MAX_HISTORY:
+        history = history[-_MAX_HISTORY:]
+    _chat_history[chat_id] = history
+
+    messages = [{"role": "system", "content": SAPPHIRE_SYSTEM_PROMPT}] + history
+
+    # Try Windows GPU first, then Mac
+    endpoints = [
+        ("gpu", "http://100.71.10.48:11434"),
+        ("local", "http://localhost:11434"),
+    ]
+
+    for ep_name, base_url in endpoints:
+        try:
+            payload = json.dumps({
+                "model": "hermes3:8b",
+                "messages": messages,
+                "stream": False,
+                "options": {"temperature": 0.7, "num_predict": 512},
+            }).encode()
+
+            req = urllib.request.Request(
+                f"{base_url}/api/chat",
+                data=payload,
+                headers={"Content-Type": "application/json"},
             )
-        else:
-            send_message(f"❌ {result.error}", chat_id)
+            with urllib.request.urlopen(req, timeout=60, context=_SSL_CTX) as resp:
+                data = json.loads(resp.read())
+
+            assistant_msg = data.get("message", {}).get("content", "")
+            if not assistant_msg:
+                continue
+
+            # Add assistant response to history
+            history.append({"role": "assistant", "content": assistant_msg})
+            _chat_history[chat_id] = history
+
+            # Token stats
+            eval_count = data.get("eval_count", 0)
+            eval_dur = data.get("eval_duration", 1)
+            tps = eval_count / (eval_dur / 1e9) if eval_dur else 0
+
+            return f"{assistant_msg}\n\n_({ep_name} • hermes3:8b • {tps:.0f} t/s)_"
+
+        except Exception:
+            continue
+
+    return "❌ All inference endpoints unavailable. Check Ollama on Windows (100.71.10.48:11434) and Mac (localhost:11434)."
 
 
 def poll_loop() -> None:
