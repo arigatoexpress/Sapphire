@@ -99,6 +99,8 @@ python3 plugins/claw-sapphire/tools/budget.py < /dev/null
 - `sapphire_notify` — Telegram via NemotronRariBot
 - `sapphire_market` — unified OpenBB + TradingView data
 - `threat_intel` — CISA KEV + NVD + MITRE ATT&CK signals (via cyber-threat-bot)
+- `starred_repos` — GitHub starred/trending repo synergy finder + discovery
+- `vote_monitor` — ve Vote escrow bridge (Blackhole, Supernova, Full Sail)
 
 ## Inference Fallback Chain
 
