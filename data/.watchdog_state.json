@@ -1,8 +1,6 @@
 {
-  "timestamp": "2026-04-09T12:39:54.493520",
-  "overall": "RED",
-  "red_items": [
-    "inference/windows_gpu_ollama"
-  ],
-  "summary": "17 green, 2 yellow, 1 red out of 20 checks"
+  "timestamp": "2026-04-09T16:00:50.664284",
+  "overall": "YELLOW",
+  "red_items": [],
+  "summary": "17 green, 3 yellow, 0 red out of 20 checks"
 }
