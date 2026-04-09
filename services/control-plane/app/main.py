@@ -1101,6 +1101,11 @@ async def secops_page():
     return HTMLResponse(_render_page("secops"))
 
 
+@app.get("/status", response_class=HTMLResponse)
+async def status_page():
+    return HTMLResponse(_render_page("status"))
+
+
 @app.get("/health")
 async def health():
     settings = get_settings()
@@ -1111,6 +1116,21 @@ async def health():
         "store": "memory" if settings.use_in_memory_store else "firestore",
         "revision": _service_revision(),
     }
+
+
+@app.get("/api/ecosystem-health")
+async def ecosystem_health():
+    """Run the full 20-point ecosystem health check and return JSON."""
+    import subprocess, json as _json
+    tool_path = Path.home() / "Code" / "Sapphire" / "plugins" / "claw-sapphire" / "tools" / "health_check.py"
+    try:
+        r = subprocess.run(
+            [shutil.which("python3") or "python3", str(tool_path)],
+            input="{}", capture_output=True, text=True, timeout=30,
+        )
+        return _json.loads(r.stdout) if r.stdout else {"error": "No output"}
+    except Exception as exc:
+        return {"error": str(exc)[:200]}
 
 
 @app.get("/api/events")
