@@ -50,6 +50,8 @@ MAX_HISTORY     = 200
 # POST /api/signals/create with X-Sapphire-Control-Token header
 ALPHA_ENGINE_RARI1 = os.getenv("ALPHA_ENGINE_RARI1", "http://100.120.191.1:18080")
 ALPHA_ENGINE_RARI2 = os.getenv("ALPHA_ENGINE_RARI2", "http://100.87.225.89:18080")
+# Mac signal logger — primary target now that Pis are decommissioned
+SIGNAL_LOGGER_MAC = os.getenv("SIGNAL_LOGGER_MAC", "http://100.67.171.79:18081")
 SAPPHIRE_CONTROL_TOKEN = os.getenv("SAPPHIRE_CONTROL_API_TOKEN", "")
 
 # Legacy GCP vars — kept for reference, no longer used
@@ -398,12 +400,15 @@ def build_trade_signal(alert: TradingViewAlert) -> dict:
 
 async def publish_signal(signal: dict) -> dict:
     """
-    On-prem signal routing: POST to alpha-engine on rari1 (primary),
-    then rari2 (secondary) over Tailscale. No GCP Pub/Sub.
+    On-prem signal routing over Tailscale. Targets (in priority order):
+    1. Mac signal logger (primary — always-on, logs + AI assessment)
+    2. rari2 api-gateway (secondary — if Pi is online)
+    3. rari1 alpha-engine (tertiary — if Pi is online)
     """
     targets = [
-        ("rari1", f"{ALPHA_ENGINE_RARI1}/api/signals/create"),
+        ("mac-logger", f"{SIGNAL_LOGGER_MAC}/api/signals"),
         ("rari2", f"{ALPHA_ENGINE_RARI2}/api/signals/create"),
+        ("rari1", f"{ALPHA_ENGINE_RARI1}/api/signals/create"),
     ]
     headers = {"Content-Type": "application/json"}
     if SAPPHIRE_CONTROL_TOKEN:
