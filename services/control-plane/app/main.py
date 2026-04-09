@@ -57,6 +57,7 @@ FRONTEND_PAGES = {
     "architecture": "architecture.html",
     "logbook": "logbook.html",
     "secops": "secops.html",
+    "status": "status.html",
 }
 _OPS_CACHE: dict[str, Any] = {"ts": 0.0, "payload": None}
 _OPS_CACHE_TTL_SECONDS = 20.0
