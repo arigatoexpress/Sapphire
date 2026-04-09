@@ -25,6 +25,24 @@ WINDOWS_GPU = "http://100.71.10.48:11434"
 MAC_LOCAL = "http://127.0.0.1:11434"
 PORT = 11435
 
+# ─── Smart Model Routing ────────────────────────────────────────────────────
+# Map task complexity to optimal model. Client sends model="auto" or a tier name.
+MODEL_TIERS = {
+    # Tier aliases → actual model names
+    "auto": "hermes3:8b",         # Default: good all-rounder
+    "fast": "nemotron-mini:4b",   # Quick classification, simple Q&A
+    "quick": "nemotron-mini:4b",
+    "balanced": "hermes3:8b",     # Tool calling, conversation
+    "deep": "qwen3:14b",         # Complex reasoning (Windows GPU only)
+    "code": "qwen2.5-coder:14b", # Code generation (Windows GPU only)
+    "reason": "deepseek-r1:14b", # Deep chain-of-thought (Windows GPU only)
+    "large": "qwen2.5:32b",      # Maximum capability (Windows GPU only)
+}
+
+# Models that require Windows GPU (too large for Mac)
+GPU_ONLY_MODELS = {"qwen3:14b", "qwen2.5-coder:14b", "deepseek-r1:14b", "deepseek-r1:32b",
+                    "qwen2.5:32b", "qwen2.5:14b", "gemma3:27b", "llama3.3:70b", "qwq:latest"}
+
 # Track which endpoint is healthy (avoid repeated timeouts)
 _endpoint_health = {"windows-gpu": True, "mac-local": True}
 _health_check_interval = 60  # Re-check failed endpoint after 60s
@@ -139,15 +157,22 @@ class ProxyHandler(BaseHTTPRequestHandler):
             self._respond(400, {"error": "Invalid JSON"})
             return
 
-        model = req_data.get("model", "hermes3:8b")
+        raw_model = req_data.get("model", "hermes3:8b")
+        # Resolve tier aliases (auto, fast, deep, code, etc.)
+        model = MODEL_TIERS.get(raw_model, raw_model)
+        req_data["model"] = model  # Update for passthrough
+        body = json.dumps(req_data).encode()  # Re-encode with resolved model
+
         messages = req_data.get("messages", [])
         max_tokens = req_data.get("max_tokens", 512)
         temperature = req_data.get("temperature", 0.7)
 
         is_chat = "/v1/chat/completions" in self.path
+        needs_gpu = model in GPU_ONLY_MODELS
 
         # Try Windows GPU first (native API — works reliably)
-        if _is_healthy("windows-gpu") and is_chat:
+        # GPU-only models MUST go to Windows (skip Mac fallback for these)
+        if (needs_gpu or _is_healthy("windows-gpu")) and is_chat:
             try:
                 native_resp = _call_native_ollama(WINDOWS_GPU, model, messages, max_tokens, temperature)
                 content = native_resp.get("message", {}).get("content", "")
