@@ -1,6 +1,6 @@
 """Ollama API client with real token counting.
 
-Routes to GPU (Windows) first, falls back to local Mac.
+Routes through the 4-tier inference proxy first; direct fallbacks if proxy is down.
 Returns actual eval_count and prompt_eval_count from Ollama responses.
 """
 
@@ -11,9 +11,10 @@ import urllib.request
 from dataclasses import dataclass
 
 ENDPOINTS = [
-    ("proxy", "http://127.0.0.1:11435"),  # Inference proxy: Windows GPU → Mac fallback
-    ("gpu", "http://100.71.10.48:11434"),  # Direct Windows (if proxy is down)
-    ("local", "http://localhost:11434"),    # Direct Mac (last resort)
+    ("proxy", "http://127.0.0.1:11435"),      # Inference proxy: GPU → Pi → Mac → Kimi
+    ("gpu", "http://100.71.10.48:11434"),      # Direct Windows GPU (if proxy is down)
+    ("pi", "http://100.87.225.89:11434"),      # Direct rari2 Pi (lightweight models)
+    ("local", "http://localhost:11434"),        # Direct Mac (last resort)
 ]
 
 # Benchmarked model selection

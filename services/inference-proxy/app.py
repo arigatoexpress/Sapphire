@@ -83,7 +83,8 @@ PI_MODELS = {
     "nemotron-mini:4b", "nemotron-mini",
     "gemma2:2b", "qwen2.5:0.5b", "smollm2:1.7b",
 }
-PI_DEFAULT_MODEL = "nemotron-mini:4b"  # fallback when requested model not in PI_MODELS
+PI_DEFAULT_MODEL = "nemotron-mini:4b"   # fallback when requested model not in PI_MODELS
+MAC_FALLBACK_MODEL = "hermes3:8b"       # model known to be on Mac Ollama
 
 # Enable Pi tier via environment variable (disabled by default until Pi Ollama is set up)
 PI_ENABLED = os.getenv("PI_OLLAMA_ENABLED", "0") == "1"
@@ -197,8 +198,12 @@ def _native_to_openai(native_resp: dict, model: str) -> dict:
 
 def _try_ollama_native(endpoint_name: str, base_url: str, model: str,
                        messages: list, max_tokens: int, temperature: float,
-                       timeout: int = 15) -> dict | None:
-    """Try a native Ollama endpoint. Returns OpenAI-format dict or None."""
+                       timeout: int = 60) -> dict | None:
+    """Try a native Ollama endpoint. Returns OpenAI-format dict or None.
+
+    Only marks an endpoint failed for connection-level errors (timeout, refused).
+    HTTP 404 (model not found) means the endpoint is healthy — don't blacklist it.
+    """
     if not _is_healthy(endpoint_name):
         return None
     try:
@@ -206,22 +211,52 @@ def _try_ollama_native(endpoint_name: str, base_url: str, model: str,
                                      temperature, timeout)
         content = native.get("message", {}).get("content", "")
         if not content:
-            log.warning("x %s returned empty content", endpoint_name)
-            _mark_failed(endpoint_name)
+            log.warning("x %s returned empty content for model '%s'", endpoint_name, model)
+            # Empty response is a model-level issue, not an endpoint failure
             return None
         _mark_ok(endpoint_name)
-        log.info("-> inference via %s (native ollama)", endpoint_name)
+        log.info("-> inference via %s (native ollama, model=%s)", endpoint_name, model)
         return _native_to_openai(native, model)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            # Model not found — endpoint is UP, just missing this model
+            log.warning("x %s: model '%s' not found (404) — endpoint healthy", endpoint_name, model)
+        else:
+            log.warning("x %s native HTTP %d: %s", endpoint_name, e.code, str(e)[:60])
+            _mark_failed(endpoint_name)
+        return None
+    except (TimeoutError, OSError) as e:
+        err_str = str(e)
+        if "timed out" in err_str or "time" in err_str.lower():
+            # Timeout: endpoint is reachable but model is cold-loading.
+            # Don't blacklist — fall through to faster tier and retry GPU next request.
+            log.warning("x %s timed out (model cold-loading?) — not blacklisting", endpoint_name)
+        elif "Connection refused" in err_str or "No route" in err_str:
+            log.warning("x %s unreachable: %s", endpoint_name, err_str[:60])
+            _mark_failed(endpoint_name)
+        else:
+            log.warning("x %s OS error: %s", endpoint_name, err_str[:80])
+            _mark_failed(endpoint_name)
+        return None
     except Exception as e:
-        log.warning("x %s failed: %s", endpoint_name, str(e)[:80])
-        _mark_failed(endpoint_name)
+        err_str = str(e)
+        if "timed out" in err_str:
+            log.warning("x %s timed out — not blacklisting", endpoint_name)
+        else:
+            log.warning("x %s failed: %s", endpoint_name, err_str[:80])
+            _mark_failed(endpoint_name)
         return None
 
 
 # ─── Mac Local (OpenAI-compat passthrough) ───────────────────────────────────
 
-def _try_mac_local(path: str, body: bytes) -> tuple[int, bytes] | None:
-    """Try Mac local Ollama via OpenAI-compat /v1/ endpoint."""
+def _try_mac_local(path: str, body: bytes, model: str = "") -> tuple[int, bytes] | None:
+    """Try Mac local Ollama via OpenAI-compat /v1/ endpoint.
+
+    Only marks failed for connection-level errors.
+    HTTP 404 (model not found) and BrokenPipe (client disconnected) do NOT
+    indicate the endpoint is down.
+    """
     if not _is_healthy("mac-local"):
         return None
     try:
@@ -230,11 +265,22 @@ def _try_mac_local(path: str, body: bytes) -> tuple[int, bytes] | None:
             url, data=body,
             headers={"Content-Type": "application/json", "Accept": "application/json"},
         )
-        with urllib.request.urlopen(req, timeout=60) as resp:
+        with urllib.request.urlopen(req, timeout=120) as resp:
             data = resp.read()
             _mark_ok("mac-local")
-            log.info("-> inference via mac-local (openai-compat)")
+            log.info("-> inference via mac-local (openai-compat, model=%s)", model or "?")
             return resp.status, data
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            log.warning("x mac-local: model '%s' not found (404) — endpoint healthy", model)
+        else:
+            log.warning("x mac-local HTTP %d: %s", e.code, str(e)[:60])
+            _mark_failed("mac-local")
+        return None
+    except BrokenPipeError:
+        # Client (hermes-agent) disconnected before we could respond — not Mac's fault
+        log.warning("x mac-local: client disconnected (BrokenPipe) — endpoint healthy")
+        return None
     except Exception as e:
         log.warning("x mac-local failed: %s", str(e)[:80])
         _mark_failed("mac-local")
@@ -459,8 +505,9 @@ class ProxyHandler(BaseHTTPRequestHandler):
             return
 
         # ── Tier 1: Windows GPU ──────────────────────────────────────────────
+        # 90s timeout: model cold-load can take 30-60s on RTX 5070 Ti
         resp = _try_ollama_native("windows-gpu", WINDOWS_GPU, model,
-                                  messages, max_tokens, temperature, timeout=15)
+                                  messages, max_tokens, temperature, timeout=90)
         if resp:
             self._respond(200, resp)
             return
@@ -494,7 +541,14 @@ class ProxyHandler(BaseHTTPRequestHandler):
                     return
 
         # ── Tier 3: Mac local ────────────────────────────────────────────────
-        result = _try_mac_local(self.path, body)
+        # Substitute model if requested model isn't on Mac (Mac has hermes3:8b + llama3.2)
+        mac_model = model if model not in GPU_ONLY_MODELS and model not in PI_MODELS else MAC_FALLBACK_MODEL
+        if mac_model != model:
+            mac_body = json.dumps({**req_data, "model": mac_model}).encode()
+            log.info("Mac fallback: substituting model '%s' → '%s'", model, mac_model)
+        else:
+            mac_body = body
+        result = _try_mac_local(self.path, mac_body, mac_model)
         if result:
             self.send_response(result[0])
             self.send_header("Content-Type", "application/json")

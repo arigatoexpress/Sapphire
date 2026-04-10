@@ -74,7 +74,8 @@ python3 plugins/claw-sapphire/tools/budget.py < /dev/null
 - All repos mirrored to E:\Sapphire\Code\ (SSH key: sapphire-windows)
 - SSH: `ssh aribs@100.71.10.48` (ed25519 key on GitHub)
 
-**Pis (rari1/rari2) — DECOMMISSIONED.** Pi OS WiFi incompatible.
+**Pi rari2 (100.87.225.89) — ONLINE** (ethernet, 3.8GB RAM): signal-logger:18081 active. Ollama pending install (run `~/Code/Sapphire/infra/pi/setup-ollama.sh`, then set `PI_OLLAMA_ENABLED=1`).
+**Pi rari1 (100.120.191.1) — OFFLINE** (WiFi incompatible).
 
 ## Code Style
 
@@ -128,13 +129,15 @@ python3 plugins/claw-sapphire/tools/budget.py < /dev/null
 
 ## Inference Proxy (localhost:11435)
 
-Smart failover + multi-model routing. hermes-agent and all tools talk to this.
-- Windows GPU: uses native `/api/chat` (NOT `/v1/` — it returns empty on Windows Ollama)
-- Mac: uses `/v1/chat/completions` (works natively)
-- Model tier aliases: `fast`→nemotron-mini, `balanced`→hermes3:8b, `deep`→qwen3:14b,
-  `code`→qwen2.5-coder:14b, `reason`→deepseek-r1:14b, `large`→qwen2.5:32b
-- GPU-only models (>8B) forced to Windows, skip Mac fallback
-- Health tracking: failed endpoints get 60s cooldown before retry
+4-tier failover. hermes-agent and all plugin tools talk to this.
+- **T1 Windows GPU** (100.71.10.48:11434): native `/api/chat` (NOT `/v1/` — returns empty on Windows)
+- **T2 Pi rari2** (100.87.225.89:11434): lightweight models only (≤4B). Enable with `PI_OLLAMA_ENABLED=1`
+- **T3 Mac local** (127.0.0.1:11434): uses `/v1/chat/completions` passthrough
+- **T4 Kimi Cloud** (api.moonshot.cn): non-sensitive queries only — set `MOONSHOT_API_KEY`. NEVER route credentials, PnL, customer data, or system internals to Kimi.
+- Model tiers: `fast`→nemotron-mini, `balanced`→hermes3:8b, `deep`→qwen3:14b, `code`→qwen2.5-coder:14b, `reason`→deepseek-r1:14b, `large`→qwen2.5:32b, `kimi`→kimi-cloud
+- GPU-only models (>8B params): Windows only, 503 if down
+- Sensitivity gate: regex classifier blocks private data from reaching T4
+- Health: 60s cooldown per failed endpoint
 
 ## Trading Pipeline
 
