@@ -1,97 +1,178 @@
-"""Sapphire Inference Proxy — smart failover between Ollama instances.
+"""Sapphire Inference Proxy — 4-tier multi-node failover.
 
-Tries Windows GPU first (native /api/chat), falls back to Mac (/v1/).
-Translates between OpenAI-compatible format and native Ollama format
-so hermes-agent always gets OpenAI-compatible responses regardless
-of which backend handles the request.
+Tier 1: Windows GPU (100.71.10.48:11434) — RTX 5070 Ti, hermes3/qwen/deepseek
+Tier 2: Pi (rari1/rari2 via Tailscale) — Ollama, nemotron-mini / gemma2
+Tier 3: Mac local (127.0.0.1:11434) — always-on fallback
+Tier 4: Kimi Cloud (api.kimi.com) — non-sensitive deep research only
+
+Routing rules:
+  - GPU-only models (>8B): Windows only, 503 if down (no cloud fallback)
+  - Sensitive queries: never reach Kimi Cloud (blocked at classifier)
+  - Pi: lightweight models only (≤4B), not offered GPU-only jobs
+  - All tiers use OpenAI-compatible output regardless of backend format
 
 Endpoints:
   /v1/chat/completions  — OpenAI-compatible (what hermes-agent uses)
   /v1/models            — List models
-  /health               — Proxy health
+  /health               — Full tier health report
 """
 
 import json
+import os
 import time
 import urllib.request
 import urllib.error
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import logging
+import re
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("inference-proxy")
 
-WINDOWS_GPU = "http://100.71.10.48:11434"
-MAC_LOCAL = "http://127.0.0.1:11434"
+# ─── Endpoints ──────────────────────────────────────────────────────────────
+WINDOWS_GPU   = "http://100.71.10.48:11434"
+PI_RARI1      = "http://100.120.191.1:11434"
+PI_RARI2      = "http://100.87.225.89:11434"
+MAC_LOCAL     = "http://127.0.0.1:11434"
+KIMI_API_BASE = "https://api.kimi.com/coding/v1"
+KIMI_TOKEN_FILE = os.path.expanduser("~/.kimi/credentials/kimi-code.json")
+
+# Permanent API key alternatives (no hourly expiry) — preferred over token file
+MOONSHOT_API_KEY = os.getenv("MOONSHOT_API_KEY", "")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+MOONSHOT_BASE = "https://api.moonshot.cn/v1"
+OPENROUTER_BASE = "https://openrouter.ai/api/v1"
+
 PORT = 11435
 
-# ─── Smart Model Routing ────────────────────────────────────────────────────
-# Map task complexity to optimal model. Client sends model="auto" or a tier name.
+# ─── Model Routing ──────────────────────────────────────────────────────────
 MODEL_TIERS = {
-    # Tier aliases → actual model names
-    "auto": "hermes3:8b",         # Default: good all-rounder
-    "fast": "nemotron-mini:4b",   # Quick classification, simple Q&A
-    "quick": "nemotron-mini:4b",
-    "balanced": "hermes3:8b",     # Tool calling, conversation
-    "deep": "qwen3:14b",         # Complex reasoning (Windows GPU only)
-    "code": "qwen2.5-coder:14b", # Code generation (Windows GPU only)
-    "reason": "deepseek-r1:14b", # Deep chain-of-thought (Windows GPU only)
-    "large": "qwen2.5:32b",      # Maximum capability (Windows GPU only)
+    # General
+    "auto":      "hermes3:8b",
+    "balanced":  "hermes3:8b",
+
+    # Pi-eligible (light, ≤4B)
+    "fast":      "nemotron-mini",
+    "quick":     "nemotron-mini",
+    "tiny":      "qwen2.5:0.5b",        # ultra-light, Pi-native
+
+    # GPU-heavy
+    "deep":      "qwen3:14b",
+    "code":      "qwen2.5-coder:14b",
+    "reason":    "deepseek-r1:14b",
+    "large":     "qwen2.5:32b",
+
+    # Kimi Cloud routes (non-sensitive only)
+    "kimi":       "kimi-cloud",
+    "kimi-fast":  "kimi-cloud",         # same endpoint, model chosen in handler
+    "kimi-large": "kimi-cloud",
+    "kimi-cloud": "kimi-cloud",
+    "kimi-code":  "kimi-cloud",
+    "cloud":      "kimi-cloud",
+    "research":   "kimi-cloud",
 }
 
-# Models that require Windows GPU (too large for Mac)
-GPU_ONLY_MODELS = {"qwen3:14b", "qwen2.5-coder:14b", "deepseek-r1:14b", "deepseek-r1:32b",
-                    "qwen2.5:32b", "qwen2.5:14b", "gemma3:27b", "llama3.3:70b", "qwq:latest"}
+# Models that require Windows GPU (too large for Pi/Mac)
+GPU_ONLY_MODELS = {
+    "qwen3:14b", "qwen2.5-coder:14b", "deepseek-r1:14b", "deepseek-r1:32b",
+    "qwen2.5:32b", "qwen2.5:14b", "gemma3:27b", "llama3.3:70b", "qwq:latest",
+}
 
-# Track which endpoint is healthy (avoid repeated timeouts)
-_endpoint_health = {"windows-gpu": True, "mac-local": True}
-_health_check_interval = 60  # Re-check failed endpoint after 60s
-_last_health_check = {"windows-gpu": 0, "mac-local": 0}
+# Models that can run on Pi (3.8GB RAM ceiling — nemotron-mini:4b is max)
+PI_MODELS = {
+    "nemotron-mini:4b", "nemotron-mini",
+    "gemma2:2b", "qwen2.5:0.5b", "smollm2:1.7b",
+}
+PI_DEFAULT_MODEL = "nemotron-mini:4b"  # fallback when requested model not in PI_MODELS
+
+# Enable Pi tier via environment variable (disabled by default until Pi Ollama is set up)
+PI_ENABLED = os.getenv("PI_OLLAMA_ENABLED", "0") == "1"
+
+# ─── Health Tracking ─────────────────────────────────────────────────────────
+ENDPOINTS = ["windows-gpu", "pi-rari1", "pi-rari2", "mac-local", "kimi-cloud"]
+_endpoint_health = {k: True for k in ENDPOINTS}
+_last_health_check = {k: 0.0 for k in ENDPOINTS}
+HEALTH_COOLDOWN = 60  # seconds before retrying a failed endpoint
 
 
-def _is_healthy(name):
-    """Check if endpoint should be tried (skip if recently failed)."""
+def _is_healthy(name: str) -> bool:
     if _endpoint_health[name]:
         return True
-    if time.time() - _last_health_check[name] > _health_check_interval:
-        return True  # Retry after cooldown
+    if time.time() - _last_health_check[name] > HEALTH_COOLDOWN:
+        return True  # cooldown expired — allow retry
     return False
 
 
-def _mark_failed(name):
+def _mark_failed(name: str):
     _endpoint_health[name] = False
     _last_health_check[name] = time.time()
 
 
-def _mark_ok(name):
+def _mark_ok(name: str):
     _endpoint_health[name] = True
 
 
-def _call_native_ollama(base_url, model, messages, max_tokens=512, temperature=0.7):
-    """Call Ollama native /api/chat and return the response dict."""
+# ─── Sensitivity Classifier ──────────────────────────────────────────────────
+# Blocks routing to Kimi Cloud for any query that may contain private data.
+# Heuristic-based — no LLM required (runs before inference).
+
+_SENSITIVE_PATTERNS = re.compile(
+    r"""
+    # Customer / personal data
+    customer|client|tho\b|texas.home|outlet|firestore|enrollm|
+    # Auth / secrets
+    password|token|api.key|secret|credential|jwt|hmac|pin\b|
+    # Financial PII
+    ssn|routing.num|account.num|credit.card|
+    # Internal systems
+    telegram.bot|bot.token|tailscale|ssh.key|launchagent|
+    # Addresses / contact
+    \b\d{3}[-.\s]\d{3}[-.\s]\d{4}\b|  # phone pattern
+    \b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b  # email pattern
+    """,
+    re.VERBOSE | re.IGNORECASE,
+)
+
+
+def _is_sensitive(messages: list) -> bool:
+    """Return True if any message content looks like private/sensitive data."""
+    for msg in messages:
+        content = msg.get("content", "")
+        if isinstance(content, str) and _SENSITIVE_PATTERNS.search(content):
+            return True
+        if isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict) and _SENSITIVE_PATTERNS.search(
+                    block.get("text", "")
+                ):
+                    return True
+    return False
+
+
+# ─── Ollama Native Caller ────────────────────────────────────────────────────
+
+def _call_native_ollama(base_url: str, model: str, messages: list,
+                        max_tokens: int = 512, temperature: float = 0.7,
+                        timeout: int = 15) -> dict:
+    """Call Ollama native /api/chat and return the raw response dict."""
     payload = json.dumps({
         "model": model,
         "messages": messages,
         "stream": False,
         "options": {"temperature": temperature, "num_predict": max_tokens},
     }).encode()
-
     req = urllib.request.Request(
         f"{base_url}/api/chat",
         data=payload,
         headers={"Content-Type": "application/json"},
     )
-    # 15s timeout for GPU (if model not loaded, fail fast to Mac)
-    with urllib.request.urlopen(req, timeout=15) as resp:
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read())
 
 
-def _native_to_openai(native_resp, model):
-    """Convert Ollama native /api/chat response to OpenAI format."""
+def _native_to_openai(native_resp: dict, model: str) -> dict:
+    """Convert Ollama native /api/chat response to OpenAI-compatible format."""
     msg = native_resp.get("message", {})
-    eval_count = native_resp.get("eval_count", 0)
-    prompt_count = native_resp.get("prompt_eval_count", 0)
-
     return {
         "id": f"chatcmpl-{int(time.time())}",
         "object": "chat.completion",
@@ -106,12 +187,181 @@ def _native_to_openai(native_resp, model):
             "finish_reason": "stop",
         }],
         "usage": {
-            "prompt_tokens": prompt_count,
-            "completion_tokens": eval_count,
-            "total_tokens": prompt_count + eval_count,
+            "prompt_tokens": native_resp.get("prompt_eval_count", 0),
+            "completion_tokens": native_resp.get("eval_count", 0),
+            "total_tokens": native_resp.get("prompt_eval_count", 0)
+                           + native_resp.get("eval_count", 0),
         },
     }
 
+
+def _try_ollama_native(endpoint_name: str, base_url: str, model: str,
+                       messages: list, max_tokens: int, temperature: float,
+                       timeout: int = 15) -> dict | None:
+    """Try a native Ollama endpoint. Returns OpenAI-format dict or None."""
+    if not _is_healthy(endpoint_name):
+        return None
+    try:
+        native = _call_native_ollama(base_url, model, messages, max_tokens,
+                                     temperature, timeout)
+        content = native.get("message", {}).get("content", "")
+        if not content:
+            log.warning("x %s returned empty content", endpoint_name)
+            _mark_failed(endpoint_name)
+            return None
+        _mark_ok(endpoint_name)
+        log.info("-> inference via %s (native ollama)", endpoint_name)
+        return _native_to_openai(native, model)
+    except Exception as e:
+        log.warning("x %s failed: %s", endpoint_name, str(e)[:80])
+        _mark_failed(endpoint_name)
+        return None
+
+
+# ─── Mac Local (OpenAI-compat passthrough) ───────────────────────────────────
+
+def _try_mac_local(path: str, body: bytes) -> tuple[int, bytes] | None:
+    """Try Mac local Ollama via OpenAI-compat /v1/ endpoint."""
+    if not _is_healthy("mac-local"):
+        return None
+    try:
+        url = f"{MAC_LOCAL}{path}"
+        req = urllib.request.Request(
+            url, data=body,
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = resp.read()
+            _mark_ok("mac-local")
+            log.info("-> inference via mac-local (openai-compat)")
+            return resp.status, data
+    except Exception as e:
+        log.warning("x mac-local failed: %s", str(e)[:80])
+        _mark_failed("mac-local")
+        return None
+
+
+# ─── Kimi Cloud ──────────────────────────────────────────────────────────────
+
+def _call_openai_compat(base: str, model: str, api_key: str, messages: list,
+                         max_tokens: int, temperature: float, label: str) -> dict | None:
+    """Generic OpenAI-compatible cloud call. Returns OpenAI-format dict or None."""
+    payload = json.dumps({
+        "model": model,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+        "stream": False,
+    }).encode()
+    try:
+        req = urllib.request.Request(
+            f"{base}/chat/completions",
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            data = json.loads(resp.read())
+            _mark_ok("kimi-cloud")
+            log.info("-> inference via %s", label)
+            data["model"] = label
+            return data
+    except Exception as e:
+        log.warning("x %s failed: %s", label, str(e)[:80])
+        return None
+
+
+def _load_kimi_token() -> str | None:
+    """Load current Kimi OAuth bearer token from disk (refreshed by kimi CLI)."""
+    try:
+        with open(KIMI_TOKEN_FILE) as f:
+            data = json.load(f)
+        expires_at = data.get("expires_at", 0)
+        if time.time() > expires_at:
+            log.warning("Kimi token expired (expires_at=%s)", expires_at)
+            return None
+        return data.get("access_token")
+    except Exception as e:
+        log.warning("Could not load Kimi token: %s", e)
+        return None
+
+
+def _call_kimi_cloud(messages: list, max_tokens: int = 2048,
+                     temperature: float = 0.7) -> dict | None:
+    """Call cloud research API. Prefers permanent API keys over OAuth token.
+
+    Priority: MOONSHOT_API_KEY → OPENROUTER_API_KEY → Kimi OAuth token
+    """
+    if not _is_healthy("kimi-cloud"):
+        return None
+
+    # Prefer permanent API key (Moonshot direct) — no expiry issues
+    if MOONSHOT_API_KEY:
+        result = _call_openai_compat(
+            base=MOONSHOT_BASE,
+            model="moonshot-v1-8k",
+            api_key=MOONSHOT_API_KEY,
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            label="moonshot-api",
+        )
+        if result:
+            return result
+
+    # OpenRouter fallback (free tier models available)
+    if OPENROUTER_API_KEY:
+        result = _call_openai_compat(
+            base=OPENROUTER_BASE,
+            model="moonshot/moonshot-v1-8k",
+            api_key=OPENROUTER_API_KEY,
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            label="openrouter",
+        )
+        if result:
+            return result
+
+    # Kimi OAuth token (expires periodically — requires `kimi login` to refresh)
+    token = _load_kimi_token()
+    if not token:
+        _mark_failed("kimi-cloud")
+        return None
+
+    payload = json.dumps({
+        "model": "kimi-for-coding",
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+        "stream": False,
+    }).encode()
+
+    try:
+        req = urllib.request.Request(
+            f"{KIMI_API_BASE}/chat/completions",
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {token}",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            data = json.loads(resp.read())
+            _mark_ok("kimi-cloud")
+            log.info("-> inference via kimi-cloud")
+            # Kimi returns OpenAI format — pass through with model label
+            data["model"] = "kimi-cloud"
+            return data
+    except Exception as e:
+        log.warning("x kimi-cloud failed: %s", str(e)[:80])
+        _mark_failed("kimi-cloud")
+        return None
+
+
+# ─── HTTP Handler ─────────────────────────────────────────────────────────────
 
 class ProxyHandler(BaseHTTPRequestHandler):
 
@@ -121,14 +371,22 @@ class ProxyHandler(BaseHTTPRequestHandler):
                 "status": "ok",
                 "service": "inference-proxy",
                 "endpoints": {
-                    "windows-gpu": "healthy" if _endpoint_health["windows-gpu"] else "failed",
-                    "mac-local": "healthy" if _endpoint_health["mac-local"] else "failed",
+                    name: ("healthy" if _endpoint_health[name] else "failed")
+                    for name in ENDPOINTS
+                },
+                "tiers": {
+                    "t1_windows_gpu": WINDOWS_GPU,
+                    "t2_pi_rari1": PI_RARI1,
+                    "t2_pi_rari2": PI_RARI2,
+                    "t3_mac_local": MAC_LOCAL,
+                    "t4_kimi_cloud": KIMI_API_BASE,
                 },
             })
             return
 
-        # Proxy GET requests (models list, etc.)
-        for name, base in [("windows-gpu", WINDOWS_GPU), ("mac-local", MAC_LOCAL)]:
+        # Proxy GET to first available endpoint (model list, etc.)
+        for name, base in [("windows-gpu", WINDOWS_GPU), ("pi-rari1", PI_RARI1),
+                            ("pi-rari2", PI_RARI2), ("mac-local", MAC_LOCAL)]:
             if not _is_healthy(name):
                 continue
             try:
@@ -151,94 +409,134 @@ class ProxyHandler(BaseHTTPRequestHandler):
         content_length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(content_length)
 
-        # Parse the OpenAI-format request
         try:
             req_data = json.loads(body)
         except json.JSONDecodeError:
             self._respond(400, {"error": "Invalid JSON"})
             return
 
-        raw_model = req_data.get("model", "hermes3:8b")
-        # Resolve tier aliases (auto, fast, deep, code, etc.)
+        raw_model = req_data.get("model", "auto")
         model = MODEL_TIERS.get(raw_model, raw_model)
-        req_data["model"] = model  # Update for passthrough
-        body = json.dumps(req_data).encode()  # Re-encode with resolved model
+        req_data["model"] = model
+        body = json.dumps(req_data).encode()
 
-        messages = req_data.get("messages", [])
-        max_tokens = req_data.get("max_tokens", 512)
+        messages    = req_data.get("messages", [])
+        max_tokens  = req_data.get("max_tokens", 512)
         temperature = req_data.get("temperature", 0.7)
+        is_chat     = "/v1/chat/completions" in self.path
+        needs_gpu   = model in GPU_ONLY_MODELS
+        wants_kimi  = model == "kimi-cloud"
 
-        is_chat = "/v1/chat/completions" in self.path
-        needs_gpu = model in GPU_ONLY_MODELS
-
-        # Try Windows GPU first (native API — works reliably)
-        # GPU-only models MUST go to Windows (skip Mac fallback for these)
-        if (needs_gpu or _is_healthy("windows-gpu")) and is_chat:
-            try:
-                native_resp = _call_native_ollama(WINDOWS_GPU, model, messages, max_tokens, temperature)
-                content = native_resp.get("message", {}).get("content", "")
-                if content:  # Only use if we got actual content
-                    openai_resp = _native_to_openai(native_resp, model)
-                    _mark_ok("windows-gpu")
-                    log.info("-> /v1/chat/completions via windows-gpu (native)")
-                    self._respond(200, openai_resp)
-                    return
-                else:
-                    log.warning("x windows-gpu returned empty content")
-                    _mark_failed("windows-gpu")
-            except Exception as e:
-                log.warning("x windows-gpu native failed: %s", str(e)[:80])
-                _mark_failed("windows-gpu")
-
-        # Try Mac (OpenAI-compat works fine on Mac Ollama)
-        if _is_healthy("mac-local"):
-            try:
-                url = f"{MAC_LOCAL}{self.path}"
-                req = urllib.request.Request(
-                    url, data=body,
-                    headers={"Content-Type": "application/json", "Accept": "application/json"},
-                )
-                with urllib.request.urlopen(req, timeout=60) as resp:
-                    data = resp.read()
-                    _mark_ok("mac-local")
-                    log.info("-> %s via mac-local", self.path)
-                    self.send_response(resp.status)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(data)
-                    return
-            except Exception as e:
-                log.warning("x mac-local failed: %s", str(e)[:80])
-                _mark_failed("mac-local")
-
-        # Try Windows with direct passthrough as last resort
-        if is_chat:
-            try:
-                native_resp = _call_native_ollama(WINDOWS_GPU, model, messages, max_tokens, temperature)
-                openai_resp = _native_to_openai(native_resp, model)
-                _mark_ok("windows-gpu")
-                log.info("-> /v1/chat/completions via windows-gpu (native, retry)")
-                self._respond(200, openai_resp)
+        # ── Kimi Cloud shortcut (explicit request) ──────────────────────────
+        if wants_kimi and is_chat:
+            if _is_sensitive(messages):
+                log.warning("! kimi-cloud blocked: sensitive content detected")
+                self._respond(400, {
+                    "error": "Sensitive content detected — Kimi Cloud routing blocked",
+                    "code": "sensitive_routing_blocked",
+                })
                 return
-            except Exception:
-                pass
+            resp = _call_kimi_cloud(messages, max_tokens, temperature)
+            if resp:
+                self._respond(200, resp)
+                return
+            # Kimi failed — fall through to local tiers
+            log.warning("Kimi Cloud unavailable, falling back to local tiers")
+            model = "hermes3:8b"  # reroute to default
+            req_data["model"] = model
+            body = json.dumps(req_data).encode()
 
-        self._respond(503, {"error": "All inference endpoints unavailable"})
+        if not is_chat:
+            # Non-chat POST — proxy directly
+            result = _try_mac_local(self.path, body)
+            if result:
+                self.send_response(result[0])
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(result[1])
+                return
+            self._respond(503, {"error": "All endpoints unavailable"})
+            return
 
-    def _respond(self, code, body):
+        # ── Tier 1: Windows GPU ──────────────────────────────────────────────
+        resp = _try_ollama_native("windows-gpu", WINDOWS_GPU, model,
+                                  messages, max_tokens, temperature, timeout=15)
+        if resp:
+            self._respond(200, resp)
+            return
+
+        # GPU-only models cannot fall back to Pi or Mac
+        if needs_gpu:
+            log.error("GPU-only model %s — all GPU attempts failed", model)
+            self._respond(503, {
+                "error": f"GPU-only model '{model}' unavailable (Windows GPU down)",
+                "code": "gpu_only_unavailable",
+            })
+            return
+
+        # ── Tier 2: Pi (lightweight models only, when PI_OLLAMA_ENABLED=1) ────
+        if PI_ENABLED:
+            pi_model = model if model in PI_MODELS else PI_DEFAULT_MODEL
+            if _is_healthy("pi-rari1"):
+                resp = _try_ollama_native("pi-rari1", PI_RARI1, pi_model,
+                                          messages, max_tokens, temperature, timeout=30)
+                if resp:
+                    resp["model"] = f"{resp['model']} (pi-rari1)"
+                    self._respond(200, resp)
+                    return
+
+            if _is_healthy("pi-rari2"):
+                resp = _try_ollama_native("pi-rari2", PI_RARI2, pi_model,
+                                          messages, max_tokens, temperature, timeout=30)
+                if resp:
+                    resp["model"] = f"{resp['model']} (pi-rari2)"
+                    self._respond(200, resp)
+                    return
+
+        # ── Tier 3: Mac local ────────────────────────────────────────────────
+        result = _try_mac_local(self.path, body)
+        if result:
+            self.send_response(result[0])
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(result[1])
+            return
+
+        # ── Tier 4: Kimi Cloud (non-sensitive fallback) ──────────────────────
+        log.warning("All local tiers down — attempting Kimi Cloud fallback")
+        if _is_sensitive(messages):
+            log.warning("! kimi-cloud fallback blocked: sensitive content")
+            self._respond(503, {
+                "error": "All local inference unavailable and content is sensitive — cannot route to cloud",
+                "code": "all_tiers_exhausted",
+            })
+            return
+
+        resp = _call_kimi_cloud(messages, max_tokens, temperature)
+        if resp:
+            self._respond(200, resp)
+            return
+
+        self._respond(503, {"error": "All inference tiers exhausted"})
+
+    def _respond(self, code: int, body: dict):
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
         self.wfile.write(json.dumps(body).encode())
 
     def log_message(self, format, *args):
-        pass
+        pass  # Suppress default per-request logging (we log our own)
 
 
 if __name__ == "__main__":
     server = HTTPServer(("127.0.0.1", PORT), ProxyHandler)
-    log.info("Inference proxy on :%d", PORT)
-    log.info("Windows GPU: %s (native /api/chat → OpenAI translation)", WINDOWS_GPU)
-    log.info("Mac local: %s (direct /v1/ passthrough)", MAC_LOCAL)
-    log.info("Health check cooldown: %ds", _health_check_interval)
+    log.info("Sapphire Inference Proxy :%d — 4-tier failover", PORT)
+    log.info("T1 Windows GPU : %s (native /api/chat)", WINDOWS_GPU)
+    log.info("T2 Pi rari1    : %s enabled=%s", PI_RARI1, PI_ENABLED)
+    log.info("T2 Pi rari2    : %s enabled=%s", PI_RARI2, PI_ENABLED)
+    log.info("T3 Mac local   : %s (/v1/ openai-compat)", MAC_LOCAL)
+    log.info("T4 Kimi Cloud  : moonshot=%s openrouter=%s (non-sensitive only)",
+             bool(MOONSHOT_API_KEY), bool(OPENROUTER_API_KEY))
+    log.info("Health cooldown: %ds", HEALTH_COOLDOWN)
     server.serve_forever()
