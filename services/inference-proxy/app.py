@@ -81,7 +81,8 @@ def _call_native_ollama(base_url, model, messages, max_tokens=512, temperature=0
         data=payload,
         headers={"Content-Type": "application/json"},
     )
-    with urllib.request.urlopen(req, timeout=90) as resp:
+    # 15s timeout for GPU (if model not loaded, fail fast to Mac)
+    with urllib.request.urlopen(req, timeout=15) as resp:
         return json.loads(resp.read())
 
 
@@ -133,7 +134,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
             try:
                 url = f"{base}{self.path}"
                 req = urllib.request.Request(url, headers={"Accept": "application/json"})
-                with urllib.request.urlopen(req, timeout=5) as resp:
+                with urllib.request.urlopen(req, timeout=3) as resp:
                     data = resp.read()
                     _mark_ok(name)
                     self.send_response(resp.status)
