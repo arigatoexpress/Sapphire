@@ -1,11 +1,8 @@
 {
-  "timestamp": "2026-04-10T11:21:05.496584",
+  "timestamp": "2026-04-11T12:53:18.135177",
   "overall": "RED",
   "red_items": [
-    "services/control-plane:8082",
-    "services/openbb:6900",
-    "services/regional-intel:8787",
-    "services/tho-cloud-run"
+    "inference/windows_gpu_ollama"
   ],
-  "summary": "10 green, 6 yellow, 4 red out of 20 checks"
+  "summary": "11 green, 8 yellow, 1 red out of 20 checks"
 }
