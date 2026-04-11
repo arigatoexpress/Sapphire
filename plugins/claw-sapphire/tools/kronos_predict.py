@@ -61,11 +61,27 @@ def action_forecast(symbol: str = "BTC", horizon: int = 24) -> dict:
             return {"error": f"No OHLCV data for {symbol}"}
 
         df = pd.DataFrame(raw)
-        # Kronos expects: open, high, low, close, volume
-        ohlcv = df[["open", "high", "low", "close", "volume"]].tail(400)
+        df['date'] = pd.to_datetime(df['date'])
+
+        # Kronos expects: open, high, low, close, volume, amount
+        ohlcv = df[["open", "high", "low", "close", "volume"]].tail(400).copy()
+        ohlcv["amount"] = ohlcv["volume"] * ohlcv["close"]  # Approximate amount
+
+        # Timestamps for Kronos
+        dates = df['date'].tail(400 + min(horizon, 120))
+        x_timestamp = dates.iloc[:len(ohlcv)]
+        y_timestamp = dates.iloc[len(ohlcv):len(ohlcv) + min(horizon, 120)]
+
+        # If we don't have enough future timestamps, generate them
+        if len(y_timestamp) < min(horizon, 120):
+            from datetime import timedelta
+            last_date = x_timestamp.iloc[-1]
+            freq = x_timestamp.iloc[-1] - x_timestamp.iloc[-2] if len(x_timestamp) > 1 else timedelta(days=1)
+            y_dates = [last_date + freq * (i + 1) for i in range(min(horizon, 120))]
+            y_timestamp = pd.Series(y_dates)
 
         # Run prediction
-        pred_df = predictor.predict(ohlcv, pred_len=min(horizon, 120))
+        pred_df = predictor.predict(ohlcv, x_timestamp=x_timestamp, y_timestamp=y_timestamp, pred_len=min(horizon, 120))
 
         # Extract predictions
         predictions = []
