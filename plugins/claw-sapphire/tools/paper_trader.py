@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import json
 import math
+import ssl
 import sys
 import urllib.request
 from datetime import datetime, timezone
@@ -32,6 +33,25 @@ from pathlib import Path
 
 SAPPHIRE_DIR = Path.home() / "Code" / "Sapphire"
 PORTFOLIO_FILE = SAPPHIRE_DIR / "data" / "paper_portfolio.json"
+
+# Signal pipeline integration — write outcome back when positions close
+_ALPHA_DIR = SAPPHIRE_DIR / "services" / "alpha"
+if str(_ALPHA_DIR) not in sys.path:
+    sys.path.insert(0, str(_ALPHA_DIR))
+
+try:
+    from signal_pipeline import pipeline as _signal_pipeline
+    _PIPELINE_AVAILABLE = True
+except ImportError:
+    _PIPELINE_AVAILABLE = False
+
+
+def _record_outcome(pipeline_id: str, pnl_usd: float, close_price: float = 0.0) -> None:
+    """Write trade outcome back to the signal JSONL audit trail."""
+    if not (_PIPELINE_AVAILABLE and pipeline_id):
+        return
+    outcome = "win" if pnl_usd > 0 else ("break_even" if pnl_usd == 0 else "loss")
+    _signal_pipeline.update_signal_outcome(pipeline_id, outcome, pnl_usd, close_price)
 
 # Paper trading config
 INITIAL_CAPITAL = 100_000.0  # $100K paper money
@@ -57,6 +77,15 @@ def _save_portfolio(pf: dict):
     PORTFOLIO_FILE.write_text(json.dumps(pf, indent=2, default=str))
 
 
+def _ssl_ctx() -> ssl.SSLContext:
+    """Build an SSL context that uses certifi certs (macOS Python 3.12 fix)."""
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return ssl.create_default_context()
+
+
 def _get_price(symbol: str) -> float | None:
     """Get current price from CoinGecko."""
     sym_map = {"BTCUSDT": "bitcoin", "ETHUSDT": "ethereum", "SOLUSDT": "solana"}
@@ -65,7 +94,7 @@ def _get_price(symbol: str) -> float | None:
         return None
     try:
         url = f"https://api.coingecko.com/api/v3/simple/price?ids={cg_id}&vs_currencies=usd"
-        with urllib.request.urlopen(url, timeout=10) as r:
+        with urllib.request.urlopen(url, timeout=10, context=_ssl_ctx()) as r:
             data = json.loads(r.read())
         return data[cg_id]["usd"]
     except Exception:
@@ -73,7 +102,8 @@ def _get_price(symbol: str) -> float | None:
 
 
 def action_execute(symbol: str, side: str, price: float, atr: float = None,
-                    confidence: float = 0.5, kelly_size_pct: float = None, edge: float = None) -> dict:
+                    confidence: float = 0.5, kelly_size_pct: float = None, edge: float = None,
+                    pipeline_id: str = "") -> dict:
     """Execute a paper trade with optional Half-Kelly sizing from signal generator."""
     pf = _load_portfolio()
 
@@ -122,6 +152,7 @@ def action_execute(symbol: str, side: str, price: float, atr: float = None,
         "atr": atr,
         "edge": edge,
         "confidence": confidence,
+        "pipeline_id": pipeline_id,   # links back to signal_pipeline audit JSONL
         "opened_at": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -193,6 +224,7 @@ def action_check_stops() -> dict:
                              "exit_reason": "trailing_stop", "closed_at": datetime.now(timezone.utc).isoformat()}
                     pf["history"].append(trade)
                     pf["capital"] += pnl
+                    _record_outcome(pos.get("pipeline_id", ""), pnl, current)
                     closed.append(trade)
                     continue
             else:
@@ -203,6 +235,7 @@ def action_check_stops() -> dict:
                              "exit_reason": "trailing_stop", "closed_at": datetime.now(timezone.utc).isoformat()}
                     pf["history"].append(trade)
                     pf["capital"] += pnl
+                    _record_outcome(pos.get("pipeline_id", ""), pnl, current)
                     closed.append(trade)
                     continue
 
@@ -218,6 +251,7 @@ def action_check_stops() -> dict:
                      "closed_at": datetime.now(timezone.utc).isoformat()}
             pf["history"].append(trade)
             pf["capital"] += pnl
+            _record_outcome(pos.get("pipeline_id", ""), pnl, exit_price)
             closed.append(trade)
         else:
             remaining.append(pos)
@@ -285,6 +319,7 @@ def action_close(symbol: str) -> dict:
             pf["capital"] += pnl
             pf["positions"].pop(i)
             _save_portfolio(pf)
+            _record_outcome(pos.get("pipeline_id", ""), pnl, current)
             return {"success": True, "pnl": f"${pnl:+,.2f}", "capital": f"${pf['capital']:,.2f}"}
 
     return {"error": f"No open position in {symbol}"}
@@ -359,6 +394,7 @@ def main():
             params.get("confidence", 0.5),
             params.get("kelly_size_pct"),
             params.get("edge"),
+            params.get("pipeline_id", ""),
         )
     elif action == "check_stops":
         result = action_check_stops()

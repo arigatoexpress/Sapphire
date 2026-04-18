@@ -96,14 +96,27 @@ def get_ollama_models(host: str = "localhost", port: int = 11434) -> list[str]:
         return []
 
 
+def get_proxy_health() -> dict:
+    """Query inference proxy /health for 4-tier endpoint status."""
+    import urllib.error
+    import urllib.request
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:11435/health", timeout=5) as resp:
+            data = json.loads(resp.read())
+            return data.get("endpoints", {})
+    except Exception:
+        return {}
+
+
 def run() -> str:
     """Main tool entry point — returns JSON status report."""
     report = {
         "timestamp": __import__("datetime").datetime.now().isoformat(),
         "devices": [],
         "inference": {
-            "local_ollama": get_ollama_models("localhost"),
-            "gpu_ollama": get_ollama_models("100.71.10.48"),
+            "proxy_health": get_proxy_health(),
+            "local_models": get_ollama_models("localhost"),
+            "gpu_models": get_ollama_models("100.71.10.48"),
         },
     }
 

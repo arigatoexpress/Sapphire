@@ -22,6 +22,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import ssl
 import urllib.request
 from pathlib import Path
 
@@ -30,11 +31,20 @@ COINTRACKER_DIR = Path.home() / "Code" / "Cointracker"
 PAPER_PORTFOLIO = SAPPHIRE_DIR / "data" / "paper_portfolio.json"
 
 
+def _ssl_ctx() -> ssl.SSLContext:
+    """Build an SSL context that uses certifi certs (macOS Python 3.12 fix)."""
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return ssl.create_default_context()
+
+
 def _get_prices() -> dict:
     """Get live crypto prices."""
     try:
         url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,cosmos,osmosis&vs_currencies=usd&include_24hr_change=true"
-        with urllib.request.urlopen(url, timeout=10) as r:
+        with urllib.request.urlopen(url, timeout=10, context=_ssl_ctx()) as r:
             return json.loads(r.read())
     except Exception:
         return {}

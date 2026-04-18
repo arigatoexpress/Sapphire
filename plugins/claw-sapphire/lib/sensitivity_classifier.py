@@ -41,6 +41,8 @@ _GROUPS: list[tuple[str, list[str]]] = [
     ]),
 
     # Financial / trading (internal)
+    # Blocks our own P&L / strategy state from leaking to Kimi Cloud — an
+    # over-aggressive match here is fine (false positive = local inference).
     ("financial", [
         r"\bportfolio\b",
         r"\bposition[s]?\b",
@@ -48,11 +50,11 @@ _GROUPS: list[tuple[str, list[str]]] = [
         r"p&l\b",
         r"trading signal",
         r"wallet.{0,10}address",
-        r"seed phrase",
+        r"seed phrase",           # wallet recovery phrase — never externalize
         r"private.{0,10}wallet",
         r"\bbalance[=:\s]\s*\$",
-        r"\$\s*\d[\d,]+[kKmM]?\b",  # dollar amounts
-        r"\bdrawdown\b.*\d",
+        r"\$\s*\d[\d,]+[kKmM]?\b",  # catches "$12,500" / "$5k" — position sizes
+        r"\bdrawdown\b.*\d",      # numeric drawdown → reveals account health
         r"account.{0,20}balance",
     ]),
 
@@ -72,13 +74,15 @@ _GROUPS: list[tuple[str, list[str]]] = [
     ]),
 
     # System internals (Tailscale mesh, API endpoints, service configs)
+    # Hides the private topology of the mesh — node IPs + env var names can
+    # be used together to target the Mac/Windows/Pi nodes from outside.
     ("system_internals", [
-        r"100\.\d{1,3}\.\d{1,3}\.\d{1,3}",   # Tailscale CGNAT range
+        r"100\.\d{1,3}\.\d{1,3}\.\d{1,3}",   # Tailscale CGNAT = our private mesh
         r"MOONSHOT_API_KEY",
         r"OPENAI_API_KEY",
         r"TELEGRAM_BOT_TOKEN",
         r"OPENROUTER_API_KEY",
-        r"com\.sapphire\.",                    # LaunchAgent identifiers
+        r"com\.sapphire\.",                    # LaunchAgent IDs reveal service layout
         r"launchagents",
         r"tailscale\s+(?:up|down|status)",
     ]),

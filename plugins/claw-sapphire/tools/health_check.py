@@ -23,11 +23,17 @@ SAPPHIRE_DIR = Path.home() / "Code" / "Sapphire"
 
 def _check_url(url: str, timeout: int = 5) -> tuple[bool, str]:
     """Check if a URL is reachable."""
+    import ssl
     import urllib.request
     import urllib.error
     try:
+        import certifi
+        ctx = ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        ctx = ssl.create_default_context()
+    try:
         req = urllib.request.Request(url, headers={"Accept": "application/json"})
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
             return True, f"{resp.status} OK"
     except urllib.error.HTTPError as e:
         # 401/403 means the service IS running but requires auth — that's green

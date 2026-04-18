@@ -17,6 +17,7 @@ Usage:
 from __future__ import annotations
 
 import json
+import ssl
 import subprocess
 import sys
 import urllib.request
@@ -57,18 +58,22 @@ def action_market() -> dict:
     # THO customer stats
     tho_stats = {}
     try:
-        import os
+        import certifi
+        ctx = ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        ctx = ssl.create_default_context()
+    try:
         token_resp = urllib.request.urlopen(urllib.request.Request(
             "https://project-go-forward-691674245427.us-central1.run.app/api/admin/verify",
             data=json.dumps({"pin": "4832"}).encode(),
             headers={"Content-Type": "application/json"},
-        ), timeout=10)
+        ), timeout=10, context=ctx)
         token = json.loads(token_resp.read()).get("token", "")
         if token:
             stats_resp = urllib.request.urlopen(urllib.request.Request(
                 "https://project-go-forward-691674245427.us-central1.run.app/api/analytics/customers",
                 headers={"X-Admin-Token": token},
-            ), timeout=10)
+            ), timeout=10, context=ctx)
             tho_stats = json.loads(stats_resp.read())
     except Exception:
         pass
