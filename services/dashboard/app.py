@@ -769,6 +769,41 @@ def api_risk_metrics():
         return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
 
 
+@app.route('/api/risk/backtest')
+@requires_auth
+def api_risk_backtest():
+    """Backtest SMA-crossover signals against 90d OHLCV.
+
+    Query params:
+      symbols=BTC-USD,ETH-USD   comma list (default: BTC/ETH/SOL/SPY)
+      days=90                   lookback period
+      latest=1                  return the last saved run instead of recomputing
+    """
+    import sys as _sys
+    from pathlib import Path as _Path
+    _root = _Path.home() / 'Code' / 'Sapphire'
+    if str(_root) not in _sys.path:
+        _sys.path.insert(0, str(_root))
+    try:
+        from lib.analytics.backtest import Backtester, BacktestConfig, DEFAULT_SYMBOLS
+        if request.args.get('latest') == '1':
+            latest = _root / 'data' / 'backtests' / 'latest.json'
+            if latest.exists():
+                return jsonify(json.loads(latest.read_text()))
+            return jsonify({"error": "no cached backtest"}), 404
+        syms_arg = request.args.get('symbols')
+        symbols = tuple(s.strip() for s in syms_arg.split(',') if s.strip()) if syms_arg else DEFAULT_SYMBOLS
+        days = int(request.args.get('days', 90))
+        cfg = BacktestConfig(symbols=symbols, period_days=days)
+        bt = Backtester(cfg)
+        results = bt.run_comparison()
+        bt.save(results)
+        return jsonify(results)
+    except Exception as e:
+        log.exception("backtest failed")
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
+
+
 @app.route('/api/analytics/correlation')
 @requires_auth
 def api_correlation():
