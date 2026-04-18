@@ -28,6 +28,17 @@ CACHE_FILE = DATA_DIR / "price_cache.parquet"
 HISTORY_FILE = DATA_DIR / "correlation_history.jsonl"
 CACHE_TTL_SECS = 6 * 3600
 
+# Event bus — optional, degrades silently if unavailable
+import sys as _sys
+_EVT_PATH = Path(__file__).resolve().parents[2] / "lib" / "core"
+if str(_EVT_PATH) not in _sys.path:
+    _sys.path.insert(0, str(_EVT_PATH))
+try:
+    from event_bus import get_bus as _get_event_bus
+    _EVENT_BUS = _get_event_bus(source="correlation")
+except Exception:
+    _EVENT_BUS = None
+
 # Symbol universe
 DEFAULT_SYMBOLS = {
     "BTC":  "BTC-USD",
@@ -345,6 +356,21 @@ class CorrelationEngine:
                 }) + "\n")
         except OSError:
             pass
+
+        if _EVENT_BUS is not None:
+            try:
+                for ev in events:
+                    _EVENT_BUS.publish("correlation.broken", {
+                        "pair": list(ev.pair),
+                        "current": ev.current,
+                        "baseline": ev.baseline,
+                        "severity": ev.severity,
+                        "state": "decorrelated",
+                        "note": ev.note,
+                    })
+            except Exception as e:
+                log.warning("event bus publish failed: %s", e)
+
         return report
 
     def pair_correlation(self, a: str, b: str, window_days: int = 30) -> float | None:
