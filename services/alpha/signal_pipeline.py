@@ -164,6 +164,14 @@ class ScoredSignal:
     enhancer_flags:       list[str] = field(default_factory=list)
     enhancer_reasons:     list[str] = field(default_factory=list)
 
+    # Full market context at the time the signal landed (for backtesting).
+    funding_rate:          float | None = None
+    funding_flag:          str | None = None
+    correlation_btc_spy:   float | None = None
+    fear_greed:            int | None = None
+    kronos_direction:      str | None = None
+    kronos_confidence:     float | None = None
+
     # Audit
     raw:           dict = field(default_factory=dict)
     notes:         list[str] = field(default_factory=list)
@@ -509,6 +517,26 @@ class SignalPipeline:
                         })
                     except Exception as e:
                         log.warning("pubsub close publish skipped: %s", e)
+
+                # Event bus — signal.closed so world-state PnL tracks live.
+                try:
+                    from lib.core.event_bus import get_bus
+                    get_bus().publish(
+                        "signal.closed",
+                        {
+                            "signal_id": pipeline_id,
+                            "symbol":    record.get("symbol", "UNKNOWN"),
+                            "direction": record.get("direction"),
+                            "outcome":   outcome,
+                            "pnl_usd":   round(pnl_usd, 2),
+                            "entry_price": record.get("price"),
+                            "close_price": close_price,
+                            "closed_at": record.get("closed_at"),
+                        },
+                        source="signal_pipeline",
+                    )
+                except Exception as e:
+                    log.debug("event bus signal.closed publish skipped: %s", e)
                 return True
         return False
 
@@ -573,6 +601,12 @@ class SignalPipeline:
         regime_confidence = 0.0
         enhancer_flags: list[str] = []
         enhancer_reasons: list[str] = []
+        funding_rate: float | None = None
+        funding_flag: str | None = None
+        correlation_btc_spy: float | None = None
+        fear_greed: int | None = None
+        kronos_direction: str | None = None
+        kronos_confidence: float | None = None
         if ENHANCER_ENABLED and _ENHANCER_AVAILABLE and direction != "flat":
             try:
                 enhanced = get_enhancer().enhance(symbol, action_raw, confidence)
@@ -582,6 +616,12 @@ class SignalPipeline:
                 regime_confidence = enhanced.regime_confidence
                 enhancer_flags = enhanced.flags
                 enhancer_reasons = enhanced.reasons
+                funding_rate = enhanced.funding_rate
+                funding_flag = enhanced.funding_flag
+                correlation_btc_spy = enhanced.btc_spy_correlation
+                fear_greed = enhanced.fear_greed
+                kronos_direction = enhanced.kronos_direction
+                kronos_confidence = enhanced.kronos_confidence
                 if enhanced.original_confidence != enhanced.adjusted_confidence:
                     notes.append(
                         f"confidence adjusted {enhanced.original_confidence:.2f}"
@@ -692,6 +732,12 @@ class SignalPipeline:
             regime_confidence = regime_confidence,
             enhancer_flags = enhancer_flags,
             enhancer_reasons = enhancer_reasons,
+            funding_rate = funding_rate,
+            funding_flag = funding_flag,
+            correlation_btc_spy = correlation_btc_spy,
+            fear_greed = fear_greed,
+            kronos_direction = kronos_direction,
+            kronos_confidence = kronos_confidence,
             raw          = raw,
             notes        = notes,
         )
@@ -828,6 +874,38 @@ class SignalPipeline:
             except Exception as e:
                 log.warning("pubsub publish_signal skipped: %s", e)
 
+        # Internal event bus publish — signal.generated with full context so any
+        # subscriber (dashboard, strategy agents, watchdog) can react in-process.
+        try:
+            from lib.core.event_bus import get_bus
+            get_bus().publish(
+                "signal.generated",
+                {
+                    "signal_id":           s.pipeline_id,
+                    "symbol":              s.symbol,
+                    "action":              s.action,
+                    "direction":           s.direction,
+                    "price":               s.price,
+                    "score":               s.score,
+                    "confidence":          s.confidence,
+                    "original_confidence": s.original_confidence,
+                    "routing":             s.routing,
+                    "regime":              s.regime,
+                    "regime_score":        s.regime_score,
+                    "funding_rate":        s.funding_rate,
+                    "funding_flag":        s.funding_flag,
+                    "correlation_btc_spy": s.correlation_btc_spy,
+                    "fear_greed":          s.fear_greed,
+                    "kronos_direction":    s.kronos_direction,
+                    "kronos_confidence":   s.kronos_confidence,
+                    "enhancer_flags":      list(s.enhancer_flags or []),
+                    "position_usd":        s.position_usd,
+                },
+                source="signal_pipeline",
+            )
+        except Exception as e:
+            log.debug("event bus signal.generated publish skipped: %s", e)
+
         # Paper trading secondary log
         if PAPER_TRADING and s.action.lower() in {"buy", "sell", "long", "short",
                                                    "entry_long", "entry_short"}:
@@ -938,7 +1016,7 @@ if __name__ == "__main__":
             "stop_loss": 64000.0,
         }
 
-    result = pipeline.process(raw)
+    result = get_pipeline().process(raw)
     s = result.scored
     print(f"\n{'='*60}")
     print(f"Signal Pipeline Result — ID: {s.pipeline_id}")
@@ -963,6 +1041,6 @@ if __name__ == "__main__":
     print()
 
     # Print kernel status
-    ks = pipeline.kernel_status()
+    ks = get_pipeline().kernel_status()
     print(f"Kernel Status: day={ks.get('day','?')} | blocked={ks.get('blocked')} | "
           f"consec_losses={ks.get('consecutive_loss_events','?')}")
