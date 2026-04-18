@@ -9,8 +9,6 @@ import sys
 import time
 from pathlib import Path
 
-import pytest
-
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -54,23 +52,23 @@ def test_estimate_property_value_uses_stated_value():
 
 
 def test_estimate_property_value_from_permit_class():
-    from lib.intel.lead_enricher import _estimate_property_value, PERMIT_VALUE_PRIORS
+    from lib.intel.lead_enricher import PERMIT_VALUE_PRIORS, _estimate_property_value
     assert _estimate_property_value({"description": "type C3F final plat"}) == PERMIT_VALUE_PRIORS["C3F"]
     assert _estimate_property_value({"description": "C2R subdivision"}) == PERMIT_VALUE_PRIORS["C2R"]
 
 
 def test_estimate_property_value_commercial():
-    from lib.intel.lead_enricher import _estimate_property_value, PERMIT_VALUE_PRIORS
+    from lib.intel.lead_enricher import PERMIT_VALUE_PRIORS, _estimate_property_value
     assert _estimate_property_value({"category": "commercial office"}) == PERMIT_VALUE_PRIORS["COMM"]
 
 
 def test_estimate_property_value_default_fallback():
-    from lib.intel.lead_enricher import _estimate_property_value, PERMIT_VALUE_PRIORS
+    from lib.intel.lead_enricher import PERMIT_VALUE_PRIORS, _estimate_property_value
     assert _estimate_property_value({}) == PERMIT_VALUE_PRIORS["DEFAULT"]
 
 
 def test_estimate_property_value_rejects_bad_stated():
-    from lib.intel.lead_enricher import _estimate_property_value, PERMIT_VALUE_PRIORS
+    from lib.intel.lead_enricher import PERMIT_VALUE_PRIORS, _estimate_property_value
     # Non-numeric stated value → falls through to class / default
     v = _estimate_property_value({"value_usd": "not-a-number"})
     assert v == PERMIT_VALUE_PRIORS["DEFAULT"]

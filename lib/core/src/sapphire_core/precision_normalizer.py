@@ -58,16 +58,6 @@ class PrecisionNormalizer:
                 "min_notional": Decimal("10"),
             },
             "aster": {
-                "tick_size": Decimal("0.01"),
-                "lot_size": Decimal("0.001"),
-                "min_notional": Decimal("5"),
-            },
-            "aster": {
-                "tick_size": Decimal("0.0001"),
-                "lot_size": Decimal("0.0001"),
-                "min_notional": Decimal("5"),
-            },
-            "aster": {
                 "tick_size": Decimal("0.001"),
                 "lot_size": Decimal("0.01"),
                 "min_notional": Decimal("10"),

@@ -26,7 +26,7 @@ import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -260,8 +260,8 @@ def _fetch_stablecoins(prev_snapshot: dict | None) -> StablecoinIssuance:
             try:
                 prev_dt = datetime.fromisoformat(prev_ts)
                 if prev_dt.tzinfo is None:
-                    prev_dt = prev_dt.replace(tzinfo=timezone.utc)
-                age_h = (datetime.now(timezone.utc) - prev_dt).total_seconds() / 3600
+                    prev_dt = prev_dt.replace(tzinfo=UTC)
+                age_h = (datetime.now(UTC) - prev_dt).total_seconds() / 3600
                 if age_h <= 26:
                     prev_total = float(pt)
             except Exception:
@@ -294,7 +294,7 @@ def _fetch_stablecoins(prev_snapshot: dict | None) -> StablecoinIssuance:
             detail += f" | -${abs_d/1e6:.0f}M burned"
 
     return StablecoinIssuance(
-        timestamp=datetime.now(timezone.utc).isoformat(),
+        timestamp=datetime.now(UTC).isoformat(),
         total_usd=round(sc.total_usd, 0),
         usdt_usd=round(sc.tether_usd, 0),
         usdc_usd=round(sc.usdc_usd, 0),
@@ -331,7 +331,7 @@ def _parse_ff_date(date_str: str, time_str: str) -> datetime | None:
 
 
 def _fetch_econ_calendar() -> EconCalendar:
-    now_date = datetime.now(timezone.utc).date()
+    now_date = datetime.now(UTC).date()
     events: list[EconEvent] = []
     seen: set[tuple[str, str]] = set()
 
@@ -394,7 +394,7 @@ def _fetch_econ_calendar() -> EconCalendar:
     upcoming_high = [e for e in events if e.impact == "High" and 0 <= e.days_until <= 7]
 
     return EconCalendar(
-        timestamp=datetime.now(timezone.utc).isoformat(),
+        timestamp=datetime.now(UTC).isoformat(),
         events=events,
         upcoming_high=upcoming_high,
         next_fomc_days=next_fomc_days,
@@ -460,7 +460,7 @@ def _score_text(text: str) -> tuple[float, list[str]]:
 
 
 def _fetch_political() -> PoliticalMonitor:
-    now_ts = datetime.now(timezone.utc).isoformat()
+    now_ts = datetime.now(UTC).isoformat()
     signals: list[PoliticalSignal] = []
 
     for source, url in RSS_FEEDS.items():
@@ -578,7 +578,7 @@ def _fetch_liquidation() -> LiquidationEstimator:
     alerts = [b.coin for b in bands if "cascade_risk" in b.flag]
 
     return LiquidationEstimator(
-        timestamp=datetime.now(timezone.utc).isoformat(),
+        timestamp=datetime.now(UTC).isoformat(),
         bands=bands,
         alerts=alerts,
     )
@@ -644,7 +644,7 @@ def _fetch_order_flow(current_ctxs: list | None = None) -> OrderFlowProxy:
     crowding_alerts = [v.coin for v in velocities if v.signal == "extreme_positioning"]
 
     return OrderFlowProxy(
-        timestamp=datetime.now(timezone.utc).isoformat(),
+        timestamp=datetime.now(UTC).isoformat(),
         velocities=velocities,
         crowding_alerts=crowding_alerts,
     )
@@ -661,7 +661,7 @@ class MarketIntelligence:
     def collect(self) -> MarketIntelSnapshot:
         """Fetch all feeds in parallel threads, return snapshot."""
         prev = _load_raw_snapshot()
-        now_ts = datetime.now(timezone.utc).isoformat()
+        now_ts = datetime.now(UTC).isoformat()
 
         results: dict[str, Any] = {}
         errors: dict[str, str] = {}
@@ -733,7 +733,7 @@ def _fetch_liquidation_from_ctxs(ctxs: list) -> LiquidationEstimator:
 
     bands.sort(key=lambda b: b.open_interest_usd, reverse=True)
     return LiquidationEstimator(
-        timestamp=datetime.now(timezone.utc).isoformat(),
+        timestamp=datetime.now(UTC).isoformat(),
         bands=bands,
         alerts=[b.coin for b in bands if "cascade_risk" in b.flag],
     )
@@ -789,8 +789,8 @@ def load_latest_snapshot() -> dict | None:
         try:
             dt = datetime.fromisoformat(ts)
             if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
-            age_min = (datetime.now(timezone.utc) - dt).total_seconds() / 60
+                dt = dt.replace(tzinfo=UTC)
+            age_min = (datetime.now(UTC) - dt).total_seconds() / 60
             if age_min > 45:
                 log.debug("market_intel snapshot stale (%.0f min old)", age_min)
                 return None

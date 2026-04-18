@@ -462,7 +462,6 @@ async def create_executor_swarm() -> dict[str, ExecutorAgent]:
     """Create and initialize all executor agents."""
     executors = {
         "aster": AsterExecutorAgent(),
-        "aster": AsterExecutorAgent(),
         "lighter": LighterExecutorAgent(),
     }
 

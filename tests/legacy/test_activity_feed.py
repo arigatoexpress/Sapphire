@@ -1,4 +1,6 @@
-import pytest; pytestmark = pytest.mark.skip(reason="Legacy test — depends on removed module")
+import pytest
+pytestmark = pytest.mark.skip(reason="Legacy test — depends on removed module")
+pytest.skip("Legacy test — depends on removed module", allow_module_level=True)
 """Unit tests for the Agent Activity Feed."""
 
 import os

@@ -15,7 +15,7 @@ except ImportError:
     pass
 
 try:
-    from .backtest import BacktestConfig, BacktestResult, Backtester, Trade
+    from .backtest import BacktestConfig, Backtester, BacktestResult, Trade
     __all__ += ["BacktestConfig", "BacktestResult", "Backtester", "Trade"]
 except ImportError:
     pass
