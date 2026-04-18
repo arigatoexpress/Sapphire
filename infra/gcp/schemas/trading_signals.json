@@ -1,0 +1,20 @@
+[
+  {"name": "signal_id", "type": "STRING", "mode": "REQUIRED", "description": "Unique signal identifier (uuid or hash)"},
+  {"name": "symbol", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "action", "type": "STRING", "mode": "REQUIRED", "description": "buy | sell | long | short | close"},
+  {"name": "direction", "type": "STRING", "mode": "NULLABLE", "description": "long | short | flat"},
+  {"name": "score", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "confidence", "type": "FLOAT64", "mode": "NULLABLE", "description": "0.0-1.0"},
+  {"name": "original_confidence", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "regime", "type": "STRING", "mode": "NULLABLE", "description": "RISK_ON | RISK_OFF | TRANSITION | UNKNOWN"},
+  {"name": "regime_score", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "source", "type": "STRING", "mode": "NULLABLE", "description": "pine | kronos | manual | webhook"},
+  {"name": "price_at_signal", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "notes", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "flags", "type": "STRING", "mode": "REPEATED"},
+  {"name": "outcome", "type": "STRING", "mode": "NULLABLE", "description": "win | loss | open | null"},
+  {"name": "pnl_usd", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "closed_at", "type": "TIMESTAMP", "mode": "NULLABLE"},
+  {"name": "timestamp", "type": "TIMESTAMP", "mode": "REQUIRED"},
+  {"name": "ingested_at", "type": "TIMESTAMP", "mode": "REQUIRED"}
+]

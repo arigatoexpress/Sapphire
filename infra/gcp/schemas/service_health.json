@@ -1,0 +1,14 @@
+[
+  {"name": "snapshot_id", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "service_name", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "host", "type": "STRING", "mode": "NULLABLE", "description": "mac | windows | rari1 | rari2 | cloud_run"},
+  {"name": "status", "type": "STRING", "mode": "REQUIRED", "description": "healthy | degraded | down | unknown"},
+  {"name": "response_ms", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "endpoint", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "http_status", "type": "INT64", "mode": "NULLABLE"},
+  {"name": "error", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "cpu_pct", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "memory_pct", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "timestamp", "type": "TIMESTAMP", "mode": "REQUIRED"},
+  {"name": "ingested_at", "type": "TIMESTAMP", "mode": "REQUIRED"}
+]

@@ -1,0 +1,19 @@
+[
+  {"name": "lead_id", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "address", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "neighborhood", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "city", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "state", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "zip", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "score", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "grade", "type": "STRING", "mode": "NULLABLE", "description": "A | B | C | D | F"},
+  {"name": "permit_type", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "permit_value_usd", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "owner_name", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "contacted", "type": "BOOL", "mode": "NULLABLE"},
+  {"name": "contacted_at", "type": "TIMESTAMP", "mode": "NULLABLE"},
+  {"name": "status", "type": "STRING", "mode": "NULLABLE", "description": "LEAD | ENROLLED | CLOSED | REJECTED"},
+  {"name": "source", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "timestamp", "type": "TIMESTAMP", "mode": "REQUIRED"},
+  {"name": "ingested_at", "type": "TIMESTAMP", "mode": "REQUIRED"}
+]

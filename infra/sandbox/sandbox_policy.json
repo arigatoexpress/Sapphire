@@ -1,0 +1,157 @@
+{
+  "_comment": "Sapphire OS sandbox policy — defines network, filesystem, and command constraints per component.",
+  "_version": "1.0.0",
+
+  "inference-proxy": {
+    "description": "4-tier inference failover proxy on localhost:11435",
+    "network_allow": [
+      "127.0.0.1:11434",
+      "127.0.0.1:11435",
+      "100.71.10.48:11434",
+      "100.120.191.1:11434",
+      "100.87.225.89:11434",
+      "api.moonshot.cn",
+      "openrouter.ai"
+    ],
+    "network_deny": [],
+    "filesystem": "none",
+    "max_memory_mb": 512,
+    "dangerous_commands": [],
+    "requires_confirmation": []
+  },
+
+  "hermes-agent": {
+    "description": "Telegram bot gateway — responds to messages, runs skills",
+    "network_allow": [
+      "127.0.0.1:11435",
+      "127.0.0.1:8082",
+      "127.0.0.1:8080",
+      "127.0.0.1:8787",
+      "api.telegram.org"
+    ],
+    "network_deny": [
+      "0.0.0.0/0"
+    ],
+    "filesystem_read": [
+      "~/.hermes/",
+      "~/Code/",
+      "~/world_knowledge/",
+      "~/autonomy-status/logs/"
+    ],
+    "filesystem_write": [
+      "~/.hermes/logs/",
+      "~/.hermes/sessions/",
+      "~/.hermes/memory/",
+      "~/.sapphire/pending_confirmations/"
+    ],
+    "filesystem_deny": [
+      "~/.ssh/",
+      "~/.gnupg/",
+      "~/Library/Keychains/",
+      "~/.config/sapphire-secrets/"
+    ],
+    "dangerous_commands": [
+      "rm -rf",
+      "mkfs",
+      "dd if=",
+      "curl | sh",
+      "curl | bash",
+      "wget | sh",
+      "wget | bash",
+      "eval $(curl",
+      "eval $(wget",
+      "> /dev/sda",
+      "format c:",
+      "shutdown -h",
+      "init 0",
+      ":(){ :|:& };:",
+      "chmod 777 /",
+      "chown root /",
+      "eval ",
+      "bash -c",
+      "sh -c",
+      "python3 -c",
+      "python -c",
+      "perl -e",
+      "ruby -e",
+      "node -e"
+    ],
+    "requires_confirmation": [
+      "git push",
+      "git push --force",
+      "launchctl bootout",
+      "launchctl bootstrap",
+      "launchctl remove",
+      "kill -9",
+      "pkill",
+      "systemctl stop",
+      "systemctl disable",
+      "pip install",
+      "brew install",
+      "npm install -g",
+      "curl -o",
+      "wget -O"
+    ],
+    "max_memory_mb": 1024
+  },
+
+  "control-plane": {
+    "description": "Project management hub on :8082",
+    "network_allow": [
+      "127.0.0.1:6379",
+      "127.0.0.1:11435",
+      "api.telegram.org"
+    ],
+    "network_deny": [],
+    "filesystem_read": [
+      "~/Code/Sapphire/data/",
+      "~/autonomy-status/"
+    ],
+    "filesystem_write": [
+      "~/Code/Sapphire/data/",
+      "~/autonomy-status/logs/"
+    ],
+    "dangerous_commands": [],
+    "requires_confirmation": [],
+    "max_memory_mb": 256
+  },
+
+  "signal-logger": {
+    "description": "TradingView signal ingestion on :18081",
+    "network_allow": [
+      "127.0.0.1:6379",
+      "api.telegram.org"
+    ],
+    "network_deny": [],
+    "filesystem_read": [],
+    "filesystem_write": [
+      "~/autonomy-status/logs/"
+    ],
+    "dangerous_commands": [],
+    "requires_confirmation": [],
+    "max_memory_mb": 128
+  },
+
+  "regional-intel": {
+    "description": "Regional intelligence workbench on :8787",
+    "network_allow": [
+      "127.0.0.1:11435",
+      "news.google.com",
+      "rss.app",
+      "nominatim.openstreetmap.org",
+      "data.cityofaustin.arcgis.com",
+      "data.houstontx.gov",
+      "api.telegram.org"
+    ],
+    "network_deny": [],
+    "filesystem_read": [
+      "~/Code/regional-intel-workbench/"
+    ],
+    "filesystem_write": [
+      "~/Code/regional-intel-workbench/data/"
+    ],
+    "dangerous_commands": [],
+    "requires_confirmation": [],
+    "max_memory_mb": 512
+  }
+}

@@ -1,0 +1,22 @@
+[
+  {"name": "snapshot_id", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "regime", "type": "STRING", "mode": "REQUIRED", "description": "RISK_ON | RISK_OFF | TRANSITION | UNKNOWN"},
+  {"name": "score", "type": "FLOAT64", "mode": "NULLABLE", "description": "-1.0 to +1.0"},
+  {"name": "confidence", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "reasoning", "type": "STRING", "mode": "REPEATED"},
+  {"name": "btc_price_usd", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "btc_dominance", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "total_market_cap_usd", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "market_cap_change_24h_pct", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "avg_funding_8h_pct", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "majors_funding_skew", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "oi_total_usd", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "oi_delta_24h_pct", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "stablecoins_total_usd", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "stablecoins_delta_24h_usd", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "stablecoins_flow", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "fear_greed_score", "type": "INT64", "mode": "NULLABLE"},
+  {"name": "fear_greed_label", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "timestamp", "type": "TIMESTAMP", "mode": "REQUIRED"},
+  {"name": "ingested_at", "type": "TIMESTAMP", "mode": "REQUIRED"}
+]

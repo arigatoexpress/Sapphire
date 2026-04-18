@@ -1,0 +1,17 @@
+[
+  {"name": "prediction_id", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "symbol", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "direction", "type": "STRING", "mode": "NULLABLE", "description": "bullish | bearish | neutral"},
+  {"name": "confidence", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "current_price", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "predicted_price_24h", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "predicted_move_pct", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "horizon_bars", "type": "INT64", "mode": "NULLABLE"},
+  {"name": "model", "type": "STRING", "mode": "NULLABLE", "description": "kronos | internal_ta | ensemble"},
+  {"name": "predicted_bars", "type": "JSON", "mode": "NULLABLE", "description": "Array of OHLCV forecast bars"},
+  {"name": "actual_price_24h", "type": "FLOAT64", "mode": "NULLABLE", "description": "Back-filled after 24h"},
+  {"name": "actual_move_pct", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "accuracy_score", "type": "FLOAT64", "mode": "NULLABLE", "description": "0.0-1.0, computed post-hoc"},
+  {"name": "timestamp", "type": "TIMESTAMP", "mode": "REQUIRED"},
+  {"name": "ingested_at", "type": "TIMESTAMP", "mode": "REQUIRED"}
+]

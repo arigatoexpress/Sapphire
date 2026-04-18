@@ -1,0 +1,25 @@
+[Unit]
+Description=Sapphire Health Monitor Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=rari
+WorkingDirectory=/home/rari/sapphire
+ExecStart=/usr/bin/python3 /home/rari/sapphire/agents/health_monitor.py
+Restart=on-failure
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=health-monitor
+
+# Environment
+EnvironmentFile=-/home/rari/sapphire/.env
+
+# Resource limits — rari2 runs alongside Ollama
+MemoryMax=256M
+CPUQuota=20%
+
+[Install]
+WantedBy=multi-user.target

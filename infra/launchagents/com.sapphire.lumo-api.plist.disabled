@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.sapphire.lumo-api</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/node</string>
+        <string>/Users/aribs/Code/lumo-api/lumo.js</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/aribs/Code/lumo-api</string>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/aribs/Library/Logs/sapphire/lumo-api.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/aribs/Library/Logs/sapphire/lumo-api.log</string>
+
+    <!-- NOTE: auth.json must exist at ~/Code/lumo-api/auth.json before enabling.
+         Run: cd ~/Code/lumo-api && node generate_auth.js
+         Then: cp this file (without .disabled) to ~/Library/LaunchAgents/
+               launchctl load ~/Library/LaunchAgents/com.sapphire.lumo-api.plist -->
+</dict>
+</plist>

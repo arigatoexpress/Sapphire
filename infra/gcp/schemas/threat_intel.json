@@ -1,0 +1,15 @@
+[
+  {"name": "cve_id", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "severity", "type": "STRING", "mode": "NULLABLE", "description": "CRITICAL | HIGH | MEDIUM | LOW"},
+  {"name": "cvss_score", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "exploited", "type": "BOOL", "mode": "NULLABLE"},
+  {"name": "in_kev", "type": "BOOL", "mode": "NULLABLE", "description": "CISA Known Exploited Vulnerabilities"},
+  {"name": "source", "type": "STRING", "mode": "NULLABLE", "description": "nvd | cisa_kev | mitre_attack"},
+  {"name": "attack_techniques", "type": "STRING", "mode": "REPEATED", "description": "MITRE ATT&CK technique IDs"},
+  {"name": "affected_products", "type": "STRING", "mode": "REPEATED"},
+  {"name": "description", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "published_at", "type": "TIMESTAMP", "mode": "NULLABLE"},
+  {"name": "modified_at", "type": "TIMESTAMP", "mode": "NULLABLE"},
+  {"name": "timestamp", "type": "TIMESTAMP", "mode": "REQUIRED", "description": "When our scanner observed it"},
+  {"name": "ingested_at", "type": "TIMESTAMP", "mode": "REQUIRED"}
+]
