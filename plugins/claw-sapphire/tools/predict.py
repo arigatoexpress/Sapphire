@@ -17,10 +17,11 @@ Usage:
 from __future__ import annotations
 
 import json
+import os
 import sys
+import tempfile
 import urllib.request
-from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
@@ -50,7 +51,7 @@ def action_predict() -> dict:
 
     profiles = analyze_all()
     predictions = []
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     for sym, profile in profiles.items():
         if profile is None:
@@ -190,51 +191,111 @@ def action_predict() -> dict:
     }
 
 
+_TIMEFRAME_SECONDS = {
+    "1h": 3600, "2h": 7200, "4h": 14400, "6h": 21600,
+    "12h": 43200, "24h": 86400, "1d": 86400,
+    "3d": 259200, "7d": 604800, "1w": 604800,
+}
+
+
+def _timeframe_elapsed(pred: dict, now: datetime) -> bool:
+    """True once `pred["timestamp"] + pred["timeframe"]` is in the past."""
+    tf = str(pred.get("timeframe", "24h"))
+    window = _TIMEFRAME_SECONDS.get(tf, 86400)
+    raw_ts = pred.get("timestamp")
+    if not raw_ts:
+        return False
+    try:
+        created = datetime.fromisoformat(str(raw_ts).replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=UTC)
+    return now - created >= timedelta(seconds=window)
+
+
+def _atomic_write_lines(path: Path, lines: list[str]) -> None:
+    """Write lines to path atomically via a same-directory temp file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=f".{path.name}.", dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write("\n".join(lines))
+            if lines:
+                f.write("\n")
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
 def action_score() -> dict:
-    """Score pending predictions against live prices."""
+    """Score predictions whose timeframe has elapsed against live prices.
+
+    Previously this scored every un-scored prediction the moment it saw one —
+    which turned a "24h forecast" into a "does the current price beat entry
+    right now" coin-flip and invalidated every published accuracy number.
+    """
     prices = _get_coingecko_prices()
     if not prices:
         return {"error": "Could not fetch live prices"}
 
-    lines = PREDICTIONS_FILE.read_text().strip().split("\n")
-    updated = []
+    if not PREDICTIONS_FILE.exists():
+        return {"success": True, "newly_scored": 0, "total_scored": 0, "correct": 0, "accuracy": "N/A"}
+
+    now = datetime.now(UTC)
+    updated: list[str] = []
     scored_count = 0
     correct_count = 0
+    pending_within_window = 0
 
-    for line in lines:
-        p = json.loads(line)
+    for line in PREDICTIONS_FILE.read_text().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            p = json.loads(line)
+        except json.JSONDecodeError:
+            continue
 
-        # Only score unscored predictions
-        if p.get("correct") is None and p["symbol"] in prices:
-            current = prices[p["symbol"]]
-            entry = p.get("entry_price") or p["target_price"]
-
-            if p["direction"] == "bullish":
-                p["correct"] = current > entry
-            elif p["direction"] == "bearish":
-                p["correct"] = current < entry
+        if p.get("correct") is None and p.get("symbol") in prices:
+            if not _timeframe_elapsed(p, now):
+                pending_within_window += 1
             else:
-                p["correct"] = abs((current - entry) / entry * 100) < 3
+                current = prices[p["symbol"]]
+                entry = p.get("entry_price") or p["target_price"]
+                if entry and p["direction"] == "bullish":
+                    p["correct"] = bool(current > entry)
+                elif entry and p["direction"] == "bearish":
+                    p["correct"] = bool(current < entry)
+                elif entry:
+                    p["correct"] = abs((current - entry) / entry * 100) < 3
+                p["actual_price"] = current
+                p["scored_at"] = now.isoformat()
+                scored_count += 1
 
-            p["actual_price"] = current
-            scored_count += 1
-
-        if p.get("correct") is not None:
-            if p["correct"]:
-                correct_count += 1
+        if p.get("correct") is True:
+            correct_count += 1
 
         updated.append(json.dumps(p))
 
-    # Write back
-    PREDICTIONS_FILE.write_text("\n".join(updated) + "\n")
+    _atomic_write_lines(PREDICTIONS_FILE, updated)
 
-    total_scored = sum(1 for l in updated if json.loads(l).get("correct") is not None)
+    total_scored = sum(
+        1 for line in updated if json.loads(line).get("correct") is not None
+    )
 
     return {
         "success": True,
         "newly_scored": scored_count,
         "total_scored": total_scored,
         "correct": correct_count,
+        "pending_within_window": pending_within_window,
         "accuracy": f"{correct_count / total_scored * 100:.0f}%" if total_scored else "N/A",
     }
 

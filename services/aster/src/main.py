@@ -1,8 +1,8 @@
-"""
-Aster Trading Bot - Standalone Service
+"""Aster DEX perpetuals trading bot — standalone service.
 
-This is an independent microservice for trading on Aster DEX.
-Optimized for CEX-style execution with high throughput.
+Solana-native perp DEX with a CEX-style REST/WebSocket API. Consumes
+trading signals via pubsub, executes with the Shield HFT strategy,
+and publishes fills/positions back for portfolio tracking.
 """
 
 import asyncio

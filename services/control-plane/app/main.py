@@ -12,6 +12,7 @@ instead of replaying the older Cloud Run / Firestore topology.
 """
 from __future__ import annotations
 
+import hmac
 import logging
 import os
 import shutil
@@ -117,7 +118,15 @@ def _control_token() -> str:
 
 def _require_control_token(token: str) -> None:
     expected = _control_token()
-    if expected and token != expected:
+    if not expected:
+        # Fail closed when the shared token is unconfigured — the previous
+        # behavior (silently accepting every request) turned every write
+        # endpoint into an open relay on hosts that forgot to set the env.
+        raise HTTPException(
+            status_code=503,
+            detail="control token not configured — set CONTROL_PLANE_TOKEN",
+        )
+    if not hmac.compare_digest(str(token or ""), expected):
         raise HTTPException(status_code=403, detail="invalid control token")
 
 
@@ -1122,7 +1131,8 @@ async def health():
 @app.get("/api/ecosystem-health")
 async def ecosystem_health():
     """Run the full 20-point ecosystem health check and return JSON."""
-    import subprocess, json as _json
+    import json as _json
+    import subprocess
     tool_path = Path.home() / "Code" / "Sapphire" / "plugins" / "claw-sapphire" / "tools" / "health_check.py"
     try:
         r = subprocess.run(

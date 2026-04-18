@@ -1,0 +1,75 @@
+{
+  "report": {
+    "kind": "ai_intel",
+    "title": "Sapphire AI Intelligence \u2014 2026-04-18",
+    "generated_at": "2026-04-18T01:26:56+00:00",
+    "facts": {
+      "event_count": 21,
+      "agent_counts": {
+        "claude": 4,
+        "factory": 4,
+        "dispatch": 4,
+        "research": 4
+      },
+      "device_counts": {
+        "mac": 21
+      },
+      "event_types": {
+        "test": 2,
+        "deploy.sapphire-os": 1,
+        "factory.claude_md.generated": 4,
+        "dispatch.executed": 4,
+        "deploy.trading-intelligence": 1,
+        "signal.received": 5,
+        "research.nightly": 4
+      },
+      "tracked_projects": 6
+    },
+    "body": "## Agent Activity\n\nLogged 21 system events across 4 agents and 1 devices.\nTop agents:\n- claude: 4 events\n- factory: 4 events\n- dispatch: 4 events\n- research: 4 events\n\n## Inference Mesh\n\n- mac: 21 events\n\n## Projects Tracked\n\n6 projects in the active ledger (data/tracked_projects.json).",
+    "sources": [
+      "data/system_events.jsonl",
+      "data/tracked_projects.json"
+    ],
+    "tags": [
+      "ai",
+      "agents",
+      "infra"
+    ]
+  },
+  "renderings": {
+    "linkedin": {
+      "path": "data/content/ready/linkedin/20260417_1926_ai_intel.md",
+      "quality": {
+        "passed": true,
+        "banned_hits": [],
+        "number_count": 6,
+        "word_count": 35,
+        "avg_sentence_words": 8.75,
+        "reasons": []
+      }
+    },
+    "substack": {
+      "path": "data/content/ready/substack/20260417_1926_ai_intel.md",
+      "quality": {
+        "passed": true,
+        "banned_hits": [],
+        "number_count": 19,
+        "word_count": 64,
+        "avg_sentence_words": 21.33,
+        "reasons": []
+      }
+    },
+    "x": {
+      "path": "data/content/ready/x/20260417_1926_ai_intel.jsonl",
+      "quality": {
+        "passed": true,
+        "banned_hits": [],
+        "number_count": 11,
+        "word_count": 36,
+        "avg_sentence_words": 4.5,
+        "reasons": []
+      }
+    }
+  },
+  "published_at": "2026-04-17T19:26:56"
+}

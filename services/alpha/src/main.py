@@ -1,3 +1,12 @@
+"""Sapphire Alpha trading engine — orchestrator entry point.
+
+Boots the AlphaEngine: event loop (uvloop), Telegram control-command
+dispatch, signal intake from the webhook/signal_logger pipeline, and
+execution routing via ``src.execution.dispatcher``. Serves the health
+and API surface consumed by the dashboard (control / forum / intel /
+security / market endpoints).
+"""
+
 import asyncio
 import hashlib
 import json

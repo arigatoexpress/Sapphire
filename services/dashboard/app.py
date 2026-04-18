@@ -9,7 +9,7 @@ import logging
 import os
 import secrets
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from functools import wraps
 from pathlib import Path
 
@@ -37,6 +37,23 @@ AUTH_PASSWORD = os.environ.get('AUTH_PASSWORD', '')
 
 if not AUTH_PASSWORD:
     raise RuntimeError("AUTH_PASSWORD environment variable must be set")
+
+# x402 payment gate — optional, disabled unless X402_ENABLED=1
+import sys as _sys  # noqa: E402
+
+_LIB_PAYMENTS = Path.home() / "Code" / "Sapphire"
+if str(_LIB_PAYMENTS) not in _sys.path:
+    _sys.path.insert(0, str(_LIB_PAYMENTS))
+try:
+    from lib.payments.x402_middleware import require_payment as x402_require  # noqa: E402
+    _X402_AVAILABLE = True
+except Exception:
+    _X402_AVAILABLE = False
+
+    def x402_require(amount_usd, description=""):  # type: ignore[misc]
+        def _decorator(f):
+            return f
+        return _decorator
 
 def check_auth(username, password):
     # Constant-time compare to avoid leaking password length / prefix via
@@ -81,6 +98,38 @@ def guarded_static(filename):
 _cache = {}
 _cache_time = {}
 CACHE_DURATION = 10  # seconds
+
+# ── In-process latency metrics (per-route rolling) ─────────────────────────
+# Keeps a bounded ring buffer of (method, path, ms) samples plus per-route
+# counters. Exposed via /metrics (auth-gated). Bounded size keeps memory in
+# check under long-running processes (~24 bytes/sample × 2000 = 48 KB).
+_METRICS_MAX_SAMPLES = 2000
+_metrics_samples: list[tuple[str, str, float]] = []
+_metrics_counts: dict[str, int] = {}
+_metrics_totals: dict[str, float] = {}
+
+
+@app.before_request
+def _metrics_before_request():
+    request.environ['sapphire.t0'] = time.perf_counter()
+
+
+@app.after_request
+def _metrics_after_request(response):
+    t0 = request.environ.get('sapphire.t0')
+    if t0 is None:
+        return response
+    elapsed_ms = (time.perf_counter() - t0) * 1000.0
+    endpoint = request.endpoint or request.path or 'unknown'
+    key = f'{request.method} {endpoint}'
+    _metrics_counts[key] = _metrics_counts.get(key, 0) + 1
+    _metrics_totals[key] = _metrics_totals.get(key, 0.0) + elapsed_ms
+    _metrics_samples.append((request.method, endpoint, elapsed_ms))
+    if len(_metrics_samples) > _METRICS_MAX_SAMPLES:
+        # Drop oldest ~10% to amortize the trim cost
+        del _metrics_samples[: _METRICS_MAX_SAMPLES // 10]
+    response.headers['X-Response-Time-ms'] = f'{elapsed_ms:.1f}'
+    return response
 
 def get_cached(key, fetch_func):
     """Get cached data or fetch fresh"""
@@ -167,6 +216,51 @@ def control():
 def settings():
     return render_template('pages/settings.html', current_page='settings', page_title='Settings')
 
+@app.route('/metrics')
+@requires_auth
+def metrics():
+    """Per-route latency metrics (in-process). Not Prometheus format — JSON.
+
+    Returns aggregate count/avg/p50/p95/p99/max for each endpoint plus the
+    overall slowest endpoints. Exposed to help diagnose dashboard slowness
+    (the dashboard performs many synchronous urllib fetches against remote
+    services — tail latency lives in those outbound calls, not in Flask).
+    """
+    def _percentile(values, p):
+        if not values:
+            return 0.0
+        s = sorted(values)
+        k = int(round((p / 100.0) * (len(s) - 1)))
+        return s[max(0, min(k, len(s) - 1))]
+
+    by_route: dict[str, list[float]] = {}
+    for method, endpoint, ms in _metrics_samples:
+        key = f'{method} {endpoint}'
+        by_route.setdefault(key, []).append(ms)
+
+    routes = []
+    for key, samples in by_route.items():
+        routes.append({
+            'route': key,
+            'count': _metrics_counts.get(key, len(samples)),
+            'avg_ms': round(sum(samples) / len(samples), 2),
+            'p50_ms': round(_percentile(samples, 50), 2),
+            'p95_ms': round(_percentile(samples, 95), 2),
+            'p99_ms': round(_percentile(samples, 99), 2),
+            'max_ms': round(max(samples), 2),
+            'samples': len(samples),
+        })
+    routes.sort(key=lambda r: r['p95_ms'], reverse=True)
+
+    return jsonify({
+        'window_samples': len(_metrics_samples),
+        'window_limit': _METRICS_MAX_SAMPLES,
+        'routes': routes,
+        'slowest_p95': routes[:10],
+        'timestamp': datetime.now().isoformat(),
+    })
+
+
 @app.route('/api/status')
 @requires_auth
 def api_status():
@@ -186,27 +280,57 @@ def api_status():
 
     return jsonify(get_cached('status', fetch))
 
+_WATCHLIST_SPEC = {
+    'major_crypto': [
+        ('ETH', 'Ethereum', 'perp', 'HIGH', 'ethereum'),
+        ('BTC', 'Bitcoin', 'perp', 'HIGH', 'bitcoin'),
+    ],
+    'mid_cap': [
+        ('SOL', 'Solana', 'perp', 'MEDIUM', 'solana'),
+        ('HYPE', 'Hyperliquid', 'spot', 'MEDIUM', 'hyperliquid'),
+    ],
+}
+
+
 @app.route('/api/watchlist')
 @requires_auth
 def api_watchlist():
-    """Get organized watchlist"""
-    watchlist = {
-        'major_crypto': [
-            {'symbol': 'ETH', 'name': 'Ethereum', 'type': 'perp', 'priority': 'HIGH', 'price': 3500.0},
-            {'symbol': 'BTC', 'name': 'Bitcoin', 'type': 'perp', 'priority': 'HIGH', 'price': 65000.0},
-        ],
-        'mid_cap': [
-            {'symbol': 'SOL', 'name': 'Solana', 'type': 'perp', 'priority': 'MEDIUM', 'price': 145.0},
-            {'symbol': 'HYPE', 'name': 'Hyperliquid', 'type': 'spot', 'priority': 'MEDIUM', 'price': 12.5},
-        ],
-        'pair_analysis': [
-            {'symbol': 'ETHBTC', 'name': 'ETH/BTC Ratio', 'type': 'pair', 'priority': 'HIGH',
-             'strategy': 'Z<-2: BUY ETH, Z>2: SELL ETH'},
-            {'symbol': 'SOLBTC', 'name': 'SOL/BTC Ratio', 'type': 'pair', 'priority': 'MEDIUM',
-             'strategy': 'Z<-2: BUY SOL, Z>2: SELL SOL'},
-        ]
-    }
-    return jsonify(watchlist)
+    """Organized watchlist with *live* CoinGecko prices (cached 10s)."""
+    def fetch():
+        all_ids = ','.join(cg_id for items in _WATCHLIST_SPEC.values() for _, _, _, _, cg_id in items)
+        prices: dict = fetch_sync(
+            f'https://api.coingecko.com/api/v3/simple/price?ids={all_ids}'
+            f'&vs_currencies=usd&include_24hr_change=true'
+        ) or {}
+
+        def _enrich(rows):
+            out = []
+            for sym, name, typ, prio, cg_id in rows:
+                p = prices.get(cg_id) or {}
+                out.append({
+                    'symbol': sym,
+                    'name': name,
+                    'type': typ,
+                    'priority': prio,
+                    'price': p.get('usd'),
+                    'change_24h_pct': round(p.get('usd_24h_change'), 2) if p.get('usd_24h_change') is not None else None,
+                })
+            return out
+
+        return {
+            'major_crypto': _enrich(_WATCHLIST_SPEC['major_crypto']),
+            'mid_cap': _enrich(_WATCHLIST_SPEC['mid_cap']),
+            'pair_analysis': [
+                {'symbol': 'ETHBTC', 'name': 'ETH/BTC Ratio', 'type': 'pair', 'priority': 'HIGH',
+                 'strategy': 'Z<-2: BUY ETH, Z>2: SELL ETH'},
+                {'symbol': 'SOLBTC', 'name': 'SOL/BTC Ratio', 'type': 'pair', 'priority': 'MEDIUM',
+                 'strategy': 'Z<-2: BUY SOL, Z>2: SELL SOL'},
+            ],
+            'timestamp': datetime.now().isoformat(),
+            'stale': not bool(prices),
+        }
+
+    return jsonify(get_cached('watchlist', fetch))
 
 @app.route('/api/proposals')
 @requires_auth
@@ -241,6 +365,108 @@ def api_logs():
         {'time': datetime.now().isoformat(), 'level': 'INFO', 'message': 'Agent analysis complete'},
     ]
     return jsonify(logs)
+
+
+# ── Event Bus SSE ────────────────────────────────────────────────────────────
+
+def _event_bus():
+    """Import event bus lazily — dashboard should start even if lib/core missing."""
+    import sys as _sys
+    _p = Path.home() / "Code" / "Sapphire" / "lib" / "core"
+    if str(_p) not in _sys.path:
+        _sys.path.insert(0, str(_p))
+    from event_bus import get_bus
+    return get_bus(source="dashboard")
+
+
+@app.route('/api/events/stream')
+@requires_auth
+def api_events_stream():
+    """Server-sent event stream of live bus events (glob pattern via ?types=)."""
+    patterns_raw = request.args.get('types', '*')
+    patterns = [p.strip() for p in patterns_raw.split(',') if p.strip()]
+
+    import queue as _queue
+
+    try:
+        bus = _event_bus()
+    except Exception as e:
+        return Response(
+            f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n",
+            mimetype='text/event-stream',
+        )
+
+    q: _queue.Queue = _queue.Queue(maxsize=500)
+
+    def _on_event(ev):
+        try:
+            q.put_nowait({
+                'id': ev.id,
+                'type': ev.type,
+                'ts': ev.ts,
+                'source': ev.source,
+                'data': ev.data,
+            })
+        except _queue.Full:
+            pass
+
+    subscription = bus.subscribe(patterns, _on_event)
+
+    def gen():
+        try:
+            # Opening ping so the client sees the connection immediately
+            yield f"event: open\ndata: {json.dumps({'patterns': patterns})}\n\n"
+            last_beat = time.time()
+            while True:
+                try:
+                    payload = q.get(timeout=15)
+                    yield f"event: {payload['type']}\ndata: {json.dumps(payload, default=str)}\n\n"
+                except _queue.Empty:
+                    # Keep proxies from closing the connection
+                    yield ": keepalive\n\n"
+                if time.time() - last_beat > 60:
+                    last_beat = time.time()
+        finally:
+            subscription.stop()
+
+    return Response(
+        gen(),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no',  # disable nginx buffering if proxied
+        },
+    )
+
+
+@app.route('/api/events/world-state')
+@requires_auth
+def api_world_state():
+    """Snapshot of aggregated world state for the overview page."""
+    try:
+        bus = _event_bus()
+        return jsonify(bus.get_world_state().to_dict())
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/events/replay')
+@requires_auth
+def api_events_replay():
+    """Historical replay of one event type."""
+    event_type = request.args.get('type', '')
+    if not event_type:
+        return jsonify({'error': 'missing ?type=<event_type>'}), 400
+    limit = int(request.args.get('limit', 100))
+    try:
+        bus = _event_bus()
+        events = bus.replay(event_type, limit=limit)
+        return jsonify([
+            {'id': e.id, 'type': e.type, 'ts': e.ts, 'source': e.source, 'data': e.data}
+            for e in events
+        ])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/system')
 @requires_auth
@@ -376,9 +602,9 @@ def api_signals():
         except Exception:
             # Fallback: read JSONL directly
             import json
-            from datetime import datetime as _dt, timezone as _tz
+            from datetime import datetime as _dt
             signals_dir = _root / 'data' / 'signals'
-            today = _dt.now(_tz.utc).strftime('%Y-%m-%d')
+            today = _dt.now(UTC).strftime('%Y-%m-%d')
             f = signals_dir / f'{today}.jsonl'
             if f.exists():
                 for line in f.read_text().strip().splitlines()[-20:]:
@@ -634,9 +860,9 @@ def command_deck_page():
 @requires_auth
 def api_trading_metrics():
     """Trading pipeline metrics — signal counts, success rates from signal logger"""
-    from pathlib import Path as _Path
-    from datetime import datetime as _dt, timezone as _tz
     import json as _json
+    from datetime import datetime as _dt
+    from pathlib import Path as _Path
 
     def fetch():
         import sys as _sys
@@ -644,7 +870,7 @@ def api_trading_metrics():
         if str(_alpha) not in _sys.path:
             _sys.path.insert(0, str(_alpha))
 
-        today = _dt.now(_tz.utc).strftime('%Y-%m-%d')
+        today = _dt.now(UTC).strftime('%Y-%m-%d')
         signals_dir = _Path.home() / 'Code' / 'Sapphire' / 'data' / 'signals'
         f = signals_dir / f'{today}.jsonl'
 
@@ -724,6 +950,7 @@ def chain_page():
 
 @app.route('/api/chain/overview')
 @requires_auth
+@x402_require(0.01, description="On-chain intelligence snapshot")
 def api_chain_overview():
     """Unified on-chain snapshot — regime, funding, OI, TVL, stablecoins."""
     import sys as _sys
@@ -750,6 +977,7 @@ def risk_page():
 
 @app.route('/api/risk/metrics')
 @requires_auth
+@x402_require(0.02, description="Portfolio risk analytics")
 def api_risk_metrics():
     """Portfolio metrics computed from paper_trading + signal audit logs."""
     import sys as _sys
@@ -800,8 +1028,8 @@ def api_correlation():
 @requires_auth
 def api_soc_security():
     """SOC security status — auth events, network, inference gate, threat intel, investigations"""
-    import subprocess
     import re
+    import subprocess
 
     def fetch():
         checks = {}
@@ -834,8 +1062,8 @@ def api_soc_security():
                     parts = l.split()
                     auth_events.append({'timestamp': ' '.join(parts[4:8]) if len(parts) > 7 else '--',
                                         'type': 'ok', 'message': l.strip()[:80]})
-        except Exception as e:
-            checks['auth_logs'] = {'status': 'warn', 'detail': f'Could not read auth logs'}
+        except Exception:
+            checks['auth_logs'] = {'status': 'warn', 'detail': 'Could not read auth logs'}
 
         # ── Tailscale devices ────────────────────────────────────────
         try:
@@ -1024,7 +1252,7 @@ def api_soc_security():
                     'title': trigger[:80] or f'Investigation {inv_date}',
                     'date': inv_date,
                     'verdict': verdict,
-                    'summary': f'10-point security sweep. Verdict: System clean. No unauthorized access detected.',
+                    'summary': '10-point security sweep. Verdict: System clean. No unauthorized access detected.',
                     'file': inv_file.name,
                 })
         except Exception:
@@ -1072,9 +1300,8 @@ def api_soc_threats():
     """Live threat feed from cyber-threat-bot — CISA KEV, NVD, MITRE ATT&CK.
     Reads saved reports first (fast), falls back to live fetch if stale (>4h).
     """
-    import sys as _sys
     import re as _re
-    from datetime import timezone as _tz
+    import sys as _sys
 
     CTB_SRC = Path.home() / 'Code' / 'cyber-threat-bot' / 'src'
     THREAT_CACHE = 240  # 4 hours — live fetch is slow (NVD rate limits)
@@ -1092,7 +1319,6 @@ def api_soc_threats():
             latest = saved_reports[0]
             try:
                 # Check freshness — use file if <4h old
-                import os as _os
                 age_hours = (time.time() - latest.stat().st_mtime) / 3600
                 content = latest.read_text(errors='ignore')
 
@@ -1171,7 +1397,8 @@ def api_soc_threats():
             _sys.path.insert(0, str(CTB_SRC))
 
         try:
-            from cyber_threat_bot import sources as _src, scoring as _sc
+            from cyber_threat_bot import scoring as _sc
+            from cyber_threat_bot import sources as _src
 
             records = _src.collect_latest_records(days=3, per_source=5)
             records.sort(key=lambda r: _sc.record_priority(r), reverse=True)
@@ -1247,12 +1474,12 @@ def predictions_page():
 
 @app.route('/api/predictions/kronos')
 @requires_auth
+@x402_require(0.05, description="Kronos candlestick forecasts")
 def api_kronos_prediction():
     """Kronos foundation model prediction endpoint.
     Query params: symbol (default BTC-USD), lookback (default 200), predict (default 24), interval (default 1h)
     """
     import subprocess as _sp
-    import sys as _sys
 
     symbol = request.args.get('symbol', 'BTC-USD')
     lookback = int(request.args.get('lookback', 200))
@@ -1538,6 +1765,29 @@ def api_signals_performance():
         'cumulative_pnl': cumulative_pnl[1:] if len(cumulative_pnl) > 1 else [],
         'win_rate_trend': win_rate_trend,
     })
+
+
+@app.route('/content')
+@requires_auth
+def content_page():
+    return render_template('pages/content.html', current_page='content', page_title='Content_Engine')
+
+
+@app.route('/api/content/drafts')
+@requires_auth
+def api_content_drafts():
+    """List the most recent content drafts (manifests from data/content/drafts/)."""
+    import sys
+    repo_root = Path(__file__).resolve().parents[2]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+    try:
+        from lib.content import publisher as content_publisher
+        drafts = content_publisher.list_drafts(limit=50)
+        return jsonify({"count": len(drafts), "drafts": drafts})
+    except Exception as e:
+        log.warning("content drafts listing failed: %s", e)
+        return jsonify({"count": 0, "drafts": [], "error": str(e)}), 500
 
 
 if __name__ == '__main__':

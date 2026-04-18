@@ -34,6 +34,40 @@ SAPPHIRE_DIR = Path.home() / "Code" / "Sapphire"
 INTEL_DIR = SAPPHIRE_DIR / "data" / "threat_intel"
 INTEL_DIR.mkdir(parents=True, exist_ok=True)
 
+# Event bus — optional, degrades silently if unavailable
+_EVENT_BUS_PATH = SAPPHIRE_DIR / "lib" / "core"
+if str(_EVENT_BUS_PATH) not in sys.path:
+    sys.path.insert(0, str(_EVENT_BUS_PATH))
+try:
+    from event_bus import get_bus as _get_event_bus
+    _EVENT_BUS = _get_event_bus(source="threat_intel")
+except Exception:
+    _EVENT_BUS = None
+
+
+def _publish_threats(records, *, trigger: str) -> None:
+    """Emit one threat.detected event per critical record (exploited or CVSS >= 9)."""
+    if _EVENT_BUS is None:
+        return
+    try:
+        for r in records:
+            score = getattr(r, "score", None) or 0.0
+            exploited = bool(getattr(r, "exploited", False))
+            if not (exploited or score >= 9.0):
+                continue
+            level = "critical" if exploited else "high"
+            _EVENT_BUS.publish("threat.detected", {
+                "id": getattr(r, "canonical_id", ""),
+                "title": (getattr(r, "title", "") or "")[:200],
+                "source": getattr(r, "source", ""),
+                "score": score,
+                "exploited": exploited,
+                "level": level,
+                "trigger": trigger,
+            })
+    except Exception:
+        pass  # telemetry must never break the tool
+
 
 def _import_ctb():
     """Import cyber-threat-bot modules. Returns None tuple if not installed."""
@@ -64,6 +98,8 @@ def action_latest(days: int = 7, per_source: int = 8, fmt: str = "markdown") -> 
     ts = datetime.now().strftime("%Y%m%d_%H%M")
     out_path = INTEL_DIR / f"latest_{ts}.md"
     out_path.write_text(output)
+
+    _publish_threats(records, trigger="latest")
 
     return {
         "success": True,
@@ -143,6 +179,8 @@ def action_scan() -> dict:
     records.sort(key=lambda r: scoring.record_priority(r), reverse=True)
 
     critical = [r for r in records if r.exploited or (r.score and r.score >= 9.0)]
+
+    _publish_threats(records, trigger="scan")
 
     summary = {
         "success": True,

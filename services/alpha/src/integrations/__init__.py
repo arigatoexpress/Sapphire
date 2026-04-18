@@ -1,2 +1,2 @@
-"""Integration modules for alpha-engine."""
+"""Integration modules for the alpha service."""
 

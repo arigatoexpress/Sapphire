@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Content_Engine{% endblock %}
+
+{% block extra_css %}
+.draft-card {
+    border: 1px solid var(--border-dim);
+    background: rgba(0, 0, 0, 0.5);
+    padding: var(--space-md);
+    margin-bottom: var(--space-md);
+    font-family: var(--font-terminal);
+}
+
+.draft-card h3 {
+    margin: 0 0 var(--space-sm) 0;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+}
+
+.draft-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-bottom: var(--space-sm);
+}
+
+.draft-row {
+    display: flex;
+    gap: var(--space-md);
+    font-size: 0.8rem;
+    padding: var(--space-xs) 0;
+    border-bottom: 1px dotted rgba(255, 176, 0, 0.05);
+}
+
+.draft-row:last-child { border-bottom: none; }
+
+.qa-pass { color: #00ff9c; }
+.qa-fail { color: #ff5454; }
+
+.draft-sources {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: var(--space-xs);
+}
+
+.draft-sources code {
+    background: rgba(255, 176, 0, 0.05);
+    padding: 1px 4px;
+    margin-right: 6px;
+}
+
+.empty {
+    color: var(--text-muted);
+    padding: var(--space-md);
+    border: 1px dashed var(--border-dim);
+}
+{% endblock %}
+
+{% block content %}
+<section>
+    <h2>Content_Engine // Drafts</h2>
+    <p class="draft-meta">
+        Data-driven reports formatted for LinkedIn, Substack, and X.
+        Source: <code>data/content/drafts/</code>.
+        Calendar: Mon=crypto brief · Wed=AI intel · Fri=security · Daily=market pulse.
+    </p>
+
+    <div id="drafts-container">
+        <div class="empty">Loading drafts…</div>
+    </div>
+</section>
+
+<script>
+(async function() {
+    const container = document.getElementById('drafts-container');
+    try {
+        const res = await fetch('/api/content/drafts');
+        const payload = await res.json();
+        const drafts = payload.drafts || [];
+        if (!drafts.length) {
+            container.innerHTML = '<div class="empty">No drafts yet. Run <code>python3 -m lib.content --all</code> to generate.</div>';
+            return;
+        }
+        container.innerHTML = drafts.map(renderDraft).join('');
+    } catch (e) {
+        container.innerHTML = '<div class="empty">Failed to load drafts: ' + e.message + '</div>';
+    }
+
+    function renderDraft(d) {
+        const report = d.report || {};
+        const renderings = d.renderings || {};
+        const sources = (report.sources || []).map(s => '<code>' + s + '</code>').join(' ');
+        const platforms = Object.entries(renderings).map(function(entry) {
+            const plat = entry[0];
+            const info = entry[1] || {};
+            const q = info.quality || {};
+            const status = q.passed ? '<span class="qa-pass">PASS</span>' : '<span class="qa-fail">FAIL</span>';
+            const reasons = (q.reasons || []).join(', ');
+            return '<div class="draft-row">' +
+                '<span style="min-width:90px;">' + plat + '</span>' +
+                '<span>' + status + '</span>' +
+                '<span>' + (q.number_count || 0) + ' numbers</span>' +
+                '<span>' + (q.word_count || 0) + ' words</span>' +
+                '<span style="color: var(--text-muted);">' + (reasons || 'ok') + '</span>' +
+                '<span style="flex:1; text-align:right;"><code>' + (info.path || '') + '</code></span>' +
+            '</div>';
+        }).join('');
+        return '<div class="draft-card">' +
+            '<h3>' + (report.title || 'Untitled') + '</h3>' +
+            '<div class="draft-meta">' +
+                'kind: ' + (report.kind || '?') + ' · ' +
+                'generated: ' + (report.generated_at || '?') +
+            '</div>' +
+            platforms +
+            '<div class="draft-sources">Sources: ' + (sources || 'none') + '</div>' +
+        '</div>';
+    }
+})();
+</script>
+{% endblock %}

@@ -1,3 +1,10 @@
+"""HTTP health, readiness, and dashboard WebSocket surface for services.
+
+Provides /health and /readiness endpoints plus a push-broadcast WebSocket
+(max 50 clients, 5s interval) used by the dashboard for live telemetry.
+Mutating endpoints are gated by the SAPPHIRE_CONTROL_API_TOKEN header.
+"""
+
 import asyncio
 import json
 import logging

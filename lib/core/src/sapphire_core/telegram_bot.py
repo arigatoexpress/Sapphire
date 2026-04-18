@@ -1,6 +1,8 @@
-"""
-Enhanced Telegram Bot Service for Sapphire AI.
-Supports notifications and interactive commands via @mentions.
+"""Agent-facing Telegram helpers used by core services.
+
+Exposes NotificationPriority and TelegramPlatformBot for inter-agent
+notifications and @mention command routing. Distinct from lib/telegram,
+which hosts the user-facing bot client and /command handler registry.
 """
 
 import asyncio

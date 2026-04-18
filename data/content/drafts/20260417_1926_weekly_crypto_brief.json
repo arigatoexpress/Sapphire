@@ -1,0 +1,231 @@
+{
+  "report": {
+    "kind": "weekly_crypto_brief",
+    "title": "Sapphire Weekly Crypto Brief \u2014 2026-04-18",
+    "generated_at": "2026-04-18T01:26:56+00:00",
+    "facts": {
+      "predictions": {
+        "total": 24,
+        "hits": 14,
+        "accuracy": 0.583,
+        "by_symbol": {
+          "BTC": {
+            "hits": 6,
+            "total": 8,
+            "accuracy": 0.75
+          },
+          "ETH": {
+            "hits": 5,
+            "total": 8,
+            "accuracy": 0.625
+          },
+          "SOL": {
+            "hits": 3,
+            "total": 8,
+            "accuracy": 0.375
+          }
+        }
+      },
+      "latest_forecasts": [
+        {
+          "timestamp": "2026-04-11T23:39:01.251432+00:00",
+          "symbol": "BTC",
+          "direction": "neutral",
+          "confidence": 0.76,
+          "target_price": 73143.73,
+          "entry_price": 73143.73,
+          "timeframe": "24h",
+          "rsi": 78.1,
+          "macd_cross": "none",
+          "ma_trend": "bullish",
+          "bb_position": "upper_half",
+          "volume_signal": "normal",
+          "volatility": "normal",
+          "signals_bullish": 4,
+          "signals_bearish": 1,
+          "net_signal": "bullish",
+          "reasoning": "neutral (net=+1.5): MA\u2191 RSI78\u2193. Bull=2.5 Bear=1.0. RSI 78, MA bullish, BB upper_half.",
+          "actual_price": 73149,
+          "correct": true
+        },
+        {
+          "timestamp": "2026-04-11T23:39:01.251432+00:00",
+          "symbol": "ETH",
+          "direction": "neutral",
+          "confidence": 0.65,
+          "target_price": 2289.07,
+          "entry_price": 2289.07,
+          "timeframe": "24h",
+          "rsi": 74.9,
+          "macd_cross": "none",
+          "ma_trend": "bullish",
+          "bb_position": "above_upper",
+          "volume_signal": "normal",
+          "volatility": "normal",
+          "signals_bullish": 4,
+          "signals_bearish": 2,
+          "net_signal": "bullish",
+          "reasoning": "neutral (net=+0.5): MA\u2191 RSI75\u2193 BB>high. Bull=2.5 Bear=2.0. RSI 75, MA bullish, BB above_upper.",
+          "actual_price": 2288.83,
+          "correct": true
+        },
+        {
+          "timestamp": "2026-04-11T23:39:01.251432+00:00",
+          "symbol": "SOL",
+          "direction": "bearish",
+          "confidence": 0.83,
+          "target_price": 83.19,
+          "entry_price": 85.04,
+          "timeframe": "24h",
+          "rsi": 56.9,
+          "macd_cross": "none",
+          "ma_trend": "bearish",
+          "bb_position": "upper_half",
+          "volume_signal": "high",
+          "volatility": "normal",
+          "signals_bullish": 4,
+          "signals_bearish": 1,
+          "net_signal": "bullish",
+          "reasoning": "bearish (net=-2.0): MA\u2193 RSI57 Vol\u2191. Bull=0.5 Bear=2.5. RSI 57, MA bearish, BB upper_half.",
+          "actual_price": 85.06,
+          "correct": false
+        }
+      ],
+      "portfolio": {
+        "capital": 100000.0,
+        "initial_capital": 100000.0,
+        "pnl_pct": 0.0,
+        "open_positions": 2,
+        "symbols": [
+          "BTCUSDT",
+          "ETHUSDT"
+        ],
+        "positions": [
+          {
+            "symbol": "BTCUSDT",
+            "side": "BUY",
+            "entry_price": 72391,
+            "qty": 0.1381387189015209,
+            "size_usd": 10000.0,
+            "stop_loss": 68993.5,
+            "take_profit": 78053.5,
+            "atr": 2265,
+            "confidence": 0.85,
+            "opened_at": "2026-04-09T21:51:42.676305+00:00",
+            "peak_price": 73133,
+            "trailing_active": true
+          },
+          {
+            "symbol": "ETHUSDT",
+            "side": "BUY",
+            "entry_price": 2220,
+            "qty": 4.504504504504505,
+            "size_usd": 10000.0,
+            "stop_loss": 2080.5,
+            "take_profit": 2452.5,
+            "atr": 93,
+            "confidence": 0.85,
+            "opened_at": "2026-04-09T21:51:42.719936+00:00",
+            "peak_price": 2288.66,
+            "trailing_active": true
+          }
+        ]
+      },
+      "signal_pipeline": {
+        "count": 9,
+        "sources": {
+          "webhook": 3,
+          "sapphire-ta-scanner": 4,
+          "sapphire-ta-scanner-v2": 2
+        },
+        "symbols": {
+          "ETHBTC": 2,
+          "BTCUSDT": 4,
+          "ETHUSDT": 3
+        },
+        "latest": {
+          "timestamp": "2026-04-09T23:44:18.125642+00:00",
+          "symbol": "ETHUSDT",
+          "action": "BUY",
+          "strategy": "multi_factor_ensemble",
+          "price": 2189.93,
+          "confidence": 0.68,
+          "signal_id": "2818d5b4-4c49-4d65-be2e-1693bc694c35",
+          "source": "sapphire-ta-scanner-v2",
+          "execution": "LOGGED_ONLY",
+          "raw": {
+            "factors": 3,
+            "agreeing": 3,
+            "agreement_ratio": 1.0,
+            "avg_strength": 0.38,
+            "edge": 0.0379,
+            "kelly_size_pct": 1.9,
+            "volatility_regime": "normal",
+            "reason": "3F ensemble: MA\u2191 RSI62 7d\u2191",
+            "factor_names": [
+              "MA\u2191",
+              "RSI62",
+              "7d\u2191"
+            ],
+            "rsi": 61.6,
+            "macd_cross": "none",
+            "ma_trend": "bullish",
+            "bb_position": "upper_half",
+            "volume_ratio": 1.14,
+            "change_7d_pct": 6.65,
+            "source": "sapphire-ta-scanner-v2"
+          }
+        }
+      }
+    },
+    "body": "## Where the Predictions Stand\n\nAcross 24 scored forecasts, the 6-factor TA model hit 14 (58.3%). Per symbol:\n- BTC: 6/8 correct (75.0%)\n- ETH: 5/8 correct (62.5%)\n- SOL: 3/8 correct (37.5%)\n\n## Latest Forecasts\n\n- BTC neutral \u2192 target $73143.73 (entry $73143.73, conf 76.0%, RSI 78.1)\n- ETH neutral \u2192 target $2289.07 (entry $2289.07, conf 65.0%, RSI 74.9)\n- SOL bearish \u2192 target $83.19 (entry $85.04, conf 83.0%, RSI 56.9)\n\n## Paper Portfolio ($100K book)\n\nCapital $100,000.00 vs start $100,000.00 (+0.00%). 2 open: BTCUSDT, ETHUSDT.\n- BTCUSDT BUY @ $72391 \u00b7 SL $68993.5 TP $78053.5 \u00b7 size $10,000\n- ETHUSDT BUY @ $2220 \u00b7 SL $2080.5 TP $2452.5 \u00b7 size $10,000\n\n## Signal Pipeline\n\n9 signals logged this period. Sources: {'webhook': 3, 'sapphire-ta-scanner': 4, 'sapphire-ta-scanner-v2': 2}. Symbols seen: ['ETHBTC', 'BTCUSDT', 'ETHUSDT'].\nMost recent: ETHUSDT BUY conf 0.68 via sapphire-ta-scanner-v2.",
+    "sources": [
+      "data/trading_predictions.jsonl",
+      "data/paper_portfolio.json",
+      "data/trading_signals.jsonl",
+      "data/market_pulse/pulse_20260408_2023.md"
+    ],
+    "tags": [
+      "crypto",
+      "trading",
+      "predictions",
+      "weekly"
+    ]
+  },
+  "renderings": {
+    "linkedin": {
+      "path": "data/content/ready/linkedin/20260417_1926_weekly_crypto_brief.md",
+      "quality": {
+        "passed": true,
+        "banned_hits": [],
+        "number_count": 15,
+        "word_count": 48,
+        "avg_sentence_words": 12.0,
+        "reasons": []
+      }
+    },
+    "substack": {
+      "path": "data/content/ready/substack/20260417_1926_weekly_crypto_brief.md",
+      "quality": {
+        "passed": true,
+        "banned_hits": [],
+        "number_count": 53,
+        "word_count": 162,
+        "avg_sentence_words": 20.25,
+        "reasons": []
+      }
+    },
+    "x": {
+      "path": "data/content/ready/x/20260417_1926_weekly_crypto_brief.jsonl",
+      "quality": {
+        "passed": true,
+        "banned_hits": [],
+        "number_count": 26,
+        "word_count": 53,
+        "avg_sentence_words": 5.89,
+        "reasons": []
+      }
+    }
+  },
+  "published_at": "2026-04-17T19:26:56"
+}

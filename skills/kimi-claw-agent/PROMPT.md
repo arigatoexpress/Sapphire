@@ -5,7 +5,7 @@ You are a Kimi Claw coding agent working on the **Sapphire OS** project for **Ka
 ## System Architecture
 
 Sapphire OS is an autonomous AI operations platform spanning:
-- **Mac** (commander) — 8 LaunchAgent services, 25 plugin tools, 20 scheduled tasks
+- **Mac** (commander) — 8 LaunchAgent services, 26 plugin tools, 20 scheduled tasks
 - **Windows PC** (RTX 5070 Ti) — GPU inference (27 Ollama models), TradingView webhook, telemetry dashboard
 - **Raspberry Pi** (rari1) — edge inference (2 Ollama models, 11 t/s)
 - **Google Cloud** — THO client app (Cloud Run rev 26), Firestore (1,963 customers), GCS documents
@@ -14,7 +14,7 @@ Sapphire OS is an autonomous AI operations platform spanning:
 
 | Repo | Purpose |
 |------|---------|
-| `Sapphire` | Monorepo — 1,088 tests, 25 plugin tools, trading pipeline, orchestration |
+| `Sapphire` | Monorepo — 1,088 tests, 26 plugin tools, trading pipeline, orchestration |
 | `Project-Go-Forward` | Texas Home Outlet — CRM, 63 PDF templates, customer management, 93 tests |
 | `cyber-threat-bot` | Threat intel — CISA KEV, NVD CVE, MITRE ATT&CK, revenue synthesis |
 | `regional-intel-workbench` | Business intel — Austin/Houston/Gunnison permits, news, leads |
@@ -23,7 +23,7 @@ Sapphire OS is an autonomous AI operations platform spanning:
 | `hermes-agent` | NousResearch conversational AI framework (Telegram bot) |
 | `Kronos` | Financial candlestick foundation model (AAAI 2026) |
 
-## Plugin Tools (25)
+## Plugin Tools (26)
 
 Located at `plugins/claw-sapphire/tools/`:
 - **Trading**: `signal_generator` (6-factor ensemble), `predict` (TA-grounded), `paper_trader` (Half-Kelly + trailing stops), `trading_brain` (unified 5-source decisions), `kronos_predict` (foundation model), `market` (OpenBB + TradingView), `backtest` (Pine Script)
@@ -56,7 +56,7 @@ As a Kimi Claw agent, you can:
 
 1. **Code improvements** — refactor, optimize, add error handling to any tool
 2. **Test writing** — grow coverage beyond 1,155 tests
-3. **Bug fixes** — find and fix edge cases in the 25 tools
+3. **Bug fixes** — find and fix edge cases in the 26 tools
 4. **Documentation** — update CLAUDE.md, add docstrings, write API docs
 5. **Feature development** — new tools, new scheduled tasks, new integrations
 6. **Trading strategy** — improve signal generator, backtest strategies, tune prediction engine
@@ -82,7 +82,7 @@ As a Kimi Claw agent, you can:
 
 1. Improve prediction accuracy from 56% → 70%+
 2. Get Kronos foundation model running (needs PyTorch)
-3. Build more comprehensive tests for all 25 tools
+3. Build more comprehensive tests for all 26 tools
 4. Reduce paper trader time-to-first-close (positions sitting too long)
 5. Polish the Windows telemetry dashboard (React crashes fixed but needs UX work)
 6. Integrate Palantir AIP SDK with Sapphire data

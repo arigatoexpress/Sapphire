@@ -1,11 +1,11 @@
-"""Telegram notification tool for claw-code.
+"""Telegram alerts via NemotronRariBot for claw-code.
 
-Sends messages to the Sapphire Telegram bot. Can be called directly
-or invoked by Claude Dispatch scheduled tasks.
+Sends messages to the Sapphire Telegram bot with priority tags (p0-p3).
+Called directly by scripts or invoked by scheduled tasks.
 
 Usage:
-    python -m plugins.claw-sapphire.src.tools.notify "Your message here"
-    python -m plugins.claw-sapphire.src.tools.notify --priority p0 "ALERT: Something broke"
+    python3 notify.py "Your message here"
+    python3 notify.py --priority p0 "ALERT: Something broke"
 """
 
 from __future__ import annotations
@@ -17,14 +17,16 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-# macOS system Python may lack updated CA certs — use permissive context for Telegram API
+# Telegram bot tokens travel in the URL path — MITM-ing this call leaks the
+# bot credentials. Always verify the server certificate. We prefer certifi's
+# bundle when available (macOS system Python can lag on CAs) and fall back to
+# the stock system store, but we do NOT disable verification.
 _SSL_CTX = ssl.create_default_context()
 try:
     import certifi
     _SSL_CTX.load_verify_locations(certifi.where())
 except ImportError:
-    _SSL_CTX.check_hostname = False
-    _SSL_CTX.verify_mode = ssl.CERT_NONE
+    pass
 
 # Secret locations (checked in order)
 SECRET_PATHS = [

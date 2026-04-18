@@ -64,6 +64,26 @@ except ImportError:
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("inference-proxy")
 
+# ─── x402 payment gate (optional — X402_ENABLED=1 to activate) ────────────────
+_SAPPHIRE_ROOT = Path(__file__).resolve().parents[2]
+if str(_SAPPHIRE_ROOT) not in sys.path:
+    sys.path.insert(0, str(_SAPPHIRE_ROOT))
+try:
+    from lib.payments.x402_middleware import X402Middleware
+    _X402 = X402Middleware(pricing={
+        "/v1/chat/completions": float(os.getenv("X402_PRICE_CHAT", "0.001")),
+        "/v1/completions":      float(os.getenv("X402_PRICE_COMPLETIONS", "0.001")),
+        "/v1/embeddings":       float(os.getenv("X402_PRICE_EMBED", "0.0005")),
+    })
+    _X402_AVAILABLE = True
+    log.info("x402 payment gate: enabled=%s recipient=%s network=%s",
+             _X402.enabled, _X402.recipient[:10] + "..." if _X402.recipient else "-",
+             _X402.network)
+except Exception as e:
+    log.warning("x402 middleware unavailable: %s", e)
+    _X402 = None
+    _X402_AVAILABLE = False
+
 # ─── Endpoints (overridable via env vars for network changes) ────────────────
 WINDOWS_GPU   = os.getenv("WINDOWS_GPU_URL",  "http://100.71.10.48:11434")
 PI_RARI1      = os.getenv("PI_RARI1_URL",     "http://100.120.191.1:11434")
@@ -162,6 +182,8 @@ def _is_healthy(name: str) -> bool:
     with _health_lock:
         if _endpoint_health[name]:
             return True
+        # Cooldown avoids hammering a down endpoint on every request — each
+        # failed probe costs a 15–90s timeout that blocks the caller.
         return time.time() - _last_health_check[name] > HEALTH_COOLDOWN
 
 
@@ -644,6 +666,26 @@ class ProxyHandler(BaseHTTPRequestHandler):
             return
         body = self.rfile.read(content_length)
 
+        # x402 payment gate — /health and /metrics stay free (those are GETs).
+        # Any paid POST path is priced via `_X402.pricing`; absent entries fall
+        # through. When X402_ENABLED is off, `gate()` is a no-op.
+        if _X402 is not None and self.path in _X402.pricing:
+            price = _X402.price_for(self.path) or 0.0
+            header = self.headers.get("X-PAYMENT") or self.headers.get("PAYMENT-SIGNATURE")
+            resource_url = f"http://{self.headers.get('Host', 'localhost')}{self.path}"
+            allowed, body_402, _ = _X402.gate(
+                resource_url=resource_url,
+                amount_usd=price,
+                header_value=header,
+            )
+            if not allowed:
+                self.send_response(402)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("X-Payment-Required", "true")
+                self.end_headers()
+                self.wfile.write(json.dumps(body_402).encode())
+                return
+
         try:
             req_data = json.loads(body)
         except json.JSONDecodeError:
@@ -681,6 +723,8 @@ class ProxyHandler(BaseHTTPRequestHandler):
 
         # ── Kimi Cloud shortcut (explicit request) ──────────────────────────
         if wants_kimi and is_chat:
+            # Sensitivity gate runs BEFORE any network call — prevents leaking
+            # creds/PnL to a third-party API even if the user asked for Kimi.
             if _is_sensitive(messages):
                 log.warning("! kimi-cloud blocked: sensitive content detected")
                 self._respond(400, {
@@ -712,6 +756,8 @@ class ProxyHandler(BaseHTTPRequestHandler):
             return
 
         # ── Tier 1: Windows GPU ──────────────────────────────────────────────
+        # Native /api/chat (not /v1/chat/completions): Windows Ollama's
+        # OpenAI-compat layer returns empty responses — the native endpoint works.
         if _is_healthy("windows-gpu"):
             tried.append("windows-gpu")
         resp = _try_ollama_native("windows-gpu", WINDOWS_GPU, model,
@@ -721,6 +767,9 @@ class ProxyHandler(BaseHTTPRequestHandler):
             return
 
         if needs_gpu:
+            # GPU-only models short-circuit to 503 — Pi/Mac can't fit the weights
+            # and Kimi Cloud is a different model family, so falling through would
+            # silently change what the caller asked for.
             log.error("GPU-only model %s — all GPU attempts failed", model)
             self._respond(503, {
                 "error": f"GPU-only model '{model}' unavailable (Windows GPU down)",

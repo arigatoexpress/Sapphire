@@ -1,0 +1,4 @@
+{"index": 0, "text": "Security digest: 5 prioritized CVEs, 5 in KEV, avg CVSS 9.54. CVE-2026-1340 KEV CVSS 9.8 \u2014 Ivanti Endpoint Manager Mobile (EPMM): Ivanti Endpoint Manager Mobile (EPMM) Code Injection Vulnerability (prio 14.13). (1/4)"}
+{"index": 1, "text": "CVE-2026-35616 KEV CVSS 9.8 \u2014 Fortinet FortiClient EMS: Fortinet FortiClient EMS Improper Access Control Vulnerability (prio 11.97). CVE-2025-32432 KEV CVSS 10.0 \u2014 Craft CMS Craft CMS: Craft CMS Code Injection Vulnerability (prio 11.50). (2/4)"}
+{"index": 2, "text": "CVE-2026-5281 KEV CVSS 8.8 \u2014 Google Dawn: Google Dawn Use-After-Free Vulnerability (prio 11.37). CVE-2025-53521 KEV CVSS 9.3 \u2014 F5 BIG-IP: F5 BIG-IP Stack-Based Buffer Overflow Vulnerability (prio 11.15). (3/4)"}
+{"index": 3, "text": "Source: /Users/aribs/Code/Sapphire/.claude/worktrees/quizzical-mclaren-8cabc7/data/threat_intel/latest_20260409_0118.md (4/4)"}

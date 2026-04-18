@@ -433,10 +433,11 @@ class TestApplyStageMultiplier:
         result = sizing.apply_stage_multiplier(100.0, "full_live")
         assert result == pytest.approx(100.0, abs=0.01)
 
-    def test_unknown_stage_defaults_to_1(self, sizing):
-        """Unknown stage key → defaults to 1.0 multiplier."""
+    def test_unknown_stage_defaults_to_zero(self, sizing):
+        """Unknown stage → fails closed to 0 (paper). A typo in the stage
+        string must never promote an order to full_live."""
         result = sizing.apply_stage_multiplier(100.0, "unknown_stage")
-        assert result == pytest.approx(100.0, abs=0.01)
+        assert result == pytest.approx(0.0, abs=0.01)
 
     def test_override_multiplier(self, sizing):
         result = sizing.apply_stage_multiplier(100.0, "paper", multiplier_override=0.5)

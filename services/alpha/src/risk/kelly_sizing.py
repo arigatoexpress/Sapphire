@@ -22,6 +22,9 @@ logger = get_logger(__name__)
 @dataclass
 class KellyConfig:
     """Configuration for Kelly sizing"""
+    # Fractional Kelly (1/10 here — much more conservative than the 1/2 classical
+    # recommendation) because our edge estimate has high variance on a small
+    # sample; full Kelly at a wrong win_prob produces ruin with probability 1.
     kelly_fraction: float = 0.1  # Use 10% of full Kelly (conservative)
     min_kelly_fraction: float = 0.05  # Minimum 5%
     max_kelly_fraction: float = 0.2  # Maximum 20%
@@ -140,12 +143,14 @@ class KellySizer:
             
             # Kelly-based position size
             kelly_position_size = capital * kelly_fraction
-            
+
             # Risk-based position size (1% rule)
             risk_amount = capital * (self.config.risk_per_trade_pct / 100.0)
             risk_position_size = risk_amount / stop_loss_pct if stop_loss_pct > 0 else 0
-            
-            # Use the more conservative of the two
+
+            # Vol-budget cap: Kelly can recommend huge size on a tight stop,
+            # but the 1%-risk rule caps $ at risk regardless. Taking the min
+            # means drawdown stays bounded even when our edge estimate is off.
             position_size = min(kelly_position_size, risk_position_size)
             
             # Apply hard limits
@@ -244,11 +249,13 @@ class KellySizer:
             if self.total_trades < 10:
                 # Not enough data, use default
                 return self.config.default_win_prob
-            
+
             # Calculate from recent history
             win_rate = self.win_count / self.total_trades
-            
-            # Regress towards default (Bayesian update)
+
+            # Shrinkage toward 0.55 prior — a 3-trade hot streak would otherwise
+            # report 100% win rate and blow up position size. alpha=0.7 keeps
+            # 30% weight on the prior until the sample dominates.
             alpha = 0.7  # Weight on historical data
             estimated_prob = alpha * win_rate + (1 - alpha) * self.config.default_win_prob
             
@@ -420,8 +427,9 @@ def calculate_sharpe_optimal_kelly(mean_return: float,
         # Sharpe-optimal Kelly
         excess_return = mean_return - risk_free_rate
         kelly_fraction = excess_return / (std_return ** 2)
-        
-        # Apply safety factor
+
+        # Half-Kelly here (not 1/10 like the base config) because the variance
+        # estimate std_return already penalizes noisy returns quadratically.
         kelly_fraction *= 0.5  # Use 50% of full Kelly
         
         # Clip to reasonable range
