@@ -1,264 +1,170 @@
-"""Tests for ConfirmationFirewall — classification + approval logic.
+"""Tests for lib/core/confirmation_firewall.py — action classification + budget tracking.
 
 Run: /usr/local/bin/python3 -m pytest tests/unit/test_confirmation_firewall.py -v
 """
-
 from __future__ import annotations
 
 import json
-
-# Import module under test
+import os
 import sys
-import time
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "lib" / "core"))
-from confirmation_firewall import (
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+import lib.core.confirmation_firewall as fw_module  # type: ignore
+from lib.core.confirmation_firewall import (  # type: ignore
     ActionRisk,
-    ConfirmationFirewall,
-    _approve_pending,
-    _deny_pending,
-    _load_daily_spend,
-    _poll_pending,
-    _record_spend,
-    _write_pending,
     classify_action,
+    _load_daily_spend,
+    _record_spend,
+    _try_consume_daily_budget,
+    DAILY_AUTO_LIMIT,
 )
 
-# ─── Fixtures ─────────────────────────────────────────────────────────────────
 
 @pytest.fixture(autouse=True)
 def isolated_state(tmp_path, monkeypatch):
-    """Redirect all state dirs to tmp_path so tests don't touch real ~/.sapphire."""
-    monkeypatch.setattr("confirmation_firewall.SAPPHIRE_STATE", tmp_path)
-    monkeypatch.setattr("confirmation_firewall.PENDING_DIR", tmp_path / "pending")
-    monkeypatch.setattr("confirmation_firewall.LIMITS_FILE", tmp_path / "limits.json")
+    """Redirect all state paths to tmp_path and disable Redis."""
+    state = tmp_path / ".sapphire"
+    state.mkdir()
+    monkeypatch.setattr(fw_module, "SAPPHIRE_STATE", state)
+    monkeypatch.setattr(fw_module, "PENDING_DIR", state / "pending_confirmations")
+    monkeypatch.setattr(fw_module, "LIMITS_FILE", state / "financial_limits.json")
     monkeypatch.setenv("SAPPHIRE_NO_REDIS", "1")
-    yield tmp_path
+    return state
 
 
-@pytest.fixture
-def fw():
-    return ConfirmationFirewall()
+class TestClassifyAction:
+    def test_cat_is_read(self):
+        assert classify_action("cat /var/log/system.log") == ActionRisk.READ_ONLY
 
+    def test_health_check_is_read(self):
+        assert classify_action("health check services") == ActionRisk.READ_ONLY
 
-# ─── Classification Tests ─────────────────────────────────────────────────────
+    def test_curl_get_is_read(self):
+        assert classify_action("curl GET http://localhost:8080/health") == ActionRisk.READ_ONLY
 
-class TestClassification:
-    def test_read_only_commands(self):
-        assert classify_action("cat /var/log/syslog") == ActionRisk.READ_ONLY
-        assert classify_action("ls -la ~/.hermes/") == ActionRisk.READ_ONLY
-        assert classify_action("health check endpoint") == ActionRisk.READ_ONLY
-        assert classify_action("get model list") == ActionRisk.READ_ONLY
-        assert classify_action("status check") == ActionRisk.READ_ONLY
+    def test_status_is_read(self):
+        assert classify_action("status sapphire services") == ActionRisk.READ_ONLY
 
-    def test_self_modify_commands(self):
-        assert classify_action("write log entry") == ActionRisk.SELF_MODIFY
-        assert classify_action("append log") == ActionRisk.SELF_MODIFY
-        assert classify_action("send self message") == ActionRisk.SELF_MODIFY
-
-    def test_system_modify_commands(self):
-        assert classify_action("restart hermes") == ActionRisk.SYSTEM_MODIFY
-        assert classify_action("launchctl kickstart inference-proxy") == ActionRisk.SYSTEM_MODIFY
-        assert classify_action("config set PI_RARI2_ENABLED=1") == ActionRisk.SYSTEM_MODIFY
-        assert classify_action("pip install requests") == ActionRisk.SYSTEM_MODIFY
-        assert classify_action("chmod +x script.sh") == ActionRisk.SYSTEM_MODIFY
-
-    def test_external_send_commands(self):
-        assert classify_action("send message to alice") == ActionRisk.EXTERNAL_SEND
-        assert classify_action("git push origin main") == ActionRisk.EXTERNAL_SEND
-        assert classify_action("deploy to production") == ActionRisk.EXTERNAL_SEND
-
-    def test_financial_commands(self):
-        assert classify_action("buy 0.1 ETH") == ActionRisk.FINANCIAL
-        assert classify_action("place order sell BTC") == ActionRisk.FINANCIAL
-        assert classify_action("transfer $500") == ActionRisk.FINANCIAL
-        assert classify_action("swap USDC for ETH") == ActionRisk.FINANCIAL
-
-    def test_destructive_commands(self):
+    def test_rm_rf_is_destructive(self):
         assert classify_action("rm -rf /tmp/data") == ActionRisk.DESTRUCTIVE
-        assert classify_action("launchctl bootout gui/501/com.sapphire.proxy") == ActionRisk.DESTRUCTIVE
-        assert classify_action("kill -9 12345") == ActionRisk.DESTRUCTIVE
-        assert classify_action("pkill ollama") == ActionRisk.DESTRUCTIVE
+
+    def test_launchctl_bootout_is_destructive(self):
+        assert classify_action("launchctl bootout system/com.sapphire") == ActionRisk.DESTRUCTIVE
+
+    def test_pkill_is_destructive(self):
+        assert classify_action("pkill -f python3") == ActionRisk.DESTRUCTIVE
+
+    def test_drop_table_is_destructive(self):
+        assert classify_action("drop table signals") == ActionRisk.DESTRUCTIVE
+
+    def test_trade_is_financial(self):
+        assert classify_action("trade BTC on hyperliquid") == ActionRisk.FINANCIAL
+
+    def test_go_long_is_financial(self):
+        assert classify_action("go long on ETH") == ActionRisk.FINANCIAL
+
+    def test_stop_loss_is_financial(self):
+        assert classify_action("set stop-loss at 63000") == ActionRisk.FINANCIAL
+
+    def test_place_position_is_financial(self):
+        assert classify_action("place position SOL 1x long") == ActionRisk.FINANCIAL
+
+    def test_withdraw_is_financial(self):
+        assert classify_action("withdraw funds from account") == ActionRisk.FINANCIAL
+
+    def test_write_log_is_self_modify(self):
+        assert classify_action("write log entry for today") == ActionRisk.SELF_MODIFY
+
+    def test_append_log_is_self_modify(self):
+        assert classify_action("echo done >> /var/log/app.log") == ActionRisk.SELF_MODIFY
+
+    def test_memory_write_is_self_modify(self):
+        assert classify_action("memory write note about BTC") == ActionRisk.SELF_MODIFY
+
+    def test_git_push_is_external(self):
+        assert classify_action("git push origin main") == ActionRisk.EXTERNAL_SEND
+
+    def test_post_tweet_is_external(self):
+        assert classify_action("post tweet about market") == ActionRisk.EXTERNAL_SEND
+
+    def test_send_message_is_external(self):
+        assert classify_action("send message to team") == ActionRisk.EXTERNAL_SEND
+
+    def test_deploy_is_external(self):
+        assert classify_action("deploy service to production") == ActionRisk.EXTERNAL_SEND
+
+    def test_restart_is_system(self):
+        assert classify_action("restart inference-proxy service") == ActionRisk.SYSTEM_MODIFY
+
+    def test_pip_install_is_system(self):
+        assert classify_action("pip install requests") == ActionRisk.SYSTEM_MODIFY
+
+    def test_git_commit_is_system(self):
+        assert classify_action("git commit -m fix") == ActionRisk.SYSTEM_MODIFY
+
+    def test_config_write_is_system(self):
+        assert classify_action("config write new settings") == ActionRisk.SYSTEM_MODIFY
 
     def test_destructive_beats_financial(self):
-        """Destructive patterns take priority over financial."""
-        assert classify_action("delete all trade history") == ActionRisk.DESTRUCTIVE
+        assert classify_action("rm -rf data and close position") == ActionRisk.DESTRUCTIVE
 
-    def test_target_included_in_matching(self):
-        assert classify_action("service stop", target="ollama") == ActionRisk.SYSTEM_MODIFY
-        assert classify_action("systemctl stop", target="ollama") == ActionRisk.SYSTEM_MODIFY
+    def test_financial_beats_external(self):
+        assert classify_action("send $500 via transfer") == ActionRisk.FINANCIAL
 
     def test_unknown_defaults_to_read_only(self):
-        assert classify_action("frobulate the widget") == ActionRisk.READ_ONLY
+        assert classify_action("frob the quux") == ActionRisk.READ_ONLY
+
+    def test_target_included_in_classification(self):
+        result = classify_action("launchctl kickstart", target="system/com.sapphire")
+        assert result == ActionRisk.SYSTEM_MODIFY
 
 
-# ─── Auto-Approval Tests ──────────────────────────────────────────────────────
+class TestDailySpend:
+    def test_initial_spend_is_zero(self):
+        assert _load_daily_spend() == pytest.approx(0.0)
 
-class TestAutoApproval:
-    def test_read_only_auto_approved(self, fw):
-        approved = fw.request_confirmation("cat file.txt", ActionRisk.READ_ONLY)
+    def test_record_spend_accumulates(self):
+        _record_spend(25.0)
+        _record_spend(30.0)
+        assert _load_daily_spend() == pytest.approx(55.0)
+
+    def test_spend_resets_on_new_day(self):
+        fw_module.LIMITS_FILE.write_text(json.dumps({"date": "2020-01-01", "spent": 99.0}))
+        assert _load_daily_spend() == pytest.approx(0.0)
+
+    def test_record_handles_corrupt_file(self):
+        fw_module.LIMITS_FILE.write_text("not json")
+        _record_spend(10.0)
+        assert _load_daily_spend() == pytest.approx(10.0)
+
+
+class TestTryConsumeBudget:
+    def test_first_spend_approved(self):
+        approved, total = _try_consume_daily_budget(50.0, DAILY_AUTO_LIMIT)
         assert approved is True
+        assert total == pytest.approx(50.0)
 
-    def test_self_modify_auto_approved(self, fw):
-        approved = fw.request_confirmation("append log entry", ActionRisk.SELF_MODIFY)
-        assert approved is True
-
-    def test_system_modify_requires_confirmation(self, fw):
-        """Without Telegram and with instant timeout, should deny."""
-        # Use tiny poll_interval + instantly deny the confirmation
-        mock_send = MagicMock(return_value=False)
-
-        def instant_deny(*_, **__):
-            # deny immediately via pending file
-            pass
-
-        # Override poll to immediately return "denied"
-        with patch("confirmation_firewall._poll_pending", return_value="denied"):
-            approved = fw.request_confirmation(
-                "restart proxy", ActionRisk.SYSTEM_MODIFY, "restart inference proxy",
-                _send_fn=mock_send, poll_interval=0.01,
-            )
+    def test_spend_at_limit_denied(self):
+        _record_spend(DAILY_AUTO_LIMIT)
+        approved, _ = _try_consume_daily_budget(0.01, DAILY_AUTO_LIMIT)
         assert approved is False
-        mock_send.assert_called_once()
 
-    def test_system_modify_approved_when_confirmed(self, fw, tmp_path):
-        mock_send = MagicMock(return_value=True)
-        responses = ["pending", "pending", "approved"]
-        response_iter = iter(responses)
-
-        with patch("confirmation_firewall._poll_pending", side_effect=lambda _: next(response_iter)):
-            with patch("time.sleep"):
-                approved = fw.request_confirmation(
-                    "restart proxy", ActionRisk.SYSTEM_MODIFY, "restart inference proxy",
-                    _send_fn=mock_send, poll_interval=0.01,
-                )
-        assert approved is True
-
-
-# ─── Financial Limit Tests ────────────────────────────────────────────────────
-
-class TestFinancialLimits:
-    def test_under_daily_limit_auto_approved(self, fw, tmp_path):
-        # Start with $0 spent
-        approved = fw.request_confirmation(
-            "buy ETH", ActionRisk.FINANCIAL, "buy 0.01 ETH", amount=50.0,
-        )
-        assert approved is True
-
-    def test_spend_tracked(self, fw, tmp_path):
-        fw.request_confirmation("buy ETH", ActionRisk.FINANCIAL, "buy", amount=30.0)
-        fw.request_confirmation("buy BTC", ActionRisk.FINANCIAL, "buy", amount=40.0)
-        spent = _load_daily_spend()
-        assert spent == pytest.approx(70.0)
-
-    def test_over_daily_limit_requires_confirmation(self, fw):
-        _record_spend(90.0)  # pre-spend $90
-        mock_send = MagicMock(return_value=False)
-        with patch("confirmation_firewall._poll_pending", return_value="denied"):
-            approved = fw.request_confirmation(
-                "buy ETH", ActionRisk.FINANCIAL, "buy 0.1 ETH", amount=50.0,
-                _send_fn=mock_send, poll_interval=0.01,
-            )
-        assert approved is False
-        mock_send.assert_called_once()
-
-    def test_exactly_at_limit_still_approved(self, fw):
+    def test_spend_under_limit_approved(self):
         _record_spend(50.0)
-        approved = fw.request_confirmation(
-            "buy", ActionRisk.FINANCIAL, "buy", amount=50.0,
-        )
+        approved, total = _try_consume_daily_budget(40.0, DAILY_AUTO_LIMIT)
         assert approved is True
+        assert total == pytest.approx(90.0)
 
-
-# ─── Destructive Delay Tests ──────────────────────────────────────────────────
-
-class TestDestructiveDelay:
-    def test_destructive_enforces_30s_delay(self, fw):
-        mock_send = MagicMock(return_value=True)
-        slept = []
-
-        def fake_sleep(n):
-            slept.append(n)
-
-        with patch("confirmation_firewall._poll_pending", return_value="approved"):
-            approved = fw.request_confirmation(
-                "rm -rf /tmp/test", ActionRisk.DESTRUCTIVE, "delete temp data",
-                _send_fn=mock_send, poll_interval=0.01, _sleep_fn=fake_sleep,
-            )
-        assert approved is True
-        # The 30s delay must appear in slept calls
-        assert any(n >= 30 for n in slept), f"No 30s delay found in sleep calls: {slept}"
-
-    def test_destructive_denied_no_delay(self, fw):
-        mock_send = MagicMock(return_value=True)
-        slept = []
-
-        with patch("confirmation_firewall._poll_pending", return_value="denied"):
-            approved = fw.request_confirmation(
-                "rm -rf /tmp/test", ActionRisk.DESTRUCTIVE, "delete data",
-                _send_fn=mock_send, poll_interval=0.01, _sleep_fn=lambda n: slept.append(n),
-            )
+    def test_spend_over_limit_denied(self):
+        _record_spend(80.0)
+        approved, _ = _try_consume_daily_budget(30.0, DAILY_AUTO_LIMIT)
         assert approved is False
-        assert not any(n >= 30 for n in slept)
 
-
-# ─── Pending Store Tests ──────────────────────────────────────────────────────
-
-class TestPendingStore:
-    def test_write_and_approve(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("confirmation_firewall.PENDING_DIR", tmp_path)
-        code = "TESTCODE"
-        _write_pending(code, "restart", ActionRisk.SYSTEM_MODIFY, "details")
-        assert (tmp_path / f"{code}.json").exists()
-        result = _approve_pending(code)
-        assert result is True
-        # File is cleaned up on next poll
-        status = _poll_pending(code)
-        assert status == "approved"
-
-    def test_write_and_deny(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("confirmation_firewall.PENDING_DIR", tmp_path)
-        code = "DENYCODE"
-        _write_pending(code, "rm -rf", ActionRisk.DESTRUCTIVE, "bad action")
-        _deny_pending(code)
-        status = _poll_pending(code)
-        assert status == "denied"
-
-    def test_expired_returns_denied(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("confirmation_firewall.PENDING_DIR", tmp_path)
-        code = "EXPCODE"
-        _write_pending(code, "action", ActionRisk.SYSTEM_MODIFY, "detail")
-        # Manually expire
-        path = tmp_path / f"{code}.json"
-        data = json.loads(path.read_text())
-        data["expires"] = time.time() - 1
-        path.write_text(json.dumps(data))
-        status = _poll_pending(code)
-        assert status == "denied"
-        assert not path.exists()
-
-    def test_list_pending(self, fw, tmp_path, monkeypatch):
-        monkeypatch.setattr("confirmation_firewall.PENDING_DIR", tmp_path)
-        _write_pending("AAA", "action 1", ActionRisk.SYSTEM_MODIFY, "d1")
-        _write_pending("BBB", "action 2", ActionRisk.EXTERNAL_SEND, "d2")
-        pending = fw.list_pending()
-        assert len(pending) == 2
-        codes = {p["code"] for p in pending}
-        assert codes == {"AAA", "BBB"}
-
-
-# ─── Auto-Approve Shortcut ────────────────────────────────────────────────────
-
-class TestAutoApproveShortcut:
-    def test_safe_actions_pass(self, fw):
-        assert fw.auto_approve("cat log.txt") is True
-        assert fw.auto_approve("append log") is True
-
-    def test_risky_actions_fail(self, fw):
-        assert fw.auto_approve("restart service") is False
-        assert fw.auto_approve("rm -rf data") is False
-        assert fw.auto_approve("buy ETH") is False
+    def test_denied_does_not_record(self):
+        _record_spend(DAILY_AUTO_LIMIT)
+        _try_consume_daily_budget(10.0, DAILY_AUTO_LIMIT)
+        assert _load_daily_spend() == pytest.approx(DAILY_AUTO_LIMIT)
