@@ -285,7 +285,7 @@ if __name__ == "__main__":
 
     query = " ".join(sys.argv[1:]) or "Analyze BTC and ETH. What are the key levels and which has a better setup?"
 
-    print(f"🤖 NVIDIA Agent Pipeline")
+    print("🤖 NVIDIA Agent Pipeline")
     print(f"   Query: {query}\n")
 
     result = run_agent(query)
@@ -294,7 +294,7 @@ if __name__ == "__main__":
     for tc in result.tool_calls:
         print(f"   → {tc['name']}({json.dumps(tc['args'])})")
 
-    print(f"\n📊 Tool Results:")
+    print("\n📊 Tool Results:")
     for name, data in result.tool_results.items():
         parsed = json.loads(data)
         print(f"   {name}: {json.dumps(parsed)[:150]}...")

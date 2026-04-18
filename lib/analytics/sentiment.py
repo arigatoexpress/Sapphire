@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 log = logging.getLogger(__name__)
 
@@ -222,7 +222,7 @@ def compute_sentiment(
         label=_label_for(score),
         components=components,
         explanations=explanations,
-        timestamp=datetime.now(timezone.utc).isoformat(),
+        timestamp=datetime.now(UTC).isoformat(),
     )
 
 
@@ -232,7 +232,6 @@ def compute_sentiment(
 
 
 if __name__ == "__main__":
-    import json
     s = compute_sentiment()
     print(f"=== Fear & Greed: {s.score}/100 ({s.label.replace('_',' ').upper()}) ===")
     for k, v in s.components.items():

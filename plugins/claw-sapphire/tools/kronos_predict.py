@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import sys
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 SAPPHIRE_DIR = Path.home() / "Code" / "Sapphire"
@@ -31,7 +31,7 @@ def _fetch_ohlcv(symbol: str, days: int = 60) -> list[dict]:
     """Fetch OHLCV from OpenBB."""
     yf_symbol = SYMBOLS.get(symbol, f"{symbol}-USD")
     from datetime import timedelta
-    start = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+    start = (datetime.now(UTC) - timedelta(days=days)).strftime("%Y-%m-%d")
     url = f"{OPENBB_BASE}/crypto/price/historical?symbol={yf_symbol}&provider=yfinance&start_date={start}"
     try:
         with urllib.request.urlopen(url, timeout=15) as r:
@@ -46,7 +46,7 @@ def action_forecast(symbol: str = "BTC", horizon: int = 24) -> dict:
     try:
         sys.path.insert(0, str(KRONOS_DIR))
         import pandas as pd
-        from model import Kronos, KronosTokenizer, KronosPredictor
+        from model import Kronos, KronosPredictor, KronosTokenizer
 
         # Load model (use mini for speed on CPU)
         tokenizer = KronosTokenizer.from_pretrained("NeoQuasar/Kronos-Tokenizer-2k")

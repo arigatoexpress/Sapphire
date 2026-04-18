@@ -27,10 +27,9 @@ import logging
 import re
 import subprocess
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Optional
 
 log = logging.getLogger(__name__)
 
@@ -99,7 +98,7 @@ def _matches_pattern(command: str, pattern: str) -> bool:
 class CommandGuard:
     """Enforces sandbox policy for a named Sapphire component."""
 
-    def __init__(self, component: str, policy_file: Optional[Path] = None):
+    def __init__(self, component: str, policy_file: Path | None = None):
         self.component = component
         self._policy_file = policy_file or POLICY_FILE
         self._policy = self._load_component_policy()

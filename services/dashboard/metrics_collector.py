@@ -7,7 +7,7 @@ Feeds /api/metrics/history and /api/agents/history sparkline endpoints.
 import json
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 DATA_DIR = Path.home() / 'Code' / 'Sapphire' / 'data' / 'intelligence'
@@ -117,7 +117,7 @@ def _fetch_pi_vitals():
 # ── Snapshot ──────────────────────────────────────────────────────────────────
 
 def _snapshot():
-    ts = datetime.now(timezone.utc).isoformat()
+    ts = datetime.now(UTC).isoformat()
 
     req_count, avg_ms = _inference_total_requests()
     _append_jsonl(METRICS_FILE, {

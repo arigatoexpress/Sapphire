@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 SAPPHIRE = Path.home() / "Code" / "Sapphire"
@@ -22,7 +22,7 @@ NOTIFY_TOOL = SAPPHIRE / "plugins" / "claw-sapphire" / "tools" / "notify.py"
 KRONOS_PYTHON = Path.home() / "Code" / "Kronos" / ".venv" / "bin" / "python3"
 SYSTEM_PYTHON = Path("/usr/local/bin/python3")
 
-WATCHLIST = ["BTC-USD", "ETH-USD", "SOL-USD", "SPY", "TSLA"]
+WATCHLIST = ["BTC-USD", "ETH-USD", "SOL-USD", "SPY", "TSLA", "ONDO-USD", "ASTER-USD", "LIT-USD"]
 PREDICT_BARS = 24
 LOOKBACK_BARS = 200
 INTERVAL = "1h"
@@ -110,13 +110,13 @@ def main() -> int:
             print(f"OK ({r.get('direction','?')} {r.get('confidence',0)*100:.0f}%)")
 
     # Write aggregate snapshot
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
     out_dir = SAPPHIRE / "data" / "intelligence" / today
     out_dir.mkdir(parents=True, exist_ok=True)
     pred_file = out_dir / "predictions.json"
 
     snapshot = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "source": "kronos-daily LaunchAgent",
         "watchlist": WATCHLIST,
         "predictions": {

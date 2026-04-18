@@ -7,13 +7,11 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "infra" / "sandbox"))
-from command_guard import CommandGuard, GuardAction, GuardResult, _normalize_command
-
+from command_guard import CommandGuard, GuardAction, _normalize_command
 
 # ─── Policy fixture ────────────────────────────────────────────────────────────
 

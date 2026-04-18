@@ -48,3 +48,33 @@ output/
 
 # Trading secrets
 configs/pi/shared/trading.env
+
+# Runtime data artifacts (produced by services; not source)
+data/analytics/
+data/chain/
+data/content/
+data/events/
+data/health/
+data/intelligence/
+data/metrics/
+data/signals/
+data/vote_monitor/
+data/.gcp_stage/
+data/.gcp_sync_state.json
+data/.watchdog_state.json
+data/paper_trading.jsonl
+data/system_events.jsonl
+data/trading_predictions.jsonl
+data/trading_signals.jsonl
+data/starred_repos/trending_report_*.md
+data/leads/pipeline_*.json
+services/control-plane/app/data/system_events.jsonl
+
+# Local-only state
+.claude/launch.json
+.claude/worktrees/
+
+# Large benchmark/archived content — tracked separately if needed
+archived/
+benchmarks/
+world_knowledge/

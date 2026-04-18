@@ -10,13 +10,16 @@ Builds on technical_analysis.py with higher-order analysis:
 
 from __future__ import annotations
 
-import json
-import math
-import urllib.request
-from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from dataclasses import dataclass
+from datetime import UTC, datetime
 
-from technical_analysis import OHLCV, SYMBOLS, TechnicalProfile, _fetch_ohlcv, _rsi, _sma, _atr, _ema, analyze
+from technical_analysis import (
+    OHLCV,
+    SYMBOLS,
+    TechnicalProfile,
+    _fetch_ohlcv,
+    analyze,
+)
 
 OPENBB_BASE = "http://127.0.0.1:6900/api/v1"
 
@@ -304,7 +307,6 @@ def correlation_matrix() -> list[CorrelationPair]:
 
 
 if __name__ == "__main__":
-    from dataclasses import asdict
 
     print("=" * 60)
     print("  SAPPHIRE QUANT ANALYSIS")

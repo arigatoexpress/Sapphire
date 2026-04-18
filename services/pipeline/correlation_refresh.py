@@ -16,7 +16,7 @@ import json
 import logging
 import sys
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path.home() / "Code" / "Sapphire"
@@ -44,7 +44,7 @@ def run(window_days: int = 30) -> dict:
         "decorrelation_events": [asdict(e) for e in report.decorrelation_events],
         "risk_on_matrix":  asdict(report.risk_on_matrix)  if report.risk_on_matrix  else None,
         "risk_off_matrix": asdict(report.risk_off_matrix) if report.risk_off_matrix else None,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
     }
     dest = LATEST_DIR / "correlations.json"
     dest.write_text(json.dumps(out, indent=2, default=str))

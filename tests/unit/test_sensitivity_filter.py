@@ -10,8 +10,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import pytest
-
 # We need to import _is_sensitive from the inference proxy.
 # The proxy is not a package, so we add its directory to sys.path.
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "services" / "inference-proxy"))

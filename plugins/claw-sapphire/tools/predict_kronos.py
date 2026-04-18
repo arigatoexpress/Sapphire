@@ -18,10 +18,9 @@ Usage:
 from __future__ import annotations
 
 import json
-import os
 import sys
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -50,7 +49,7 @@ def _load_predictor(verbose: bool = False) -> Any:
 
     t0 = time.time()
     try:
-        from model import Kronos, KronosTokenizer, KronosPredictor  # type: ignore
+        from model import Kronos, KronosPredictor, KronosTokenizer  # type: ignore
 
         if verbose:
             print("Loading KronosTokenizer...", file=sys.stderr)
@@ -82,11 +81,11 @@ def _load_predictor(verbose: bool = False) -> Any:
 
 # ── Data fetching ─────────────────────────────────────────────────────────────
 
-def _fetch_openbb(symbol: str, interval: str, bars: int) -> "pd.DataFrame | None":
+def _fetch_openbb(symbol: str, interval: str, bars: int) -> pd.DataFrame | None:
     """Try to fetch OHLCV from OpenBB REST API."""
     try:
-        import requests
         import pandas as pd
+        import requests
 
         # Determine date range
         interval_minutes = {
@@ -94,7 +93,7 @@ def _fetch_openbb(symbol: str, interval: str, bars: int) -> "pd.DataFrame | None
             "1h": 60, "4h": 240, "1d": 1440,
         }.get(interval, 60)
 
-        end_dt = datetime.now(timezone.utc)
+        end_dt = datetime.now(UTC)
         start_dt = end_dt - timedelta(minutes=interval_minutes * (bars + 20))
 
         start_str = start_dt.strftime("%Y-%m-%d")
@@ -151,10 +150,10 @@ def _fetch_openbb(symbol: str, interval: str, bars: int) -> "pd.DataFrame | None
         return None
 
 
-def _fetch_yfinance(symbol: str, interval: str, bars: int) -> "pd.DataFrame":
+def _fetch_yfinance(symbol: str, interval: str, bars: int) -> pd.DataFrame:
     """Fetch OHLCV from yfinance directly."""
-    import yfinance as yf
     import pandas as pd
+    import yfinance as yf
 
     # Map interval to yfinance period
     interval_to_period = {
@@ -186,7 +185,7 @@ def _fetch_yfinance(symbol: str, interval: str, bars: int) -> "pd.DataFrame":
     return df.tail(bars)
 
 
-def _get_ohlcv(symbol: str, interval: str, bars: int) -> "pd.DataFrame":
+def _get_ohlcv(symbol: str, interval: str, bars: int) -> pd.DataFrame:
     """Fetch OHLCV — OpenBB first, yfinance fallback."""
     df = _fetch_openbb(symbol, interval, bars)
     if df is not None and len(df) >= 20:
@@ -196,7 +195,7 @@ def _get_ohlcv(symbol: str, interval: str, bars: int) -> "pd.DataFrame":
 
 # ── Prediction logic ──────────────────────────────────────────────────────────
 
-def _make_timestamps(last_ts: "pd.Timestamp", interval: str, n: int) -> "pd.Series":
+def _make_timestamps(last_ts: pd.Timestamp, interval: str, n: int) -> pd.Series:
     """Generate future timestamps for prediction horizon."""
     import pandas as pd
 
@@ -209,7 +208,7 @@ def _make_timestamps(last_ts: "pd.Timestamp", interval: str, n: int) -> "pd.Seri
     return pd.Series(future)
 
 
-def _direction_from_pred(current_close: float, pred_df: "pd.DataFrame") -> tuple[str, float]:
+def _direction_from_pred(current_close: float, pred_df: pd.DataFrame) -> tuple[str, float]:
     """Compute direction and confidence from prediction DataFrame."""
     if "close" not in pred_df.columns or len(pred_df) == 0:
         return "neutral", 0.5
@@ -329,7 +328,7 @@ def action_predict(
         "history": history,
         "model": "Kronos-base",
         "elapsed_s": elapsed,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
 
@@ -341,7 +340,7 @@ def action_batch(
 ) -> dict:
     """Run Kronos predictions for multiple symbols."""
     if symbols is None:
-        symbols = ["BTC-USD", "ETH-USD", "SOL-USD"]
+        symbols = ["BTC-USD", "ETH-USD", "SOL-USD", "ONDO-USD", "ASTER-USD", "LIT-USD"]
 
     results = {}
     for sym in symbols:
@@ -363,7 +362,7 @@ def action_batch(
         "market_bias": market_bias,
         "bullish_count": bull,
         "bearish_count": bear,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
 
@@ -380,21 +379,21 @@ def action_status() -> dict:
     return {
         "model_loaded": _predictor is not None,
         "model_loaded_at": (
-            datetime.fromtimestamp(_model_loaded_at, tz=timezone.utc).isoformat()
+            datetime.fromtimestamp(_model_loaded_at, tz=UTC).isoformat()
             if _model_loaded_at else None
         ),
         "models_cached": models_present,
         "kronos_root": str(KRONOS_ROOT),
         "kronos_root_exists": KRONOS_ROOT.exists(),
         "models_dir": str(model_dir),
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
 
 def _save_intelligence_snapshot(result: dict, symbol: str) -> None:
     """Write prediction result to data/intelligence/YYYY-MM-DD/predictions.json."""
     try:
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
         out_dir = INTEL_DIR / today
         out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -402,10 +401,10 @@ def _save_intelligence_snapshot(result: dict, symbol: str) -> None:
         if pred_file.exists():
             existing = json.loads(pred_file.read_text())
         else:
-            existing = {"generated_at": datetime.now(timezone.utc).isoformat(), "predictions": {}}
+            existing = {"generated_at": datetime.now(UTC).isoformat(), "predictions": {}}
 
         existing["predictions"][symbol] = result
-        existing["updated_at"] = datetime.now(timezone.utc).isoformat()
+        existing["updated_at"] = datetime.now(UTC).isoformat()
         pred_file.write_text(json.dumps(existing, indent=2))
     except Exception:
         pass

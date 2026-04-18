@@ -5,11 +5,10 @@ Run: /usr/local/bin/python3 -m pytest tests/unit/test_signal_pipeline.py -v
 from __future__ import annotations
 
 import json
-import os
 import sys
 import threading
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -18,7 +17,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "services" / "alpha
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "lib" / "core"))
 
 from signal_pipeline import SignalPipeline  # type: ignore
-
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
 

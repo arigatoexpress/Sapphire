@@ -21,8 +21,7 @@ import os
 import sys
 import tempfile
 import urllib.request
-from dataclasses import asdict
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
@@ -52,7 +51,7 @@ def action_predict() -> dict:
 
     profiles = analyze_all()
     predictions = []
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     for sym, profile in profiles.items():
         if profile is None:
@@ -211,7 +210,7 @@ def _timeframe_elapsed(pred: dict, now: datetime) -> bool:
     except ValueError:
         return False
     if created.tzinfo is None:
-        created = created.replace(tzinfo=timezone.utc)
+        created = created.replace(tzinfo=UTC)
     return now - created >= timedelta(seconds=window)
 
 
@@ -249,7 +248,7 @@ def action_score() -> dict:
     if not PREDICTIONS_FILE.exists():
         return {"success": True, "newly_scored": 0, "total_scored": 0, "correct": 0, "accuracy": "N/A"}
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     updated: list[str] = []
     scored_count = 0
     correct_count = 0

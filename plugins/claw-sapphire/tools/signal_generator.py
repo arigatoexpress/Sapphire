@@ -23,7 +23,7 @@ import json
 import subprocess
 import sys
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
@@ -50,13 +50,13 @@ def _log_signal(signal: dict):
 
 def scan_for_signals(symbols: list[str] = None) -> dict:
     """Scan markets for trading signals using real TA."""
-    from technical_analysis import analyze_all, TechnicalProfile
+    from technical_analysis import analyze_all
 
     symbols = symbols or ["BTC", "ETH", "SOL"]
     profiles = analyze_all()
 
     signals_generated = []
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     for sym in symbols:
         profile = profiles.get(sym)

@@ -31,7 +31,7 @@ import os
 import re
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
@@ -121,7 +121,7 @@ def action_status() -> dict:
                 "node lumo.js            # start the API server",
             ]
         ),
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
 
@@ -154,7 +154,7 @@ def action_ask(
             "elapsed_s": elapsed,
             "model": "lumo-proton",
             "tier": "T5",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
     except TimeoutError:
@@ -234,7 +234,7 @@ def action_security_brief(
             "elapsed_s": elapsed,
             "model": "lumo-proton",
             "tier": "T5",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
     except TimeoutError:

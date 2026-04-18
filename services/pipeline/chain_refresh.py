@@ -21,7 +21,7 @@ from __future__ import annotations
 import json
 import logging
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path.home() / "Code" / "Sapphire"
@@ -116,7 +116,7 @@ def run() -> dict:
 
     ci = ChainIntelligence()
     snap = ci.snapshot()
-    ts = snap.get("generated_at") or datetime.now(timezone.utc).isoformat()
+    ts = snap.get("generated_at") or datetime.now(UTC).isoformat()
     snap["timestamp"] = ts
 
     fname = f"chain_{ts.replace(':','-')}.json"

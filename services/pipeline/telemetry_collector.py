@@ -21,7 +21,7 @@ import json
 import logging
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 log = logging.getLogger("telemetry_collector")
@@ -60,11 +60,11 @@ SERVICES = [
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _today() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return datetime.now(UTC).strftime("%Y-%m-%d")
 
 
 def _stable_id(*parts: object) -> str:
@@ -121,15 +121,15 @@ def _probe(host: str, port: int, path: str, timeout: float = 5.0) -> tuple[str, 
     """Return (status, http_code, response_ms, error_msg)."""
     scheme = "https" if port == 443 else "http"
     url = f"{scheme}://{host}:{port}{path}" if port not in (80, 443) else f"{scheme}://{host}{path}"
-    t0 = datetime.now(timezone.utc)
+    t0 = datetime.now(UTC)
     try:
         req = urllib.request.Request(url, method="GET")
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            rtt = (datetime.now(timezone.utc) - t0).total_seconds() * 1000.0
+            rtt = (datetime.now(UTC) - t0).total_seconds() * 1000.0
             code = resp.status
             return ("healthy" if 200 <= code < 400 else "degraded", code, rtt, None)
     except urllib.error.HTTPError as e:
-        rtt = (datetime.now(timezone.utc) - t0).total_seconds() * 1000.0
+        rtt = (datetime.now(UTC) - t0).total_seconds() * 1000.0
         return ("degraded", e.code, rtt, str(e)[:200])
     except Exception as e:
         return ("down", None, None, str(e)[:200])

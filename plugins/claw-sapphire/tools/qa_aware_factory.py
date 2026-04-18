@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import json
 import subprocess
-import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -105,7 +104,7 @@ def run_qa_check() -> dict:
         results.append({**p, "check": check})
 
     # Frontend scores
-    print(f"\n  Frontend Scores:")
+    print("\n  Frontend Scores:")
     for name, fe in report.get("frontends", {}).items():
         score = fe.get("ux_score", 0)
         status = fe.get("status", "unknown")

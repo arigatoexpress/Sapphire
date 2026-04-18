@@ -4,19 +4,19 @@ Provides adapters for free on-chain data sources (DeFiLlama, Hyperliquid,
 CoinGecko) and an aggregator that synthesizes them into a single market regime.
 """
 
-from .sources import (
-    DefiLlamaClient,
-    HyperliquidClient,
-    CoinGeckoClient,
-)
 from .intelligence import (
     ChainIntelligence,
-    MarketOverview,
     FundingSnapshot,
-    OISnapshot,
-    TVLTrend,
-    StablecoinFlows,
+    MarketOverview,
     MarketRegime,
+    OISnapshot,
+    StablecoinFlows,
+    TVLTrend,
+)
+from .sources import (
+    CoinGeckoClient,
+    DefiLlamaClient,
+    HyperliquidClient,
 )
 
 __all__ = [

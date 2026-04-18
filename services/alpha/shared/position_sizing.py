@@ -7,4 +7,3 @@ if _CORE not in sys.path:
     sys.path.insert(0, _CORE)
 
 from sapphire_core.position_sizing import *  # noqa: F401,F403,E402
-from sapphire_core.position_sizing import SizingConfig, apply_stage_multiplier  # noqa: E402,F811

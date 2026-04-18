@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 THREAT_BOT_VENV = Path.home() / "Code" / "cyber-threat-bot" / ".venv"
@@ -22,7 +22,7 @@ def main() -> int:
         print(f"threat-bot not found at {THREAT_BOT_PY}", file=sys.stderr)
         return 1
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
     out_dir = DATA_DIR / today
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -44,7 +44,7 @@ def main() -> int:
 
     out_file = out_dir / "threats.json"
     payload = {
-        "refreshed_at": datetime.now(timezone.utc).isoformat(),
+        "refreshed_at": datetime.now(UTC).isoformat(),
         "source_count": len(threats),
         "threats": threats,
     }

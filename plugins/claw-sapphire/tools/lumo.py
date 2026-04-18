@@ -22,8 +22,8 @@ from __future__ import annotations
 
 import json
 import sys
-import urllib.request
 import urllib.error
+import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
 

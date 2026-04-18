@@ -24,13 +24,13 @@ import platform
 import signal
 import subprocess
 import sys
-import time
 import threading
-import urllib.request
+import time
 import urllib.error
-from dataclasses import dataclass, asdict, field
+import urllib.request
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
 

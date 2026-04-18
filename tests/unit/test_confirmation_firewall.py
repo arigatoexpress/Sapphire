@@ -6,30 +6,27 @@ Run: /usr/local/bin/python3 -m pytest tests/unit/test_confirmation_firewall.py -
 from __future__ import annotations
 
 import json
+
+# Import module under test
+import sys
 import time
-import uuid
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-# Import module under test
-import sys, os
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "lib" / "core"))
 from confirmation_firewall import (
     ActionRisk,
     ConfirmationFirewall,
-    classify_action,
-    _write_pending,
-    _poll_pending,
     _approve_pending,
     _deny_pending,
     _load_daily_spend,
+    _poll_pending,
     _record_spend,
-    PENDING_DIR,
-    LIMITS_FILE,
+    _write_pending,
+    classify_action,
 )
-
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
 

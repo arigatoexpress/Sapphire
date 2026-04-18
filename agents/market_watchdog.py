@@ -24,15 +24,14 @@ import logging
 import os
 import signal
 import sys
-import time
 import threading
-import urllib.request
+import time
 import urllib.error
+import urllib.request
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from typing import Any
 
 try:
     import yaml
@@ -204,7 +203,7 @@ class AlertState:
             log.warning("State save failed: %s", e)
 
     @classmethod
-    def load(cls, path: str) -> "AlertState":
+    def load(cls, path: str) -> AlertState:
         try:
             with open(path) as f:
                 data = json.load(f)
@@ -221,7 +220,7 @@ class AlertState:
 # ─── Health HTTP Handler ───────────────────────────────────────────────────────
 
 class _HealthHandler(BaseHTTPRequestHandler):
-    watchdog: "MarketWatchdog | None" = None
+    watchdog: MarketWatchdog | None = None
 
     def do_GET(self):
         if self.path in {"/health", "/"}:

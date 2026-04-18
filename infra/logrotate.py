@@ -6,7 +6,6 @@ Keeps the 3 most recent rotated copies; deletes older ones.
 Max size before rotation: 5MB.
 """
 
-import os
 import gzip
 import shutil
 from datetime import datetime

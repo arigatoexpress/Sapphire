@@ -107,7 +107,7 @@ async def receive_signal(request: Request):
     if not pipeline_result or not pipeline_result.telegram_sent:
         # Fallback: quick Nemotron analysis + basic notification
         try:
-            from nemotron import generate, MODELS
+            from nemotron import MODELS, generate
             analysis_prompt = f"Trading signal: {signal['action']} {signal['symbol']} at ${signal['price']} with confidence {signal['confidence']}. Strategy: {signal['strategy']}. Give a one-sentence assessment."
             result = generate(analysis_prompt, model=MODELS["classify"], timeout=10)
             ai_assessment = result.response if result.success else "Analysis unavailable"

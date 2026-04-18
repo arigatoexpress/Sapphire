@@ -16,8 +16,8 @@ import json
 import os
 import subprocess
 import sys
-import urllib.request
 import urllib.error
+import urllib.request
 from pathlib import Path
 
 SAPPHIRE_DIR = Path.home() / "Code" / "Sapphire"

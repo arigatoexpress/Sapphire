@@ -30,7 +30,6 @@ log = logging.getLogger(__name__)
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
 # ─── Path Setup ────────────────────────────────────────────────────────────────
 _ROOT       = Path.home() / "Code" / "Sapphire"
@@ -53,14 +52,17 @@ except ImportError:
 
 try:
     from sapphire_core.position_sizing import (
-        SizingInput, SizingMethod, compute_position_size, MarketRegime,
+        MarketRegime,
+        SizingInput,
+        SizingMethod,
+        compute_position_size,
     )
     _SIZING_AVAILABLE = True
 except ImportError:
     _SIZING_AVAILABLE = False
 
 try:
-    from confirmation_firewall import ConfirmationFirewall, classify_action, ActionRisk
+    from confirmation_firewall import ActionRisk, ConfirmationFirewall, classify_action
     _FIREWALL_AVAILABLE = True
 except ImportError:
     _FIREWALL_AVAILABLE = False
@@ -304,7 +306,7 @@ class SignalPipeline:
         with self._active_lock:
             return [asdict(s) for s in self._active.values()]
 
-    def _close_position(self, open_signal: "ScoredSignal", close_price: float) -> None:
+    def _close_position(self, open_signal: ScoredSignal, close_price: float) -> None:
         """Calculate realised P&L for a closed position and update the JSONL audit record.
 
         Runs in a daemon thread so it does not block the main process() call.

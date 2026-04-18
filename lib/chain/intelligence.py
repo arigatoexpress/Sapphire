@@ -15,13 +15,12 @@ import statistics
 import threading
 import time
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .sources import (
     CoinGeckoClient,
     DefiLlamaClient,
-    HLAssetCtx,
     HyperliquidClient,
     SourceError,
 )
@@ -126,9 +125,8 @@ _history_lock = threading.Lock()
 
 
 def _append_history(snapshot: dict) -> None:
-    with _history_lock:
-        with HISTORY_FILE.open("a") as f:
-            f.write(json.dumps(snapshot) + "\n")
+    with _history_lock, HISTORY_FILE.open("a") as f:
+        f.write(json.dumps(snapshot) + "\n")
 
 
 def _read_history(kind: str, max_age_secs: float) -> list[dict]:
@@ -137,19 +135,18 @@ def _read_history(kind: str, max_age_secs: float) -> list[dict]:
         return []
     cutoff = time.time() - max_age_secs
     out: list[dict] = []
-    with _history_lock:
-        with HISTORY_FILE.open() as f:
-            for line in f:
-                try:
-                    e = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if e.get("kind") != kind:
-                    continue
-                ts = e.get("unix_ts")
-                if ts is None or ts < cutoff:
-                    continue
-                out.append(e)
+    with _history_lock, HISTORY_FILE.open() as f:
+        for line in f:
+            try:
+                e = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if e.get("kind") != kind:
+                continue
+            ts = e.get("unix_ts")
+            if ts is None or ts < cutoff:
+                continue
+            out.append(e)
     return out
 
 
@@ -196,7 +193,7 @@ class ChainIntelligence:
         if prev_total and prev_total > 0:
             delta_pct = (sc.total_usd - prev_total) / prev_total * 100.0
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         overview = MarketOverview(
             timestamp=now.isoformat(),
             total_market_cap_usd=gm.total_market_cap_usd,
@@ -262,7 +259,7 @@ class ChainIntelligence:
             skew = "short"
         else:
             skew = "neutral"
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         _append_history({
             "kind": "funding",
             "unix_ts": now.timestamp(),
@@ -284,7 +281,7 @@ class ChainIntelligence:
         majors = [by_coin[c] for c in MAJOR_PERPS if c in by_coin]
         total_oi_usd = sum(c.open_interest * c.mark_px for c in majors)
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         # Record current OI in history
         _append_history({
             "kind": "open_interest",
@@ -358,7 +355,7 @@ class ChainIntelligence:
             elif delta_pct < -1.5:
                 direction = "falling"
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         return TVLTrend(
             timestamp=now.isoformat(),
             total_tvl_usd=total_tvl,
@@ -370,7 +367,7 @@ class ChainIntelligence:
 
     def get_stablecoin_flows(self) -> StablecoinFlows:
         sc = self.llama.stablecoins()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         hist = _read_history("stablecoins", 8 * 86400)
         delta_24h: float | None = None
@@ -416,7 +413,7 @@ class ChainIntelligence:
         Confidence is derived from the magnitude of the score and the
         agreement between inputs.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         signals: dict[str, float] = {}
         reasoning: list[str] = []
         weights: dict[str, float] = {}
@@ -460,7 +457,7 @@ class ChainIntelligence:
                 reasoning.append(f"Funding healthy long ({avg*100*3*365:.1f}% APR)")
             elif avg < FUNDING_EXTREME_NEG:
                 f_score += 0.4  # Crowded short = contrarian bullish
-                reasoning.append(f"Funding extreme short → squeeze potential")
+                reasoning.append("Funding extreme short → squeeze potential")
             elif avg < -FUNDING_ELEVATED:
                 f_score -= 0.2
                 reasoning.append(f"Funding bearish ({avg*100*3*365:.1f}% APR)")
@@ -529,8 +526,8 @@ class ChainIntelligence:
                 signals={},
                 reasoning=["All data sources failed"] + failures,
             )
-        total_weight = sum(weights[k] for k in signals.keys())
-        score = sum(signals[k] * weights[k] for k in signals.keys()) / total_weight
+        total_weight = sum(weights[k] for k in signals)
+        score = sum(signals[k] * weights[k] for k in signals) / total_weight
 
         if score >= 0.2:
             state = "RISK_ON"
@@ -576,7 +573,7 @@ class ChainIntelligence:
 
     def snapshot(self) -> dict:
         """Unified dict of every metric — used by /api/chain/overview."""
-        out: dict = {"generated_at": datetime.now(timezone.utc).isoformat()}
+        out: dict = {"generated_at": datetime.now(UTC).isoformat()}
         try:
             out["overview"] = asdict(self.get_market_overview())
         except SourceError as e:

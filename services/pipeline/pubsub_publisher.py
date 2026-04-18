@@ -19,7 +19,7 @@ import json
 import logging
 import os
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 log = logging.getLogger(__name__)
@@ -60,7 +60,7 @@ def _get_client():
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def publish(kind: str, payload: dict[str, Any]) -> bool:

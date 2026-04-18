@@ -21,8 +21,7 @@ import dataclasses
 import json
 import logging
 import subprocess
-import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 log = logging.getLogger("check_routines")
@@ -123,8 +122,8 @@ def _artifact_age_secs(artifact: str) -> int | None:
     p = Path(artifact)
     if not p.exists():
         return None
-    mtime = datetime.fromtimestamp(p.stat().st_mtime, tz=timezone.utc)
-    return int((datetime.now(timezone.utc) - mtime).total_seconds())
+    mtime = datetime.fromtimestamp(p.stat().st_mtime, tz=UTC)
+    return int((datetime.now(UTC) - mtime).total_seconds())
 
 
 def _gcp_query_state(cfg_id: str) -> tuple[str, str | None]:
@@ -233,7 +232,7 @@ def main() -> int:
 
     if args.json:
         print(json.dumps({"rows": rows, "failures": failures,
-                          "generated_at": datetime.now(timezone.utc).isoformat()}, indent=2))
+                          "generated_at": datetime.now(UTC).isoformat()}, indent=2))
     else:
         print("=== Sapphire Routines — Health Check ===")
         for r in rows:

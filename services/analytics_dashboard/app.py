@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from flask import Flask, jsonify, render_template, request
 from google.cloud import bigquery
@@ -55,7 +55,7 @@ def _clean(rows: list[dict]) -> list[dict]:
 @app.get("/healthz")
 def healthz():
     return {"ok": True, "project": PROJECT, "dataset": DATASET,
-            "ts": datetime.now(timezone.utc).isoformat()}
+            "ts": datetime.now(UTC).isoformat()}
 
 
 @app.get("/api/summary")

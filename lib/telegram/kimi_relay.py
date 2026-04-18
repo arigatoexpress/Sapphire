@@ -220,7 +220,7 @@ if __name__ == "__main__":
     print(f"Sending to relay group as NemotronRariBot: {query!r}")
     print(f"Relay chat: {RELAY_CHAT_ID}")
     print(f"Reader bot configured: {'yes' if READER_TOKEN else 'NO — set RELAY_READER_TOKEN'}")
-    print(f"Polling via relay-reader bot every ~1s")
+    print("Polling via relay-reader bot every ~1s")
     try:
         response = relay_query(query, timeout=60)
         print(f"\nResponse:\n{response}")

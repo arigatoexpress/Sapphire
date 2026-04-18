@@ -230,7 +230,7 @@ MARKET_KEYWORDS = {
 }
 
 # Liquidation estimator
-TRACKED_COINS = ["BTC", "ETH", "SOL", "BNB", "AVAX", "DOGE", "XRP", "ARB", "OP", "LINK"]
+TRACKED_COINS = ["BTC", "ETH", "SOL", "BNB", "AVAX", "DOGE", "XRP", "ARB", "OP", "LINK", "ONDO", "ASTER", "LIT"]
 # Funding history lookback for velocity: 6 hours
 VELOCITY_LOOKBACK_MS = 6 * 60 * 60 * 1000
 

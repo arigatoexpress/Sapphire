@@ -355,7 +355,7 @@ function renderCDP(data) {
                 <span style="color:var(--green);font-size:1.3rem;">◆</span>
                 <div>
                     <div style="font-size:13px;font-weight:600;color:var(--green);">CDP Connected</div>
-                    <div style="font-size:11px;color:var(--text-muted);">100.71.10.48:9222 · Chrome DevTools Protocol</div>
+                    <div style="font-size:11px;color:var(--text-muted);">127.0.0.1:9222 · Chrome DevTools Protocol</div>
                 </div>
             </div>
             <div style="display:flex;gap:24px;font-size:12px;">
@@ -371,13 +371,13 @@ function renderCDP(data) {
                 <span style="color:var(--red);font-size:1.3rem;">◇</span>
                 <div>
                     <div style="font-size:13px;font-weight:600;color:var(--red);">CDP Unreachable</div>
-                    <div style="font-size:11px;color:var(--text-muted);">100.71.10.48:9222</div>
+                    <div style="font-size:11px;color:var(--text-muted);">127.0.0.1:9222</div>
                 </div>
             </div>
             ${cdp.error ? `<div style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono);">${cdp.error}</div>` : ''}
             <div style="font-size:11px;color:var(--text-secondary);padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:4px;border:1px solid var(--border);">
-                Start TradingView Desktop on Windows with<br>
-                <code style="color:var(--accent-bright);">--remote-debugging-port=9222</code>
+                Run <code style="color:var(--accent-bright);">~/Code/Sapphire/infra/scripts/start-tradingview-cdp.sh</code><br>
+                or <code style="color:var(--accent-bright);">launchctl kickstart -k gui/$UID/com.sapphire.tradingview-cdp</code>
             </div>
         </div>`;
     }

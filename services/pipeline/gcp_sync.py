@@ -24,10 +24,11 @@ import json
 import logging
 import sys
 import uuid
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable, Iterable, Iterator
+from typing import Any
 
 from google.cloud import bigquery, storage
 
@@ -47,7 +48,7 @@ log = logging.getLogger("gcp_sync")
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _stable_id(*parts: Any) -> str:
@@ -110,14 +111,14 @@ def _parse_ts(s: Any) -> str:
     if not s:
         return _now_iso()
     if isinstance(s, (int, float)):
-        return datetime.fromtimestamp(s, tz=timezone.utc).isoformat()
+        return datetime.fromtimestamp(s, tz=UTC).isoformat()
     if isinstance(s, str):
         if s.endswith("Z"):
             return s.replace("Z", "+00:00")
         # YYYYMMDD_HHMM (legacy lead pipeline format)
         if len(s) == 13 and s[8] == "_" and s[:8].isdigit() and s[9:].isdigit():
             try:
-                dt = datetime.strptime(s, "%Y%m%d_%H%M").replace(tzinfo=timezone.utc)
+                dt = datetime.strptime(s, "%Y%m%d_%H%M").replace(tzinfo=UTC)
                 return dt.isoformat()
             except ValueError:
                 return _now_iso()
@@ -489,7 +490,7 @@ def sync_source(
     log.info("[%s] %d file(s) since watermark %.0f", source.name, len(files), watermark)
 
     # Transform → NDJSON staging file
-    day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    day = datetime.now(UTC).strftime("%Y-%m-%d")
     run_id = uuid.uuid4().hex[:8]
     stage = DATA_DIR / ".gcp_stage" / f"{source.name}_{day}_{run_id}.ndjson"
     rows_written = _write_ndjson(source.transform(files), stage)
