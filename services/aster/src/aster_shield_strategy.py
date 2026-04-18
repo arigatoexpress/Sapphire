@@ -281,7 +281,6 @@ class AsterShieldStrategy:
             result.quantity = quantity
 
             # 4. Execute entry order
-            time.time()
             entry_order = await self.aster_client.place_order(
                 symbol=symbol,
                 side=side,

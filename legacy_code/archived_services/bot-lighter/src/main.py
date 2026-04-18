@@ -26,6 +26,8 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
+import requests
+
 # Load .env file if present (for local/Pi deployment)
 try:
     from pathlib import Path

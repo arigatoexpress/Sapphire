@@ -27,14 +27,14 @@ def main():
     """Process PreToolUse hook."""
     # Read context from environment (claw-code hook protocol)
     tool_name = os.environ.get("HOOK_TOOL_NAME", "")
-    os.environ.get("HOOK_TOOL_INPUT", "{}")
+    _tool_input = os.environ.get("HOOK_TOOL_INPUT", "{}")
 
     # Also try stdin
     if not tool_name:
         try:
             stdin_data = json.loads(sys.stdin.read())
             tool_name = stdin_data.get("tool_name", "")
-            json.dumps(stdin_data.get("tool_input", {}))
+            _tool_input = json.dumps(stdin_data.get("tool_input", {}))
         except (json.JSONDecodeError, EOFError):
             pass
 

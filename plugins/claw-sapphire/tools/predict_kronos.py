@@ -32,6 +32,11 @@ try:
 except ImportError:
     pd = None  # type: ignore[assignment]
 
+try:
+    import pandas as pd
+except ImportError:
+    pd = None  # type: ignore[assignment]
+
 # ── Paths ─────────────────────────────────────────────────────────────────────
 KRONOS_ROOT = Path.home() / "Code" / "Kronos"
 KRONOS_MODELS = KRONOS_ROOT / ".models"

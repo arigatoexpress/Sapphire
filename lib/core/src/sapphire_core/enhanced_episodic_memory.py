@@ -130,8 +130,6 @@ def auto_detect_regime(
     """
     indicators = snapshot.get_regime_indicators()
 
-    # Default confidence
-
     # High volatility regime
     if indicators["high_volatility"]:
         if indicators["avg_imbalance"] > 0.15:

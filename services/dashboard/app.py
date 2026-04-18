@@ -57,6 +57,9 @@ if not AUTH_PASSWORD:
     raise RuntimeError("AUTH_PASSWORD environment variable must be set")
 
 # x402 payment gate — optional, disabled unless X402_ENABLED=1
+import contextlib
+import sys as _sys  # noqa: E402
+
 _LIB_PAYMENTS = Path.home() / "Code" / "Sapphire"
 if str(_LIB_PAYMENTS) not in sys.path:
     sys.path.insert(0, str(_LIB_PAYMENTS))
@@ -629,6 +632,105 @@ def api_events_replay():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
+# ── Event Bus SSE ────────────────────────────────────────────────────────────
+
+def _event_bus():
+    """Import event bus lazily — dashboard should start even if lib/core missing."""
+    import sys as _sys
+    _p = Path.home() / "Code" / "Sapphire" / "lib" / "core"
+    if str(_p) not in _sys.path:
+        _sys.path.insert(0, str(_p))
+    from event_bus import get_bus
+    return get_bus(source="dashboard")
+
+
+@app.route('/api/events/stream')
+@requires_auth
+def api_events_stream():
+    """Server-sent event stream of live bus events (glob pattern via ?types=)."""
+    patterns_raw = request.args.get('types', '*')
+    patterns = [p.strip() for p in patterns_raw.split(',') if p.strip()]
+
+    import queue as _queue
+
+    try:
+        bus = _event_bus()
+    except Exception as e:
+        return Response(
+            f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n",
+            mimetype='text/event-stream',
+        )
+
+    q: _queue.Queue = _queue.Queue(maxsize=500)
+
+    def _on_event(ev):
+        with contextlib.suppress(_queue.Full):
+            q.put_nowait({
+                'id': ev.id,
+                'type': ev.type,
+                'ts': ev.ts,
+                'source': ev.source,
+                'data': ev.data,
+            })
+
+    subscription = bus.subscribe(patterns, _on_event)
+
+    def gen():
+        try:
+            # Opening ping so the client sees the connection immediately
+            yield f"event: open\ndata: {json.dumps({'patterns': patterns})}\n\n"
+            last_beat = time.time()
+            while True:
+                try:
+                    payload = q.get(timeout=15)
+                    yield f"event: {payload['type']}\ndata: {json.dumps(payload, default=str)}\n\n"
+                except _queue.Empty:
+                    # Keep proxies from closing the connection
+                    yield ": keepalive\n\n"
+                if time.time() - last_beat > 60:
+                    last_beat = time.time()
+        finally:
+            subscription.stop()
+
+    return Response(
+        gen(),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no',  # disable nginx buffering if proxied
+        },
+    )
+
+
+@app.route('/api/events/world-state')
+@requires_auth
+def api_world_state():
+    """Snapshot of aggregated world state for the overview page."""
+    try:
+        bus = _event_bus()
+        return jsonify(bus.get_world_state().to_dict())
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/events/replay')
+@requires_auth
+def api_events_replay():
+    """Historical replay of one event type."""
+    event_type = request.args.get('type', '')
+    if not event_type:
+        return jsonify({'error': 'missing ?type=<event_type>'}), 400
+    limit = int(request.args.get('limit', 100))
+    try:
+        bus = _event_bus()
+        events = bus.replay(event_type, limit=limit)
+        return jsonify([
+            {'id': e.id, 'type': e.type, 'ts': e.ts, 'source': e.source, 'data': e.data}
+            for e in events
+        ])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/system')
 @requires_auth

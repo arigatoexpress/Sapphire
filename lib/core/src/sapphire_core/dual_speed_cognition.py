@@ -193,6 +193,7 @@ class DualSpeedCognition:
             logger.info(f"⚡ System 1 high confidence ({s1_confidence:.2f}), provisional action")
             try:
                 await on_provisional(s1_decision, s1_confidence, s1_reasoning)
+                _provisional_action_taken = True
             except Exception as e:
                 logger.error(f"Provisional action failed: {e}")
 
