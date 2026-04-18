@@ -9,8 +9,10 @@ import logging
 import os
 import secrets
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import wraps
+
+UTC = timezone.utc
 from pathlib import Path
 
 log = logging.getLogger("dashboard")
@@ -37,6 +39,22 @@ AUTH_PASSWORD = os.environ.get('AUTH_PASSWORD', '')
 
 if not AUTH_PASSWORD:
     raise RuntimeError("AUTH_PASSWORD environment variable must be set")
+
+# x402 payment gate — optional, disabled unless X402_ENABLED=1
+import sys as _sys  # noqa: E402
+_LIB_PAYMENTS = Path.home() / "Code" / "Sapphire"
+if str(_LIB_PAYMENTS) not in _sys.path:
+    _sys.path.insert(0, str(_LIB_PAYMENTS))
+try:
+    from lib.payments.x402_middleware import require_payment as x402_require  # noqa: E402
+    _X402_AVAILABLE = True
+except Exception:
+    _X402_AVAILABLE = False
+
+    def x402_require(amount_usd, description=""):  # type: ignore[misc]
+        def _decorator(f):
+            return f
+        return _decorator
 
 def check_auth(username, password):
     # Constant-time compare to avoid leaking password length / prefix via
@@ -81,6 +99,38 @@ def guarded_static(filename):
 _cache = {}
 _cache_time = {}
 CACHE_DURATION = 10  # seconds
+
+# ── In-process latency metrics (per-route rolling) ─────────────────────────
+# Keeps a bounded ring buffer of (method, path, ms) samples plus per-route
+# counters. Exposed via /metrics (auth-gated). Bounded size keeps memory in
+# check under long-running processes (~24 bytes/sample × 2000 = 48 KB).
+_METRICS_MAX_SAMPLES = 2000
+_metrics_samples: list[tuple[str, str, float]] = []
+_metrics_counts: dict[str, int] = {}
+_metrics_totals: dict[str, float] = {}
+
+
+@app.before_request
+def _metrics_before_request():
+    request.environ['sapphire.t0'] = time.perf_counter()
+
+
+@app.after_request
+def _metrics_after_request(response):
+    t0 = request.environ.get('sapphire.t0')
+    if t0 is None:
+        return response
+    elapsed_ms = (time.perf_counter() - t0) * 1000.0
+    endpoint = request.endpoint or request.path or 'unknown'
+    key = f'{request.method} {endpoint}'
+    _metrics_counts[key] = _metrics_counts.get(key, 0) + 1
+    _metrics_totals[key] = _metrics_totals.get(key, 0.0) + elapsed_ms
+    _metrics_samples.append((request.method, endpoint, elapsed_ms))
+    if len(_metrics_samples) > _METRICS_MAX_SAMPLES:
+        # Drop oldest ~10% to amortize the trim cost
+        del _metrics_samples[: _METRICS_MAX_SAMPLES // 10]
+    response.headers['X-Response-Time-ms'] = f'{elapsed_ms:.1f}'
+    return response
 
 def get_cached(key, fetch_func):
     """Get cached data or fetch fresh"""
@@ -167,6 +217,51 @@ def control():
 def settings():
     return render_template('pages/settings.html', current_page='settings', page_title='Settings')
 
+@app.route('/metrics')
+@requires_auth
+def metrics():
+    """Per-route latency metrics (in-process). Not Prometheus format — JSON.
+
+    Returns aggregate count/avg/p50/p95/p99/max for each endpoint plus the
+    overall slowest endpoints. Exposed to help diagnose dashboard slowness
+    (the dashboard performs many synchronous urllib fetches against remote
+    services — tail latency lives in those outbound calls, not in Flask).
+    """
+    def _percentile(values, p):
+        if not values:
+            return 0.0
+        s = sorted(values)
+        k = int(round((p / 100.0) * (len(s) - 1)))
+        return s[max(0, min(k, len(s) - 1))]
+
+    by_route: dict[str, list[float]] = {}
+    for method, endpoint, ms in _metrics_samples:
+        key = f'{method} {endpoint}'
+        by_route.setdefault(key, []).append(ms)
+
+    routes = []
+    for key, samples in by_route.items():
+        routes.append({
+            'route': key,
+            'count': _metrics_counts.get(key, len(samples)),
+            'avg_ms': round(sum(samples) / len(samples), 2),
+            'p50_ms': round(_percentile(samples, 50), 2),
+            'p95_ms': round(_percentile(samples, 95), 2),
+            'p99_ms': round(_percentile(samples, 99), 2),
+            'max_ms': round(max(samples), 2),
+            'samples': len(samples),
+        })
+    routes.sort(key=lambda r: r['p95_ms'], reverse=True)
+
+    return jsonify({
+        'window_samples': len(_metrics_samples),
+        'window_limit': _METRICS_MAX_SAMPLES,
+        'routes': routes,
+        'slowest_p95': routes[:10],
+        'timestamp': datetime.now().isoformat(),
+    })
+
+
 @app.route('/api/status')
 @requires_auth
 def api_status():
@@ -186,27 +281,57 @@ def api_status():
 
     return jsonify(get_cached('status', fetch))
 
+_WATCHLIST_SPEC = {
+    'major_crypto': [
+        ('ETH', 'Ethereum', 'perp', 'HIGH', 'ethereum'),
+        ('BTC', 'Bitcoin', 'perp', 'HIGH', 'bitcoin'),
+    ],
+    'mid_cap': [
+        ('SOL', 'Solana', 'perp', 'MEDIUM', 'solana'),
+        ('HYPE', 'Hyperliquid', 'spot', 'MEDIUM', 'hyperliquid'),
+    ],
+}
+
+
 @app.route('/api/watchlist')
 @requires_auth
 def api_watchlist():
-    """Get organized watchlist"""
-    watchlist = {
-        'major_crypto': [
-            {'symbol': 'ETH', 'name': 'Ethereum', 'type': 'perp', 'priority': 'HIGH', 'price': 3500.0},
-            {'symbol': 'BTC', 'name': 'Bitcoin', 'type': 'perp', 'priority': 'HIGH', 'price': 65000.0},
-        ],
-        'mid_cap': [
-            {'symbol': 'SOL', 'name': 'Solana', 'type': 'perp', 'priority': 'MEDIUM', 'price': 145.0},
-            {'symbol': 'HYPE', 'name': 'Hyperliquid', 'type': 'spot', 'priority': 'MEDIUM', 'price': 12.5},
-        ],
-        'pair_analysis': [
-            {'symbol': 'ETHBTC', 'name': 'ETH/BTC Ratio', 'type': 'pair', 'priority': 'HIGH',
-             'strategy': 'Z<-2: BUY ETH, Z>2: SELL ETH'},
-            {'symbol': 'SOLBTC', 'name': 'SOL/BTC Ratio', 'type': 'pair', 'priority': 'MEDIUM',
-             'strategy': 'Z<-2: BUY SOL, Z>2: SELL SOL'},
-        ]
-    }
-    return jsonify(watchlist)
+    """Organized watchlist with *live* CoinGecko prices (cached 10s)."""
+    def fetch():
+        all_ids = ','.join(cg_id for items in _WATCHLIST_SPEC.values() for _, _, _, _, cg_id in items)
+        prices: dict = fetch_sync(
+            f'https://api.coingecko.com/api/v3/simple/price?ids={all_ids}'
+            f'&vs_currencies=usd&include_24hr_change=true'
+        ) or {}
+
+        def _enrich(rows):
+            out = []
+            for sym, name, typ, prio, cg_id in rows:
+                p = prices.get(cg_id) or {}
+                out.append({
+                    'symbol': sym,
+                    'name': name,
+                    'type': typ,
+                    'priority': prio,
+                    'price': p.get('usd'),
+                    'change_24h_pct': round(p.get('usd_24h_change'), 2) if p.get('usd_24h_change') is not None else None,
+                })
+            return out
+
+        return {
+            'major_crypto': _enrich(_WATCHLIST_SPEC['major_crypto']),
+            'mid_cap': _enrich(_WATCHLIST_SPEC['mid_cap']),
+            'pair_analysis': [
+                {'symbol': 'ETHBTC', 'name': 'ETH/BTC Ratio', 'type': 'pair', 'priority': 'HIGH',
+                 'strategy': 'Z<-2: BUY ETH, Z>2: SELL ETH'},
+                {'symbol': 'SOLBTC', 'name': 'SOL/BTC Ratio', 'type': 'pair', 'priority': 'MEDIUM',
+                 'strategy': 'Z<-2: BUY SOL, Z>2: SELL SOL'},
+            ],
+            'timestamp': datetime.now().isoformat(),
+            'stale': not bool(prices),
+        }
+
+    return jsonify(get_cached('watchlist', fetch))
 
 @app.route('/api/proposals')
 @requires_auth
@@ -219,28 +344,277 @@ def api_proposals():
 @app.route('/api/opportunities')
 @requires_auth
 def api_opportunities():
-    """Get trading opportunities"""
-    opportunities = [
-        {
-            'symbol': 'ETH',
-            'side': 'buy',
-            'confidence': 0.85,
-            'z_score': -2.3,
-            'reason': 'ETH undervalued vs BTC',
-            'timestamp': datetime.now().isoformat()
-        }
-    ]
-    return jsonify(opportunities)
+    """Trading opportunities sourced from today's signal_generator output.
+
+    Reads `data/trading_signals.jsonl` (TA scanner) and returns the latest
+    high-confidence BUY/SELL signals as opportunities. No mocked entries.
+    """
+    def fetch():
+        path = Path.home() / 'Code' / 'Sapphire' / 'data' / 'trading_signals.jsonl'
+        if not path.exists():
+            return {'opportunities': [], 'timestamp': datetime.now().isoformat()}
+        try:
+            lines = path.read_text().strip().splitlines()[-60:]
+        except OSError:
+            return {'opportunities': [], 'timestamp': datetime.now().isoformat()}
+        out: list[dict] = []
+        seen_symbols: set[str] = set()
+        for line in reversed(lines):
+            try:
+                s = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            sym = s.get('symbol') or ''
+            if not sym or sym in seen_symbols:
+                continue
+            if float(s.get('confidence') or 0) < 0.5:
+                continue
+            seen_symbols.add(sym)
+            raw = s.get('raw') or {}
+            out.append({
+                'symbol': sym,
+                'side': (s.get('action') or '').lower(),
+                'confidence': s.get('confidence'),
+                'price': s.get('price'),
+                'reason': raw.get('reason') or s.get('strategy', ''),
+                'edge': raw.get('edge'),
+                'kelly_size_pct': raw.get('kelly_size_pct'),
+                'timestamp': s.get('timestamp'),
+            })
+            if len(out) >= 6:
+                break
+        return {'opportunities': out, 'timestamp': datetime.now().isoformat()}
+
+    return jsonify(get_cached('opportunities', fetch))
+
 
 @app.route('/api/logs')
 @requires_auth
 def api_logs():
-    """Get recent logs"""
-    logs = [
-        {'time': datetime.now().isoformat(), 'level': 'INFO', 'message': 'System operational'},
-        {'time': datetime.now().isoformat(), 'level': 'INFO', 'message': 'Agent analysis complete'},
-    ]
-    return jsonify(logs)
+    """Recent entries from data/system_events.jsonl — no mocked logs.
+
+    Query params:
+        hours:   filter to last N hours (default 24)
+        level:   filter by level (INFO/WARN/ERROR)
+        service: substring match against event type or tags
+    """
+    hours = max(1, min(int(request.args.get('hours', 24) or 24), 168))
+    level_filter = (request.args.get('level') or '').upper().strip() or None
+    service_filter = (request.args.get('service') or '').lower().strip() or None
+
+    def _level_for_event(evt_type: str, tags: list) -> str:
+        """Classify event bus events by priority level."""
+        for t in tags:
+            if str(t).startswith('priority:p0'):
+                return 'ERROR'
+            if str(t).startswith('priority:p1'):
+                return 'WARN'
+        # Event bus types map to levels by convention
+        if evt_type in {'service.health'} or evt_type.endswith('.failed'):
+            return 'WARN'
+        if evt_type in {'regime.shifted', 'funding.extreme'}:
+            return 'WARN'
+        return 'INFO'
+
+    def _bus_entries(cutoff: float) -> list:
+        """Pull recent events across all canonical streams via event bus replay."""
+        try:
+            bus = _event_bus()
+        except Exception:
+            return []
+        from lib.core.event_bus import EVENT_TYPES
+        since = datetime.fromtimestamp(cutoff, tz=UTC)
+        collected = []
+        for et in EVENT_TYPES:
+            try:
+                for ev in bus.replay(et, since=since, limit=50):
+                    data = ev.data if isinstance(ev.data, dict) else {}
+                    # Build a concise human-readable message from the event payload
+                    if ev.type == 'signal.generated':
+                        msg = f"signal: {data.get('action','?')} {data.get('symbol','?')} @ ${data.get('price',0)} (conf {data.get('confidence',0):.2f})"
+                    elif ev.type == 'signal.closed':
+                        msg = f"signal closed: {data.get('symbol','?')} pnl ${data.get('pnl_usd',0):.2f}"
+                    elif ev.type == 'regime.snapshot':
+                        msg = f"regime: {data.get('regime','?')} conf {data.get('confidence') or 0:.2f}"
+                    elif ev.type == 'regime.shifted':
+                        msg = f"regime shift: {data.get('prior','?')} → {data.get('regime','?')}"
+                    elif ev.type == 'funding.extreme':
+                        msg = f"funding extreme: {data.get('count',0)} perps, bias {data.get('bias','?')}"
+                    elif ev.type == 'service.health':
+                        msg = f"health: {data.get('pass',0)} ok · {data.get('warn',0)} warn · {data.get('fail',0)} fail ({data.get('status','?')})"
+                    elif ev.type == 'content.generated':
+                        msg = f"content: {data.get('kind','?')} · {data.get('quality_passed',0)}/{data.get('quality_passed',0)+data.get('quality_failed',0)} platforms passed"
+                    else:
+                        msg = json.dumps(data, default=str)[:160]
+                    collected.append({
+                        'timestamp': ev.ts,
+                        'level': _level_for_event(ev.type, []),
+                        'message': msg[:240],
+                        'type': ev.type,
+                        'tags': [f"source:{ev.source}"],
+                    })
+            except Exception:
+                continue
+        return collected
+
+    def fetch():
+        cutoff = time.time() - hours * 3600
+        entries: list = []
+
+        # 1) Traditional system_events.jsonl (service lifecycle, watchdog, etc.)
+        path = Path.home() / 'Code' / 'Sapphire' / 'data' / 'system_events.jsonl'
+        if path.exists():
+            try:
+                lines = path.read_text().strip().splitlines()[-500:]
+            except OSError:
+                lines = []
+            for line in reversed(lines):
+                try:
+                    e = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                ts_str = e.get('timestamp', '')
+                try:
+                    ts_unix = datetime.fromisoformat(ts_str.replace('Z', '+00:00')).timestamp()
+                except (ValueError, TypeError):
+                    ts_unix = 0
+                if ts_unix and ts_unix < cutoff:
+                    continue
+                tags = e.get('tags') or []
+                entries.append({
+                    'timestamp': ts_str,
+                    'level': _level_for_event(e.get('type', ''), tags),
+                    'message': e.get('message', '')[:240],
+                    'type': e.get('type', ''),
+                    'tags': tags,
+                })
+
+        # 2) Event bus (regime, signals, content, health) — richer real-time feed.
+        entries.extend(_bus_entries(cutoff))
+
+        # Filters are applied uniformly across both sources.
+        def _keep(entry: dict) -> bool:
+            if level_filter and entry['level'] != level_filter:
+                return False
+            if service_filter:
+                evt_type = entry['type'].lower()
+                tags = entry['tags']
+                if service_filter not in evt_type and not any(service_filter in str(t).lower() for t in tags):
+                    return False
+            return True
+
+        entries = [e for e in entries if _keep(e)]
+        entries.sort(key=lambda e: e['timestamp'], reverse=True)
+        return {
+            'logs': entries[:200],
+            'count': len(entries),
+            'timestamp': datetime.now().isoformat(),
+        }
+
+    cache_key = f'logs::h{hours}::l{level_filter or ""}::s{service_filter or ""}'
+    return jsonify(get_cached(cache_key, fetch))
+
+
+# ── Event Bus SSE ────────────────────────────────────────────────────────────
+
+def _event_bus():
+    """Import event bus lazily — dashboard should start even if lib/core missing."""
+    import sys as _sys
+    _p = Path.home() / "Code" / "Sapphire" / "lib" / "core"
+    if str(_p) not in _sys.path:
+        _sys.path.insert(0, str(_p))
+    from event_bus import get_bus
+    return get_bus(source="dashboard")
+
+
+@app.route('/api/events/stream')
+@requires_auth
+def api_events_stream():
+    """Server-sent event stream of live bus events (glob pattern via ?types=)."""
+    patterns_raw = request.args.get('types', '*')
+    patterns = [p.strip() for p in patterns_raw.split(',') if p.strip()]
+
+    import queue as _queue
+
+    try:
+        bus = _event_bus()
+    except Exception as e:
+        return Response(
+            f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n",
+            mimetype='text/event-stream',
+        )
+
+    q: _queue.Queue = _queue.Queue(maxsize=500)
+
+    def _on_event(ev):
+        try:
+            q.put_nowait({
+                'id': ev.id,
+                'type': ev.type,
+                'ts': ev.ts,
+                'source': ev.source,
+                'data': ev.data,
+            })
+        except _queue.Full:
+            pass
+
+    subscription = bus.subscribe(patterns, _on_event)
+
+    def gen():
+        try:
+            # Opening ping so the client sees the connection immediately
+            yield f"event: open\ndata: {json.dumps({'patterns': patterns})}\n\n"
+            last_beat = time.time()
+            while True:
+                try:
+                    payload = q.get(timeout=15)
+                    yield f"event: {payload['type']}\ndata: {json.dumps(payload, default=str)}\n\n"
+                except _queue.Empty:
+                    # Keep proxies from closing the connection
+                    yield ": keepalive\n\n"
+                if time.time() - last_beat > 60:
+                    last_beat = time.time()
+        finally:
+            subscription.stop()
+
+    return Response(
+        gen(),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no',  # disable nginx buffering if proxied
+        },
+    )
+
+
+@app.route('/api/events/world-state')
+@requires_auth
+def api_world_state():
+    """Snapshot of aggregated world state for the overview page."""
+    try:
+        bus = _event_bus()
+        return jsonify(bus.get_world_state().to_dict())
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/events/replay')
+@requires_auth
+def api_events_replay():
+    """Historical replay of one event type."""
+    event_type = request.args.get('type', '')
+    if not event_type:
+        return jsonify({'error': 'missing ?type=<event_type>'}), 400
+    limit = int(request.args.get('limit', 100))
+    try:
+        bus = _event_bus()
+        events = bus.replay(event_type, limit=limit)
+        return jsonify([
+            {'id': e.id, 'type': e.type, 'ts': e.ts, 'source': e.source, 'data': e.data}
+            for e in events
+        ])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/system')
 @requires_auth
@@ -724,6 +1098,7 @@ def chain_page():
 
 @app.route('/api/chain/overview')
 @requires_auth
+@x402_require(0.01, description="On-chain intelligence snapshot")
 def api_chain_overview():
     """Unified on-chain snapshot — regime, funding, OI, TVL, stablecoins."""
     import sys as _sys
@@ -750,6 +1125,7 @@ def risk_page():
 
 @app.route('/api/risk/metrics')
 @requires_auth
+@x402_require(0.02, description="Portfolio risk analytics")
 def api_risk_metrics():
     """Portfolio metrics computed from paper_trading + signal audit logs."""
     import sys as _sys
@@ -1247,6 +1623,7 @@ def predictions_page():
 
 @app.route('/api/predictions/kronos')
 @requires_auth
+@x402_require(0.05, description="Kronos candlestick forecasts")
 def api_kronos_prediction():
     """Kronos foundation model prediction endpoint.
     Query params: symbol (default BTC-USD), lookback (default 200), predict (default 24), interval (default 1h)
@@ -1538,6 +1915,29 @@ def api_signals_performance():
         'cumulative_pnl': cumulative_pnl[1:] if len(cumulative_pnl) > 1 else [],
         'win_rate_trend': win_rate_trend,
     })
+
+
+@app.route('/content')
+@requires_auth
+def content_page():
+    return render_template('pages/content.html', current_page='content', page_title='Content_Engine')
+
+
+@app.route('/api/content/drafts')
+@requires_auth
+def api_content_drafts():
+    """List the most recent content drafts (manifests from data/content/drafts/)."""
+    import sys
+    repo_root = Path(__file__).resolve().parents[2]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+    try:
+        from lib.content import publisher as content_publisher
+        drafts = content_publisher.list_drafts(limit=50)
+        return jsonify({"count": len(drafts), "drafts": drafts})
+    except Exception as e:
+        log.warning("content drafts listing failed: %s", e)
+        return jsonify({"count": 0, "drafts": [], "error": str(e)}), 500
 
 
 if __name__ == '__main__':
