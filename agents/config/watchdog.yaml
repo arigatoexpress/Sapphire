@@ -1,0 +1,113 @@
+# Market Watchdog Agent Configuration
+# Runs on rari1 (100.120.191.1) — lightweight, stays within 3.8GB RAM
+# Restart: sudo systemctl restart market-watchdog
+
+agent:
+  name: market-watchdog
+  version: 1.1.0
+  log_level: INFO
+  health_port: 19001
+
+# Check schedule — CT (America/Chicago)
+# Active window: 08:00–22:00 CT every 4 hours
+# Quiet hours: 23:00–07:00 CT (security alerts only — no market noise)
+schedule:
+  interval_hours: 4          # Check every 4 hours
+  active_start_ct: "08:00"   # Start checks at 8 AM CT
+  active_end_ct: "22:00"     # Last check at 10 PM CT
+  quiet_mode: security_only  # During quiet hours: only alert on extreme moves (>2x threshold)
+  timezone: "America/Chicago"
+
+# Polling intervals (seconds) — used within a check cycle
+intervals:
+  heartbeat: 60              # Health endpoint heartbeat every 60s
+
+# OpenBB API (proxied from Mac via Tailscale)
+openbb:
+  base_url: "http://100.67.171.79:6900"   # Mac via Tailscale
+  timeout: 10
+  fallback_url: "https://api.coingecko.com"  # direct CoinGecko fallback
+
+# Telegram gateway (hermes on Mac)
+telegram:
+  proxy_url: "http://100.67.171.79:11435"   # Mac inference proxy
+  bot_token_env: "TELEGRAM_BOT_TOKEN"
+  priority: "p1"
+
+# ── Major Index Alerts ──────────────────────────────────────────────────────
+indices:
+  - symbol: "SPY"
+    name: "S&P 500"
+    source: "yahoo"            # yfinance via OpenBB
+    alert_threshold_pct: 2.0   # Alert on >2% daily move
+    direction: both            # both | up | down
+
+  - symbol: "DXY"
+    name: "US Dollar Index"
+    source: "yahoo"
+    ticker_yahoo: "DX-Y.NYB"   # Yahoo Finance DXY ticker
+    alert_threshold_pct: 1.0   # Alert on >1% daily move
+    direction: both
+
+  - symbol: "VIX"
+    name: "CBOE Volatility Index"
+    source: "yahoo"
+    ticker_yahoo: "^VIX"
+    alert_threshold_abs_elevated: 25.0  # Elevated volatility
+    alert_threshold_abs_crisis: 30.0    # Crisis level
+    alert_spike_pct: 20.0               # Also alert on >20% intraday spike
+    direction: up
+
+# ── Crypto Price Alerts ─────────────────────────────────────────────────────
+# Source: CoinGecko free tier (no API key required, 30 req/min)
+crypto:
+  - symbol: "bitcoin"
+    ticker: "BTC"
+    coingecko_id: "bitcoin"
+    alert_threshold_pct: 4.0   # Alert on >4% 24h move (tight — large cap)
+
+  - symbol: "ethereum"
+    ticker: "ETH"
+    coingecko_id: "ethereum"
+    alert_threshold_pct: 6.0   # Alert on >6% 24h move
+
+  - symbol: "solana"
+    ticker: "SOL"
+    coingecko_id: "solana"
+    alert_threshold_pct: 10.0  # Alert on >10% 24h move (higher vol)
+
+  - symbol: "avalanche-2"
+    ticker: "AVAX"
+    coingecko_id: "avalanche-2"
+    alert_threshold_pct: 10.0
+
+  - symbol: "hyperliquid"
+    ticker: "HYPE"
+    coingecko_id: "hyperliquid"
+    alert_threshold_pct: 12.0
+
+# ── Funding Rate Alerts ─────────────────────────────────────────────────────
+# Source: Hyperliquid public API (no key required)
+# Funding rate: hourly rate on perps. Extreme = market very one-sided.
+funding_rates:
+  enabled: true
+  source: "hyperliquid"
+  hyperliquid_api: "https://api.hyperliquid.xyz/info"
+  symbols:
+    - "BTC"
+    - "ETH"
+    - "SOL"
+    - "AVAX"
+  alert_threshold_high: 0.001    # >0.1% per 8h = extremely bullish/crowded longs
+  alert_threshold_low: -0.001    # <-0.1% per 8h = extremely bearish/crowded shorts
+  # These are per-8h rates (Hyperliquid standard). Convert to hourly: /8
+
+# ── Notification Cooldown ────────────────────────────────────────────────────
+cooldown:
+  same_alert_seconds: 14400  # Don't repeat the same alert within 4 hours (matches schedule interval)
+  max_alerts_per_hour: 8     # Rate limit — prevents noise storms
+
+# ── State Persistence ────────────────────────────────────────────────────────
+state:
+  path: "/home/rari/sapphire/watchdog_state.json"
+  save_interval: 60

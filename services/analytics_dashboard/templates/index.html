@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sapphire Analytics — BigQuery</title>
+<style>
+:root {
+  --bg: #0b0f17;
+  --panel: #121a26;
+  --panel-2: #1a2233;
+  --border: #1f2a3d;
+  --text: #e6edf3;
+  --muted: #8b98ab;
+  --accent: #4ea8ff;
+  --green: #3fb950;
+  --red: #f85149;
+  --yellow: #d29922;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  background: var(--bg); color: var(--text);
+  margin: 0; padding: 24px;
+  font-size: 13px;
+}
+h1 { font-size: 18px; letter-spacing: .02em; margin: 0 0 4px; }
+.sub { color: var(--muted); margin-bottom: 24px; font-size: 12px; }
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.kpi {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 8px; padding: 14px 16px;
+}
+.kpi-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
+.kpi-value { font-size: 22px; font-weight: 600; }
+.kpi-value.up { color: var(--green); }
+.kpi-value.down { color: var(--red); }
+.panel {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 8px; padding: 16px; margin-bottom: 16px;
+}
+.panel h2 { font-size: 13px; font-weight: 600; margin: 0 0 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+th { color: var(--muted); font-weight: 500; text-transform: uppercase; font-size: 11px; letter-spacing: .06em; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.pill {
+  display: inline-block; padding: 2px 8px; border-radius: 4px;
+  font-size: 11px; font-weight: 500;
+}
+.pill.green  { background: rgba(63,185,80,0.15); color: var(--green); }
+.pill.red    { background: rgba(248,81,73,0.15); color: var(--red); }
+.pill.yellow { background: rgba(210,153,34,0.15); color: var(--yellow); }
+.pill.blue   { background: rgba(78,168,255,0.15); color: var(--accent); }
+.footer { color: var(--muted); font-size: 11px; margin-top: 24px; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<h1>Sapphire Analytics</h1>
+<div class="sub">BigQuery dataset <code>{{ project }}.{{ dataset }}</code> · live-refreshing every 60s</div>
+
+<div class="kpi-grid" id="kpis"></div>
+
+<div class="cols">
+  <div class="panel">
+    <h2>Latest regime snapshots</h2>
+    <table id="regime"><thead><tr><th>Time</th><th>Regime</th><th class="num">Score</th><th class="num">BTC</th><th class="num">F&G</th></tr></thead><tbody></tbody></table>
+  </div>
+  <div class="panel">
+    <h2>Recent signals</h2>
+    <table id="signals"><thead><tr><th>Time</th><th>Sym</th><th>Action</th><th class="num">Conf</th><th class="num">Score</th><th>Regime</th></tr></thead><tbody></tbody></table>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Daily performance (last 30d)</h2>
+  <table id="perf"><thead><tr><th>Date</th><th>Symbol</th><th class="num">N</th><th class="num">Win rate</th><th class="num">PnL</th><th class="num">PF</th><th class="num">Avg conf</th></tr></thead><tbody></tbody></table>
+</div>
+
+<div class="cols">
+  <div class="panel">
+    <h2>Predictions</h2>
+    <table id="preds"><thead><tr><th>Time</th><th>Sym</th><th>Dir</th><th class="num">Conf</th><th class="num">Price</th><th class="num">Move</th></tr></thead><tbody></tbody></table>
+  </div>
+  <div class="panel">
+    <h2>Threat severity (30d)</h2>
+    <table id="threats"><thead><tr><th>Date</th><th>Severity</th><th class="num">CVEs</th><th class="num">KEV</th><th class="num">Avg CVSS</th></tr></thead><tbody></tbody></table>
+  </div>
+</div>
+
+<div class="footer">Project: {{ project }} · refreshed <span id="ts"></span></div>
+
+<script>
+const $ = (sel) => document.querySelector(sel);
+const fmt = (n, d=2) => (n == null || isNaN(n)) ? '—' : Number(n).toFixed(d);
+const fmtUsd = (n) => (n == null || isNaN(n)) ? '—' : '$' + Number(n).toLocaleString(undefined, {maximumFractionDigits: 0});
+const fmtPct = (n, d=1) => (n == null || isNaN(n)) ? '—' : (n * 100).toFixed(d) + '%';
+const shortTs = (s) => s ? s.replace('T', ' ').slice(0, 16) : '—';
+
+function pill(cls, txt) { return `<span class="pill ${cls}">${txt}</span>`; }
+
+function regimeClass(r) {
+  if (r === 'RISK_ON') return 'green';
+  if (r === 'RISK_OFF') return 'red';
+  if (r === 'TRANSITION') return 'yellow';
+  return 'blue';
+}
+
+async function refresh() {
+  try {
+    const [sum, regime, perf, preds, threats, signals] = await Promise.all([
+      fetch('/api/summary').then(r => r.json()),
+      fetch('/api/regime?limit=10').then(r => r.json()),
+      fetch('/api/performance?days=30').then(r => r.json()),
+      fetch('/api/predictions?limit=10').then(r => r.json()),
+      fetch('/api/threats?days=30').then(r => r.json()),
+      fetch('/api/signals/recent?limit=10').then(r => r.json()),
+    ]);
+
+    // KPIs
+    const kpis = [
+      { label: 'Signals', value: sum.signals || 0 },
+      { label: 'Regime', value: sum.latest_regime || '—', cls: regimeClass(sum.latest_regime) },
+      { label: 'Fear & Greed', value: sum.fear_greed ?? '—' },
+      { label: 'Predictions', value: sum.predictions || 0 },
+      { label: 'Threats', value: sum.threats || 0 },
+      { label: 'Leads', value: sum.leads || 0 },
+      { label: 'Total PnL', value: fmtUsd(sum.total_pnl_usd), cls: (sum.total_pnl_usd||0) >= 0 ? 'up' : 'down' },
+      { label: 'Win rate', value: fmtPct(sum.win_rate) },
+    ];
+    $('#kpis').innerHTML = kpis.map(k =>
+      `<div class="kpi"><div class="kpi-label">${k.label}</div><div class="kpi-value ${k.cls||''}">${k.value}</div></div>`
+    ).join('');
+
+    // Regime table
+    $('#regime tbody').innerHTML = (regime.rows || []).map(r =>
+      `<tr><td>${shortTs(r.timestamp)}</td><td>${pill(regimeClass(r.regime), r.regime)}</td>
+       <td class="num">${fmt(r.score, 2)}</td>
+       <td class="num">${r.btc_price_usd ? fmtUsd(r.btc_price_usd) : '—'}</td>
+       <td class="num">${r.fear_greed_score ?? '—'}</td></tr>`
+    ).join('') || '<tr><td colspan="5" class="muted">no data yet</td></tr>';
+
+    // Signals
+    $('#signals tbody').innerHTML = (signals.rows || []).map(r =>
+      `<tr><td>${shortTs(r.timestamp)}</td><td>${r.symbol || '—'}</td>
+       <td>${r.action || '—'}</td>
+       <td class="num">${fmt(r.confidence, 2)}</td>
+       <td class="num">${fmt(r.score, 1)}</td>
+       <td>${r.regime ? pill(regimeClass(r.regime), r.regime) : '—'}</td></tr>`
+    ).join('') || '<tr><td colspan="6">no data yet</td></tr>';
+
+    // Performance
+    $('#perf tbody').innerHTML = (perf.rows || []).slice(0, 30).map(r =>
+      `<tr><td>${r.date}</td><td>${r.symbol}</td>
+       <td class="num">${r.total_signals}</td>
+       <td class="num">${fmtPct(r.win_rate)}</td>
+       <td class="num">${fmtUsd(r.daily_pnl_usd)}</td>
+       <td class="num">${fmt(r.profit_factor, 2)}</td>
+       <td class="num">${fmt(r.avg_confidence, 2)}</td></tr>`
+    ).join('') || '<tr><td colspan="7">no data yet</td></tr>';
+
+    // Predictions
+    $('#preds tbody').innerHTML = (preds.rows || []).map(r =>
+      `<tr><td>${shortTs(r.timestamp)}</td><td>${r.symbol}</td>
+       <td>${r.direction || '—'}</td>
+       <td class="num">${fmt(r.confidence, 2)}</td>
+       <td class="num">${r.current_price ? fmtUsd(r.current_price) : '—'}</td>
+       <td class="num">${r.predicted_move_pct ? (r.predicted_move_pct).toFixed(2) + '%' : '—'}</td></tr>`
+    ).join('') || '<tr><td colspan="6">no data yet</td></tr>';
+
+    // Threats
+    $('#threats tbody').innerHTML = (threats.rows || []).map(r =>
+      `<tr><td>${r.date}</td>
+       <td>${pill(r.severity === 'CRITICAL' ? 'red' : (r.severity === 'HIGH' ? 'yellow' : 'blue'), r.severity || '—')}</td>
+       <td class="num">${r.cves}</td>
+       <td class="num">${r.kev_cves}</td>
+       <td class="num">${fmt(r.avg_cvss, 1)}</td></tr>`
+    ).join('') || '<tr><td colspan="5">no data yet</td></tr>';
+
+    $('#ts').textContent = new Date().toLocaleTimeString();
+  } catch (e) {
+    console.error('refresh failed', e);
+  }
+}
+
+refresh();
+setInterval(refresh, 60_000);
+</script>
+</body>
+</html>
