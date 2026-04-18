@@ -542,6 +542,11 @@ def _call_kimi_cloud(messages: list, max_tokens: int = 2048,
                 t0 = time.time()
                 try:
                     text = _kimi_relay_fn(query)
+                    if not text or not text.strip():
+                        log.warning("x kimi-relay returned empty response")
+                        _mark_failed("kimi-cloud")
+                        _record("kimi-cloud", False, int((time.time() - t0) * 1000))
+                        return None
                     elapsed = int((time.time() - t0) * 1000)
                     _mark_ok("kimi-cloud")
                     _record("kimi-cloud", True, elapsed)
@@ -631,7 +636,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
         if self.path == "/metrics":
             with _metrics_lock:
                 snapshot = {k: dict(v) for k, v in _metrics.items()}
-            for tier, m in snapshot.items():
+            for _tier, m in snapshot.items():
                 n = m["requests"]
                 m["avg_ms"] = round(m["total_ms"] / n) if n > 0 else 0
                 m["success_rate"] = f"{100*m['success']//n}%" if n > 0 else "n/a"

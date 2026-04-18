@@ -31,3 +31,32 @@ try:
     __all__ += ["EnhancedSignal", "SignalEnhancer"]
 except ImportError:
     pass
+
+try:
+    from .cpcv import CPCVResult, CPCVSplitMetrics, cpcv_splits, run_cpcv_backtest
+    __all__ += ["CPCVResult", "CPCVSplitMetrics", "cpcv_splits", "run_cpcv_backtest"]
+except ImportError:
+    pass
+
+try:
+    from .regime import GMMRegimeDetector, RegimePrediction, extract_features, get_detector
+    __all__ += ["GMMRegimeDetector", "RegimePrediction", "extract_features", "get_detector"]
+except ImportError:
+    pass
+
+try:
+    from .vpin import (
+        VPINCache,
+        VPINReading,
+        classify_vpin,
+        compute_vpin,
+        compute_vpin_from_bars,
+        get_vpin_cache,
+        vpin_reading,
+    )
+    __all__ += [
+        "VPINCache", "VPINReading", "classify_vpin", "compute_vpin",
+        "compute_vpin_from_bars", "get_vpin_cache", "vpin_reading",
+    ]
+except ImportError:
+    pass

@@ -2,7 +2,7 @@
 import json
 import logging
 import re
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 # We will use the existing GeminiGuard or a lightweight client
@@ -11,7 +11,7 @@ from src.ai.gemini_guard import GeminiGuard
 logger = logging.getLogger(__name__)
 
 
-class IntentType(str, Enum):
+class IntentType(StrEnum):
     STATUS_REPORT = "status_report"
     CONTROL_TRADING = "control_trading"
     MEDIA_PUBLISH = "media_publish"

@@ -144,7 +144,7 @@ Consensus reasoning: {request.reasoning or 'No reasoning provided'}
 
 Any concerns before execution?"""
 
-        pre_analysis = await self.reason(pre_prompt, max_tokens=128)
+        await self.reason(pre_prompt, max_tokens=128)
 
         # Execute
         start_time = datetime.now()

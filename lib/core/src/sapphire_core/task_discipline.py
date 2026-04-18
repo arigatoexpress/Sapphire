@@ -15,10 +15,10 @@ Usage:
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class TaskDiscipline(str, Enum):
+class TaskDiscipline(StrEnum):
     """Discipline mode — controls which principles are emphasized."""
     FULL = "full"          # All 4 principles (non-trivial features, architecture)
     SURGICAL = "surgical"  # Principles 3+4 (bug fixes, targeted edits)

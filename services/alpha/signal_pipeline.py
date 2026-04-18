@@ -27,6 +27,7 @@ import time
 import uuid
 
 log = logging.getLogger(__name__)
+import contextlib
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -45,7 +46,7 @@ for _p in [str(_CORE_SRC), str(_CORE_LIB), str(_TOOLS), str(_PLUGIN_LIB)]:
 # ─── Optional Imports (graceful degradation) ──────────────────────────────────
 
 try:
-    from sapphire_core.risk_kernel import HardRiskKernel, RiskKernelEvent
+    from sapphire_core.risk_kernel import HardRiskKernel
     _KERNEL_AVAILABLE = True
 except ImportError:
     _KERNEL_AVAILABLE = False
@@ -62,7 +63,7 @@ except ImportError:
     _SIZING_AVAILABLE = False
 
 try:
-    from confirmation_firewall import ActionRisk, ConfirmationFirewall, classify_action
+    from confirmation_firewall import ConfirmationFirewall
     _FIREWALL_AVAILABLE = True
 except ImportError:
     _FIREWALL_AVAILABLE = False
@@ -90,6 +91,15 @@ try:
     _ENHANCER_AVAILABLE = True
 except ImportError:
     _ENHANCER_AVAILABLE = False
+
+# Decision engine — world-state-aware confidence gate (regime/funding/fear-greed).
+try:
+    from lib.core.decision_engine import DecisionEngine as _DecisionEngine
+    _DECISION_ENGINE: "_DecisionEngine | None" = _DecisionEngine()
+    _DECISION_ENGINE_AVAILABLE = True
+except Exception:
+    _DECISION_ENGINE = None
+    _DECISION_ENGINE_AVAILABLE = False
 
 # Event bus — central nervous system. Degrades to JSONL fallback if Redis down.
 try:
@@ -395,10 +405,8 @@ class SignalPipeline:
         lines = path.read_text().strip().splitlines()[-n:]
         result = []
         for line in lines:
-            try:
+            with contextlib.suppress(json.JSONDecodeError):
                 result.append(json.loads(line))
-            except json.JSONDecodeError:
-                pass
         return list(reversed(result))
 
     def _update_paper_outcome(
@@ -456,10 +464,8 @@ class SignalPipeline:
             return True
         finally:
             if tmp_path and os.path.exists(tmp_path):
-                try:
+                with contextlib.suppress(OSError):
                     os.unlink(tmp_path)
-                except OSError:
-                    pass
 
     def update_signal_outcome(
         self,
@@ -521,10 +527,8 @@ class SignalPipeline:
                     raise
                 finally:
                     if tmp_path and os.path.exists(tmp_path):
-                        try:
+                        with contextlib.suppress(OSError):
                             os.unlink(tmp_path)
-                        except OSError:
-                            pass
                 # Mirror the outcome into paper_trading.jsonl so paper_stats()
                 # reflects the close (not stuck at paper_status=open forever).
                 if PAPER_TRADING:
@@ -742,8 +746,28 @@ class SignalPipeline:
         pos_pts   = min(15, (position_pct / 0.10) * 15)
         score     = round(conf_pts + kern_pts + rr_pts + pos_pts, 1)
 
+        # ── Decision Engine Gate ──────────────────────────────────────────────
+        decision_verdict = "ALLOW"
+        if _DECISION_ENGINE_AVAILABLE and _DECISION_ENGINE and direction != "flat" and kernel_ok:
+            try:
+                dec = _DECISION_ENGINE.evaluate({
+                    "symbol": symbol,
+                    "direction": direction,
+                    "confidence": confidence,
+                })
+                decision_verdict = dec.verdict
+                if dec.adjusted_confidence != confidence:
+                    notes.append(
+                        f"decision_engine:{dec.verdict} "
+                        f"{confidence:.2f}→{dec.adjusted_confidence:.2f} "
+                        f"({'; '.join(dec.reasons[:2])})"
+                    )
+                    confidence = dec.adjusted_confidence
+            except Exception as e:
+                notes.append(f"decision_engine_error: {e}")
+
         # ── Routing Decision ──────────────────────────────────────────────────
-        if not kernel_ok:
+        if not kernel_ok or decision_verdict == "BLOCK":
             routing = "BLOCKED"
         elif confidence >= HIGH_CONF:
             routing = "CONFIRMATION_REQUIRED"
@@ -892,10 +916,8 @@ class SignalPipeline:
             # record "audited". A crash between write-to-pagecache and fsync
             # would otherwise drop the most recent trade events.
             f.flush()
-            try:
+            with contextlib.suppress(OSError):
                 os.fsync(f.fileno())
-            except OSError:
-                pass
 
         # Real-time BigQuery publish (Pub/Sub → sapphire.trading_signals). Best-effort;
         # hourly gcp_sync also backfills from this JSONL if the publish is dropped.
@@ -980,10 +1002,8 @@ class SignalPipeline:
             with open(PAPER_TRADING_LOG, "a") as f:
                 f.write(json.dumps(paper_record) + "\n")
                 f.flush()
-                try:
+                with contextlib.suppress(OSError):
                     os.fsync(f.fileno())
-                except OSError:
-                    pass
 
         return path
 

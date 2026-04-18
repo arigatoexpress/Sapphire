@@ -23,10 +23,7 @@ from token_governor import is_available, record
 def dispatch(task: str, tier: str | None = None, repo: str | None = None) -> dict:
     """Route and execute a task."""
     # Step 1: Classify
-    if tier:
-        classification = Classification(tier, "user-specified", 0, "manual")
-    else:
-        classification = classify(task)
+    classification = Classification(tier, "user-specified", 0, "manual") if tier else classify(task)
 
     target = classification.tier
 

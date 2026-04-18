@@ -42,10 +42,22 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--kind", help="Generate a specific report kind")
     ap.add_argument("--all", action="store_true", help="Run every report kind")
     ap.add_argument("--list-drafts", action="store_true")
+    ap.add_argument(
+        "--publish",
+        action="store_true",
+        help="Run the live publishers against data/content/ready/ (dry-run unless SAPPHIRE_PUBLISH_LIVE=1)",
+    )
     args = ap.parse_args(argv)
 
     if args.list_drafts:
         print(json.dumps(publisher.list_drafts(), indent=2, default=str))
+        return 0
+
+    if args.publish:
+        from lib.content import auto_publish  # lazy — pulls in requests path
+
+        out = auto_publish.run()
+        print(json.dumps(out, indent=2, default=str))
         return 0
 
     if args.kind:

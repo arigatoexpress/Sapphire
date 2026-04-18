@@ -179,7 +179,7 @@ class EnsembleTradingSystem:
         self.meta_learner = MetaLearner(num_models).to(self.device)
 
         # Initialize with equal weights
-        self.model_weights = {name: 1.0 / num_models for name in self.models.keys()}
+        self.model_weights = {name: 1.0 / num_models for name in self.models}
 
     async def predict(self, market_data: dict[str, Any], symbol: str) -> EnsemblePrediction:
         """
@@ -304,7 +304,7 @@ class EnsembleTradingSystem:
         weight_sum = 0.0
         confidence_sum = 0.0
 
-        for model_name in filtered_predictions.keys():
+        for model_name in filtered_predictions:
             if model_name in weights and model_name in confidences:
                 weight = weights[model_name]
                 pred = filtered_predictions[model_name]

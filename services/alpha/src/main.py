@@ -76,6 +76,8 @@ except Exception:
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 # Configure high-performance logging
+import contextlib
+
 from loguru import logger
 
 logger.remove()
@@ -367,7 +369,7 @@ class AlphaEngine:
             number = float(value)
         except (TypeError, ValueError):
             return None
-        if not number == number:  # NaN guard
+        if number != number:  # NaN guard
             return None
         return number
 
@@ -626,7 +628,7 @@ class AlphaEngine:
 
     def _effective_trade_quantity_cap(self) -> float | None:
         caps: list[float] = []
-        for venue in dispatcher.bot_urls.keys():
+        for venue in dispatcher.bot_urls:
             venue_cap = self._max_quantity_for_venue(venue)
             if venue_cap is not None and venue_cap > 0:
                 caps.append(float(venue_cap))
@@ -950,7 +952,7 @@ class AlphaEngine:
             control = dispatcher.get_control_state()
             snapshot = self.market_data.get_market_snapshot(symbol=symbol)
             candidates: list[tuple[float, str]] = []
-            for venue in dispatcher.bot_urls.keys():
+            for venue in dispatcher.bot_urls:
                 venue_state = control.get(venue, {})
                 if bool(venue_state.get("paused")):
                     continue
@@ -1331,7 +1333,7 @@ class AlphaEngine:
             for sym in preferred:
                 info = venue_data.get(sym, {})
                 price = info.get("price", 0.0)
-                status = info.get("status", "offline")
+                info.get("status", "offline")
                 if price > 0:
                     age = info.get("age_seconds")
                     age_text = f"{age}s" if age is not None else "?"
@@ -1933,7 +1935,7 @@ class AlphaEngine:
         active_text = ", ".join(active) if active else "none"
         paused_text = ", ".join(paused) if paused else "none"
         failure_pressure = int(context.get("total_failure_pressure", 0))
-        pending = int(context.get("pending_autonomy_sessions", 0))
+        int(context.get("pending_autonomy_sessions", 0))
         dex_stage = str(context.get("dex_execution_stage", "paper"))
         dex_live = "ON" if bool(context.get("dex_live_dispatch", False)) else "OFF"
         key = str(session_key or "").strip() or "n/a"
@@ -3331,14 +3333,12 @@ class AlphaEngine:
                         # Compare by numeric value to avoid cross-class TypeError.
                         severity_value = getattr(severity, "value", severity)
                         error_threshold = getattr(ErrorSeverity.ERROR, "value", ErrorSeverity.ERROR)
-                        try:
-                            priority = (
+                        with contextlib.suppress(TypeError, ValueError):
+                            (
                                 "high"
                                 if int(severity_value) >= int(error_threshold)
                                 else "medium"
                             )
-                        except (TypeError, ValueError):
-                            priority = "medium"
                         await self.telegram.send_as(SAPPHIRE, msg)
                         logger.warning(msg)
                     else:

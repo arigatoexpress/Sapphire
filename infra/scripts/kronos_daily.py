@@ -10,6 +10,7 @@ Watchlist: BTC-USD, ETH-USD, SOL-USD, SPY, TSLA
 
 from __future__ import annotations
 
+import contextlib
 import json
 import subprocess
 import sys
@@ -64,14 +65,12 @@ def run_prediction(symbol: str) -> dict:
 
 
 def send_telegram(message: str) -> None:
-    try:
+    with contextlib.suppress(Exception):
         subprocess.run(
             [str(SYSTEM_PYTHON), str(NOTIFY_TOOL), message, "--priority", "p2"],
             timeout=15,
             capture_output=True,
         )
-    except Exception:
-        pass
 
 
 def build_summary(results: dict[str, dict]) -> str:

@@ -55,9 +55,7 @@ def _path_should_skip_local_check(path_text: str) -> bool:
         return True
     if normalized.startswith("/Volumes/"):
         return True
-    if normalized.lower().startswith("c:/") or normalized.lower().startswith("d:/"):
-        return True
-    return False
+    return bool(normalized.lower().startswith("c:/") or normalized.lower().startswith("d:/"))
 
 
 def _safe_run(command: list[str], timeout_seconds: int = 7) -> str:

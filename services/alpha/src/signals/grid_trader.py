@@ -41,7 +41,7 @@ def _env_float(name: str, default: float, minimum: float = 0.0, maximum: float =
         value = float(raw)
     except (TypeError, ValueError):
         return default
-    if not value == value:
+    if value != value:
         return default
     return max(minimum, min(maximum, value))
 

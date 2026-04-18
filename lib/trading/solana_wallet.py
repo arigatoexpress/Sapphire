@@ -409,9 +409,7 @@ class SolanaWallet:
             return bool(code)
         except Exception as e:
             log.debug("firewall unavailable: %s — auto-approving in paper mode", e)
-            if LIVE_TRADING:
-                return False
-            return True
+            return not LIVE_TRADING
 
     def _simulate_swap(self, proposal: Proposal) -> None:
         """Update the paper ledger as if the swap filled at the quoted price."""

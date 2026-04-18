@@ -55,7 +55,8 @@ class AISymbolResolver:
                 "LUNC": "1000LUNC",
             },
             "aster": {
-                # Aster uses BTCUSDT format (no hyphen); add address mappings as discovered
+                # Aster uses full addresses for some tokens
+                # Add known mappings as discovered
             },
         }
 

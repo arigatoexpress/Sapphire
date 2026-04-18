@@ -8,6 +8,7 @@ orchestration loop consumed by services/control-plane (port 8082).
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hashlib
 import html
 import json
@@ -1289,10 +1290,8 @@ class AlphaBotOrchestrator:
 
         control = {"agents_online": 0, "tasks": {"queued": 0, "leased": 0, "failed": 0}}
         next_actions: list[dict[str, Any]] = []
-        try:
+        with contextlib.suppress(Exception):
             control = ControlPlaneStore().overview(heartbeat_ttl_seconds=180)
-        except Exception:
-            pass
         try:
             projects = get_projects_overview(force_refresh=True)
             if isinstance(projects, dict) and isinstance(projects.get("next_actions"), list):

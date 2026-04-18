@@ -8,6 +8,7 @@ Input schema:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import subprocess
@@ -95,20 +96,14 @@ def verify_repo(repo_name: str, lint_only: bool = False) -> dict:
                 parts = line.split()
                 for i, p in enumerate(parts):
                     if p == "passed" and i > 0:
-                        try:
+                        with contextlib.suppress(ValueError):
                             result["tests"]["passed"] = int(parts[i - 1])
-                        except ValueError:
-                            pass
                     elif p == "failed" and i > 0:
-                        try:
+                        with contextlib.suppress(ValueError):
                             result["tests"]["failed"] = int(parts[i - 1])
-                        except ValueError:
-                            pass
                     elif p == "error" in line.lower() and i > 0:
-                        try:
+                        with contextlib.suppress(ValueError):
                             result["tests"]["errors"] = int(parts[i - 1])
-                        except ValueError:
-                            pass
 
         result["tests"]["total"] = result["tests"]["passed"] + result["tests"]["failed"] + result["tests"]["errors"]
 
@@ -132,10 +127,7 @@ def main():
     try:
         input_data = json.loads(sys.stdin.read())
     except (json.JSONDecodeError, EOFError):
-        if len(sys.argv) > 1:
-            input_data = {"repo": sys.argv[1]}
-        else:
-            input_data = {"all": True}
+        input_data = {"repo": sys.argv[1]} if len(sys.argv) > 1 else {"all": True}
 
     if input_data.get("all"):
         print(json.dumps(verify_all(), indent=2))

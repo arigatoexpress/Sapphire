@@ -89,10 +89,7 @@ def action_latest(days: int = 7, per_source: int = 8, fmt: str = "markdown") -> 
     # Sort by priority
     records.sort(key=lambda r: scoring.record_priority(r), reverse=True)
 
-    if fmt == "json":
-        output = render.to_json(records)
-    else:
-        output = render.render_latest_markdown(records)
+    output = render.to_json(records) if fmt == "json" else render.render_latest_markdown(records)
 
     # Save to data dir
     ts = datetime.now().strftime("%Y%m%d_%H%M")

@@ -304,11 +304,11 @@ async def test_neural_cache():
 
         # Query routing
         trade_query = {"type": "trade", "symbol": "SOL"}
-        results = await moe.query(trade_query)
+        await moe.query(trade_query)
         test_result("MoE Trade Query", True, "Routed successfully")
 
         regime_query = {"type": "regime"}
-        results = await moe.query(regime_query)
+        await moe.query(regime_query)
         test_result("MoE Regime Query", True)
 
         moe_stats = moe.get_stats()

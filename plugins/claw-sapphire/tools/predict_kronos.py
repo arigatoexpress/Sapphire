@@ -24,6 +24,11 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+try:
+    import pandas as pd
+except ImportError:
+    pd = None  # type: ignore[assignment]
+
 # ── Paths ─────────────────────────────────────────────────────────────────────
 KRONOS_ROOT = Path.home() / "Code" / "Kronos"
 KRONOS_MODELS = KRONOS_ROOT / ".models"
@@ -74,9 +79,9 @@ def _load_predictor(verbose: bool = False) -> Any:
         return _predictor
 
     except ImportError as e:
-        raise RuntimeError(f"Kronos model code not found at {KRONOS_ROOT}: {e}")
+        raise RuntimeError(f"Kronos model code not found at {KRONOS_ROOT}: {e}") from e
     except Exception as e:
-        raise RuntimeError(f"Failed to load Kronos model: {e}")
+        raise RuntimeError(f"Failed to load Kronos model: {e}") from e
 
 
 # ── Data fetching ─────────────────────────────────────────────────────────────
@@ -291,7 +296,7 @@ def action_predict(
 
     # Build predictions list
     predictions = []
-    for i, (ts, row) in enumerate(zip(y_timestamp, pred_df.itertuples())):
+    for i, (ts, row) in enumerate(zip(y_timestamp, pred_df.itertuples(), strict=False)):
         entry: dict = {
             "bar": i + 1,
             "timestamp": str(ts),

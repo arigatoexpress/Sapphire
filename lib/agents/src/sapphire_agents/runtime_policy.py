@@ -220,13 +220,12 @@ def load_runtime_policy_observed(force_refresh: bool = False) -> dict[str, Any]:
     cache_key = _runtime_policy_cache_key()
 
     if backend == "firestore":
-        if not force_refresh:
-            if (
-                _CACHE.get("payload") is not None
-                and str(_CACHE.get("key") or "") == cache_key
-                and (time.time() - float(_CACHE.get("ts") or 0.0)) < _FIRESTORE_CACHE_TTL_SECONDS
-            ):
-                return _apply_env_overrides(dict(_CACHE["payload"]))
+        if not force_refresh and (
+            _CACHE.get("payload") is not None
+            and str(_CACHE.get("key") or "") == cache_key
+            and (time.time() - float(_CACHE.get("ts") or 0.0)) < _FIRESTORE_CACHE_TTL_SECONDS
+        ):
+            return _apply_env_overrides(dict(_CACHE["payload"]))
         parsed = _firestore_runtime_policy_load()
         if not isinstance(parsed, dict):
             payload = _default_policy_payload()

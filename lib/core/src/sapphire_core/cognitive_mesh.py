@@ -17,13 +17,13 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class AgentRole(str, Enum):
+class AgentRole(StrEnum):
     """Emergent roles that agents can specialize into."""
 
     SCOUT = "scout"  # Market observation, pattern detection
@@ -34,7 +34,7 @@ class AgentRole(str, Enum):
     EXECUTOR = "executor"  # Trade execution on specific platform
 
 
-class MessageType(str, Enum):
+class MessageType(StrEnum):
     """Types of cognitive messages between agents."""
 
     OBSERVATION = "observation"  # Raw market observation
@@ -152,7 +152,7 @@ class ConsensusState:
         actions = {}
         total_confidence = 0.0
 
-        for agent_id, msg in self.votes.items():
+        for _agent_id, msg in self.votes.items():
             action = msg.suggested_action or "HOLD"
             if action not in actions:
                 actions[action] = {"count": 0, "confidence": 0.0, "reasoning": []}

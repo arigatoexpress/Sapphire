@@ -10,6 +10,7 @@ Endpoints:
   - Events: GET /events?active=true&limit=100
 """
 
+import contextlib
 import re
 from datetime import datetime
 from typing import Any
@@ -174,19 +175,15 @@ class PolymarketClient(PredictionMarketFeed):
         end_date = None
         end_str = raw.get("endDate") or raw.get("endDateIso")
         if end_str:
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 end_date = datetime.fromisoformat(str(end_str).replace("Z", "+00:00"))
-            except (ValueError, TypeError):
-                pass
 
         # Price changes
         prob_1h_ago = None
         one_hour_change = raw.get("oneHourPriceChange")
         if one_hour_change is not None:
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 prob_1h_ago = probability - float(one_hour_change)
-            except (ValueError, TypeError):
-                pass
 
         tags = []
         if raw.get("competitive"):

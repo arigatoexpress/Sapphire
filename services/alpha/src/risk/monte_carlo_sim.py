@@ -207,9 +207,8 @@ class MonteCarloSimulator:
                     logger.info(f"Path {path_id}: Reached target on day {day}")
             
             # Check drawdown limit
-            if max_drawdown > self.config.max_drawdown_limit:
-                if verbose:
-                    logger.warning(f"Path {path_id}: Exceeded max drawdown on day {day}")
+            if max_drawdown > self.config.max_drawdown_limit and verbose:
+                logger.warning(f"Path {path_id}: Exceeded max drawdown on day {day}")
         
         # Calculate final statistics
         final_capital = capital
@@ -348,7 +347,7 @@ class MonteCarloSimulator:
             
             # Plot 1: Capital paths
             ax1 = axes[0, 0]
-            for i, result in enumerate(self.simulation_results[:num_paths_to_plot]):
+            for _i, result in enumerate(self.simulation_results[:num_paths_to_plot]):
                 capitals = result['daily_capitals']
                 color = 'green' if result['success'] else 'red'
                 alpha = 0.3 if result['success'] else 0.2

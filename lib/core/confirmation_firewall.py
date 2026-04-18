@@ -26,6 +26,7 @@ Usage:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import re
@@ -234,10 +235,8 @@ def _try_consume_daily_budget(amount: float, limit: float) -> tuple[bool, float]
         try:
             new_total = float(r.incrbyfloat(key, amount))
             from datetime import timedelta
-            try:
+            with contextlib.suppress(Exception):
                 r.expire(key, int(timedelta(days=2).total_seconds()))
-            except Exception:
-                pass
             if new_total > limit:
                 try:
                     r.incrbyfloat(key, -amount)
@@ -485,7 +484,6 @@ class ConfirmationFirewall:
         # Prior impl was a TOCTOU race (load→check→record); replace with a
         # single reserve-or-rollback call so concurrent callers cannot each
         # see spent=$0 and all commit past the cap.
-        financial_reserved = False
         if risk == ActionRisk.FINANCIAL and amount > 0:
             approved, new_total = _try_consume_daily_budget(amount, DAILY_AUTO_LIMIT)
             if approved:

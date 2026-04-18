@@ -262,7 +262,7 @@ class HyperliquidClient:
         if not isinstance(universe, list) or not isinstance(ctxs, list):
             raise SourceError("Hyperliquid metaAndAssetCtxs inner shape unexpected")
         out: list[HLAssetCtx] = []
-        for asset_meta, ctx in zip(universe, ctxs):
+        for asset_meta, ctx in zip(universe, ctxs, strict=False):
             coin = asset_meta.get("name") or ""
             try:
                 mark = float(ctx.get("markPx") or 0.0)

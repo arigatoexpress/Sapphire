@@ -279,7 +279,7 @@ async def main():
         await controller.start(headless=False)
         
         # Start API
-        api = await start_api(controller, port=8085)
+        await start_api(controller, port=8085)
         
         logger.info("")
         logger.info("═══════════════════════════════════════════════════════════")
