@@ -81,7 +81,7 @@ def _load_predictor(verbose: bool = False) -> Any:
 
 # ── Data fetching ─────────────────────────────────────────────────────────────
 
-def _fetch_openbb(symbol: str, interval: str, bars: int) -> pd.DataFrame | None:
+def _fetch_openbb(symbol: str, interval: str, bars: int):
     """Try to fetch OHLCV from OpenBB REST API."""
     try:
         import pandas as pd
@@ -150,7 +150,7 @@ def _fetch_openbb(symbol: str, interval: str, bars: int) -> pd.DataFrame | None:
         return None
 
 
-def _fetch_yfinance(symbol: str, interval: str, bars: int) -> pd.DataFrame:
+def _fetch_yfinance(symbol: str, interval: str, bars: int):
     """Fetch OHLCV from yfinance directly."""
     import pandas as pd
     import yfinance as yf
@@ -185,7 +185,7 @@ def _fetch_yfinance(symbol: str, interval: str, bars: int) -> pd.DataFrame:
     return df.tail(bars)
 
 
-def _get_ohlcv(symbol: str, interval: str, bars: int) -> pd.DataFrame:
+def _get_ohlcv(symbol: str, interval: str, bars: int):
     """Fetch OHLCV — OpenBB first, yfinance fallback."""
     df = _fetch_openbb(symbol, interval, bars)
     if df is not None and len(df) >= 20:
@@ -195,7 +195,7 @@ def _get_ohlcv(symbol: str, interval: str, bars: int) -> pd.DataFrame:
 
 # ── Prediction logic ──────────────────────────────────────────────────────────
 
-def _make_timestamps(last_ts: pd.Timestamp, interval: str, n: int) -> pd.Series:
+def _make_timestamps(last_ts: Any, interval: str, n: int):
     """Generate future timestamps for prediction horizon."""
     import pandas as pd
 
@@ -208,7 +208,7 @@ def _make_timestamps(last_ts: pd.Timestamp, interval: str, n: int) -> pd.Series:
     return pd.Series(future)
 
 
-def _direction_from_pred(current_close: float, pred_df: pd.DataFrame) -> tuple[str, float]:
+def _direction_from_pred(current_close: float, pred_df: Any) -> tuple[str, float]:
     """Compute direction and confidence from prediction DataFrame."""
     if "close" not in pred_df.columns or len(pred_df) == 0:
         return "neutral", 0.5
