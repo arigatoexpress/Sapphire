@@ -1,9 +1,9 @@
 """Sapphire Inference Proxy — 4-tier multi-node failover.
 
-Tier 1: Windows GPU (100.71.10.48:11434) — RTX 5070 Ti, hermes3/qwen/deepseek
+Tier 1: Windows GPU (100.71.10.48:11434) — RTX 5070 Ti, hermes3/qwen/deepseek/gemma4
 Tier 2: Pi (rari1/rari2 via Tailscale) — Ollama, nemotron-mini / gemma2
 Tier 3: Mac local (127.0.0.1:11434) — always-on fallback
-Tier 4: Kimi Cloud (api.kimi.com) — non-sensitive deep research only
+Tier 4: Kimi Cloud (api.moonshot.cn) — non-sensitive deep research only
 
 Routing rules:
   - GPU-only models (>8B): Windows only, 503 if down (no cloud fallback)
@@ -11,37 +11,74 @@ Routing rules:
   - Pi: lightweight models only (≤4B), not offered GPU-only jobs
   - All tiers use OpenAI-compatible output regardless of backend format
 
+Benchmark-informed routing (RTX 5070 Ti, 2026-04-14):
+  fast/quick  → nemotron-mini:4b     232 tok/s  2.7 GB  T0 classifier + quick facts
+  balanced    → hermes3:8b           118 tok/s  4.7 GB  general chat, tool calls
+  code        → gemma4:latest        154 tok/s  9.0 GB  code gen (best GPU model, via Ollama)
+  reason      → deepseek-r1:14b       80 tok/s  9.0 GB  structured R1 chain-of-thought
+  qwen-reason → qwen3.5:9b           107 tok/s  6.6 GB  fast reasoning (via Ollama)
+  deep        → qwen3:14b             81 tok/s  9.3 GB  deep analysis, multi-step
+  large       → qwen2.5:32b          2.7 tok/s 19.9 GB  background / batch (RAM spill)
+  cascade     → nemotron-cascade-2    16 tok/s 22.6 GB  MoE deep analysis (fits in VRAM)
+
 Endpoints:
   /v1/chat/completions  — OpenAI-compatible (what hermes-agent uses)
   /v1/models            — List models
   /health               — Full tier health report
+  /metrics              — Per-tier request/success/failure counters
 """
 
 import json
 import os
+import sys
+import threading
 import time
 import urllib.request
 import urllib.error
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from socketserver import ThreadingMixIn
 import logging
 import re
+from pathlib import Path
+
+# Task classifier for auto-routing (no LLM required — keyword matching)
+try:
+    from task_classifier import classify_messages as _classify_messages
+    _CLASSIFIER_AVAILABLE = True
+except ImportError:
+    _CLASSIFIER_AVAILABLE = False
+
+# Kimi Claw Telegram relay — T4 fallback when Moonshot/OpenRouter API unavailable
+_KIMI_RELAY_AVAILABLE = False
+_kimi_relay_fn = None
+_LIB_TELEGRAM = Path(__file__).parents[2] / "lib" / "telegram"
+if str(_LIB_TELEGRAM) not in sys.path:
+    sys.path.insert(0, str(_LIB_TELEGRAM))
+try:
+    from kimi_relay import relay_query as _relay_query
+    _kimi_relay_fn = _relay_query
+    _KIMI_RELAY_AVAILABLE = True
+except ImportError:
+    pass
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("inference-proxy")
 
-# ─── Endpoints ──────────────────────────────────────────────────────────────
-WINDOWS_GPU   = "http://100.71.10.48:11434"
-PI_RARI1      = "http://100.120.191.1:11434"
-PI_RARI2      = "http://100.87.225.89:11434"
-MAC_LOCAL     = "http://127.0.0.1:11434"
-KIMI_API_BASE = "https://api.kimi.com/coding/v1"
-KIMI_TOKEN_FILE = os.path.expanduser("~/.kimi/credentials/kimi-code.json")
+# ─── Endpoints (overridable via env vars for network changes) ────────────────
+WINDOWS_GPU   = os.getenv("WINDOWS_GPU_URL",  "http://100.71.10.48:11434")
+PI_RARI1      = os.getenv("PI_RARI1_URL",     "http://100.120.191.1:11434")
+PI_RARI2      = os.getenv("PI_RARI2_URL",     "http://100.87.225.89:11434")
+MAC_LOCAL     = os.getenv("MAC_LOCAL_URL",    "http://127.0.0.1:11434")
 
-# Permanent API key alternatives (no hourly expiry) — preferred over token file
-MOONSHOT_API_KEY = os.getenv("MOONSHOT_API_KEY", "")
+# Kimi Cloud — permanent API keys only (no expiring CLI tokens)
+# T4 primary:  Moonshot HTTP API (MOONSHOT_API_KEY → api.moonshot.cn)
+# T4 fallback: @rarikimibot Telegram relay (KIMI_CLAW_BOT_TOKEN, needs shared group relay)
+#              Bot token stored in ~/.hermes/.env — see docs/tradingview-cdp-setup.md and
+#              ~/.hermes/skills/sapphire/kimi-delegate/SKILL.md for relay architecture
+MOONSHOT_API_KEY   = os.getenv("MOONSHOT_API_KEY", "")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
-MOONSHOT_BASE = "https://api.moonshot.cn/v1"
-OPENROUTER_BASE = "https://openrouter.ai/api/v1"
+MOONSHOT_BASE      = "https://api.moonshot.cn/v1"
+OPENROUTER_BASE    = "https://openrouter.ai/api/v1"
 
 PORT = 11435
 
@@ -52,19 +89,28 @@ MODEL_TIERS = {
     "balanced":  "hermes3:8b",
 
     # Pi-eligible (light, ≤4B)
-    "fast":      "nemotron-mini",
-    "quick":     "nemotron-mini",
+    "fast":      "nemotron-mini:latest",
+    "quick":     "nemotron-mini:latest",
     "tiny":      "qwen2.5:0.5b",        # ultra-light, Pi-native
 
-    # GPU-heavy
-    "deep":      "qwen3:14b",
-    "code":      "qwen2.5-coder:14b",
-    "reason":    "deepseek-r1:14b",
-    "large":     "qwen2.5:32b",
+    # GPU-heavy — benchmark-calibrated 2026-04-14 (RTX 5070 Ti)
+    "deep":           "qwen3:14b",              # 81 tok/s, 9.3 GB — deep multi-step
+    "code":           "gemma4:latest",          # 154 tok/s, 9.0 GB — best code model (via Ollama)
+    "fast-code":      "gemma4:latest",          # alias
+    "reason":         "deepseek-r1:14b",        # 80 tok/s, 9.0 GB — structured R1 reasoning
+    "qwen-reason":    "qwen3.5:9b",             # 107 tok/s, 6.6 GB — fast reasoning (via Ollama)
+    "fast-reason":    "qwen3.5:9b",             # alias
+    "large":          "qwen2.5:32b",            # 2.7 tok/s, 19.9 GB — background/batch (RAM spill)
+    "cascade":        "nemotron-cascade-2",     # 16 tok/s, 22.6 GB — MoE, fits 16 GB VRAM
+    "moe":            "nemotron-cascade-2",     # alias
+
+    # Legacy aliases (kept for compatibility)
+    "qwen2.5-coder":  "qwen2.5-coder:14b",     # 72 tok/s — superseded by gemma4 for code
+    "phi4":           "phi4:latest",            # 83 tok/s, 9.1 GB — good general + code
 
     # Kimi Cloud routes (non-sensitive only)
     "kimi":       "kimi-cloud",
-    "kimi-fast":  "kimi-cloud",         # same endpoint, model chosen in handler
+    "kimi-fast":  "kimi-cloud",
     "kimi-large": "kimi-cloud",
     "kimi-cloud": "kimi-cloud",
     "kimi-code":  "kimi-cloud",
@@ -72,45 +118,90 @@ MODEL_TIERS = {
     "research":   "kimi-cloud",
 }
 
-# Models that require Windows GPU (too large for Pi/Mac)
+# Models that require Windows GPU (too large for Pi/Mac).
+# gemma3:27b removed — consistently times out on llama-server b8795 (OOM at 17.4 GB).
+# gemma4:latest and qwen3.5:9b are GPU-routed but NOT blocking (they use Ollama backend).
 GPU_ONLY_MODELS = {
-    "qwen3:14b", "qwen2.5-coder:14b", "deepseek-r1:14b", "deepseek-r1:32b",
-    "qwen2.5:32b", "qwen2.5:14b", "gemma3:27b", "llama3.3:70b", "qwq:latest",
+    # Benchmarked 14B class — confirmed GPU-only (9–10 GB, fit in 16 GB VRAM)
+    "qwen3:14b", "qwen2.5-coder:14b", "deepseek-r1:14b", "phi4:latest",
+    # Large class — RAM spill but still routed to Windows only
+    "deepseek-r1:32b", "qwen2.5:32b", "qwen2.5:14b",
+    # Via Ollama (no llama-server compat), GPU Windows only
+    "gemma4:latest", "qwen3.5:9b",
+    # Oversized / exotic
+    "llama3.3:70b", "qwq:latest",
+    # MoE — 22.6 GB, fits in 16 GB VRAM via sparse activation
+    "nemotron-cascade-2",
 }
 
 # Models that can run on Pi (3.8GB RAM ceiling — nemotron-mini:4b is max)
 PI_MODELS = {
-    "nemotron-mini:4b", "nemotron-mini",
+    "nemotron-mini:4b", "nemotron-mini", "nemotron-mini:latest",
     "gemma2:2b", "qwen2.5:0.5b", "smollm2:1.7b",
 }
-PI_DEFAULT_MODEL = "nemotron-mini:4b"   # fallback when requested model not in PI_MODELS
+PI_DEFAULT_MODEL  = "nemotron-mini:latest"  # fallback when requested model not in PI_MODELS
 MAC_FALLBACK_MODEL = "hermes3:8b"       # model known to be on Mac Ollama
 
-# Enable Pi tier via environment variable (disabled by default until Pi Ollama is set up)
-PI_ENABLED = os.getenv("PI_OLLAMA_ENABLED", "0") == "1"
+# Mac models (models confirmed available locally)
+MAC_MODELS = {"hermes3:8b", "llama3.2:3b", "nemotron-mini:latest", "llama3.2:latest"}
+
+# Enable Pi tiers independently — rari2 is offline so set PI_RARI2_ENABLED=0 to skip the 30s timeout
+PI_RARI1_ENABLED = os.getenv("PI_RARI1_ENABLED", os.getenv("PI_OLLAMA_ENABLED", "0")) == "1"
+PI_RARI2_ENABLED = os.getenv("PI_RARI2_ENABLED", "0") == "1"
+PI_ENABLED = PI_RARI1_ENABLED or PI_RARI2_ENABLED  # any Pi active
 
 # ─── Health Tracking ─────────────────────────────────────────────────────────
 ENDPOINTS = ["windows-gpu", "pi-rari1", "pi-rari2", "mac-local", "kimi-cloud"]
-_endpoint_health = {k: True for k in ENDPOINTS}
-_last_health_check = {k: 0.0 for k in ENDPOINTS}
-HEALTH_COOLDOWN = 60  # seconds before retrying a failed endpoint
+_endpoint_health     = {k: True  for k in ENDPOINTS}
+_last_health_check   = {k: 0.0  for k in ENDPOINTS}
+_health_lock         = threading.Lock()
+HEALTH_COOLDOWN      = 120  # seconds before retrying a failed endpoint
 
 
 def _is_healthy(name: str) -> bool:
-    if _endpoint_health[name]:
-        return True
-    if time.time() - _last_health_check[name] > HEALTH_COOLDOWN:
-        return True  # cooldown expired — allow retry
-    return False
+    with _health_lock:
+        if _endpoint_health[name]:
+            return True
+        return time.time() - _last_health_check[name] > HEALTH_COOLDOWN
 
 
 def _mark_failed(name: str):
-    _endpoint_health[name] = False
-    _last_health_check[name] = time.time()
+    with _health_lock:
+        _endpoint_health[name] = False
+        _last_health_check[name] = time.time()
 
 
 def _mark_ok(name: str):
-    _endpoint_health[name] = True
+    with _health_lock:
+        was_failed = not _endpoint_health[name]
+        _endpoint_health[name] = True
+        if was_failed:
+            log.info("Endpoint %s recovered", name)
+
+
+# ─── Metrics ─────────────────────────────────────────────────────────────────
+_metrics = {
+    name: {"requests": 0, "success": 0, "failure": 0, "total_ms": 0}
+    for name in ENDPOINTS + ["proxy"]
+}
+_metrics_lock = threading.Lock()
+
+
+_MAX_METRIC_KEYS = 32  # Guard against unbounded growth from unknown tier names
+
+def _record(tier: str, success: bool, elapsed_ms: int):
+    with _metrics_lock:
+        if tier not in _metrics and len(_metrics) >= _MAX_METRIC_KEYS:
+            log.warning("_record: metrics dict full (%d keys), dropping tier '%s'",
+                        _MAX_METRIC_KEYS, tier)
+            return
+        m = _metrics.setdefault(tier, {"requests": 0, "success": 0, "failure": 0, "total_ms": 0})
+        m["requests"] += 1
+        if success:
+            m["success"] += 1
+        else:
+            m["failure"] += 1
+        m["total_ms"] += elapsed_ms
 
 
 # ─── Sensitivity Classifier ──────────────────────────────────────────────────
@@ -119,24 +210,31 @@ def _mark_ok(name: str):
 
 _SENSITIVE_PATTERNS = re.compile(
     r"""
-    # Auth / secrets (exact credential patterns only)
-    password|api.key|secret|credential|jwt|ssh.key|
+    # API keys / tokens (exact patterns only)
+    api[_\-.]?key|apikey|\bbearer\b|\bjwt\b|
+    # OAuth tokens and service account fields
+    access_token|refresh_token|id_token|client_secret|
+    # Private key fields (service accounts, OAuth apps)
+    private_key|privatekey|
+    # Passwords / secrets
+    password|passwd|\bsecret\b|
+    # SSH private keys (PEM headers)
+    BEGIN\s+(?:RSA\s+|OPENSSH\s+|EC\s+)?PRIVATE\s+KEY|
+    # Database connection strings with embedded credentials
+    (?:postgres|mysql|mongodb|redis)://[^@\s]+:[^@\s]+@|
+    # Slack tokens
+    xox[bpao]-[0-9A-Za-z\-]+|
     # Financial PII
-    ssn|routing.num|account.num|credit.card|
-    # Addresses / contact
-    \b\d{3}[-.\s]\d{3}[-.\s]\d{4}\b|  # phone pattern
-    \b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b  # email pattern
+    \b\d{4}[\s\-]\d{4}[\s\-]\d{4}[\s\-]\d{4}\b|  # credit card
+    \b\d{3}-\d{2}-\d{4}\b|                         # SSN
+    routing\.num                                    # routing number
     """,
     re.VERBOSE | re.IGNORECASE,
 )
 
 
 def _is_sensitive(messages: list) -> bool:
-    """Return True if any message content looks like private/sensitive data.
-    DISABLED: always returns False until sensitivity rules are tuned.
-    Re-enable by removing the early return below.
-    """
-    return False  # noqa: disabled — uncomment loop below to re-enable
+    """Return True if any message content looks like private/sensitive data."""
     for msg in messages:
         content = msg.get("content", "")
         if isinstance(content, str) and _SENSITIVE_PATTERNS.search(content):
@@ -172,8 +270,19 @@ def _call_native_ollama(base_url: str, model: str, messages: list,
 
 
 def _native_to_openai(native_resp: dict, model: str) -> dict:
-    """Convert Ollama native /api/chat response to OpenAI-compatible format."""
+    """Convert Ollama native /api/chat response to OpenAI-compatible format.
+
+    Handles qwen3/thinking models: if content is empty but thinking is present,
+    use the thinking field as the response content (reasoning-mode output).
+    """
     msg = native_resp.get("message", {})
+    content = msg.get("content", "")
+    # Thinking models (qwen3, deepseek-r1) may put all output in 'thinking'
+    # and leave 'content' empty. Surface the thinking as the response.
+    if not content:
+        thinking = msg.get("thinking", "")
+        if thinking:
+            content = f"[thinking]\n{thinking}"
     return {
         "id": f"chatcmpl-{int(time.time())}",
         "object": "chat.completion",
@@ -183,7 +292,7 @@ def _native_to_openai(native_resp: dict, model: str) -> dict:
             "index": 0,
             "message": {
                 "role": msg.get("role", "assistant"),
-                "content": msg.get("content", ""),
+                "content": content,
             },
             "finish_reason": "stop",
         }],
@@ -201,50 +310,68 @@ def _try_ollama_native(endpoint_name: str, base_url: str, model: str,
                        timeout: int = 60) -> dict | None:
     """Try a native Ollama endpoint. Returns OpenAI-format dict or None.
 
-    Only marks an endpoint failed for connection-level errors (timeout, refused).
-    HTTP 404 (model not found) means the endpoint is healthy — don't blacklist it.
+    Only marks an endpoint failed for connection-level errors (refused, no route).
+    HTTP 404 (model not found) and timeouts (cold model load) do NOT blacklist.
     """
     if not _is_healthy(endpoint_name):
         return None
+    t0 = time.time()
     try:
         native = _call_native_ollama(base_url, model, messages, max_tokens,
                                      temperature, timeout)
-        content = native.get("message", {}).get("content", "")
+        msg = native.get("message", {})
+        content = msg.get("content", "") or msg.get("thinking", "")
         if not content:
             log.warning("x %s returned empty content for model '%s'", endpoint_name, model)
-            # Empty response is a model-level issue, not an endpoint failure
             return None
+        elapsed = int((time.time() - t0) * 1000)
         _mark_ok(endpoint_name)
-        log.info("-> inference via %s (native ollama, model=%s)", endpoint_name, model)
+        _record(endpoint_name, True, elapsed)
+        log.info("-> inference via %s (native ollama, model=%s, %dms)",
+                 endpoint_name, model, elapsed)
         return _native_to_openai(native, model)
     except urllib.error.HTTPError as e:
         if e.code == 404:
-            # Model not found — endpoint is UP, just missing this model
             log.warning("x %s: model '%s' not found (404) — endpoint healthy", endpoint_name, model)
         else:
             log.warning("x %s native HTTP %d: %s", endpoint_name, e.code, str(e)[:60])
             _mark_failed(endpoint_name)
+            _record(endpoint_name, False, int((time.time() - t0) * 1000))
         return None
     except (TimeoutError, OSError) as e:
         err_str = str(e)
-        if "timed out" in err_str or "time" in err_str.lower():
-            # Timeout: endpoint is reachable but model is cold-loading.
-            # Don't blacklist — fall through to faster tier and retry GPU next request.
-            log.warning("x %s timed out (model cold-loading?) — not blacklisting", endpoint_name)
-        elif "Connection refused" in err_str or "No route" in err_str:
-            log.warning("x %s unreachable: %s", endpoint_name, err_str[:60])
+        elapsed = int((time.time() - t0) * 1000)
+        # Word-boundary "time" check — the prior `"time" in last.lower()` also
+        # matched "timestamp", "timeseries", etc., misclassifying unrelated
+        # errors as timeouts. Use explicit substrings instead.
+        err_lower = err_str.lower()
+        if ("timed out" in err_lower or "timeout" in err_lower
+                or isinstance(e, TimeoutError)):
+            # Timeout means the host is unreachable or hung — engage circuit breaker.
+            # (Cold model loads in Ollama respond normally; a socket timeout = host down.)
+            log.warning("x %s timed out after %dms — marking failed", endpoint_name, elapsed)
             _mark_failed(endpoint_name)
+            _record(endpoint_name, False, elapsed)
+        elif "Connection refused" in err_str or "No route" in err_str:
+            log.warning("x %s unreachable (%s): %s", endpoint_name, base_url, err_str[:60])
+            _mark_failed(endpoint_name)
+            _record(endpoint_name, False, elapsed)
         else:
             log.warning("x %s OS error: %s", endpoint_name, err_str[:80])
             _mark_failed(endpoint_name)
+            _record(endpoint_name, False, elapsed)
         return None
     except Exception as e:
         err_str = str(e)
+        elapsed = int((time.time() - t0) * 1000)
         if "timed out" in err_str:
-            log.warning("x %s timed out — not blacklisting", endpoint_name)
+            log.warning("x %s timed out — marking failed", endpoint_name)
+            _mark_failed(endpoint_name)
+            _record(endpoint_name, False, elapsed)
         else:
             log.warning("x %s failed: %s", endpoint_name, err_str[:80])
             _mark_failed(endpoint_name)
+            _record(endpoint_name, False, elapsed)
         return None
 
 
@@ -254,11 +381,10 @@ def _try_mac_local(path: str, body: bytes, model: str = "") -> tuple[int, bytes]
     """Try Mac local Ollama via OpenAI-compat /v1/ endpoint.
 
     Only marks failed for connection-level errors.
-    HTTP 404 (model not found) and BrokenPipe (client disconnected) do NOT
-    indicate the endpoint is down.
     """
     if not _is_healthy("mac-local"):
         return None
+    t0 = time.time()
     try:
         url = f"{MAC_LOCAL}{path}"
         req = urllib.request.Request(
@@ -267,8 +393,11 @@ def _try_mac_local(path: str, body: bytes, model: str = "") -> tuple[int, bytes]
         )
         with urllib.request.urlopen(req, timeout=120) as resp:
             data = resp.read()
+            elapsed = int((time.time() - t0) * 1000)
             _mark_ok("mac-local")
-            log.info("-> inference via mac-local (openai-compat, model=%s)", model or "?")
+            _record("mac-local", True, elapsed)
+            log.info("-> inference via mac-local (openai-compat, model=%s, %dms)",
+                     model or "?", elapsed)
             return resp.status, data
     except urllib.error.HTTPError as e:
         if e.code == 404:
@@ -276,22 +405,44 @@ def _try_mac_local(path: str, body: bytes, model: str = "") -> tuple[int, bytes]
         else:
             log.warning("x mac-local HTTP %d: %s", e.code, str(e)[:60])
             _mark_failed("mac-local")
+            _record("mac-local", False, int((time.time() - t0) * 1000))
         return None
     except BrokenPipeError:
-        # Client (hermes-agent) disconnected before we could respond — not Mac's fault
         log.warning("x mac-local: client disconnected (BrokenPipe) — endpoint healthy")
         return None
     except Exception as e:
         log.warning("x mac-local failed: %s", str(e)[:80])
         _mark_failed("mac-local")
+        _record("mac-local", False, int((time.time() - t0) * 1000))
         return None
 
 
 # ─── Kimi Cloud ──────────────────────────────────────────────────────────────
 
+# Allowlist of hostnames the proxy is permitted to make outbound HTTPS calls to.
+# Any base URL not matching this set is rejected before the request is sent.
+_ALLOWED_CLOUD_HOSTS: frozenset[str] = frozenset({
+    "api.moonshot.cn",
+    "openrouter.ai",
+    "api.openai.com",
+    "api.telegram.org",
+})
+
+
+def _is_allowed_outbound(url: str) -> bool:
+    """Return True if *url*'s hostname is on the cloud allowlist."""
+    from urllib.parse import urlparse
+    host = (urlparse(url).hostname or "").lower()
+    return host in _ALLOWED_CLOUD_HOSTS
+
+
 def _call_openai_compat(base: str, model: str, api_key: str, messages: list,
                          max_tokens: int, temperature: float, label: str) -> dict | None:
     """Generic OpenAI-compatible cloud call. Returns OpenAI-format dict or None."""
+    target_url = f"{base}/chat/completions"
+    if not _is_allowed_outbound(target_url):
+        log.warning("_call_openai_compat: blocked outbound to %s — not in allowlist", base)
+        return None
     payload = json.dumps({
         "model": model,
         "messages": messages,
@@ -299,6 +450,7 @@ def _call_openai_compat(base: str, model: str, api_key: str, messages: list,
         "temperature": temperature,
         "stream": False,
     }).encode()
+    t0 = time.time()
     try:
         req = urllib.request.Request(
             f"{base}/chat/completions",
@@ -310,70 +462,124 @@ def _call_openai_compat(base: str, model: str, api_key: str, messages: list,
         )
         with urllib.request.urlopen(req, timeout=120) as resp:
             data = json.loads(resp.read())
+            elapsed = int((time.time() - t0) * 1000)
             _mark_ok("kimi-cloud")
-            log.info("-> inference via %s", label)
+            _record("kimi-cloud", True, elapsed)
+            log.info("-> inference via %s (%dms)", label, elapsed)
             data["model"] = label
             return data
     except Exception as e:
+        _mark_failed("kimi-cloud")
+        _record("kimi-cloud", False, int((time.time() - t0) * 1000))
         log.warning("x %s failed: %s", label, str(e)[:80])
-        return None
-
-
-def _load_kimi_token() -> str | None:
-    """Load current Kimi OAuth bearer token from disk (refreshed by kimi CLI)."""
-    try:
-        with open(KIMI_TOKEN_FILE) as f:
-            data = json.load(f)
-        expires_at = data.get("expires_at", 0)
-        if time.time() > expires_at:
-            log.warning("Kimi token expired (expires_at=%s)", expires_at)
-            return None
-        return data.get("access_token")
-    except Exception as e:
-        log.warning("Could not load Kimi token: %s", e)
         return None
 
 
 def _call_kimi_cloud(messages: list, max_tokens: int = 2048,
                      temperature: float = 0.7) -> dict | None:
-    """Call cloud research API. Prefers permanent API keys over OAuth token.
-
-    Priority: MOONSHOT_API_KEY → OPENROUTER_API_KEY → Kimi OAuth token
-    """
+    """Call cloud research API. Priority: Moonshot API → OpenRouter → Telegram relay."""
     if not _is_healthy("kimi-cloud"):
         return None
 
-    # Prefer permanent API key (Moonshot direct) — no expiry issues
     if MOONSHOT_API_KEY:
         result = _call_openai_compat(
-            base=MOONSHOT_BASE,
-            model="moonshot-v1-8k",
-            api_key=MOONSHOT_API_KEY,
-            messages=messages,
-            max_tokens=max_tokens,
-            temperature=temperature,
+            base=MOONSHOT_BASE, model="moonshot-v1-8k", api_key=MOONSHOT_API_KEY,
+            messages=messages, max_tokens=max_tokens, temperature=temperature,
             label="moonshot-api",
         )
         if result:
             return result
 
-    # OpenRouter fallback (free tier models available)
     if OPENROUTER_API_KEY:
         result = _call_openai_compat(
-            base=OPENROUTER_BASE,
-            model="moonshot/moonshot-v1-8k",
+            base=OPENROUTER_BASE, model="moonshot/moonshot-v1-8k",
             api_key=OPENROUTER_API_KEY,
-            messages=messages,
-            max_tokens=max_tokens,
-            temperature=temperature,
+            messages=messages, max_tokens=max_tokens, temperature=temperature,
             label="openrouter",
         )
         if result:
             return result
 
-    # No API key configured — skip gracefully, don't mark failed
-    log.debug("kimi-cloud: no API key configured, skipping tier")
+    # Telegram relay fallback — @rarikimibot in shared group
+    if _KIMI_RELAY_AVAILABLE and _kimi_relay_fn:
+        relay_chat_id = os.environ.get("KIMI_RELAY_CHAT_ID", "")
+        kimi_token    = os.environ.get("KIMI_CLAW_BOT_TOKEN", "")
+        if relay_chat_id and kimi_token:
+            # Flatten messages into a single query string for the relay
+            query_parts = []
+            for m in messages:
+                role = m.get("role", "")
+                content = m.get("content", "")
+                if isinstance(content, list):
+                    content = " ".join(b.get("text", "") for b in content if isinstance(b, dict))
+                if content:
+                    query_parts.append(f"[{role}]: {content}" if role not in ("user",) else content)
+            query = "\n".join(query_parts).strip()
+            if query:
+                t0 = time.time()
+                try:
+                    text = _kimi_relay_fn(query)
+                    elapsed = int((time.time() - t0) * 1000)
+                    _mark_ok("kimi-cloud")
+                    _record("kimi-cloud", True, elapsed)
+                    log.info("-> inference via kimi-relay (telegram, %dms)", elapsed)
+                    return {
+                        "id": f"chatcmpl-relay-{int(time.time())}",
+                        "object": "chat.completion",
+                        "created": int(time.time()),
+                        "model": "kimi-relay",
+                        "choices": [{
+                            "index": 0,
+                            "message": {"role": "assistant", "content": text},
+                            "finish_reason": "stop",
+                        }],
+                        "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+                    }
+                except Exception as e:
+                    elapsed = int((time.time() - t0) * 1000)
+                    _mark_failed("kimi-cloud")
+                    _record("kimi-cloud", False, elapsed)
+                    log.warning("x kimi-relay failed: %s", str(e)[:80])
+        else:
+            log.debug("kimi-relay: KIMI_RELAY_CHAT_ID or KIMI_CLAW_BOT_TOKEN not set")
+
+    log.debug("kimi-cloud: no API key or relay configured, skipping tier")
     return None
+
+
+# ─── Background Health Probe ─────────────────────────────────────────────────
+
+def _probe_endpoint(name: str, url: str):
+    """Lightweight connectivity check — HEAD /api/tags or /v1/models."""
+    try:
+        req = urllib.request.Request(f"{url}/api/tags", method="GET",
+                                     headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            if resp.status == 200:
+                _mark_ok(name)
+    except Exception:
+        pass  # Probe failures don't change health state — only real requests do
+
+
+def _background_health_probe():
+    """Runs every 30s. Probes failed endpoints to detect recovery early."""
+    probes = [
+        ("windows-gpu", WINDOWS_GPU),
+        ("pi-rari1",    PI_RARI1),
+        ("pi-rari2",    PI_RARI2),
+        ("mac-local",   MAC_LOCAL),
+    ]
+    while True:
+        try:
+            time.sleep(30)
+            for name, url in probes:
+                # Only probe endpoints that are marked failed (recovery detection)
+                with _health_lock:
+                    is_failed = not _endpoint_health.get(name, True)
+                if is_failed:
+                    _probe_endpoint(name, url)
+        except Exception:
+            pass  # Never let the probe thread die
 
 
 # ─── HTTP Handler ─────────────────────────────────────────────────────────────
@@ -391,15 +597,27 @@ class ProxyHandler(BaseHTTPRequestHandler):
                 },
                 "tiers": {
                     "t1_windows_gpu": WINDOWS_GPU,
-                    "t2_pi_rari1": PI_RARI1,
-                    "t2_pi_rari2": PI_RARI2,
+                    "t2_pi_rari1": f"{PI_RARI1} (enabled={PI_RARI1_ENABLED})",
+                    "t2_pi_rari2": f"{PI_RARI2} (enabled={PI_RARI2_ENABLED})",
                     "t3_mac_local": MAC_LOCAL,
-                    "t4_kimi_cloud": KIMI_API_BASE,
+                    "t4_kimi_cloud": MOONSHOT_BASE,
                 },
             })
             return
 
-        # Proxy GET to first available endpoint (model list, etc.)
+        if self.path == "/metrics":
+            with _metrics_lock:
+                snapshot = {k: dict(v) for k, v in _metrics.items()}
+            for tier, m in snapshot.items():
+                n = m["requests"]
+                m["avg_ms"] = round(m["total_ms"] / n) if n > 0 else 0
+                m["success_rate"] = f"{100*m['success']//n}%" if n > 0 else "n/a"
+            self._respond(200, {"metrics": snapshot})
+            return
+
+        # Proxy GET to first healthy endpoint (model list, etc.)
+        # Note: do NOT call _mark_failed here — a 404 or timeout on /v1/models
+        # does not mean the endpoint is down for inference.
         for name, base in [("windows-gpu", WINDOWS_GPU), ("pi-rari1", PI_RARI1),
                             ("pi-rari2", PI_RARI2), ("mac-local", MAC_LOCAL)]:
             if not _is_healthy(name):
@@ -407,21 +625,23 @@ class ProxyHandler(BaseHTTPRequestHandler):
             try:
                 url = f"{base}{self.path}"
                 req = urllib.request.Request(url, headers={"Accept": "application/json"})
-                with urllib.request.urlopen(req, timeout=3) as resp:
+                with urllib.request.urlopen(req, timeout=5) as resp:
                     data = resp.read()
-                    _mark_ok(name)
                     self.send_response(resp.status)
                     self.send_header("Content-Type", "application/json")
                     self.end_headers()
                     self.wfile.write(data)
                     return
             except Exception:
-                _mark_failed(name)
-                continue
+                continue  # Try next endpoint — don't blacklist on GET failures
         self._respond(503, {"error": "All endpoints unavailable"})
 
     def do_POST(self):
+        t_start = time.time()
         content_length = int(self.headers.get("Content-Length", 0))
+        if content_length > 4 * 1024 * 1024:  # 4 MB hard limit
+            self._respond(413, {"error": "Request body too large", "code": "body_too_large"})
+            return
         body = self.rfile.read(content_length)
 
         try:
@@ -430,17 +650,34 @@ class ProxyHandler(BaseHTTPRequestHandler):
             self._respond(400, {"error": "Invalid JSON"})
             return
 
-        raw_model = req_data.get("model", "auto")
-        model = MODEL_TIERS.get(raw_model, raw_model)
-        req_data["model"] = model
-        body = json.dumps(req_data).encode()
-
+        raw_model   = req_data.get("model", "auto")
         messages    = req_data.get("messages", [])
         max_tokens  = req_data.get("max_tokens", 512)
         temperature = req_data.get("temperature", 0.7)
         is_chat     = "/v1/chat/completions" in self.path
+
+        # Auto-routing: classify task content to pick the best model tier
+        if raw_model == "auto" and _CLASSIFIER_AVAILABLE and is_chat and messages:
+            clf = _classify_messages(messages)
+            model = MODEL_TIERS.get(clf.model, clf.model)
+            log.info(
+                "auto-route: %s → %s (model=%s, conf=%.2f)",
+                clf.category.value, clf.model, model, clf.confidence,
+            )
+        else:
+            model = MODEL_TIERS.get(raw_model, raw_model)
+
+        req_data["model"] = model
+        body = json.dumps(req_data).encode()
+
         needs_gpu   = model in GPU_ONLY_MODELS
         wants_kimi  = model == "kimi-cloud"
+
+        if is_chat and not messages:
+            self._respond(400, {"error": "messages array is empty", "code": "invalid_request"})
+            return
+
+        tried: list[str] = []  # diagnostic trail
 
         # ── Kimi Cloud shortcut (explicit request) ──────────────────────────
         if wants_kimi and is_chat:
@@ -451,67 +688,76 @@ class ProxyHandler(BaseHTTPRequestHandler):
                     "code": "sensitive_routing_blocked",
                 })
                 return
+            tried.append("kimi-cloud")
             resp = _call_kimi_cloud(messages, max_tokens, temperature)
             if resp:
-                self._respond(200, resp)
+                self._respond(200, resp, tier="kimi-cloud")
                 return
-            # Kimi failed — fall through to local tiers
             log.warning("Kimi Cloud unavailable, falling back to local tiers")
-            model = "hermes3:8b"  # reroute to default
+            model = "hermes3:8b"
             req_data["model"] = model
             body = json.dumps(req_data).encode()
 
         if not is_chat:
-            # Non-chat POST — proxy directly
             result = _try_mac_local(self.path, body)
             if result:
                 self.send_response(result[0])
                 self.send_header("Content-Type", "application/json")
+                self.send_header("X-Inference-Tier", "mac-local")
                 self.end_headers()
                 self.wfile.write(result[1])
+                _record("proxy", result[0] < 400, 0)
                 return
             self._respond(503, {"error": "All endpoints unavailable"})
             return
 
         # ── Tier 1: Windows GPU ──────────────────────────────────────────────
-        # 90s timeout: model cold-load can take 30-60s on RTX 5070 Ti
+        if _is_healthy("windows-gpu"):
+            tried.append("windows-gpu")
         resp = _try_ollama_native("windows-gpu", WINDOWS_GPU, model,
-                                  messages, max_tokens, temperature, timeout=90)
+                                  messages, max_tokens, temperature, timeout=15)
         if resp:
-            self._respond(200, resp)
+            self._respond(200, resp, tier="windows-gpu")
             return
 
-        # GPU-only models cannot fall back to Pi or Mac
         if needs_gpu:
             log.error("GPU-only model %s — all GPU attempts failed", model)
             self._respond(503, {
                 "error": f"GPU-only model '{model}' unavailable (Windows GPU down)",
                 "code": "gpu_only_unavailable",
+                "tried": tried,
             })
             return
 
-        # ── Tier 2: Pi (lightweight models only, when PI_OLLAMA_ENABLED=1) ────
+        # ── Tier 2: Pi ────────────────────────────────────────────────────────
         if PI_ENABLED:
+            # Graceful model substitution: use Pi-compatible model
             pi_model = model if model in PI_MODELS else PI_DEFAULT_MODEL
-            if _is_healthy("pi-rari1"):
+            if pi_model != model:
+                log.info("Pi fallback: substituting model '%s' → '%s'", model, pi_model)
+
+            if PI_RARI1_ENABLED and _is_healthy("pi-rari1"):
+                tried.append("pi-rari1")
                 resp = _try_ollama_native("pi-rari1", PI_RARI1, pi_model,
-                                          messages, max_tokens, temperature, timeout=30)
+                                          messages, max_tokens, temperature, timeout=90)
                 if resp:
                     resp["model"] = f"{resp['model']} (pi-rari1)"
-                    self._respond(200, resp)
+                    self._respond(200, resp, tier="pi-rari1")
                     return
 
-            if _is_healthy("pi-rari2"):
+            if PI_RARI2_ENABLED and _is_healthy("pi-rari2"):
+                tried.append("pi-rari2")
                 resp = _try_ollama_native("pi-rari2", PI_RARI2, pi_model,
-                                          messages, max_tokens, temperature, timeout=30)
+                                          messages, max_tokens, temperature, timeout=90)
                 if resp:
                     resp["model"] = f"{resp['model']} (pi-rari2)"
-                    self._respond(200, resp)
+                    self._respond(200, resp, tier="pi-rari2")
                     return
 
         # ── Tier 3: Mac local ────────────────────────────────────────────────
-        # Substitute model if requested model isn't on Mac (Mac has hermes3:8b + llama3.2)
-        mac_model = model if model not in GPU_ONLY_MODELS and model not in PI_MODELS else MAC_FALLBACK_MODEL
+        tried.append("mac-local")
+        # Model substitution: use hermes3:8b if requested model not on Mac
+        mac_model = model if model in MAC_MODELS else MAC_FALLBACK_MODEL
         if mac_model != model:
             mac_body = json.dumps({**req_data, "model": mac_model}).encode()
             log.info("Mac fallback: substituting model '%s' → '%s'", model, mac_model)
@@ -521,45 +767,75 @@ class ProxyHandler(BaseHTTPRequestHandler):
         if result:
             self.send_response(result[0])
             self.send_header("Content-Type", "application/json")
+            self.send_header("X-Inference-Tier", "mac-local")
             self.end_headers()
             self.wfile.write(result[1])
+            _record("proxy", result[0] < 400, 0)
             return
 
         # ── Tier 4: Kimi Cloud (non-sensitive fallback) ──────────────────────
         log.warning("All local tiers down — attempting Kimi Cloud fallback")
+        tried.append("kimi-cloud")
         if _is_sensitive(messages):
             log.warning("! kimi-cloud fallback blocked: sensitive content")
+            elapsed_s = round(time.time() - t_start, 1)
             self._respond(503, {
-                "error": "All local inference unavailable and content is sensitive — cannot route to cloud",
-                "code": "all_tiers_exhausted",
+                "error": "All local inference unavailable and content is sensitive",
+                "code": "all_tiers_exhausted_sensitive",
+                "tried": tried,
+                "elapsed_s": elapsed_s,
             })
             return
 
         resp = _call_kimi_cloud(messages, max_tokens, temperature)
         if resp:
-            self._respond(200, resp)
+            self._respond(200, resp, tier="kimi-cloud")
             return
 
-        self._respond(503, {"error": "All inference tiers exhausted"})
+        elapsed_s = round(time.time() - t_start, 1)
+        self._respond(503, {
+            "error": "All inference tiers exhausted",
+            "code": "all_tiers_exhausted",
+            "tried": tried,
+            "elapsed_s": elapsed_s,
+            "hint": "Set MOONSHOT_API_KEY for cloud fallback, or check GPU/Pi connectivity",
+        })
 
-    def _respond(self, code: int, body: dict):
+    def _respond(self, code: int, body: dict, tier: str = ""):
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
+        if tier:
+            self.send_header("X-Inference-Tier", tier)
         self.end_headers()
         self.wfile.write(json.dumps(body).encode())
+        # Record the aggregate "proxy" outcome only after the upstream reply
+        # has been validated and the response has been sent. The prior
+        # implementation incremented proxy-success at request-parse time,
+        # inflating the metric for every failed/503'd request.
+        if self.command == "POST":
+            _record("proxy", code < 400, 0)
 
     def log_message(self, format, *args):
         pass  # Suppress default per-request logging (we log our own)
 
 
+class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+    """Handle each request in a separate thread — prevents slow requests from blocking health checks."""
+    daemon_threads = True
+
+
 if __name__ == "__main__":
-    server = HTTPServer(("127.0.0.1", PORT), ProxyHandler)
-    log.info("Sapphire Inference Proxy :%d — 4-tier failover", PORT)
+    # Start background health probe
+    probe_thread = threading.Thread(target=_background_health_probe, daemon=True)
+    probe_thread.start()
+
+    server = ThreadedHTTPServer(("127.0.0.1", PORT), ProxyHandler)
+    log.info("Sapphire Inference Proxy :%d — 4-tier failover (threaded)", PORT)
     log.info("T1 Windows GPU : %s (native /api/chat)", WINDOWS_GPU)
-    log.info("T2 Pi rari1    : %s enabled=%s", PI_RARI1, PI_ENABLED)
-    log.info("T2 Pi rari2    : %s enabled=%s", PI_RARI2, PI_ENABLED)
+    log.info("T2 Pi rari1    : %s enabled=%s", PI_RARI1, PI_RARI1_ENABLED)
+    log.info("T2 Pi rari2    : %s enabled=%s", PI_RARI2, PI_RARI2_ENABLED)
     log.info("T3 Mac local   : %s (/v1/ openai-compat)", MAC_LOCAL)
-    log.info("T4 Kimi Cloud  : moonshot=%s openrouter=%s (non-sensitive only)",
-             bool(MOONSHOT_API_KEY), bool(OPENROUTER_API_KEY))
-    log.info("Health cooldown: %ds", HEALTH_COOLDOWN)
+    log.info("T4 Kimi Cloud  : moonshot=%s openrouter=%s relay=%s (non-sensitive only)",
+             bool(MOONSHOT_API_KEY), bool(OPENROUTER_API_KEY), _KIMI_RELAY_AVAILABLE)
+    log.info("Health cooldown: %ds | Background probe: 30s", HEALTH_COOLDOWN)
     server.serve_forever()
