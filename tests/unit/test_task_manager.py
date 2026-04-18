@@ -228,7 +228,7 @@ def test_list_tasks_filter_by_agent(mgr):
 
 
 def test_list_tasks_filter_by_status(mgr):
-    r1 = mgr.create_task(title="Pending")
+    mgr.create_task(title="Pending")
     r2 = mgr.create_task(title="Done")
     mgr.update_task(r2["task"]["task_id"], status="completed")
     result = mgr.list_tasks(status="completed")
@@ -520,7 +520,7 @@ def test_progress_report_milestones_summary(mgr):
     t = mgr.create_task(title="MS report")
     tid = t["task"]["task_id"]
     ms1 = mgr.add_milestone(tid, title="MS 1")
-    ms2 = mgr.add_milestone(tid, title="MS 2")
+    mgr.add_milestone(tid, title="MS 2")
     mgr.complete_milestone(ms1["milestone"]["milestone_id"])
     result = mgr.progress_report()
     assert result["milestones_summary"]["total"] == 2

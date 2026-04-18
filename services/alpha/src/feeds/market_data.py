@@ -802,7 +802,7 @@ class MarketDataAggregator:
             {"type": "subscribe", "channel": "trade", "marketId": market_id},
         ]
         # Also subscribe to other configured symbols
-        for sym, mid in self._lighter_market_ids.items():
+        for _sym, mid in self._lighter_market_ids.items():
             if mid != market_id:
                 payloads.append({"type": "subscribe", "channel": f"trade:{mid}"})
                 payloads.append({"type": "subscribe", "channel": f"order_book:{mid}"})

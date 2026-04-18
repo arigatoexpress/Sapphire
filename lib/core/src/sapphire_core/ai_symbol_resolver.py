@@ -58,16 +58,11 @@ class AISymbolResolver:
                 # Aster uses full addresses for some tokens
                 # Add known mappings as discovered
             },
-            "aster": {
-                # Aster uses BTCUSDT format (no hyphen)
-            },
         }
 
         # Common symbol format patterns
         self._format_transformations = {
             "lighter": self._format_for_lighter,
-            "aster": self._format_for_aster,
-            "aster": self._format_for_aster,
             "aster": self._format_for_aster,
         }
 

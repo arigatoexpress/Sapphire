@@ -76,7 +76,7 @@ def write_sheet_rows(spreadsheet_id: str, tab_name: str, rows: list[dict[str, An
         headers: list[str] = []
         seen = set()
         for row in rows:
-            for key in row.keys():
+            for key in row:
                 key_str = str(key)
                 if key_str not in seen:
                     seen.add(key_str)

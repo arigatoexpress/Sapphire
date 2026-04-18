@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import re
 import sys
@@ -386,10 +387,8 @@ def load_config_if_present(path: Path | None) -> dict[str, Any] | None:
 
 def export_inventory(config_path: Path | None, include_menus: bool, menu_max_depth: int, activate: bool) -> dict[str, Any]:
     if activate:
-        try:
+        with contextlib.suppress(Exception):
             tvctl.activate_app(launch=False, delay=0.2)
-        except Exception:
-            pass
 
     out: dict[str, Any] = {
         "schema_version": 1,

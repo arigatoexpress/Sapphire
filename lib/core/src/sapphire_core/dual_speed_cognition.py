@@ -14,7 +14,7 @@ import os
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 import google.generativeai as genai
@@ -22,7 +22,7 @@ import google.generativeai as genai
 logger = logging.getLogger(__name__)
 
 
-class CognitionSpeed(str, Enum):
+class CognitionSpeed(StrEnum):
     """Which cognitive system to engage."""
 
     SYSTEM_1 = "system_1"  # Fast/Flash - intuitive
@@ -189,12 +189,10 @@ class DualSpeedCognition:
         self._update_system1_metrics(s1_latency)
 
         # Check if we should act provisionally
-        provisional_action_taken = False
         if s1_confidence >= self.INSTANT_ACTION_THRESHOLD and on_provisional:
             logger.info(f"⚡ System 1 high confidence ({s1_confidence:.2f}), provisional action")
             try:
                 await on_provisional(s1_decision, s1_confidence, s1_reasoning)
-                provisional_action_taken = True
             except Exception as e:
                 logger.error(f"Provisional action failed: {e}")
 
@@ -345,10 +343,7 @@ ANALYSIS: [Detailed reasoning with risk factors]
             return True
 
         # System 2 says HOLD but System 1 wants to trade = override (safety)
-        if s2_decision == "HOLD" and s1_decision in ("BUY", "SELL") and s2_confidence >= 0.6:
-            return True
-
-        return False
+        return bool(s2_decision == "HOLD" and s1_decision in ("BUY", "SELL") and s2_confidence >= 0.6)
 
     def _update_system1_metrics(self, latency_ms: float):
         """Update System 1 performance metrics."""

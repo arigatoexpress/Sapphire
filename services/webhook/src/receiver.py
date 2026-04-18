@@ -54,6 +54,7 @@ SAPPHIRE_CONTROL_TOKEN = os.getenv("SAPPHIRE_CONTROL_API_TOKEN", "")
 
 # Legacy GCP vars — kept for reference, no longer used
 EDGE_CAPABILITIES_COLLECTION = "edge_capabilities"
+SYSTEM_LOGS_COLLECTION = "system_logs"
 CAPABILITY_SYNC_INTERVAL_SECONDS = int(
     os.getenv("CAPABILITY_SYNC_INTERVAL_SECONDS", "180")
 )

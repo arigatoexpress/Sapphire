@@ -22,7 +22,10 @@ import sys
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 KRONOS_ROOT = Path.home() / "Code" / "Kronos"
@@ -291,7 +294,7 @@ def action_predict(
 
     # Build predictions list
     predictions = []
-    for i, (ts, row) in enumerate(zip(y_timestamp, pred_df.itertuples())):
+    for i, (ts, row) in enumerate(zip(y_timestamp, pred_df.itertuples(), strict=False)):
         entry: dict = {
             "bar": i + 1,
             "timestamp": str(ts),

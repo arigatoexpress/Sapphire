@@ -190,7 +190,7 @@ def check_inference() -> dict:
 def main():
     raw = sys.stdin.read().strip()
     params = json.loads(raw) if raw else {}
-    verbose = params.get("verbose", False)
+    params.get("verbose", False)
 
     services = check_services()
     repos = check_repos()

@@ -22,6 +22,8 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "lib", "core", "src", "sapphire_core"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "lib", "core", "src"))
 
+import contextlib
+
 import health
 from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
@@ -241,10 +243,8 @@ async def test_ws_push_loop_sends_snapshots():
                 assert "timestamp" in snapshot_msg
             finally:
                 push_task.cancel()
-                try:
+                with contextlib.suppress(asyncio.CancelledError):
                     await push_task
-                except asyncio.CancelledError:
-                    pass
                 await ws.close()
 
 
@@ -268,10 +268,8 @@ async def test_ws_multiple_clients_receive_broadcast():
                 assert msg2["type"] == "snapshot"
             finally:
                 push_task.cancel()
-                try:
+                with contextlib.suppress(asyncio.CancelledError):
                     await push_task
-                except asyncio.CancelledError:
-                    pass
                 await ws1.close()
                 await ws2.close()
 

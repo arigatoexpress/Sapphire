@@ -37,7 +37,7 @@ import urllib.parse
 import urllib.request
 import uuid
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -155,7 +155,10 @@ class SolanaWallet:
         from cryptography.fernet import Fernet
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
         from cryptography.hazmat.primitives.serialization import (
-            Encoding, NoEncryption, PrivateFormat, PublicFormat,
+            Encoding,
+            NoEncryption,
+            PrivateFormat,
+            PublicFormat,
         )
 
         priv = Ed25519PrivateKey.generate()
@@ -176,7 +179,7 @@ class SolanaWallet:
             "priv": base64.b64encode(priv_bytes).decode(),
             "pub": base64.b64encode(pub_bytes).decode(),
             "pubkey_b58": pubkey_b58,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         }).encode()
         WALLET_PATH.write_bytes(f.encrypt(payload))
         os.chmod(WALLET_PATH, stat.S_IRUSR | stat.S_IWUSR)    # 0600
@@ -194,7 +197,7 @@ class SolanaWallet:
 
         return WalletInfo(
             pubkey_base58=pubkey_b58,
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
             live=LIVE_TRADING,
             path=str(WALLET_PATH),
         )
@@ -335,7 +338,7 @@ class SolanaWallet:
 
         proposal = Proposal(
             id=f"prop-{uuid.uuid4().hex[:10]}",
-            ts=datetime.now(timezone.utc).isoformat(),
+            ts=datetime.now(UTC).isoformat(),
             input_token=input_token.upper(),
             output_token=output_token.upper(),
             input_amount=amount_in,
@@ -406,9 +409,7 @@ class SolanaWallet:
             return bool(code)
         except Exception as e:
             log.debug("firewall unavailable: %s — auto-approving in paper mode", e)
-            if LIVE_TRADING:
-                return False
-            return True
+            return not LIVE_TRADING
 
     def _simulate_swap(self, proposal: Proposal) -> None:
         """Update the paper ledger as if the swap filled at the quoted price."""

@@ -19,6 +19,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import json
 import logging
@@ -95,10 +96,8 @@ def _save_state(state: dict) -> None:
         tmp_path = None
     finally:
         if tmp_path and os.path.exists(tmp_path):
-            try:
+            with contextlib.suppress(OSError):
                 os.unlink(tmp_path)
-            except OSError:
-                pass
 
 
 # ---------------------------------------------------------------------------
@@ -497,10 +496,8 @@ def sync_source(
     log.info("[%s] wrote %d row(s) to %s", source.name, rows_written, stage.name)
 
     if rows_written == 0:
-        try:
+        with contextlib.suppress(OSError):
             stage.unlink()
-        except OSError:
-            pass
         return SyncResult(source.name, len(files), 0, 0, None, True, "empty transform")
 
     if dry_run:
@@ -561,10 +558,9 @@ def main() -> int:
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
-    if args.reset_watermark:
-        if STATE_FILE.exists():
-            STATE_FILE.unlink()
-            log.info("watermark reset")
+    if args.reset_watermark and STATE_FILE.exists():
+        STATE_FILE.unlink()
+        log.info("watermark reset")
 
     results = run_sync(sources=args.source, dry_run=args.dry_run)
 

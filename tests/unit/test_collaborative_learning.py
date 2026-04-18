@@ -50,7 +50,7 @@ def test_record_normalizes_inputs(learning):
 
 def test_history_max_cap(learning):
     learning.MAX_HISTORY = 10
-    for i in range(20):
+    for _i in range(20):
         learning.record_outcome(
             symbol="BTC", direction="LONG", timeframe="1h",
             conviction=0.5, contributors=["BOT_A"],

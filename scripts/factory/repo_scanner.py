@@ -12,6 +12,7 @@ Usage:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import subprocess
 import sys
@@ -134,15 +135,11 @@ def scan_repo(name: str, path: Path) -> RepoHealth:
                     parts = line.split()
                     for i, part in enumerate(parts):
                         if part == "passed" and i > 0:
-                            try:
+                            with contextlib.suppress(ValueError):
                                 h.test_pass = int(parts[i - 1])
-                            except ValueError:
-                                pass
                         if part == "failed" and i > 0:
-                            try:
+                            with contextlib.suppress(ValueError):
                                 h.test_fail = int(parts[i - 1])
-                            except ValueError:
-                                pass
                 if "error" in line.lower() and "collection" in line.lower():
                     h.test_error = line.strip()
 

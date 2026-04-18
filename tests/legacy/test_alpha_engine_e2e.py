@@ -264,7 +264,7 @@ class TestDispatcherConcurrency:
 
         # Default rate limit is 10/min
         results = []
-        for i in range(15):
+        for _i in range(15):
             r = await dispatcher.send_command(
                 "ASTER", {"action": "BUY", "symbol": "SOL", "quantity": 0.01}
             )

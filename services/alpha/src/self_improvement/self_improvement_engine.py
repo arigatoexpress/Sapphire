@@ -181,7 +181,7 @@ class GeneticOptimizer:
         position = 0
         entry_price = 0
         
-        for i, row in historical_data.iterrows():
+        for _i, row in historical_data.iterrows():
             # Get strategy signal
             signal = strategy.generate_signal(row)
             
@@ -437,7 +437,7 @@ class SelfImprovementEngine:
     async def _update_strategy_performance(self, performance_data: pd.DataFrame):
         """Update performance metrics for each strategy"""
         
-        for strategy_name in self.strategy_parameter_ranges.keys():
+        for strategy_name in self.strategy_parameter_ranges:
             strategy_data = performance_data[performance_data['strategy'] == strategy_name]
             
             if len(strategy_data) == 0:

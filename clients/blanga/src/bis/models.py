@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
-from enum import Enum
+from enum import StrEnum
 from uuid import uuid4
 
 
@@ -14,19 +14,19 @@ def make_urn(prefix: str) -> str:
     return f"{prefix}:{uuid4().hex[:12]}"
 
 
-class SignalType(str, Enum):
+class SignalType(StrEnum):
     NEW_PERMIT = "new_permit"
     ZONING_APPLICATION = "zoning_application"
     OWNERSHIP_CHANGE = "ownership_change"
     NEWS_MENTION = "news_mention"
 
 
-class OutreachState(str, Enum):
+class OutreachState(StrEnum):
     ACTIVE = "active"
     PAUSED = "paused"
 
 
-class ListingStatus(str, Enum):
+class ListingStatus(StrEnum):
     DRAFT = "draft"
     LISTED = "listed"
     UNDER_CONTRACT = "under_contract"
@@ -34,7 +34,7 @@ class ListingStatus(str, Enum):
     OFF_MARKET = "off_market"
 
 
-class MarketEventType(str, Enum):
+class MarketEventType(StrEnum):
     LISTED = "listed"
     SOLD = "sold"
     CLIENT_NEWS = "client_news"
@@ -42,7 +42,7 @@ class MarketEventType(str, Enum):
     NEW_COMPANY = "new_company"
 
 
-class ReviewStatus(str, Enum):
+class ReviewStatus(StrEnum):
     PENDING = "pending"
     APPROVED = "approved"
     REJECTED = "rejected"

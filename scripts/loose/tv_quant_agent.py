@@ -571,7 +571,7 @@ async def main():
             logger.info("✅ Already on TradingView")
             
         # Start API
-        api = await start_quant_api(agent, port=8084)
+        await start_quant_api(agent, port=8084)
         
         logger.info("")
         logger.info("═══════════════════════════════════════════════════════════")

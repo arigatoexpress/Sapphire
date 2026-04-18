@@ -531,7 +531,7 @@ async def main():
     """Main entry"""
     orchestrator = AIOrchestrator()
     
-    api = await start_orchestrator_api(orchestrator, port=8087)
+    await start_orchestrator_api(orchestrator, port=8087)
     
     logger.info("")
     logger.info("═══════════════════════════════════════════════════════════")

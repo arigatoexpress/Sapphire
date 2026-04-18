@@ -27,6 +27,7 @@ import time
 import uuid
 
 log = logging.getLogger(__name__)
+import contextlib
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -395,10 +396,8 @@ class SignalPipeline:
         lines = path.read_text().strip().splitlines()[-n:]
         result = []
         for line in lines:
-            try:
+            with contextlib.suppress(json.JSONDecodeError):
                 result.append(json.loads(line))
-            except json.JSONDecodeError:
-                pass
         return list(reversed(result))
 
     def _update_paper_outcome(
@@ -456,10 +455,8 @@ class SignalPipeline:
             return True
         finally:
             if tmp_path and os.path.exists(tmp_path):
-                try:
+                with contextlib.suppress(OSError):
                     os.unlink(tmp_path)
-                except OSError:
-                    pass
 
     def update_signal_outcome(
         self,
@@ -521,10 +518,8 @@ class SignalPipeline:
                     raise
                 finally:
                     if tmp_path and os.path.exists(tmp_path):
-                        try:
+                        with contextlib.suppress(OSError):
                             os.unlink(tmp_path)
-                        except OSError:
-                            pass
                 # Mirror the outcome into paper_trading.jsonl so paper_stats()
                 # reflects the close (not stuck at paper_status=open forever).
                 if PAPER_TRADING:
@@ -892,10 +887,8 @@ class SignalPipeline:
             # record "audited". A crash between write-to-pagecache and fsync
             # would otherwise drop the most recent trade events.
             f.flush()
-            try:
+            with contextlib.suppress(OSError):
                 os.fsync(f.fileno())
-            except OSError:
-                pass
 
         # Real-time BigQuery publish (Pub/Sub → sapphire.trading_signals). Best-effort;
         # hourly gcp_sync also backfills from this JSONL if the publish is dropped.
@@ -980,10 +973,8 @@ class SignalPipeline:
             with open(PAPER_TRADING_LOG, "a") as f:
                 f.write(json.dumps(paper_record) + "\n")
                 f.flush()
-                try:
+                with contextlib.suppress(OSError):
                     os.fsync(f.fileno())
-                except OSError:
-                    pass
 
         return path
 

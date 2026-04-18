@@ -11,18 +11,21 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from enum import Enum
-from typing import Any
+from enum import StrEnum
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import aiohttp
 
 from loguru import logger
 
 
-class PredictionSource(str, Enum):
+class PredictionSource(StrEnum):
     POLYMARKET = "polymarket"
     KALSHI = "kalshi"
 
 
-class SignalRelevance(str, Enum):
+class SignalRelevance(StrEnum):
     """How relevant a prediction market is to crypto trading."""
     DIRECT = "direct"        # Directly about crypto prices (e.g., "BTC > $100K")
     MACRO = "macro"          # Macro events affecting crypto (Fed, CPI, jobs)

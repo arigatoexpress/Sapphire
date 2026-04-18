@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import ctypes
 import ctypes.util
 import datetime as dt
@@ -184,7 +185,7 @@ def activate_app(launch: bool = False, delay: float = 0.25) -> None:
         subprocess.run(["open", "-a", APP_NAME], check=False)
         time.sleep(0.5)
     run_osascript([f'tell application "{APP_NAME}" to activate'])
-    try:
+    with contextlib.suppress(OsaScriptError):
         run_osascript(
             [
                 'tell application "System Events"',
@@ -194,8 +195,6 @@ def activate_app(launch: bool = False, delay: float = 0.25) -> None:
                 "end tell",
             ]
         )
-    except OsaScriptError:
-        pass
     if delay > 0:
         time.sleep(delay)
 
@@ -853,7 +852,7 @@ def watchlist_remove_row_from_config(
 ) -> dict[str, Any]:
     if activate:
         activate_app(launch=launch, delay=pre_wait)
-    wl = _watchlist_cfg(config)
+    _watchlist_cfg(config)
     row_name = row_point_name or watchlist_config_point_name(config, "default_from_row_point", "watchlist_row_1")
     remove_name = remove_menu_point_name or watchlist_config_point_name(
         config, "remove_menu_item_point", "watchlist_context_remove_item"
@@ -878,7 +877,7 @@ def watchlist_reorder_from_config(
 ) -> dict[str, Any]:
     if activate:
         activate_app(launch=launch, delay=pre_wait)
-    wl = _watchlist_cfg(config)
+    _watchlist_cfg(config)
     from_name = from_point_name or watchlist_config_point_name(config, "default_from_row_point", "watchlist_row_1")
     to_name = to_point_name or watchlist_config_point_name(config, "default_to_row_point", "watchlist_row_2")
     result = drag_between_config_points(config, from_name, to_name, steps=steps, duration=duration)

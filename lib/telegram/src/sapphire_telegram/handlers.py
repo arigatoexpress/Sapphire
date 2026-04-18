@@ -365,7 +365,7 @@ async def handle_forum_commands(engine: AlphaEngine, target: str, action: str, v
     if normalized == "FORUM_AGENTS":
         profiles = engine.forum.list_agent_profiles()
         lines = ["🤖 **Agent Personality Profiles**\n"]
-        for agent_id, p in profiles.items():
+        for _agent_id, p in profiles.items():
             lines.append(
                 f"{p['emoji']} **{p['name']}** — {p['role']}\n"
                 f"  Expertise: {', '.join(p['expertise'])}\n"
@@ -1649,7 +1649,6 @@ async def handle_proposal_commands(engine: AlphaEngine, target: str, action: str
             return True
         # Compact diff — truncate for Telegram readability
         diff_lines = diff_text.splitlines()
-        file_stats: dict[str, dict[str, int]] = {}
         for line in diff_lines:
             if line.startswith("diff --git") or line.startswith("--- ") or line.startswith("+++ "):
                 continue

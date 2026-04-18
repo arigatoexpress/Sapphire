@@ -141,10 +141,7 @@ def _address_from_row(row: dict[str, object]) -> str:
     for candidate in candidates:
         if not candidate:
             continue
-        if isinstance(candidate, str):
-            text = candidate.strip()
-        else:
-            text = str(candidate).strip()
+        text = candidate.strip() if isinstance(candidate, str) else str(candidate).strip()
         if text:
             return text
     return ""

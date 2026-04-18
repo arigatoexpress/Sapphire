@@ -23,6 +23,8 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/alpha"))
 
+import contextlib
+
 from src.execution.dispatcher import ExecutionDispatcher
 
 # ── Helpers ─────────────────────────────────────────────────────
@@ -440,17 +442,15 @@ class TestSendAndConfirm:
         await count_dispatches()
         task = asyncio.create_task(resolve_on_retry())
 
-        result = await d.send_and_confirm(
+        await d.send_and_confirm(
             "ASTER",
             {"action": "BUY", "symbol": "SOL"},
             timeout_seconds=0.1,
             retries=3,
         )
         task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await task
-        except asyncio.CancelledError:
-            pass
 
         # Should have attempted multiple dispatches
         assert attempt_count >= 2

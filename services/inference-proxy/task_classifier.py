@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 import re
-from enum import Enum
+from enum import StrEnum
 from typing import NamedTuple
 
 log = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 __all__ = ["TaskCategory", "ClassifierResult", "classify_messages", "classify_text"]
 
 
-class TaskCategory(str, Enum):
+class TaskCategory(StrEnum):
     FACTUAL   = "factual"
     CODE      = "code"
     REASONING = "reasoning"
@@ -203,10 +203,7 @@ def classify_messages(messages: list[dict]) -> ClassifierResult:
 
     # Prefer the last user message for intent detection
     user_msgs = [m for m in messages if m.get("role") == "user"]
-    if user_msgs:
-        primary = user_msgs[-1].get("content", "")
-    else:
-        primary = messages[-1].get("content", "")
+    primary = user_msgs[-1].get("content", "") if user_msgs else messages[-1].get("content", "")
 
     if not primary or not primary.strip():
         log.warning("classify_messages: empty/whitespace message content — defaulting to balanced")

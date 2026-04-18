@@ -188,9 +188,7 @@ def _is_retryable_web_inventory_error(result: dict[str, Any]) -> bool:
     ]
     if any(marker in blob for marker in transient_markers):
         return True
-    if "action failed" in blob and "snapshot-click" in blob and "not found" in blob:
-        return True
-    return False
+    return bool("action failed" in blob and "snapshot-click" in blob and "not found" in blob)
 
 
 def _web_inventory_error_blob(result: dict[str, Any]) -> str:

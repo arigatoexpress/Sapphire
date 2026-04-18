@@ -9,6 +9,7 @@ Priority: MOONSHOT_API_KEY → OPENROUTER_API_KEY → kimi CLI binary (legacy fa
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import subprocess
@@ -293,20 +294,14 @@ def _parse_kimi_tokens(output: str) -> tuple[int, int]:
             for part in line.split(","):
                 part = part.strip()
                 if "input_other=" in part:
-                    try:
+                    with contextlib.suppress(ValueError, IndexError):
                         prompt_tokens += int(part.split("=")[1])
-                    except (ValueError, IndexError):
-                        pass
                 elif "output=" in part and "input" not in part:
-                    try:
+                    with contextlib.suppress(ValueError, IndexError):
                         eval_tokens += int(part.split("=")[1])
-                    except (ValueError, IndexError):
-                        pass
                 elif "input_cache_read=" in part:
-                    try:
+                    with contextlib.suppress(ValueError, IndexError):
                         prompt_tokens += int(part.split("=")[1])
-                    except (ValueError, IndexError):
-                        pass
     return prompt_tokens, eval_tokens
 
 

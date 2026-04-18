@@ -5,6 +5,8 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/alpha"))
 
+import contextlib
+
 import pytest
 from src.security.agent_permissions import (
     CAPABILITY_RISK_TIER,
@@ -227,10 +229,8 @@ def test_stats_tracking():
 
 def test_recent_denials():
     g = _gate()
-    try:
+    with contextlib.suppress(PermissionDenied):
         g.require("SCOUT", Capability.SECRET_ACCESS, detail="test denial")
-    except PermissionDenied:
-        pass
 
     denials = g.recent_denials()
     assert len(denials) >= 1

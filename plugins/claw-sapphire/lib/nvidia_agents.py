@@ -225,7 +225,7 @@ def run_agent(query: str, max_turns: int = 3) -> AgentResponse:
     tool_results = {}
 
     # Turn 1: Hermes 3 decides what tools to call
-    for turn in range(max_turns):
+    for _turn in range(max_turns):
         response = _ollama_chat(MODELS["tool_caller"], messages, tools=SAPPHIRE_TOOLS, timeout=60)
 
         if "error" in response:

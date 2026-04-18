@@ -97,7 +97,7 @@ class MacStrategyBridge:
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as resp:
                     if resp.status == 200:
-                        result = await resp.json()
+                        await resp.json()
                         logger.info(f"✅ Forwarded: {payload['symbol']} {payload['action']}")
                         return True
                     else:
