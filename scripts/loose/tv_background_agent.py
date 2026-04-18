@@ -321,7 +321,7 @@ async def main():
             logger.warning("⚠️  TradingView tab not found - please open tradingview.com/chart")
         
         # Start API
-        api = await start_api(agent, port=8086)
+        await start_api(agent, port=8086)
         
         # Start background monitoring
         monitor_task = asyncio.create_task(agent.start_monitoring())

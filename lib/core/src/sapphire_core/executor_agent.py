@@ -144,7 +144,7 @@ Consensus reasoning: {request.reasoning or 'No reasoning provided'}
 
 Any concerns before execution?"""
 
-        pre_analysis = await self.reason(pre_prompt, max_tokens=128)
+        await self.reason(pre_prompt, max_tokens=128)
 
         # Execute
         start_time = datetime.now()
@@ -461,7 +461,6 @@ class LighterExecutorAgent(ExecutorAgent):
 async def create_executor_swarm() -> dict[str, ExecutorAgent]:
     """Create and initialize all executor agents."""
     executors = {
-        "aster": AsterExecutorAgent(),
         "aster": AsterExecutorAgent(),
         "lighter": LighterExecutorAgent(),
     }

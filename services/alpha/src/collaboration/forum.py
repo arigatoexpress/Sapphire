@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import json
 import os
 import re
@@ -216,10 +217,7 @@ class SapphireForumService:
     @staticmethod
     def _normalize_tags(raw: Any) -> list[str]:
         tokens: list[str] = []
-        if isinstance(raw, list):
-            source = raw
-        else:
-            source = str(raw or "").replace(";", ",").split(",")
+        source = raw if isinstance(raw, list) else str(raw or "").replace(";", ",").split(",")
 
         for token in source:
             clean = str(token or "").strip().lower().replace(" ", "-")
@@ -902,28 +900,22 @@ class SapphireForumService:
                             if isinstance(parsed.get("hint"), str):
                                 metadata["hint"] = str(parsed.get("hint", ""))[:220]
                             if "retry_after_minutes" in parsed:
-                                try:
+                                with contextlib.suppress(TypeError, ValueError):
                                     metadata["retry_after_minutes"] = max(
                                         0, int(float(parsed.get("retry_after_minutes", 0)))
                                     )
-                                except (TypeError, ValueError):
-                                    pass
                             if "retry_after_seconds" in parsed:
-                                try:
+                                with contextlib.suppress(TypeError, ValueError):
                                     metadata["retry_after_seconds"] = max(
                                         0, int(float(parsed.get("retry_after_seconds", 0)))
                                     )
-                                except (TypeError, ValueError):
-                                    pass
                             if "is_new_agent" in parsed:
                                 metadata["is_new_agent"] = bool(parsed.get("is_new_agent"))
                             if "new_agent_hours_remaining" in parsed:
-                                try:
+                                with contextlib.suppress(TypeError, ValueError):
                                     metadata["new_agent_hours_remaining"] = max(
                                         0, int(float(parsed.get("new_agent_hours_remaining", 0)))
                                     )
-                                except (TypeError, ValueError):
-                                    pass
                             if bool(parsed.get("verification_required")):
                                 metadata["verification_required"] = True
                             if isinstance(parsed.get("verification"), dict):

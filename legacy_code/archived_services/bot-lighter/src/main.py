@@ -6,6 +6,7 @@ Lighter is a decentralized L2 order book exchange built on ZK-rollups.
 """
 
 import asyncio
+import contextlib
 import html
 import inspect
 import json
@@ -22,6 +23,8 @@ from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
+
+import requests
 
 # Load .env file if present (for local/Pi deployment)
 try:
@@ -2057,10 +2060,8 @@ class LighterBot:
                 logger.debug("Trade chart send skipped: %s", exc)
             finally:
                 if chart_path and chart_path.exists():
-                    try:
+                    with contextlib.suppress(Exception):
                         chart_path.unlink(missing_ok=True)
-                    except Exception:
-                        pass
 
     async def _send_telegram_message(
         self,
@@ -3877,7 +3878,7 @@ class LighterBot:
         stale_price_positions = 0
         positions_count = 0
 
-        for symbol, position in self.positions.items():
+        for _symbol, position in self.positions.items():
             qty = abs(self._to_float(getattr(position, "quantity", 0.0), 0.0))
             if qty <= 0:
                 continue

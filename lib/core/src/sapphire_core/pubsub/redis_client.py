@@ -12,6 +12,7 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -187,9 +188,7 @@ class RedisPubSubClient:
             await asyncio.gather(*tasks, return_exceptions=True)
         self._pull_tasks = []
         if self._redis is not None:
-            try:
+            with contextlib.suppress(Exception):
                 await self._redis.aclose()
-            except Exception:
-                pass
             self._redis = None
         self._initialized = False

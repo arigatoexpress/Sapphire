@@ -117,7 +117,6 @@ def action_discover(industry: str = None, region: str = "houston_tx",
     if data:
         businesses = data.get("businesses", [])
         permits = data.get("permits", [])
-        news = data.get("news", [])
         contacts = data.get("contacts", [])
         orgs = data.get("organizations", [])
 

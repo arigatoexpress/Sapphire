@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.sapphire.backtest-weekly</string>
+
+    <!-- Saturday 22:00 — after markets close, before Sunday analysis -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key>
+        <integer>6</integer>
+        <key>Hour</key>
+        <integer>22</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/python3</string>
+        <string>-m</string>
+        <string>lib.analytics.run_strategies</string>
+        <string>--days</string>
+        <string>90</string>
+        <string>--bankroll</string>
+        <string>10000</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/aribs/Code/Sapphire</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>/Users/aribs</string>
+        <key>PYTHONPATH</key>
+        <string>/Users/aribs/Code/Sapphire</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/aribs/Library/Logs/sapphire/backtest-weekly.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/aribs/Library/Logs/sapphire/backtest-weekly.err</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>

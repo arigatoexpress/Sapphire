@@ -5,12 +5,20 @@ Receives signals from the webhook (Windows PC :9090), logs them to JSONL,
 analyzes with Nemotron, and notifies via Telegram.
 
 Usage:
-    uvicorn signal_logger:app --host 0.0.0.0 --port 18081
+    WEBHOOK_SECRET=<secret> uvicorn signal_logger:app --host 100.67.171.79 --port 18081
+
+Security:
+    - Bind to Tailscale interface (100.67.171.79), NOT 0.0.0.0
+    - WEBHOOK_SECRET must be set — all requests are rejected without it
+    - All endpoints only accept connections from localhost or Tailscale CGNAT (100.x.x.x)
 """
 
 from __future__ import annotations
 
+import contextlib
+import ipaddress
 import json
+import logging
 import os
 import sys
 from datetime import UTC, datetime
@@ -18,6 +26,9 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+
+log = logging.getLogger(__name__)
 
 SIGNALS_PATH = Path.home() / "Code" / "Sapphire" / "data" / "trading_signals.jsonl"
 EVENTS_PATH = Path.home() / "Code" / "Sapphire" / "data" / "system_events.jsonl"
@@ -33,11 +44,37 @@ try:
 except Exception:
     _PIPELINE_AVAILABLE = False
 
-app = FastAPI(title="Sapphire Signal Logger", version="0.1.0")
+# ─── Security: Tailscale IP allowlist ────────────────────────────────────────
+# Only localhost and Tailscale CGNAT (100.64.0.0/10) are permitted.
+# The Windows webhook (100.71.10.48) and Pi nodes sit inside this range.
+_TAILSCALE_NET = ipaddress.ip_network("100.64.0.0/10")
+_LOCALHOST = ipaddress.ip_address("127.0.0.1")
 
-# Optional webhook secret for signal authentication (set WEBHOOK_SECRET env var)
-# TradingView sends the secret as a field in the JSON body: {"secret": "...", ...}
+
+class _TailscaleOnlyMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        client_ip = request.client.host if request.client else ""
+        try:
+            addr = ipaddress.ip_address(client_ip)
+        except ValueError:
+            return JSONResponse({"error": "forbidden"}, status_code=403)
+        if addr != _LOCALHOST and addr not in _TAILSCALE_NET:
+            log.warning("signal_logger: blocked request from non-Tailscale IP %s", client_ip)
+            return JSONResponse({"error": "forbidden"}, status_code=403)
+        return await call_next(request)
+
+
+app = FastAPI(title="Sapphire Signal Logger", version="0.1.0")
+app.add_middleware(_TailscaleOnlyMiddleware)
+
+# WEBHOOK_SECRET is required — all signal POST requests are rejected without it.
+# Set via WEBHOOK_SECRET env var. TradingView sends it as {"secret": "...", ...} in body.
 _WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
+if not _WEBHOOK_SECRET:
+    log.warning(
+        "WEBHOOK_SECRET is not set — /api/signals endpoint will reject all requests. "
+        "Set WEBHOOK_SECRET env var before starting."
+    )
 
 
 @app.get("/health")
@@ -60,8 +97,10 @@ async def receive_signal(request: Request):
     except Exception:
         return JSONResponse({"error": "invalid JSON"}, status_code=400)
 
-    # Validate webhook secret if configured
-    if _WEBHOOK_SECRET and body.get("secret") != _WEBHOOK_SECRET:
+    # Validate webhook secret — required, not optional
+    if not _WEBHOOK_SECRET:
+        return JSONResponse({"error": "service misconfigured — WEBHOOK_SECRET not set"}, status_code=503)
+    if body.get("secret") != _WEBHOOK_SECRET:
         return JSONResponse({"error": "unauthorized"}, status_code=401)
 
     signal = {
@@ -97,10 +136,8 @@ async def receive_signal(request: Request):
     # ── Signal Pipeline (scoring + routing + confirmation firewall) ─────────
     pipeline_result = None
     if _PIPELINE_AVAILABLE:
-        try:
+        with contextlib.suppress(Exception):
             pipeline_result = _signal_pipeline.process(signal)
-        except Exception:
-            pass
 
     # ── Telegram notification (pipeline handles it if available) ────────────
     ai_assessment = "Analysis unavailable"
@@ -157,10 +194,8 @@ async def recent_signals():
     lines = SIGNALS_PATH.read_text().strip().splitlines()[-20:]
     signals = []
     for line in lines:
-        try:
+        with contextlib.suppress(json.JSONDecodeError):
             signals.append(json.loads(line))
-        except json.JSONDecodeError:
-            pass
 
     return {"signals": list(reversed(signals)), "count": len(signals)}
 
@@ -168,4 +203,6 @@ async def recent_signals():
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", "18081"))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    # Bind to Tailscale IP only — never 0.0.0.0
+    host = os.environ.get("HOST", "100.67.171.79")
+    uvicorn.run(app, host=host, port=port)

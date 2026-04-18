@@ -10,6 +10,7 @@ Endpoints:
   - Markets: GET /markets?status=open&limit=200
 """
 
+import contextlib
 import os
 import re
 from datetime import datetime
@@ -198,10 +199,8 @@ class KalshiClient(PredictionMarketFeed):
         prob_1h_ago = None
         prev_price = raw.get("previous_price")
         if prev_price is not None and probability is not None:
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 prob_1h_ago = float(prev_price) / 100.0
-            except (ValueError, TypeError):
-                pass
 
         tags = []
         if volume_24h >= 1000:

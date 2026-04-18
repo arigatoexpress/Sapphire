@@ -57,6 +57,7 @@ if not AUTH_PASSWORD:
     raise RuntimeError("AUTH_PASSWORD environment variable must be set")
 
 # x402 payment gate — optional, disabled unless X402_ENABLED=1
+import contextlib
 import sys as _sys  # noqa: E402
 
 _LIB_PAYMENTS = Path.home() / "Code" / "Sapphire"
@@ -564,7 +565,7 @@ def api_events_stream():
     q: _queue.Queue = _queue.Queue(maxsize=500)
 
     def _on_event(ev):
-        try:
+        with contextlib.suppress(_queue.Full):
             q.put_nowait({
                 'id': ev.id,
                 'type': ev.type,
@@ -572,8 +573,6 @@ def api_events_stream():
                 'source': ev.source,
                 'data': ev.data,
             })
-        except _queue.Full:
-            pass
 
     subscription = bus.subscribe(patterns, _on_event)
 
@@ -666,7 +665,7 @@ def api_events_stream():
     q: _queue.Queue = _queue.Queue(maxsize=500)
 
     def _on_event(ev):
-        try:
+        with contextlib.suppress(_queue.Full):
             q.put_nowait({
                 'id': ev.id,
                 'type': ev.type,
@@ -674,8 +673,6 @@ def api_events_stream():
                 'source': ev.source,
                 'data': ev.data,
             })
-        except _queue.Full:
-            pass
 
     subscription = bus.subscribe(patterns, _on_event)
 
@@ -874,10 +871,8 @@ def api_signals():
             f = signals_dir / f'{today}.jsonl'
             if f.exists():
                 for line in f.read_text().strip().splitlines()[-20:]:
-                    try:
+                    with contextlib.suppress(Exception):
                         recent.append(json.loads(line))
-                    except Exception:
-                        pass
                 recent.reverse()
 
         return {
@@ -905,7 +900,7 @@ def api_agents():
     def fetch():
         agents = []
 
-        for agent_name, pi_ip, pi_port, log_path in [
+        for agent_name, pi_ip, pi_port, _log_path in [
             ('market-watchdog', '100.120.191.1', 19001,
              '/home/rari/sapphire/logs/market-watchdog.log'),
             ('health-monitor',  '100.87.225.89', 19002,
@@ -1143,10 +1138,8 @@ def api_trading_metrics():
         signals_today = []
         if f.exists():
             for line in f.read_text().strip().splitlines():
-                try:
+                with contextlib.suppress(Exception):
                     signals_today.append(_json.loads(line))
-                except Exception:
-                    pass
 
         total = len(signals_today)
 
@@ -1314,7 +1307,7 @@ def api_risk_backtest():
       latest=1                  return the last saved run instead of recomputing
     """
     try:
-        from lib.analytics.backtest import Backtester, BacktestConfig, DEFAULT_SYMBOLS
+        from lib.analytics.backtest import DEFAULT_SYMBOLS, BacktestConfig, Backtester
         if request.args.get('latest') == '1':
             for cand in (r / 'data' / 'backtests' / 'latest.json' for r in _DASHBOARD_ROOTS):
                 if cand.exists():

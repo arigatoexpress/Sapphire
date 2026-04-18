@@ -103,7 +103,7 @@ def capability_search_fields(cap: dict[str, Any]) -> dict[str, Any]:
 
 def score_capability(query: str, q_tokens: set[str], cap: dict[str, Any], prefer_surface_family: str | None) -> tuple[float, list[str]]:
     fields = capability_search_fields(cap)
-    label = fields["label"]
+    fields["label"]
     label_norm = fields["label_norm"]
     cluster_key = fields["cluster_key"]
     score = 0.0

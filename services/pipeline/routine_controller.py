@@ -25,7 +25,7 @@ import logging
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path.home() / "Code" / "Sapphire"
@@ -92,7 +92,7 @@ def heal(rows: list[dict]) -> list[dict]:
 def log_history(rows: list[dict], actions: list[dict]) -> None:
     HISTORY.parent.mkdir(parents=True, exist_ok=True)
     entry = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "total": len(rows),
         "ok": sum(1 for r in rows if r.get("ok")),
         "failing": [r["name"] for r in rows if not r.get("ok")],
@@ -107,7 +107,7 @@ def format_summary(rows: list[dict], actions: list[dict]) -> str:
     """Plaintext-safe summary for Telegram."""
     ok = [r for r in rows if r.get("ok")]
     bad = [r for r in rows if not r.get("ok")]
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    ts = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
 
     lines = [
         f"Routine Health — {ts}",
@@ -127,7 +127,6 @@ def format_summary(rows: list[dict], actions: list[dict]) -> str:
             lines.append(f"  {result} {a['name']}")
 
     # Freshness block
-    import time as _t
 
     fresh_rows = []
     for r in rows:

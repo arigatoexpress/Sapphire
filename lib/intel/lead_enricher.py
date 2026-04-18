@@ -22,14 +22,10 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 import time
-import urllib.error
-import urllib.parse
-import urllib.request
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -281,7 +277,7 @@ def enrich_lead(lead: dict[str, Any]) -> EnrichedLead:
         original=lead,
         grade=grade,
         score=round(score, 3),
-        enriched_at=datetime.now(timezone.utc).isoformat(),
+        enriched_at=datetime.now(UTC).isoformat(),
     )
 
     try:
@@ -356,7 +352,7 @@ def enrich_pipeline(pipeline_path: Path, grade_filter: str = "A") -> dict[str, A
         enriched.append(asdict(en))
 
     doc["enriched_leads"] = enriched
-    doc["enriched_at"] = datetime.now(timezone.utc).isoformat()
+    doc["enriched_at"] = datetime.now(UTC).isoformat()
     doc["enrichment_threshold"] = threshold
 
     try:

@@ -94,7 +94,7 @@ class NewsFetcher:
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
         merged: list[NewsItem] = []
-        for source, result in zip(sources, results):
+        for source, result in zip(sources, results, strict=False):
             if isinstance(result, Exception):
                 logger.warning("failed source %s: %s", source.key, result)
                 continue

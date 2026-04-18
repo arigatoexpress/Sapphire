@@ -110,10 +110,10 @@ class AIErrorRecoveryAgent:
         # Track error frequency
         self._error_counts[error_type] = self._error_counts.get(error_type, 0) + 1
 
-        # 2. Get context info
-        platform = context.get("platform", "unknown")
-        symbol = context.get("symbol", "unknown")
-        attempt = context.get("attempt", 0)
+        # 2. Get context info (available for handlers/logging)
+        _platform = context.get("platform", "unknown")
+        _symbol = context.get("symbol", "unknown")
+        _attempt = context.get("attempt", 0)
 
         # 3. Apply specific handler if available
         handler = self._recovery_handlers.get(error_type)
@@ -142,8 +142,6 @@ class AIErrorRecoveryAgent:
 
     def _classify_error(self, error_message: str) -> tuple:
         """Classify error based on pattern matching."""
-        error_lower = error_message.lower()
-
         for pattern, error_type, action, confidence in self.ERROR_PATTERNS:
             if re.search(pattern, error_message, re.IGNORECASE):
                 return (error_type, action, confidence)

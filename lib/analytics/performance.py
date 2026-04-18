@@ -21,7 +21,7 @@ import json
 import logging
 import math
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -95,11 +95,11 @@ def _load_trades() -> list[dict[str, Any]]:
     def _ts_key(t: dict) -> datetime:
         raw = t.get("timestamp") or ""
         if not raw:
-            return datetime.min.replace(tzinfo=timezone.utc)
+            return datetime.min.replace(tzinfo=UTC)
         try:
             return datetime.fromisoformat(raw.replace("Z", "+00:00"))
         except ValueError:
-            return datetime.min.replace(tzinfo=timezone.utc)
+            return datetime.min.replace(tzinfo=UTC)
 
     trades.sort(key=_ts_key)
     return trades
@@ -286,7 +286,7 @@ def compute_performance(bankroll: float = 10_000.0) -> dict[str, Any]:
         })
 
     return {
-        "run_at": datetime.now(timezone.utc).isoformat(),
+        "run_at": datetime.now(UTC).isoformat(),
         "trades": len(trades),
         "bankroll": bankroll,
         "final_equity": equity,
@@ -314,11 +314,11 @@ DEFAULT_BACKTEST_FILE = Path("data/backtests/latest.json")
 
 
 def build_performance_report(
-    backtest_path: "Path | None" = None,
+    backtest_path: Path | None = None,
     *,
     primary_symbol: str = "BTC-USD",
     rolling_window: int = 30,
-) -> "dict[str, Any]":
+) -> dict[str, Any]:
     """Build the /analytics-page payload from a backtest latest.json.
 
     Falls back to live paper-trading data via compute_performance if no
@@ -354,7 +354,7 @@ def build_performance_report(
                 all_trades.append(t)
 
     return {
-        "run_at": datetime.now(timezone.utc).isoformat(),
+        "run_at": datetime.now(UTC).isoformat(),
         "primary_symbol": primary_symbol,
         "equity_curve": [{"timestamp": d, "equity_usd": v} for d, v in equity],
         "benchmark_curve": [{"timestamp": d, "equity_usd": v} for d, v in bench],

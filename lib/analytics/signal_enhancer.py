@@ -55,6 +55,12 @@ class EnhancedSignal:
     # Decorrelation context
     decorrelation_pairs: list[str] = field(default_factory=list)
 
+    # ADX regime filter (populated when OHLC bars are supplied to enhance())
+    adx_value: float | None = None
+    adx_regime: str | None = None  # trending | ranging | transition | unknown
+    plus_di: float | None = None
+    minus_di: float | None = None
+
     # Full market context at the moment the signal landed — captured so the
     # signal JSONL has enough context to replay / backtest without having to
     # reconstruct state from timestamp.
@@ -62,6 +68,13 @@ class EnhancedSignal:
     fear_greed: int | None = None
     kronos_direction: str | None = None
     kronos_confidence: float | None = None
+
+    # GMM regime (complementary to chain intelligence — ML-derived)
+    gmm_regime: str | None = None          # trend | mean_reverting | crisis | unknown
+    gmm_regime_prob: float | None = None   # probability of the current GMM state
+
+    # VPIN flow toxicity
+    vpin: float | None = None              # 0–1; > 0.7 = high informed-trading risk
 
 
 # ---------------------------------------------------------------------------
@@ -165,6 +178,28 @@ class SignalEnhancer:
                 log.debug("market intelligence unavailable: %s", e)
                 state["market_intel"] = {}
 
+            # GMM regime detection (sklearn-based, complements chain intelligence)
+            try:
+                from lib.analytics.regime import get_detector
+                detector = get_detector(n_components=3)
+                if detector is not None:
+                    pred = detector.get_regime("BTC-USD", days=90)
+                    if pred is not None:
+                        state["gmm_regime"] = pred.state
+                        state["gmm_regime_prob"] = pred.prob
+                        state["gmm_crisis_prob"] = pred.crisis_prob or 0.0
+                        state["gmm_trend_prob"] = pred.trend_prob
+            except Exception as e:
+                log.debug("GMM regime unavailable: %s", e)
+
+            # VPIN flow toxicity for BTC (market proxy — cached separately per symbol)
+            try:
+                from lib.analytics.vpin import get_vpin_cache
+                vpin_reading = get_vpin_cache().get("BTC")
+                state["btc_vpin"] = vpin_reading
+            except Exception as e:
+                log.debug("VPIN unavailable: %s", e)
+
             # Kronos predictions (latest per-symbol direction + confidence)
             try:
                 import json
@@ -200,8 +235,33 @@ class SignalEnhancer:
 
     # ------------------------------------------------------------------
 
-    def enhance(self, symbol: str, action: str, confidence: float) -> EnhancedSignal:
-        """Apply regime/funding/correlation adjustments to a raw signal."""
+    # ADX thresholds (Wilder convention)
+    ADX_TRENDING_MIN = 25.0
+    ADX_RANGING_MAX = 20.0
+    ADX_TRANSITION_PENALTY = 0.85   # 15% reduction in transition zone
+    ADX_TREND_BOOST = 1.10          # 10% boost when trend + direction align
+    ADX_MEANREV_PENALTY = 0.80      # 20% penalty for momentum-style longs in ranging regime
+
+    def enhance(
+        self,
+        symbol: str,
+        action: str,
+        confidence: float,
+        *,
+        bars: dict | None = None,
+    ) -> EnhancedSignal:
+        """Apply regime/funding/correlation/ADX adjustments to a raw signal.
+
+        Parameters
+        ----------
+        symbol, action, confidence
+            The raw signal.
+        bars
+            Optional OHLC data for ADX computation:
+            ``{"highs": [...], "lows": [...], "closes": [...]}``.
+            When omitted, ADX filtering is skipped (adx_regime = "unknown").
+            Needs at least 2 * period + 1 bars (29 with the default period of 14).
+        """
         symbol = str(symbol).upper()
         action_lower = str(action).lower()
         direction = self._direction(action_lower)
@@ -325,6 +385,114 @@ class SignalEnhancer:
             flags.append("extreme_positioning")
             reasons.append(f"{symbol} funding velocity shows extreme one-sided positioning")
 
+        # --- GMM regime (ML-derived, complements chain intelligence) ---------
+        gmm_state = state.get("gmm_regime")
+        gmm_prob = state.get("gmm_regime_prob", 0.0) or 0.0
+        gmm_crisis_prob = state.get("gmm_crisis_prob", 0.0) or 0.0
+        if gmm_state == "crisis" and gmm_prob >= 0.50:
+            # Crisis regime: reduce confidence for longs; reinforce shorts
+            if direction == "long":
+                adjusted *= 0.88
+                flags.append("gmm_crisis_regime")
+                reasons.append(
+                    f"GMM detects crisis regime (prob {gmm_prob:.0%}) — penalising long"
+                )
+            elif direction == "short" and "regime_contradiction" not in flags:
+                adjusted *= 1.03
+                reasons.append(f"GMM crisis regime (prob {gmm_prob:.0%}) aligns with short")
+        elif gmm_state == "mean_reverting" and gmm_prob >= 0.55:
+            # In mean-reverting regime, momentum signals carry less weight
+            reasons.append(
+                f"GMM: mean-reverting regime (prob {gmm_prob:.0%}, trend prob "
+                f"{state.get('gmm_trend_prob', 0.0):.0%})"
+            )
+        elif gmm_crisis_prob >= 0.35 and direction == "long":
+            # Rising crisis probability — warn even if not dominant state
+            flags.append("gmm_crisis_elevated")
+            reasons.append(f"GMM crisis component elevated ({gmm_crisis_prob:.0%})")
+
+        # --- VPIN flow toxicity (informed-trading risk) ----------------------
+        btc_vpin = state.get("btc_vpin")
+        vpin_score: float | None = None
+        if btc_vpin is not None:
+            vpin_score = btc_vpin.score
+            if btc_vpin.flag == "extreme_flow_toxicity":
+                adjusted *= 0.85
+                flags.append("extreme_flow_toxicity")
+                reasons.append(
+                    f"VPIN={vpin_score:.2f} (extreme) — informed traders dominate; "
+                    "widening spreads, elevated slippage risk"
+                )
+            elif btc_vpin.flag == "high_flow_toxicity":
+                adjusted *= 0.90
+                flags.append("high_flow_toxicity")
+                reasons.append(
+                    f"VPIN={vpin_score:.2f} (high) — flow toxicity elevated; "
+                    "reduce leverage or widen stops"
+                )
+            elif btc_vpin.toxicity == "moderate":
+                reasons.append(f"VPIN={vpin_score:.2f} (moderate flow toxicity)")
+
+        # --- ADX regime filter --------------------------------------------
+        # Only applied when the caller supplies OHLC bars. The filter is
+        # direction-aware: a +DI > -DI trend reinforces longs and penalises
+        # shorts (and vice versa). A ranging regime penalises momentum
+        # signals; the transition zone shaves 15% as a small tax on
+        # ambiguous conditions.
+        adx_value: float | None = None
+        adx_regime: str | None = None
+        plus_di_val: float | None = None
+        minus_di_val: float | None = None
+        if bars:
+            try:
+                from lib.analytics.indicators import classify_adx_regime, compute_adx
+                highs = bars.get("highs") or bars.get("high") or []
+                lows = bars.get("lows") or bars.get("low") or []
+                closes = bars.get("closes") or bars.get("close") or []
+                res = compute_adx(list(highs), list(lows), list(closes))
+                if res is not None:
+                    adx_value = res["adx"]
+                    plus_di_val = res["plus_di"]
+                    minus_di_val = res["minus_di"]
+                    adx_regime = classify_adx_regime(adx_value)
+
+                    di_bull = plus_di_val > minus_di_val
+                    if adx_regime == "trending":
+                        if direction == "long" and di_bull:
+                            adjusted *= self.ADX_TREND_BOOST
+                            reasons.append(
+                                f"ADX {adx_value:.1f} trending (+DI>{minus_di_val:.1f}) — long reinforced ×{self.ADX_TREND_BOOST}"
+                            )
+                        elif direction == "short" and not di_bull:
+                            adjusted *= self.ADX_TREND_BOOST
+                            reasons.append(
+                                f"ADX {adx_value:.1f} trending (-DI>{plus_di_val:.1f}) — short reinforced ×{self.ADX_TREND_BOOST}"
+                            )
+                        elif direction in {"long", "short"}:
+                            # Trending *against* the signal direction
+                            adjusted *= self.REGIME_PENALTY
+                            flags.append("adx_trend_contradiction")
+                            reasons.append(
+                                f"ADX {adx_value:.1f} trending against {direction} (+DI {plus_di_val:.1f} / -DI {minus_di_val:.1f})"
+                            )
+                    elif adx_regime == "ranging":
+                        # In a ranging regime, momentum-style entries (long/short)
+                        # are penalised — mean-reversion setups fare better.
+                        if direction in {"long", "short"}:
+                            adjusted *= self.ADX_MEANREV_PENALTY
+                            flags.append("adx_ranging")
+                            reasons.append(
+                                f"ADX {adx_value:.1f} ranging — momentum {direction} penalised ×{self.ADX_MEANREV_PENALTY}"
+                            )
+                    elif adx_regime == "transition":
+                        adjusted *= self.ADX_TRANSITION_PENALTY
+                        flags.append("adx_transition")
+                        reasons.append(
+                            f"ADX {adx_value:.1f} in transition zone — confidence ×{self.ADX_TRANSITION_PENALTY}"
+                        )
+            except Exception as e:
+                log.debug("ADX computation failed: %s", e)
+
         # Clamp
         adjusted = max(self.MIN_CONFIDENCE, min(self.MAX_CONFIDENCE, adjusted))
 
@@ -342,10 +510,18 @@ class SignalEnhancer:
             funding_rate=round(funding_rate, 6) if funding_rate is not None else None,
             funding_flag=funding_flag,
             decorrelation_pairs=decorr_pairs,
+            adx_value=round(adx_value, 3) if adx_value is not None else None,
+            adx_regime=adx_regime,
+            plus_di=round(plus_di_val, 3) if plus_di_val is not None else None,
+            minus_di=round(minus_di_val, 3) if minus_di_val is not None else None,
             btc_spy_correlation=state.get("btc_spy_correlation"),
             fear_greed=state.get("fear_greed"),
             kronos_direction=kronos_dir,
             kronos_confidence=round(kronos_conf, 3) if kronos_conf is not None else None,
+            gmm_regime=state.get("gmm_regime"),
+            gmm_regime_prob=round(float(state["gmm_regime_prob"]), 3)
+                if state.get("gmm_regime_prob") is not None else None,
+            vpin=round(vpin_score, 4) if vpin_score is not None else None,
         )
 
     # ------------------------------------------------------------------

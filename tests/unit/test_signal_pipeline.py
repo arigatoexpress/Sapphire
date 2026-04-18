@@ -121,7 +121,7 @@ class TestScoring:
 class TestAuditTrail:
     def test_writes_jsonl_record(self, pipeline):
         pl, sig_dir = pipeline
-        result = pl.process(_raw())
+        pl.process(_raw())
         # Should have written a .jsonl file
         files = list(sig_dir.glob("*.jsonl"))
         assert len(files) == 1

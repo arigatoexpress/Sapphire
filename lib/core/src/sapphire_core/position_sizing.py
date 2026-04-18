@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 # ---------------------------------------------------------------------------
 # Configuration — every parameter is env-overridable
@@ -81,13 +81,13 @@ DEFAULT_CONFIG = SizingConfig()
 # Enums
 # ---------------------------------------------------------------------------
 
-class SizingMethod(str, Enum):
+class SizingMethod(StrEnum):
     KELLY = "kelly"
     VOLATILITY = "volatility"
     FIXED_PCT = "fixed_pct"
 
 
-class MarketRegime(str, Enum):
+class MarketRegime(StrEnum):
     TRENDING_UP = "trending_up"
     TRENDING_DOWN = "trending_down"
     VOLATILE = "volatile"

@@ -7,11 +7,11 @@ for inter-service communication via Pub/Sub and Firestore storage.
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class TradeSide(str, Enum):
+class TradeSide(StrEnum):
     """Trade direction."""
 
     BUY = "BUY"
@@ -20,7 +20,7 @@ class TradeSide(str, Enum):
     SHORT = "SHORT"
 
 
-class SignalType(str, Enum):
+class SignalType(StrEnum):
     """Types of trading signals."""
 
     ENTRY = "entry"
@@ -31,7 +31,7 @@ class SignalType(str, Enum):
     TAKE_PROFIT = "take_profit"
 
 
-class Platform(str, Enum):
+class Platform(StrEnum):
     """Supported trading platforms."""
 
     ASTER = "aster"

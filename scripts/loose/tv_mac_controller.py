@@ -266,7 +266,7 @@ async def main():
         await controller.login()
         
         # Start API
-        api = await start_api(controller, port=8082)
+        await start_api(controller, port=8082)
         
         logger.info("")
         logger.info("✅ TradingView Mac Controller is RUNNING")

@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class OrderSide(str, Enum):
+class OrderSide(StrEnum):
     BUY = "BUY"
     SELL = "SELL"
 
 
-class OrderType(str, Enum):
+class OrderType(StrEnum):
     LIMIT = "LIMIT"
     MARKET = "MARKET"
     STOP = "STOP"
@@ -20,7 +20,7 @@ class OrderType(str, Enum):
     TRAILING_STOP_MARKET = "TRAILING_STOP_MARKET"
 
 
-class OrderStatus(str, Enum):
+class OrderStatus(StrEnum):
     NEW = "NEW"
     PARTIALLY_FILLED = "PARTIALLY_FILLED"
     FILLED = "FILLED"
@@ -31,35 +31,35 @@ class OrderStatus(str, Enum):
     EXPIRED_IN_MATCH = "EXPIRED_IN_MATCH"
 
 
-class PositionSide(str, Enum):
+class PositionSide(StrEnum):
     BOTH = "BOTH"
     LONG = "LONG"
     SHORT = "SHORT"
 
 
-class TimeInForce(str, Enum):
+class TimeInForce(StrEnum):
     GTC = "GTC"  # Good Till Cancel
     IOC = "IOC"  # Immediate or Cancel
     FOK = "FOK"  # Fill or Kill
     GTX = "GTX"  # Good Till Crossing (Post Only)
 
 
-class WorkingType(str, Enum):
+class WorkingType(StrEnum):
     MARK_PRICE = "MARK_PRICE"
     CONTRACT_PRICE = "CONTRACT_PRICE"
 
 
-class MarginType(str, Enum):
+class MarginType(StrEnum):
     ISOLATED = "ISOLATED"
     CROSSED = "CROSSED"
 
 
-class ResponseType(str, Enum):
+class ResponseType(StrEnum):
     ACK = "ACK"
     RESULT = "RESULT"
 
 
-class SignalType(str, Enum):
+class SignalType(StrEnum):
     LONG = "long"
     SHORT = "short"
     HOLD = "hold"

@@ -183,10 +183,7 @@ def calculate_correlation(symbol_a: str, symbol_b: str, days: int = 30) -> Corre
     std_a = (sum((r - mean_a) ** 2 for r in returns_a) / n) ** 0.5
     std_b = (sum((r - mean_b) ** 2 for r in returns_b) / n) ** 0.5
 
-    if std_a == 0 or std_b == 0:
-        corr = 0
-    else:
-        corr = cov / (std_a * std_b)
+    corr = 0 if std_a == 0 or std_b == 0 else cov / (std_a * std_b)
 
     corr = max(-1, min(1, corr))
 

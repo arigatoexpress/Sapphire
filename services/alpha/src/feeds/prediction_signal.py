@@ -6,23 +6,28 @@ Core data structures for prediction market intelligence:
 - PredictionMarketFeed: async base class for platform-specific feeds
 """
 
+from __future__ import annotations
+
 import asyncio
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from enum import Enum
-from typing import Any
+from enum import StrEnum
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import aiohttp
 
 from loguru import logger
 
 
-class PredictionSource(str, Enum):
+class PredictionSource(StrEnum):
     POLYMARKET = "polymarket"
     KALSHI = "kalshi"
 
 
-class SignalRelevance(str, Enum):
+class SignalRelevance(StrEnum):
     """How relevant a prediction market is to crypto trading."""
     DIRECT = "direct"        # Directly about crypto prices (e.g., "BTC > $100K")
     MACRO = "macro"          # Macro events affecting crypto (Fed, CPI, jobs)
@@ -248,11 +253,11 @@ class PredictionMarketFeed(ABC):
         self._last_error_ts = 0.0
 
     @abstractmethod
-    async def _fetch_markets(self, session: "aiohttp.ClientSession") -> list[PredictionSignal]:
+    async def _fetch_markets(self, session: aiohttp.ClientSession) -> list[PredictionSignal]:
         """Fetch current prediction market data. Implement per platform."""
         ...
 
-    async def start(self, session: "aiohttp.ClientSession") -> None:
+    async def start(self, session: aiohttp.ClientSession) -> None:
         """Start the polling loop."""
         self.running = True
         logger.info(f"🔮 {self.source.value} prediction feed starting (interval={self.poll_interval}s)")

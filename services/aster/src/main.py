@@ -1158,12 +1158,11 @@ class AsterBot:
                 symbol = pos_data.get("symbol")
                 qty = float(pos_data.get("positionAmt", 0))
 
-                if qty != 0 and symbol:
-                    if symbol in self.positions:
-                        self.positions[symbol].current_price = float(pos_data.get("markPrice", 0))
-                        self.positions[symbol].unrealized_pnl = float(
-                            pos_data.get("unrealizedProfit", 0)
-                        )
+                if qty != 0 and symbol and symbol in self.positions:
+                    self.positions[symbol].current_price = float(pos_data.get("markPrice", 0))
+                    self.positions[symbol].unrealized_pnl = float(
+                        pos_data.get("unrealizedProfit", 0)
+                    )
 
         except Exception as e:
             logger.error(f"Position check error: {e}")

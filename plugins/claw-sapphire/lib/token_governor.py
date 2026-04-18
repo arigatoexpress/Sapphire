@@ -142,7 +142,7 @@ def format_report() -> str:
     s = status()
     lines = [f"📊 *Token Budget — {_today()}*\n"]
 
-    for tier, info in s.items():
+    for _tier, info in s.items():
         if info["budget"] == "unlimited":
             lines.append(
                 f"🟢 *{info['label']}*\n"

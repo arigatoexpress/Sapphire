@@ -1426,7 +1426,7 @@ class ControlPlaneStore:
                     "title_changed": title is not None,
                     "priority_changed": priority is not None,
                     "required_capabilities_changed": required_capabilities is not None,
-                    "payload_merge_keys": sorted([str(key) for key in (payload_merge or {}).keys()]),
+                    "payload_merge_keys": sorted([str(key) for key in (payload_merge or {})]),
                     "note_added": bool(note_text),
                 },
             )

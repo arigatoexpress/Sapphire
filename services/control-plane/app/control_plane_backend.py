@@ -117,7 +117,7 @@ class _PgCursorCompat:
         keys_attr = getattr(row, "keys", None)
         if callable(keys_attr):
             try:
-                return {str(key): row[key] for key in row.keys()}
+                return {str(key): row[key] for key in row}
             except Exception:
                 return row
         return row
@@ -439,7 +439,8 @@ class PostgresControlPlaneBackendAdapter:
             except Exception:
                 pass
             raw = driver.connect(**kwargs)
-            cursor_factory = lambda conn: conn.cursor()
+            def cursor_factory(conn):
+                return conn.cursor()
             return raw, cursor_factory
 
         if driver_name == "psycopg2":
@@ -469,9 +470,11 @@ class PostgresControlPlaneBackendAdapter:
             try:
                 import psycopg2.extras  # type: ignore
 
-                cursor_factory = lambda conn: conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+                def cursor_factory(conn):
+                    return conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             except Exception:
-                cursor_factory = lambda conn: conn.cursor()
+                def cursor_factory(conn):
+                    return conn.cursor()
             return raw, cursor_factory
 
         raise RuntimeError("Unsupported PostgreSQL driver")

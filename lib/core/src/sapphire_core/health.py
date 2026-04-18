@@ -6,6 +6,7 @@ Mutating endpoints are gated by the SAPPHIRE_CONTROL_API_TOKEN header.
 """
 
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -204,10 +205,8 @@ async def _stop_ws_push(app: web.Application) -> None:
     task = app.get("_ws_push_task")
     if task and not task.done():
         task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await task
-        except asyncio.CancelledError:
-            pass
 
 
 # ---------------------------------------------------------------------------

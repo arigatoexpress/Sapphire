@@ -280,7 +280,7 @@ async def main():
     healer = AutoHealSystem()
     
     # Start API
-    api = await start_heal_api(healer, port=8089)
+    await start_heal_api(healer, port=8089)
     
     logger.info("")
     logger.info("═══════════════════════════════════════════════════════════")
